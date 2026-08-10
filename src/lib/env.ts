@@ -94,6 +94,49 @@ export const env = {
   get maxAttempts(): number {
     return Math.max(1, integer('SCHEDULER_MAX_ATTEMPTS', 5));
   },
+  // --- Email (Resend) ---
+  get resendApiKey(): string | null {
+    return process.env.RESEND_API_KEY || null;
+  },
+  get emailFrom(): string {
+    return optional('EMAIL_FROM', 'MS Social Pilot <onboarding@resend.dev>');
+  },
+
+  // --- AI (Claude) ---
+  get anthropicApiKey(): string | null {
+    return process.env.ANTHROPIC_API_KEY || null;
+  },
+  get aiModel(): string {
+    return optional('AI_MODEL', 'claude-sonnet-5');
+  },
+  get aiRateLimitPerHour(): number {
+    return Math.max(1, integer('AI_RATE_LIMIT_PER_HOUR', 100));
+  },
+
+  // --- Link shortener ---
+  /** Bare host, e.g. "go.example.com". Blank means links live under APP_URL. */
+  get shortenerDomain(): string | null {
+    const value = process.env.SHORTENER_DOMAIN;
+    return value ? value.replace(/^https?:\/\//, '').replace(/\/+$/, '') : null;
+  },
+  get shortLinkBase(): string {
+    return env.shortenerDomain ? `https://${env.shortenerDomain}` : env.appUrl;
+  },
+
+  // --- Worker job intervals ---
+  get rssPollMinutes(): number {
+    return Math.max(1, integer('RSS_POLL_MINUTES', 15));
+  },
+  get evergreenCheckMinutes(): number {
+    return Math.max(1, integer('EVERGREEN_CHECK_MINUTES', 60));
+  },
+  get tokenExpiryCheckHours(): number {
+    return Math.max(1, integer('TOKEN_EXPIRY_CHECK_HOURS', 24));
+  },
+  get analyticsRefreshHours(): number {
+    return Math.max(1, integer('ANALYTICS_REFRESH_HOURS', 6));
+  },
+
   get cronSecret(): string | null {
     const value = process.env.CRON_SECRET;
     return value ? value : null;

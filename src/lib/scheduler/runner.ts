@@ -8,6 +8,7 @@ import { resolveMediaForPublish } from '../media';
 import { asGraphError, GraphError } from '../facebook/graph';
 import { publishPost } from '../facebook/publish';
 import { decideRetry } from './backoff';
+import { notifyConnectionExpired, notifyPublishFailure } from '../email/notify';
 import {
   PUBLISHABLE_APPROVAL_STATUSES,
   TERMINAL_TARGET_STATUSES,
@@ -203,11 +204,29 @@ async function publishClaimed(
     });
 
     // A dead token affects every destination on the account, so flag it once
-    // here rather than letting each scheduled post rediscover it.
+    // here rather than letting each scheduled post rediscover it — and tell
+    // someone, since otherwise this is only noticed when a client asks why
+    // nothing has posted.
     if (graphError.invalidatesToken && target.socialAccountId && !target.socialAccount?.invalidatedAt) {
       await prisma.socialAccount.update({
         where: { id: target.socialAccountId },
         data: { invalidatedAt: options.now, invalidReason: graphError.displayMessage },
+      });
+      await notifyConnectionExpired({
+        workspaceId: post.workspaceId,
+        accountName: target.socialAccount?.name ?? target.name,
+      });
+    }
+
+    // Only alert once the post has actually given up. Emailing on every
+    // interim retry would train people to ignore these.
+    if (!decision.shouldRetry) {
+      await notifyPublishFailure({
+        workspaceId: post.workspaceId,
+        targetName: target.name,
+        reason: graphError.displayMessage,
+        scheduledAt: post.scheduledAt,
+        postId: post.id,
       });
     }
 

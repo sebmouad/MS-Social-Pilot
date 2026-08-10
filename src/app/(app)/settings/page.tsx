@@ -1,3 +1,4 @@
+import { SettingsNav } from '@/components/SettingsNav';
 import { SettingsClient } from '@/components/SettingsClient';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -58,6 +59,8 @@ export default async function SettingsPage() {
         <h1 className="text-xl font-semibold text-slate-900">Settings</h1>
         <p className="mt-1 text-sm text-slate-600">Workspace, publishing queue and bulk scheduling.</p>
       </header>
+
+      <SettingsNav />
 
       <SettingsClient
         workspaceName={auth.workspace.name}

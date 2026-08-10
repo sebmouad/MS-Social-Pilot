@@ -355,7 +355,11 @@
     "connectionNeedsRenewal": "The Facebook connection for this destination needs to be renewed.",
     "awaitingApproval": "This post is waiting for approval and cannot be published yet.",
     "aiRateLimited": "You have reached the AI usage limit for this hour. Try again shortly.",
-    "aiNotConfigured": "AI assistance is not configured on this server."
+    "aiNotConfigured": "AI assistance is not configured on this server.",
+    "alreadyMember": "That person is already a member of this workspace.",
+    "lastOwner": "A workspace must keep at least one owner.",
+    "cannotApproveOwn": "You cannot approve your own post.",
+    "notPending": "That post is not awaiting approval."
   },
   "email": {
     "invitation": {

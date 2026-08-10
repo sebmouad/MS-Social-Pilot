@@ -37,7 +37,12 @@ export const POST = route(async (request: Request) => {
 
     try {
       const created = await createPost(
-        { workspaceId: auth.workspace.id, userId: auth.user.id },
+            {
+          workspaceId: auth.workspace.id,
+          userId: auth.user.id,
+          role: auth.role,
+          requiresApproval: auth.workspace.requiresApproval,
+        },
         {
           message: row.message,
           link: row.link ? row.link : null,

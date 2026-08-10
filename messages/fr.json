@@ -355,7 +355,11 @@
     "connectionNeedsRenewal": "La connexion Facebook de cette destination doit être renouvelée.",
     "awaitingApproval": "Cette publication attend une validation et ne peut pas encore être publiée.",
     "aiRateLimited": "Vous avez atteint la limite d'utilisation de l'IA pour cette heure. Réessayez bientôt.",
-    "aiNotConfigured": "L'assistance IA n'est pas configurée sur ce serveur."
+    "aiNotConfigured": "L'assistance IA n'est pas configurée sur ce serveur.",
+    "alreadyMember": "Cette personne est déjà membre de cet espace de travail.",
+    "lastOwner": "Un espace de travail doit conserver au moins un propriétaire.",
+    "cannotApproveOwn": "Vous ne pouvez pas valider votre propre publication.",
+    "notPending": "Cette publication n'est pas en attente de validation."
   },
   "email": {
     "invitation": {

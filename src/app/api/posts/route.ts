@@ -63,7 +63,12 @@ export const POST = route(async (request: Request) => {
   const input = createPostSchema.parse(await readJson(request));
 
   const result = await createPost(
-    { workspaceId: auth.workspace.id, userId: auth.user.id },
+        {
+          workspaceId: auth.workspace.id,
+          userId: auth.user.id,
+          role: auth.role,
+          requiresApproval: auth.workspace.requiresApproval,
+        },
     input,
   );
   return ok(result, 201);

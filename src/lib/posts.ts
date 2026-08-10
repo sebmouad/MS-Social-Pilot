@@ -17,6 +17,9 @@ import { errors } from './errors';
 import { logActivity, publishNow, refreshPostStatus } from './scheduler/runner';
 import type { CreatePostInput, UpdatePostInput } from './validation';
 import type { PublishMode, TargetType } from './constants';
+import { initialApprovalStatus } from './approvals';
+import { notifyApprovalRequest } from './email/notify';
+import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
 
 /**
  * Post lifecycle: composing, scheduling, editing and cancelling.
@@ -110,12 +113,21 @@ export interface CreatePostResult {
 }
 
 export async function createPost(
-  context: { workspaceId: string; userId: string },
+  context: { workspaceId: string; userId: string; role: WorkspaceRole; requiresApproval: boolean },
   input: CreatePostInput,
   now: Date = new Date(),
 ): Promise<CreatePostResult> {
   const targets = await loadTargets(context.workspaceId, input.targetIds);
   const schedule = await resolveSchedule(context.workspaceId, input, now);
+
+  // Decided once, here, and stored on the row: recomputing it later from
+  // settings that may since have changed would let a post slip through.
+  const approvalStatus = initialApprovalStatus({
+    requiresApproval: context.requiresApproval,
+    role: context.role,
+    saveAsDraft: input.saveAsDraft,
+  });
+  const needsApproval = approvalStatus === ApprovalStatus.pending;
 
   // Native scheduling is a Pages-only Graph feature; fall back cleanly rather
   // than letting Graph reject the whole batch.
@@ -137,7 +149,13 @@ export async function createPost(
     }
   }
 
-  const status = input.saveAsDraft ? 'draft' : schedule.publishMode === 'immediate' ? 'publishing' : 'scheduled';
+  const status: PostStatus = input.saveAsDraft
+    ? PostStatus.draft
+    : needsApproval
+      ? PostStatus.pending_approval
+      : schedule.publishMode === 'immediate'
+        ? PostStatus.publishing
+        : PostStatus.scheduled;
 
   const post = await prisma.post.create({
     data: {
@@ -148,6 +166,9 @@ export async function createPost(
       linkPreview: toJsonOrNull(linkPreview),
       media: toJson(input.media),
       status,
+      approvalStatus,
+      submittedById: needsApproval ? context.userId : null,
+      submittedAt: needsApproval ? now : null,
       publishMode: schedule.publishMode,
       scheduledAt: schedule.scheduledAt,
       timezone: schedule.timezone,
@@ -166,7 +187,19 @@ export async function createPost(
   }, context.userId);
 
   if (input.saveAsDraft) {
-    return { postId: post.id, status: 'draft', scheduledAt: null, results: [] };
+    return { postId: post.id, status: PostStatus.draft, scheduledAt: null, results: [] };
+  }
+
+  // Held for review: no publishing of any kind happens now, including
+  // "publish immediately", which is exactly what approval is for.
+  if (needsApproval) {
+    const author = await prisma.user.findUniqueOrThrow({ where: { id: context.userId } });
+    await notifyApprovalRequest({
+      workspaceId: context.workspaceId,
+      authorName: author.name,
+      scheduledAt: schedule.scheduledAt,
+    });
+    return { postId: post.id, status, scheduledAt: schedule.scheduledAt, results: [] };
   }
 
   if (schedule.publishMode === 'immediate') {
