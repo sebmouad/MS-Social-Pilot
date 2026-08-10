@@ -1,0 +1,276 @@
+// MS Social Pilot — data model.
+//
+// The default datasource is SQLite so the app runs with zero infrastructure.
+// To move to Postgres, change `provider` to "postgresql" and point DATABASE_URL
+// at your server; no model changes are required (see docs/DEPLOYMENT.md).
+//
+// Portability note: enums and native JSON columns are deliberately avoided.
+// Status/type fields are plain strings validated by the unions in
+// src/lib/constants.ts, and structured payloads are stored as JSON text and
+// parsed through src/lib/json.ts. This keeps one schema valid on both engines.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships Membership[]
+  sessions    Session[]
+  posts       Post[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  timezone  String   @default("UTC")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships    Membership[]
+  socialAccounts SocialAccount[]
+  targets        Target[]
+  posts          Post[]
+  media          Media[]
+  queueSlots     QueueSlot[]
+  activityLogs   ActivityLog[]
+
+  @@map("workspaces")
+}
+
+model Membership {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String
+  // "owner" | "admin" | "member" — see WORKSPACE_ROLES.
+  role        String   @default("member")
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+  @@map("memberships")
+}
+
+/// A connected Facebook user. Holds the long-lived *user* access token, which
+/// is what page tokens and group posting are derived from. The token is stored
+/// encrypted (AES-256-GCM) — never in plaintext.
+model SocialAccount {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  // "facebook" today; the column exists so other networks can be added.
+  provider       String    @default("facebook")
+  providerUserId String
+  name           String
+  pictureUrl     String?
+  accessToken    String
+  tokenExpiresAt DateTime?
+  scopes         String    @default("")
+  // Set when Facebook tells us the token died (deauth webhook or a 190 error).
+  invalidatedAt  DateTime?
+  invalidReason  String?
+  lastSyncedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  targets   Target[]
+
+  @@unique([workspaceId, provider, providerUserId])
+  @@index([workspaceId])
+  @@map("social_accounts")
+}
+
+/// A destination we can publish to: a Facebook Page or a Group.
+///
+/// Pages carry their own page access token (derived from the user token and
+/// effectively non-expiring while the user token is valid). Groups have no
+/// per-target token — they publish with the parent account's user token.
+model Target {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  /// Nullable so disconnecting an account can drop the credentials without
+  /// cascading away published-post history (see disconnectAccount).
+  socialAccountId String?
+  // "page" | "group" — see TARGET_TYPES.
+  type            String
+  providerId      String
+  name            String
+  pictureUrl      String?
+  category        String?
+  accessToken     String?
+  // Whether the target is selectable in the composer.
+  enabled         Boolean   @default(true)
+  // Group publishing needs the app installed in the group; we record what the
+  // last sync told us so the UI can explain failures before they happen.
+  canPublish      Boolean   @default(true)
+  publishBlocker  String?
+  lastSyncedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  postTargets   PostTarget[]
+
+  @@unique([workspaceId, providerId])
+  @@index([socialAccountId])
+  @@map("targets")
+}
+
+/// One composed message. Fan-out to destinations lives in PostTarget, so a
+/// single post can succeed on one page and fail on another independently.
+model Post {
+  id          String   @id @default(cuid())
+  workspaceId String
+  authorId    String
+  message     String   @default("")
+  link        String?
+  /// JSON: LinkPreview | null — cached Open Graph metadata for the link.
+  linkPreview String?
+  /// JSON: PostMedia[] — ordered attachments.
+  media       String   @default("[]")
+  // "draft" | "scheduled" | "publishing" | "published" | "partially_failed"
+  // | "failed" | "cancelled" — see POST_STATUSES.
+  status      String   @default("draft")
+  // "immediate" | "worker" | "native" — see PUBLISH_MODES.
+  publishMode String   @default("worker")
+  scheduledAt DateTime?
+  timezone    String   @default("UTC")
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author    User         @relation(fields: [authorId], references: [id])
+  targets   PostTarget[]
+
+  @@index([workspaceId, status])
+  @@index([scheduledAt])
+  @@map("posts")
+}
+
+/// The unit of work the scheduler actually claims and publishes.
+model PostTarget {
+  id       String @id @default(cuid())
+  postId   String
+  targetId String
+  // "pending" | "processing" | "published" | "failed" | "cancelled" | "skipped".
+  status   String @default("pending")
+
+  /// Facebook's id for the created post, e.g. "1234567890_9876543210".
+  remotePostId  String?
+  remoteUrl     String?
+  /// Set when we hand scheduling to Facebook itself (publishMode "native").
+  nativeScheduledFor DateTime?
+
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime?
+  /// Guard against two workers picking up the same row.
+  lockedAt      DateTime?
+  lockedBy      String?
+
+  errorCode    String?
+  errorMessage String?
+  publishedAt  DateTime?
+
+  /// JSON: PostInsights | null — last analytics snapshot.
+  insights         String?
+  insightsSyncedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, targetId])
+  @@index([status, nextAttemptAt])
+  @@index([targetId])
+  @@map("post_targets")
+}
+
+model Media {
+  id          String   @id @default(cuid())
+  workspaceId String
+  filename    String
+  mimeType    String
+  size        Int
+  // "image" | "video".
+  kind        String
+  /// Path on disk relative to MEDIA_DIR, or null for externally hosted media.
+  storageKey  String?
+  /// Public URL. Facebook needs a reachable URL for url-based uploads; local
+  /// files are instead streamed to Graph as multipart binary.
+  url         String
+  width       Int?
+  height      Int?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("media")
+}
+
+/// Recurring publishing times ("queue"), the SocialPilot-style workflow where
+/// you add content to a queue and it fills the next free slot.
+model QueueSlot {
+  id          String   @id @default(cuid())
+  workspaceId String
+  /// 0 = Sunday … 6 = Saturday, in the workspace timezone.
+  dayOfWeek   Int
+  hour        Int
+  minute      Int
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, dayOfWeek, hour, minute])
+  @@index([workspaceId])
+  @@map("queue_slots")
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  actorId     String?
+  action      String
+  /// JSON: arbitrary structured detail.
+  detail      String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@map("activity_logs")
+}
