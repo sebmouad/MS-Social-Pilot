@@ -1,0 +1,62 @@
+# Development and single-host production stack.
+#
+# Three services from one image: the web app, the scheduler worker, and
+# Postgres. The worker is a separate container running the same code with a
+# different command — that separation is why a slow publish never blocks a
+# page load.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-social_pilot}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      # Exposed for local tooling (psql, Prisma Studio). Remove in production.
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-social_pilot}?schema=public
+    ports:
+      - '3000:3000'
+    volumes:
+      - media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Migrations run here rather than in the worker so that two containers
+    # starting together cannot race to apply the same migration.
+    command: sh -c "npx prisma migrate deploy && npm start"
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-social_pilot}?schema=public
+    volumes:
+      # The same media volume: the worker reads uploaded files to publish them.
+      - media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      web:
+        condition: service_started
+    command: npm run worker
+
+volumes:
+  postgres-data:
+  media:

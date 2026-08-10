@@ -1,4 +1,5 @@
-import { canManageAccounts, requireAuth } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
+import { canManageAccounts } from '@/lib/constants';
 import { checkAccountHealth, disconnectAccount } from '@/lib/accounts';
 import { prisma } from '@/lib/prisma';
 import { fail, ok, route } from '@/lib/api';

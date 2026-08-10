@@ -1,15 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
-import path from 'node:path';
+
+import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
  * End-to-end test of the publishing pipeline.
  *
- * A real SQLite database and a stub Graph API, driven through the same
+ * A real Postgres database and a stub Graph API, driven through the same
  * `runSchedulerTick` the worker calls. This is the test that would catch the
  * failures that actually matter in a scheduling product: a post silently not
  * going out, going out twice, or a dead token being retried forever.
@@ -17,7 +15,7 @@ import path from 'node:path';
 
 let server: Server;
 let baseUrl: string;
-let workDir: string;
+let database: TestDatabase;
 
 /** Requests the stub received, for asserting on what we sent Facebook. */
 interface Recorded {
@@ -36,8 +34,6 @@ let prisma: Prisma;
 let runner: Runner;
 
 beforeAll(async () => {
-  workDir = mkdtempSync(path.join(tmpdir(), 'msp-test-'));
-
   // A stub Graph API. It records what it was asked to do and replies with
   // whatever the current test queued up.
   server = createServer((request, response) => {
@@ -59,18 +55,8 @@ beforeAll(async () => {
   if (typeof address === 'string' || address === null) throw new Error('no port');
   baseUrl = `http://127.0.0.1:${address.port}`;
 
-  process.env.DATABASE_URL = `file:${path.join(workDir, 'test.db')}`;
-  process.env.ENCRYPTION_KEY = randomBytes(32).toString('base64');
-  process.env.SESSION_SECRET = 'integration-test-secret';
-  process.env.FACEBOOK_APP_ID = '111';
-  process.env.FACEBOOK_APP_SECRET = 'integration-app-secret';
-  process.env.FACEBOOK_GRAPH_BASE_URL = baseUrl;
-  process.env.SCHEDULER_MAX_ATTEMPTS = '3';
-
-  execFileSync('npx', ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss'], {
-    env: process.env,
-    stdio: 'pipe',
-  });
+  setTestEnv({ FACEBOOK_GRAPH_BASE_URL: baseUrl, SCHEDULER_MAX_ATTEMPTS: '3' });
+  database = setupTestDatabase('scheduler');
 
   // Imported after the environment is set so Prisma picks up DATABASE_URL.
   ({ prisma } = await import('../src/lib/prisma'));
@@ -80,7 +66,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma?.$disconnect();
   await new Promise<void>((resolve) => server.close(() => resolve()));
-  rmSync(workDir, { recursive: true, force: true });
+  database?.drop();
 });
 
 /** Build a workspace with one page, and a post due five minutes ago. */
@@ -88,7 +74,7 @@ async function seedDuePost(options: { message?: string; link?: string } = {}) {
   const { encryptSecret } = await import('../src/lib/crypto');
 
   const workspace = await prisma.workspace.create({
-    data: { name: 'Test workspace', timezone: 'UTC' },
+    data: { name: 'Test workspace', slug: `test-${randomBytes(4).toString('hex')}`, timezone: 'UTC' },
   });
   const user = await prisma.user.create({
     data: {

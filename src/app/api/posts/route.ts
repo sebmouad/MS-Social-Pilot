@@ -4,14 +4,14 @@ import { createPost } from '@/lib/posts';
 import { createPostSchema } from '@/lib/validation';
 import { parseLinkPreview, parseMedia } from '@/lib/json';
 import { ok, readJson, route } from '@/lib/api';
-import { isPostStatus } from '@/lib/constants';
+import { postStatusFilter } from '@/lib/constants';
 
 /** List posts, newest scheduled first. Supports status and date filtering. */
 export const GET = route(async (request: Request) => {
   const auth = await requireAuth();
   const url = new URL(request.url);
 
-  const status = url.searchParams.get('status');
+  const statuses = postStatusFilter(url.searchParams.get('status') ?? undefined);
   const from = url.searchParams.get('from');
   const to = url.searchParams.get('to');
   const limit = Math.min(Number.parseInt(url.searchParams.get('limit') ?? '50', 10) || 50, 200);
@@ -23,7 +23,7 @@ export const GET = route(async (request: Request) => {
   const posts = await prisma.post.findMany({
     where: {
       workspaceId: auth.workspace.id,
-      ...(status && isPostStatus(status) ? { status } : {}),
+      ...(statuses ? { status: { in: statuses } } : {}),
       ...(from || to ? { scheduledAt } : {}),
     },
     include: { targets: { include: { target: true } }, author: { select: { name: true } } },

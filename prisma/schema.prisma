@@ -1,34 +1,126 @@
 // MS Social Pilot — data model.
 //
-// The default datasource is SQLite so the app runs with zero infrastructure.
-// To move to Postgres, change `provider` to "postgresql" and point DATABASE_URL
-// at your server; no model changes are required (see docs/DEPLOYMENT.md).
+// PostgreSQL. Status fields are native enums and structured payloads are native
+// Json, so the database rejects invalid values rather than trusting application
+// code to have validated them.
 //
-// Portability note: enums and native JSON columns are deliberately avoided.
-// Status/type fields are plain strings validated by the unions in
-// src/lib/constants.ts, and structured payloads are stored as JSON text and
-// parsed through src/lib/json.ts. This keeps one schema valid on both engines.
+// See docs/PROJECT_SCHEMA.md for the design this implements.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum WorkspaceRole {
+  owner
+  admin
+  editor
+  contributor
+}
+
+enum TargetType {
+  page
+  group
+}
+
+enum PostStatus {
+  draft
+  pending_approval
+  rejected
+  scheduled
+  publishing
+  published
+  partially_failed
+  failed
+  cancelled
+}
+
+enum PostTargetStatus {
+  pending
+  processing
+  published
+  /// Handed to Facebook with a scheduled_publish_time: it exists remotely but
+  /// is not live yet, and our scheduler must leave it alone.
+  scheduled_remote
+  failed
+  cancelled
+  skipped
+}
+
+enum PublishMode {
+  /// Publish as soon as the request is handled.
+  immediate
+  /// Hold in our database; the worker publishes at scheduledAt.
+  worker
+  /// Hand the schedule to Facebook via scheduled_publish_time (Pages only).
+  native
+}
+
+enum ApprovalStatus {
+  not_required
+  pending
+  approved
+  rejected
+}
+
+enum MediaKind {
+  image
+  video
+}
+
+enum StorageProvider {
+  local
+  s3
+}
+
+enum Locale {
+  en
+  fr
+}
+
+enum EmailStatus {
+  sent
+  failed
+  skipped
+}
+
+enum AiGenerationKind {
+  generate
+  improve
+}
+
+// ---------------------------------------------------------------------------
+// Identity and tenancy
+// ---------------------------------------------------------------------------
 
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String
   passwordHash String
+  locale       Locale   @default(en)
+  /// Which workspace to open on sign-in. Not a security boundary — membership
+  /// is always re-checked — just a convenience.
+  lastActiveWorkspaceId String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships Membership[]
-  sessions    Session[]
-  posts       Post[]
+  memberships       Membership[]
+  sessions          Session[]
+  posts             Post[]
+  submittedPosts    Post[]         @relation("PostSubmitter")
+  reviewedPosts     Post[]         @relation("PostReviewer")
+  sentInvitations   Invitation[]   @relation("InvitationSender")
+  notificationSettings NotificationSetting[]
+  aiGenerations     AiGeneration[]
 
   @@map("users")
 }
@@ -47,31 +139,58 @@ model Session {
   @@map("sessions")
 }
 
+/// One client or brand. An agency has several; a single business has one.
 model Workspace {
-  id        String   @id @default(cuid())
-  name      String
-  timezone  String   @default("UTC")
+  id       String @id @default(cuid())
+  name     String
+  slug     String @unique
+  timezone String @default("UTC")
+  defaultLocale Locale @default(en)
+
+  /// Turns the approval workflow on for this client.
+  requiresApproval Boolean @default(false)
+
+  // Light branding, used on client-facing reports.
+  logoUrl     String?
+  accentColor String?
+
+  // Link tagging defaults, applied at publish time.
+  utmSource           String?
+  utmMedium           String?
+  utmCampaignTemplate String?
+  shortenerEnabled    Boolean @default(false)
+
+  // AI caption defaults, fed into the prompt.
+  aiEnabled    Boolean @default(true)
+  aiTone       String?
+  aiBrandVoice String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships    Membership[]
-  socialAccounts SocialAccount[]
-  targets        Target[]
-  posts          Post[]
-  media          Media[]
-  queueSlots     QueueSlot[]
-  activityLogs   ActivityLog[]
+  memberships          Membership[]
+  socialAccounts       SocialAccount[]
+  targets              Target[]
+  posts                Post[]
+  media                Media[]
+  queueSlots           QueueSlot[]
+  activityLogs         ActivityLog[]
+  invitations          Invitation[]
+  feedSources          FeedSource[]
+  shortLinks           ShortLink[]
+  aiGenerations        AiGeneration[]
+  notificationSettings NotificationSetting[]
+  emailLogs            EmailLog[]
 
   @@map("workspaces")
 }
 
 model Membership {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   userId      String
   workspaceId String
-  // "owner" | "admin" | "member" — see WORKSPACE_ROLES.
-  role        String   @default("member")
-  createdAt   DateTime @default(now())
+  role        WorkspaceRole @default(contributor)
+  createdAt   DateTime      @default(now())
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -81,13 +200,38 @@ model Membership {
   @@map("memberships")
 }
 
+/// A pending invitation to join a workspace. The token is stored hashed, like
+/// sessions, so a database dump cannot be used to join someone's workspace.
+model Invitation {
+  id          String        @id @default(cuid())
+  workspaceId String
+  email       String
+  role        WorkspaceRole @default(contributor)
+  tokenHash   String        @unique
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  acceptedByUserId String?
+  createdAt   DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation("InvitationSender", fields: [invitedById], references: [id])
+
+  // One live invitation per address per workspace; re-inviting updates this row.
+  @@unique([workspaceId, email])
+  @@index([workspaceId])
+  @@map("invitations")
+}
+
+// ---------------------------------------------------------------------------
+// Facebook connections
+// ---------------------------------------------------------------------------
+
 /// A connected Facebook user. Holds the long-lived *user* access token, which
-/// is what page tokens and group posting are derived from. The token is stored
-/// encrypted (AES-256-GCM) — never in plaintext.
+/// is what page tokens and group posting are derived from. Encrypted at rest.
 model SocialAccount {
   id             String    @id @default(cuid())
   workspaceId    String
-  // "facebook" today; the column exists so other networks can be added.
   provider       String    @default("facebook")
   providerUserId String
   name           String
@@ -95,10 +239,12 @@ model SocialAccount {
   accessToken    String
   tokenExpiresAt DateTime?
   scopes         String    @default("")
-  // Set when Facebook tells us the token died (deauth webhook or a 190 error).
   invalidatedAt  DateTime?
   invalidReason  String?
   lastSyncedAt   DateTime?
+  /// Set when an expiry warning has been emailed, so the daily job warns once
+  /// per token rather than every day until it dies.
+  expiryWarningSentAt DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -110,33 +256,25 @@ model SocialAccount {
   @@map("social_accounts")
 }
 
-/// A destination we can publish to: a Facebook Page or a Group.
-///
-/// Pages carry their own page access token (derived from the user token and
-/// effectively non-expiring while the user token is valid). Groups have no
-/// per-target token — they publish with the parent account's user token.
+/// A destination: a Facebook Page or Group.
 model Target {
-  id              String    @id @default(cuid())
-  workspaceId     String
+  id          String @id @default(cuid())
+  workspaceId String
   /// Nullable so disconnecting an account can drop the credentials without
-  /// cascading away published-post history (see disconnectAccount).
+  /// cascading away published-post history.
   socialAccountId String?
-  // "page" | "group" — see TARGET_TYPES.
-  type            String
-  providerId      String
-  name            String
-  pictureUrl      String?
-  category        String?
-  accessToken     String?
-  // Whether the target is selectable in the composer.
-  enabled         Boolean   @default(true)
-  // Group publishing needs the app installed in the group; we record what the
-  // last sync told us so the UI can explain failures before they happen.
-  canPublish      Boolean   @default(true)
-  publishBlocker  String?
-  lastSyncedAt    DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  type        TargetType
+  providerId  String
+  name        String
+  pictureUrl  String?
+  category    String?
+  accessToken String?
+  enabled     Boolean @default(true)
+  canPublish  Boolean @default(true)
+  publishBlocker String?
+  lastSyncedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   socialAccount SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
@@ -147,55 +285,82 @@ model Target {
   @@map("targets")
 }
 
-/// One composed message. Fan-out to destinations lives in PostTarget, so a
-/// single post can succeed on one page and fail on another independently.
+// ---------------------------------------------------------------------------
+// Content
+// ---------------------------------------------------------------------------
+
 model Post {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   workspaceId String
   authorId    String
-  message     String   @default("")
+  message     String  @default("")
   link        String?
-  /// JSON: LinkPreview | null — cached Open Graph metadata for the link.
-  linkPreview String?
-  /// JSON: PostMedia[] — ordered attachments.
-  media       String   @default("[]")
-  // "draft" | "scheduled" | "publishing" | "published" | "partially_failed"
-  // | "failed" | "cancelled" — see POST_STATUSES.
-  status      String   @default("draft")
-  // "immediate" | "worker" | "native" — see PUBLISH_MODES.
-  publishMode String   @default("worker")
+  /// Cached Open Graph metadata for `link`.
+  linkPreview Json?
+  /// Ordered attachments (PostMedia[]).
+  media       Json    @default("[]")
+
+  status      PostStatus  @default(draft)
+  publishMode PublishMode @default(worker)
   scheduledAt DateTime?
-  timezone    String   @default("UTC")
+  timezone    String      @default("UTC")
   publishedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  // --- Approval workflow ---
+  approvalStatus ApprovalStatus @default(not_required)
+  submittedById  String?
+  submittedAt    DateTime?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  reviewNote     String?
+
+  // --- Evergreen recycling ---
+  /// Alternate wordings, rotated between repeats. Facebook rejects identical
+  /// repeated content with error 506, so recycling without variants fails.
+  variants          Json    @default("[]")
+  recycleEnabled    Boolean @default(false)
+  recycleEveryDays  Int?
+  recycleLimit      Int?
+  recycleCount      Int     @default(0)
+  recycleNextAt     DateTime?
+  /// Set on a recycled copy, pointing at the post it was cloned from.
+  originPostId      String?
+
+  /// Set when this post was created from an RSS item.
+  sourceFeedItemId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   author    User         @relation(fields: [authorId], references: [id])
+  submitter User?        @relation("PostSubmitter", fields: [submittedById], references: [id])
+  reviewer  User?        @relation("PostReviewer", fields: [reviewedById], references: [id])
   targets   PostTarget[]
+  shortLinks ShortLink[]
+  feedItem  FeedItem?    @relation(fields: [sourceFeedItemId], references: [id])
 
   @@index([workspaceId, status])
   @@index([scheduledAt])
+  @@index([workspaceId, approvalStatus])
+  @@index([recycleEnabled, recycleNextAt])
   @@map("posts")
 }
 
-/// The unit of work the scheduler actually claims and publishes.
+/// The unit of work the scheduler claims and publishes: one post, one
+/// destination. This is what makes partial success expressible.
 model PostTarget {
-  id       String @id @default(cuid())
+  id       String           @id @default(cuid())
   postId   String
   targetId String
-  // "pending" | "processing" | "published" | "failed" | "cancelled" | "skipped".
-  status   String @default("pending")
+  status   PostTargetStatus @default(pending)
 
-  /// Facebook's id for the created post, e.g. "1234567890_9876543210".
-  remotePostId  String?
-  remoteUrl     String?
-  /// Set when we hand scheduling to Facebook itself (publishMode "native").
+  remotePostId       String?
+  remoteUrl          String?
   nativeScheduledFor DateTime?
 
   attempts      Int       @default(0)
   nextAttemptAt DateTime?
-  /// Guard against two workers picking up the same row.
   lockedAt      DateTime?
   lockedBy      String?
 
@@ -203,8 +368,8 @@ model PostTarget {
   errorMessage String?
   publishedAt  DateTime?
 
-  /// JSON: PostInsights | null — last analytics snapshot.
-  insights         String?
+  /// Last analytics snapshot (PostInsights).
+  insights         Json?
   insightsSyncedAt DateTime?
 
   createdAt DateTime @default(now())
@@ -220,21 +385,20 @@ model PostTarget {
 }
 
 model Media {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   workspaceId String
   filename    String
   mimeType    String
   size        Int
-  // "image" | "video".
-  kind        String
-  /// Path on disk relative to MEDIA_DIR, or null for externally hosted media.
+  kind        MediaKind
+  storageProvider StorageProvider @default(local)
+  /// Path within the storage backend, or null for externally hosted media.
   storageKey  String?
-  /// Public URL. Facebook needs a reachable URL for url-based uploads; local
-  /// files are instead streamed to Graph as multipart binary.
+  checksum    String?
   url         String
   width       Int?
   height      Int?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime        @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
@@ -242,12 +406,11 @@ model Media {
   @@map("media")
 }
 
-/// Recurring publishing times ("queue"), the SocialPilot-style workflow where
-/// you add content to a queue and it fills the next free slot.
+/// Recurring publishing times, in workspace-local terms.
 model QueueSlot {
   id          String   @id @default(cuid())
   workspaceId String
-  /// 0 = Sunday … 6 = Saturday, in the workspace timezone.
+  /// 0 = Sunday … 6 = Saturday.
   dayOfWeek   Int
   hour        Int
   minute      Int
@@ -260,13 +423,168 @@ model QueueSlot {
   @@map("queue_slots")
 }
 
+// ---------------------------------------------------------------------------
+// RSS auto-posting
+// ---------------------------------------------------------------------------
+
+model FeedSource {
+  id          String  @id @default(cuid())
+  workspaceId String
+  name        String
+  url         String
+  enabled     Boolean @default(true)
+  /// Supports {{title}}, {{link}}, {{description}}.
+  messageTemplate String @default("{{title}}\n\n{{link}}")
+  /// Target ids to publish new items to (string[]).
+  targetIds   Json    @default("[]")
+  publishMode PublishMode @default(worker)
+  /// When false, new items land in the approval queue instead of scheduling.
+  autoApprove Boolean @default(true)
+
+  // Conditional-request state, so polling is cheap and polite.
+  lastPolledAt   DateTime?
+  lastEtag       String?
+  lastModified   String?
+  /// Items published before this are ignored — stops a new subscription from
+  /// dumping the feed's whole archive into the queue.
+  ingestFrom     DateTime  @default(now())
+
+  pollErrorCount Int     @default(0)
+  lastError      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items     FeedItem[]
+
+  @@index([workspaceId])
+  @@index([enabled, lastPolledAt])
+  @@map("feed_sources")
+}
+
+model FeedItem {
+  id           String   @id @default(cuid())
+  feedSourceId String
+  /// Feed-provided guid, falling back to the canonical URL.
+  guid         String
+  url          String?
+  title        String?
+  publishedAt  DateTime?
+  createdAt    DateTime @default(now())
+
+  feedSource FeedSource @relation(fields: [feedSourceId], references: [id], onDelete: Cascade)
+  posts      Post[]
+
+  // The de-duplication guard: a feed re-publishing its history cannot re-post.
+  @@unique([feedSourceId, guid])
+  @@index([feedSourceId])
+  @@map("feed_items")
+}
+
+// ---------------------------------------------------------------------------
+// Link shortening
+// ---------------------------------------------------------------------------
+
+model ShortLink {
+  id          String   @id @default(cuid())
+  workspaceId String
+  slug        String   @unique
+  targetUrl   String
+  postId      String?
+  clickCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  post      Post?       @relation(fields: [postId], references: [id], onDelete: SetNull)
+  clicks    LinkClick[]
+
+  @@index([workspaceId])
+  @@index([postId])
+  @@map("short_links")
+}
+
+model LinkClick {
+  id          String   @id @default(cuid())
+  shortLinkId String
+  /// Hashed, never the raw address.
+  ipHash      String?
+  userAgent   String?
+  referer     String?
+  country     String?
+  createdAt   DateTime @default(now())
+
+  shortLink ShortLink @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+
+  @@index([shortLinkId, createdAt])
+  @@map("link_clicks")
+}
+
+// ---------------------------------------------------------------------------
+// AI, notifications, audit
+// ---------------------------------------------------------------------------
+
+/// One AI caption call. Exists so spend is visible rather than a surprise.
+model AiGeneration {
+  id           String           @id @default(cuid())
+  workspaceId  String
+  userId       String
+  kind         AiGenerationKind
+  prompt       String
+  output       String
+  model        String
+  inputTokens  Int              @default(0)
+  outputTokens Int              @default(0)
+  createdAt    DateTime         @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@map("ai_generations")
+}
+
+/// Per user per workspace, so an agency owner is not emailed about every client.
+model NotificationSetting {
+  id          String  @id @default(cuid())
+  userId      String
+  workspaceId String
+
+  onPublishFailure  Boolean @default(true)
+  onTokenExpiry     Boolean @default(true)
+  onApprovalRequest Boolean @default(true)
+  onApprovalDecision Boolean @default(true)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@map("notification_settings")
+}
+
+/// Needed to answer "was the failure alert actually sent?"
+model EmailLog {
+  id          String      @id @default(cuid())
+  workspaceId String?
+  to          String
+  template    String
+  subject     String
+  providerId  String?
+  status      EmailStatus
+  error       String?
+  createdAt   DateTime    @default(now())
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@map("email_logs")
+}
+
 model ActivityLog {
   id          String   @id @default(cuid())
   workspaceId String
   actorId     String?
   action      String
-  /// JSON: arbitrary structured detail.
-  detail      String?
+  detail      Json?
   createdAt   DateTime @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

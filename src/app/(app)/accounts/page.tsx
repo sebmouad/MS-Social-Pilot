@@ -1,5 +1,6 @@
 import { AccountsClient } from '@/components/AccountsClient';
-import { requireAuth, canManageAccounts } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
+import { canManageAccounts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
 

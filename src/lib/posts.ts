@@ -1,6 +1,13 @@
 import { prisma } from './prisma';
 import { decryptSecret } from './crypto';
-import { stringifyJson, parseMedia, type PostMedia, type LinkPreview } from './json';
+import {
+  toJson,
+  toJsonOrNull,
+  parseMedia,
+  parseLinkPreview,
+  type PostMedia,
+  type LinkPreview,
+} from './json';
 import { localInputToUtc, nextAvailableSlot } from './time';
 import { resolveMediaForPublish } from './media';
 import { resolveLinkPreview } from './facebook/opengraph';
@@ -167,8 +174,8 @@ export async function createPost(
       authorId: context.userId,
       message: input.message,
       link: input.link ?? null,
-      linkPreview: linkPreview ? stringifyJson(linkPreview) : null,
-      media: stringifyJson(input.media),
+      linkPreview: toJsonOrNull(linkPreview),
+      media: toJson(input.media),
       status,
       publishMode: schedule.publishMode,
       scheduledAt: schedule.scheduledAt,
@@ -324,21 +331,21 @@ export async function updatePost(
 
   const data: Record<string, unknown> = {};
   if (input.message !== undefined) data.message = input.message;
-  if (input.media !== undefined) data.media = stringifyJson(input.media);
+  if (input.media !== undefined) data.media = toJson(input.media);
   if (input.publishMode !== undefined) data.publishMode = input.publishMode;
   if (input.timezone !== undefined) data.timezone = input.timezone;
 
   if (input.link !== undefined) {
     data.link = input.link ?? null;
-    data.linkPreview = null;
+    data.linkPreview = toJsonOrNull(null);
     if (input.link && input.link !== post.link) {
       try {
-        data.linkPreview = stringifyJson(await resolveLinkPreview(input.link));
+        data.linkPreview = toJson(await resolveLinkPreview(input.link));
       } catch {
         // Preview refresh is best-effort.
       }
     } else if (input.link === post.link) {
-      data.linkPreview = post.linkPreview;
+      data.linkPreview = toJsonOrNull(parseLinkPreview(post.linkPreview));
     }
   }
 
@@ -477,8 +484,8 @@ export async function duplicatePost(
       authorId: context.userId,
       message: post.message,
       link: post.link,
-      linkPreview: post.linkPreview,
-      media: post.media,
+      linkPreview: toJsonOrNull(parseLinkPreview(post.linkPreview)),
+      media: toJson(parseMedia(post.media)),
       status: 'draft',
       publishMode: post.publishMode,
       timezone: post.timezone,

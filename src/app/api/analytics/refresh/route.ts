@@ -1,7 +1,7 @@
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { decryptSecret } from '@/lib/crypto';
-import { stringifyJson } from '@/lib/json';
+import { toJson } from '@/lib/json';
 import { fetchPostInsights } from '@/lib/facebook/insights';
 import { asGraphError } from '@/lib/facebook/graph';
 import { ok, route } from '@/lib/api';
@@ -45,7 +45,7 @@ export const POST = route(async () => {
 
       await prisma.postTarget.update({
         where: { id: row.id },
-        data: { insights: stringifyJson(insights), insightsSyncedAt: new Date() },
+        data: { insights: toJson(insights), insightsSyncedAt: new Date() },
       });
       refreshed += 1;
     } catch (error) {

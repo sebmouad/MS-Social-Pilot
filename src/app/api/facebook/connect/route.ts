@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-import { requireAuth, canManageAccounts } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
+import { canManageAccounts } from '@/lib/constants';
 import { authorizationUrl, createOAuthState, OAUTH_NONCE_COOKIE } from '@/lib/facebook/oauth';
 import { env } from '@/lib/env';
 import { fail, route } from '@/lib/api';

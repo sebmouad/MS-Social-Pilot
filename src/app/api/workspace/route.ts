@@ -1,4 +1,5 @@
-import { canManageAccounts, requireAuth } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
+import { canManageAccounts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { workspaceSettingsSchema } from '@/lib/validation';
 import { fail, ok, readJson, route } from '@/lib/api';

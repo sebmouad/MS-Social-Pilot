@@ -3,12 +3,17 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '../prisma';
 import { env } from '../env';
 import { decryptSecret } from '../crypto';
-import { parseMedia, stringifyJson } from '../json';
+import { parseMedia, toJsonOrNull } from '../json';
 import { resolveMediaForPublish } from '../media';
 import { asGraphError, GraphError } from '../facebook/graph';
 import { publishPost } from '../facebook/publish';
 import { decideRetry } from './backoff';
-import { TERMINAL_TARGET_STATUSES, type PostStatus, type TargetType } from '../constants';
+import {
+  PUBLISHABLE_APPROVAL_STATUSES,
+  TERMINAL_TARGET_STATUSES,
+  PostStatus,
+  PostTargetStatus,
+} from '../constants';
 
 /**
  * The scheduler.
@@ -19,10 +24,11 @@ import { TERMINAL_TARGET_STATUSES, type PostStatus, type TargetType } from '../c
  * the other two published, instead of failing all three or, worse, retrying
  * the whole post and double-posting to the two that succeeded.
  *
- * Concurrency safety without row locks: SQLite has no `SELECT … FOR UPDATE`,
- * so claiming is done with a conditional `updateMany` that only matches rows
- * still in `pending`. The update is atomic on both SQLite and Postgres, so if
- * two workers race, exactly one sees `count === 1` and the other moves on.
+ * Concurrency safety: claiming is a conditional `updateMany` that only matches
+ * rows still in `pending`. That update is atomic, so if two workers race,
+ * exactly one sees `count === 1` and the other moves on. Postgres could use
+ * `SELECT … FOR UPDATE SKIP LOCKED` instead, but this is simpler and already
+ * proven by the integration tests.
  */
 
 /** A row stuck in `processing` for longer than this is assumed abandoned. */
@@ -74,8 +80,11 @@ async function findDue(now: Date, limit: number): Promise<string[]> {
       status: 'pending',
       OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
       post: {
-        status: { in: ['scheduled', 'publishing'] },
+        status: { in: [PostStatus.scheduled, PostStatus.publishing] },
         scheduledAt: { lte: now },
+        // An unapproved post must never go out, whatever its scheduled time
+        // says. This is the scheduler's half of the approval workflow.
+        approvalStatus: { in: [...PUBLISHABLE_APPROVAL_STATUSES] },
       },
       target: { enabled: true },
     },
@@ -141,7 +150,7 @@ async function publishClaimed(
     const media = await resolveMediaForPublish(parseMedia(post.media));
 
     const result = await publishPost({
-      targetType: target.type as TargetType,
+      targetType: target.type,
       targetId: target.providerId,
       accessToken: decryptSecret(encryptedToken),
       message: post.message,
@@ -395,7 +404,7 @@ export async function logActivity(
         workspaceId,
         actorId: actorId ?? null,
         action,
-        detail: detail === undefined ? null : stringifyJson(detail),
+        detail: toJsonOrNull(detail),
       },
     });
   } catch (error) {

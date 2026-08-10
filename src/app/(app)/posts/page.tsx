@@ -5,7 +5,7 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { parseMedia } from '@/lib/json';
 import { formatInZone } from '@/lib/time';
-import { isPostStatus } from '@/lib/constants';
+import { postStatusFilter } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,16 +26,12 @@ export default async function PostsPage({
   const auth = await requireAuth();
   const params = await searchParams;
   const raw = Array.isArray(params.status) ? params.status[0] : params.status;
-  const status = raw && isPostStatus(raw) ? raw : undefined;
+  const statuses = postStatusFilter(raw);
 
   const posts = await prisma.post.findMany({
     where: {
       workspaceId: auth.workspace.id,
-      ...(status
-        ? status === 'failed'
-          ? { status: { in: ['failed', 'partially_failed'] } }
-          : { status }
-        : {}),
+      ...(statuses ? { status: { in: statuses } } : {}),
     },
     include: { targets: { include: { target: { select: { name: true, type: true } } } } },
     orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],

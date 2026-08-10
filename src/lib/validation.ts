@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { LIMITS, PUBLISH_MODES } from './constants';
+import { LIMITS, PublishMode } from './constants';
 import { isValidTimeZone } from './time';
 
 /**
@@ -54,7 +54,7 @@ export const createPostSchema = z
       .array(z.string().min(1))
       .min(1, 'Choose at least one page or group.')
       .max(LIMITS.targetsPerPost),
-    publishMode: z.enum(PUBLISH_MODES).default('worker'),
+    publishMode: z.nativeEnum(PublishMode).default(PublishMode.worker),
     /** Wall-clock time as typed by the user, interpreted in `timezone`. */
     scheduledAtLocal: z.string().min(10).nullish(),
     timezone: timezone.default('UTC'),
@@ -105,7 +105,7 @@ export const updatePostSchema = z.object({
   targetIds: z.array(z.string().min(1)).min(1).max(LIMITS.targetsPerPost).optional(),
   scheduledAtLocal: z.string().min(10).nullish(),
   timezone: timezone.optional(),
-  publishMode: z.enum(PUBLISH_MODES).optional(),
+  publishMode: z.nativeEnum(PublishMode).optional(),
   status: z.enum(['draft', 'scheduled', 'cancelled']).optional(),
 });
 
@@ -151,7 +151,7 @@ export const bulkUploadSchema = z.object({
   csv: z.string().min(1, 'The file is empty.'),
   targetIds: z.array(z.string().min(1)).min(1, 'Choose at least one destination.'),
   timezone: timezone.default('UTC'),
-  publishMode: z.enum(PUBLISH_MODES).default('worker'),
+  publishMode: z.nativeEnum(PublishMode).default(PublishMode.worker),
 });
 
 export type CreatePostInput = z.infer<typeof createPostSchema>;
