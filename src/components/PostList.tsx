@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { StatusBadge } from './StatusBadge';
 
@@ -26,6 +27,9 @@ export interface PostView {
 }
 
 export function PostList({ posts }: { posts: PostView[] }) {
+  const t = useTranslations('posts');
+  const tCommon = useTranslations('common');
+  const tCompose = useTranslations('compose');
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,12 +41,12 @@ export function PostList({ posts }: { posts: PostView[] }) {
     setError(null);
     try {
       const response = await fetch(path, { method });
-      const body = (await response.json().catch(() => ({}))) as { error?: string; errors?: string[] };
+      const body = (await response.json().catch(() => ({}))) as { error?: string; failures?: string[] };
       if (!response.ok) {
-        setError(body.error ?? 'That action failed.');
+        setError(body.error ?? t('actionFailed'));
         return;
       }
-      if (body.errors?.length) setError(body.errors.join(' '));
+      if (body.failures?.length) setError(body.failures.join(' '));
       router.refresh();
     } finally {
       setBusy(null);
@@ -51,9 +55,7 @@ export function PostList({ posts }: { posts: PostView[] }) {
 
   if (posts.length === 0) {
     return (
-      <div className="card p-8 text-center text-sm text-slate-600">
-        No posts here yet.
-      </div>
+      <div className="card p-8 text-center text-sm text-slate-600">{t('noPosts')}</div>
     );
   }
 
@@ -73,7 +75,7 @@ export function PostList({ posts }: { posts: PostView[] }) {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="whitespace-pre-wrap text-sm text-slate-800">
-                  {post.message || <span className="text-slate-400">(no text)</span>}
+                  {post.message || <span className="text-slate-400">{t('noText')}</span>}
                 </p>
                 {post.link && (
                   <a
@@ -87,12 +89,12 @@ export function PostList({ posts }: { posts: PostView[] }) {
                 )}
                 <p className="mt-2 text-xs text-slate-500">
                   {post.publishedAtLabel
-                    ? `Published ${post.publishedAtLabel}`
+                    ? t('publishedAt', { when: post.publishedAtLabel })
                     : post.scheduledAtLabel
-                      ? `Scheduled for ${post.scheduledAtLabel}`
-                      : 'No time set'}
-                  {post.publishMode === 'native' && ' · held by Facebook'}
-                  {post.mediaCount > 0 && ` · ${post.mediaCount} attachment${post.mediaCount === 1 ? '' : 's'}`}
+                      ? t('scheduledFor', { when: post.scheduledAtLabel })
+                      : t('noTimeSet')}
+                  {post.publishMode === 'native' && ` · ${t('heldByFacebook')}`}
+                  {post.mediaCount > 0 && ` · ${t('attachments', { count: post.mediaCount })}`}
                 </p>
               </div>
               <StatusBadge status={post.status} />
@@ -110,13 +112,13 @@ export function PostList({ posts }: { posts: PostView[] }) {
                       rel="noreferrer"
                       className="text-brand-600 hover:underline"
                     >
-                      View on Facebook
+                      {t('viewOnFacebook')}
                     </a>
                   )}
                   {target.error && (
                     <span className="text-red-600">
                       {target.error}
-                      {target.attempts > 1 && ` (${target.attempts} attempts)`}
+                      {target.attempts > 1 && ` ${t('attempts', { count: target.attempts })}`}
                     </span>
                   )}
                 </li>
@@ -131,7 +133,7 @@ export function PostList({ posts }: { posts: PostView[] }) {
                   disabled={busy === post.id}
                   onClick={() => act(post.id, `/api/posts/${post.id}/publish`, 'POST')}
                 >
-                  Publish now
+                  {tCompose('publishNow')}
                 </button>
               )}
               {canRetry && (
@@ -141,7 +143,7 @@ export function PostList({ posts }: { posts: PostView[] }) {
                   disabled={busy === post.id}
                   onClick={() => act(post.id, `/api/posts/${post.id}/retry`, 'POST')}
                 >
-                  Retry failed
+                  {t('retryFailed')}
                 </button>
               )}
               <button
@@ -150,7 +152,7 @@ export function PostList({ posts }: { posts: PostView[] }) {
                 disabled={busy === post.id}
                 onClick={() => act(post.id, `/api/posts/${post.id}/duplicate`, 'POST')}
               >
-                Duplicate
+                {tCommon('duplicate')}
               </button>
               {canCancel && (
                 <button
@@ -162,11 +164,11 @@ export function PostList({ posts }: { posts: PostView[] }) {
                       post.id,
                       `/api/posts/${post.id}`,
                       'DELETE',
-                      'Cancel this post? Anything already scheduled inside Facebook will be deleted there too.',
+                      t('cancelConfirm'),
                     )
                   }
                 >
-                  Cancel
+                  {tCommon('cancel')}
                 </button>
               )}
             </div>

@@ -1,4 +1,5 @@
 import { AccountsClient } from '@/components/AccountsClient';
+import { getTranslations } from 'next-intl/server';
 import { requireAuth } from '@/lib/auth';
 import { canManageAccounts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
@@ -12,6 +13,7 @@ export default async function AccountsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const auth = await requireAuth();
+  const t = await getTranslations('accounts');
   const params = await searchParams;
 
   const accounts = await prisma.socialAccount.findMany({
@@ -26,15 +28,15 @@ export default async function AccountsPage({
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Connected accounts</h1>
+          <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Facebook pages and groups this workspace can publish to.
+            {t('subtitle')}
           </p>
         </div>
         {canManageAccounts(auth.role) && (
           // A full navigation, not fetch: the route redirects to Facebook.
           <a href="/api/facebook/connect" className="btn-primary">
-            Connect Facebook
+            {t('connect')}
           </a>
         )}
       </header>
@@ -57,13 +59,12 @@ export default async function AccountsPage({
 
       {accounts.length === 0 ? (
         <div className="card p-8 text-center">
-          <h2 className="text-sm font-semibold text-slate-900">No accounts connected yet</h2>
+          <h2 className="text-sm font-semibold text-slate-900">{t('noneTitle')}</h2>
           <p className="mx-auto mt-2 max-w-lg text-sm text-slate-600">
-            Connect the Facebook account that manages your pages. We ask for permission to list your
-            pages and publish posts on their behalf, and store the resulting tokens encrypted.
+            {t('noneBody')}
           </p>
           <a href="/api/facebook/connect" className="btn-primary mt-4">
-            Connect Facebook
+            {t('connect')}
           </a>
         </div>
       ) : (

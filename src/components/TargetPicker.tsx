@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 export interface TargetOption {
   id: string;
   name: string;
@@ -17,6 +19,8 @@ interface Props {
 }
 
 export function TargetPicker({ targets, selected, onChange }: Props) {
+  const t = useTranslations('targets');
+
   function toggle(id: string) {
     onChange(selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id]);
   }
@@ -27,11 +31,11 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
   if (targets.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-600">
-        No Facebook pages or groups are connected yet.{' '}
+        {t('noneConnected')}{' '}
         <a href="/accounts" className="font-medium text-brand-600 hover:underline">
-          Connect an account
+          {t('connectAnAccount')}
         </a>{' '}
-        to start scheduling.
+        {t('toStart')}
       </div>
     );
   }
@@ -40,14 +44,14 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs text-slate-500">
-          {selected.length} of {selectable.length} selected
+          {t('selectedOf', { selected: selected.length, total: selectable.length })}
         </span>
         <button
           type="button"
           className="text-xs font-medium text-brand-600 hover:underline"
           onClick={() => onChange(allSelected ? [] : selectable.map((target) => target.id))}
         >
-          {allSelected ? 'Clear all' : 'Select all'}
+          {allSelected ? t('clearAll') : t('selectAll')}
         </button>
       </div>
 
@@ -80,7 +84,7 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-slate-900">{target.name}</span>
                 <span className="block truncate text-xs text-slate-500">
-                  {target.type === 'group' ? 'Group' : 'Page'}
+                  {target.type === 'group' ? t('group') : t('page')}
                   {target.accountName ? ` · ${target.accountName}` : ''}
                   {disabled && target.publishBlocker ? ` · ${target.publishBlocker}` : ''}
                 </span>

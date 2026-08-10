@@ -1,25 +1,38 @@
-const POST_STYLES: Record<string, { label: string; className: string }> = {
-  draft: { label: 'Draft', className: 'bg-slate-100 text-slate-700' },
-  scheduled: { label: 'Scheduled', className: 'bg-blue-50 text-blue-700' },
-  publishing: { label: 'Publishing', className: 'bg-amber-50 text-amber-700' },
-  published: { label: 'Published', className: 'bg-emerald-50 text-emerald-700' },
-  partially_failed: { label: 'Partly failed', className: 'bg-orange-50 text-orange-700' },
-  failed: { label: 'Failed', className: 'bg-red-50 text-red-700' },
-  cancelled: { label: 'Cancelled', className: 'bg-slate-100 text-slate-500' },
+'use client';
+
+import { useTranslations } from 'next-intl';
+
+/**
+ * Colour is carried here; the wording comes from the message catalogues so a
+ * status reads correctly in every language.
+ */
+
+const POST_COLOURS: Record<string, string> = {
+  draft: 'bg-slate-100 text-slate-700',
+  pending_approval: 'bg-violet-50 text-violet-700',
+  rejected: 'bg-rose-50 text-rose-700',
+  scheduled: 'bg-blue-50 text-blue-700',
+  publishing: 'bg-amber-50 text-amber-700',
+  published: 'bg-emerald-50 text-emerald-700',
+  partially_failed: 'bg-orange-50 text-orange-700',
+  failed: 'bg-red-50 text-red-700',
+  cancelled: 'bg-slate-100 text-slate-500',
 };
 
-const TARGET_STYLES: Record<string, { label: string; className: string }> = {
-  pending: { label: 'Waiting', className: 'bg-slate-100 text-slate-600' },
-  processing: { label: 'Publishing', className: 'bg-amber-50 text-amber-700' },
-  published: { label: 'Published', className: 'bg-emerald-50 text-emerald-700' },
-  scheduled_remote: { label: 'Scheduled on Facebook', className: 'bg-indigo-50 text-indigo-700' },
-  failed: { label: 'Failed', className: 'bg-red-50 text-red-700' },
-  cancelled: { label: 'Cancelled', className: 'bg-slate-100 text-slate-500' },
-  skipped: { label: 'Skipped', className: 'bg-slate-100 text-slate-500' },
+const TARGET_COLOURS: Record<string, string> = {
+  pending: 'bg-slate-100 text-slate-600',
+  processing: 'bg-amber-50 text-amber-700',
+  published: 'bg-emerald-50 text-emerald-700',
+  scheduled_remote: 'bg-indigo-50 text-indigo-700',
+  failed: 'bg-red-50 text-red-700',
+  cancelled: 'bg-slate-100 text-slate-500',
+  skipped: 'bg-slate-100 text-slate-500',
 };
 
 export function StatusBadge({ status, kind = 'post' }: { status: string; kind?: 'post' | 'target' }) {
-  const styles = kind === 'post' ? POST_STYLES : TARGET_STYLES;
-  const style = styles[status] ?? { label: status, className: 'bg-slate-100 text-slate-600' };
-  return <span className={`badge ${style.className}`}>{style.label}</span>;
+  const t = useTranslations('status');
+  const colours = kind === 'post' ? POST_COLOURS : TARGET_COLOURS;
+  const className = colours[status] ?? 'bg-slate-100 text-slate-600';
+
+  return <span className={`badge ${className}`}>{t(`${kind}.${status}`)}</span>;
 }

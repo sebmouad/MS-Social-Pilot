@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 import { PostList } from '@/components/PostList';
 import { requireAuth } from '@/lib/auth';
@@ -24,6 +25,10 @@ export default async function PostsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const auth = await requireAuth();
+  const t = await getTranslations('posts');
+  const tDash = await getTranslations('dashboard');
+  const tCommon = await getTranslations('common');
+  const tStatus = await getTranslations('status.post');
   const params = await searchParams;
   const raw = Array.isArray(params.status) ? params.status[0] : params.status;
   const statuses = postStatusFilter(raw);
@@ -44,11 +49,11 @@ export default async function PostsPage({
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Posts</h1>
-          <p className="mt-1 text-sm text-slate-600">Everything scheduled, published or waiting.</p>
+          <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+          <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
         </div>
         <Link href="/compose" className="btn-primary">
-          New post
+          {tDash('newPost')}
         </Link>
       </header>
 
@@ -63,7 +68,7 @@ export default async function PostsPage({
                 active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              {filter.label}
+              {filter.value ? tStatus(filter.value) : tCommon('all')}
             </Link>
           );
         })}

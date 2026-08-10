@@ -1,8 +1,9 @@
 import Link from 'next/link';
+import { getLocale, getTranslations } from 'next-intl/server';
 
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { formatInZone, monthGrid, WEEKDAY_NAMES } from '@/lib/time';
+import { formatInZone, monthGrid } from '@/lib/time';
 import { StatusBadge } from '@/components/StatusBadge';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,10 @@ export default async function CalendarPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const auth = await requireAuth();
+  const locale = await getLocale();
+  const t = await getTranslations('calendar');
+  const tDash = await getTranslations('dashboard');
+  const tPosts = await getTranslations('posts');
   const params = await searchParams;
   const timezone = auth.workspace.timezone;
 
@@ -63,17 +68,24 @@ export default async function CalendarPage({
 
   const previous = new Date(Date.UTC(safeYear, safeMonth - 1, 1));
   const next = new Date(Date.UTC(safeYear, safeMonth + 1, 1));
-  const monthLabel = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
-    new Date(Date.UTC(safeYear, safeMonth, 1)),
-  );
+  const monthLabel = new Intl.DateTimeFormat(locale, {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(safeYear, safeMonth, 1)));
+
+  // 2024-01-07 was a Sunday, so this indexes weekdays 0..6 in the active locale.
+  const weekdayFormatter = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' });
+  const weekdayName = (day: number) =>
+    weekdayFormatter.format(new Date(Date.UTC(2024, 0, 7 + day)));
   const todayKey = formatInZone(today, timezone, 'yyyy-MM-dd');
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Calendar</h1>
-          <p className="mt-1 text-sm text-slate-600">Times shown in {timezone}.</p>
+          <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+          <p className="mt-1 text-sm text-slate-600">{t('timesShownIn', { timezone })}</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -90,7 +102,7 @@ export default async function CalendarPage({
             →
           </Link>
           <Link href="/compose" className="btn-primary">
-            New post
+            {tDash('newPost')}
           </Link>
         </div>
       </header>
@@ -100,7 +112,7 @@ export default async function CalendarPage({
           {/* Monday-first, matching monthGrid. */}
           {[1, 2, 3, 4, 5, 6, 0].map((day) => (
             <div key={day} className="px-2 py-2 text-center text-xs font-medium text-slate-500">
-              {WEEKDAY_NAMES[day]?.slice(0, 3)}
+              {weekdayName(day)}
             </div>
           ))}
         </div>
@@ -152,13 +164,15 @@ export default async function CalendarPage({
                           </span>
                         </span>
                         <span className="mt-0.5 line-clamp-2 block text-[11px] leading-tight text-slate-700">
-                          {post.message || post.link || '(media)'}
+                          {post.message || post.link || tPosts('mediaOnly')}
                         </span>
                       </Link>
                     </li>
                   ))}
                   {dayPosts.length > 3 && (
-                    <li className="px-1.5 text-[10px] text-slate-400">+{dayPosts.length - 3} more</li>
+                    <li className="px-1.5 text-[10px] text-slate-400">
+                      {t('more', { count: dayPosts.length - 3 })}
+                    </li>
                   )}
                 </ul>
               </div>

@@ -3,12 +3,15 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 interface Props {
   mode: 'login' | 'register';
 }
 
 export function AuthForm({ mode }: Props) {
+  const t = useTranslations('auth');
+  const tApp = useTranslations('app');
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +39,7 @@ export function AuthForm({ mode }: Props) {
         error?: string;
         fields?: Record<string, string>;
       };
-      setError(body.error ?? 'Something went wrong.');
+      setError(body.error ?? t('somethingWrong'));
       setFields(body.fields ?? {});
       setPending(false);
       return;
@@ -51,10 +54,10 @@ export function AuthForm({ mode }: Props) {
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6">
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-semibold text-slate-900">
-          {isRegister ? 'Create your workspace' : 'Sign in'}
+          {isRegister ? t('createWorkspace') : t('signIn')}
         </h1>
         <p className="mt-2 text-sm text-slate-600">
-          Schedule Facebook Page and Group posts from one place.
+          {tApp('tagline')}
         </p>
       </div>
 
@@ -62,7 +65,7 @@ export function AuthForm({ mode }: Props) {
         {isRegister && (
           <div>
             <label className="label" htmlFor="name">
-              Your name
+              {t('name')}
             </label>
             <input id="name" name="name" className="input" required autoComplete="name" />
             {fields.name && <p className="error-text">{fields.name}</p>}
@@ -71,7 +74,7 @@ export function AuthForm({ mode }: Props) {
 
         <div>
           <label className="label" htmlFor="email">
-            Email
+            {t('email')}
           </label>
           <input
             id="email"
@@ -86,7 +89,7 @@ export function AuthForm({ mode }: Props) {
 
         <div>
           <label className="label" htmlFor="password">
-            Password
+            {t('password')}
           </label>
           <input
             id="password"
@@ -96,14 +99,15 @@ export function AuthForm({ mode }: Props) {
             required
             autoComplete={isRegister ? 'new-password' : 'current-password'}
           />
-          {isRegister && <p className="hint">At least 10 characters.</p>}
+          {isRegister && <p className="hint">{t('passwordHint')}</p>}
           {fields.password && <p className="error-text">{fields.password}</p>}
         </div>
 
         {isRegister && (
           <div>
             <label className="label" htmlFor="workspaceName">
-              Workspace name <span className="font-normal text-slate-400">(optional)</span>
+              {t('workspaceName')}{' '}
+              <span className="font-normal text-slate-400">{t('optional')}</span>
             </label>
             <input id="workspaceName" name="workspaceName" className="input" placeholder="Acme Marketing" />
           </div>
@@ -116,23 +120,23 @@ export function AuthForm({ mode }: Props) {
         )}
 
         <button type="submit" className="btn-primary w-full" disabled={pending}>
-          {pending ? 'Please wait…' : isRegister ? 'Create workspace' : 'Sign in'}
+          {pending ? t('pleaseWait') : isRegister ? t('createWorkspace') : t('signIn')}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm text-slate-600">
         {isRegister ? (
           <>
-            Already have an account?{' '}
+            {t('haveAccount')}{' '}
             <Link href="/login" className="font-medium text-brand-600 hover:underline">
-              Sign in
+              {t('signIn')}
             </Link>
           </>
         ) : (
           <>
-            No account yet?{' '}
+            {t('noAccount')}{' '}
             <Link href="/register" className="font-medium text-brand-600 hover:underline">
-              Create one
+              {t('createOne')}
             </Link>
           </>
         )}

@@ -13,6 +13,7 @@ import { resolveMediaForPublish } from './media';
 import { resolveLinkPreview } from './facebook/opengraph';
 import { publishPost } from './facebook/publish';
 import { asGraphError, GraphError } from './facebook/graph';
+import { errors } from './errors';
 import { logActivity, publishNow, refreshPostStatus } from './scheduler/runner';
 import type { CreatePostInput, UpdatePostInput } from './validation';
 import type { PublishMode, TargetType } from './constants';
@@ -63,12 +64,7 @@ export async function resolveSchedule(
       }),
     ]);
 
-    if (slots.length === 0) {
-      throw new GraphError({
-        message: 'Your posting queue is empty. Add publishing times in Settings first.',
-        kind: 'invalid_request',
-      });
-    }
+    if (slots.length === 0) throw errors.queueEmpty();
 
     const slot = nextAvailableSlot({
       slots,
@@ -77,26 +73,14 @@ export async function resolveSchedule(
       now,
     });
 
-    if (!slot) {
-      throw new GraphError({
-        message: 'Every queue slot in the next 90 days is taken. Add more times or pick a date.',
-        kind: 'invalid_request',
-      });
-    }
+    if (!slot) throw errors.queueFull();
     return { scheduledAt: slot, timezone: input.timezone, publishMode: input.publishMode, usedQueueSlot: true };
   }
 
-  if (!input.scheduledAtLocal) {
-    throw new GraphError({ message: 'Pick a date and time for this post.', kind: 'invalid_request' });
-  }
+  if (!input.scheduledAtLocal) throw errors.pickDateTime();
 
   const scheduledAt = localInputToUtc(input.scheduledAtLocal, input.timezone);
-  if (scheduledAt.getTime() <= now.getTime()) {
-    throw new GraphError({
-      message: 'That time has already passed. Choose a time in the future.',
-      kind: 'invalid_request',
-    });
-  }
+  if (scheduledAt.getTime() <= now.getTime()) throw errors.timePassed();
 
   return { scheduledAt, timezone: input.timezone, publishMode: input.publishMode, usedQueueSlot: false };
 }
@@ -108,19 +92,11 @@ async function loadTargets(workspaceId: string, targetIds: string[]) {
     include: { socialAccount: true },
   });
 
-  if (targets.length !== targetIds.length) {
-    throw new GraphError({
-      message: 'One or more selected destinations are no longer available.',
-      kind: 'invalid_request',
-    });
-  }
+  if (targets.length !== targetIds.length) throw errors.targetsUnavailable();
 
   const disabled = targets.filter((target) => !target.enabled);
   if (disabled.length > 0) {
-    throw new GraphError({
-      message: `These destinations are turned off: ${disabled.map((target) => target.name).join(', ')}.`,
-      kind: 'invalid_request',
-    });
+    throw errors.targetsDisabled(disabled.map((target) => target.name).join(', '));
   }
   return targets;
 }
@@ -146,12 +122,7 @@ export async function createPost(
   if (schedule.publishMode === 'native') {
     const groups = targets.filter((target) => target.type === 'group');
     if (groups.length > 0) {
-      throw new GraphError({
-        message: `Facebook cannot natively schedule Group posts (${groups
-          .map((group) => group.name)
-          .join(', ')}). Use the built-in scheduler for these.`,
-        kind: 'invalid_request',
-      });
+      throw errors.nativeGroupsUnsupported(groups.map((group) => group.name).join(', '));
     }
   }
 
@@ -307,26 +278,14 @@ export async function updatePost(
     where: { id: postId, workspaceId: context.workspaceId },
     include: { targets: true },
   });
-  if (!post) throw new GraphError({ message: 'Post not found.', kind: 'invalid_request' });
+  if (!post) throw errors.postNotFound();
 
-  if (post.status === 'publishing') {
-    throw new GraphError({
-      message: 'This post is being published right now and can no longer be edited.',
-      kind: 'invalid_request',
-    });
-  }
+  if (post.status === 'publishing') throw errors.alreadyPublishing();
   if (post.status === 'published' || post.status === 'partially_failed') {
-    throw new GraphError({
-      message: 'This post has already been published. Create a new post instead.',
-      kind: 'invalid_request',
-    });
+    throw errors.alreadyPublished();
   }
   if (post.targets.some((target) => target.status === 'scheduled_remote')) {
-    throw new GraphError({
-      message:
-        'This post is scheduled inside Facebook. Cancel it first, which deletes it from Facebook, then schedule a new one.',
-      kind: 'invalid_request',
-    });
+    throw errors.scheduledInFacebook();
   }
 
   const data: Record<string, unknown> = {};
@@ -377,9 +336,7 @@ export async function updatePost(
         where: { id: { in: input.targetIds }, workspaceId: context.workspaceId },
         select: { id: true },
       });
-      if (valid.length !== input.targetIds.length) {
-        throw new GraphError({ message: 'Unknown destination selected.', kind: 'invalid_request' });
-      }
+      if (valid.length !== input.targetIds.length) throw errors.targetsUnavailable();
 
       // Replace the fan-out wholesale; nothing has been published yet, so no
       // per-destination history is lost.
@@ -408,14 +365,14 @@ export async function updatePost(
 export async function cancelPost(
   context: { workspaceId: string; userId: string },
   postId: string,
-): Promise<{ removedFromFacebook: number; errors: string[] }> {
+): Promise<{ removedFromFacebook: number; failures: string[] }> {
   const post = await prisma.post.findFirst({
     where: { id: postId, workspaceId: context.workspaceId },
     include: { targets: { include: { target: { include: { socialAccount: true } } } } },
   });
-  if (!post) throw new GraphError({ message: 'Post not found.', kind: 'invalid_request' });
+  if (!post) throw errors.postNotFound();
 
-  const errors: string[] = [];
+  const failures: string[] = [];
   let removedFromFacebook = 0;
 
   for (const postTarget of post.targets) {
@@ -428,7 +385,7 @@ export async function cancelPost(
           removedFromFacebook += 1;
         }
       } catch (error) {
-        errors.push(`${postTarget.target.name}: ${asGraphError(error).displayMessage}`);
+        failures.push(`${postTarget.target.name}: ${asGraphError(error).displayMessage}`);
       }
     }
   }
@@ -440,7 +397,7 @@ export async function cancelPost(
   await prisma.post.update({ where: { id: postId }, data: { status: 'cancelled' } });
 
   await logActivity(context.workspaceId, 'post.cancelled', { postId, removedFromFacebook }, context.userId);
-  return { removedFromFacebook, errors };
+  return { removedFromFacebook, failures };
 }
 
 /** Reset failed destinations so the scheduler picks them up again. */
@@ -449,7 +406,7 @@ export async function retryPost(
   postId: string,
 ): Promise<number> {
   const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: context.workspaceId } });
-  if (!post) throw new GraphError({ message: 'Post not found.', kind: 'invalid_request' });
+  if (!post) throw errors.postNotFound();
 
   const { count } = await prisma.postTarget.updateMany({
     where: { postId, status: 'failed' },
@@ -476,7 +433,7 @@ export async function duplicatePost(
     where: { id: postId, workspaceId: context.workspaceId },
     include: { targets: true },
   });
-  if (!post) throw new GraphError({ message: 'Post not found.', kind: 'invalid_request' });
+  if (!post) throw errors.postNotFound();
 
   const copy = await prisma.post.create({
     data: {
