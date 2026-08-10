@@ -15,8 +15,10 @@ The web app never waits on a scheduled publish; it writes rows. The worker owns
 everything time-based. Both call Graph through the same client, so retry and
 error-classification rules cannot drift apart.
 
-**The worker runs six jobs** on independent intervals — publish (30s), rss
-(15m), evergreen (1h), analytics (6h), pageInsights (12h), tokens (24h). Each is a plain async
+**The worker runs up to nine jobs** on independent intervals — publish (30s),
+rss (15m), evergreen (1h), analytics (6h), pageInsights (12h), edges (4h),
+tokens (24h), plus instagram (12h) and ads (12h) when those permissions are
+enabled. Each is a plain async
 function with one shape, so the loop is a table rather than a pile of branches,
 and any job can be run alone from a test or `POST /api/cron/tick?jobs=…`. A job
 that throws is caught per job: a failing RSS poll must never stop posts going
@@ -177,6 +179,13 @@ credentials do not.
 | `NotificationSetting`, `EmailLog` | Who gets emailed, and whether it arrived |
 | `PageInsight` | Captured Graph metric values over time |
 | `MetricAvailability` | What Graph would actually serve, last time we asked |
+| `PostComment` | Comments on posts we published, with hidden state |
+| `PageReview` | Star ratings and recommendations left on a Page |
+| `Conversation`, `ConversationMessage` | Page inbox threads |
+| `ExternalPost` | Posts that reached a Page without going through this app |
+| `PageVideo` | Videos, with the video-level insight catalogue attached |
+| `InstagramAccount`, `InstagramMedia`, `InstagramInsight` | Instagram Business analytics |
+| `AdAccount`, `AdInsight` | Spend and delivery, so paid reach can be told from earned |
 | `ActivityLog` | Audit trail |
 
 Status fields are **native Postgres enums**, so an invalid value is rejected by
@@ -267,8 +276,14 @@ production image.
 
 ## Analytics
 
-`src/lib/facebook/metrics.ts` is a catalogue of every Page and post metric worth
-asking Graph for. Nothing in it is assumed to work.
+`src/lib/facebook/metrics.ts` is a catalogue of **every metric Meta documents**
+— 354 insight names across five levels (Page, post, video, Instagram account,
+Instagram media) plus 110 Ads Insights fields. Nothing in it is assumed to work.
+
+Deprecated names are listed rather than deleted. A metric Meta removed in v4.0
+still appears, tagged `deprecatedFrom`, so a blank chart carries an explanation
+instead of looking like a bug — and because Pages older than the deprecation
+sometimes keep serving them.
 
 The reason is a specific Graph behaviour: **one unknown metric name fails the
 entire request** with error 100, and Meta removes metrics between versions
@@ -297,3 +312,51 @@ permission and no date range, so they still land when the insights edge is
 restricted or empty.
 
 Groups are skipped throughout: Facebook exposes no insights edge for a Group.
+
+### Beyond /insights
+
+Insights say a post reached 4,000 people. They do not say what those people
+wrote, whether one of them left a one-star rating, or what the inbox was asked.
+`src/lib/facebook/edges.ts` reads the rest: comments (flattened with
+`filter=stream`, so replies arrive in the same call), ratings, conversations,
+`published_posts` and videos.
+
+Two rules hold across all of them. Every reader **pages with a hard ceiling** —
+a Page with six years of comments must not be able to hold a worker job open
+forever — and every sync **catches per edge**, so a Page whose token cannot read
+the inbox still gets its comments. A refused edge is reported in the result, not
+swallowed.
+
+`published_posts` is the reconciliation edge. Posts made from the Facebook app,
+by another tool, or by a colleague who never opened this product are invisible
+otherwise, and every Page-level report that ignores them understates the Page.
+Posts this app published are filtered out by remote id before storing, or the
+totals would count them twice.
+
+Comment moderation writes to Facebook **first** and mirrors the change locally
+only after Graph confirms. An optimistic update would show a comment as hidden
+while it was still public, which is the failure that gets a page reported.
+
+### Instagram and advertising
+
+An Instagram Business account linked to a connected Page is reachable with that
+Page's own token — there is no separate Instagram login — so
+`src/lib/facebook/instagram.ts` sits beside the Facebook client. The Graph shape
+is the same, so the bisecting fetcher is reused; the vocabulary differs in three
+ways that each need handling: some metrics exist only under
+`metric_type=total_value`, demographics are refused without a `breakdown`
+parameter, and bare names like `impressions` collide between account and media
+level, so lookups pass a level.
+
+Ads Insights is read-only. `ads_read` is requested; `ads_management` never is.
+The point is the comparison: a Page whose reach tripled last month either earned
+it or bought it, and only spend distinguishes the two. Rates are derived from
+the totals rather than averaged across days — a mean of daily CPCs weights a £1
+day the same as a £1,000 one. Campaign reach shows the best single day rather
+than a sum, because reach counts people and adding days counts the same person
+repeatedly.
+
+Messaging, Instagram and Ads each sit behind a `FACEBOOK_ENABLE_*` flag. Meta
+reviews those permissions separately, and requesting one the app has not been
+approved for fails the whole consent dialog rather than just that permission —
+so the scopes, and the worker jobs that need them, only turn on together.

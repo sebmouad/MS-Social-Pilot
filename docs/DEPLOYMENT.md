@@ -84,7 +84,7 @@ while analytics runs hourly from a separate schedule:
 
 ```bash
 curl -X POST "https://your-domain.com/api/cron/tick?jobs=publish" -H "Authorization: Bearer $CRON_SECRET"
-curl -X POST "https://your-domain.com/api/cron/tick?jobs=analytics,tokens" -H "Authorization: Bearer $CRON_SECRET"
+curl -X POST "https://your-domain.com/api/cron/tick?jobs=analytics,edges,tokens" -H "Authorization: Bearer $CRON_SECRET"
 ```
 
 Vercel (`vercel.json`):
@@ -152,6 +152,15 @@ any in-flight OAuth state.
   first (`/api/analytics/refresh` does 25 on demand). These counters move
   slowly; refreshing everything on page load would burn the rate limit for
   nothing.
+- **Edges.** The `edges` job (4h) reads comments, ratings, inbox threads, videos
+  and posts published outside this app. It caps comments at the 25 newest posts
+  per Page and video insights at 10 videos, so one pass over one Page stays
+  bounded however much history the Page has.
+- **Instagram and Ads.** Both are off unless `FACEBOOK_ENABLE_INSTAGRAM` /
+  `FACEBOOK_ENABLE_ADS` is set, and the worker does not schedule the job at all
+  while the flag is off — running it unapproved would spend the rate limit on a
+  permission error every pass. Turn the flag on only once Meta has approved
+  `instagram_manage_insights` / `ads_read` for the app.
 - **Backlogs.** Each tick takes `SCHEDULER_CONCURRENCY × 10` destinations, oldest
   scheduled first, so a backlog drains in the order users expect.
 - **AI spend.** `AI_RATE_LIMIT_PER_HOUR` is per workspace. Every call is recorded

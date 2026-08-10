@@ -442,3 +442,65 @@ gating, evergreen recycling and RSS ingestion.
    arbitrary addresses.
 5. **Approval granularity** — is per-workspace on/off enough, or should approval
    depend on the destination (e.g. only the main brand Page needs sign-off)?
+
+---
+
+## 12. Amendment — full Graph coverage
+
+Agreed after the original build. This widens the original scope, which was
+"Facebook Pages and Groups only", so it is recorded here rather than folded
+silently into the sections above.
+
+### What changed
+
+**The metric catalogue is now everything Meta documents** — 354 insight names
+plus 110 Ads Insights fields, across five levels:
+
+| Level | Names | Read from |
+| --- | --- | --- |
+| Page | 168 | `{page-id}/insights` |
+| Post | 77 | `{post-id}/insights` |
+| Video | 58 | `{video-id}/video_insights` |
+| Instagram account | 28 | `{ig-user-id}/insights` |
+| Instagram media | 23 | `{ig-media-id}/insights` |
+| Ads | 110 fields | `{act_id}/insights` |
+
+Deprecated names are listed, not deleted. A metric Meta removed in v4.0 still
+appears tagged `deprecatedFrom`, so an empty chart carries a reason.
+
+**Graph edges beyond `/insights`** are now read and stored: post comments (with
+hide, unhide, delete and reply), Page ratings, inbox conversations, Page videos,
+and `published_posts` — the last of these being what stops every Page-level
+report from understating a Page whose team also posts from the Facebook app.
+
+**Instagram Business analytics and Ads Insights** are read through the same
+connected Page and user tokens. Instagram is analytics only; publishing to it is
+a separate piece of work. Ads is read-only — `ads_read` is requested and
+`ads_management` never is.
+
+### Permissions
+
+Three new permission families, each behind a flag because Meta reviews them
+separately and requesting an unapproved one fails the entire consent dialog:
+
+| Flag | Scopes | Unlocks |
+| --- | --- | --- |
+| `FACEBOOK_ENABLE_MESSAGING` | `pages_messaging`, `pages_manage_metadata` | Inbox tab |
+| `FACEBOOK_ENABLE_INSTAGRAM` | `instagram_basic`, `instagram_manage_insights` | Instagram tab and job |
+| `FACEBOOK_ENABLE_ADS` | `ads_read` | Ads tab and job |
+
+Comments, ratings, videos and `published_posts` need only `pages_read_engagement`
+and `pages_manage_engagement`, which the app already requests — so those tabs
+work without any new app review.
+
+### Worker
+
+Three jobs added: `edges` (4h, always on), `instagram` (12h) and `ads` (12h).
+The last two are not scheduled at all while their flag is off, so an unapproved
+app does not spend its rate limit on a permission error every twelve hours.
+
+### Open question added
+
+6. **App review** — Instagram insights and Ads read both need Meta review
+   against a live app. Do you want those submitted, or should the product ship
+   Facebook-only with the flags left off?

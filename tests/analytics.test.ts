@@ -18,6 +18,10 @@ let baseUrl: string;
 let removed = new Set<string>();
 /** Every `metric=` parameter the stub received, for asserting on chunking. */
 let requests: string[][] = [];
+/** Request paths, so the video edge can be told apart from the ordinary one. */
+let paths: string[] = [];
+/** Full query strings, for asserting on Instagram's extra parameters. */
+let extras: URLSearchParams[] = [];
 let failEverything: { code: number; message: string } | null = null;
 
 beforeAll(async () => {
@@ -31,6 +35,8 @@ beforeAll(async () => {
     const names = (url.searchParams.get('metric') ?? '').split(',').filter(Boolean);
     const period = url.searchParams.get('period') ?? 'day';
     requests.push(names);
+    paths.push(url.pathname);
+    extras.push(url.searchParams);
 
     if (failEverything) {
       response.writeHead(400, { 'content-type': 'application/json' });
@@ -82,11 +88,24 @@ afterAll(async () => {
 beforeEach(() => {
   removed = new Set();
   requests = [];
+  paths = [];
+  extras = [];
   failEverything = null;
 });
 
 const { chunk, fetchInsights, topBreakdown } = await import('../src/lib/facebook/analytics');
-const { PAGE_METRICS, POST_METRICS, findMetric } = await import('../src/lib/facebook/metrics');
+const {
+  AD_INSIGHT_FIELDS,
+  ALL_METRICS,
+  IG_ACCOUNT_METRICS,
+  IG_MEDIA_METRICS,
+  PAGE_METRICS,
+  POST_METRICS,
+  VIDEO_METRICS,
+  catalogueSize,
+  findMetric,
+  metricsFor,
+} = await import('../src/lib/facebook/metrics');
 const { trendOf } = await import('../src/lib/analytics');
 
 describe('chunk', () => {
@@ -257,21 +276,124 @@ describe('fetchInsights', () => {
 });
 
 describe('metric catalogue', () => {
-  it('has no duplicate names', () => {
-    const names = [...PAGE_METRICS, ...POST_METRICS].map((metric) => metric.name);
-    expect(new Set(names).size).toBe(names.length);
+  const LEVELS = ['page', 'post', 'video', 'ig_account', 'ig_media'] as const;
+
+  it('has no duplicate names within a level', () => {
+    // Across levels, collisions are expected: Instagram uses a bare
+    // `impressions` at both account and media level.
+    for (const level of LEVELS) {
+      const names = metricsFor(level).map((metric) => metric.name);
+      expect(new Set(names).size, level).toBe(names.length);
+    }
   });
 
   it('gives every metric at least one period and a description', () => {
-    for (const metric of [...PAGE_METRICS, ...POST_METRICS]) {
+    for (const metric of ALL_METRICS) {
       expect(metric.periods.length, metric.name).toBeGreaterThan(0);
       expect(metric.description.length, metric.name).toBeGreaterThan(10);
     }
   });
 
-  it('scopes page and post metrics to their own level', () => {
+  it('tags every metric with the level its list belongs to', () => {
+    for (const level of LEVELS) {
+      expect(metricsFor(level).every((metric) => metric.level === level), level).toBe(true);
+    }
+  });
+
+  it('scopes Facebook names to their own prefix', () => {
     expect(PAGE_METRICS.every((metric) => metric.name.startsWith('page_'))).toBe(true);
     expect(POST_METRICS.every((metric) => metric.name.startsWith('post_'))).toBe(true);
+    expect(VIDEO_METRICS.every((metric) => metric.name.startsWith('total_video_'))).toBe(true);
+  });
+
+  it('resolves a colliding Instagram name by level', () => {
+    // Both catalogues carry `impressions`; without a level the lookup would
+    // silently describe media reach as account reach.
+    expect(findMetric('impressions', 'ig_account')!.level).toBe('ig_account');
+    expect(findMetric('impressions', 'ig_media')!.level).toBe('ig_media');
+  });
+
+  it('covers every level and the ad fields', () => {
+    const sizes = catalogueSize();
+    expect(sizes.page).toBeGreaterThan(150);
+    expect(sizes.post).toBeGreaterThan(70);
+    expect(sizes.video).toBeGreaterThan(50);
+    expect(sizes.ig_account).toBeGreaterThan(20);
+    expect(sizes.ig_media).toBeGreaterThan(20);
+    expect(sizes.ads).toBeGreaterThan(100);
+  });
+
+  it('has no duplicate ad field names', () => {
+    const names = AD_INSIGHT_FIELDS.map((field) => field.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('marks deprecated metrics rather than dropping them', () => {
+    // A metric Meta removed should be listed with an explanation, so a blank
+    // chart has a reason instead of looking like a bug.
+    const deprecated = PAGE_METRICS.filter((metric) => metric.deprecatedFrom);
+    expect(deprecated.length).toBeGreaterThan(0);
+    expect(deprecated.every((metric) => /^v\d/.test(metric.deprecatedFrom!))).toBe(true);
+  });
+
+  it('keeps Instagram account and media catalogues separate', () => {
+    const accountOnly = IG_ACCOUNT_METRICS.map((metric) => metric.name);
+    const mediaOnly = IG_MEDIA_METRICS.map((metric) => metric.name);
+    expect(accountOnly).toContain('profile_views');
+    expect(mediaOnly).toContain('saved');
+    expect(mediaOnly).not.toContain('profile_views');
+  });
+});
+
+describe('fetchInsights across levels', () => {
+  it('reads video metrics from the video_insights edge', async () => {
+    const result = await fetchInsights({
+      objectId: '9001',
+      level: 'video',
+      accessToken: 'token',
+      period: 'lifetime',
+      only: ['total_video_views', 'total_video_view_total_time'],
+    });
+
+    expect(result.series.map((entry) => entry.name).sort()).toEqual([
+      'total_video_view_total_time',
+      'total_video_views',
+    ]);
+    expect(paths.some((path) => path.includes('/video_insights'))).toBe(true);
+  });
+
+  it('reads Instagram account metrics from the ordinary insights edge', async () => {
+    const result = await fetchInsights({
+      objectId: '77',
+      level: 'ig_account',
+      accessToken: 'token',
+      period: 'day',
+      only: ['reach', 'profile_views'],
+    });
+
+    expect(result.series.map((entry) => entry.name).sort()).toEqual(['profile_views', 'reach']);
+  });
+
+  it('passes extra parameters through, for Instagram total_value metrics', async () => {
+    await fetchInsights({
+      objectId: '77',
+      level: 'ig_account',
+      accessToken: 'token',
+      period: 'day',
+      only: ['likes'],
+      extraParams: { metric_type: 'total_value' },
+    });
+
+    expect(extras.some((entry) => entry.get('metric_type') === 'total_value')).toBe(true);
+  });
+
+  it('defaults page and Instagram accounts to day, everything else to lifetime', async () => {
+    const { defaultPeriodFor } = await import('../src/lib/facebook/analytics');
+    expect(defaultPeriodFor('page')).toBe('day');
+    expect(defaultPeriodFor('ig_account')).toBe('day');
+    expect(defaultPeriodFor('post')).toBe('lifetime');
+    expect(defaultPeriodFor('video')).toBe('lifetime');
+    expect(defaultPeriodFor('ig_media')).toBe('lifetime');
   });
 });
 

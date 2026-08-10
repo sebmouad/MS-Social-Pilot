@@ -277,6 +277,41 @@ export async function graphRequest<T = unknown>(
   };
 }
 
+interface PagedResponse<T> {
+  data?: T[];
+  paging?: { cursors?: { after?: string }; next?: string };
+}
+
+/**
+ * Read every page of a Graph edge.
+ *
+ * Graph pages with opaque cursors and will happily hand back an endless chain,
+ * so `maxPages` is a required guard rather than an option nobody sets: a Page
+ * with 400,000 comments must not be able to run the worker out of memory.
+ */
+export async function graphPaged<T>(
+  path: string,
+  options: GraphRequestOptions & { maxPages: number; limit?: number },
+): Promise<T[]> {
+  const items: T[] = [];
+  let after: string | undefined;
+
+  for (let page = 0; page < options.maxPages; page += 1) {
+    const { data } = await graphRequest<PagedResponse<T>>(path, {
+      ...options,
+      params: { ...options.params, limit: options.limit ?? 100, after },
+    });
+
+    items.push(...(data.data ?? []));
+
+    after = data.paging?.cursors?.after;
+    // No `next` means this was the last page, whatever the cursor says.
+    if (!after || !data.paging?.next) break;
+  }
+
+  return items;
+}
+
 /**
  * Upload binary media (photo or video) as multipart/form-data.
  *

@@ -5,6 +5,9 @@ import { runEvergreenCycle } from '../evergreen';
 import { pollDueSources } from '../rss/poll';
 import { runSchedulerTick } from './runner';
 import { syncPostInsights, syncWorkspaceAnalytics } from '../analytics';
+import { syncTargetEdges } from '../engagement';
+import { discoverInstagramAccounts, syncWorkspaceInstagram } from '../instagram';
+import { discoverAdAccounts, syncWorkspaceAds } from '../ads';
 
 /**
  * The worker's job set.
@@ -16,7 +19,16 @@ import { syncPostInsights, syncWorkspaceAnalytics } from '../analytics';
  * A job that throws must never stop the others — the loop catches per job.
  */
 
-export type JobName = 'publish' | 'rss' | 'evergreen' | 'analytics' | 'pageInsights' | 'tokens';
+export type JobName =
+  | 'publish'
+  | 'rss'
+  | 'evergreen'
+  | 'analytics'
+  | 'pageInsights'
+  | 'edges'
+  | 'instagram'
+  | 'ads'
+  | 'tokens';
 
 export interface JobContext {
   now: Date;
@@ -144,6 +156,109 @@ export async function runPageInsightsSync(context: JobContext): Promise<string |
   return `stored=${stored} failed=${failed}`;
 }
 
+/**
+ * Refresh the non-insights edges: comments, reviews, inbox, videos, and posts
+ * published outside this app.
+ *
+ * Runs against every enabled Page rather than a batch, because these edges are
+ * cheap per call and stale comments are the ones people notice.
+ */
+export async function runEdgeSync(context: JobContext): Promise<string | null> {
+  const targets = await prisma.target.findMany({
+    where: { type: 'page', enabled: true },
+    select: { id: true },
+  });
+
+  let comments = 0;
+  let reviews = 0;
+  let conversations = 0;
+  let external = 0;
+  let failed = 0;
+
+  for (const target of targets) {
+    const result = await syncTargetEdges({ targetId: target.id, now: context.now });
+    comments += result.comments;
+    reviews += result.reviews;
+    conversations += result.conversations;
+    external += result.externalPosts;
+
+    for (const error of result.errors) {
+      failed += 1;
+      context.logger(`${result.targetName} ${error.edge}: ${error.message}`);
+    }
+  }
+
+  if (comments + reviews + conversations + external + failed === 0) return null;
+  return `comments=${comments} reviews=${reviews} threads=${conversations} external=${external} failed=${failed}`;
+}
+
+/**
+ * Discover and refresh Instagram Business accounts.
+ *
+ * Discovery runs every pass rather than once: an account can be linked to a
+ * Page at any time, and there is no webhook that tells us when.
+ */
+export async function runInstagramSync(context: JobContext): Promise<string | null> {
+  const workspaces = await prisma.workspace.findMany({ select: { id: true } });
+
+  let accounts = 0;
+  let stored = 0;
+  let failed = 0;
+
+  for (const workspace of workspaces) {
+    const discovery = await discoverInstagramAccounts(workspace.id);
+    for (const error of discovery.errors) context.logger(`Instagram discovery: ${error}`);
+
+    const results = await syncWorkspaceInstagram({
+      workspaceId: workspace.id,
+      since: new Date(context.now.getTime() - 30 * 24 * 60 * 60 * 1000),
+      until: context.now,
+    });
+
+    for (const result of results) {
+      accounts += 1;
+      stored += result.stored;
+      if (result.error) {
+        failed += 1;
+        context.logger(`Instagram ${result.username}: ${result.error}`);
+      }
+    }
+  }
+
+  if (accounts === 0 && failed === 0) return null;
+  return `accounts=${accounts} stored=${stored} failed=${failed}`;
+}
+
+/** Discover and refresh ad accounts, so spend can sit next to organic reach. */
+export async function runAdsSync(context: JobContext): Promise<string | null> {
+  const workspaces = await prisma.workspace.findMany({ select: { id: true } });
+
+  let rows = 0;
+  let failed = 0;
+
+  for (const workspace of workspaces) {
+    const discovery = await discoverAdAccounts(workspace.id);
+    for (const error of discovery.errors) context.logger(`Ads discovery: ${error}`);
+
+    const results = await syncWorkspaceAds({
+      workspaceId: workspace.id,
+      since: new Date(context.now.getTime() - 30 * 24 * 60 * 60 * 1000),
+      until: context.now,
+    });
+
+    for (const result of results) {
+      rows += result.rows;
+      if (result.error) {
+        failed += 1;
+        context.logger(`Ads ${result.name}: ${result.error}`);
+      }
+    }
+  }
+
+  if (rows === 0 && failed === 0) return null;
+  return `rows=${rows} failed=${failed}`;
+}
+
 export function jobDefinitions(): JobDefinition[] {
   return [
     {
@@ -189,6 +304,32 @@ export function jobDefinitions(): JobDefinition[] {
       intervalMs: env.pageInsightsHours * 60 * 60 * 1000,
       run: runPageInsightsSync,
     },
+    {
+      name: 'edges',
+      intervalMs: env.edgeSyncHours * 60 * 60 * 1000,
+      run: runEdgeSync,
+    },
+    // Instagram and Ads need permissions Meta reviews separately. Running them
+    // unapproved would spend the rate limit on a permission error every pass,
+    // so they are only scheduled once the app is actually allowed to ask.
+    ...(env.instagramEnabled
+      ? [
+          {
+            name: 'instagram' as const,
+            intervalMs: env.instagramSyncHours * 60 * 60 * 1000,
+            run: runInstagramSync,
+          },
+        ]
+      : []),
+    ...(env.adsEnabled
+      ? [
+          {
+            name: 'ads' as const,
+            intervalMs: env.adsSyncHours * 60 * 60 * 1000,
+            run: runAdsSync,
+          },
+        ]
+      : []),
     {
       name: 'tokens',
       intervalMs: env.tokenExpiryCheckHours * 60 * 60 * 1000,

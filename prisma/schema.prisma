@@ -181,6 +181,8 @@ model Workspace {
   aiGenerations        AiGeneration[]
   notificationSettings NotificationSetting[]
   emailLogs            EmailLog[]
+  instagramAccounts    InstagramAccount[]
+  adAccounts           AdAccount[]
 
   @@map("workspaces")
 }
@@ -248,8 +250,10 @@ model SocialAccount {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  targets   Target[]
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  targets           Target[]
+  instagramAccounts InstagramAccount[]
+  adAccounts        AdAccount[]
 
   @@unique([workspaceId, provider, providerUserId])
   @@index([workspaceId])
@@ -288,6 +292,11 @@ model Target {
   postTargets   PostTarget[]
   insights      PageInsight[]
   availability  MetricAvailability[]
+  reviews           PageReview[]
+  conversations     Conversation[]
+  externalPosts     ExternalPost[]
+  videos            PageVideo[]
+  instagramAccounts InstagramAccount[]
 
   @@unique([workspaceId, providerId])
   @@index([socialAccountId])
@@ -384,8 +393,9 @@ model PostTarget {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
-  target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  post     Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  target   Target        @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  comments PostComment[]
 
   @@unique([postId, targetId])
   @@index([status, nextAttemptAt])
@@ -632,6 +642,284 @@ model MetricAvailability {
   @@unique([targetId, metric, period])
   @@index([targetId])
   @@map("metric_availability")
+}
+
+// ---------------------------------------------------------------------------
+// Graph edges beyond /insights
+// ---------------------------------------------------------------------------
+//
+// Insights answer "how many". These edges answer "who and what" — the comment
+// text, the star rating, the message thread. They are separate tables rather
+// than Json blobs because they are the things people search and read, not
+// aggregate.
+
+/// A comment left on a post this app published.
+model PostComment {
+  id             String   @id @default(cuid())
+  postTargetId   String
+  remoteId       String
+  /// Set for replies; null for top-level comments.
+  parentRemoteId String?
+  message        String
+  fromName       String?
+  fromId         String?
+  likeCount      Int      @default(0)
+  replyCount     Int      @default(0)
+  isHidden       Boolean  @default(false)
+  createdTime    DateTime
+  fetchedAt      DateTime @default(now())
+
+  postTarget PostTarget @relation(fields: [postTargetId], references: [id], onDelete: Cascade)
+
+  @@unique([postTargetId, remoteId])
+  @@index([postTargetId, createdTime])
+  @@map("post_comments")
+}
+
+/// A star rating or recommendation left on a Page.
+model PageReview {
+  id           String   @id @default(cuid())
+  targetId     String
+  remoteId     String
+  reviewerName String?
+  rating       Int?
+  /// Newer Pages expose a recommendation type instead of stars.
+  recommendationType String?
+  reviewText   String?
+  createdTime  DateTime
+  fetchedAt    DateTime @default(now())
+
+  target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, remoteId])
+  @@index([targetId, createdTime])
+  @@map("page_reviews")
+}
+
+/// A Page inbox thread.
+model Conversation {
+  id           String   @id @default(cuid())
+  targetId     String
+  remoteId     String
+  snippet      String?
+  unreadCount  Int      @default(0)
+  messageCount Int      @default(0)
+  /// Names of the people in the thread.
+  participants Json?
+  updatedTime  DateTime
+  fetchedAt    DateTime @default(now())
+
+  target   Target                @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  messages ConversationMessage[]
+
+  @@unique([targetId, remoteId])
+  @@index([targetId, updatedTime])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  remoteId       String
+  fromName       String?
+  fromId         String?
+  message        String?
+  createdTime    DateTime
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, remoteId])
+  @@index([conversationId, createdTime])
+  @@map("conversation_messages")
+}
+
+/// A post that appeared on a Page without going through this app.
+///
+/// Without these, every report understates the Page: someone posting from the
+/// Facebook app directly is invisible to us otherwise.
+model ExternalPost {
+  id          String   @id @default(cuid())
+  targetId    String
+  remoteId    String
+  message     String?
+  permalink   String?
+  statusType  String?
+  createdTime DateTime
+  /// Whatever the post-level catalogue returned for it (PostInsights).
+  insights    Json?
+  insightsSyncedAt DateTime?
+  fetchedAt   DateTime @default(now())
+
+  target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, remoteId])
+  @@index([targetId, createdTime])
+  @@map("external_posts")
+}
+
+/// A video on a Page, with the video-level insight catalogue attached.
+///
+/// Separate from the post that carried it: a crossposted video has one video
+/// object and several posts, and only the video object holds the combined
+/// figures.
+model PageVideo {
+  id          String   @id @default(cuid())
+  targetId    String
+  remoteId    String
+  title       String?
+  description String?
+  permalink   String?
+  thumbnailUrl String?
+  lengthSeconds Float?
+  createdTime DateTime
+  /// Metric name to number, or to a breakdown map.
+  insights    Json?
+  insightsSyncedAt DateTime?
+  fetchedAt   DateTime @default(now())
+
+  target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, remoteId])
+  @@index([targetId, createdTime])
+  @@map("page_videos")
+}
+
+// ---------------------------------------------------------------------------
+// Instagram (analytics only — publishing is a separate piece of work)
+// ---------------------------------------------------------------------------
+
+/// An Instagram Business account reachable through a connected Facebook Page.
+model InstagramAccount {
+  id                String    @id @default(cuid())
+  workspaceId       String
+  socialAccountId   String?
+  /// The Page this account is linked to; the Page token is what reads it.
+  targetId          String?
+  igUserId          String
+  username          String
+  name              String?
+  profilePictureUrl String?
+  followersCount    Int?
+  followsCount      Int?
+  mediaCount        Int?
+  enabled           Boolean   @default(true)
+  lastSyncedAt      DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount?     @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  target        Target?            @relation(fields: [targetId], references: [id], onDelete: SetNull)
+  media         InstagramMedia[]
+  insights      InstagramInsight[]
+
+  @@unique([workspaceId, igUserId])
+  @@index([workspaceId])
+  @@map("instagram_accounts")
+}
+
+model InstagramMedia {
+  id            String   @id @default(cuid())
+  accountId     String
+  remoteId      String
+  caption       String?
+  mediaType     String?
+  mediaProductType String?
+  mediaUrl      String?
+  permalink     String?
+  thumbnailUrl  String?
+  timestamp     DateTime
+  likeCount     Int?
+  commentsCount Int?
+  /// Per-media insights, metric name to value.
+  insights      Json?
+  insightsSyncedAt DateTime?
+  fetchedAt     DateTime @default(now())
+
+  account InstagramAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, remoteId])
+  @@index([accountId, timestamp])
+  @@map("instagram_media")
+}
+
+model InstagramInsight {
+  id        String   @id @default(cuid())
+  accountId String
+  metric    String
+  period    String
+  endTime   DateTime
+  value     Json
+  numeric   Float?
+  fetchedAt DateTime @default(now())
+
+  account InstagramAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, metric, period, endTime])
+  @@index([accountId, metric, endTime])
+  @@map("instagram_insights")
+}
+
+// ---------------------------------------------------------------------------
+// Advertising (Marketing API — spend against organic performance)
+// ---------------------------------------------------------------------------
+
+model AdAccount {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  socialAccountId String?
+  /// Facebook's account id, including the "act_" prefix.
+  actId           String
+  name            String
+  currency        String?
+  accountStatus   Int?
+  enabled         Boolean   @default(true)
+  lastSyncedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  insights      AdInsight[]
+
+  @@unique([workspaceId, actId])
+  @@index([workspaceId])
+  @@map("ad_accounts")
+}
+
+/// One day of delivery for an ad account, campaign, ad set or ad.
+model AdInsight {
+  id          String   @id @default(cuid())
+  adAccountId String
+  /// "account", "campaign", "adset" or "ad".
+  level       String
+  /// The id of the object this row describes.
+  objectId    String
+  objectName  String?
+  date        DateTime
+
+  spend       Float    @default(0)
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  reach       Int      @default(0)
+  /// Cost per click, cost per mille and click-through rate, as Facebook
+  /// computes them — recomputing from the totals gives different numbers.
+  cpc         Float?
+  cpm         Float?
+  cpp         Float?
+  ctr         Float?
+  frequency   Float?
+  /// Actions and conversions, which vary by campaign objective.
+  actions     Json?
+  /// Every remaining field the request returned, so nothing is thrown away.
+  fields      Json?
+  fetchedAt   DateTime @default(now())
+
+  adAccount AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([adAccountId, level, objectId, date])
+  @@index([adAccountId, date])
+  @@map("ad_insights")
 }
 
 model ActivityLog {

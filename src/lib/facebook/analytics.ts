@@ -109,6 +109,10 @@ interface FetchOptions {
   since?: Date;
   until?: Date;
   signal?: AbortSignal;
+  /** The edge to read. Videos use `video_insights`; everything else `insights`. */
+  edge?: string;
+  /** Extra query parameters, e.g. Instagram's `metric_type` or `breakdown`. */
+  extraParams?: Record<string, string | number | undefined>;
 }
 
 /** One Graph call for a set of metric names. Throws on any failure. */
@@ -118,6 +122,7 @@ async function fetchChunk(
   options: FetchOptions,
 ): Promise<RawInsight[]> {
   const params: Record<string, string | number | undefined> = {
+    ...options.extraParams,
     metric: names.join(','),
   };
   if (options.period) params.period = options.period;
@@ -125,13 +130,32 @@ async function fetchChunk(
   if (options.since) params.since = Math.floor(options.since.getTime() / 1000);
   if (options.until) params.until = Math.floor(options.until.getTime() / 1000);
 
-  const { data } = await graphRequest<{ data: RawInsight[] }>(`${objectId}/insights`, {
-    accessToken: options.accessToken,
-    params,
-    signal: options.signal,
-  });
+  const { data } = await graphRequest<{ data: RawInsight[] }>(
+    `${objectId}/${options.edge ?? 'insights'}`,
+    {
+      accessToken: options.accessToken,
+      params,
+      signal: options.signal,
+    },
+  );
 
   return data.data ?? [];
+}
+
+/**
+ * The window Graph expects by default for each level.
+ *
+ * Page and Instagram account metrics are time series; post, video and media
+ * metrics are running totals with no period at all, which Graph spells
+ * `lifetime`.
+ */
+export function defaultPeriodFor(level: MetricLevel): MetricPeriod {
+  return level === 'page' || level === 'ig_account' ? 'day' : 'lifetime';
+}
+
+/** Which edge a level's insights live on. */
+function edgeFor(level: MetricLevel): string {
+  return level === 'video' ? 'video_insights' : 'insights';
 }
 
 /**
@@ -196,11 +220,15 @@ export async function fetchInsights(options: {
   until?: Date;
   /** Restrict to these metric names instead of the whole catalogue. */
   only?: string[];
+  /** Extra query parameters, e.g. Instagram's `metric_type` or `breakdown`. */
+  extraParams?: Record<string, string | number | undefined>;
 }): Promise<InsightsResult> {
-  const period = options.period ?? (options.level === 'page' ? 'day' : 'lifetime');
+  const period = options.period ?? defaultPeriodFor(options.level);
 
   const candidates = (options.only
-    ? options.only.map(findMetric).filter((metric): metric is MetricDefinition => Boolean(metric))
+    ? options.only
+        .map((name) => findMetric(name, options.level))
+        .filter((metric): metric is MetricDefinition => Boolean(metric))
     : metricsFor(options.level)
   ).filter((metric) => metric.periods.includes(period));
 
@@ -216,6 +244,8 @@ export async function fetchInsights(options: {
         period,
         since: options.since,
         until: options.until,
+        edge: edgeFor(options.level),
+        extraParams: options.extraParams,
       },
       results,
       unavailable,
@@ -356,7 +386,7 @@ export async function probeMetrics(options: {
   accessToken: string;
   period?: MetricPeriod;
 }): Promise<MetricAvailability[]> {
-  const period = options.period ?? (options.level === 'page' ? 'day' : 'lifetime');
+  const period = options.period ?? defaultPeriodFor(options.level);
   const definitions = metricsFor(options.level).filter((metric) =>
     metric.periods.includes(period),
   );

@@ -4,7 +4,19 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
-const VIEWS = ['overview', 'posts', 'interactions', 'audience'] as const;
+const VIEWS = [
+  'overview',
+  'posts',
+  'interactions',
+  'audience',
+  'videos',
+  'comments',
+  'reviews',
+  'inbox',
+  'external',
+  'instagram',
+  'ads',
+] as const;
 
 /**
  * View switcher for the analytics screen.

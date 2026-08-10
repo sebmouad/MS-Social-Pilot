@@ -80,7 +80,35 @@ export const env = {
         if (!base.includes(scope)) base.push(scope);
       }
     }
+
+    // Analytics-only extras. Each is opt-in because Meta reviews them
+    // separately, and requesting one the app has not been approved for makes
+    // the whole consent dialog fail rather than just that permission.
+    if (env.messagingEnabled) {
+      for (const scope of ['pages_messaging', 'pages_manage_metadata']) {
+        if (!base.includes(scope)) base.push(scope);
+      }
+    }
+    if (env.instagramEnabled) {
+      for (const scope of ['instagram_basic', 'instagram_manage_insights']) {
+        if (!base.includes(scope)) base.push(scope);
+      }
+    }
+    if (env.adsEnabled && !base.includes('ads_read')) base.push('ads_read');
+
     return base;
+  },
+  /** Page inbox reads. Off by default: `pages_messaging` needs app review. */
+  get messagingEnabled(): boolean {
+    return boolean('FACEBOOK_ENABLE_MESSAGING', false);
+  },
+  /** Instagram Business analytics. */
+  get instagramEnabled(): boolean {
+    return boolean('FACEBOOK_ENABLE_INSTAGRAM', false);
+  },
+  /** Ads Insights reads. Read-only — the app never requests ads_management. */
+  get adsEnabled(): boolean {
+    return boolean('FACEBOOK_ENABLE_ADS', false);
   },
   get groupsEnabled(): boolean {
     return boolean('FACEBOOK_ENABLE_GROUPS', false);
@@ -139,6 +167,16 @@ export const env = {
   /** How often the full Page insights catalogue is captured. */
   get pageInsightsHours(): number {
     return Math.max(1, integer('PAGE_INSIGHTS_HOURS', 12));
+  },
+  /** Comments, reviews, inbox threads, videos and unscheduled posts. */
+  get edgeSyncHours(): number {
+    return Math.max(1, integer('EDGE_SYNC_HOURS', 4));
+  },
+  get instagramSyncHours(): number {
+    return Math.max(1, integer('INSTAGRAM_SYNC_HOURS', 12));
+  },
+  get adsSyncHours(): number {
+    return Math.max(1, integer('ADS_SYNC_HOURS', 12));
   },
 
   get cronSecret(): string | null {
