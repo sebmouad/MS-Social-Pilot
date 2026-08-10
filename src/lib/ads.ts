@@ -26,8 +26,15 @@ export interface AdSyncResult {
 
 /** Default sync window. Facebook keeps 37 months, but daily rows add up. */
 const DEFAULT_WINDOW_DAYS = 90;
-/** Levels stored per pass, coarsest first. */
-const LEVELS: AdLevel[] = ['account', 'campaign'];
+
+/**
+ * Levels stored per pass, coarsest first.
+ *
+ * All four, because "which ad" is the question people actually have when a
+ * campaign underperforms — and because the row count is bounded by the account
+ * rather than by us: an account with three ads produces three ad rows a day.
+ */
+const LEVELS: AdLevel[] = ['account', 'campaign', 'adset', 'ad'];
 
 /**
  * Find every ad account the workspace's connected users can read.
@@ -288,16 +295,18 @@ export interface CampaignRow {
   actions: Record<string, number>;
 }
 
-/** Per-campaign totals over the window, biggest spender first. */
+/** Per-object totals over the window, biggest spender first. */
 export async function readCampaigns(options: {
   workspaceId: string;
   adAccountId?: string;
   from: Date;
   to: Date;
+  /** Campaign, ad set or individual ad. Defaults to campaign. */
+  level?: Exclude<AdLevel, 'account'>;
 }): Promise<CampaignRow[]> {
   const rows = await prisma.adInsight.findMany({
     where: {
-      level: 'campaign',
+      level: options.level ?? 'campaign',
       date: { gte: options.from, lte: options.to },
       adAccount: {
         workspaceId: options.workspaceId,

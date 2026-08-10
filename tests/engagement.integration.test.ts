@@ -323,6 +323,158 @@ describe('syncTargetEdges', () => {
   });
 });
 
+describe('external post insights', () => {
+  /** The post catalogue, as Graph returns it for a single post. */
+  function stubPostCatalogue(): void {
+    routes['/insights'] = () => ({
+      data: [
+        { name: 'post_impressions', period: 'lifetime', values: [{ value: 4000 }] },
+        { name: 'post_impressions_unique', period: 'lifetime', values: [{ value: 3100 }] },
+        { name: 'post_engaged_users', period: 'lifetime', values: [{ value: 210 }] },
+        {
+          name: 'post_reactions_by_type_total',
+          period: 'lifetime',
+          values: [{ value: { like: 40, love: 9 } }],
+        },
+      ],
+    });
+    routes['/external-1'] = () => ({
+      likes: { summary: { total_count: 49 } },
+      comments: { summary: { total_count: 7 } },
+      shares: { count: 3 },
+      permalink_url: 'https://facebook.com/external-1',
+    });
+  }
+
+  it('reads the full catalogue for a post nobody scheduled here', async () => {
+    // Without this the list can say a colleague posted from the Facebook app
+    // but not whether anyone saw it, and Page-level totals stay wrong.
+    const { workspace, target } = await seedWorkspace();
+    stubEverything();
+    stubPostCatalogue();
+
+    await engagement.syncTargetEdges({ targetId: target.id });
+
+    const [post] = await engagement.readExternalPosts({ workspaceId: workspace.id });
+    expect(post!.impressions).toBe(4000);
+    expect(post!.reach).toBe(3100);
+    expect(post!.reactions).toBe(49);
+    expect(post!.metricCount).toBe(4);
+    expect(post!.syncedAt).not.toBeNull();
+  });
+
+  it('backfills the permalink Graph reported', async () => {
+    const { workspace, target } = await seedWorkspace();
+    stubEverything();
+    stubPostCatalogue();
+
+    await engagement.syncTargetEdges({ targetId: target.id });
+
+    const [post] = await engagement.readExternalPosts({ workspaceId: workspace.id });
+    expect(post!.permalink).toBe('https://facebook.com/external-1');
+  });
+
+  it('stores the post without insights when the catalogue is refused', async () => {
+    // A refused insights edge must not lose the post itself.
+    const { workspace, target } = await seedWorkspace();
+    stubEverything();
+    denied = ['/insights'];
+
+    await engagement.syncTargetEdges({ targetId: target.id });
+
+    const [post] = await engagement.readExternalPosts({ workspaceId: workspace.id });
+    expect(post!.message).toBe('Posted from the app');
+    expect(post!.metricCount).toBe(0);
+  });
+});
+
+describe('readPostMetrics', () => {
+  it('returns every stored metric with its catalogue description', async () => {
+    const { workspace, target, postTarget } = await seedWorkspace();
+    routes['/insights'] = () => ({
+      data: [
+        { name: 'post_impressions', period: 'lifetime', values: [{ value: 900 }] },
+        { name: 'post_clicks_by_type', period: 'lifetime', values: [{ value: { link: 12 } }] },
+      ],
+    });
+    routes[`/${postTarget.remotePostId}`] = () => ({ shares: { count: 1 } });
+
+    const { syncPostInsights } = await import('../src/lib/analytics');
+    await syncPostInsights(postTarget.id);
+
+    const { readPostMetrics } = await import('../src/lib/analytics');
+    const result = await readPostMetrics({
+      workspaceId: workspace.id,
+      postTargetId: postTarget.id,
+    });
+
+    expect(result!.targetName).toBe(target.name);
+    const impressions = result!.metrics.find((row) => row.metric === 'post_impressions');
+    expect(impressions!.value).toBe(900);
+    expect(impressions!.description.length).toBeGreaterThan(10);
+    expect(impressions!.breakdown).toBe(false);
+
+    const clicks = result!.metrics.find((row) => row.metric === 'post_clicks_by_type');
+    expect(clicks!.breakdown).toBe(true);
+    expect(clicks!.value).toEqual({ link: 12 });
+  });
+
+  it('will not read a post from another workspace', async () => {
+    const mine = await seedWorkspace('mine');
+    const theirs = await seedWorkspace('theirs');
+
+    expect(
+      await (
+        await import('../src/lib/analytics')
+      ).readPostMetrics({
+        workspaceId: mine.workspace.id,
+        postTargetId: theirs.postTarget.id,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe('probing every level', () => {
+  it('probes the levels it has a subject for and says why it skipped the rest', async () => {
+    const { target } = await seedWorkspace();
+    // A Page and a published post exist; no video, no Instagram account.
+    routes['/insights'] = () => ({
+      data: [{ name: 'post_impressions', period: 'lifetime', values: [{ value: 1 }] }],
+    });
+
+    const { probeAllLevels } = await import('../src/lib/analytics');
+    const summary = await probeAllLevels(target.id);
+
+    const video = summary.find((row) => row.level === 'video');
+    expect(video!.checked).toBe(0);
+    expect(video!.skipped).toBeTruthy();
+
+    const post = summary.find((row) => row.level === 'post');
+    expect(post!.checked).toBeGreaterThan(0);
+  });
+
+  it('records post-level availability against the destination', async () => {
+    const { target } = await seedWorkspace();
+    routes['/insights'] = () => ({
+      data: [{ name: 'post_impressions', period: 'lifetime', values: [{ value: 1 }] }],
+    });
+
+    const { probeTarget, readAvailability, readCoverage } = await import('../src/lib/analytics');
+    await probeTarget(target.id, 'lifetime', 'post');
+
+    const availability = await readAvailability(target.id);
+    const impressions = availability.find((row) => row.metric === 'post_impressions');
+    expect(impressions!.available).toBe(true);
+
+    // Everything else in the post catalogue was asked for and did not come
+    // back, which is a different fact from never having been asked.
+    const coverage = await readCoverage(target.id);
+    const post = coverage.find((row) => row.level === 'post');
+    expect(post!.available).toBe(1);
+    expect(post!.checked).toBe(post!.catalogue);
+  });
+});
+
 describe('comment moderation', () => {
   it('hides a comment on Facebook before recording it locally', async () => {
     const { workspace, target } = await seedWorkspace();
@@ -418,6 +570,122 @@ describe('reading back is scoped to the workspace', () => {
     expect(await engagement.readExternalPosts({ workspaceId: mine.workspace.id })).toEqual([]);
 
     expect((await engagement.readComments({ workspaceId: theirs.workspace.id })).length).toBe(1);
+  });
+});
+
+describe('CSV export', () => {
+  /** Split a CSV into rows, respecting quoted fields. */
+  async function parse(csv: string): Promise<string[][]> {
+    const { parseCsv } = await import('../src/lib/csv');
+    return parseCsv(csv);
+  }
+
+  const window = (workspaceId: string) => ({
+    workspaceId,
+    from: new Date('2026-07-01T00:00:00Z'),
+    to: new Date('2026-09-01T00:00:00Z'),
+  });
+
+  it('gives every captured metric its own column', async () => {
+    // The whole point of the export: the UI table shows seven numbers, this
+    // has to reach the rest of the catalogue.
+    const { workspace, postTarget } = await seedWorkspace();
+    routes['/insights'] = () => ({
+      data: [
+        { name: 'post_impressions', period: 'lifetime', values: [{ value: 900 }] },
+        { name: 'post_impressions_viral', period: 'lifetime', values: [{ value: 120 }] },
+        { name: 'post_video_views', period: 'lifetime', values: [{ value: 44 }] },
+      ],
+    });
+    routes[`/${postTarget.remotePostId}`] = () => ({ shares: { count: 2 } });
+
+    const { syncPostInsights } = await import('../src/lib/analytics');
+    await syncPostInsights(postTarget.id);
+
+    const { postMetricsCsv } = await import('../src/lib/analytics-export');
+    const [header, row] = await parse(await postMetricsCsv(window(workspace.id)));
+
+    expect(header).toContain('post_impressions_viral');
+    expect(header).toContain('post_video_views');
+    expect(row![header!.indexOf('post_impressions')]).toBe('900');
+    expect(row![header!.indexOf('post_video_views')]).toBe('44');
+  });
+
+  it('quotes post text containing a comma or a newline', async () => {
+    const { workspace, post } = await seedWorkspace();
+    await prisma.post.update({
+      where: { id: post.id },
+      data: { message: 'Hello, world\nsecond line' },
+    });
+
+    const { postMetricsCsv } = await import('../src/lib/analytics-export');
+    const csv = await postMetricsCsv(window(workspace.id));
+    const rows = await parse(csv);
+
+    // Round-trips through the reader: a naive join would have split this into
+    // two rows and three fields.
+    expect(rows).toHaveLength(2);
+    expect(rows[1]!).toContain('Hello, world\nsecond line');
+  });
+
+  it('keeps a breakdown map as JSON rather than flattening it to a number', async () => {
+    const { workspace, postTarget } = await seedWorkspace();
+    routes['/insights'] = () => ({
+      data: [
+        {
+          name: 'post_reactions_by_type_total',
+          period: 'lifetime',
+          values: [{ value: { like: 5, love: 2 } }],
+        },
+      ],
+    });
+    routes[`/${postTarget.remotePostId}`] = () => ({ shares: { count: 0 } });
+
+    const { syncPostInsights } = await import('../src/lib/analytics');
+    await syncPostInsights(postTarget.id);
+
+    const { postMetricsCsv } = await import('../src/lib/analytics-export');
+    const [header, row] = await parse(await postMetricsCsv(window(workspace.id)));
+
+    expect(JSON.parse(row![header!.indexOf('post_reactions_by_type_total')]!)).toEqual({
+      like: 5,
+      love: 2,
+    });
+  });
+
+  it('exports the edges and the ad spend', async () => {
+    const { workspace, target } = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: target.id });
+
+    const { buildExport } = await import('../src/lib/analytics-export');
+
+    const comments = await parse(await buildExport('comments', window(workspace.id)));
+    expect(comments[1]).toContain('Love this');
+
+    const reviews = await parse(await buildExport('reviews', window(workspace.id)));
+    expect(reviews.flat()).toContain('Great service');
+
+    const videos = await parse(await buildExport('videos', window(workspace.id)));
+    expect(videos[0]).toContain('total_video_views');
+
+    // No ad account connected: a header and nothing else, not a crash.
+    const spend = await parse(await buildExport('ads', window(workspace.id)));
+    expect(spend[0]![0]).toBe('date');
+    expect(spend).toHaveLength(1);
+  });
+
+  it('never exports another workspace’s rows', async () => {
+    const mine = await seedWorkspace('mine');
+    const theirs = await seedWorkspace('theirs');
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: theirs.target.id });
+
+    const { buildExport } = await import('../src/lib/analytics-export');
+    const comments = await parse(await buildExport('comments', window(mine.workspace.id)));
+
+    // Header only.
+    expect(comments).toHaveLength(1);
   });
 });
 
@@ -560,8 +828,8 @@ describe('Ads', () => {
     const result = await ads.syncAdAccount({ adAccountId: account!.id });
 
     expect(result.error).toBeUndefined();
-    // One row at account level and one at campaign level.
-    expect(result.rows).toBe(2);
+    // One row per level: account, campaign, ad set and ad.
+    expect(result.rows).toBe(4);
 
     const summary = await ads.readAdSummary({
       workspaceId: workspace.id,
@@ -632,7 +900,46 @@ describe('Ads', () => {
     await ads.syncAdAccount({ adAccountId: account!.id });
     await ads.syncAdAccount({ adAccountId: account!.id });
 
-    expect(await prisma.adInsight.count()).toBe(2);
+    expect(await prisma.adInsight.count()).toBe(4);
+  });
+
+  it('breaks spend down by ad set and by ad, not only by campaign', async () => {
+    const { workspace } = await seedWorkspace();
+    stubAds();
+    await ads.discoverAdAccounts(workspace.id);
+    const [account] = await ads.listAdAccounts(workspace.id);
+
+    routes['/act_500/insights'] = () => ({
+      data: [
+        {
+          date_start: '2026-08-01',
+          account_id: '500',
+          campaign_id: 'camp-1',
+          campaign_name: 'Summer',
+          adset_id: 'set-1',
+          adset_name: 'Lookalike 1%',
+          ad_id: 'ad-1',
+          ad_name: 'Video A',
+          spend: '40',
+          impressions: '400',
+          clicks: '10',
+          reach: '350',
+        },
+      ],
+    });
+
+    await ads.syncAdAccount({ adAccountId: account!.id });
+
+    const window = {
+      workspaceId: workspace.id,
+      from: new Date('2026-07-01T00:00:00Z'),
+      to: new Date('2026-09-01T00:00:00Z'),
+    };
+
+    expect((await ads.readCampaigns({ ...window, level: 'adset' }))[0]!.name).toBe('Lookalike 1%');
+    expect((await ads.readCampaigns({ ...window, level: 'ad' }))[0]!.name).toBe('Video A');
+    // Campaign stays the default, so existing callers are unaffected.
+    expect((await ads.readCampaigns(window))[0]!.name).toBe('Summer');
   });
 
   it('reports the permission error rather than showing zero spend', async () => {

@@ -2,9 +2,10 @@ import { TargetType } from '@prisma/client';
 
 import { prisma } from './prisma';
 import { decryptSecret } from './crypto';
-import { toJson, toJsonOrNull } from './json';
+import { parseInsights, toJson, toJsonOrNull } from './json';
 import { asGraphError } from './facebook/graph';
 import { fetchInsights } from './facebook/analytics';
+import { syncExternalPostInsights } from './analytics';
 import {
   deleteComment,
   fetchComments,
@@ -396,11 +397,16 @@ export async function syncTargetEdges(options: {
     const external = posts.filter((post) => !ours.has(post.remoteId));
 
     for (const post of external) {
-      await prisma.externalPost.upsert({
+      const stored = await prisma.externalPost.upsert({
         where: { targetId_remoteId: { targetId: target.id, remoteId: post.remoteId } },
         create: { targetId: target.id, ...post },
         update: { message: post.message, permalink: post.permalink, fetchedAt: new Date() },
       });
+
+      // The same catalogue we read for our own posts. Without it this list can
+      // say a colleague posted from the Facebook app but not whether anyone
+      // saw it, and the Page-level totals stay wrong.
+      await syncExternalPostInsights(stored.id);
     }
 
     return external.length;
@@ -619,6 +625,15 @@ export interface ExternalPostRow {
   statusType: string | null;
   createdTime: Date;
   targetName: string;
+  impressions: number | null;
+  reach: number | null;
+  engagedUsers: number | null;
+  reactions: number | null;
+  comments: number | null;
+  shares: number | null;
+  /** How many catalogue metrics were captured, for the drill-down link. */
+  metricCount: number;
+  syncedAt: Date | null;
 }
 
 /** Posts that reached the Page without going through this app. */
@@ -642,12 +657,24 @@ export async function readExternalPosts(options: {
     take: options.limit ?? 100,
   });
 
-  return rows.map((row) => ({
-    id: row.id,
-    message: row.message ?? '(no text)',
-    permalink: row.permalink,
-    statusType: row.statusType,
-    createdTime: row.createdTime,
-    targetName: row.target.name,
-  }));
+  return rows.map((row) => {
+    const insights = parseInsights(row.insights);
+
+    return {
+      id: row.id,
+      message: row.message ?? '(no text)',
+      permalink: row.permalink,
+      statusType: row.statusType,
+      createdTime: row.createdTime,
+      targetName: row.target.name,
+      impressions: insights?.impressions ?? null,
+      reach: insights?.reach ?? null,
+      engagedUsers: insights?.engagedUsers ?? null,
+      reactions: insights?.reactions ?? null,
+      comments: insights?.comments ?? null,
+      shares: insights?.shares ?? null,
+      metricCount: Object.keys(insights?.metrics ?? {}).length,
+      syncedAt: row.insightsSyncedAt,
+    };
+  });
 }

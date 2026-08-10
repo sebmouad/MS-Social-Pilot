@@ -27,13 +27,17 @@ export const GET = route(async (request: Request) => {
 
   const adAccountId = url.searchParams.get('adAccountId') ?? undefined;
 
+  const requested = url.searchParams.get('level');
+  const level =
+    requested === 'adset' || requested === 'ad' || requested === 'campaign' ? requested : 'campaign';
+
   const [accounts, summary, campaigns] = await Promise.all([
     listAdAccounts(auth.workspace.id),
     readAdSummary({ workspaceId: auth.workspace.id, adAccountId, from, to }),
-    readCampaigns({ workspaceId: auth.workspace.id, adAccountId, from, to }),
+    readCampaigns({ workspaceId: auth.workspace.id, adAccountId, from, to, level }),
   ]);
 
-  return ok({ accounts, summary, campaigns });
+  return ok({ accounts, summary, campaigns, level });
 });
 
 const schema = z.object({

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
 export interface PostRow {
@@ -116,7 +117,14 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
             {sorted.map((post) => (
               <tr key={post.postTargetId} className="border-b border-slate-100 last:border-0">
                 <td className="max-w-xs py-2 pr-3">
-                  <p className="line-clamp-2 text-slate-800">{post.message || '—'}</p>
+                  {/* The table shows seven numbers; the drill-down shows the
+                      rest of the catalogue Graph returned for this post. */}
+                  <Link
+                    href={`/analytics/post/${post.postTargetId}`}
+                    className="line-clamp-2 text-slate-800 hover:text-brand-700 hover:underline"
+                  >
+                    {post.message || '—'}
+                  </Link>
                   <p className="mt-0.5 text-xs text-slate-500">
                     {post.targetName}
                     {post.publishedLabel ? ` · ${post.publishedLabel}` : ''}

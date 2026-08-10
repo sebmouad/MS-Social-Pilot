@@ -11,7 +11,13 @@ import {
   type MetricSeries,
   type UnavailableMetric,
 } from './facebook/analytics';
-import { CATEGORY_LABELS, findMetric, type MetricPeriod } from './facebook/metrics';
+import {
+  CATEGORY_LABELS,
+  catalogueSize,
+  findMetric,
+  type MetricLevel,
+  type MetricPeriod,
+} from './facebook/metrics';
 import { logActivity } from './scheduler/runner';
 
 /**
@@ -330,12 +336,111 @@ export async function readAvailability(targetId: string) {
       checkedAt: row.checkedAt,
       description: definition?.description ?? '',
       category: definition?.category ?? 'engagement',
+      level: definition?.level ?? 'page',
+      // A metric Meta announced the removal of explains its own absence.
+      deprecatedFrom: definition?.deprecatedFrom ?? null,
     };
   });
 }
 
-/** Live probe against Graph, bypassing stored snapshots. */
-export async function probeTarget(targetId: string, period?: MetricPeriod) {
+export interface CoverageRow {
+  level: MetricLevel;
+  catalogue: number;
+  checked: number;
+  available: number;
+  unavailable: number;
+}
+
+/**
+ * How much of the catalogue this destination has actually been shown to serve.
+ *
+ * The honest version of "all available metrics": the catalogue is what we know
+ * to ask for, and this is what came back. A level with `checked: 0` has never
+ * been probed, which is different from a level Meta refuses.
+ */
+export async function readCoverage(targetId: string): Promise<CoverageRow[]> {
+  const rows = await prisma.metricAvailability.findMany({
+    where: { targetId },
+    select: { metric: true, available: true },
+  });
+
+  const sizes = catalogueSize();
+  const levels: MetricLevel[] = ['page', 'post', 'video', 'ig_account', 'ig_media'];
+
+  return levels.map((level) => {
+    const forLevel = rows.filter((row) => findMetric(row.metric)?.level === level);
+    return {
+      level,
+      catalogue: sizes[level],
+      checked: forLevel.length,
+      available: forLevel.filter((row) => row.available).length,
+      unavailable: forLevel.filter((row) => !row.available).length,
+    };
+  });
+}
+
+/**
+ * Pick the Graph object a level should be probed against.
+ *
+ * A post-level probe needs a real post id and a video-level probe a real video
+ * id — the catalogue cannot be tested against the Page for either. Returns null
+ * when the destination has nothing of that kind yet, which is a fact worth
+ * reporting rather than an error.
+ */
+async function probeSubjectFor(
+  level: MetricLevel,
+  target: { id: string; providerId: string; workspaceId: string },
+): Promise<string | null> {
+  if (level === 'page') return target.providerId;
+
+  if (level === 'post') {
+    const row = await prisma.postTarget.findFirst({
+      where: { targetId: target.id, status: 'published', remotePostId: { not: null } },
+      orderBy: { publishedAt: 'desc' },
+      select: { remotePostId: true },
+    });
+    return row?.remotePostId ?? null;
+  }
+
+  if (level === 'video') {
+    const row = await prisma.pageVideo.findFirst({
+      where: { targetId: target.id },
+      orderBy: { createdTime: 'desc' },
+      select: { remoteId: true },
+    });
+    return row?.remoteId ?? null;
+  }
+
+  const account = await prisma.instagramAccount.findFirst({
+    where: { targetId: target.id, enabled: true },
+    select: { id: true, igUserId: true },
+  });
+  if (!account) return null;
+
+  if (level === 'ig_account') return account.igUserId;
+
+  const media = await prisma.instagramMedia.findFirst({
+    where: { accountId: account.id },
+    orderBy: { timestamp: 'desc' },
+    select: { remoteId: true },
+  });
+  return media?.remoteId ?? null;
+}
+
+/**
+ * Live probe against Graph, bypassing stored snapshots.
+ *
+ * Answers the question no amount of reading Meta's docs will: what this app, on
+ * this pinned Graph version, with the permissions it was actually granted, can
+ * retrieve for this destination today. Results are written to
+ * `MetricAvailability`, so the UI can distinguish "Meta refused this" from
+ * "this Page had no activity" without re-probing on every render.
+ */
+export async function probeTarget(
+  targetId: string,
+  period?: MetricPeriod,
+  level: MetricLevel = 'page',
+) {
   const target = await prisma.target.findUniqueOrThrow({
     where: { id: targetId },
     include: { socialAccount: true },
@@ -348,12 +453,77 @@ export async function probeTarget(targetId: string, period?: MetricPeriod) {
   const token = tokenFor(target);
   if (!token) throw new Error('No access token stored for this destination.');
 
-  return probeMetrics({
-    objectId: target.providerId,
-    level: 'page',
-    accessToken: token,
-    period,
-  });
+  const objectId = await probeSubjectFor(level, target);
+  if (!objectId) return [];
+
+  const results = await probeMetrics({ objectId, level, accessToken: token, period });
+
+  for (const entry of results) {
+    await prisma.metricAvailability.upsert({
+      where: {
+        targetId_metric_period: {
+          targetId: target.id,
+          metric: entry.name,
+          period: String(entry.period),
+        },
+      },
+      create: {
+        targetId: target.id,
+        metric: entry.name,
+        period: String(entry.period),
+        available: entry.available,
+        reason: entry.reason,
+      },
+      update: { available: entry.available, reason: entry.reason, checkedAt: new Date() },
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Probe every level in one pass.
+ *
+ * This is what fills the coverage panel: 354 catalogue names checked against a
+ * real Page, a real post, a real video and, where linked, a real Instagram
+ * account and media item.
+ */
+export async function probeAllLevels(targetId: string): Promise<
+  Array<{ level: MetricLevel; period: MetricPeriod; checked: number; available: number; skipped?: string }>
+> {
+  const passes: Array<{ level: MetricLevel; period: MetricPeriod }> = [
+    { level: 'page', period: 'day' },
+    { level: 'page', period: 'lifetime' },
+    { level: 'post', period: 'lifetime' },
+    { level: 'video', period: 'lifetime' },
+    { level: 'ig_account', period: 'day' },
+    { level: 'ig_media', period: 'lifetime' },
+  ];
+
+  const summary = [];
+
+  for (const pass of passes) {
+    try {
+      const results = await probeTarget(targetId, pass.period, pass.level);
+      summary.push({
+        ...pass,
+        checked: results.length,
+        available: results.filter((entry) => entry.available).length,
+        // Nothing of that kind exists yet: no post, no video, no linked
+        // Instagram account. Worth saying, rather than reporting zero coverage.
+        ...(results.length === 0 ? { skipped: 'Nothing of this kind to probe against.' } : {}),
+      });
+    } catch (error) {
+      summary.push({
+        ...pass,
+        checked: 0,
+        available: 0,
+        skipped: asGraphError(error).displayMessage,
+      });
+    }
+  }
+
+  return summary;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +540,76 @@ function numberOf(series: MetricSeries[], name: string): number | null {
 function mapOf(series: MetricSeries[], name: string): Record<string, number> | undefined {
   const entry = series.find((item) => item.name === name);
   return entry && entry.latest && typeof entry.latest === 'object' ? entry.latest : undefined;
+}
+
+/**
+ * Read the whole post catalogue for one Facebook post id.
+ *
+ * Shared by scheduled posts and by posts found on the Page that never went
+ * through this app: the numbers mean the same thing either way, and having one
+ * reader is what keeps the two from drifting into different definitions of
+ * "impressions".
+ */
+export async function readPostCatalogue(options: {
+  remotePostId: string;
+  accessToken: string;
+  /** Groups have no insights edge, so only the object counters are attempted. */
+  isPage: boolean;
+}): Promise<{ payload: ReturnType<typeof buildPostInsights>; permalink: string | null; count: number }> {
+  const { fetchInsights, fetchPostEngagement } = await import('./facebook/analytics');
+
+  const [engagement, insights] = await Promise.all([
+    fetchPostEngagement(options.remotePostId, options.accessToken).catch(() => null),
+    options.isPage
+      ? fetchInsights({
+          objectId: options.remotePostId,
+          level: 'post',
+          accessToken: options.accessToken,
+          period: 'lifetime',
+        })
+      : Promise.resolve({ series: [] as MetricSeries[], unavailable: [], empty: [] }),
+  ]);
+
+  return {
+    payload: buildPostInsights(insights.series, engagement),
+    permalink: engagement?.permalink ?? null,
+    count: insights.series.length,
+  };
+}
+
+/** Flatten a Graph series list into the stored PostInsights shape. */
+function buildPostInsights(
+  series: MetricSeries[],
+  engagement: { reactions: number | null; comments: number | null; shares: number | null } | null,
+) {
+  const metrics: Record<string, number | Record<string, number>> = {};
+  for (const entry of series) {
+    if (entry.latest !== null) metrics[entry.name] = entry.latest;
+  }
+
+  return {
+    impressions: numberOf(series, 'post_impressions'),
+    reach: numberOf(series, 'post_impressions_unique'),
+    engagedUsers: numberOf(series, 'post_engaged_users'),
+    reactions: engagement?.reactions ?? null,
+    comments: engagement?.comments ?? null,
+    shares: engagement?.shares ?? null,
+    clicks: numberOf(series, 'post_clicks'),
+
+    impressionsOrganic: numberOf(series, 'post_impressions_organic'),
+    impressionsPaid: numberOf(series, 'post_impressions_paid'),
+    impressionsViral: numberOf(series, 'post_impressions_viral'),
+    impressionsFan: numberOf(series, 'post_impressions_fan'),
+    negativeFeedback: numberOf(series, 'post_negative_feedback'),
+    videoViews: numberOf(series, 'post_video_views'),
+    videoViewTime: numberOf(series, 'post_video_view_time'),
+    videoAvgTimeWatched: numberOf(series, 'post_video_avg_time_watched'),
+
+    reactionsByType: mapOf(series, 'post_reactions_by_type_total'),
+    clicksByType: mapOf(series, 'post_clicks_by_type'),
+    metrics,
+    syncedAt: new Date().toISOString(),
+  };
 }
 
 /**
@@ -395,68 +635,165 @@ export async function syncPostInsights(postTargetId: string): Promise<{
   if (!token) return { ok: false, metrics: 0, error: 'No access token stored.' };
 
   try {
-    const { fetchInsights, fetchPostEngagement } = await import('./facebook/analytics');
-
-    // Engagement counters live on the post object; insights on its edge. A
-    // Group has no insights edge at all, so only the former is attempted.
-    const isPage = row.target.type === TargetType.page;
-
-    const [engagement, insights] = await Promise.all([
-      fetchPostEngagement(row.remotePostId, token).catch(() => null),
-      isPage
-        ? fetchInsights({
-            objectId: row.remotePostId,
-            level: 'post',
-            accessToken: token,
-            period: 'lifetime',
-          })
-        : Promise.resolve({ series: [], unavailable: [], empty: [] }),
-    ]);
-
-    const series = insights.series;
-
-    const metrics: Record<string, number | Record<string, number>> = {};
-    for (const entry of series) {
-      if (entry.latest !== null) metrics[entry.name] = entry.latest;
-    }
-
-    const insightsPayload = {
-      impressions: numberOf(series, 'post_impressions'),
-      reach: numberOf(series, 'post_impressions_unique'),
-      engagedUsers: numberOf(series, 'post_engaged_users'),
-      reactions: engagement?.reactions ?? null,
-      comments: engagement?.comments ?? null,
-      shares: engagement?.shares ?? null,
-      clicks: numberOf(series, 'post_clicks'),
-
-      impressionsOrganic: numberOf(series, 'post_impressions_organic'),
-      impressionsPaid: numberOf(series, 'post_impressions_paid'),
-      impressionsViral: numberOf(series, 'post_impressions_viral'),
-      impressionsFan: numberOf(series, 'post_impressions_fan'),
-      negativeFeedback: numberOf(series, 'post_negative_feedback'),
-      videoViews: numberOf(series, 'post_video_views'),
-      videoViewTime: numberOf(series, 'post_video_view_time'),
-      videoAvgTimeWatched: numberOf(series, 'post_video_avg_time_watched'),
-
-      reactionsByType: mapOf(series, 'post_reactions_by_type_total'),
-      clicksByType: mapOf(series, 'post_clicks_by_type'),
-      metrics,
-      syncedAt: new Date().toISOString(),
-    };
+    const result = await readPostCatalogue({
+      remotePostId: row.remotePostId,
+      accessToken: token,
+      isPage: row.target.type === TargetType.page,
+    });
 
     await prisma.postTarget.update({
       where: { id: postTargetId },
       data: {
-        insights: toJson(insightsPayload),
+        insights: toJson(result.payload),
         insightsSyncedAt: new Date(),
-        ...(engagement?.permalink && !row.remoteUrl ? { remoteUrl: engagement.permalink } : {}),
+        ...(result.permalink && !row.remoteUrl ? { remoteUrl: result.permalink } : {}),
       },
     });
 
-    return { ok: true, metrics: series.length };
+    return { ok: true, metrics: result.count };
   } catch (error) {
     return { ok: false, metrics: 0, error: asGraphError(error).displayMessage };
   }
+}
+
+/**
+ * Read the post catalogue for a post that never went through this app.
+ *
+ * Without this the "other posts" list is a bare list of text: it can say a
+ * colleague posted from the Facebook app, but not whether anyone saw it — and
+ * a Page-level report that counts only our own posts understates the Page.
+ */
+export async function syncExternalPostInsights(externalPostId: string): Promise<{
+  ok: boolean;
+  metrics: number;
+  error?: string;
+}> {
+  const row = await prisma.externalPost.findUniqueOrThrow({
+    where: { id: externalPostId },
+    include: { target: { include: { socialAccount: true } } },
+  });
+
+  const token = tokenFor(row.target);
+  if (!token) return { ok: false, metrics: 0, error: 'No access token stored.' };
+
+  try {
+    const result = await readPostCatalogue({
+      remotePostId: row.remoteId,
+      accessToken: token,
+      isPage: row.target.type === TargetType.page,
+    });
+
+    await prisma.externalPost.update({
+      where: { id: externalPostId },
+      data: {
+        insights: toJson(result.payload),
+        insightsSyncedAt: new Date(),
+        ...(result.permalink && !row.permalink ? { permalink: result.permalink } : {}),
+      },
+    });
+
+    return { ok: true, metrics: result.count };
+  } catch (error) {
+    return { ok: false, metrics: 0, error: asGraphError(error).displayMessage };
+  }
+}
+
+export interface PostMetricRow {
+  metric: string;
+  label: string;
+  description: string;
+  category: string;
+  categoryLabel: string;
+  value: number | Record<string, number>;
+  breakdown: boolean;
+  deprecatedFrom: string | null;
+}
+
+/**
+ * Every catalogue metric stored against one post, ready for the explorer.
+ *
+ * The headline fields answer "how did this post do". This answers "what else
+ * does Facebook know about it", which is the whole reason the full response is
+ * kept rather than the seven numbers a table can show.
+ */
+export async function readPostMetrics(options: {
+  postTargetId?: string;
+  externalPostId?: string;
+  workspaceId: string;
+}): Promise<{
+  message: string;
+  targetName: string;
+  publishedAt: Date | null;
+  url: string | null;
+  syncedAt: Date | null;
+  metrics: PostMetricRow[];
+} | null> {
+  const source = options.postTargetId
+    ? await prisma.postTarget
+        .findFirst({
+          where: { id: options.postTargetId, post: { workspaceId: options.workspaceId } },
+          include: { target: { select: { name: true } }, post: { select: { message: true } } },
+        })
+        .then((row) =>
+          row
+            ? {
+                message: row.post.message,
+                targetName: row.target.name,
+                publishedAt: row.publishedAt,
+                url: row.remoteUrl,
+                syncedAt: row.insightsSyncedAt,
+                insights: row.insights,
+              }
+            : null,
+        )
+    : options.externalPostId
+      ? await prisma.externalPost
+          .findFirst({
+            where: { id: options.externalPostId, target: { workspaceId: options.workspaceId } },
+            include: { target: { select: { name: true } } },
+          })
+          .then((row) =>
+            row
+              ? {
+                  message: row.message ?? '(no text)',
+                  targetName: row.target.name,
+                  publishedAt: row.createdTime,
+                  url: row.permalink,
+                  syncedAt: row.insightsSyncedAt,
+                  insights: row.insights,
+                }
+              : null,
+          )
+      : null;
+
+  if (!source) return null;
+
+  const stored = parseInsights(source.insights)?.metrics ?? {};
+
+  const metrics: PostMetricRow[] = Object.entries(stored).map(([name, value]) => {
+    const definition = findMetric(name, 'post');
+    return {
+      metric: name,
+      label: humanise(name),
+      description: definition?.description ?? '',
+      category: definition?.category ?? 'engagement',
+      categoryLabel: CATEGORY_LABELS[definition?.category ?? 'engagement'],
+      value,
+      breakdown: typeof value === 'object',
+      deprecatedFrom: definition?.deprecatedFrom ?? null,
+    };
+  });
+
+  return {
+    message: source.message,
+    targetName: source.targetName,
+    publishedAt: source.publishedAt,
+    url: source.url,
+    syncedAt: source.syncedAt,
+    metrics: metrics.sort(
+      (a, b) => a.category.localeCompare(b.category) || a.metric.localeCompare(b.metric),
+    ),
+  };
 }
 
 export interface PostAnalyticsRow {

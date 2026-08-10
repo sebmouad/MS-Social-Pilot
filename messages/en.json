@@ -468,7 +468,37 @@
     "newLikes": "New likes",
     "lostLikes": "Lost likes",
     "netChange": "Net change",
-    "audienceHint": "Demographics are lifetime snapshots from Facebook, so they show the audience as it stands now. New and lost likes are counted over the selected range."
+    "audienceHint": "Demographics are lifetime snapshots from Facebook, so they show the audience as it stands now. New and lost likes are counted over the selected range.",
+    "probeAll": "Test coverage",
+    "probed": "Checked {checked} metric names; Facebook serves {available}.",
+    "coverageTitle": "Catalogue coverage",
+    "coverageHint": "The catalogue is every metric Meta documents. This is how much of it this destination has actually been shown to serve — untested means never asked for, which is not the same as refused.",
+    "level": "Level",
+    "level_page": "Page",
+    "level_post": "Post",
+    "level_video": "Video",
+    "level_ig_account": "Instagram account",
+    "level_ig_media": "Instagram media",
+    "catalogue": "Catalogue",
+    "confirmed": "Served",
+    "refused": "Refused",
+    "untested": "Untested",
+    "deprecatedFrom": "removed in {version}",
+    "postMetricsTitle": "Every metric for this post",
+    "backToPosts": "Back to posts",
+    "syncedAt": "read {when}",
+    "viewOnFacebook": "View on Facebook",
+    "breakdownBelow": "breakdown",
+    "allMetrics": "All {count} metrics",
+    "export_posts": "Posts — every metric",
+    "export_page": "Page insights (time series)",
+    "export_external": "Other posts on the page",
+    "export_comments": "Comments",
+    "export_reviews": "Ratings",
+    "export_videos": "Videos — every metric",
+    "export_instagram": "Instagram insights",
+    "export_instagram_media": "Instagram media — every metric",
+    "export_ads": "Ad spend"
   },
   "engagement": {
     "refresh": "Pull from Facebook",
@@ -509,7 +539,14 @@
     "externalHint": "Posts that reached the page without going through this app. Reports understate the page without them.",
     "noExternal": "No other posts found in this range.",
     "postType": "Post",
-    "viewOnFacebook": "View on Facebook"
+    "viewOnFacebook": "View on Facebook",
+    "impressions": "Impressions",
+    "reach": "Reach",
+    "engaged": "Engaged people",
+    "reactions": "Reactions",
+    "comments": "Comments",
+    "shares": "Shares",
+    "allMetrics": "All {count} metrics"
   },
   "instagram": {
     "none": "No Instagram business account is linked to a connected page yet.",
@@ -549,6 +586,10 @@
     "actionsHint": "Every action type the campaigns produced, summed over the range.",
     "campaign": "Campaign",
     "noCampaigns": "No campaign data in this range.",
-    "reachNote": "Campaign reach shows the highest single day rather than a sum, because reach counts people and adding daily figures would count the same person twice."
+    "reachNote": "Campaign reach shows the highest single day rather than a sum, because reach counts people and adding daily figures would count the same person twice.",
+    "level": "Break down by",
+    "level_campaign": "Campaign",
+    "level_adset": "Ad set",
+    "level_ad": "Ad"
   }
 }

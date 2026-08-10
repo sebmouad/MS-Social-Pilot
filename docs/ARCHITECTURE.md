@@ -301,6 +301,13 @@ answers the question no amount of documentation will: what this app, on this
 pinned Graph version, with the permissions it was actually granted, can retrieve
 today.
 
+`probeAllLevels` runs that probe across all five levels in one pass — against a
+real Page, a real post, a real video and, where linked, a real Instagram account
+and media item, because the post catalogue cannot be tested against the Page.
+A level with no subject yet reports `skipped` rather than zero coverage, and
+`readCoverage` turns the stored results into the honest version of "all
+available metrics": catalogue size, confirmed, refused, and never asked.
+
 Values are snapshotted into `PageInsight` because Graph serves only about two
 years of history. Breakdown metrics (`page_fans_country` and the like) keep
 their map and store `numeric = null` — summing "FR + GB + US" would be a number
@@ -310,6 +317,20 @@ Page profile counters (`fan_count`, `followers_count`, `talking_about_count`)
 are read separately off the Page object. They need no `read_insights`
 permission and no date range, so they still land when the insights edge is
 restricted or empty.
+
+The full per-post response is kept in `PostInsights.metrics`, not just the
+seven numbers a table can show, and `/analytics/post/<id>` renders all of it
+grouped by category with breakdown maps expanded. Posts found on the Page that
+never went through this app get the same catalogue through the same reader
+(`readPostCatalogue`), so the two cannot drift into different definitions of
+"impressions".
+
+Exports live in `src/lib/analytics-export.ts`: one CSV per part of the
+catalogue, and for posts, videos and Instagram media, **one column per metric**.
+Columns are derived from the data rather than the catalogue — 354 mostly-empty
+columns would be worse than useless — so the header is the union of what
+actually came back for the rows being exported. Breakdown maps are written as
+JSON rather than collapsed to a number that would mean nothing.
 
 Groups are skipped throughout: Facebook exposes no insights edge for a Group.
 
@@ -348,7 +369,9 @@ ways that each need handling: some metrics exist only under
 parameter, and bare names like `impressions` collide between account and media
 level, so lookups pass a level.
 
-Ads Insights is read-only. `ads_read` is requested; `ads_management` never is.
+Ads Insights is read-only and stored at all four levels — account, campaign,
+ad set and ad — because "which ad" is the question people actually have when a
+campaign underperforms. `ads_read` is requested; `ads_management` never is.
 The point is the comparison: a Page whose reach tripled last month either earned
 it or bought it, and only spend distinguishes the two. Rates are derived from
 the totals rather than averaged across days — a mean of daily CPCs weights a £1

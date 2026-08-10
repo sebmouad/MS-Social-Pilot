@@ -6,6 +6,7 @@ import { AnalyticsClient } from '@/components/AnalyticsClient';
 import { AnalyticsTabs } from '@/components/AnalyticsTabs';
 import { BreakdownBars } from '@/components/BreakdownBars';
 import { CommentsPanel } from '@/components/CommentsPanel';
+import { ExportMenu } from '@/components/ExportMenu';
 import { PagePicker } from '@/components/PagePicker';
 import { PostAnalyticsTable } from '@/components/PostAnalyticsTable';
 import { SyncButton } from '@/components/SyncButton';
@@ -14,6 +15,7 @@ import { prisma } from '@/lib/prisma';
 import {
   readAudience,
   readAvailability,
+  readCoverage,
   readInteractions,
   readPostAnalytics,
   readStoredAnalytics,
@@ -92,6 +94,12 @@ export default async function AnalyticsPage({
             pages={pages.map((page) => ({ id: page.id, name: page.name }))}
             selectedId={selected.id}
             days={window}
+          />
+
+          <ExportMenu
+            targetId={selected.id}
+            from={from.toISOString()}
+            to={to.toISOString()}
           />
 
           <div className="flex gap-1">
@@ -189,7 +197,13 @@ export default async function AnalyticsPage({
       )}
 
       {view === 'ads' && (
-        <AdsView workspaceId={auth.workspace.id} from={from} to={to} timezone={timezone} />
+        <AdsView
+          workspaceId={auth.workspace.id}
+          level={first(params.adLevel)}
+          from={from}
+          to={to}
+          timezone={timezone}
+        />
       )}
 
       {view === 'overview' && (
@@ -204,6 +218,11 @@ export default async function AnalyticsPage({
             available: entry.available,
             reason: entry.reason,
             description: entry.description,
+            deprecatedFrom: entry.deprecatedFrom,
+          }))}
+          coverage={(await readCoverage(selected.id)).map((row) => ({
+            ...row,
+            levelLabel: t(`level_${row.level}`),
           }))}
           profile={{
             fanCount: selected.fanCount,
@@ -570,29 +589,67 @@ async function ExternalView({
       </div>
 
       <ul className="space-y-3">
-        {posts.map((post) => (
-          <li key={post.id} className="card p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-xs uppercase tracking-wide text-slate-500">
-                {post.statusType ?? t('postType')}
-              </p>
-              <p className="text-xs text-slate-500">
-                {post.targetName} · {formatInZone(post.createdTime, timezone)}
-              </p>
-            </div>
-            <p className="mt-1.5 whitespace-pre-wrap text-sm text-slate-700">{post.message}</p>
-            {post.permalink && (
-              <a
-                href={post.permalink}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-2 inline-block text-xs font-medium text-brand-600 hover:underline"
-              >
-                {t('viewOnFacebook')}
-              </a>
-            )}
-          </li>
-        ))}
+        {posts.map((post) => {
+          const figures = [
+            { label: t('impressions'), value: post.impressions },
+            { label: t('reach'), value: post.reach },
+            { label: t('engaged'), value: post.engagedUsers },
+            { label: t('reactions'), value: post.reactions },
+            { label: t('comments'), value: post.comments },
+            { label: t('shares'), value: post.shares },
+          ];
+
+          return (
+            <li key={post.id} className="card p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-xs uppercase tracking-wide text-slate-500">
+                  {post.statusType ?? t('postType')}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {post.targetName} · {formatInZone(post.createdTime, timezone)}
+                </p>
+              </div>
+
+              <p className="mt-1.5 whitespace-pre-wrap text-sm text-slate-700">{post.message}</p>
+
+              {post.syncedAt && (
+                <dl className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  {figures.map((figure) => (
+                    <div key={figure.label}>
+                      <dt className="text-[10px] uppercase tracking-wide text-slate-500">
+                        {figure.label}
+                      </dt>
+                      <dd className="text-sm font-medium text-slate-900">
+                        {figure.value === null ? '—' : figure.value.toLocaleString()}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              <div className="mt-2 flex flex-wrap gap-3 text-xs font-medium">
+                {post.metricCount > 0 && (
+                  <Link
+                    href={`/analytics/post/${post.id}?external=true`}
+                    className="text-brand-600 hover:underline"
+                  >
+                    {t('allMetrics', { count: post.metricCount })}
+                  </Link>
+                )}
+                {post.permalink && (
+                  <a
+                    href={post.permalink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-brand-600 hover:underline"
+                  >
+                    {t('viewOnFacebook')}
+                  </a>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -798,17 +855,22 @@ async function InstagramView({
 
 async function AdsView({
   workspaceId,
+  level,
   from,
   to,
   timezone,
 }: {
   workspaceId: string;
+  level?: string;
   from: Date;
   to: Date;
   timezone: string;
 }) {
   const t = await getTranslations('ads');
   const accounts = await listAdAccounts(workspaceId);
+
+  const breakdown: 'campaign' | 'adset' | 'ad' =
+    level === 'adset' || level === 'ad' ? level : 'campaign';
 
   if (accounts.length === 0) {
     return (
@@ -826,7 +888,7 @@ async function AdsView({
 
   const [summary, campaigns] = await Promise.all([
     readAdSummary({ workspaceId, from, to }),
-    readCampaigns({ workspaceId, from, to }),
+    readCampaigns({ workspaceId, from, to, level: breakdown }),
   ]);
 
   const money = (value: number | null) =>
@@ -876,6 +938,21 @@ async function AdsView({
         <BreakdownBars title={t('actions')} description={t('actionsHint')} data={summary.actions} />
       )}
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs uppercase tracking-wide text-slate-500">{t('level')}</span>
+        {(['campaign', 'adset', 'ad'] as const).map((option) => (
+          <Link
+            key={option}
+            href={`/analytics?view=ads&adLevel=${option}`}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+              option === breakdown ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            {t(`level_${option}`)}
+          </Link>
+        ))}
+      </div>
+
       {campaigns.length === 0 ? (
         <p className="card p-6 text-center text-sm text-slate-600">{t('noCampaigns')}</p>
       ) : (
@@ -883,7 +960,7 @@ async function AdsView({
           <table className="w-full min-w-[720px] text-sm">
             <thead className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="px-4 py-3">{t('campaign')}</th>
+                <th className="px-4 py-3">{t(`level_${breakdown}`)}</th>
                 <th className="px-4 py-3 text-right">{t('spend')}</th>
                 <th className="px-4 py-3 text-right">{t('impressions')}</th>
                 <th className="px-4 py-3 text-right">{t('reach')}</th>

@@ -468,7 +468,37 @@
     "newLikes": "Nouveaux J'aime",
     "lostLikes": "J'aime perdus",
     "netChange": "Variation nette",
-    "audienceHint": "Les données démographiques sont des relevés cumulés fournis par Facebook : elles décrivent l'audience actuelle. Les J'aime gagnés et perdus sont comptés sur la période sélectionnée."
+    "audienceHint": "Les données démographiques sont des relevés cumulés fournis par Facebook : elles décrivent l'audience actuelle. Les J'aime gagnés et perdus sont comptés sur la période sélectionnée.",
+    "probeAll": "Tester la couverture",
+    "probed": "{checked} indicateurs testés ; Facebook en fournit {available}.",
+    "coverageTitle": "Couverture du catalogue",
+    "coverageHint": "Le catalogue reprend tous les indicateurs documentés par Meta. Voici la part que cette destination fournit réellement — « non testé » signifie jamais demandé, ce qui n’est pas la même chose que refusé.",
+    "level": "Niveau",
+    "level_page": "Page",
+    "level_post": "Publication",
+    "level_video": "Vidéo",
+    "level_ig_account": "Compte Instagram",
+    "level_ig_media": "Contenu Instagram",
+    "catalogue": "Catalogue",
+    "confirmed": "Fournis",
+    "refused": "Refusés",
+    "untested": "Non testés",
+    "deprecatedFrom": "supprimé en {version}",
+    "postMetricsTitle": "Tous les indicateurs de cette publication",
+    "backToPosts": "Retour aux publications",
+    "syncedAt": "lu {when}",
+    "viewOnFacebook": "Voir sur Facebook",
+    "breakdownBelow": "répartition",
+    "allMetrics": "Les {count} indicateurs",
+    "export_posts": "Publications — tous les indicateurs",
+    "export_page": "Statistiques de page (série temporelle)",
+    "export_external": "Autres publications de la page",
+    "export_comments": "Commentaires",
+    "export_reviews": "Avis",
+    "export_videos": "Vidéos — tous les indicateurs",
+    "export_instagram": "Statistiques Instagram",
+    "export_instagram_media": "Contenus Instagram — tous les indicateurs",
+    "export_ads": "Dépenses publicitaires"
   },
   "engagement": {
     "refresh": "Récupérer depuis Facebook",
@@ -509,7 +539,14 @@
     "externalHint": "Publications parues sur la page sans passer par cet outil. Sans elles, les rapports sous-estiment la page.",
     "noExternal": "Aucune autre publication sur cette période.",
     "postType": "Publication",
-    "viewOnFacebook": "Voir sur Facebook"
+    "viewOnFacebook": "Voir sur Facebook",
+    "impressions": "Impressions",
+    "reach": "Couverture",
+    "engaged": "Personnes engagées",
+    "reactions": "Réactions",
+    "comments": "Commentaires",
+    "shares": "Partages",
+    "allMetrics": "Les {count} indicateurs"
   },
   "instagram": {
     "none": "Aucun compte professionnel Instagram n’est encore relié à une page connectée.",
@@ -549,6 +586,10 @@
     "actionsHint": "Tous les types d’actions produits par les campagnes, cumulés sur la période.",
     "campaign": "Campagne",
     "noCampaigns": "Aucune donnée de campagne sur cette période.",
-    "reachNote": "La couverture d’une campagne affiche le meilleur jour et non un cumul : elle compte des personnes, et additionner les jours compterait deux fois la même personne."
+    "reachNote": "La couverture d’une campagne affiche le meilleur jour et non un cumul : elle compte des personnes, et additionner les jours compterait deux fois la même personne.",
+    "level": "Détailler par",
+    "level_campaign": "Campagne",
+    "level_adset": "Ensemble de publicités",
+    "level_ad": "Publicité"
   }
 }

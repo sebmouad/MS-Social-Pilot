@@ -2,7 +2,14 @@ import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { probeTarget, readAvailability, readStoredAnalytics, syncTargetAnalytics } from '@/lib/analytics';
+import {
+  probeAllLevels,
+  probeTarget,
+  readAvailability,
+  readCoverage,
+  readStoredAnalytics,
+  syncTargetAnalytics,
+} from '@/lib/analytics';
 import { fail, ok, readJson, route } from '@/lib/api';
 
 type Context = { params: Promise<{ targetId: string }> };
@@ -35,7 +42,7 @@ export const GET = route(async (request: Request, context: Context) => {
     return fail('Enter a valid date range.', 400);
   }
 
-  const [series, availability] = await Promise.all([
+  const [series, availability, coverage] = await Promise.all([
     readStoredAnalytics({
       targetId,
       from,
@@ -43,9 +50,11 @@ export const GET = route(async (request: Request, context: Context) => {
       period: url.searchParams.get('period') ?? undefined,
     }),
     readAvailability(targetId),
+    readCoverage(targetId),
   ]);
 
   return ok({
+    coverage,
     target: {
       id: target.id,
       name: target.name,
@@ -61,10 +70,11 @@ export const GET = route(async (request: Request, context: Context) => {
 });
 
 const postSchema = z.object({
-  action: z.enum(['sync', 'probe']).default('sync'),
+  action: z.enum(['sync', 'probe', 'probeAll']).default('sync'),
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
   period: z.enum(['day', 'week', 'days_28', 'lifetime']).optional(),
+  level: z.enum(['page', 'post', 'video', 'ig_account', 'ig_media']).optional(),
 });
 
 /** Pull fresh data from Graph, or probe which metrics it will serve. */
@@ -78,8 +88,14 @@ export const POST = route(async (request: Request, context: Context) => {
   const body = await readJson(request).catch(() => ({}));
   const input = postSchema.parse(body ?? {});
 
+  // A full probe walks every level against a real Page, post, video and — when
+  // linked — a real Instagram account and media item.
+  if (input.action === 'probeAll') {
+    return ok({ levels: await probeAllLevels(targetId) });
+  }
+
   if (input.action === 'probe') {
-    return ok({ metrics: await probeTarget(targetId, input.period) });
+    return ok({ metrics: await probeTarget(targetId, input.period, input.level) });
   }
 
   const result = await syncTargetAnalytics({

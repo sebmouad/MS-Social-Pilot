@@ -27,6 +27,16 @@ export interface AvailabilityView {
   available: boolean;
   reason: string | null;
   description: string;
+  deprecatedFrom: string | null;
+}
+
+export interface CoverageView {
+  level: string;
+  levelLabel: string;
+  catalogue: number;
+  checked: number;
+  available: number;
+  unavailable: number;
 }
 
 interface Props {
@@ -34,6 +44,7 @@ interface Props {
   targetName: string;
   series: SeriesView[];
   availability: AvailabilityView[];
+  coverage: CoverageView[];
   profile: {
     fanCount: number | null;
     followersCount: number | null;
@@ -54,11 +65,19 @@ function breakdownRows(value: number | Record<string, number> | null): Array<[st
     .sort((a, b) => b[1] - a[1]);
 }
 
-export function AnalyticsClient({ targetId, targetName, series, availability, profile }: Props) {
+export function AnalyticsClient({
+  targetId,
+  targetName,
+  series,
+  availability,
+  coverage,
+  profile,
+}: Props) {
   const t = useTranslations('analytics');
   const tCommon = useTranslations('common');
   const router = useRouter();
 
+  const [probing, setProbing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +126,40 @@ export function AnalyticsClient({ targetId, targetName, series, availability, pr
     setSyncing(false);
   }
 
+  /**
+   * Ask Graph what it will actually serve, level by level.
+   *
+   * Separate from `sync` because it is a different question: sync fetches the
+   * numbers, this establishes which of the 354 catalogue names exist for this
+   * destination at all — against a real Page, a real post, a real video and,
+   * when linked, a real Instagram account.
+   */
+  async function probeAll() {
+    setProbing(true);
+    setError(null);
+    setMessage(null);
+
+    const response = await fetch(`/api/analytics/${targetId}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'probeAll' }),
+    });
+    const body = (await response.json().catch(() => ({}))) as {
+      levels?: Array<{ checked: number; available: number }>;
+      error?: string;
+    };
+
+    if (!response.ok || body.error) {
+      setError(body.error ?? t('syncFailed'));
+    } else {
+      const checked = (body.levels ?? []).reduce((sum, level) => sum + level.checked, 0);
+      const available = (body.levels ?? []).reduce((sum, level) => sum + level.available, 0);
+      setMessage(t('probed', { checked, available }));
+      router.refresh();
+    }
+    setProbing(false);
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -121,9 +174,14 @@ export function AnalyticsClient({ targetId, targetName, series, availability, pr
             {t('metricsShown', { count: series.length })}
           </span>
         </div>
-        <button type="button" className="btn-primary" onClick={sync} disabled={syncing}>
-          {syncing ? tCommon('working') : t('syncNow')}
-        </button>
+        <div className="flex gap-2">
+          <button type="button" className="btn-secondary" onClick={probeAll} disabled={probing}>
+            {probing ? tCommon('working') : t('probeAll')}
+          </button>
+          <button type="button" className="btn-primary" onClick={sync} disabled={syncing}>
+            {syncing ? tCommon('working') : t('syncNow')}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -150,6 +208,41 @@ export function AnalyticsClient({ targetId, targetName, series, availability, pr
             </p>
           </div>
         ))}
+      </section>
+
+      {/* Catalogue coverage: what we know to ask for, against what this
+          destination has actually been shown to serve. A level with nothing
+          checked has never been probed, which is not the same as refused. */}
+      <section className="card p-5">
+        <h2 className="text-sm font-semibold text-slate-900">{t('coverageTitle')}</h2>
+        <p className="mt-0.5 text-xs text-slate-500">{t('coverageHint')}</p>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[420px] text-sm">
+            <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="pb-2">{t('level')}</th>
+                <th className="pb-2 text-right">{t('catalogue')}</th>
+                <th className="pb-2 text-right">{t('confirmed')}</th>
+                <th className="pb-2 text-right">{t('refused')}</th>
+                <th className="pb-2 text-right">{t('untested')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {coverage.map((row) => (
+                <tr key={row.level}>
+                  <td className="py-2 font-medium text-slate-900">{row.levelLabel}</td>
+                  <td className="py-2 text-right text-slate-600">{row.catalogue}</td>
+                  <td className="py-2 text-right font-medium text-emerald-700">{row.available}</td>
+                  <td className="py-2 text-right text-amber-700">{row.unavailable}</td>
+                  <td className="py-2 text-right text-slate-400">
+                    {Math.max(0, row.catalogue - row.checked)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {series.length === 0 ? (
@@ -260,6 +353,12 @@ export function AnalyticsClient({ targetId, targetName, series, availability, pr
                     <span className="font-mono text-slate-700">{entry.metric}</span>
                     <span className="text-slate-400"> · {entry.period} · </span>
                     <span className="text-amber-700">{entry.reason}</span>
+                    {entry.deprecatedFrom && (
+                      <span className="text-slate-400">
+                        {' '}
+                        · {t('deprecatedFrom', { version: entry.deprecatedFrom })}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
