@@ -14,7 +14,8 @@
     "reports": "Reports",
     "settings": "Settings",
     "signOut": "Sign out",
-    "switchWorkspace": "Switch client"
+    "switchWorkspace": "Switch client",
+    "analytics": "Analytics"
   },
   "auth": {
     "signIn": "Sign in",
@@ -406,5 +407,26 @@
       "cta": "Open the post"
     },
     "footer": "You are receiving this because of your notification settings in {workspace}."
+  },
+  "analytics": {
+    "title": "Analytics",
+    "subtitle": "Everything the Facebook Graph API will give us for this page",
+    "noPages": "No Facebook pages are connected yet.",
+    "connect": "Connect a page",
+    "choosePage": "Choose a page",
+    "lastDays": "{count} days",
+    "syncNow": "Pull from Facebook",
+    "synced": "Stored {stored} values across {metrics} metrics.",
+    "syncFailed": "Could not read analytics from Facebook.",
+    "noData": "Nothing captured yet. Pull from Facebook to fill this in.",
+    "filterPlaceholder": "Filter metrics…",
+    "metricsShown": "{count} metrics",
+    "fans": "Page likes",
+    "followers": "Followers",
+    "talkingAbout": "Talking about this",
+    "andMore": "and {count} more",
+    "unavailableTitle": "{count} metrics Facebook did not return",
+    "unavailableHint": "Meta removes insights metrics between API versions. These were requested and refused, so they are listed rather than silently dropped.",
+    "footnote": "Figures come from the Facebook Graph API for {name}. Snapshots are stored here because Graph serves only about two years of history."
   }
 }

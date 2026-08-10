@@ -15,8 +15,8 @@ The web app never waits on a scheduled publish; it writes rows. The worker owns
 everything time-based. Both call Graph through the same client, so retry and
 error-classification rules cannot drift apart.
 
-**The worker runs five jobs** on independent intervals — publish (30s), rss
-(15m), evergreen (1h), analytics (6h), tokens (24h). Each is a plain async
+**The worker runs six jobs** on independent intervals — publish (30s), rss
+(15m), evergreen (1h), analytics (6h), pageInsights (12h), tokens (24h). Each is a plain async
 function with one shape, so the loop is a table rather than a pile of branches,
 and any job can be run alone from a test or `POST /api/cron/tick?jobs=…`. A job
 that throws is caught per job: a failing RSS poll must never stop posts going
@@ -175,6 +175,8 @@ credentials do not.
 | `ShortLink`, `LinkClick` | Link shortening and click tracking |
 | `AiGeneration` | Caption calls with token counts, so spend is visible |
 | `NotificationSetting`, `EmailLog` | Who gets emailed, and whether it arrived |
+| `PageInsight` | Captured Graph metric values over time |
+| `MetricAvailability` | What Graph would actually serve, last time we asked |
 | `ActivityLog` | Audit trail |
 
 Status fields are **native Postgres enums**, so an invalid value is rejected by
@@ -259,3 +261,39 @@ per hour, so a stuck loop hits a limit rather than an invoice.
 never sums them; they measure different things. PDF is a print-styled page
 rather than server-side rendering, which keeps headless Chromium out of the
 production image.
+
+
+---
+
+## Analytics
+
+`src/lib/facebook/metrics.ts` is a catalogue of every Page and post metric worth
+asking Graph for. Nothing in it is assumed to work.
+
+The reason is a specific Graph behaviour: **one unknown metric name fails the
+entire request** with error 100, and Meta removes metrics between versions
+without telling individual apps. Asking for thirty and getting a 400 back says
+nothing about the other twenty-nine.
+
+So `fetchInsights` chunks the request and **bisects a failing chunk** until the
+offending names are isolated, returning both what came back and what was
+refused. Auth failures and rate limits are deliberately *not* bisected — they
+apply to every name equally, so splitting only spends more of the budget.
+
+The refusals are stored in `MetricAvailability`, which is what lets the UI say
+"Meta no longer serves this" instead of drawing an empty chart. `probeMetrics`
+answers the question no amount of documentation will: what this app, on this
+pinned Graph version, with the permissions it was actually granted, can retrieve
+today.
+
+Values are snapshotted into `PageInsight` because Graph serves only about two
+years of history. Breakdown metrics (`page_fans_country` and the like) keep
+their map and store `numeric = null` — summing "FR + GB + US" would be a number
+that means nothing, so those series report no total.
+
+Page profile counters (`fan_count`, `followers_count`, `talking_about_count`)
+are read separately off the Page object. They need no `read_insights`
+permission and no date range, so they still land when the insights edge is
+restricted or empty.
+
+Groups are skipped throughout: Facebook exposes no insights edge for a Group.

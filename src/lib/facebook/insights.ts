@@ -13,6 +13,12 @@ import { GraphError, graphRequest } from './graph';
  * than failing the whole refresh.
  */
 
+/**
+ * The subset kept on PostTarget for lists and reports. The *full* catalogue is
+ * fetched separately by src/lib/facebook/analytics.ts — these are the few
+ * figures every screen needs, so they are denormalised onto the row rather than
+ * re-read from the insights store each render.
+ */
 const INSIGHT_METRICS = [
   'post_impressions',
   'post_impressions_unique',
@@ -96,6 +102,35 @@ export async function fetchPostInsights(
   }
 
   return result;
+}
+
+/**
+ * Everything Graph will give us about one post: every catalogue metric plus
+ * the engagement counters that live on the post object.
+ *
+ * Unlike {@link fetchPostInsights}, a metric Meta has removed does not cost the
+ * rest of the request — the fetcher isolates bad names by bisection.
+ */
+export async function fetchFullPostInsights(
+  remotePostId: string,
+  accessToken: string,
+): Promise<{
+  engagement: Awaited<ReturnType<typeof import('./analytics').fetchPostEngagement>> | null;
+  series: Awaited<ReturnType<typeof import('./analytics').fetchInsights>>;
+}> {
+  const { fetchInsights, fetchPostEngagement } = await import('./analytics');
+
+  const [engagement, series] = await Promise.all([
+    fetchPostEngagement(remotePostId, accessToken).catch(() => null),
+    fetchInsights({
+      objectId: remotePostId,
+      level: 'post',
+      accessToken,
+      period: 'lifetime',
+    }),
+  ]);
+
+  return { engagement, series };
 }
 
 /** Aggregate per-destination insights into workspace totals for the dashboard. */

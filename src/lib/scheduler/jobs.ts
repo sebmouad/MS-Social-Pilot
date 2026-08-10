@@ -8,6 +8,7 @@ import { notifyTokenExpiring } from '../email/notify';
 import { runEvergreenCycle } from '../evergreen';
 import { pollDueSources } from '../rss/poll';
 import { runSchedulerTick } from './runner';
+import { syncWorkspaceAnalytics } from '../analytics';
 
 /**
  * The worker's job set.
@@ -19,7 +20,7 @@ import { runSchedulerTick } from './runner';
  * A job that throws must never stop the others — the loop catches per job.
  */
 
-export type JobName = 'publish' | 'rss' | 'evergreen' | 'analytics' | 'tokens';
+export type JobName = 'publish' | 'rss' | 'evergreen' | 'analytics' | 'pageInsights' | 'tokens';
 
 export interface JobContext {
   now: Date;
@@ -119,6 +120,40 @@ export async function runAnalyticsRefresh(context: JobContext): Promise<string |
   return refreshed > 0 ? `refreshed ${refreshed} destination(s)` : null;
 }
 
+/**
+ * Pull Page-level insights for every enabled Page.
+ *
+ * Separate from `analytics`, which refreshes per-post engagement: this one
+ * reads the whole Page catalogue and stores snapshots, because Graph serves
+ * only about two years of history and drops metrics between versions.
+ */
+export async function runPageInsightsSync(context: JobContext): Promise<string | null> {
+  const workspaces = await prisma.workspace.findMany({ select: { id: true } });
+
+  let stored = 0;
+  let failed = 0;
+
+  for (const workspace of workspaces) {
+    const results = await syncWorkspaceAnalytics({
+      workspaceId: workspace.id,
+      // A week back each run, so a missed day is filled in on the next.
+      since: new Date(context.now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      until: context.now,
+    });
+
+    for (const result of results) {
+      stored += result.stored;
+      if (result.error) {
+        failed += 1;
+        context.logger(`${result.targetName}: ${result.error}`);
+      }
+    }
+  }
+
+  if (stored === 0 && failed === 0) return null;
+  return `stored=${stored} failed=${failed}`;
+}
+
 export function jobDefinitions(): JobDefinition[] {
   return [
     {
@@ -158,6 +193,11 @@ export function jobDefinitions(): JobDefinition[] {
       name: 'analytics',
       intervalMs: env.analyticsRefreshHours * 60 * 60 * 1000,
       run: runAnalyticsRefresh,
+    },
+    {
+      name: 'pageInsights',
+      intervalMs: env.pageInsightsHours * 60 * 60 * 1000,
+      run: runPageInsightsSync,
     },
     {
       name: 'tokens',

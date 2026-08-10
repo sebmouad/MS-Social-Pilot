@@ -44,6 +44,7 @@ export function NavBar({
     ...(showApprovals ? [{ href: '/approvals', label: t('approvals'), badge: pendingApprovals }] : []),
     { href: '/accounts', label: t('accounts') },
     { href: '/feeds', label: t('feeds') },
+    { href: '/analytics', label: t('analytics') },
     { href: '/reports', label: t('reports') },
     { href: '/settings', label: t('settings') },
   ];

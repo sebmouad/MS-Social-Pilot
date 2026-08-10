@@ -136,6 +136,10 @@ export const env = {
   get analyticsRefreshHours(): number {
     return Math.max(1, integer('ANALYTICS_REFRESH_HOURS', 6));
   },
+  /** How often the full Page insights catalogue is captured. */
+  get pageInsightsHours(): number {
+    return Math.max(1, integer('PAGE_INSIGHTS_HOURS', 12));
+  },
 
   get cronSecret(): string | null {
     const value = process.env.CRON_SECRET;

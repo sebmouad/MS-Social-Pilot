@@ -273,12 +273,21 @@ model Target {
   canPublish  Boolean @default(true)
   publishBlocker String?
   lastSyncedAt   DateTime?
+
+  // Read straight off the Page object: no insights permission, no date range.
+  fanCount           Int?
+  followersCount     Int?
+  talkingAboutCount  Int?
+  profileSyncedAt    DateTime?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   socialAccount SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
   postTargets   PostTarget[]
+  insights      PageInsight[]
+  availability  MetricAvailability[]
 
   @@unique([workspaceId, providerId])
   @@index([socialAccountId])
@@ -577,6 +586,52 @@ model EmailLog {
 
   @@index([workspaceId, createdAt])
   @@map("email_logs")
+}
+
+/// A single insights value for a destination, captured over time.
+///
+/// Graph only serves roughly two years of history and drops metrics between
+/// versions, so anything we want to keep must be copied out. The unique key
+/// makes re-fetching the same window idempotent.
+model PageInsight {
+  id       String @id @default(cuid())
+  targetId String
+  metric   String
+  period   String
+  /// End of the window this value covers.
+  endTime  DateTime
+  /// A number, or a breakdown map for metrics like page_fans_country.
+  value    Json
+  /// Null for breakdowns, where a single figure has no meaning.
+  numeric  Float?
+  fetchedAt DateTime @default(now())
+
+  target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, metric, period, endTime])
+  @@index([targetId, metric, endTime])
+  @@map("page_insights")
+}
+
+/// What Graph would actually serve, last time we asked.
+///
+/// Meta removes metrics without telling individual apps, so this is recorded
+/// rather than assumed: the UI can then say "Meta no longer serves this"
+/// instead of drawing an empty chart.
+model MetricAvailability {
+  id        String   @id @default(cuid())
+  targetId  String
+  metric    String
+  period    String
+  available Boolean
+  reason    String?
+  checkedAt DateTime @default(now())
+
+  target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, metric, period])
+  @@index([targetId])
+  @@map("metric_availability")
 }
 
 model ActivityLog {
