@@ -2,7 +2,7 @@ import { TargetType } from '@prisma/client';
 
 import { prisma } from './prisma';
 import { decryptSecret } from './crypto';
-import { toJson } from './json';
+import { parseInsights, toJson } from './json';
 import { asGraphError } from './facebook/graph';
 import {
   fetchInsights,
@@ -354,4 +354,310 @@ export async function probeTarget(targetId: string, period?: MetricPeriod) {
     accessToken: token,
     period,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Post-level analytics
+// ---------------------------------------------------------------------------
+
+/** Pull a named number out of a Graph series list. */
+function numberOf(series: MetricSeries[], name: string): number | null {
+  const entry = series.find((item) => item.name === name);
+  return typeof entry?.latest === 'number' ? entry.latest : null;
+}
+
+/** Pull a named breakdown map out of a Graph series list. */
+function mapOf(series: MetricSeries[], name: string): Record<string, number> | undefined {
+  const entry = series.find((item) => item.name === name);
+  return entry && entry.latest && typeof entry.latest === 'object' ? entry.latest : undefined;
+}
+
+/**
+ * Read everything Graph has about one published destination and store it.
+ *
+ * The named fields on PostInsights stay populated for lists and reports; the
+ * complete response goes into `metrics` so the explorer can show the rest
+ * without a second round trip.
+ */
+export async function syncPostInsights(postTargetId: string): Promise<{
+  ok: boolean;
+  metrics: number;
+  error?: string;
+}> {
+  const row = await prisma.postTarget.findUniqueOrThrow({
+    where: { id: postTargetId },
+    include: { target: { include: { socialAccount: true } } },
+  });
+
+  if (!row.remotePostId) return { ok: false, metrics: 0, error: 'Post has no Facebook id.' };
+
+  const token = tokenFor(row.target);
+  if (!token) return { ok: false, metrics: 0, error: 'No access token stored.' };
+
+  try {
+    const { fetchInsights, fetchPostEngagement } = await import('./facebook/analytics');
+
+    // Engagement counters live on the post object; insights on its edge. A
+    // Group has no insights edge at all, so only the former is attempted.
+    const isPage = row.target.type === TargetType.page;
+
+    const [engagement, insights] = await Promise.all([
+      fetchPostEngagement(row.remotePostId, token).catch(() => null),
+      isPage
+        ? fetchInsights({
+            objectId: row.remotePostId,
+            level: 'post',
+            accessToken: token,
+            period: 'lifetime',
+          })
+        : Promise.resolve({ series: [], unavailable: [], empty: [] }),
+    ]);
+
+    const series = insights.series;
+
+    const metrics: Record<string, number | Record<string, number>> = {};
+    for (const entry of series) {
+      if (entry.latest !== null) metrics[entry.name] = entry.latest;
+    }
+
+    const insightsPayload = {
+      impressions: numberOf(series, 'post_impressions'),
+      reach: numberOf(series, 'post_impressions_unique'),
+      engagedUsers: numberOf(series, 'post_engaged_users'),
+      reactions: engagement?.reactions ?? null,
+      comments: engagement?.comments ?? null,
+      shares: engagement?.shares ?? null,
+      clicks: numberOf(series, 'post_clicks'),
+
+      impressionsOrganic: numberOf(series, 'post_impressions_organic'),
+      impressionsPaid: numberOf(series, 'post_impressions_paid'),
+      impressionsViral: numberOf(series, 'post_impressions_viral'),
+      impressionsFan: numberOf(series, 'post_impressions_fan'),
+      negativeFeedback: numberOf(series, 'post_negative_feedback'),
+      videoViews: numberOf(series, 'post_video_views'),
+      videoViewTime: numberOf(series, 'post_video_view_time'),
+      videoAvgTimeWatched: numberOf(series, 'post_video_avg_time_watched'),
+
+      reactionsByType: mapOf(series, 'post_reactions_by_type_total'),
+      clicksByType: mapOf(series, 'post_clicks_by_type'),
+      metrics,
+      syncedAt: new Date().toISOString(),
+    };
+
+    await prisma.postTarget.update({
+      where: { id: postTargetId },
+      data: {
+        insights: toJson(insightsPayload),
+        insightsSyncedAt: new Date(),
+        ...(engagement?.permalink && !row.remoteUrl ? { remoteUrl: engagement.permalink } : {}),
+      },
+    });
+
+    return { ok: true, metrics: series.length };
+  } catch (error) {
+    return { ok: false, metrics: 0, error: asGraphError(error).displayMessage };
+  }
+}
+
+export interface PostAnalyticsRow {
+  postTargetId: string;
+  postId: string;
+  message: string;
+  targetName: string;
+  publishedAt: Date | null;
+  url: string | null;
+  impressions: number;
+  reach: number;
+  engagedUsers: number;
+  reactions: number;
+  comments: number;
+  shares: number;
+  clicks: number;
+  negativeFeedback: number;
+  videoViews: number;
+  organic: number;
+  paid: number;
+  reactionsByType: Record<string, number>;
+  clicksByType: Record<string, number>;
+  /** Engaged users as a share of reach, or null when reach is unknown. */
+  engagementRate: number | null;
+  syncedAt: Date | null;
+}
+
+/**
+ * Every published post in a window, with its numbers.
+ *
+ * This is the "impressions by post" view: one row per post per destination,
+ * because the same post can perform very differently on two Pages.
+ */
+export async function readPostAnalytics(options: {
+  workspaceId: string;
+  from: Date;
+  to: Date;
+  targetId?: string;
+  limit?: number;
+}): Promise<PostAnalyticsRow[]> {
+  const rows = await prisma.postTarget.findMany({
+    where: {
+      status: 'published',
+      publishedAt: { gte: options.from, lte: options.to },
+      post: { workspaceId: options.workspaceId },
+      ...(options.targetId ? { targetId: options.targetId } : {}),
+    },
+    include: {
+      target: { select: { name: true } },
+      post: { select: { id: true, message: true } },
+    },
+    orderBy: { publishedAt: 'desc' },
+    take: options.limit ?? 200,
+  });
+
+  return rows.map((row) => {
+    const insights = parseInsights(row.insights);
+    const value = (key: keyof NonNullable<typeof insights>): number => {
+      const raw = insights?.[key];
+      return typeof raw === 'number' ? raw : 0;
+    };
+
+    const reach = value('reach');
+    const engaged = value('engagedUsers');
+
+    return {
+      postTargetId: row.id,
+      postId: row.post.id,
+      message: row.post.message,
+      targetName: row.target.name,
+      publishedAt: row.publishedAt,
+      url: row.remoteUrl,
+      impressions: value('impressions'),
+      reach,
+      engagedUsers: engaged,
+      reactions: value('reactions'),
+      comments: value('comments'),
+      shares: value('shares'),
+      clicks: value('clicks'),
+      negativeFeedback: value('negativeFeedback'),
+      videoViews: value('videoViews'),
+      organic: value('impressionsOrganic'),
+      paid: value('impressionsPaid'),
+      reactionsByType: insights?.reactionsByType ?? {},
+      clicksByType: insights?.clicksByType ?? {},
+      // Rate against reach, not impressions: the same person seeing a post
+      // three times is one opportunity to engage, not three.
+      engagementRate: reach > 0 ? Math.round((engaged / reach) * 1000) / 10 : null,
+      syncedAt: row.insightsSyncedAt,
+    };
+  });
+}
+
+export interface InteractionSummary {
+  reactionsByType: Record<string, number>;
+  clicksByType: Record<string, number>;
+  totals: {
+    reactions: number;
+    comments: number;
+    shares: number;
+    clicks: number;
+    negativeFeedback: number;
+    engagedUsers: number;
+  };
+}
+
+/** How people interacted, aggregated across a window. */
+export async function readInteractions(options: {
+  workspaceId: string;
+  from: Date;
+  to: Date;
+  targetId?: string;
+}): Promise<InteractionSummary> {
+  const posts = await readPostAnalytics({ ...options, limit: 1000 });
+  const { mergeBreakdowns } = await import('./facebook/insights');
+
+  return {
+    reactionsByType: mergeBreakdowns(posts.map((post) => post.reactionsByType)),
+    clicksByType: mergeBreakdowns(posts.map((post) => post.clicksByType)),
+    totals: {
+      reactions: posts.reduce((sum, post) => sum + post.reactions, 0),
+      comments: posts.reduce((sum, post) => sum + post.comments, 0),
+      shares: posts.reduce((sum, post) => sum + post.shares, 0),
+      clicks: posts.reduce((sum, post) => sum + post.clicks, 0),
+      negativeFeedback: posts.reduce((sum, post) => sum + post.negativeFeedback, 0),
+      engagedUsers: posts.reduce((sum, post) => sum + post.engagedUsers, 0),
+    },
+  };
+}
+
+export interface AudienceSummary {
+  /** Standing totals, straight off the Page object. */
+  fans: number | null;
+  followers: number | null;
+  talkingAbout: number | null;
+  /** Lifetime demographic breakdowns, most recent snapshot. */
+  byCountry: Record<string, number>;
+  byCity: Record<string, number>;
+  byLocale: Record<string, number>;
+  byGenderAge: Record<string, number>;
+  /** Daily gains and losses over the window. */
+  adds: number;
+  removes: number;
+  net: number;
+}
+
+/**
+ * Who the audience is.
+ *
+ * Demographics are lifetime snapshots rather than windowed series, so the most
+ * recent capture is the answer — averaging them would be meaningless.
+ */
+export async function readAudience(options: {
+  targetId: string;
+  from: Date;
+  to: Date;
+}): Promise<AudienceSummary> {
+  const target = await prisma.target.findUniqueOrThrow({ where: { id: options.targetId } });
+
+  const latestOf = async (metric: string): Promise<Record<string, number>> => {
+    const row = await prisma.pageInsight.findFirst({
+      where: { targetId: options.targetId, metric },
+      orderBy: { endTime: 'desc' },
+    });
+    const value = row?.value;
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, number>)
+      : {};
+  };
+
+  const sumOf = async (metric: string): Promise<number> => {
+    const result = await prisma.pageInsight.aggregate({
+      where: {
+        targetId: options.targetId,
+        metric,
+        endTime: { gte: options.from, lte: options.to },
+      },
+      _sum: { numeric: true },
+    });
+    return Math.round(result._sum.numeric ?? 0);
+  };
+
+  const [byCountry, byCity, byLocale, byGenderAge, adds, removes] = await Promise.all([
+    latestOf('page_fans_country'),
+    latestOf('page_fans_city'),
+    latestOf('page_fans_locale'),
+    latestOf('page_fans_gender_age'),
+    sumOf('page_fan_adds'),
+    sumOf('page_fan_removes'),
+  ]);
+
+  return {
+    fans: target.fanCount,
+    followers: target.followersCount,
+    talkingAbout: target.talkingAboutCount,
+    byCountry,
+    byCity,
+    byLocale,
+    byGenderAge,
+    adds,
+    removes,
+    net: adds - removes,
+  };
 }

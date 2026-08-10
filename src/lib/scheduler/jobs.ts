@@ -1,14 +1,10 @@
 import { prisma } from '../prisma';
 import { env } from '../env';
-import { decryptSecret } from '../crypto';
-import { toJson } from '../json';
-import { fetchPostInsights } from '../facebook/insights';
-import { asGraphError } from '../facebook/graph';
 import { notifyTokenExpiring } from '../email/notify';
 import { runEvergreenCycle } from '../evergreen';
 import { pollDueSources } from '../rss/poll';
 import { runSchedulerTick } from './runner';
-import { syncWorkspaceAnalytics } from '../analytics';
+import { syncPostInsights, syncWorkspaceAnalytics } from '../analytics';
 
 /**
  * The worker's job set.
@@ -91,41 +87,35 @@ export async function runTokenExpiryCheck(context: JobContext): Promise<string |
 export async function runAnalyticsRefresh(context: JobContext): Promise<string | null> {
   const rows = await prisma.postTarget.findMany({
     where: { status: 'published', remotePostId: { not: null } },
-    include: { target: { include: { socialAccount: true } } },
     orderBy: [{ insightsSyncedAt: { sort: 'asc', nulls: 'first' } }, { publishedAt: 'desc' }],
     take: ANALYTICS_BATCH,
+    select: { id: true, target: { select: { name: true } } },
   });
 
   let refreshed = 0;
+  let metrics = 0;
 
   for (const row of rows) {
-    const encrypted = row.target.accessToken ?? row.target.socialAccount?.accessToken ?? null;
-    if (!encrypted || !row.remotePostId) continue;
-
-    try {
-      const insights = await fetchPostInsights(row.remotePostId, decryptSecret(encrypted), {
-        // Groups have no insights edge; skip the call rather than fail it.
-        includeInsights: row.target.type === 'page',
-      });
-      await prisma.postTarget.update({
-        where: { id: row.id },
-        data: { insights: toJson(insights), insightsSyncedAt: context.now },
-      });
+    // The full per-post catalogue, not just the four headline numbers: a bad
+    // metric name costs only itself, since the fetcher bisects.
+    const result = await syncPostInsights(row.id);
+    if (result.ok) {
       refreshed += 1;
-    } catch (error) {
-      context.logger(`Analytics refresh failed for ${row.target.name}: ${asGraphError(error).displayMessage}`);
+      metrics += result.metrics;
+    } else if (result.error) {
+      context.logger(`Analytics refresh failed for ${row.target.name}: ${result.error}`);
     }
   }
 
-  return refreshed > 0 ? `refreshed ${refreshed} destination(s)` : null;
+  return refreshed > 0 ? `refreshed ${refreshed} post(s), ${metrics} metric reads` : null;
 }
 
 /**
  * Pull Page-level insights for every enabled Page.
  *
- * Separate from `analytics`, which refreshes per-post engagement: this one
- * reads the whole Page catalogue and stores snapshots, because Graph serves
- * only about two years of history and drops metrics between versions.
+ * Separate from `analytics`, which refreshes per-post numbers: this one reads
+ * the whole Page catalogue and stores snapshots, because Graph serves only
+ * about two years of history and drops metrics between versions.
  */
 export async function runPageInsightsSync(context: JobContext): Promise<string | null> {
   const workspaces = await prisma.workspace.findMany({ select: { id: true } });

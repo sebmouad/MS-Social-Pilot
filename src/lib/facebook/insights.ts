@@ -133,19 +133,55 @@ export async function fetchFullPostInsights(
   return { engagement, series };
 }
 
-/** Aggregate per-destination insights into workspace totals for the dashboard. */
+/**
+ * Aggregate per-destination insights into workspace totals.
+ *
+ * Only the flat numeric fields are summed. Breakdown maps and the raw
+ * `metrics` bag are skipped: adding two country maps together is a different
+ * operation, handled by `mergeBreakdowns`.
+ */
+const SUMMABLE_KEYS = [
+  'impressions',
+  'reach',
+  'engagedUsers',
+  'reactions',
+  'comments',
+  'shares',
+  'clicks',
+  'impressionsOrganic',
+  'impressionsPaid',
+  'impressionsViral',
+  'impressionsFan',
+  'negativeFeedback',
+  'videoViews',
+  'videoViewTime',
+] as const satisfies ReadonlyArray<keyof PostInsights>;
+
 export function sumInsights(items: Array<PostInsights | null>): PostInsights {
   const total: PostInsights = { ...EMPTY };
-  const keys = Object.keys(total) as Array<keyof PostInsights>;
 
   for (const item of items) {
     if (!item) continue;
-    for (const key of keys) {
+    for (const key of SUMMABLE_KEYS) {
       const value = item[key];
       if (typeof value === 'number') {
-        total[key] = (total[key] ?? 0) + value;
+        total[key] = ((total[key] as number | null) ?? 0) + value;
       }
     }
   }
   return total;
+}
+
+/** Add breakdown maps together, key by key. */
+export function mergeBreakdowns(
+  maps: Array<Record<string, number> | undefined | null>,
+): Record<string, number> {
+  const merged: Record<string, number> = {};
+  for (const map of maps) {
+    if (!map) continue;
+    for (const [key, value] of Object.entries(map)) {
+      if (typeof value === 'number') merged[key] = (merged[key] ?? 0) + value;
+    }
+  }
+  return merged;
 }

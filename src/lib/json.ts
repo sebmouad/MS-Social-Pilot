@@ -30,6 +30,15 @@ export interface PostMedia {
   altText?: string;
 }
 
+/**
+ * Per-post analytics.
+ *
+ * The named fields are the handful every screen needs, kept flat so lists and
+ * reports do not have to dig. `metrics` holds the complete Graph response —
+ * every catalogue metric that came back, including breakdown maps like
+ * post_reactions_by_type_total. Screens that show one number read the fields;
+ * the analytics explorer reads `metrics`.
+ */
 export interface PostInsights {
   impressions: number | null;
   reach: number | null;
@@ -38,6 +47,23 @@ export interface PostInsights {
   comments: number | null;
   shares: number | null;
   clicks: number | null;
+
+  // --- Extended, populated by the full analytics sync ---
+  impressionsOrganic?: number | null;
+  impressionsPaid?: number | null;
+  impressionsViral?: number | null;
+  impressionsFan?: number | null;
+  negativeFeedback?: number | null;
+  videoViews?: number | null;
+  videoViewTime?: number | null;
+  videoAvgTimeWatched?: number | null;
+  /** Every metric Graph returned, by name. */
+  metrics?: Record<string, number | Record<string, number>>;
+  /** Reaction split: like, love, wow, haha, sorry, anger. */
+  reactionsByType?: Record<string, number>;
+  /** Click split, by what was clicked. */
+  clicksByType?: Record<string, number>;
+  syncedAt?: string;
 }
 
 /** What Prisma hands back for a Json column. */
