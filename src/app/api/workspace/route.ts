@@ -1,24 +1,37 @@
 import { requireAuth } from '@/lib/auth';
-import { canManageAccounts } from '@/lib/constants';
+import { canManageSettings } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { workspaceSettingsSchema } from '@/lib/validation';
 import { fail, ok, readJson, route } from '@/lib/api';
 
 export const PATCH = route(async (request: Request) => {
   const auth = await requireAuth();
-  if (!canManageAccounts(auth.role)) {
+  if (!canManageSettings(auth.role)) {
     return fail('Only workspace owners and admins can change these settings.', 403);
   }
 
   const input = workspaceSettingsSchema.parse(await readJson(request));
 
-  const workspace = await prisma.workspace.update({
-    where: { id: auth.workspace.id },
-    data: {
-      ...(input.name ? { name: input.name } : {}),
-      ...(input.timezone ? { timezone: input.timezone } : {}),
-    },
-  });
+  // Only fields the request actually sent are written; an empty string is a
+  // deliberate "clear this", which is why these are nullable in the schema.
+  const data: Record<string, unknown> = {};
+  const assign = (key: string, value: unknown) => {
+    if (value !== undefined) data[key] = value === '' ? null : value;
+  };
+
+  assign('name', input.name);
+  assign('timezone', input.timezone);
+  assign('defaultLocale', input.defaultLocale);
+  assign('requiresApproval', input.requiresApproval);
+  assign('utmSource', input.utmSource);
+  assign('utmMedium', input.utmMedium);
+  assign('utmCampaignTemplate', input.utmCampaignTemplate);
+  assign('shortenerEnabled', input.shortenerEnabled);
+  assign('aiEnabled', input.aiEnabled);
+  assign('aiTone', input.aiTone);
+  assign('aiBrandVoice', input.aiBrandVoice);
+
+  const workspace = await prisma.workspace.update({ where: { id: auth.workspace.id }, data });
 
   return ok({ id: workspace.id, name: workspace.name, timezone: workspace.timezone });
 });

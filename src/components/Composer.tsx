@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 
 import { TargetPicker, type TargetOption } from './TargetPicker';
+import { AiAssist } from './AiAssist';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 import { LIMITS } from '@/lib/constants';
 
@@ -13,12 +14,26 @@ interface Props {
   hasQueueSlots: boolean;
   /** Local `datetime-local` value one hour from now, computed on the server. */
   defaultScheduledAt: string;
+  /** Hidden entirely when the server has no API key or the client opted out. */
+  aiEnabled: boolean;
+  /** True when this workspace holds posts for review. */
+  requiresApproval: boolean;
+  /** False for contributors, who can only submit for approval. */
+  canPublishDirectly: boolean;
 }
 
 type Timing = 'now' | 'schedule' | 'queue';
 type Handler = 'worker' | 'native';
 
-export function Composer({ targets, timezone, hasQueueSlots, defaultScheduledAt }: Props) {
+export function Composer({
+  targets,
+  timezone,
+  hasQueueSlots,
+  defaultScheduledAt,
+  aiEnabled,
+  requiresApproval,
+  canPublishDirectly,
+}: Props) {
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -132,9 +147,11 @@ export function Composer({ targets, timezone, hasQueueSlots, defaultScheduledAt 
     setResult(
       saveAsDraft
         ? 'Saved as a draft.'
-        : timing === 'now'
-          ? 'Published.'
-          : 'Scheduled. You can see it on the calendar.',
+        : needsApproval
+          ? 'Submitted for approval.'
+          : timing === 'now'
+            ? 'Published.'
+            : 'Scheduled. You can see it on the calendar.',
     );
     setMessage('');
     setLink('');
@@ -143,6 +160,10 @@ export function Composer({ targets, timezone, hasQueueSlots, defaultScheduledAt 
     setPending(false);
     router.refresh();
   }
+
+  // A contributor in a workspace with approval on is submitting, not
+  // scheduling, and the button must say so.
+  const needsApproval = requiresApproval && !canPublishDirectly;
 
   const canSubmit =
     !pending && selected.length > 0 && (message.trim().length > 0 || link.trim().length > 0 || media.length > 0);
@@ -163,6 +184,8 @@ export function Composer({ targets, timezone, hasQueueSlots, defaultScheduledAt 
             onChange={(event) => setMessage(event.target.value)}
           />
           <p className="hint">{message.length.toLocaleString()} characters</p>
+
+          {aiEnabled && <AiAssist draft={message} onResult={setMessage} />}
 
           <div className="mt-5">
             <label className="label" htmlFor="link">
@@ -350,7 +373,13 @@ export function Composer({ targets, timezone, hasQueueSlots, defaultScheduledAt 
 
         <div className="flex gap-2">
           <button type="button" className="btn-primary flex-1" disabled={!canSubmit} onClick={() => submit(false)}>
-            {pending ? 'Working…' : timing === 'now' ? 'Publish now' : 'Schedule'}
+            {pending
+              ? 'Working…'
+              : needsApproval
+                ? 'Submit for approval'
+                : timing === 'now'
+                  ? 'Publish now'
+                  : 'Schedule'}
           </button>
           <button type="button" className="btn-secondary" disabled={pending} onClick={() => submit(true)}>
             Save draft

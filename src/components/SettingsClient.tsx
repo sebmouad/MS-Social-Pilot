@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { useTranslations } from 'next-intl';
+
 import { WEEKDAY_NAMES } from '@/lib/time';
 import type { TargetOption } from './TargetPicker';
 
@@ -12,6 +14,17 @@ interface Slot {
   minute: number;
 }
 
+export interface WorkspaceOptions {
+  requiresApproval: boolean;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaignTemplate: string;
+  shortenerEnabled: boolean;
+  aiEnabled: boolean;
+  aiTone: string;
+  aiBrandVoice: string;
+}
+
 interface Props {
   workspaceName: string;
   timezone: string;
@@ -19,13 +32,30 @@ interface Props {
   slots: Slot[];
   targets: TargetOption[];
   csvTemplate: string;
+  options: WorkspaceOptions;
+  /** False when the server has no ANTHROPIC_API_KEY. */
+  aiConfigured: boolean;
+  shortLinkBase: string;
 }
 
-export function SettingsClient({ workspaceName, timezone, timezones, slots, targets, csvTemplate }: Props) {
+export function SettingsClient({
+  workspaceName,
+  timezone,
+  timezones,
+  slots,
+  targets,
+  csvTemplate,
+  options,
+  aiConfigured,
+  shortLinkBase,
+}: Props) {
+  const t = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const router = useRouter();
 
   const [name, setName] = useState(workspaceName);
   const [zone, setZone] = useState(timezone);
+  const [settings, setSettings] = useState<WorkspaceOptions>(options);
   const [currentSlots, setCurrentSlots] = useState<Slot[]>(slots);
   const [newSlot, setNewSlot] = useState<Slot>({ dayOfWeek: 1, hour: 9, minute: 0 });
   const [status, setStatus] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
@@ -37,7 +67,7 @@ export function SettingsClient({ workspaceName, timezone, timezones, slots, targ
     const response = await fetch('/api/workspace', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, timezone: zone }),
+      body: JSON.stringify({ name, timezone: zone, ...settings }),
     });
     const body = (await response.json().catch(() => ({}))) as { error?: string };
     setStatus(
@@ -122,8 +152,147 @@ export function SettingsClient({ workspaceName, timezone, timezones, slots, targ
             </p>
           </div>
         </div>
+        <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500"
+            checked={settings.requiresApproval}
+            onChange={(event) =>
+              setSettings({ ...settings, requiresApproval: event.target.checked })
+            }
+          />
+          <span>
+            {t('requireApproval')}
+            <span className="block text-xs text-slate-500">{t('requireApprovalHint')}</span>
+          </span>
+        </label>
+
         <button type="button" className="btn-primary mt-4" onClick={saveWorkspace} disabled={pending}>
-          Save workspace
+          {t('saveWorkspace')}
+        </button>
+      </section>
+
+      <section className="card p-5">
+        <h2 className="text-sm font-semibold text-slate-900">{t('linkTagging')}</h2>
+        <p className="mt-1 text-sm text-slate-600">{t('utmHint')}</p>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className="label" htmlFor="utmSource">
+              {t('utmSource')}
+            </label>
+            <input
+              id="utmSource"
+              className="input"
+              placeholder="facebook"
+              value={settings.utmSource}
+              onChange={(event) => setSettings({ ...settings, utmSource: event.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="utmMedium">
+              {t('utmMedium')}
+            </label>
+            <input
+              id="utmMedium"
+              className="input"
+              placeholder="social"
+              value={settings.utmMedium}
+              onChange={(event) => setSettings({ ...settings, utmMedium: event.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="utmCampaign">
+              {t('utmCampaign')}
+            </label>
+            <input
+              id="utmCampaign"
+              className="input"
+              placeholder="{month}-{target}"
+              value={settings.utmCampaignTemplate}
+              onChange={(event) =>
+                setSettings({ ...settings, utmCampaignTemplate: event.target.value })
+              }
+            />
+            <p className="hint">{'{date} {month} {year} {target}'}</p>
+          </div>
+        </div>
+
+        <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500"
+            checked={settings.shortenerEnabled}
+            onChange={(event) =>
+              setSettings({ ...settings, shortenerEnabled: event.target.checked })
+            }
+          />
+          <span>
+            {t('shortenLinks')}
+            <span className="block text-xs text-slate-500">
+              {t('shortenHint')} {shortLinkBase}/l/…
+            </span>
+          </span>
+        </label>
+
+        <button type="button" className="btn-primary mt-4" onClick={saveWorkspace} disabled={pending}>
+          {tCommon('save')}
+        </button>
+      </section>
+
+      <section className="card p-5">
+        <h2 className="text-sm font-semibold text-slate-900">{t('ai')}</h2>
+        {!aiConfigured && (
+          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            No ANTHROPIC_API_KEY is set on this server, so the composer hides these tools.
+          </p>
+        )}
+
+        <label className="mt-4 flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 text-brand-500"
+            checked={settings.aiEnabled}
+            onChange={(event) => setSettings({ ...settings, aiEnabled: event.target.checked })}
+          />
+          {t('aiEnabled')}
+        </label>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className="label" htmlFor="aiTone">
+              {t('aiTone')}
+            </label>
+            <select
+              id="aiTone"
+              className="input"
+              value={settings.aiTone}
+              onChange={(event) => setSettings({ ...settings, aiTone: event.target.value })}
+            >
+              <option value="">{tCommon('none')}</option>
+              {['friendly', 'professional', 'playful', 'urgent', 'informative'].map((tone) => (
+                <option key={tone} value={tone}>
+                  {tone}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="aiBrandVoice">
+              {t('aiBrandVoice')}
+            </label>
+            <textarea
+              id="aiBrandVoice"
+              className="input min-h-[72px]"
+              value={settings.aiBrandVoice}
+              onChange={(event) => setSettings({ ...settings, aiBrandVoice: event.target.value })}
+            />
+            <p className="hint">{t('aiBrandVoiceHint')}</p>
+          </div>
+        </div>
+
+        <button type="button" className="btn-primary mt-4" onClick={saveWorkspace} disabled={pending}>
+          {tCommon('save')}
         </button>
       </section>
 

@@ -3,6 +3,8 @@ import { SettingsClient } from '@/components/SettingsClient';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { BULK_CSV_TEMPLATE } from '@/lib/csv';
+import { aiAvailable } from '@/lib/ai';
+import { env } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +43,7 @@ function timezoneOptions(): string[] {
 export default async function SettingsPage() {
   const auth = await requireAuth();
 
-  const [slots, targets] = await Promise.all([
+  const [slots, targets, workspace] = await Promise.all([
     prisma.queueSlot.findMany({
       where: { workspaceId: auth.workspace.id },
       orderBy: [{ dayOfWeek: 'asc' }, { hour: 'asc' }, { minute: 'asc' }],
@@ -51,6 +53,7 @@ export default async function SettingsPage() {
       include: { socialAccount: { select: { name: true } } },
       orderBy: [{ type: 'asc' }, { name: 'asc' }],
     }),
+    prisma.workspace.findUniqueOrThrow({ where: { id: auth.workspace.id } }),
   ]);
 
   return (
@@ -67,6 +70,18 @@ export default async function SettingsPage() {
         timezone={auth.workspace.timezone}
         timezones={timezoneOptions()}
         csvTemplate={BULK_CSV_TEMPLATE}
+        aiConfigured={aiAvailable()}
+        shortLinkBase={env.shortLinkBase}
+        options={{
+          requiresApproval: workspace.requiresApproval,
+          utmSource: workspace.utmSource ?? '',
+          utmMedium: workspace.utmMedium ?? '',
+          utmCampaignTemplate: workspace.utmCampaignTemplate ?? '',
+          shortenerEnabled: workspace.shortenerEnabled,
+          aiEnabled: workspace.aiEnabled,
+          aiTone: workspace.aiTone ?? '',
+          aiBrandVoice: workspace.aiBrandVoice ?? '',
+        }}
         slots={slots.map((slot) => ({
           dayOfWeek: slot.dayOfWeek,
           hour: slot.hour,

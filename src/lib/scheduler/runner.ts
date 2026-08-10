@@ -9,6 +9,7 @@ import { asGraphError, GraphError } from '../facebook/graph';
 import { publishPost } from '../facebook/publish';
 import { decideRetry } from './backoff';
 import { notifyConnectionExpired, notifyPublishFailure } from '../email/notify';
+import { prepareLinks } from '../links';
 import {
   PUBLISHABLE_APPROVAL_STATUSES,
   TERMINAL_TARGET_STATUSES,
@@ -118,7 +119,7 @@ async function publishClaimed(
   const row = await prisma.postTarget.findUnique({
     where: { id: postTargetId },
     include: {
-      post: true,
+      post: { include: { workspace: true } },
       target: { include: { socialAccount: true } },
     },
   });
@@ -150,12 +151,28 @@ async function publishClaimed(
 
     const media = await resolveMediaForPublish(parseMedia(post.media));
 
+    // UTM tags and shortening are applied per destination, so a campaign can
+    // be attributed to the Page it actually ran on.
+    const prepared = await prepareLinks({
+      workspaceId: post.workspaceId,
+      postId: post.id,
+      message: post.message,
+      link: post.link,
+      settings: {
+        utmSource: post.workspace.utmSource,
+        utmMedium: post.workspace.utmMedium,
+        utmCampaignTemplate: post.workspace.utmCampaignTemplate,
+        shortenerEnabled: post.workspace.shortenerEnabled,
+      },
+      targetName: target.name,
+    });
+
     const result = await publishPost({
       targetType: target.type,
       targetId: target.providerId,
       accessToken: decryptSecret(encryptedToken),
-      message: post.message,
-      link: post.link,
+      message: prepared.message,
+      link: prepared.link,
       media,
       // The worker publishes at the scheduled moment, so it never asks
       // Facebook to hold the post as well — native scheduling is handed over

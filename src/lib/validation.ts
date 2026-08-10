@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { LIMITS, PublishMode } from './constants';
+import { LIMITS, Locale, PublishMode } from './constants';
 import { isValidTimeZone } from './time';
 
 /**
@@ -122,6 +122,19 @@ export const targetUpdateSchema = z.object({
 export const workspaceSettingsSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   timezone: timezone.optional(),
+  defaultLocale: z.nativeEnum(Locale).optional(),
+  requiresApproval: z.boolean().optional(),
+
+  // Link tagging. Empty string means "clear it", so these are nullable rather
+  // than merely optional.
+  utmSource: z.string().trim().max(100).nullish(),
+  utmMedium: z.string().trim().max(100).nullish(),
+  utmCampaignTemplate: z.string().trim().max(200).nullish(),
+  shortenerEnabled: z.boolean().optional(),
+
+  aiEnabled: z.boolean().optional(),
+  aiTone: z.string().trim().max(50).nullish(),
+  aiBrandVoice: z.string().trim().max(2000).nullish(),
 });
 
 export const queueSlotsSchema = z.object({

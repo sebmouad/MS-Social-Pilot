@@ -2,19 +2,25 @@ import { Composer } from '@/components/Composer';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { utcToLocalInput } from '@/lib/time';
+import { canPublishWithoutApproval } from '@/lib/constants';
+import { aiAvailable } from '@/lib/ai';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ComposePage() {
   const auth = await requireAuth();
 
-  const [targets, queueSlots] = await Promise.all([
+  const [targets, queueSlots, workspace] = await Promise.all([
     prisma.target.findMany({
       where: { workspaceId: auth.workspace.id },
       include: { socialAccount: { select: { name: true } } },
       orderBy: [{ type: 'asc' }, { name: 'asc' }],
     }),
     prisma.queueSlot.count({ where: { workspaceId: auth.workspace.id } }),
+    prisma.workspace.findUniqueOrThrow({
+      where: { id: auth.workspace.id },
+      select: { aiEnabled: true },
+    }),
   ]);
 
   // One hour out is a friendlier default than "now", and clears Facebook's
@@ -37,6 +43,9 @@ export default async function ComposePage() {
         timezone={auth.workspace.timezone}
         hasQueueSlots={queueSlots > 0}
         defaultScheduledAt={defaultScheduledAt}
+        aiEnabled={aiAvailable() && workspace.aiEnabled}
+        requiresApproval={auth.workspace.requiresApproval}
+        canPublishDirectly={canPublishWithoutApproval(auth.role)}
         targets={targets.map((target) => ({
           id: target.id,
           name: target.name,
