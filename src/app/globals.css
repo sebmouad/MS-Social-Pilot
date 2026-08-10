@@ -56,3 +56,26 @@
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
   }
 }
+
+@layer utilities {
+  /* Reports are printed or saved as PDF for clients, so navigation,
+     controls and interactive chrome are dropped and cards flattened. */
+  @media print {
+    body {
+      @apply bg-white;
+    }
+
+    header nav,
+    .btn,
+    .btn-primary,
+    .btn-secondary,
+    .btn-danger {
+      display: none !important;
+    }
+
+    .card {
+      @apply border-slate-300 shadow-none;
+      break-inside: avoid;
+    }
+  }
+}

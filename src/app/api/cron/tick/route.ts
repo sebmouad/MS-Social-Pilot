@@ -2,21 +2,22 @@ import { NextResponse } from 'next/server';
 
 import { env } from '@/lib/env';
 import { safeEqual } from '@/lib/crypto';
-import { runSchedulerTick } from '@/lib/scheduler/runner';
+import { jobDefinitions, type JobName } from '@/lib/scheduler/jobs';
 
 /**
- * Run one scheduler pass over HTTP.
+ * Run the worker's jobs over HTTP.
  *
- * This exists for serverless deployments (Vercel Cron, Cloud Scheduler, a
- * plain `curl` from crontab) where a long-lived worker process is awkward. It
- * does exactly what `npm run worker` does per tick — run one or the other, not
- * both, or two schedulers will compete for the same rows. They will not
- * double-post if you do (claiming is atomic), but it wastes work.
+ * For serverless deployments (Vercel Cron, Cloud Scheduler, crontab + curl)
+ * where a long-lived worker is awkward. Run this *or* `npm run worker`, not
+ * both — they cannot double-publish, since claiming is atomic, but it wastes
+ * work.
  *
- * Authenticated with a bearer token because it is an unauthenticated route
- * from the app's point of view.
+ * `?jobs=publish,rss` restricts the run, so publishing can be called every
+ * minute while analytics runs hourly from a separate schedule.
  */
 export const dynamic = 'force-dynamic';
+/** Analytics over a large workspace is the slow one. */
+export const maxDuration = 300;
 
 export async function POST(request: Request): Promise<NextResponse> {
   const secret = env.cronSecret;
@@ -33,9 +34,26 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 
-  const result = await runSchedulerTick({
-    logger: (message, detail) => console.log(`[cron] ${message}`, detail ?? ''),
-  });
+  const requested = new URL(request.url).searchParams.get('jobs');
+  const wanted = requested
+    ? new Set(requested.split(',').map((name) => name.trim()) as JobName[])
+    : null;
 
-  return NextResponse.json(result);
+  const jobs = jobDefinitions().filter((job) => !wanted || wanted.has(job.name));
+  const results: Record<string, string> = {};
+
+  for (const job of jobs) {
+    try {
+      const summary = await job.run({
+        now: new Date(),
+        logger: (message, detail) => console.log(`[cron] [${job.name}] ${message}`, detail ?? ''),
+      });
+      results[job.name] = summary ?? 'nothing to do';
+    } catch (error) {
+      // One failing job must not abort the rest of the run.
+      results[job.name] = `error: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
+  return NextResponse.json({ ran: jobs.map((job) => job.name), results });
 }

@@ -1,22 +1,23 @@
 # MS Social Pilot
 
-A SocialPilot-style scheduler for Facebook. Compose once, pick any number of
-Facebook Pages and Groups, and have the post published at the time you choose —
-with per-destination status, automatic retries, and link previews built from the
-page's Open Graph tags.
+A SocialPilot-style scheduler for Facebook Pages and Groups. Compose once,
+publish to many destinations, with approval workflow, RSS auto-posting, AI
+writing help, link tracking and client reporting.
 
-Built with Next.js 15 (App Router), TypeScript, Prisma and Tailwind. Runs on
-SQLite out of the box; Postgres is a one-line change.
+Next.js 15 (App Router), TypeScript, Prisma, PostgreSQL, Tailwind. English and
+French.
+
+Built to the specification in [docs/PROJECT_SCHEMA.md](docs/PROJECT_SCHEMA.md).
 
 ---
 
 ## What it does
 
 **Publishing**
-- Post to many Facebook Pages and Groups from one composer.
-- Text, links, photos (single or as a gallery) and video.
-- Per-destination outcomes: publishing to five Pages where one token is dead
-  succeeds on four and reports the fifth, instead of failing the batch.
+- Many Facebook Pages and Groups from one composer: text, links, photo
+  galleries, video.
+- Per-destination outcomes. Publishing to five Pages where one token is dead
+  succeeds on four and reports the fifth, rather than failing the batch.
 
 **Scheduling** — three modes, because they fail differently:
 
@@ -24,78 +25,115 @@ SQLite out of the box; Postgres is a one-line change.
 |---|---|---|---|---|
 | Publish now | — | n/a | Yes | n/a |
 | Scheduled (default) | This app | Yes | Yes | No — the worker must be running |
-| Scheduled (native) | Facebook | No, must cancel and recreate | No | Yes |
+| Scheduled (native) | Facebook | No, cancel and recreate | No | Yes |
 
-- A recurring **queue** ("post this at my next free slot"), defined in workspace-local
+- A recurring **queue** ("post at my next free slot"), defined in workspace-local
   time and stable across daylight saving changes.
-- A calendar view, and bulk scheduling from CSV.
+- Calendar view, bulk CSV scheduling, and **evergreen recycling** that rotates
+  text variants so Facebook does not reject repeats as duplicates.
+
+**Teams and clients**
+- Several clients per account, each its own workspace with its own
+  destinations, queue, branding and language.
+- Roles: owner, admin, editor, contributor. Email invitations with hashed,
+  expiring tokens.
+- **Approval workflow**: contributors submit, admins approve or send back with a
+  note. Enforced in the scheduler, not just the UI.
+
+**Automation**
+- **RSS auto-posting** with conditional polling, guid de-duplication, and a
+  first-poll cutoff so subscribing to a blog does not queue its archive.
+- **AI captions** via the Claude API, seeded by the workspace's brand voice.
+- **Link shortener + UTM tagging** applied at publish time, per destination.
 
 **Reliability**
-- Failed publishes retry with exponential backoff and jitter; rate limits back
-  off far harder than transient errors.
-- Failures that cannot succeed on a retry — a revoked token, a missing
-  permission, content Facebook rejected — fail immediately with an explanation
-  rather than burning attempts.
-- A dead token flags the whole connection, so the UI tells you to reconnect
-  instead of letting every scheduled post discover it separately.
-- Crashed workers release their locks; multiple workers can run safely.
+- Retries with exponential backoff and jitter; rate limits back off much harder
+  than transient errors.
+- Failures that cannot succeed on retry — revoked token, missing permission,
+  content Facebook rejected — fail immediately with an explanation.
+- Email alerts on publish failure, dead connections, and tokens **approaching**
+  expiry.
+- Crashed workers release their locks; several workers can run safely.
 
-**Open Graph link previews**
-- Uses Facebook's own scraper (`POST /?id=<url>&scrape=true`) so you see exactly
-  the card Facebook will render, and so Facebook's cache is refreshed — the fix
-  for "my preview shows the old headline".
-- Falls back to fetching and parsing the page's `og:` tags directly.
+**Open Graph link previews** — Facebook's own scraper
+(`POST /?id=<url>&scrape=true`), so you see exactly the card Facebook will
+render and its cache is refreshed. Falls back to parsing `og:` tags directly.
 
-**Analytics** — impressions, reach, engaged users, reactions, comments and shares
-per published post.
+**Reporting** — impressions, reach, engagement and link clicks per destination
+and per post, with CSV export and a print-styled page for PDF.
 
 ---
 
 ## Quick start
 
-Requires Node 20.11+ (Node 22 recommended).
+Node 20.11+ (22 recommended) and PostgreSQL 14+.
 
 ```bash
 npm install
 cp .env.example .env
 ```
 
-Fill in `.env`. The two secrets can be generated right now:
+Generate the two secrets:
 
 ```bash
 openssl rand -base64 48   # → SESSION_SECRET
 openssl rand -base64 32   # → ENCRYPTION_KEY (must decode to exactly 32 bytes)
 ```
 
-`FACEBOOK_APP_ID` and `FACEBOOK_APP_SECRET` come from your Meta app — see
-[docs/META_APP_SETUP.md](docs/META_APP_SETUP.md), which is the fiddly part.
-
-Then:
+`FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET` come from your Meta app — see
+[docs/META_APP_SETUP.md](docs/META_APP_SETUP.md), the fiddly part.
 
 ```bash
-npm run db:push     # create the database
-npm run db:seed     # optional: a demo login
-npm run dev         # web app on http://localhost:3000
-npm run dev:worker  # scheduler, in a second terminal
+docker compose up -d postgres   # or point DATABASE_URL at your own
+npm run db:migrate
+npm run db:seed                 # optional: demo login, two workspaces
+npm run dev                     # http://localhost:3000
+npm run dev:worker              # second terminal
 ```
 
-Both processes are needed: the web app schedules posts, the worker publishes
-them. (Serverless alternative: `POST /api/cron/tick` — see
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).)
+Both processes are needed: the web app schedules, the worker publishes.
+Serverless alternative: `POST /api/cron/tick` — see
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-Register at `/register`, then connect Facebook on the Accounts page.
+Everything optional degrades cleanly. No `RESEND_API_KEY` means email is logged
+as skipped rather than failing; no `ANTHROPIC_API_KEY` means the composer hides
+the AI tools.
+
+### Docker
+
+```bash
+docker compose up --build
+```
+
+Three services from one image: `web`, `worker`, `postgres`.
 
 ---
 
 ## Terminology
 
-The user-facing request for this project asked for the "Facebook Open Graph API".
-Two different things are involved, and both are used here:
+The original request asked for the "Facebook Open Graph API". Two different
+things, both used here:
 
-- **Graph API** — the REST API that creates posts (`POST /{page-id}/feed`). This
-  is what publishes.
-- **Open Graph** — the `og:` metadata protocol that describes a web page. The
-  Graph API's scrape endpoint reads it to build link preview cards.
+- **Graph API** — the REST API that creates posts (`POST /{page-id}/feed`).
+- **Open Graph** — the `og:` metadata protocol describing a web page. Graph's
+  scrape endpoint reads it to build link preview cards.
+
+---
+
+## The worker
+
+Five jobs on independent intervals:
+
+| Job | Default | What it does |
+|---|---|---|
+| `publish` | 30s | Publishes due posts |
+| `rss` | 15m | Polls feeds, queues new items |
+| `evergreen` | 1h | Creates the next copy of recycling posts |
+| `analytics` | 6h | Refreshes engagement figures, stalest first |
+| `tokens` | 24h | Warns before a token expires |
+
+A failing job never stops the others. `POST /api/cron/tick?jobs=publish,rss`
+runs a chosen subset over HTTP.
 
 ---
 
@@ -103,16 +141,12 @@ Two different things are involved, and both are used here:
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Next.js dev server |
-| `npm run dev:worker` | Scheduler worker, restarting on changes |
-| `npm run worker` | Scheduler worker (production) |
+| `npm run dev` / `npm run dev:worker` | Dev server / worker |
 | `npm run build` / `npm start` | Production build and server |
-| `npm test` | Vitest suite (unit + integration) |
+| `npm run worker` | Worker (production) |
+| `npm test` | Vitest suite |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run db:push` | Apply the schema (development) |
-| `npm run db:migrate` | Create and apply a migration |
-| `npm run db:studio` | Prisma Studio |
-| `npm run db:seed` | Demo workspace and login |
+| `npm run db:migrate` / `db:push` / `db:studio` / `db:seed` | Prisma |
 
 ---
 
@@ -122,16 +156,26 @@ Two different things are involved, and both are used here:
 npm test
 ```
 
-92 tests. The unit tests cover token encryption, the retry policy, timezone and
-queue-slot maths, Open Graph parsing, CSV parsing and the Graph publishing
-decision table.
+211 tests. Unit tests cover token encryption, retry policy, timezone and
+queue-slot maths, Open Graph and RSS parsing, CSV in and out, link tagging, and
+the Graph publishing decision table.
 
-`tests/scheduler.integration.test.ts` runs the real scheduler against a real
-SQLite database and a stub Graph API, and covers the cases that actually matter
-in a scheduling product: a post going out exactly once, a transient error
-retrying with a backoff, a revoked token failing permanently and flagging the
-account, partial success across destinations, and an abandoned lock being
-reclaimed.
+Four integration suites run against a real Postgres schema and a stub Graph API,
+covering the failures that actually cost customers:
+
+- **scheduler** — a post going out exactly once, backoff on transient errors, a
+  revoked token failing permanently and flagging the account, partial success
+  across destinations, abandoned locks reclaimed.
+- **approvals** — an unapproved post never publishing even when due, "publish
+  now" not bypassing review, and one client's workspace unable to read, post to
+  or approve anything belonging to another.
+- **jobs** — expiry warnings sent once per token and respecting opt-outs;
+  evergreen creating a copy, rotating variants, and stopping at its limit.
+- Invitations — wrong address refused, single use, expiry, last-owner
+  protection.
+
+Tests need a reachable Postgres; each suite creates and drops its own schema.
+Point `TEST_DATABASE_URL` at it if it is not the Compose default.
 
 ---
 
@@ -139,49 +183,57 @@ reclaimed.
 
 ```
 src/lib/facebook/     Graph client, OAuth, publishing, Open Graph, insights
-src/lib/scheduler/    Claiming, publishing, retry policy
-src/lib/              Auth, posts, accounts, media, time, validation
+src/lib/scheduler/    Claiming, publishing, retry policy, job definitions
+src/lib/rss/          Feed parsing and ingestion
+src/lib/email/        Resend, templates, notification routing
+src/lib/              Auth, posts, approvals, team, links, AI, reports, media
 src/app/api/          REST endpoints
-src/app/(app)/        Dashboard, composer, calendar, posts, accounts, settings
-scripts/worker.ts     The scheduler process
+src/app/(app)/        Dashboard, composer, calendar, posts, approvals,
+                      accounts, feeds, reports, settings
+messages/             en.json, fr.json
+scripts/worker.ts     The background worker
 prisma/schema.prisma  Data model
 ```
 
-More detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
 ## Important limitations
 
 **Groups.** Meta restricted the Groups API in April 2024. `publish_to_groups`
-requires separate approval, and a Group only appears at all if a Group admin has
-added your app to it. Group support is therefore **off by default**
-(`FACEBOOK_ENABLE_GROUPS=false`). The code paths are complete and will work once
-your app has the access — but do not plan a product around Group publishing
-without confirming your app can get it.
+needs separate approval, and a Group only appears if an admin has added your app
+to it. Off by default (`FACEBOOK_ENABLE_GROUPS=false`). The code paths are
+complete and work once you have the access — but do not plan a product around
+Group publishing before confirming you can get it.
 
-**App Review.** Publishing to Pages you do not own requires `pages_manage_posts`
-to be approved by Meta. Before that, your app works only for users with a role on
-it (admin/developer/tester). This is a process measured in days, not minutes.
+**App Review.** Publishing to Pages you do not own needs `pages_manage_posts`
+approved by Meta. Until then the app works only for people with a role on it.
+Days, not minutes.
 
 **Editing published posts.** Not supported, deliberately: Facebook cannot change
 a published post's attachments, so "edit" would silently do less than it claims.
-Cancel and repost instead.
+
+**Link clicks** are indicative, not audit-grade. Bot filtering is user-agent
+based, and Facebook's own scraper is excluded so previews do not inflate counts.
 
 ---
 
-## Security notes
+## Security
 
-- Access tokens are encrypted at rest with AES-256-GCM; nothing stores a
-  plaintext token.
-- Every Graph call is signed with `appsecret_proof`, so a stolen token is useless
-  without the app secret. Turn on "Require app secret proof" in your Meta app.
-- Passwords use scrypt; sessions are database-backed and stored as hashes, so
-  logout revokes immediately and a database dump cannot be replayed.
-- Uploaded media is served through an authenticated route, not from `/public`.
-- The link-preview endpoint refuses loopback and private address ranges (SSRF).
-- The `signed_request` on Facebook's deauthorize and data-deletion callbacks is
-  verified before it is acted on.
+- Access tokens encrypted at rest (AES-256-GCM, versioned envelope). No
+  plaintext token is ever stored.
+- Every Graph call signed with `appsecret_proof` — turn on "Require app secret
+  proof" in your Meta app.
+- Passwords use scrypt. Sessions and invitation tokens are stored hashed, so a
+  database dump cannot be replayed.
+- Workspace scoping is a security boundary between clients, with tests that a
+  member of one cannot reach another.
+- Uploaded media served through an authenticated route, not `/public`.
+- Link preview fetches refuse loopback and private address ranges (SSRF).
+- `signed_request` verified on Facebook's deauthorize and data-deletion
+  callbacks.
+- AI output never publishes on its own — it lands in the composer for a human.
 
-Before going live, read the deployment checklist in
+Before going live, read the checklist in
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
