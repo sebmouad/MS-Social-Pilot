@@ -288,7 +288,9 @@
     "scheduling": "Scheduling…",
     "rowsScheduled": "{scheduled} of {total} rows scheduled",
     "rowsFailed": ", {count} failed",
-    "uploadFailed": "The upload failed."
+    "uploadFailed": "The upload failed.",
+    "bulkDestinations": "Destinations",
+    "row": "Row"
   },
   "team": {
     "title": "Team",

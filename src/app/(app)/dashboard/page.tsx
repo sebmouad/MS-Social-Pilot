@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
 import { StatusBadge } from '@/components/StatusBadge';
-import { requireAuth } from '@/lib/auth';
+import { requirePage } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { parseInsights } from '@/lib/json';
 import { sumInsights } from '@/lib/facebook/insights';
@@ -11,7 +11,7 @@ import { formatInZone, relativeTime } from '@/lib/time';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const auth = await requireAuth();
+  const auth = await requirePage();
   const t = await getTranslations('dashboard');
   const tPosts = await getTranslations('posts');
   const workspaceId = auth.workspace.id;

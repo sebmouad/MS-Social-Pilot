@@ -3,14 +3,24 @@
 Two processes share one database:
 
 ```
-   Browser ──► Next.js app ──► database ◄── Scheduler worker ──► Graph API
-                    │                                                │
-                    └──────────── Graph API (immediate/native) ──────┘
+   Browser ──► Next.js app ──► Postgres ◄── Worker ──► Graph API
+                    │                                  RSS feeds
+                    │                                  Resend
+                    └──► Graph API (immediate / native)
+                         Claude API (captions)
+                         Resend (invitations)
 ```
 
 The web app never waits on a scheduled publish; it writes rows. The worker owns
 everything time-based. Both call Graph through the same client, so retry and
 error-classification rules cannot drift apart.
+
+**The worker runs five jobs** on independent intervals — publish (30s), rss
+(15m), evergreen (1h), analytics (6h), tokens (24h). Each is a plain async
+function with one shape, so the loop is a table rather than a pile of branches,
+and any job can be run alone from a test or `POST /api/cron/tick?jobs=…`. A job
+that throws is caught per job: a failing RSS poll must never stop posts going
+out.
 
 ---
 
@@ -57,8 +67,9 @@ and cancelling deletes the remote post rather than silently letting it publish.
 
 ### Claiming work without row locks
 
-SQLite has no `SELECT … FOR UPDATE`, and the same code must run on Postgres. So
-claiming is a conditional update:
+Claiming is a conditional update rather than a row lock — simpler, and already
+proven by the integration tests. Postgres could use
+`SELECT … FOR UPDATE SKIP LOCKED` instead if throughput ever demands it.
 
 ```ts
 const { count } = await prisma.postTarget.updateMany({
@@ -68,7 +79,7 @@ const { count } = await prisma.postTarget.updateMany({
 return count === 1;                         // exactly one worker wins
 ```
 
-Atomic on both engines, so multiple workers are safe.
+Atomic, so multiple workers are safe.
 
 **The one accepted risk:** a worker that dies *after* Facebook accepts a post but
 *before* the row is updated leaves a lock that is reclaimed after 15 minutes and
@@ -153,19 +164,41 @@ credentials do not.
 | Model | Purpose |
 |---|---|
 | `User`, `Session`, `Workspace`, `Membership` | Auth and tenancy |
+| `Invitation` | Pending team invitations; token stored hashed |
 | `SocialAccount` | A connected Facebook user; holds the long-lived user token |
 | `Target` | A Page or Group; Pages carry their own token |
 | `Post` | What was written, and when it should go out |
 | `PostTarget` | One post × one destination: status, attempts, remote id, insights |
 | `Media` | Uploaded files |
 | `QueueSlot` | Recurring publishing times |
+| `FeedSource`, `FeedItem` | RSS sources and the guid de-duplication ledger |
+| `ShortLink`, `LinkClick` | Link shortening and click tracking |
+| `AiGeneration` | Caption calls with token counts, so spend is visible |
+| `NotificationSetting`, `EmailLog` | Who gets emailed, and whether it arrived |
 | `ActivityLog` | Audit trail |
 
-Portability constraints: no enums and no native JSON columns, because SQLite
-lacks both. Status fields are strings validated against the unions in
-`src/lib/constants.ts`; structured payloads are JSON text parsed through
-`src/lib/json.ts`, tolerantly — a row written by an older version degrades to a
-fallback instead of crashing a page render.
+Status fields are **native Postgres enums**, so an invalid value is rejected by
+the database rather than trusted from application code. Structured payloads are
+native `Json`. Reads still narrow defensively through `src/lib/json.ts` —
+Postgres validates that a column holds JSON, not *which* JSON, so a row written
+by an older version must degrade to a fallback rather than crash a render.
+
+### Multi-tenancy
+
+A client is a `Workspace`; a user may belong to several with different roles.
+`getAuthContext` resolves the requested workspace and **re-checks membership** —
+an id from a cookie or URL is a request, not a permission. Workspace scoping is
+therefore a security boundary, with tests that a member of one workspace cannot
+read, publish to, or approve anything in another.
+
+### Approval workflow
+
+`initialApprovalStatus` decides at creation time and stores the result on the
+row, rather than recomputing later from settings that may have changed. The
+load-bearing half is in the scheduler: the due-work query filters
+`approvalStatus IN ('not_required','approved')`, so an unapproved post cannot go
+out when its scheduled time arrives, and "publish now" is not a way around
+review.
 
 ---
 
@@ -196,3 +229,33 @@ Composer → `POST /api/posts`:
 Errors surface in one shape — `{ error, fields?, traceId? }` — via
 `handleApiError`. Unrecognised exceptions return a generic message and are logged
 server-side, because a raw exception can contain a token.
+
+
+---
+
+## Feature notes worth knowing
+
+**Link handling** is applied at publish time, not compose time, so the composer
+keeps showing the real destination and an edited post does not accumulate
+redirects. UTM tags are per destination, so a campaign is attributable to the
+Page it ran on. `/l/[slug]` is a bare 302 with no body — Facebook fetches
+whatever URL appears in a post to build its preview card, so an interstitial
+would publish the post with a blank card. Facebook's scraper is excluded from
+click counts for the same reason: it hits every shortened link at publish time.
+
+**Evergreen recycling** creates a copy each cycle rather than re-running the
+original row, keeping per-attempt history intact. Text variants rotate because
+Facebook rejects identical repeated content with error 506.
+
+**RSS ingestion** has three guards against flooding a Page: nothing published
+before the subscription (`ingestFrom`), guid-based de-duplication, and a
+per-poll cap. ETag/Last-Modified make the common "nothing new" case cheap.
+
+**AI captions** never publish on their own — output lands in the composer for a
+human to accept. Every call is logged with token counts and capped per workspace
+per hour, so a stuck loop hits a limit rather than an invoice.
+
+**Reporting** keeps Facebook's insights and our own click counts separate and
+never sums them; they measure different things. PDF is a print-styled page
+rather than server-side rendering, which keeps headless Chromium out of the
+production image.

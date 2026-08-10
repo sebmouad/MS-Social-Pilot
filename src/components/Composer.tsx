@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { TargetPicker, type TargetOption } from './TargetPicker';
 import { AiAssist } from './AiAssist';
@@ -34,6 +35,9 @@ export function Composer({
   requiresApproval,
   canPublishDirectly,
 }: Props) {
+  const t = useTranslations('compose');
+  const tCommon = useTranslations('common');
+  const tAuth = useTranslations('auth');
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -87,7 +91,7 @@ export function Composer({
       const body = (await response.json()) as PostMedia & { error?: string };
 
       if (!response.ok) {
-        setError(body.error ?? `Could not upload ${file.name}.`);
+        setError(body.error ?? `${file.name}: ${body.error ?? ''}`.trim());
         continue;
       }
       setMedia((current) => [...current, body]);
@@ -127,7 +131,7 @@ export function Composer({
 
     if (!response.ok) {
       const fieldError = body.fields ? Object.values(body.fields)[0] : undefined;
-      setError(fieldError ?? body.error ?? 'Could not save this post.');
+      setError(fieldError ?? body.error ?? t('couldNotSave'));
       setPending(false);
       return;
     }
@@ -135,9 +139,11 @@ export function Composer({
     const failures = (body.results ?? []).filter((item) => item.status === 'failed');
     if (failures.length > 0) {
       setError(
-        `Published with problems: ${failures
-          .map((failure) => `${failure.targetName} — ${failure.error ?? 'failed'}`)
-          .join('; ')}`,
+        t('publishedWithProblems', {
+          details: failures
+            .map((failure) => `${failure.targetName} — ${failure.error ?? ''}`.trim())
+            .join('; '),
+        }),
       );
       setPending(false);
       router.refresh();
@@ -146,12 +152,12 @@ export function Composer({
 
     setResult(
       saveAsDraft
-        ? 'Saved as a draft.'
+        ? t('savedDraft')
         : needsApproval
-          ? 'Submitted for approval.'
+          ? t('submittedOk')
           : timing === 'now'
-            ? 'Published.'
-            : 'Scheduled. You can see it on the calendar.',
+            ? t('publishedOk')
+            : t('scheduledOk'),
     );
     setMessage('');
     setLink('');
@@ -173,29 +179,29 @@ export function Composer({
       <div className="space-y-6 lg:col-span-2">
         <section className="card p-5">
           <label className="label" htmlFor="message">
-            What do you want to say?
+            {t('whatToSay')}
           </label>
           <textarea
             id="message"
             className="input min-h-[160px] resize-y"
-            placeholder="Write your post…"
+            placeholder={t('placeholder')}
             value={message}
             maxLength={LIMITS.messageLength}
             onChange={(event) => setMessage(event.target.value)}
           />
-          <p className="hint">{message.length.toLocaleString()} characters</p>
+          <p className="hint">{t('characters', { count: message.length })}</p>
 
           {aiEnabled && <AiAssist draft={message} onResult={setMessage} />}
 
           <div className="mt-5">
             <label className="label" htmlFor="link">
-              Link <span className="font-normal text-slate-400">(optional)</span>
+              {t('link')} <span className="font-normal text-slate-400">{tAuth('optional')}</span>
             </label>
             <div className="flex gap-2">
               <input
                 id="link"
                 className="input"
-                placeholder="https://example.com/article"
+                placeholder={t('linkPlaceholder')}
                 value={link}
                 onChange={(event) => setLink(event.target.value)}
                 onBlur={(event) => loadPreview(event.target.value)}
@@ -205,15 +211,12 @@ export function Composer({
                 className="btn-secondary shrink-0"
                 disabled={!link.trim() || previewLoading}
                 onClick={() => loadPreview(link, true)}
-                title="Ask Facebook to re-read this page's Open Graph tags"
+                title={t('linkHint')}
               >
-                {previewLoading ? 'Reading…' : 'Refresh card'}
+                {previewLoading ? t('reading') : t('refreshCard')}
               </button>
             </div>
-            <p className="hint">
-              Facebook builds the preview card from the page&apos;s Open Graph tags. Use “Refresh card” if
-              you have just changed them.
-            </p>
+            <p className="hint">{t('linkHint')}</p>
 
             {preview && (
               <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
@@ -225,12 +228,16 @@ export function Composer({
                   <p className="text-xs uppercase tracking-wide text-slate-400">
                     {preview.siteName ?? new URL(preview.url).hostname}
                   </p>
-                  <p className="text-sm font-semibold text-slate-900">{preview.title ?? 'No title found'}</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {preview.title ?? t('noTitleFound')}
+                  </p>
                   {preview.description && (
                     <p className="line-clamp-2 text-sm text-slate-600">{preview.description}</p>
                   )}
                   <p className="text-xs text-slate-400">
-                    Read via {preview.source === 'graph' ? 'the Facebook scraper' : 'a direct fetch'}
+                    {t('readVia', {
+                      source: preview.source === 'graph' ? t('viaGraph') : t('viaHtml'),
+                    })}
                   </p>
                 </div>
               </div>
@@ -238,7 +245,7 @@ export function Composer({
           </div>
 
           <div className="mt-5">
-            <span className="label">Media</span>
+            <span className="label">{t('media')}</span>
             <input
               ref={fileInput}
               type="file"
@@ -247,9 +254,7 @@ export function Composer({
               className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-slate-200"
               onChange={(event) => event.target.files && uploadFiles(event.target.files)}
             />
-            <p className="hint">
-              Up to {LIMITS.mediaPerPost} photos, or one video. Facebook cannot mix a video with photos.
-            </p>
+            <p className="hint">{t('mediaHint', { max: LIMITS.mediaPerPost })}</p>
 
             {media.length > 0 && (
               <ul className="mt-3 flex flex-wrap gap-2">
@@ -260,12 +265,12 @@ export function Composer({
                       <img src={item.url} alt="" className="h-20 w-20 rounded-lg border border-slate-200 object-cover" />
                     ) : (
                       <span className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-xs text-slate-600">
-                        Video
+                        {t('video')}
                       </span>
                     )}
                     <button
                       type="button"
-                      aria-label="Remove attachment"
+                      aria-label={t('removeAttachment')}
                       className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-xs text-white"
                       onClick={() => setMedia((current) => current.filter((entry) => entry.id !== item.id))}
                     >
@@ -281,19 +286,19 @@ export function Composer({
 
       <div className="space-y-6">
         <section className="card p-5">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Where to post</h2>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">{t('whereToPost')}</h2>
           <TargetPicker targets={targets} selected={selected} onChange={setSelected} />
         </section>
 
         <section className="card p-5">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">When to post</h2>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">{t('whenToPost')}</h2>
 
           <div className="space-y-2">
             {(
               [
-                ['now', 'Publish now'],
-                ['schedule', 'Schedule for a specific time'],
-                ['queue', 'Add to the next queue slot'],
+                ['now', t('publishNow')],
+                ['schedule', t('scheduleForTime')],
+                ['queue', t('addToQueue')],
               ] as Array<[Timing, string]>
             ).map(([value, label]) => (
               <label key={value} className="flex items-center gap-2 text-sm text-slate-700">
@@ -307,7 +312,7 @@ export function Composer({
                 />
                 {label}
                 {value === 'queue' && !hasQueueSlots && (
-                  <span className="text-xs text-slate-400">(set up times in Settings)</span>
+                  <span className="text-xs text-slate-400">{t('queueNotSetUp')}</span>
                 )}
               </label>
             ))}
@@ -316,7 +321,7 @@ export function Composer({
           {timing === 'schedule' && (
             <div className="mt-4">
               <label className="label" htmlFor="scheduledAt">
-                Date and time
+                {t('dateAndTime')}
               </label>
               <input
                 id="scheduledAt"
@@ -325,10 +330,10 @@ export function Composer({
                 value={scheduledAt}
                 onChange={(event) => setScheduledAt(event.target.value)}
               />
-              <p className="hint">Times are in {timezone}, your workspace timezone.</p>
+              <p className="hint">{t('timezoneHint', { timezone })}</p>
 
               <div className="mt-4 space-y-2 rounded-lg bg-slate-50 p-3">
-                <p className="text-xs font-medium text-slate-700">Who holds the post until then?</p>
+                <p className="text-xs font-medium text-slate-700">{t('whoHolds')}</p>
                 <label className="flex items-start gap-2 text-xs text-slate-600">
                   <input
                     type="radio"
@@ -338,8 +343,8 @@ export function Composer({
                     onChange={() => setHandler('worker')}
                   />
                   <span>
-                    <strong className="font-medium text-slate-800">This app.</strong> Editable until it goes
-                    out, and works for groups.
+                    <strong className="font-medium text-slate-800">{t('thisApp')}</strong>{' '}
+                    {t('thisAppHint')}
                   </span>
                 </label>
                 <label className="flex items-start gap-2 text-xs text-slate-600">
@@ -352,9 +357,9 @@ export function Composer({
                     onChange={() => setHandler('native')}
                   />
                   <span>
-                    <strong className="font-medium text-slate-800">Facebook.</strong> Publishes even if this
-                    app is offline. Pages only, at least 10 minutes ahead
-                    {hasGroupSelected && ', and unavailable while a group is selected'}.
+                    <strong className="font-medium text-slate-800">{t('facebook')}</strong>{' '}
+                    {t('facebookHint')}
+                    {hasGroupSelected && t('facebookGroupWarning')}.
                   </span>
                 </label>
               </div>
@@ -374,15 +379,15 @@ export function Composer({
         <div className="flex gap-2">
           <button type="button" className="btn-primary flex-1" disabled={!canSubmit} onClick={() => submit(false)}>
             {pending
-              ? 'Working…'
+              ? tCommon('working')
               : needsApproval
-                ? 'Submit for approval'
+                ? t('submitForApproval')
                 : timing === 'now'
-                  ? 'Publish now'
-                  : 'Schedule'}
+                  ? t('publishNow')
+                  : t('schedule')}
           </button>
           <button type="button" className="btn-secondary" disabled={pending} onClick={() => submit(true)}>
-            Save draft
+            {t('saveDraft')}
           </button>
         </div>
       </div>

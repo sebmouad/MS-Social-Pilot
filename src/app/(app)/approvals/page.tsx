@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { ApprovalStatus } from '@prisma/client';
 
 import { ApprovalsClient } from '@/components/ApprovalsClient';
-import { requireAuth } from '@/lib/auth';
+import { requirePage } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { canApprove } from '@/lib/constants';
 import { parseMedia } from '@/lib/json';
@@ -12,7 +12,7 @@ import { formatInZone } from '@/lib/time';
 export const dynamic = 'force-dynamic';
 
 export default async function ApprovalsPage() {
-  const auth = await requireAuth();
+  const auth = await requirePage();
   // Not an error page: someone without approval rights simply has no business
   // here, so send them somewhere useful.
   if (!canApprove(auth.role)) redirect('/dashboard');

@@ -1,6 +1,8 @@
+import { getTranslations } from 'next-intl/server';
+
 import { SettingsNav } from '@/components/SettingsNav';
 import { SettingsClient } from '@/components/SettingsClient';
-import { requireAuth } from '@/lib/auth';
+import { requirePage } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { BULK_CSV_TEMPLATE } from '@/lib/csv';
 import { aiAvailable } from '@/lib/ai';
@@ -41,7 +43,8 @@ function timezoneOptions(): string[] {
 }
 
 export default async function SettingsPage() {
-  const auth = await requireAuth();
+  const auth = await requirePage();
+  const t = await getTranslations('settings');
 
   const [slots, targets, workspace] = await Promise.all([
     prisma.queueSlot.findMany({
@@ -59,8 +62,8 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-xl font-semibold text-slate-900">Settings</h1>
-        <p className="mt-1 text-sm text-slate-600">Workspace, publishing queue and bulk scheduling.</p>
+        <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+        <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
 
       <SettingsNav />

@@ -288,7 +288,9 @@
     "scheduling": "Planification…",
     "rowsScheduled": "{scheduled} lignes planifiées sur {total}",
     "rowsFailed": ", {count} en échec",
-    "uploadFailed": "L'import a échoué."
+    "uploadFailed": "L'import a échoué.",
+    "bulkDestinations": "Destinations",
+    "row": "Ligne"
   },
   "team": {
     "title": "Équipe",

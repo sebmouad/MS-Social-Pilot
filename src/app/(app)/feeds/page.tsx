@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 
 import { FeedsClient } from '@/components/FeedsClient';
-import { requireAuth } from '@/lib/auth';
+import { requirePage } from '@/lib/auth';
 import { canManageSettings } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { parseTargetIds } from '@/lib/json';
@@ -10,7 +10,7 @@ import { formatInZone } from '@/lib/time';
 export const dynamic = 'force-dynamic';
 
 export default async function FeedsPage() {
-  const auth = await requireAuth();
+  const auth = await requirePage();
   const t = await getTranslations('feeds');
   const timezone = auth.workspace.timezone;
 

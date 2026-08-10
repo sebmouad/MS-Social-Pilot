@@ -2,8 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 export function AcceptInvitation({ token, label }: { token: string; label: string }) {
+  const t = useTranslations('team');
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +22,7 @@ export function AcceptInvitation({ token, label }: { token: string; label: strin
 
     if (!response.ok) {
       const body = (await response.json().catch(() => ({}))) as { error?: string };
-      setError(body.error ?? 'Could not accept this invitation.');
+      setError(body.error ?? t('acceptInvalid'));
       setPending(false);
       return;
     }

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 export interface AccountView {
   id: string;
@@ -22,6 +23,10 @@ export interface AccountView {
 }
 
 export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
+  const t = useTranslations('accounts');
+  const tCommon = useTranslations('common');
+  const tPosts = useTranslations('posts');
+  const tTargets = useTranslations('targets');
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -35,7 +40,7 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
       const response = await fetch(path, { method });
       const body = (await response.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
       if (!response.ok) {
-        setError(body.error ?? 'That did not work.');
+        setError(body.error ?? tPosts('actionFailed'));
         return null;
       }
       router.refresh();
@@ -50,7 +55,7 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
       | { pages?: number; groups?: number; warnings?: string[] }
       | null;
     if (body) {
-      setNotice(`Synced ${body.pages ?? 0} page(s) and ${body.groups ?? 0} group(s).`);
+      setNotice(t('syncedResult', { pages: body.pages ?? 0, groups: body.groups ?? 0 }));
       if (body.warnings?.length) setError(body.warnings[0] ?? null);
     }
   }
@@ -62,10 +67,12 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
     if (body?.health) {
       setNotice(
         body.health.message ??
-          `Connection is healthy${
+          `${t('healthy')}${
             body.health.expiresAt
-              ? `; the token expires ${new Date(body.health.expiresAt).toLocaleDateString()}.`
-              : ' and does not expire.'
+              ? ` · ${t('tokenExpires', {
+                  when: new Date(body.health.expiresAt).toLocaleDateString(),
+                })}`
+              : ''
           }`,
       );
     }
@@ -73,9 +80,7 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
 
   async function disconnect(accountId: string, name: string) {
     if (
-      !window.confirm(
-        `Disconnect ${name}? Scheduled posts to its pages and groups will be cancelled. Published history is kept.`,
-      )
+      !window.confirm(t('disconnectConfirm', { name }))
     ) {
       return;
     }
@@ -93,7 +98,7 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? 'Could not update that destination.');
+        setError(body.error ?? tPosts('actionFailed'));
         return;
       }
       router.refresh();
@@ -130,12 +135,14 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
               <div>
                 <p className="text-sm font-semibold text-slate-900">{account.name}</p>
                 <p className="text-xs text-slate-500">
-                  {account.targets.length} destination{account.targets.length === 1 ? '' : 's'}
+                  {t('destinations', { count: account.targets.length })}
                   {account.lastSyncedAt
-                    ? ` · synced ${new Date(account.lastSyncedAt).toLocaleString()}`
+                    ? ` · ${t('syncedAt', { when: new Date(account.lastSyncedAt).toLocaleString() })}`
                     : ''}
                   {account.tokenExpiresAt
-                    ? ` · token expires ${new Date(account.tokenExpiresAt).toLocaleDateString()}`
+                    ? ` · ${t('tokenExpires', {
+                        when: new Date(account.tokenExpiresAt).toLocaleDateString(),
+                      })}`
                     : ''}
                 </p>
               </div>
@@ -148,7 +155,7 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
                 disabled={busy === account.id}
                 onClick={() => check(account.id)}
               >
-                Check connection
+                {t('checkConnection')}
               </button>
               <button
                 type="button"
@@ -156,7 +163,7 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
                 disabled={busy === account.id}
                 onClick={() => sync(account.id)}
               >
-                {busy === account.id ? 'Working…' : 'Sync pages'}
+                {busy === account.id ? tCommon('working') : t('syncPages')}
               </button>
               <button
                 type="button"
@@ -164,14 +171,14 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
                 disabled={busy === account.id}
                 onClick={() => disconnect(account.id, account.name)}
               >
-                Disconnect
+                {t('disconnect')}
               </button>
             </div>
           </div>
 
           {account.invalidReason && (
             <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {account.invalidReason} Reconnect this account to resume scheduled posts.
+              {account.invalidReason} {t('reconnectPrompt')}
             </p>
           )}
 
@@ -189,7 +196,7 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-slate-900">{target.name}</p>
                   <p className="truncate text-xs text-slate-500">
-                    {target.type === 'group' ? 'Group' : 'Page'}
+                    {target.type === 'group' ? tTargets('group') : tTargets('page')}
                     {target.publishBlocker ? ` · ${target.publishBlocker}` : ''}
                   </p>
                 </div>
@@ -201,7 +208,7 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
                     disabled={busy === target.id || (!target.canPublish && !target.enabled)}
                     onChange={(event) => toggleTarget(target.id, event.target.checked)}
                   />
-                  Available
+                  {t('available')}
                 </label>
               </li>
             ))}

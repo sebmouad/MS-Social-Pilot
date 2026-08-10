@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 
-import { requireAuth } from '@/lib/auth';
+import { requirePage } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatInZone, monthGrid } from '@/lib/time';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -23,7 +23,7 @@ export default async function CalendarPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const auth = await requireAuth();
+  const auth = await requirePage();
   const locale = await getLocale();
   const t = await getTranslations('calendar');
   const tDash = await getTranslations('dashboard');

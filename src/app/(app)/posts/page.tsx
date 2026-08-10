@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
 import { PostList } from '@/components/PostList';
-import { requireAuth } from '@/lib/auth';
+import { requirePage } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { parseMedia } from '@/lib/json';
 import { formatInZone } from '@/lib/time';
@@ -24,7 +24,7 @@ export default async function PostsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const auth = await requireAuth();
+  const auth = await requirePage();
   const t = await getTranslations('posts');
   const tDash = await getTranslations('dashboard');
   const tCommon = await getTranslations('common');

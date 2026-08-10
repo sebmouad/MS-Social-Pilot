@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { Locale, WorkspaceRole } from '@prisma/client';
 
@@ -263,6 +264,20 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
     })),
   };
 });
+
+/**
+ * Page-context guard: redirect to sign-in rather than throwing.
+ *
+ * `requireAuth` throws, which is right for an API route — the wrapper turns it
+ * into a 401. In a server component it produces a 500 error page instead, and
+ * Next renders pages alongside their layout, so the layout's own redirect does
+ * not prevent the throw. Screens use this; API routes use `requireAuth`.
+ */
+export async function requirePage(requestedWorkspaceId?: string): Promise<AuthContext> {
+  const context = await getAuthContext(requestedWorkspaceId);
+  if (!context) redirect('/login');
+  return context;
+}
 
 /** Same as {@link getAuthContext} but throws — for routes that require a login. */
 export async function requireAuth(requestedWorkspaceId?: string): Promise<AuthContext> {

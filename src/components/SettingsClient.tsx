@@ -72,8 +72,8 @@ export function SettingsClient({
     const body = (await response.json().catch(() => ({}))) as { error?: string };
     setStatus(
       response.ok
-        ? { kind: 'ok', text: 'Workspace settings saved.' }
-        : { kind: 'error', text: body.error ?? 'Could not save.' },
+        ? { kind: 'ok', text: t('saved') }
+        : { kind: 'error', text: body.error ?? t('couldNotSave') },
     );
     setPending(false);
     if (response.ok) router.refresh();
@@ -90,10 +90,10 @@ export function SettingsClient({
     const body = (await response.json().catch(() => ({}))) as { error?: string };
     if (response.ok) {
       setCurrentSlots(next);
-      setStatus({ kind: 'ok', text: 'Publishing times updated.' });
+      setStatus({ kind: 'ok', text: t('queueUpdated') });
       router.refresh();
     } else {
-      setStatus({ kind: 'error', text: body.error ?? 'Could not save the queue.' });
+      setStatus({ kind: 'error', text: body.error ?? t('couldNotSave') });
     }
     setPending(false);
   }
@@ -117,11 +117,11 @@ export function SettingsClient({
       )}
 
       <section className="card p-5">
-        <h2 className="text-sm font-semibold text-slate-900">Workspace</h2>
+        <h2 className="text-sm font-semibold text-slate-900">{t('workspace')}</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="workspaceName">
-              Name
+              {t('name')}
             </label>
             <input
               id="workspaceName"
@@ -132,7 +132,7 @@ export function SettingsClient({
           </div>
           <div>
             <label className="label" htmlFor="timezone">
-              Timezone
+              {t('timezone')}
             </label>
             <select
               id="timezone"
@@ -146,10 +146,7 @@ export function SettingsClient({
                 </option>
               ))}
             </select>
-            <p className="hint">
-              Every scheduled time you enter is interpreted in this timezone, and stays correct across
-              daylight saving changes.
-            </p>
+            <p className="hint">{t('timezoneHint')}</p>
           </div>
         </div>
         <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
@@ -297,13 +294,11 @@ export function SettingsClient({
       </section>
 
       <section className="card p-5">
-        <h2 className="text-sm font-semibold text-slate-900">Publishing queue</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Recurring times for “add to the next queue slot”. Each new post takes the earliest free slot.
-        </p>
+        <h2 className="text-sm font-semibold text-slate-900">{t('queue')}</h2>
+        <p className="mt-1 text-sm text-slate-600">{t('queueSubtitle')}</p>
 
         <ul className="mt-4 flex flex-wrap gap-2">
-          {sorted.length === 0 && <li className="text-sm text-slate-500">No times set yet.</li>}
+          {sorted.length === 0 && <li className="text-sm text-slate-500">{t('noTimes')}</li>}
           {sorted.map((slot) => (
             <li
               key={`${slot.dayOfWeek}-${slot.hour}-${slot.minute}`}
@@ -315,7 +310,7 @@ export function SettingsClient({
               </span>
               <button
                 type="button"
-                aria-label="Remove slot"
+                aria-label={t('removeSlot')}
                 className="text-slate-400 hover:text-red-600"
                 disabled={pending}
                 onClick={() =>
@@ -340,7 +335,7 @@ export function SettingsClient({
         <div className="mt-4 flex flex-wrap items-end gap-2">
           <div>
             <label className="label" htmlFor="slotDay">
-              Day
+              {t('day')}
             </label>
             <select
               id="slotDay"
@@ -357,7 +352,7 @@ export function SettingsClient({
           </div>
           <div>
             <label className="label" htmlFor="slotTime">
-              Time
+              {t('time')}
             </label>
             <input
               id="slotTime"
@@ -380,7 +375,7 @@ export function SettingsClient({
             disabled={pending}
             onClick={() => saveSlots([...currentSlots, newSlot])}
           >
-            Add time
+            {t('addTime')}
           </button>
         </div>
       </section>
@@ -399,6 +394,8 @@ function BulkUpload({
   timezone: string;
   csvTemplate: string;
 }) {
+  const t = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const [csv, setCsv] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
@@ -424,7 +421,7 @@ function BulkUpload({
     const body = (await response.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
 
     if (!response.ok) {
-      setError(body.error ?? 'The upload failed.');
+      setError(body.error ?? t('uploadFailed'));
     } else {
       setSummary(body as never);
       router.refresh();
@@ -434,15 +431,11 @@ function BulkUpload({
 
   return (
     <section className="card p-5">
-      <h2 className="text-sm font-semibold text-slate-900">Bulk schedule from CSV</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        Columns: <code className="rounded bg-slate-100 px-1">message, link, scheduled_at, media_url</code>.
-        Leave <code className="rounded bg-slate-100 px-1">scheduled_at</code> empty to use the next free
-        queue slot. Dates are read in {timezone}.
-      </p>
+      <h2 className="text-sm font-semibold text-slate-900">{t('bulk')}</h2>
+      <p className="mt-1 text-sm text-slate-600">{t('bulkColumns', { timezone })}</p>
 
       <details className="mt-3">
-        <summary className="cursor-pointer text-xs font-medium text-brand-600">Show an example</summary>
+        <summary className="cursor-pointer text-xs font-medium text-brand-600">{t('showExample')}</summary>
         <pre className="mt-2 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
           {csvTemplate}
         </pre>
@@ -450,7 +443,7 @@ function BulkUpload({
 
       <div className="mt-4">
         <label className="label" htmlFor="csvInput">
-          Paste or upload CSV
+          {t('pasteOrUpload')}
         </label>
         <input
           type="file"
@@ -471,7 +464,7 @@ function BulkUpload({
       </div>
 
       <div className="mt-4">
-        <span className="label">Destinations</span>
+        <span className="label">{t('bulkDestinations')}</span>
         <div className="flex flex-wrap gap-2">
           {targets
             .filter((target) => target.canPublish)
@@ -507,8 +500,8 @@ function BulkUpload({
       {summary && (
         <div className="mt-4 rounded-lg border border-slate-200 p-3 text-sm">
           <p className="font-medium text-slate-900">
-            {summary.scheduled} of {summary.total} rows scheduled
-            {summary.failed > 0 ? `, ${summary.failed} failed` : ''}.
+            {t('rowsScheduled', { scheduled: summary.scheduled, total: summary.total })}
+            {summary.failed > 0 ? t('rowsFailed', { count: summary.failed }) : ''}
           </p>
           {summary.failed > 0 && (
             <ul className="mt-2 space-y-0.5 text-xs text-red-600">
@@ -516,7 +509,7 @@ function BulkUpload({
                 .filter((result) => result.status === 'error')
                 .map((result) => (
                   <li key={result.row}>
-                    Row {result.row}: {result.message}
+                    {t('row')} {result.row}: {result.message}
                   </li>
                 ))}
             </ul>
@@ -530,7 +523,7 @@ function BulkUpload({
         disabled={pending || !csv.trim() || selected.length === 0}
         onClick={upload}
       >
-        {pending ? 'Scheduling…' : 'Schedule all rows'}
+        {pending ? t('scheduling') : t('scheduleAllRows')}
       </button>
     </section>
   );

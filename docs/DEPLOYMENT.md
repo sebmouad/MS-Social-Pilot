@@ -4,7 +4,10 @@
 
 - [ ] `SESSION_SECRET` and `ENCRYPTION_KEY` generated fresh (`openssl rand -base64 48` / `-base64 32`)
 - [ ] `APP_URL` uses https and matches the Meta app's OAuth redirect URI exactly
-- [ ] Postgres instead of SQLite (see below)
+- [ ] Postgres reachable and migrated (`npm run db:migrate`)
+- [ ] `RESEND_API_KEY` set and its sending domain verified, or failures go unreported
+- [ ] `ANTHROPIC_API_KEY` set if AI captions are wanted (optional)
+- [ ] `SHORTENER_DOMAIN` pointed at this app if link shortening is on (optional)
 - [ ] The scheduler runs — either `npm run worker` or a cron hitting `/api/cron/tick`
 - [ ] Deauthorize and data-deletion callback URLs set in the Meta app and publicly reachable
 - [ ] "Require app secret proof" enabled in the Meta app
@@ -13,28 +16,19 @@
 
 ---
 
-## Postgres
-
-SQLite is fine for a single instance, but it does not tolerate several app
-servers sharing a database. Switch in `prisma/schema.prisma`:
-
-```prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-```
+## Database
 
 ```env
 DATABASE_URL="postgresql://user:password@host:5432/social_pilot?schema=public"
 ```
 
 ```bash
-npm run db:migrate -- --name init
+npm run db:migrate     # development
+npx prisma migrate deploy   # production; the web container runs this on boot
 ```
 
-No model changes are needed — the schema deliberately avoids enums and native
-JSON columns so one file is valid on both engines.
+Migrations run in the `web` container rather than the worker, so two containers
+starting together cannot race to apply the same migration.
 
 ---
 
@@ -69,8 +63,9 @@ RestartSec=10
 WantedBy=multi-user.target
 ```
 
-The worker handles SIGTERM by finishing the tick in flight, so a restart does
-not abandon a post mid-publish.
+The worker handles SIGTERM by stopping new work and draining the jobs in
+flight, so a restart does not abandon a post mid-publish. A second signal exits
+immediately.
 
 Running several workers is safe — destinations are claimed atomically — but one
 is enough until you are publishing thousands of posts an hour.
@@ -82,6 +77,14 @@ Set `CRON_SECRET`, then call the endpoint on a schedule:
 ```bash
 curl -X POST https://your-domain.com/api/cron/tick \
      -H "Authorization: Bearer $CRON_SECRET"
+```
+
+`?jobs=publish,rss` restricts the run, so publishing can be called every minute
+while analytics runs hourly from a separate schedule:
+
+```bash
+curl -X POST "https://your-domain.com/api/cron/tick?jobs=publish" -H "Authorization: Bearer $CRON_SECRET"
+curl -X POST "https://your-domain.com/api/cron/tick?jobs=analytics,tokens" -H "Authorization: Bearer $CRON_SECRET"
 ```
 
 Vercel (`vercel.json`):
@@ -140,36 +143,37 @@ any in-flight OAuth state.
   parsed on every response; if you approach the ceiling, lower
   `SCHEDULER_CONCURRENCY` before Meta starts throttling — a code 4 costs a
   15-minute backoff.
-- **Token expiry.** Long-lived user tokens last ~60 days. The Accounts page
-  reports real expiry via `/debug_token`. A production deployment should nag
-  users before expiry rather than after; a weekly job over
-  `SocialAccount.tokenExpiresAt` is the straightforward version.
-- **Analytics.** `/api/analytics/refresh` deliberately refreshes 25 destinations
-  per call, stalest first. These counters move slowly; refreshing everything on
-  page load would burn the rate limit for nothing.
+- **Token expiry.** Long-lived user tokens last ~60 days. The `tokens` job warns
+  by email seven days out, once per token, and the Accounts page reports real
+  expiry via `/debug_token`. This is what prevents the classic silent failure —
+  a token dying and nobody noticing until a client asks why their page went
+  quiet.
+- **Analytics.** The `analytics` job refreshes 50 destinations per run, stalest
+  first (`/api/analytics/refresh` does 25 on demand). These counters move
+  slowly; refreshing everything on page load would burn the rate limit for
+  nothing.
 - **Backlogs.** Each tick takes `SCHEDULER_CONCURRENCY × 10` destinations, oldest
   scheduled first, so a backlog drains in the order users expect.
+- **AI spend.** `AI_RATE_LIMIT_PER_HOUR` is per workspace. Every call is recorded
+  in `AiGeneration` with token counts — query it before assuming a bill is wrong.
+- **Email deliverability.** Resend will not send to arbitrary addresses until
+  the sending domain is verified. Until then invitations and failure alerts are
+  logged as failed in `EmailLog`, not silently dropped.
 
 ---
 
 ## Docker
 
-```dockerfile
-FROM node:22-slim AS base
-WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends openssl \
-    && rm -rf /var/lib/apt/lists/*
+`Dockerfile` and `docker-compose.yml` are in the repository root:
 
-COPY package*.json prisma ./
-RUN npm ci
-
-COPY . .
-RUN npm run build
-
-ENV NODE_ENV=production
-EXPOSE 3000
-CMD ["npm", "start"]
+```bash
+docker compose up --build
 ```
 
-Run the worker as a second container from the same image with
-`command: npm run worker`, sharing the database and the media volume.
+Three services from one image — `web`, `worker`, `postgres` — with named
+volumes for the database and for `MEDIA_DIR`. The worker is the same image with
+`command: npm run worker`, so it can never drift out of sync with the code that
+scheduled the work.
+
+For production, drop the `5432` port mapping on `postgres` (it is exposed only
+for local `psql` and Prisma Studio) and put a TLS terminator in front of `web`.

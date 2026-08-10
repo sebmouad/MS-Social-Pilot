@@ -1,5 +1,5 @@
 import { Composer } from '@/components/Composer';
-import { requireAuth } from '@/lib/auth';
+import { requirePage } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { utcToLocalInput } from '@/lib/time';
 import { canPublishWithoutApproval } from '@/lib/constants';
@@ -8,7 +8,7 @@ import { aiAvailable } from '@/lib/ai';
 export const dynamic = 'force-dynamic';
 
 export default async function ComposePage() {
-  const auth = await requireAuth();
+  const auth = await requirePage();
 
   const [targets, queueSlots, workspace] = await Promise.all([
     prisma.target.findMany({

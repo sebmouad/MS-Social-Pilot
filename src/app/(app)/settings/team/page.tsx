@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { SettingsNav } from '@/components/SettingsNav';
 
 import { TeamClient } from '@/components/TeamClient';
-import { requireAuth } from '@/lib/auth';
+import { requirePage } from '@/lib/auth';
 import { canManageTeam } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { emailEnabled } from '@/lib/email/send';
@@ -12,7 +12,7 @@ import { formatInZone } from '@/lib/time';
 export const dynamic = 'force-dynamic';
 
 export default async function TeamPage() {
-  const auth = await requireAuth();
+  const auth = await requirePage();
   const t = await getTranslations('team');
   const timezone = auth.workspace.timezone;
 

@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 
-import { requireAuth } from '@/lib/auth';
+import { requirePage } from '@/lib/auth';
 import { buildReport } from '@/lib/reports';
 import { formatInZone, utcToLocalInput } from '@/lib/time';
 import { ReportControls } from '@/components/ReportControls';
@@ -12,7 +12,7 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const auth = await requireAuth();
+  const auth = await requirePage();
   const t = await getTranslations('reports');
   const params = await searchParams;
   const timezone = auth.workspace.timezone;

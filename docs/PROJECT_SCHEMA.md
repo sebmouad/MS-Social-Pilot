@@ -4,9 +4,10 @@ The agreed design for the full product. Every choice below was decided
 explicitly; where something was not asked, it is marked **[assumption]** so you
 can overrule it before implementation starts.
 
-Status: **specification**. The Facebook publishing core already exists on
-`claude/social-scheduler-facebook-api-c6kuza`; everything else here is to be
-built.
+Status: **implemented**. Every section below has been built on
+`claude/social-scheduler-facebook-api-c6kuza`. Where the implementation departed
+from this document, the document has been corrected. The open questions in §11
+remain open — they need answers from you, not code.
 
 ---
 

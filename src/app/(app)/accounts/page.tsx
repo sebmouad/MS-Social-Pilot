@@ -1,6 +1,6 @@
 import { AccountsClient } from '@/components/AccountsClient';
 import { getTranslations } from 'next-intl/server';
-import { requireAuth } from '@/lib/auth';
+import { requirePage } from '@/lib/auth';
 import { canManageAccounts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
@@ -12,7 +12,7 @@ export default async function AccountsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const auth = await requireAuth();
+  const auth = await requirePage();
   const t = await getTranslations('accounts');
   const params = await searchParams;
 
