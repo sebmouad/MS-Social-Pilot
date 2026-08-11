@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { invalidateAccountsForFacebookUser } from '@/lib/accounts';
 import { parseSignedRequest } from '@/lib/facebook/oauth';
+import { ensureSettings } from '@/lib/settings';
 
 /**
  * Deauthorize callback.
@@ -16,6 +17,13 @@ import { parseSignedRequest } from '@/lib/facebook/oauth';
  */
 export async function POST(request: Request): Promise<NextResponse> {
   try {
+    // Meta calls this directly, so there is no session handler ahead of it to
+    // have loaded the settings snapshot — and the very next thing needed is the
+    // app secret, which lives in the settings store. Without this, an install
+    // configured on the config screen rather than through the environment
+    // rejects Meta's callbacks outright.
+    await ensureSettings();
+
     const form = await request.formData();
     const signedRequest = form.get('signed_request');
 

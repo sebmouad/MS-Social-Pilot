@@ -470,6 +470,107 @@ describe('setting recycling variants', () => {
   });
 });
 
+/**
+ * Meta's own callbacks.
+ *
+ * These are the only routes Facebook calls directly: no session, no wrapper,
+ * nothing ahead of them to have loaded the settings snapshot — and the first
+ * thing each needs is the app secret, which lives in the settings store.
+ */
+describe('Meta callbacks', () => {
+  let settings: typeof import('../src/lib/settings');
+  let deauthorize: typeof import('../src/app/api/facebook/deauthorize/route');
+  let dataDeletion: typeof import('../src/app/api/facebook/data-deletion/route');
+
+  /** The secret an operator typed on the configuration screen. */
+  const configuredSecret = 'secret-set-on-the-config-screen';
+
+  beforeAll(async () => {
+    settings = await import('../src/lib/settings');
+    deauthorize = await import('../src/app/api/facebook/deauthorize/route');
+    dataDeletion = await import('../src/app/api/facebook/data-deletion/route');
+  });
+
+  async function signedRequest(secret: string, facebookUserId: string) {
+    const { hmacHex } = await import('../src/lib/crypto');
+    const payload = Buffer.from(
+      JSON.stringify({ algorithm: 'HMAC-SHA256', user_id: facebookUserId }),
+    ).toString('base64url');
+    const signature = Buffer.from(hmacHex(secret, payload), 'hex').toString('base64url');
+    return `${signature}.${payload}`;
+  }
+
+  function post(body: string) {
+    const form = new FormData();
+    form.set('signed_request', body);
+    return new Request('http://localhost/callback', { method: 'POST', body: form });
+  }
+
+  async function seedConnected() {
+    const { workspace, account } = await seedWorkspace();
+    return { workspace, account };
+  }
+
+  it('accepts a deauthorize callback signed with the configured secret', async () => {
+    const { account } = await seedConnected();
+    await settings.writeSetting('facebook.appSecret', configuredSecret, null);
+
+    try {
+      const response = await deauthorize.POST(
+        post(await signedRequest(configuredSecret, account.providerUserId)),
+      );
+      expect(response.status).toBe(200);
+
+      // The tokens are dead the moment the user removes the app, so the
+      // connection has to be flagged now rather than at the next publish.
+      const after = await prisma.socialAccount.findUniqueOrThrow({ where: { id: account.id } });
+      expect(after.invalidatedAt).not.toBeNull();
+    } finally {
+      await settings.clearSetting('facebook.appSecret');
+      await settings.ensureSettings();
+    }
+  });
+
+  it('accepts a data deletion callback signed with the configured secret', async () => {
+    const { account } = await seedConnected();
+    await settings.writeSetting('facebook.appSecret', configuredSecret, null);
+
+    try {
+      const response = await dataDeletion.POST(
+        post(await signedRequest(configuredSecret, account.providerUserId)),
+      );
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as { confirmation_code?: string };
+      expect(body.confirmation_code).toBeTruthy();
+
+      // Meta requires the deletion to have actually happened.
+      expect(await prisma.socialAccount.findUnique({ where: { id: account.id } })).toBeNull();
+    } finally {
+      await settings.clearSetting('facebook.appSecret');
+      await settings.ensureSettings();
+    }
+  });
+
+  it('still rejects a request signed with the wrong secret', async () => {
+    const { account } = await seedConnected();
+    await settings.writeSetting('facebook.appSecret', configuredSecret, null);
+
+    try {
+      const response = await deauthorize.POST(
+        post(await signedRequest('not-the-secret', account.providerUserId)),
+      );
+      expect(response.status).toBe(401);
+
+      const after = await prisma.socialAccount.findUniqueOrThrow({ where: { id: account.id } });
+      expect(after.invalidatedAt).toBeNull();
+    } finally {
+      await settings.clearSetting('facebook.appSecret');
+      await settings.ensureSettings();
+    }
+  });
+});
+
 describe('POST /api/cron/tick', () => {
   let settings: typeof import('../src/lib/settings');
   let route: typeof import('../src/app/api/cron/tick/route');

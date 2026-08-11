@@ -473,6 +473,15 @@ snapshot loaded at two choke points: the API route wrapper for requests, and
 `getAuthContext` for server rendering. The worker re-reads on every pass of its
 one-second loop.
 
+Those choke points cover everything a browser reaches, which is why the routes
+that no browser reaches are the ones to watch: `/api/cron/tick` and Meta's
+`deauthorize` and data-deletion callbacks have no session ahead of them and are
+not wrapped, so each loads the snapshot itself. Missing that call does not fail
+loudly — the route runs on environment values and silently ignores the config
+screen, which for these three means a cron secret that reads as unset and Meta
+callbacks rejected as unsigned. The short-link redirect is deliberately left
+out: it reads no settings, and it is the hottest public path in the app.
+
 The cache is validated against a **version stamp** rather than simply expiring.
 More than one process runs this app — the web server, the worker, and possibly
 several of each behind a load balancer — and a blind TTL let them disagree about
