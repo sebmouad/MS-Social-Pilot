@@ -197,6 +197,10 @@ export const env = {
     return settingNumber('analytics.tokenWarningDays');
   },
 
+  /** Language for a visitor who has not signed in and whose browser is silent. */
+  get defaultLocale(): string {
+    return settingString('i18n.defaultLocale');
+  },
   get cronSecret(): string | null {
     return settingString('cron.secret') || null;
   },

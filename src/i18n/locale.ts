@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { Locale } from '@prisma/client';
 
 import { getAuthContext } from '@/lib/auth';
+import { env } from '@/lib/env';
 
 /**
  * Which language to render in.
@@ -52,10 +53,14 @@ export async function resolveLocale(): Promise<Locale> {
   if (auth) return auth.user.locale ?? auth.workspace.defaultLocale ?? DEFAULT_LOCALE;
 
   const requestHeaders = await headers();
-  const envDefault = process.env.DEFAULT_LOCALE;
+  // Read through the settings store rather than the environment directly, so
+  // this is editable on the configuration screen like everything else. The
+  // getAuthContext call above has already loaded the snapshot, even for the
+  // signed-out visitor this branch exists for.
+  const configured = env.defaultLocale;
 
   return (
     negotiateLocale(requestHeaders.get('accept-language')) ??
-    (envDefault && isSupportedLocale(envDefault) ? envDefault : DEFAULT_LOCALE)
+    (configured && isSupportedLocale(configured) ? configured : DEFAULT_LOCALE)
   );
 }

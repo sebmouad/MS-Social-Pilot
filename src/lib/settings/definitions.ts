@@ -72,6 +72,20 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     hint: 'Used for OAuth redirects and every link in an email. Facebook rejects a redirect that is not https outside localhost.',
   },
   {
+    key: 'i18n.defaultLocale',
+    group: 'general',
+    type: 'select',
+    label: 'Default language',
+    description: 'The language used before anyone signs in, when the browser asks for neither.',
+    default: 'en',
+    env: 'DEFAULT_LOCALE',
+    options: [
+      { value: 'en', label: 'English' },
+      { value: 'fr', label: 'Français' },
+    ],
+    hint: 'A signed-in person always sees their own language, and their browser’s preference wins over this. It decides the login and registration screens for a first-time visitor.',
+  },
+  {
     key: 'cron.secret',
     group: 'general',
     type: 'secret',

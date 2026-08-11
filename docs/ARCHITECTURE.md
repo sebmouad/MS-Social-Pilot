@@ -547,6 +547,14 @@ keeps working exactly as before; anything set on Settings → Configuration wins
 over it, and clearing an override hands the setting back. `env` reads through
 the store, so no call site changed shape.
 
+The registry, `.env.example` and the schema notes describe the same
+configuration three times, and three copies drift — they did, which is why
+`tests/configuration-docs.test.ts` now fails when they stop agreeing, in both
+directions. A name documented but absent from the registry is the more
+interesting failure: it means a setting wired straight to `process.env`, which
+is a setting nobody can change from the config screen. That is how
+`DEFAULT_LOCALE` was found.
+
 Three things stay purely environmental because they cannot be anything else:
 `DATABASE_URL` reads the settings table, `ENCRYPTION_KEY` protects the secrets
 stored in it, and `SESSION_SECRET` cannot be rotated from inside a session.

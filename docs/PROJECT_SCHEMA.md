@@ -320,6 +320,7 @@ FACEBOOK_APP_SECRET=
 FACEBOOK_GRAPH_VERSION=v21.0
 FACEBOOK_SCOPES=
 FACEBOOK_ENABLE_GROUPS=true
+FACEBOOK_GRAPH_BASE_URL=   # override only to point at a recording proxy
 
 # Scheduler
 SCHEDULER_POLL_SECONDS=30
@@ -329,7 +330,14 @@ SCHEDULER_STALE_LOCK_MINUTES=15
 RSS_POLL_MINUTES=15
 EVERGREEN_CHECK_MINUTES=60
 TOKEN_EXPIRY_CHECK_HOURS=24
+BULK_ROW_LIMIT=500
+
+# Analytics
 ANALYTICS_REFRESH_HOURS=6
+PAGE_INSIGHTS_HOURS=24
+EDGE_SYNC_HOURS=6
+INSTAGRAM_SYNC_HOURS=12
+ADS_SYNC_HOURS=12
 
 # Email (Resend)
 RESEND_API_KEY=
@@ -351,7 +359,16 @@ MAX_UPLOAD_MB=25
 
 # i18n
 DEFAULT_LOCALE=en          # en | fr
+
+# Serverless trigger
+CRON_SECRET=               # blank disables POST /api/cron/tick
 ```
+
+Every variable above except `DATABASE_URL`, `SESSION_SECRET` and
+`ENCRYPTION_KEY` is also editable on Settings → Configuration, which wins over
+the environment. `src/lib/settings/definitions.ts` is the source of truth for
+all three lists, and `tests/configuration-docs.test.ts` fails if this block,
+`.env.example` and the registry stop agreeing.
 
 **Per-workspace settings** (in the UI, not env): timezone, default locale,
 require approval, queue slots, UTM defaults, shortener on/off, AI tone and brand
