@@ -32,15 +32,14 @@ import {
  * proven by the integration tests.
  */
 
-/** A row stuck in `processing` for longer than this is assumed abandoned. */
-const STALE_LOCK_MINUTES = 15;
-
 export interface TickResult {
   claimed: number;
   published: number;
   failed: number;
   retrying: number;
   reclaimedStale: number;
+  /** Interrupted destinations that had run out of attempts and were failed. */
+  abandonedStale: number;
 }
 
 export interface TickOptions {
@@ -49,29 +48,92 @@ export interface TickOptions {
   limit?: number;
   concurrency?: number;
   maxAttempts?: number;
+  /** Overrides the configured abandoned-lock timeout, in minutes. */
+  staleLockMinutes?: number;
   workerId?: string;
   logger?: (message: string, detail?: unknown) => void;
+}
+
+interface ReclaimResult {
+  /** Rows handed back to the queue for another go. */
+  reclaimed: number;
+  /** Rows that had used up their attempts and were given up on. */
+  abandoned: number;
 }
 
 /**
  * Release rows whose worker died mid-publish.
  *
- * Note the risk this accepts: if the worker crashed *after* Facebook accepted
- * the post but before the row was updated, the retry double-posts. Facebook's
- * own duplicate detection (error 506) catches the common case of identical
- * content, and the alternative — never retrying — silently drops posts, which
- * is worse for a scheduling product.
+ * Two risks are traded off here, and the timeout is where the trade sits. Too
+ * long and a crash leaves a client's post stuck until the timeout elapses; too
+ * short and a destination that is merely *slow* — a large video upload holds
+ * one open for minutes — is reclaimed while its first worker is still talking
+ * to Facebook, and the post goes out twice. There is no value that is right for
+ * every installation, so it is configurable rather than baked in.
+ *
+ * Note the residual risk the reclaim itself accepts: if the worker crashed
+ * *after* Facebook accepted the post but before the row was updated, the retry
+ * double-posts. Facebook's own duplicate detection (error 506) catches the
+ * common case of identical content, and the alternative — never retrying —
+ * silently drops posts, which is worse for a scheduling product.
+ *
+ * A reclaim spends an attempt. It has to: a payload that kills the worker kills
+ * it again next time, and without counting the crash the row is handed back
+ * every timeout for ever, taking the worker down with it each round. Counting
+ * it means `maxAttempts` still terminates, and the post lands in `failed` where
+ * someone can see it instead of looping invisibly.
  */
-async function reclaimStaleLocks(now: Date, logger: TickOptions['logger']): Promise<number> {
-  const cutoff = new Date(now.getTime() - STALE_LOCK_MINUTES * 60 * 1000);
+async function reclaimStaleLocks(
+  now: Date,
+  maxAttempts: number,
+  staleLockMinutes: number,
+  logger: TickOptions['logger'],
+): Promise<ReclaimResult> {
+  const cutoff = new Date(now.getTime() - staleLockMinutes * 60 * 1000);
+  const stale = { status: 'processing', lockedAt: { lt: cutoff } } as const;
 
-  const { count } = await prisma.postTarget.updateMany({
-    where: { status: 'processing', lockedAt: { lt: cutoff } },
-    data: { status: 'pending', lockedAt: null, lockedBy: null },
+  // Read first, so the posts whose destinations are given up on can have their
+  // headline status recomputed below.
+  const exhausted = await prisma.postTarget.findMany({
+    where: { ...stale, attempts: { gte: maxAttempts - 1 } },
+    select: { id: true, postId: true },
   });
 
-  if (count > 0) logger?.(`Reclaimed ${count} stale destination lock(s).`);
-  return count;
+  if (exhausted.length > 0) {
+    await prisma.postTarget.updateMany({
+      where: { id: { in: exhausted.map((row) => row.id) } },
+      data: {
+        status: 'failed',
+        attempts: { increment: 1 },
+        lockedAt: null,
+        lockedBy: null,
+        errorCode: 'worker_lost',
+        errorMessage:
+          'Publishing was interrupted and did not recover within the attempt limit. Check the destination and try again.',
+      },
+    });
+
+    for (const postId of new Set(exhausted.map((row) => row.postId))) {
+      await refreshPostStatus(postId, now);
+    }
+  }
+
+  const { count: reclaimed } = await prisma.postTarget.updateMany({
+    where: stale,
+    data: {
+      status: 'pending',
+      attempts: { increment: 1 },
+      lockedAt: null,
+      lockedBy: null,
+    },
+  });
+
+  if (reclaimed > 0) logger?.(`Reclaimed ${reclaimed} stale destination lock(s).`);
+  if (exhausted.length > 0) {
+    logger?.(`Gave up on ${exhausted.length} destination(s) that never recovered.`);
+  }
+
+  return { reclaimed, abandoned: exhausted.length };
 }
 
 /**
@@ -378,22 +440,27 @@ export async function runSchedulerTick(options: TickOptions = {}): Promise<TickR
   const concurrency = options.concurrency ?? env.concurrency;
   const maxAttempts = options.maxAttempts ?? env.maxAttempts;
   const limit = options.limit ?? concurrency * 10;
+  const staleLockMinutes = options.staleLockMinutes ?? env.staleLockMinutes;
   const logger = options.logger;
 
-  const reclaimedStale = await reclaimStaleLocks(now, logger);
+  const stale = await reclaimStaleLocks(now, maxAttempts, staleLockMinutes, logger);
+  const idle = {
+    claimed: 0,
+    published: 0,
+    failed: 0,
+    retrying: 0,
+    reclaimedStale: stale.reclaimed,
+    abandonedStale: stale.abandoned,
+  };
 
   const candidates = await findDue(now, limit);
-  if (candidates.length === 0) {
-    return { claimed: 0, published: 0, failed: 0, retrying: 0, reclaimedStale };
-  }
+  if (candidates.length === 0) return idle;
 
   const claimed: string[] = [];
   for (const id of candidates) {
     if (await claim(id, workerId, now)) claimed.push(id);
   }
-  if (claimed.length === 0) {
-    return { claimed: 0, published: 0, failed: 0, retrying: 0, reclaimedStale };
-  }
+  if (claimed.length === 0) return idle;
 
   // Mark parent posts as in-flight so the UI stops offering "edit" on
   // something that is already going out.
@@ -420,7 +487,8 @@ export async function runSchedulerTick(options: TickOptions = {}): Promise<TickR
     published: outcomes.filter((outcome) => outcome === 'published').length,
     failed: outcomes.filter((outcome) => outcome === 'failed').length,
     retrying: outcomes.filter((outcome) => outcome === 'retrying').length,
-    reclaimedStale,
+    reclaimedStale: stale.reclaimed,
+    abandonedStale: stale.abandoned,
   };
 }
 
@@ -464,6 +532,7 @@ export async function publishNow(postId: string, logger?: TickOptions['logger'])
     failed: outcomes.filter((outcome) => outcome === 'failed').length,
     retrying: outcomes.filter((outcome) => outcome === 'retrying').length,
     reclaimedStale: 0,
+    abandonedStale: 0,
   };
 }
 

@@ -94,10 +94,27 @@ return count === 1;                         // exactly one worker wins
 Atomic, so multiple workers are safe.
 
 **The one accepted risk:** a worker that dies *after* Facebook accepts a post but
-*before* the row is updated leaves a lock that is reclaimed after 15 minutes and
-retried — which can double-post. Facebook's own duplicate detection (error 506)
-catches identical content. The alternative, never reclaiming, silently drops
-posts, which is worse for a scheduling product.
+*before* the row is updated leaves a lock that is reclaimed and retried — which
+can double-post. Facebook's own duplicate detection (error 506) catches
+identical content. The alternative, never reclaiming, silently drops posts,
+which is worse for a scheduling product.
+
+### Reclaiming abandoned locks
+
+How long a destination may stay in `processing` before another worker takes it
+back is `scheduler.staleLockMinutes` (default 15). It is a setting rather than a
+constant because both directions hurt and the right value is
+installation-specific: too long and a crash strands a client's post until it
+elapses, too short and a slow-but-healthy publish — a large video upload holds a
+destination open for minutes — is reclaimed while its first worker is still
+talking to Facebook, and the post goes out twice.
+
+A reclaim spends an attempt. A payload that kills the worker kills it again next
+time, so without counting the crash the row is handed back every timeout for
+ever, taking the worker down with it each round. Counting it means
+`SCHEDULER_MAX_ATTEMPTS` still terminates: the last reclaim marks the
+destination `failed` with `worker_lost`, recomputes the parent post's status,
+and the post becomes visible in the UI instead of looping unseen.
 
 ### Retry policy
 

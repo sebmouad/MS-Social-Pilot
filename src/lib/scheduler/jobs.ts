@@ -306,9 +306,12 @@ export function jobDefinitions(): JobDefinition[] {
       intervalMs: env.pollSeconds * 1000,
       run: async (context) => {
         const result = await runSchedulerTick({ now: context.now, logger: context.logger });
-        return result.claimed > 0 || result.reclaimedStale > 0
+        const moved =
+          result.claimed > 0 || result.reclaimedStale > 0 || result.abandonedStale > 0;
+        return moved
           ? `claimed=${result.claimed} published=${result.published} failed=${result.failed} ` +
-              `retrying=${result.retrying} reclaimed=${result.reclaimedStale}`
+              `retrying=${result.retrying} reclaimed=${result.reclaimedStale} ` +
+              `abandoned=${result.abandonedStale}`
           : null;
       },
     },

@@ -329,6 +329,93 @@ describe('runSchedulerTick', () => {
     expect(result.reclaimedStale).toBe(0);
     expect(result.claimed).toBe(0);
   });
+
+  /** Hand a destination to a worker that started `minutesAgo` and never came back. */
+  async function seedAbandonedLock(minutesAgo: number, attempts = 0) {
+    const seeded = await seedDuePost();
+    await prisma.postTarget.update({
+      where: { id: seeded.postTarget.id },
+      data: {
+        status: 'processing',
+        attempts,
+        lockedAt: new Date(Date.now() - minutesAgo * 60 * 1000),
+        lockedBy: 'worker-that-died',
+      },
+    });
+    return seeded;
+  }
+
+  it('leaves a slow publish alone until the configured timeout elapses', async () => {
+    // Five minutes into a large video upload. The default timeout is fifteen,
+    // so nothing should touch it — reclaiming a publish that is still running
+    // is how a post goes out twice.
+    await seedAbandonedLock(5);
+
+    const result = await runner.runSchedulerTick();
+    expect(result.reclaimedStale).toBe(0);
+    expect(received).toHaveLength(0);
+  });
+
+  it('takes the timeout from the configuration screen', async () => {
+    const settings = await import('../src/lib/settings');
+    await seedAbandonedLock(5);
+
+    // Same five-minute-old lock as above, but shortened by an operator rather
+    // than by the caller. `ensureSettings` is what the worker calls at the top
+    // of every loop, so this is the path a real deployment takes.
+    await settings.writeSetting('scheduler.staleLockMinutes', 3, null);
+    await settings.ensureSettings();
+    try {
+      const result = await runner.runSchedulerTick();
+      expect(result.reclaimedStale).toBe(1);
+    } finally {
+      await settings.clearSetting('scheduler.staleLockMinutes');
+      await settings.ensureSettings();
+    }
+  });
+
+  it('reclaims that same lock once the timeout is shortened', async () => {
+    await seedAbandonedLock(5);
+
+    const result = await runner.runSchedulerTick({ staleLockMinutes: 3 });
+    expect(result.reclaimedStale).toBe(1);
+    expect(result.published).toBe(1);
+  });
+
+  it('counts the interrupted run as an attempt', async () => {
+    const { postTarget } = await seedAbandonedLock(60);
+
+    await runner.runSchedulerTick();
+
+    // One for the run that died, one for the retry that succeeded. Without the
+    // first, a payload that kills the worker is handed back for ever.
+    const updated = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(updated.attempts).toBe(2);
+    expect(updated.status).toBe('published');
+  });
+
+  it('gives up on a destination whose attempts ran out while it was locked', async () => {
+    // maxAttempts is 3 in this suite, so the crash that just happened was the
+    // third and last go.
+    const { post, postTarget } = await seedAbandonedLock(60, 2);
+
+    const result = await runner.runSchedulerTick();
+    expect(result.abandonedStale).toBe(1);
+    expect(result.reclaimedStale).toBe(0);
+
+    // Crucially it is not retried again in the same breath.
+    expect(received).toHaveLength(0);
+
+    const updated = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(updated.status).toBe('failed');
+    expect(updated.attempts).toBe(3);
+    expect(updated.errorCode).toBe('worker_lost');
+    expect(updated.lockedBy).toBeNull();
+
+    // And the post stops claiming to be publishing, so someone can see it.
+    const parent = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(parent.status).toBe('failed');
+  });
 });
 
 describe('publishNow', () => {

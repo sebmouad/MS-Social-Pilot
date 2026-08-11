@@ -111,6 +111,10 @@ export const env = {
   get maxAttempts(): number {
     return settingNumber('scheduler.maxAttempts');
   },
+  /** How long a destination may sit mid-publish before it is taken back. */
+  get staleLockMinutes(): number {
+    return settingNumber('scheduler.staleLockMinutes');
+  },
 
   // --- Email (Resend) ---
   get resendApiKey(): string | null {

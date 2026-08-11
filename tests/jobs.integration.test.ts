@@ -280,3 +280,60 @@ describe('evergreen recycling', () => {
     expect((await evergreen.runEvergreenCycle({ now, logger })).created).toBe(0);
   });
 });
+
+/**
+ * The serverless trigger.
+ *
+ * Nothing authenticates ahead of this route — it is called by a cron service,
+ * not a browser — so it is the one entry point with no session handler in front
+ * of it to have loaded the settings snapshot. Getting that wrong is invisible:
+ * the jobs still run, they just quietly ignore every value on the configuration
+ * screen, starting with the secret that lets the caller in at all.
+ */
+describe('POST /api/cron/tick', () => {
+  let settings: typeof import('../src/lib/settings');
+  let route: typeof import('../src/app/api/cron/tick/route');
+
+  beforeAll(async () => {
+    settings = await import('../src/lib/settings');
+    route = await import('../src/app/api/cron/tick/route');
+  });
+
+  async function call(token: string, jobs: string) {
+    return route.POST(
+      new Request(`http://localhost/api/cron/tick?jobs=${jobs}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      }),
+    );
+  }
+
+  it('accepts a secret that only exists on the configuration screen', async () => {
+    await settings.writeSetting('cron.secret', 'set-in-the-database', null);
+    try {
+      const response = await call('set-in-the-database', 'publish');
+      expect(response.status).toBe(200);
+
+      const body = (await response.json()) as { ran: string[] };
+      expect(body.ran).toEqual(['publish']);
+    } finally {
+      await settings.clearSetting('cron.secret');
+      await settings.ensureSettings();
+    }
+  });
+
+  it('still rejects the wrong secret', async () => {
+    await settings.writeSetting('cron.secret', 'set-in-the-database', null);
+    try {
+      expect((await call('guessed', 'publish')).status).toBe(401);
+    } finally {
+      await settings.clearSetting('cron.secret');
+      await settings.ensureSettings();
+    }
+  });
+
+  it('stays disabled when no secret is configured anywhere', async () => {
+    await settings.ensureSettings();
+    expect((await call('anything', 'publish')).status).toBe(404);
+  });
+});

@@ -218,6 +218,19 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     max: 20,
   },
   {
+    key: 'scheduler.staleLockMinutes',
+    group: 'scheduler',
+    type: 'number',
+    label: 'Abandoned lock timeout',
+    description:
+      'How long a destination may stay mid-publish before another worker takes it back, in minutes.',
+    default: 15,
+    env: 'SCHEDULER_STALE_LOCK_MINUTES',
+    min: 1,
+    max: 720,
+    hint: 'Set this above the slowest publish you expect. Large video uploads legitimately hold a destination for several minutes, and reclaiming one that is still uploading can post it twice.',
+  },
+  {
     key: 'scheduler.rssPollMinutes',
     group: 'scheduler',
     type: 'number',

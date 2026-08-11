@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { env } from '@/lib/env';
 import { safeEqual } from '@/lib/crypto';
+import { ensureSettings } from '@/lib/settings';
 import { jobDefinitions, type JobName } from '@/lib/scheduler/jobs';
 
 /**
@@ -20,6 +21,13 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 export async function POST(request: Request): Promise<NextResponse> {
+  // Before anything reads a setting. Nothing has authenticated on this path —
+  // it is not a browser request — so unlike every other route there is no
+  // session handler ahead of it to have loaded the snapshot, and without this
+  // the whole serverless deployment silently runs on environment values and
+  // ignores the configuration screen, starting with the secret below.
+  await ensureSettings();
+
   const secret = env.cronSecret;
   if (!secret) {
     return NextResponse.json(
