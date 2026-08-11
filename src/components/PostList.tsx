@@ -1,11 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { StatusBadge } from './StatusBadge';
 import { ExternalLink } from './ExternalLink';
+import { postIsEditable } from '@/lib/constants';
 
 export interface PostView {
   id: string;
@@ -69,6 +71,8 @@ export function PostList({ posts }: { posts: PostView[] }) {
       {posts.map((post) => {
         const canPublishNow = ['draft', 'scheduled', 'failed', 'partially_failed'].includes(post.status);
         const canCancel = ['draft', 'scheduled'].includes(post.status);
+        // The same rule the API enforces, so the button is never a dead end.
+        const canEdit = postIsEditable(post);
         const canRetry = post.targets.some((target) => target.status === 'failed');
 
         return (
@@ -120,6 +124,11 @@ export function PostList({ posts }: { posts: PostView[] }) {
             </ul>
 
             <div className="mt-4 flex flex-wrap gap-2">
+              {canEdit && (
+                <Link href={`/compose?post=${post.id}`} className="btn-secondary">
+                  {tCommon('edit')}
+                </Link>
+              )}
               {canPublishNow && (
                 <button
                   type="button"

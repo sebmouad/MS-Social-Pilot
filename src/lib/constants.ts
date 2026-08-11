@@ -207,3 +207,42 @@ export function postStatusFilter(value: string | undefined): PostStatus[] | unde
   if (value === PostStatus.failed) return [PostStatus.failed, PostStatus.partially_failed];
   return POST_STATUSES.includes(value as PostStatus) ? [value as PostStatus] : undefined;
 }
+
+/**
+ * Why a post can no longer be edited, or `null` when it still can.
+ *
+ * One rule, two callers. `updatePost` enforces it and turns each reason into
+ * the error that explains it; the post list asks the same question to decide
+ * whether to offer an Edit button. Written once so the two cannot drift — a
+ * button that leads to a 409 is worse than no button.
+ */
+export type EditBlocker = 'publishing' | 'published' | 'scheduled_remote' | null;
+
+export function postEditBlocker(post: {
+  status: string;
+  targets: Array<{ status: string }>;
+}): EditBlocker {
+  if (post.status === PostStatus.publishing) return 'publishing';
+  if (post.status === PostStatus.published || post.status === PostStatus.partially_failed) {
+    return 'published';
+  }
+  // Facebook is holding this one. Changing our copy would change nothing about
+  // what goes out, which is the worst kind of edit: it looks like it worked.
+  if (post.targets.some((target) => target.status === 'scheduled_remote')) {
+    return 'scheduled_remote';
+  }
+  return null;
+}
+
+/**
+ * Named `postIsEditable` rather than `canEditPost` on purpose: everything
+ * called `can*` in this file answers a question about a *role*, and a test
+ * sweeps them all to check no junior role outranks a senior one. Joining that
+ * naming convention with a function that takes a post breaks the sweep.
+ */
+export function postIsEditable(post: {
+  status: string;
+  targets: Array<{ status: string }>;
+}): boolean {
+  return postEditBlocker(post) === null;
+}

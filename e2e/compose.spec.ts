@@ -15,6 +15,7 @@ import { OWNER } from './helpers';
 test.describe.configure({ mode: 'serial' });
 
 const MESSAGE = 'Sourdough is out of the oven at seven tomorrow.';
+const CORRECTED = 'Sourdough is out of the oven at eight tomorrow.';
 
 test.beforeAll(async () => {
   await connectPretendPage(OWNER.workspace);
@@ -72,13 +73,56 @@ test('a post can be scheduled and then found on the other screens', async ({ pag
   }
 });
 
+test('a scheduled post can be corrected without being recreated', async ({ page }) => {
+  const failures = collectFailures(page);
+
+  await open(page, '/posts');
+  await page.getByRole('link', { name: /^edit$/i }).first().click();
+
+  // The same composer, with the post already in it — not a blank form and not
+  // a cut-down edit dialog.
+  await page.waitForURL(/\/compose\?post=/);
+  const box = page.getByLabel(/what do you want to say/i);
+  await expect(box).toHaveValue(MESSAGE);
+  await expect(page.getByRole('checkbox').first()).toBeChecked();
+
+  await box.fill(CORRECTED);
+
+  const save = page.getByRole('button', { name: /save changes/i });
+  await expect(save).toBeEnabled();
+  await save.click();
+
+  // Back on the list, with the correction in place and no second post.
+  await page.waitForURL(/\/posts/, { timeout: 30_000 });
+  await expect(page.getByText(CORRECTED, { exact: false })).toBeVisible();
+  await expect(page.getByText(MESSAGE, { exact: true })).toHaveCount(0);
+
+  expect(failures).toEqual([]);
+});
+
+test('a published post offers no way to rewrite it', async ({ page }) => {
+  // The Edit button and the API agree on this: the copy on Facebook cannot be
+  // changed, so an edit here would only create a second version of the truth.
+  const published = await prisma.post.findFirstOrThrow({ orderBy: { createdAt: 'desc' } });
+  await prisma.post.update({ where: { id: published.id }, data: { status: 'published' } });
+
+  await open(page, '/posts');
+  await expect(page.getByRole('link', { name: /^edit$/i })).toHaveCount(0);
+
+  // And the URL is refused even when typed by hand.
+  const response = await page.goto(`/compose?post=${published.id}`);
+  expect(response?.status()).toBe(404);
+
+  await prisma.post.update({ where: { id: published.id }, data: { status: 'scheduled' } });
+});
+
 test('a scheduled post can be cancelled from the list', async ({ page }) => {
   const failures = collectFailures(page);
 
   page.on('dialog', (dialog) => dialog.accept());
 
   await open(page, '/posts');
-  await expect(page.getByText(MESSAGE, { exact: false }).first()).toBeVisible();
+  await expect(page.getByText(CORRECTED, { exact: false }).first()).toBeVisible();
 
   const cancel = page.getByRole('button', { name: /cancel/i }).first();
   await cancel.click();

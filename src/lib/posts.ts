@@ -23,6 +23,7 @@ import { initialApprovalStatus } from './approvals';
 import {
   canManageOthersPosts,
   canPublishWithoutApproval,
+  postEditBlocker,
   PUBLISHABLE_APPROVAL_STATUSES,
   QUEUE_OCCUPYING_STATUSES,
 } from './constants';
@@ -449,13 +450,10 @@ export async function updatePost(
 
   assertMayAct(post, context);
 
-  if (post.status === 'publishing') throw errors.alreadyPublishing();
-  if (post.status === 'published' || post.status === 'partially_failed') {
-    throw errors.alreadyPublished();
-  }
-  if (post.targets.some((target) => target.status === 'scheduled_remote')) {
-    throw errors.scheduledInFacebook();
-  }
+  const blocker = postEditBlocker(post);
+  if (blocker === 'publishing') throw errors.alreadyPublishing();
+  if (blocker === 'published') throw errors.alreadyPublished();
+  if (blocker === 'scheduled_remote') throw errors.scheduledInFacebook();
 
   const data: Record<string, unknown> = {};
   if (input.message !== undefined) data.message = input.message;

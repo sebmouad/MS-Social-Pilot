@@ -21,6 +21,26 @@ interface Props {
   requiresApproval: boolean;
   /** False for contributors, who can only submit for approval. */
   canPublishDirectly: boolean;
+  /**
+   * An existing post this screen is editing rather than writing.
+   *
+   * Absent for a new post, which is the usual case. When present every field
+   * starts from the stored post and saving sends a PATCH: the same screen, so
+   * that editing offers exactly what composing does — the alternative was
+   * cancelling the post and typing it again.
+   */
+  editing?: EditingPost;
+}
+
+export interface EditingPost {
+  id: string;
+  message: string;
+  link: string | null;
+  media: PostMedia[];
+  targetIds: string[];
+  /** `datetime-local` value in the workspace's zone, or null for a draft. */
+  scheduledAtLocal: string | null;
+  publishMode: string;
 }
 
 type Timing = 'now' | 'schedule' | 'queue';
@@ -34,6 +54,7 @@ export function Composer({
   aiEnabled,
   requiresApproval,
   canPublishDirectly,
+  editing,
 }: Props) {
   const t = useTranslations('compose');
   const tCommon = useTranslations('common');
@@ -43,15 +64,19 @@ export function Composer({
   const messageBox = useRef<HTMLTextAreaElement>(null);
   const linkBox = useRef<HTMLInputElement>(null);
 
-  const [message, setMessage] = useState('');
-  const [link, setLink] = useState('');
+  const [message, setMessage] = useState(editing?.message ?? '');
+  const [link, setLink] = useState(editing?.link ?? '');
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [media, setMedia] = useState<PostMedia[]>([]);
-  const [selected, setSelected] = useState<string[]>([]);
+  const [media, setMedia] = useState<PostMedia[]>(editing?.media ?? []);
+  const [selected, setSelected] = useState<string[]>(editing?.targetIds ?? []);
   const [timing, setTiming] = useState<Timing>('schedule');
-  const [handler, setHandler] = useState<Handler>('worker');
-  const [scheduledAt, setScheduledAt] = useState(defaultScheduledAt);
+  const [handler, setHandler] = useState<Handler>(
+    editing?.publishMode === 'native' ? 'native' : 'worker',
+  );
+  const [scheduledAt, setScheduledAt] = useState(
+    editing?.scheduledAtLocal ?? defaultScheduledAt,
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
@@ -151,21 +176,39 @@ export function Composer({
 
     const publishMode = timing === 'now' ? 'immediate' : handler;
 
-    const response = await fetch('/api/posts', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        link: link.trim() ? link.trim() : null,
-        media,
-        targetIds: selected,
-        publishMode,
-        scheduledAtLocal: timing === 'schedule' ? scheduledAt : null,
-        timezone,
-        useQueue: timing === 'queue',
-        saveAsDraft,
-      }),
-    });
+    // Editing takes a narrower route on purpose. "Publish now" and the queue
+    // are ways of *starting* a post; a post that already exists has a place in
+    // the calendar, and the thing being changed here is its content and when
+    // it goes out.
+    const response = editing
+      ? await fetch(`/api/posts/${editing.id}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            link: link.trim() ? link.trim() : null,
+            media,
+            targetIds: selected,
+            publishMode: handler,
+            scheduledAtLocal: saveAsDraft ? null : scheduledAt,
+            timezone,
+          }),
+        })
+      : await fetch('/api/posts', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            link: link.trim() ? link.trim() : null,
+            media,
+            targetIds: selected,
+            publishMode,
+            scheduledAtLocal: timing === 'schedule' ? scheduledAt : null,
+            timezone,
+            useQueue: timing === 'queue',
+            saveAsDraft,
+          }),
+        });
 
     const body = (await response.json().catch(() => ({}))) as {
       error?: string;
@@ -191,6 +234,15 @@ export function Composer({
         }),
       );
       setPending(false);
+      router.refresh();
+      return;
+    }
+
+    // Editing ends by going back to the list the Edit button came from, where
+    // the changed row is on screen. Emptying the form and staying put would
+    // look like the post had been thrown away.
+    if (editing) {
+      router.push('/posts');
       router.refresh();
       return;
     }
@@ -231,7 +283,7 @@ export function Composer({
             ref={messageBox}
             className="input min-h-[160px] resize-y"
             placeholder={t('placeholder')}
-            defaultValue=""
+            defaultValue={editing?.message ?? ''}
             maxLength={LIMITS.messageLength}
             onChange={(event) => setMessage(event.target.value)}
           />
@@ -249,7 +301,7 @@ export function Composer({
                 ref={linkBox}
                 className="input"
                 placeholder={t('linkPlaceholder')}
-                defaultValue=""
+                defaultValue={editing?.link ?? ''}
                 onChange={(event) => setLink(event.target.value)}
                 onBlur={(event) => loadPreview(event.target.value)}
               />
@@ -342,11 +394,13 @@ export function Composer({
 
           <div className="space-y-2">
             {(
-              [
-                ['now', t('publishNow')],
-                ['schedule', t('scheduleForTime')],
-                ['queue', t('addToQueue')],
-              ] as Array<[Timing, string]>
+              editing
+                ? ([['schedule', t('scheduleForTime')]] as Array<[Timing, string]>)
+                : ([
+                    ['now', t('publishNow')],
+                    ['schedule', t('scheduleForTime')],
+                    ['queue', t('addToQueue')],
+                  ] as Array<[Timing, string]>)
             ).map(([value, label]) => (
               <label key={value} className="flex items-center gap-2 text-sm text-slate-700">
                 <input
@@ -427,14 +481,16 @@ export function Composer({
           <button type="button" className="btn-primary flex-1" disabled={!canSubmit} onClick={() => submit(false)}>
             {pending
               ? tCommon('working')
-              : needsApproval
-                ? t('submitForApproval')
-                : timing === 'now'
-                  ? t('publishNow')
-                  : t('schedule')}
+              : editing
+                ? t('saveChanges')
+                : needsApproval
+                  ? t('submitForApproval')
+                  : timing === 'now'
+                    ? t('publishNow')
+                    : t('schedule')}
           </button>
           <button type="button" className="btn-secondary" disabled={pending} onClick={() => submit(true)}>
-            {t('saveDraft')}
+            {editing ? t('moveToDrafts') : t('saveDraft')}
           </button>
         </div>
       </div>

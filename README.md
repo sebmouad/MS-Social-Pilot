@@ -31,6 +31,9 @@ Built to the specification in [docs/PROJECT_SCHEMA.md](docs/PROJECT_SCHEMA.md).
   time and stable across daylight saving changes.
 - Calendar view, bulk CSV scheduling, and **evergreen recycling** that rotates
   text variants so Facebook does not reject repeats as duplicates.
+- Anything not yet sent can be **edited in place** — wording, attachments,
+  destinations, time — in the composer it was written in. A post held for review
+  goes back to the reviewer only if the edit changes what they looked at.
 
 **Teams and clients**
 - Several clients per account, each its own workspace with its own
@@ -156,7 +159,7 @@ runs a chosen subset over HTTP.
 npm test
 ```
 
-706 tests. Unit tests cover token encryption, retry policy, timezone and
+715 tests. Unit tests cover token encryption, retry policy, timezone and
 queue-slot maths, Open Graph and RSS parsing, CSV in and out, link tagging, and
 the Graph publishing decision table.
 

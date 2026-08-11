@@ -50,7 +50,7 @@ PLAYWRIGHT_CHROMIUM_PATH=/path/to/chromium npx playwright test
 | --- | --- |
 | `auth.setup.ts` | A server nobody has used yet: the setup screen, then registering the first account. Saves the session the rest of the run uses. |
 | `screens.spec.ts` | Every screen behind the sign-in wall, signed in as the owner, plus every link in the nav bar. |
-| `compose.spec.ts` | Writing a post, scheduling it, finding it on the list, the calendar and the dashboard, and cancelling it. |
+| `compose.spec.ts` | Writing a post, scheduling it, finding it on the list, the calendar and the dashboard, correcting it in place, and cancelling it. |
 | `invite.spec.ts` | Inviting a colleague, accepting the invitation, and walking every screen again **in French**. |
 | `signed-out.spec.ts` | That none of it is served to a stranger, and that the public pages still are. |
 
