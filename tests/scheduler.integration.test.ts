@@ -300,6 +300,62 @@ describe('runSchedulerTick', () => {
     expect(received).toHaveLength(0);
   });
 
+  it('settles a turned-off destination instead of leaving it pending for ever', async () => {
+    const { post, postTarget, target } = await seedDuePost();
+    await prisma.target.update({ where: { id: target.id }, data: { enabled: false } });
+
+    const result = await runner.runSchedulerTick();
+    expect(result.skipped).toBe(1);
+
+    const updated = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(updated.status).toBe('skipped');
+    expect(updated.errorCode).toBe('destination_off');
+
+    // Not "cancelled": nobody cancelled it. It never went anywhere.
+    const parent = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(parent.status).toBe('failed');
+  });
+
+  it('publishes to the Pages that are still on, and skips the rest', async () => {
+    const { post, workspace, target } = await seedDuePost();
+    const off = await prisma.target.create({
+      data: {
+        workspaceId: workspace.id,
+        type: 'page',
+        providerId: '3000',
+        name: 'Retired Page',
+        enabled: false,
+      },
+    });
+    await prisma.postTarget.create({ data: { postId: post.id, targetId: off.id } });
+
+    const result = await runner.runSchedulerTick();
+    expect(result.skipped).toBe(1);
+    expect(result.published).toBe(1);
+
+    // One destination going quiet must not colour the post as a failure.
+    const parent = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(parent.status).toBe('published');
+    void target;
+  });
+
+  it('leaves a turned-off destination alone until its post is due', async () => {
+    const { post, postTarget, target } = await seedDuePost();
+    await prisma.post.update({
+      where: { id: post.id },
+      data: { scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+    });
+    await prisma.target.update({ where: { id: target.id }, data: { enabled: false } });
+
+    // It may well be switched back on before tomorrow; deciding now would
+    // settle the outcome early.
+    const result = await runner.runSchedulerTick();
+    expect(result.skipped).toBe(0);
+
+    const updated = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(updated.status).toBe('pending');
+  });
+
   it('reclaims a lock abandoned by a crashed worker', async () => {
     const { postTarget } = await seedDuePost();
 

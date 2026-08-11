@@ -116,6 +116,24 @@ ever, taking the worker down with it each round. Counting it means
 destination `failed` with `worker_lost`, recomputes the parent post's status,
 and the post becomes visible in the UI instead of looping unseen.
 
+### Destinations that were turned off
+
+`findDue` excludes a destination whose Page is disabled, which stops it
+publishing — and, on its own, leaves the row `pending` for ever and the post
+reading "Scheduled" for ever. It never goes out, never fails and never explains
+itself.
+
+`skipped` is the state for that. It was already in the enum, already terminal,
+already excluded from the active set when a post's headline status is
+recomputed, and nothing had ever set it. Each tick settles *due* destinations
+whose Page is off — not ones scheduled for next week, which may well be back on
+by then — so a post publishes to the Pages that were on and records why it went
+nowhere on the ones that were off.
+
+A post every one of whose destinations was skipped reads `failed`, not
+`cancelled`. Nobody cancelled it; calling it cancelled sends the reader looking
+for a colleague who did it.
+
 ### Retry policy
 
 `src/lib/scheduler/backoff.ts`. The base delay depends on why the attempt failed:

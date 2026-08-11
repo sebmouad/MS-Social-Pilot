@@ -42,6 +42,8 @@ export interface TickResult {
   reclaimedStale: number;
   /** Interrupted destinations that had run out of attempts and were failed. */
   abandonedStale: number;
+  /** Due destinations whose Page was turned off, settled rather than left hanging. */
+  skipped: number;
 }
 
 export interface TickOptions {
@@ -189,6 +191,60 @@ async function findDue(now: Date, limit: number): Promise<string[]> {
   `;
 
   return rows.map((row) => row.id);
+}
+
+/**
+ * Settle destinations that are due but point at a Page nobody turned back on.
+ *
+ * `findDue` filters these out, which keeps the scheduler from publishing to a
+ * disabled destination — but filtering alone leaves the row `pending` for ever
+ * and the post reading "Scheduled" for ever. The post never goes out, never
+ * fails, and never explains itself: the exact silent failure this product is
+ * supposed to prevent.
+ *
+ * `skipped` is the state for it. It was already in the enum, already counted as
+ * terminal, and already excluded from the active set when a post's headline
+ * status is recomputed — nothing had ever set it. A skipped destination lets
+ * the post settle honestly: published to the Pages that were on, skipped on the
+ * ones that were off.
+ *
+ * Only *due* work is settled. A destination turned off a week before its post
+ * is due may well be back on by then, and pre-emptively skipping it would
+ * decide the outcome early. At the moment publication should happen, the
+ * destination genuinely is unavailable, and that is what gets recorded.
+ */
+async function skipDisabledDestinations(now: Date, logger: TickOptions['logger']): Promise<number> {
+  const stranded = await prisma.postTarget.findMany({
+    where: {
+      status: 'pending',
+      target: { enabled: false },
+      post: {
+        status: { in: ['scheduled', 'publishing'] },
+        scheduledAt: { lte: now },
+        approvalStatus: { in: [...PUBLISHABLE_APPROVAL_STATUSES] },
+      },
+    },
+    select: { id: true, postId: true },
+  });
+
+  if (stranded.length === 0) return 0;
+
+  await prisma.postTarget.updateMany({
+    where: { id: { in: stranded.map((row) => row.id) } },
+    data: {
+      status: 'skipped',
+      nextAttemptAt: null,
+      errorCode: 'destination_off',
+      errorMessage: 'This destination was turned off when the post was due, so it was not published there.',
+    },
+  });
+
+  for (const postId of new Set(stranded.map((row) => row.postId))) {
+    await refreshPostStatus(postId, now);
+  }
+
+  logger?.(`Skipped ${stranded.length} destination(s) that were turned off.`);
+  return stranded.length;
 }
 
 /**
@@ -369,6 +425,7 @@ export async function refreshPostStatus(postId: string, now: Date = new Date()):
     select: { status: true, publishedAt: true },
   });
 
+  const skipped = targets.filter((target) => target.status === 'skipped');
   const active = targets.filter((target) => target.status !== 'cancelled' && target.status !== 'skipped');
   const published = active.filter((target) => target.status === 'published');
   const remoteScheduled = active.filter((target) => target.status === 'scheduled_remote');
@@ -379,7 +436,11 @@ export async function refreshPostStatus(postId: string, now: Date = new Date()):
 
   let status: PostStatus;
   if (active.length === 0) {
-    status = 'cancelled';
+    // Nothing left to do. "Cancelled" is only honest when a person cancelled
+    // it: a post every one of whose destinations was skipped was not cancelled
+    // by anyone, it simply never went anywhere, and calling that cancelled
+    // sends the reader looking for a colleague who did it.
+    status = skipped.length > 0 ? 'failed' : 'cancelled';
   } else if (settled.length < active.length) {
     // Still working: some destinations are pending or in flight.
     status = published.length > 0 || failed.length > 0 ? 'publishing' : 'scheduled';
@@ -446,6 +507,7 @@ export async function runSchedulerTick(options: TickOptions = {}): Promise<TickR
   const logger = options.logger;
 
   const stale = await reclaimStaleLocks(now, maxAttempts, staleLockMinutes, logger);
+  const skipped = await skipDisabledDestinations(now, logger);
   const idle = {
     claimed: 0,
     published: 0,
@@ -453,6 +515,7 @@ export async function runSchedulerTick(options: TickOptions = {}): Promise<TickR
     retrying: 0,
     reclaimedStale: stale.reclaimed,
     abandonedStale: stale.abandoned,
+    skipped,
   };
 
   const candidates = await findDue(now, limit);
@@ -491,6 +554,7 @@ export async function runSchedulerTick(options: TickOptions = {}): Promise<TickR
     retrying: outcomes.filter((outcome) => outcome === 'retrying').length,
     reclaimedStale: stale.reclaimed,
     abandonedStale: stale.abandoned,
+    skipped,
   };
 }
 
@@ -548,6 +612,7 @@ export async function publishNow(postId: string, logger?: TickOptions['logger'])
     retrying: outcomes.filter((outcome) => outcome === 'retrying').length,
     reclaimedStale: 0,
     abandonedStale: 0,
+    skipped: 0,
   };
 }
 

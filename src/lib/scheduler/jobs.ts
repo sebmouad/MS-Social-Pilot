@@ -307,11 +307,14 @@ export function jobDefinitions(): JobDefinition[] {
       run: async (context) => {
         const result = await runSchedulerTick({ now: context.now, logger: context.logger });
         const moved =
-          result.claimed > 0 || result.reclaimedStale > 0 || result.abandonedStale > 0;
+          result.claimed > 0 ||
+          result.reclaimedStale > 0 ||
+          result.abandonedStale > 0 ||
+          result.skipped > 0;
         return moved
           ? `claimed=${result.claimed} published=${result.published} failed=${result.failed} ` +
               `retrying=${result.retrying} reclaimed=${result.reclaimedStale} ` +
-              `abandoned=${result.abandonedStale}`
+              `abandoned=${result.abandonedStale} skipped=${result.skipped}`
           : null;
       },
     },
