@@ -32,7 +32,7 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
     return (
       <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-600">
         {t('noneConnected')}{' '}
-        <a href="/accounts" className="font-medium text-brand-600 hover:underline">
+        <a href="/connections" className="font-medium text-brand-600 hover:underline">
           {t('connectAnAccount')}
         </a>{' '}
         {t('toStart')}

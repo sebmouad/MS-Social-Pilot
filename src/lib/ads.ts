@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { env } from './env';
 import { decryptSecret } from './crypto';
 import { toJsonOrNull } from './json';
 import { asGraphError } from './facebook/graph';
@@ -24,8 +25,6 @@ export interface AdSyncResult {
   error?: string;
 }
 
-/** Default sync window. Facebook keeps 37 months, but daily rows add up. */
-const DEFAULT_WINDOW_DAYS = 90;
 
 /**
  * Levels stored per pass, coarsest first.
@@ -107,7 +106,7 @@ export async function syncAdAccount(options: {
 
   const until = options.until ?? new Date();
   const since =
-    options.since ?? new Date(until.getTime() - DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    options.since ?? new Date(until.getTime() - env.adWindowDays * 24 * 60 * 60 * 1000);
 
   try {
     const token = decryptSecret(account.socialAccount.accessToken);

@@ -103,7 +103,7 @@ describe('other templates', () => {
       account: 'Sam Jones',
     });
     expect(email.subject).toContain('Reconnectez');
-    expect(email.html).toContain('/accounts');
+    expect(email.html).toContain('/connections');
   });
 
   it('points an approver at the approvals queue', () => {

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
+import { Icon, type IconName } from '@/components/Icon';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requirePage } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -47,31 +48,43 @@ export default async function DashboardPage() {
   const countFor = (status: string) => counts.find((entry) => entry.status === status)?._count ?? 0;
   const totals = sumInsights(insightRows.map((row) => parseInsights(row.insights)));
 
-  const stats = [
-    { label: t('scheduled'), value: countFor('scheduled') + countFor('publishing') },
-    { label: t('published'), value: countFor('published') + countFor('partially_failed') },
-    { label: t('drafts'), value: countFor('draft') },
-    { label: t('destinations'), value: targetCount },
+  const stats: Array<{ label: string; value: number; icon: IconName; href: string }> = [
+    {
+      label: t('scheduled'),
+      value: countFor('scheduled') + countFor('publishing'),
+      icon: 'clock',
+      href: '/posts?status=scheduled',
+    },
+    {
+      label: t('published'),
+      value: countFor('published') + countFor('partially_failed'),
+      icon: 'check',
+      href: '/posts?status=published',
+    },
+    { label: t('drafts'), value: countFor('draft'), icon: 'compose', href: '/posts?status=draft' },
+    { label: t('destinations'), value: targetCount, icon: 'connections', href: '/connections' },
   ];
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">
             {formatInZone(now, auth.workspace.timezone, 'EEEE d MMMM yyyy, HH:mm')} ·{' '}
             {auth.workspace.timezone}
           </p>
         </div>
         <Link href="/compose" className="btn-primary">
-          {t('newPost')}
+          <Icon name="plus" size={16} /> {t('newPost')}
         </Link>
       </header>
 
       {staleAccounts.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <p className="font-medium">{t('connectionsNeedAttention')}</p>
+          <p className="flex items-center gap-2 font-medium">
+            <Icon name="warning" size={16} /> {t('connectionsNeedAttention')}
+          </p>
           <ul className="mt-1 list-inside list-disc">
             {staleAccounts.map((account) => (
               <li key={account.id}>
@@ -79,14 +92,15 @@ export default async function DashboardPage() {
               </li>
             ))}
           </ul>
-          <Link href="/accounts" className="mt-2 inline-block font-medium underline">
+          <Link href="/connections" className="mt-2 inline-block font-medium underline">
             {t('fixOnAccounts')}
           </Link>
         </div>
       )}
 
       {failures > 0 && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <Icon name="error" size={16} />
           {t('destinationsFailed', { count: failures })}{' '}
           <Link href="/posts?status=failed" className="font-medium underline">
             {t('reviewAndRetry')}
@@ -94,18 +108,29 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Each tile is a link to the list it counts: a number nobody can act on
+          is decoration, and the count is exactly the filter someone wants. */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="card p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{stat.label}</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{stat.value}</p>
-          </div>
+          <Link
+            key={stat.label}
+            href={stat.href}
+            className="card group p-4 transition-colors hover:border-brand-200 hover:bg-brand-50/40"
+          >
+            <p className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-slate-500">
+              <Icon name={stat.icon} size={14} className="text-slate-400 group-hover:text-brand-500" />
+              {stat.label}
+            </p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900 sm:text-3xl">{stat.value}</p>
+          </Link>
         ))}
       </div>
 
       {(totals.impressions ?? 0) + (totals.reactions ?? 0) > 0 && (
         <div className="card p-5">
-          <h2 className="text-sm font-semibold text-slate-900">{t('reachAndEngagement')}</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <Icon name="analytics" className="text-slate-400" /> {t('reachAndEngagement')}
+          </h2>
           <p className="mt-0.5 text-xs text-slate-500">
             {t('reachSubtitle')}
           </p>
@@ -129,7 +154,9 @@ export default async function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card p-5">
-          <h2 className="mb-4 text-sm font-semibold text-slate-900">{t('goingOutNext')}</h2>
+          <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <Icon name="clock" className="text-slate-400" /> {t('goingOutNext')}
+          </h2>
           {upcoming.length === 0 ? (
             <p className="text-sm text-slate-500">
               {t('nothingScheduled')}{' '}
@@ -161,7 +188,9 @@ export default async function DashboardPage() {
         </section>
 
         <section className="card p-5">
-          <h2 className="mb-4 text-sm font-semibold text-slate-900">{t('recentlyPublished')}</h2>
+          <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <Icon name="posts" className="text-slate-400" /> {t('recentlyPublished')}
+          </h2>
           {recent.length === 0 ? (
             <p className="text-sm text-slate-500">{t('nothingPublished')}</p>
           ) : (

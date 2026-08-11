@@ -1,3 +1,4 @@
+import { canManageInstance } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 
 import { NotificationsClient } from '@/components/NotificationsClient';
@@ -23,7 +24,7 @@ export default async function NotificationsSettingsPage() {
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
 
-      <SettingsNav />
+      <SettingsNav showConfig={canManageInstance(auth.role)} />
 
       <NotificationsClient
         emailConfigured={emailEnabled()}

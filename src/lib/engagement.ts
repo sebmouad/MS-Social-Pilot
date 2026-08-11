@@ -1,6 +1,7 @@
 import { TargetType } from '@prisma/client';
 
 import { prisma } from './prisma';
+import { env } from './env';
 import { decryptSecret } from './crypto';
 import { parseInsights, toJson, toJsonOrNull } from './json';
 import { asGraphError } from './facebook/graph';
@@ -51,12 +52,6 @@ export interface EdgeSyncResult {
   errors: Array<{ edge: string; message: string }>;
 }
 
-/** How far back a routine sync reaches. */
-const DEFAULT_WINDOW_DAYS = 30;
-/** Posts whose comments are refreshed per pass, newest first. */
-const COMMENT_POST_LIMIT = 25;
-/** Videos whose insights are refreshed per pass. */
-const VIDEO_LIMIT = 10;
 
 // ---------------------------------------------------------------------------
 // Comments
@@ -267,7 +262,8 @@ export async function syncTargetEdges(options: {
   now?: Date;
 }): Promise<EdgeSyncResult> {
   const now = options.now ?? new Date();
-  const since = options.since ?? new Date(now.getTime() - DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const since =
+    options.since ?? new Date(now.getTime() - env.edgeWindowDays * 24 * 60 * 60 * 1000);
 
   const target = await prisma.target.findUniqueOrThrow({
     where: { id: options.targetId },
@@ -310,7 +306,7 @@ export async function syncTargetEdges(options: {
     const posts = await prisma.postTarget.findMany({
       where: { targetId: target.id, status: 'published', remotePostId: { not: null } },
       orderBy: { publishedAt: 'desc' },
-      take: COMMENT_POST_LIMIT,
+      take: env.commentPostLimit,
       select: { id: true },
     });
 
@@ -415,7 +411,7 @@ export async function syncTargetEdges(options: {
   await attempt('videos', async () => {
     const videos = await fetchPageVideos(target.providerId, token);
 
-    for (const video of videos.slice(0, VIDEO_LIMIT)) {
+    for (const video of videos.slice(0, env.videoLimit)) {
       // The video-level catalogue: the only place a crossposted video's
       // combined figures exist.
       const insights = await fetchInsights({
@@ -448,7 +444,7 @@ export async function syncTargetEdges(options: {
       });
     }
 
-    return Math.min(videos.length, VIDEO_LIMIT);
+    return Math.min(videos.length, env.videoLimit);
   });
 
   return result;

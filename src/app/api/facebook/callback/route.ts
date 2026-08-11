@@ -20,7 +20,7 @@ import { asGraphError } from '@/lib/facebook/graph';
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const url = new URL(request.url);
-  const accounts = new URL('/accounts', env.appUrl);
+  const accounts = new URL('/connections', env.appUrl);
 
   const store = await cookies();
   const nonce = store.get(OAUTH_NONCE_COOKIE)?.value;

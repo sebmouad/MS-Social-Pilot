@@ -1,3 +1,4 @@
+import { canManageInstance } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 
 import { SettingsNav } from '@/components/SettingsNav';
@@ -66,7 +67,7 @@ export default async function SettingsPage() {
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
 
-      <SettingsNav />
+      <SettingsNav showConfig={canManageInstance(auth.role)} />
 
       <SettingsClient
         workspaceName={auth.workspace.name}

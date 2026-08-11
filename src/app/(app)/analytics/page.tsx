@@ -61,7 +61,7 @@ export default async function AnalyticsPage({
         </header>
         <div className="card p-8 text-center">
           <p className="text-sm text-slate-600">{t('noPages')}</p>
-          <Link href="/accounts" className="btn-primary mt-4 inline-flex">
+          <Link href="/connections" className="btn-primary mt-4 inline-flex">
             {t('connect')}
           </Link>
         </div>

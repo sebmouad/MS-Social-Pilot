@@ -6,6 +6,7 @@ import { AuthError, ForbiddenError } from './auth';
 import { AppError } from './errors';
 import { GraphError } from './facebook/graph';
 import { MediaError } from './media';
+import { ensureSettings } from './settings';
 import { fieldErrors } from './validation';
 
 /**
@@ -86,12 +87,19 @@ export async function handleApiError(error: unknown): Promise<NextResponse> {
   return fail(await translate('errors.generic', {}, 'Something went wrong. Please try again.'), 500);
 }
 
-/** Wrap a route handler so every thrown error becomes a structured response. */
+/**
+ * Wrap a route handler so every thrown error becomes a structured response.
+ *
+ * Also the single place runtime configuration is loaded: every API request goes
+ * through here, so `env` reads inside a handler are backed by a fresh-enough
+ * snapshot rather than falling through to the environment.
+ */
 export function route<Args extends unknown[]>(
   handler: (...args: Args) => Promise<NextResponse>,
 ): (...args: Args) => Promise<NextResponse> {
   return async (...args: Args) => {
     try {
+      await ensureSettings();
       return await handler(...args);
     } catch (error) {
       return handleApiError(error);

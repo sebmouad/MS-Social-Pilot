@@ -41,10 +41,6 @@ export interface JobDefinition {
   run: (context: JobContext) => Promise<string | null>;
 }
 
-/** Warn this many days before a token expires. */
-const TOKEN_WARNING_DAYS = 7;
-/** How many destinations one analytics pass refreshes. */
-const ANALYTICS_BATCH = 50;
 
 /**
  * Warn about tokens nearing expiry.
@@ -54,7 +50,7 @@ const ANALYTICS_BATCH = 50;
  * why their page has gone quiet.
  */
 export async function runTokenExpiryCheck(context: JobContext): Promise<string | null> {
-  const horizon = new Date(context.now.getTime() + TOKEN_WARNING_DAYS * 24 * 60 * 60 * 1000);
+  const horizon = new Date(context.now.getTime() + env.tokenWarningDays * 24 * 60 * 60 * 1000);
 
   const accounts = await prisma.socialAccount.findMany({
     where: {
@@ -100,7 +96,7 @@ export async function runAnalyticsRefresh(context: JobContext): Promise<string |
   const rows = await prisma.postTarget.findMany({
     where: { status: 'published', remotePostId: { not: null } },
     orderBy: [{ insightsSyncedAt: { sort: 'asc', nulls: 'first' } }, { publishedAt: 'desc' }],
-    take: ANALYTICS_BATCH,
+    take: env.analyticsBatch,
     select: { id: true, target: { select: { name: true } } },
   });
 
@@ -211,7 +207,7 @@ export async function runInstagramSync(context: JobContext): Promise<string | nu
 
     const results = await syncWorkspaceInstagram({
       workspaceId: workspace.id,
-      since: new Date(context.now.getTime() - 30 * 24 * 60 * 60 * 1000),
+      since: new Date(context.now.getTime() - env.edgeWindowDays * 24 * 60 * 60 * 1000),
       until: context.now,
     });
 
@@ -242,7 +238,7 @@ export async function runAdsSync(context: JobContext): Promise<string | null> {
 
     const results = await syncWorkspaceAds({
       workspaceId: workspace.id,
-      since: new Date(context.now.getTime() - 30 * 24 * 60 * 60 * 1000),
+      since: new Date(context.now.getTime() - env.adWindowDays * 24 * 60 * 60 * 1000),
       until: context.now,
     });
 

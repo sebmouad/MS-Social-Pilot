@@ -273,6 +273,55 @@ production image.
 
 
 
+
+---
+
+## Configuration
+
+Almost nothing is hardcoded. `src/lib/settings/definitions.ts` is a registry of
+every tunable — type, default, bounds, the environment variable it falls back
+to, and enough description that the config screen explains itself. The API, the
+form and the validation are all generated from it, so a setting cannot exist in
+the code and be missing from the screen.
+
+Precedence is **database → environment → registry default**. An existing `.env`
+keeps working exactly as before; anything set on Settings → Configuration wins
+over it, and clearing an override hands the setting back. `env` reads through
+the store, so no call site changed shape.
+
+Three things stay purely environmental because they cannot be anything else:
+`DATABASE_URL` reads the settings table, `ENCRYPTION_KEY` protects the secrets
+stored in it, and `SESSION_SECRET` cannot be rotated from inside a session.
+Everything else — including the Facebook app id and secret — is editable at
+runtime, so a new installation is never configured by hand-editing a file on a
+server.
+
+Secrets are encrypted with the same key that protects access tokens and are
+**never sent back to the browser**, not even to the person who set them: the
+screen is told only whether a value exists. Leaving a secret field blank keeps
+the current value rather than clearing it, so saving an unrelated change cannot
+silently wipe an API key.
+
+Reads are synchronous (`setting('scheduler.pollSeconds')`) with a cached
+snapshot loaded at two choke points: the API route wrapper for requests, and
+`getAuthContext` for server rendering. The worker re-reads on every pass, so an
+interval changed on the screen takes effect within a minute without a restart —
+that lag is what the "applies within a minute" badge on the form is telling the
+operator.
+
+## Connections
+
+One screen for everything this workspace is connected to, because the failure
+they share is the same: a token dies and everything downstream stops quietly.
+Pages, Groups, Instagram accounts and ad accounts all hang off a connected
+Facebook user, so they are grouped under the credential that reaches them.
+
+Token expiry is shown as **days remaining, not a date** — "expires 14 Sep" makes
+the reader do arithmetic before they know whether to act. Granted scopes are
+listed beside it, because a token can be perfectly alive and still be missing
+the permission a job needs, and those two failures look identical from the
+outside.
+
 ---
 
 ## Charts and layout

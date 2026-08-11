@@ -14,6 +14,7 @@
 
 import { prisma } from '../src/lib/prisma';
 import { jobDefinitions, type JobDefinition } from '../src/lib/scheduler/jobs';
+import { ensureSettings } from '../src/lib/settings';
 
 const workerId = `worker-${process.pid}`;
 let stopping = false;
@@ -51,17 +52,27 @@ async function runJob(job: JobDefinition): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const jobs = jobDefinitions();
-
-  log(`starting; jobs: ${jobs.map((job) => `${job.name}@${Math.round(job.intervalMs / 1000)}s`).join(' ')}`);
-
   // Fail fast on a misconfigured database rather than logging an error on
   // every tick for the rest of time.
   await prisma.$queryRaw`SELECT 1`;
 
-  const nextRunAt = new Map<string, number>(jobs.map((job) => [job.name, 0]));
+  await ensureSettings();
+  log(
+    `starting; jobs: ${jobDefinitions()
+      .map((job) => `${job.name}@${Math.round(job.intervalMs / 1000)}s`)
+      .join(' ')}`,
+  );
+
+  const nextRunAt = new Map<string, number>();
 
   while (!stopping) {
+    // Re-read configuration every pass (cached, so this is one query a minute
+    // at most). An interval changed on the config screen therefore takes
+    // effect without restarting this process, and a job switched off stops
+    // being scheduled.
+    await ensureSettings();
+    const jobs = jobDefinitions();
+
     const now = Date.now();
 
     for (const job of jobs) {

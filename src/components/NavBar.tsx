@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { Icon, type IconName } from './Icon';
+
 export interface WorkspaceOption {
   id: string;
   name: string;
@@ -37,17 +39,19 @@ export function NavBar({
   const [switching, setSwitching] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const links = [
-    { href: '/dashboard', label: t('dashboard') },
-    { href: '/compose', label: t('compose') },
-    { href: '/calendar', label: t('calendar') },
-    { href: '/posts', label: t('posts') },
-    ...(showApprovals ? [{ href: '/approvals', label: t('approvals'), badge: pendingApprovals }] : []),
-    { href: '/accounts', label: t('accounts') },
-    { href: '/feeds', label: t('feeds') },
-    { href: '/analytics', label: t('analytics') },
-    { href: '/reports', label: t('reports') },
-    { href: '/settings', label: t('settings') },
+  const links: Array<{ href: string; label: string; icon: IconName; badge?: number }> = [
+    { href: '/dashboard', label: t('dashboard'), icon: 'dashboard' },
+    { href: '/compose', label: t('compose'), icon: 'compose' },
+    { href: '/calendar', label: t('calendar'), icon: 'calendar' },
+    { href: '/posts', label: t('posts'), icon: 'posts' },
+    ...(showApprovals
+      ? [{ href: '/approvals', label: t('approvals'), icon: 'approvals' as IconName, badge: pendingApprovals }]
+      : []),
+    { href: '/connections', label: t('connections'), icon: 'connections' },
+    { href: '/feeds', label: t('feeds'), icon: 'feeds' },
+    { href: '/analytics', label: t('analytics'), icon: 'analytics' },
+    { href: '/reports', label: t('reports'), icon: 'reports' },
+    { href: '/settings', label: t('settings'), icon: 'settings' },
   ];
 
   async function signOut() {
@@ -84,8 +88,9 @@ export function NavBar({
               active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
+            <Icon name={link.icon} size={16} className={active ? '' : 'text-slate-400'} />
             {link.label}
-            {'badge' in link && typeof link.badge === 'number' && link.badge > 0 && (
+            {typeof link.badge === 'number' && link.badge > 0 && (
               <span className="rounded-full bg-violet-100 px-1.5 text-[10px] font-semibold text-violet-700">
                 {link.badge}
               </span>
@@ -103,19 +108,26 @@ export function NavBar({
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white">
             SP
           </span>
-          <span className="hidden text-sm font-semibold text-slate-900 sm:inline">MS Social Pilot</span>
+          {/* The wordmark is dropped once the link row appears: ten labels
+              plus a workspace switcher already fill the bar, and the product
+              name is on the tab, the login screen and every email. */}
+          <span className="text-sm font-semibold text-slate-900 lg:hidden">MS Social Pilot</span>
         </Link>
 
         {/* Ten links wrap into three ragged rows on a phone and push the page
-            below the fold. Below `lg` they live behind a menu instead. */}
-        <nav className="hidden flex-1 flex-wrap items-center gap-1 lg:flex">{navLinks}</nav>
+            below the fold. Below `lg` they live behind a menu instead; above
+            it they stay on one line and scroll rather than wrapping, so the
+            header height never changes with the label lengths. */}
+        <nav className="scroll-x hidden min-w-0 flex-1 lg:block">
+          <div className="flex items-center gap-0.5">{navLinks}</div>
+        </nav>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {workspaces.length > 1 ? (
             <label>
               <span className="sr-only">{t('switchWorkspace')}</span>
               <select
-                className="max-w-[9rem] rounded-lg border border-slate-300 px-2 py-1.5 text-sm font-medium text-slate-900"
+                className="max-w-[7.5rem] rounded-lg border border-slate-300 px-2 py-1.5 text-sm font-medium text-slate-900 lg:max-w-[9rem]"
                 value={workspaceId}
                 disabled={switching}
                 onChange={(event) => switchTo(event.target.value)}
@@ -136,7 +148,10 @@ export function NavBar({
           </p>
 
           <button type="button" onClick={signOut} className="btn-secondary hidden lg:inline-flex">
-            {t('signOut')}
+            <Icon name="signOut" size={15} />
+            {/* sr-only rather than hidden: `display:none` would take the label
+                away from a screen reader too, leaving an unnamed button. */}
+            <span className="sr-only 2xl:not-sr-only">{t('signOut')}</span>
           </button>
 
           <button
@@ -147,7 +162,7 @@ export function NavBar({
             onClick={() => setMenuOpen((value) => !value)}
           >
             <span className="sr-only">{t('menu')}</span>
-            <span aria-hidden>{menuOpen ? '✕' : '☰'}</span>
+            <Icon name={menuOpen ? 'close' : 'menu'} size={18} />
           </button>
         </div>
       </div>

@@ -104,6 +104,18 @@ export function canManageSettings(role: WorkspaceRole): boolean {
   return atLeast(role, WorkspaceRole.admin);
 }
 
+/**
+ * Change instance-wide configuration: API credentials, job intervals, feature
+ * switches.
+ *
+ * Owner only. These settings are not scoped to a workspace — an agency admin
+ * for one client must not be able to change the Graph version, or read out the
+ * fact that an API key is set, for every other client on the installation.
+ */
+export function canManageInstance(role: WorkspaceRole): boolean {
+  return atLeast(role, WorkspaceRole.owner);
+}
+
 /** Approve or reject posts submitted for review. */
 export function canApprove(role: WorkspaceRole): boolean {
   return atLeast(role, WorkspaceRole.admin);

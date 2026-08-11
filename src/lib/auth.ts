@@ -4,6 +4,7 @@ import { cache } from 'react';
 import { Locale, WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
+import { ensureSettings } from './settings';
 import { env } from './env';
 import { hashPassword, hashToken, randomToken, verifyPassword } from './crypto';
 import { uniqueSlug } from './slug';
@@ -209,6 +210,11 @@ export async function setActiveWorkspaceCookie(workspaceId: string): Promise<voi
  * hits the database once per request rather than once per component.
  */
 export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promise<AuthContext | null> => {
+  // Every authenticated screen goes through here, so this is where runtime
+  // configuration is loaded for server rendering — the mirror of the API
+  // route wrapper doing it for requests.
+  await ensureSettings();
+
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;

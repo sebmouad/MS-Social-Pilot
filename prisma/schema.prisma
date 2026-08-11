@@ -121,6 +121,7 @@ model User {
   sentInvitations   Invitation[]   @relation("InvitationSender")
   notificationSettings NotificationSetting[]
   aiGenerations     AiGeneration[]
+  settingChanges    AppSetting[]
 
   @@map("users")
 }
@@ -920,6 +921,25 @@ model AdInsight {
   @@unique([adAccountId, level, objectId, date])
   @@index([adAccountId, date])
   @@map("ad_insights")
+}
+
+/// An instance-wide setting, overriding the environment default.
+///
+/// Settings live here rather than only in `.env` so an operator can change the
+/// Graph version, a job interval or an API key without a redeploy. The value is
+/// `Json` because the registry types each key (string, number, boolean, list);
+/// storing everything as text would push parsing into every read.
+model AppSetting {
+  key       String   @id
+  value     Json
+  /// True when `value` holds a ciphertext rather than the value itself.
+  encrypted Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  updatedById String?
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@map("app_settings")
 }
 
 model ActivityLog {

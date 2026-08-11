@@ -190,7 +190,7 @@ export function connectionExpiredEmail(options: {
   const block = layout({
     heading: t('email.connectionExpired.heading'),
     body: t('email.connectionExpired.body', { account: options.account }),
-    cta: { label: t('email.connectionExpired.cta'), url: `${env.appUrl}/accounts` },
+    cta: { label: t('email.connectionExpired.cta'), url: `${env.appUrl}/connections` },
     footer: t('email.footer', { workspace: options.workspace }),
   });
 
@@ -213,7 +213,7 @@ export function tokenExpiringEmail(options: {
       account: options.account,
       date: formatDate(options.expiresAt, options.locale),
     }),
-    cta: { label: t('email.tokenExpiring.cta'), url: `${env.appUrl}/accounts` },
+    cta: { label: t('email.tokenExpiring.cta'), url: `${env.appUrl}/connections` },
     footer: t('email.footer', { workspace: options.workspace }),
   });
 

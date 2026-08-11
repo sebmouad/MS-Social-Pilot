@@ -1,5 +1,21 @@
+import {
+  settingBoolean,
+  settingList,
+  settingNumber,
+  settingString,
+} from './settings';
+
 /**
- * Environment access with validation at the point of use.
+ * Runtime configuration, read at the point of use.
+ *
+ * Most of what follows now comes from the settings store rather than the
+ * environment directly — the store falls back to the environment and then to a
+ * registry default, so an existing `.env` keeps working while anything set on
+ * the config screen wins over it. See `src/lib/settings`.
+ *
+ * What stays purely environmental is what cannot live in the database:
+ * `DATABASE_URL` reads the table, `ENCRYPTION_KEY` protects the secrets inside
+ * it, and `SESSION_SECRET` cannot be rotated from inside a session.
  *
  * Deliberately not validated eagerly at import time: `next build` imports
  * modules without a populated .env, and failing the build because a runtime
@@ -17,31 +33,10 @@ function required(name: string): string {
   return value;
 }
 
-function optional(name: string, fallback: string): string {
-  const value = process.env[name];
-  return value === undefined || value === '' ? fallback : value;
-}
-
-function integer(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`Environment variable ${name} must be an integer, got "${raw}".`);
-  }
-  return parsed;
-}
-
-function boolean(name: string, fallback: boolean): boolean {
-  const raw = process.env[name];
-  if (raw === undefined || raw === '') return fallback;
-  return raw === 'true' || raw === '1' || raw === 'yes';
-}
-
 export const env = {
   get appUrl(): string {
     // Trailing slashes break OAuth redirect matching, so normalise once here.
-    return optional('APP_URL', 'http://localhost:3000').replace(/\/+$/, '');
+    return settingString('app.url').replace(/\/+$/, '');
   },
   get sessionSecret(): string {
     return required('SESSION_SECRET');
@@ -50,30 +45,24 @@ export const env = {
     return required('ENCRYPTION_KEY');
   },
   get facebookAppId(): string {
-    return required('FACEBOOK_APP_ID');
+    return requiredSetting('facebook.appId', 'FACEBOOK_APP_ID');
   },
   get facebookAppSecret(): string {
-    return required('FACEBOOK_APP_SECRET');
+    return requiredSetting('facebook.appSecret', 'FACEBOOK_APP_SECRET');
   },
   get graphVersion(): string {
-    return optional('FACEBOOK_GRAPH_VERSION', 'v21.0');
+    return settingString('facebook.graphVersion');
   },
   /**
    * Base URL for the Graph API. Overridable so tests (and staging setups that
    * front Graph with a recording proxy) can point at something other than the
-   * live API. Leave unset in production.
+   * live API. Leave at the default in production.
    */
   get graphBaseUrl(): string {
-    return optional('FACEBOOK_GRAPH_BASE_URL', 'https://graph.facebook.com').replace(/\/+$/, '');
+    return settingString('facebook.graphBaseUrl').replace(/\/+$/, '');
   },
   get facebookScopes(): string[] {
-    const base = optional(
-      'FACEBOOK_SCOPES',
-      'pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,read_insights,business_management',
-    )
-      .split(',')
-      .map((scope) => scope.trim())
-      .filter(Boolean);
+    const base = [...settingList('facebook.scopes')];
 
     if (env.groupsEnabled) {
       for (const scope of ['publish_to_groups', 'groups_access_member_info']) {
@@ -100,51 +89,52 @@ export const env = {
   },
   /** Page inbox reads. Off by default: `pages_messaging` needs app review. */
   get messagingEnabled(): boolean {
-    return boolean('FACEBOOK_ENABLE_MESSAGING', false);
+    return settingBoolean('features.messaging');
   },
   /** Instagram Business analytics. */
   get instagramEnabled(): boolean {
-    return boolean('FACEBOOK_ENABLE_INSTAGRAM', false);
+    return settingBoolean('features.instagram');
   },
   /** Ads Insights reads. Read-only — the app never requests ads_management. */
   get adsEnabled(): boolean {
-    return boolean('FACEBOOK_ENABLE_ADS', false);
+    return settingBoolean('features.ads');
   },
   get groupsEnabled(): boolean {
-    return boolean('FACEBOOK_ENABLE_GROUPS', false);
+    return settingBoolean('features.groups');
   },
   get pollSeconds(): number {
-    return Math.max(5, integer('SCHEDULER_POLL_SECONDS', 30));
+    return settingNumber('scheduler.pollSeconds');
   },
   get concurrency(): number {
-    return Math.max(1, integer('SCHEDULER_CONCURRENCY', 4));
+    return settingNumber('scheduler.concurrency');
   },
   get maxAttempts(): number {
-    return Math.max(1, integer('SCHEDULER_MAX_ATTEMPTS', 5));
+    return settingNumber('scheduler.maxAttempts');
   },
+
   // --- Email (Resend) ---
   get resendApiKey(): string | null {
-    return process.env.RESEND_API_KEY || null;
+    return settingString('email.apiKey') || null;
   },
   get emailFrom(): string {
-    return optional('EMAIL_FROM', 'MS Social Pilot <onboarding@resend.dev>');
+    return settingString('email.from');
   },
 
   // --- AI (Claude) ---
   get anthropicApiKey(): string | null {
-    return process.env.ANTHROPIC_API_KEY || null;
+    return settingString('ai.apiKey') || null;
   },
   get aiModel(): string {
-    return optional('AI_MODEL', 'claude-sonnet-5');
+    return settingString('ai.model');
   },
   get aiRateLimitPerHour(): number {
-    return Math.max(1, integer('AI_RATE_LIMIT_PER_HOUR', 100));
+    return settingNumber('ai.rateLimitPerHour');
   },
 
   // --- Link shortener ---
   /** Bare host, e.g. "go.example.com". Blank means links live under APP_URL. */
   get shortenerDomain(): string | null {
-    const value = process.env.SHORTENER_DOMAIN;
+    const value = settingString('links.shortenerDomain');
     return value ? value.replace(/^https?:\/\//, '').replace(/\/+$/, '') : null;
   },
   get shortLinkBase(): string {
@@ -153,46 +143,82 @@ export const env = {
 
   // --- Worker job intervals ---
   get rssPollMinutes(): number {
-    return Math.max(1, integer('RSS_POLL_MINUTES', 15));
+    return settingNumber('scheduler.rssPollMinutes');
   },
   get evergreenCheckMinutes(): number {
-    return Math.max(1, integer('EVERGREEN_CHECK_MINUTES', 60));
+    return settingNumber('scheduler.evergreenCheckMinutes');
   },
   get tokenExpiryCheckHours(): number {
-    return Math.max(1, integer('TOKEN_EXPIRY_CHECK_HOURS', 24));
+    return settingNumber('scheduler.tokenExpiryCheckHours');
   },
   get analyticsRefreshHours(): number {
-    return Math.max(1, integer('ANALYTICS_REFRESH_HOURS', 6));
+    return settingNumber('analytics.refreshHours');
   },
   /** How often the full Page insights catalogue is captured. */
   get pageInsightsHours(): number {
-    return Math.max(1, integer('PAGE_INSIGHTS_HOURS', 12));
+    return settingNumber('analytics.pageInsightsHours');
   },
   /** Comments, reviews, inbox threads, videos and unscheduled posts. */
   get edgeSyncHours(): number {
-    return Math.max(1, integer('EDGE_SYNC_HOURS', 4));
+    return settingNumber('analytics.edgeSyncHours');
   },
   get instagramSyncHours(): number {
-    return Math.max(1, integer('INSTAGRAM_SYNC_HOURS', 12));
+    return settingNumber('analytics.instagramSyncHours');
   },
   get adsSyncHours(): number {
-    return Math.max(1, integer('ADS_SYNC_HOURS', 12));
+    return settingNumber('analytics.adsSyncHours');
+  },
+
+  // --- Analytics batch sizes ---
+  get analyticsBatch(): number {
+    return settingNumber('analytics.postBatch');
+  },
+  get commentPostLimit(): number {
+    return settingNumber('analytics.commentPostLimit');
+  },
+  get videoLimit(): number {
+    return settingNumber('analytics.videoLimit');
+  },
+  get edgeWindowDays(): number {
+    return settingNumber('analytics.edgeWindowDays');
+  },
+  get adWindowDays(): number {
+    return settingNumber('analytics.adWindowDays');
+  },
+  get tokenWarningDays(): number {
+    return settingNumber('analytics.tokenWarningDays');
   },
 
   get cronSecret(): string | null {
-    const value = process.env.CRON_SECRET;
-    return value ? value : null;
+    return settingString('cron.secret') || null;
   },
   get mediaDir(): string {
-    return optional('MEDIA_DIR', './media');
+    return settingString('media.dir');
   },
   get maxUploadBytes(): number {
-    return integer('MAX_UPLOAD_MB', 25) * 1024 * 1024;
+    return settingNumber('media.maxUploadMb') * 1024 * 1024;
   },
   get isProduction(): boolean {
     return process.env.NODE_ENV === 'production';
   },
 };
+
+/**
+ * A setting with no usable value anywhere.
+ *
+ * Named after the environment variable as well as the setting, because someone
+ * hitting this has either an empty config screen or an empty `.env` and the
+ * message has to point at both.
+ */
+function requiredSetting(key: string, envName: string): string {
+  const value = settingString(key);
+  if (!value) {
+    throw new Error(
+      `Missing ${key}. Set it on the configuration screen, or set ${envName} in the environment.`,
+    );
+  }
+  return value;
+}
 
 /** Facebook only accepts https redirect URIs outside of localhost. */
 export function assertOAuthReady(): void {
