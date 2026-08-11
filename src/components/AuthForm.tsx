@@ -5,11 +5,22 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
+import { afterAuthPath, withInviteParam } from '@/lib/invite-path';
+
 interface Props {
   mode: 'login' | 'register';
+  /**
+   * An invitation the visitor arrived with.
+   *
+   * Signing in or registering is a detour on the way to accepting it, so the
+   * token has to survive the detour. Without it they land on a dashboard for a
+   * workspace they were not invited to, with nothing on screen mentioning the
+   * invitation, and have to go back to the email and click the link again.
+   */
+  inviteToken?: string;
 }
 
-export function AuthForm({ mode }: Props) {
+export function AuthForm({ mode, inviteToken }: Props) {
   const t = useTranslations('auth');
   const tApp = useTranslations('app');
   const router = useRouter();
@@ -18,6 +29,10 @@ export function AuthForm({ mode }: Props) {
   const [fields, setFields] = useState<Record<string, string>>({});
 
   const isRegister = mode === 'register';
+
+  // Switching between "sign in" and "create an account" must not drop the
+  // invitation either — it is the same detour, one click longer.
+  const withInvite = (path: string): string => withInviteParam(path, inviteToken);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,7 +62,7 @@ export function AuthForm({ mode }: Props) {
 
     // Server components read the session cookie, so refresh before navigating.
     router.refresh();
-    router.push('/dashboard');
+    router.push(afterAuthPath(inviteToken));
   }
 
   return (
@@ -128,14 +143,14 @@ export function AuthForm({ mode }: Props) {
         {isRegister ? (
           <>
             {t('haveAccount')}{' '}
-            <Link href="/login" className="font-medium text-brand-600 hover:underline">
+            <Link href={withInvite('/login')} className="font-medium text-brand-600 hover:underline">
               {t('signIn')}
             </Link>
           </>
         ) : (
           <>
             {t('noAccount')}{' '}
-            <Link href="/register" className="font-medium text-brand-600 hover:underline">
+            <Link href={withInvite('/register')} className="font-medium text-brand-600 hover:underline">
               {t('createOne')}
             </Link>
           </>

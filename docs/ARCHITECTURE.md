@@ -271,6 +271,22 @@ an id from a cookie or URL is a request, not a permission. Workspace scoping is
 therefore a security boundary, with tests that a member of one workspace cannot
 read, publish to, or approve anything in another.
 
+### Accepting an invitation
+
+The token lives only in the email: the row stores a SHA-256 of it, so a database
+dump cannot be turned into a set of working invitation links. Accepting checks
+expiry, refuses a second use, and requires the signed-in address to match the
+one invited — otherwise a forwarded link admits whoever received it.
+
+The part that was broken was the detour. Most people accepting an invitation
+have no account yet, so they arrive, click "create an account", and sign in
+first. The invitation page linked to `/register?invite=…` and neither auth page
+read the parameter: they registered, landed on the dashboard of a workspace they
+had not been invited to, saw nothing about the invitation anywhere, and had to
+go back to the email and click the link again. `afterAuthPath` is now the one
+definition of where someone goes after signing in, used by both auth pages and
+the form itself.
+
 ### Who may act on a post
 
 Workspace membership was the only check on editing, cancelling, retrying and
