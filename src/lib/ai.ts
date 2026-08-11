@@ -39,6 +39,19 @@ export function aiAvailable(): boolean {
 }
 
 /** Refuse once a workspace has burned through its hourly allowance. */
+/**
+ * The only guard on what this costs.
+ *
+ * Checked before the call and recorded after it, so several requests arriving
+ * together can all pass a check that none of them has yet been counted
+ * against. Left that way deliberately: the overshoot is bounded by how many
+ * people press the button at the same moment, and the alternative — reserving
+ * a row before calling — bills a workspace for generations that failed. A cost
+ * guard that is occasionally generous beats one that charges for nothing.
+ *
+ * Note the related trade in `complete`: a failed audit write is swallowed so
+ * nobody loses their draft, which also means that generation is never counted.
+ */
 async function assertWithinRateLimit(workspaceId: string): Promise<void> {
   const since = new Date(Date.now() - 60 * 60 * 1000);
   const used = await prisma.aiGeneration.count({
