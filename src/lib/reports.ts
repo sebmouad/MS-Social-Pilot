@@ -3,6 +3,7 @@ import { PostTargetStatus } from '@prisma/client';
 import { prisma } from './prisma';
 import { parseInsights, type PostInsights } from './json';
 import { formatInZone } from './time';
+import { toCsv } from './csv';
 
 /**
  * Reporting.
@@ -161,12 +162,6 @@ export async function buildReport(options: {
 
 /** CSV of the per-destination table, for a spreadsheet or a client deck. */
 export function reportToCsv(report: Report): string {
-  const escape = (value: string | number): string => {
-    const text = String(value);
-    // Quote anything containing a delimiter, quote or newline, per RFC 4180.
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
-
   const rows = [
     ['destination', 'type', 'posts', 'impressions', 'reach', 'reactions', 'comments', 'shares', 'link_clicks'],
     ...report.destinations.map((row) => [
@@ -182,5 +177,7 @@ export function reportToCsv(report: Report): string {
     ]),
   ];
 
-  return rows.map((row) => row.map(escape).join(',')).join('\n') + '\n';
+  // Shared with the analytics exports: a destination name comes from Facebook,
+  // so it gets the same treatment as any other text that is not ours.
+  return toCsv(rows);
 }

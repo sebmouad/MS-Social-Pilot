@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { bulkCsvTemplate, parseCsv, parseCsvWithHeader } from '../src/lib/csv';
+import { bulkCsvTemplate, csvCell, parseCsv, parseCsvWithHeader, toCsv } from '../src/lib/csv';
 import { bulkRowSchema } from '../src/lib/validation';
 import { localInputToUtc } from '../src/lib/time';
 
@@ -218,5 +218,51 @@ describe('bulkCsvTemplate', () => {
       const when = localInputToUtc(row.scheduled_at!.replace(' ', 'T'), 'UTC');
       expect(when.getTime()).toBeGreaterThan(later.getTime());
     }
+  });
+});
+
+/**
+ * These files exist to be opened in Excel or Sheets, where a cell beginning
+ * `=`, `+`, `-` or `@` is code rather than text — and the text is not ours.
+ * Page names, comment bodies and reviewer names all come from Facebook.
+ */
+describe('csvCell', () => {
+  it('quotes what RFC 4180 requires', () => {
+    expect(csvCell('plain')).toBe('plain');
+    expect(csvCell('has,comma')).toBe('"has,comma"');
+    expect(csvCell('has"quote')).toBe('"has""quote"');
+    expect(csvCell('has\nnewline')).toBe('"has\nnewline"');
+  });
+
+  it('defuses a cell a spreadsheet would run', () => {
+    expect(csvCell('=1+1')).toBe("'=1+1");
+    expect(csvCell('+1')).toBe("'+1");
+    expect(csvCell('@SUM(A1)')).toBe("'@SUM(A1)");
+    expect(csvCell('=HYPERLINK("http://evil","Click")')).toBe(
+      '"\'=HYPERLINK(""http://evil"",""Click"")"',
+    );
+  });
+
+  it('is not fooled by leading whitespace, which Excel skips', () => {
+    // No quotes: a tab is not a delimiter in a comma-separated file, so the
+    // apostrophe alone is what this cell needs.
+    expect(csvCell('\t=SUM(A1)')).toBe("'\t=SUM(A1)");
+  });
+
+  it('leaves numbers alone, including negative ones', () => {
+    // The obvious over-correction: these are analytics exports, and turning
+    // -5 into text breaks every sum in the sheet they exist to feed.
+    expect(csvCell(-5)).toBe('-5');
+    expect(csvCell(0)).toBe('0');
+    expect(csvCell(1234.5)).toBe('1234.5');
+  });
+
+  it('writes nothing for a missing value', () => {
+    expect(csvCell(null)).toBe('');
+    expect(csvCell(undefined)).toBe('');
+  });
+
+  it('assembles a document', () => {
+    expect(toCsv([['name', 'posts'], ['Acme', 3]])).toBe('name,posts\nAcme,3\n');
   });
 });

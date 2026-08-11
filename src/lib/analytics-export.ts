@@ -3,6 +3,7 @@ import { parseInsights } from './json';
 import { readAdSummary, readCampaigns } from './ads';
 import { readInstagramInsights, readInstagramMedia } from './instagram';
 import { readComments, readExternalPosts, readReviews, readVideos } from './engagement';
+import { toCsv as csvDocument } from './csv';
 
 /**
  * CSV exports of the full analytics catalogue.
@@ -28,16 +29,8 @@ export type ExportKind =
   | 'instagram_media'
   | 'ads';
 
-/** RFC 4180: quote anything containing a delimiter, quote or newline. */
-function escape(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  const text =
-    typeof value === 'object' ? JSON.stringify(value) : String(value);
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
 function toCsv(header: string[], rows: unknown[][]): string {
-  return [header, ...rows].map((row) => row.map(escape).join(',')).join('\n') + '\n';
+  return csvDocument([header, ...rows]);
 }
 
 /** ISO day, which is what spreadsheets parse most reliably. */

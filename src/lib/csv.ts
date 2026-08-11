@@ -175,3 +175,41 @@ export function bulkCsvTemplate(now: Date = new Date()): string {
     '',
   ].join('\n');
 }
+
+/**
+ * Characters a spreadsheet treats as the start of a formula rather than text.
+ *
+ * Tab and carriage return are included because Excel skips leading whitespace
+ * before deciding, so `\t=SUM(...)` is still a formula to it.
+ */
+const FORMULA_START = /^[=+\-@\t\r]/;
+
+/**
+ * One cell, quoted per RFC 4180 and defused for the spreadsheet that opens it.
+ *
+ * RFC 4180 says nothing about formulas, and both exports here exist to be
+ * opened in Excel or Sheets, where a cell beginning `=`, `+`, `-` or `@` is
+ * code. The text is not ours: post messages come from colleagues, but Page
+ * names, comment bodies and reviewer names come from Facebook, which is to say
+ * from anyone at all. A leading apostrophe is the standard defusal —
+ * spreadsheets read the rest as text and do not display the apostrophe.
+ *
+ * Numbers pass through untouched. Quoting them would be the obvious
+ * over-correction: these are analytics exports, negative values are ordinary,
+ * and turning -5 into text breaks every sum in the sheet the file exists to
+ * feed.
+ */
+export function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+
+  const text = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  const defused = FORMULA_START.test(text) ? `'${text}` : text;
+
+  return /[",\n]/.test(defused) ? `"${defused.replace(/"/g, '""')}"` : defused;
+}
+
+/** A whole document: a header row, then the rest. */
+export function toCsv(rows: unknown[][]): string {
+  return rows.map((row) => row.map(csvCell).join(',')).join('\n') + '\n';
+}

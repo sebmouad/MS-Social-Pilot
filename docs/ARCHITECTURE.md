@@ -558,6 +558,20 @@ a future write path forgets. The unsafe value is shown rather than hidden — th
 point is that the address stops being clickable, not that the user stops being
 told what the post says.
 
+## Exports opened in a spreadsheet
+
+Both CSV writers — the analytics exports and the per-destination report — share
+`csvCell`, which does RFC 4180 quoting and then the thing RFC 4180 says nothing
+about. A cell beginning `=`, `+`, `-` or `@` is a formula to Excel and Sheets,
+and these files exist to be opened in one. The text is not ours: post messages
+come from colleagues, but Page names, comment bodies and reviewer names come
+from Facebook, which is to say from anyone. A leading apostrophe defuses it, and
+spreadsheets do not display the apostrophe.
+
+Numbers pass through untouched, which is the point worth guarding: these are
+analytics exports, negative values are ordinary, and turning `-5` into text
+would break every sum in the sheet the file exists to feed.
+
 ## Link previews and outbound fetches
 
 Composing a post scrapes the link for its Open Graph card, which means the
