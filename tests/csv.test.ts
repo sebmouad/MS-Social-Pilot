@@ -50,6 +50,30 @@ describe('parseCsv', () => {
   });
 });
 
+describe('parseCsv with a quote that is never closed', () => {
+  it('refuses the file rather than swallowing the rest of it', () => {
+    // Without this the remaining rows do not fail loudly, they stop existing:
+    // the uploader is told their 200-row campaign scheduled one post.
+    expect(() => parseCsv('message,link\n"Hello,https://example.com/a\nSecond,https://example.com/b')).toThrow(
+      /never closed/i,
+    );
+  });
+
+  it('points at the line the quote opened on', () => {
+    const csv = ['message', 'Fine', 'Also fine', '"Broken from here'].join('\n');
+    expect(() => parseCsv(csv)).toThrow(/line 4/);
+  });
+
+  it('counts newlines inside a quoted field when reporting the line', () => {
+    const csv = ['message', '"line one\nline two"', '"and this one never closes'].join('\n');
+    expect(() => parseCsv(csv)).toThrow(/line 4/);
+  });
+
+  it('is happy with a quote that is closed', () => {
+    expect(parseCsv('message\n"Hello, world"')).toEqual([['message'], ['Hello, world']]);
+  });
+});
+
 describe('parseCsvWithHeader', () => {
   it('keys rows by normalised header name', () => {
     const { rows } = parseCsvWithHeader('Message,Scheduled At\nHello,2026-09-01 09:00');

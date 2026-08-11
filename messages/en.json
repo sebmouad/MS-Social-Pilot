@@ -369,7 +369,8 @@
     "cannotApproveOwn": "You cannot approve your own post.",
     "notPending": "That post is not awaiting approval.",
     "variantsNeedApproval": "Alternate wordings publish without review, so only editors and above can set them while approval is on.",
-    "bulkTooManyRows": "That file has {rows} rows and the limit is {limit}. Split it into smaller uploads."
+    "bulkTooManyRows": "That file has {rows} rows and the limit is {limit}. Split it into smaller uploads.",
+    "csvUnterminatedQuote": "A quoted field starting on line {line} is never closed, so everything after it was read as one value. Add the missing quote and upload again."
   },
   "email": {
     "invitation": {

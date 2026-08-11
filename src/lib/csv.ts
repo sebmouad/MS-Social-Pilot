@@ -1,3 +1,5 @@
+import { errors } from './errors';
+
 /**
  * A small RFC 4180 CSV reader for bulk uploads.
  *
@@ -13,6 +15,10 @@ export function parseCsv(input: string): string[][] {
   let field = '';
   let inQuotes = false;
   let index = 0;
+  // Only used to say where an unclosed quote started, which is the one piece
+  // of information that makes that error fixable.
+  let line = 1;
+  let quoteOpenedOn = 0;
 
   // Strip a UTF-8 BOM, which Excel writes and which would otherwise become
   // part of the first header name.
@@ -27,6 +33,7 @@ export function parseCsv(input: string): string[][] {
     // Skip rows that are entirely empty (trailing newline at end of file).
     if (row.length > 1 || row[0] !== '') rows.push(row);
     row = [];
+    line += 1;
   };
 
   while (index < text.length) {
@@ -43,6 +50,7 @@ export function parseCsv(input: string): string[][] {
         index += 1;
         continue;
       }
+      if (char === '\n') line += 1;
       field += char;
       index += 1;
       continue;
@@ -50,6 +58,7 @@ export function parseCsv(input: string): string[][] {
 
     if (char === '"' && field === '') {
       inQuotes = true;
+      quoteOpenedOn = line;
       index += 1;
       continue;
     }
@@ -74,6 +83,13 @@ export function parseCsv(input: string): string[][] {
     field += char;
     index += 1;
   }
+
+  // A quote that is never closed swallows the rest of the file into one field:
+  // the rows after it do not go missing loudly, they simply stop existing, and
+  // the uploader is told their 200-row campaign scheduled one post. There is no
+  // per-row recovery to offer — everything past the quote is unreadable — so
+  // the whole file is refused with the line to go and look at.
+  if (inQuotes) throw errors.csvUnterminatedQuote(quoteOpenedOn);
 
   if (field !== '' || row.length > 0) endRow();
   return rows;

@@ -133,6 +133,14 @@ export const errors = {
       status: 422,
     }),
 
+  csvUnterminatedQuote: (line: number) =>
+    new AppError({
+      key: 'errors.csvUnterminatedQuote',
+      fallback: `A quoted field starting on line ${line} is never closed, so everything after it was read as one value. Add the missing " and upload again.`,
+      params: { line },
+      status: 422,
+    }),
+
   aiRateLimited: () =>
     new AppError({
       key: 'errors.aiRateLimited',
