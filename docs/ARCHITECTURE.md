@@ -15,10 +15,10 @@ The web app never waits on a scheduled publish; it writes rows. The worker owns
 everything time-based. Both call Graph through the same client, so retry and
 error-classification rules cannot drift apart.
 
-**The worker runs up to nine jobs** on independent intervals — publish (30s),
+**The worker runs up to ten jobs** on independent intervals — publish (30s),
 rss (15m), evergreen (1h), analytics (6h), pageInsights (12h), edges (4h),
-tokens (24h), plus instagram (12h) and ads (12h) when those permissions are
-enabled. Each is a plain async
+media (24h), tokens (24h), plus instagram (12h) and ads (12h) when those
+permissions are enabled. Each is a plain async
 function with one shape, so the loop is a table rather than a pile of branches,
 and any job can be run alone from a test or `POST /api/cron/tick?jobs=…`. A job
 that throws is caught per job: a failing RSS poll must never stop posts going

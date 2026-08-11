@@ -8,6 +8,7 @@ import { syncPostInsights, syncWorkspaceAnalytics } from '../analytics';
 import { syncTargetEdges } from '../engagement';
 import { discoverInstagramAccounts, syncWorkspaceInstagram } from '../instagram';
 import { discoverAdAccounts, syncWorkspaceAds } from '../ads';
+import { deleteUnusedMedia } from '../media';
 
 /**
  * The worker's job set.
@@ -28,6 +29,7 @@ export type JobName =
   | 'edges'
   | 'instagram'
   | 'ads'
+  | 'media'
   | 'tokens';
 
 export interface JobContext {
@@ -255,6 +257,37 @@ export async function runAdsSync(context: JobContext): Promise<string | null> {
   return `rows=${rows} failed=${failed}`;
 }
 
+/**
+ * Sweep uploads that were never attached to anything.
+ *
+ * People upload an image, change their mind, and close the composer. Nothing
+ * references that file again, and on a VPS with a local media directory it sits
+ * there until the disk fills. A file used by any post is kept, whatever that
+ * post's status — deleting one a published post still shows would turn history
+ * into broken images.
+ */
+export async function runMediaCleanup(context: JobContext): Promise<string | null> {
+  const workspaces = await prisma.workspace.findMany({ select: { id: true } });
+
+  let removed = 0;
+  let bytes = 0;
+
+  for (const workspace of workspaces) {
+    const result = await deleteUnusedMedia({
+      workspaceId: workspace.id,
+      olderThanDays: env.mediaRetainUnusedDays,
+      now: context.now,
+    });
+
+    removed += result.removed;
+    bytes += result.bytes;
+    for (const error of result.errors) context.logger(`Media cleanup: ${error}`);
+  }
+
+  if (removed === 0) return null;
+  return `removed ${removed} unused file(s), ${Math.round(bytes / 1024)}KB`;
+}
+
 export function jobDefinitions(): JobDefinition[] {
   return [
     {
@@ -326,6 +359,11 @@ export function jobDefinitions(): JobDefinition[] {
           },
         ]
       : []),
+    {
+      name: 'media',
+      intervalMs: env.mediaCleanupHours * 60 * 60 * 1000,
+      run: runMediaCleanup,
+    },
     {
       name: 'tokens',
       intervalMs: env.tokenExpiryCheckHours * 60 * 60 * 1000,

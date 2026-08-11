@@ -198,6 +198,12 @@ export const env = {
   get maxUploadBytes(): number {
     return settingNumber('media.maxUploadMb') * 1024 * 1024;
   },
+  get mediaRetainUnusedDays(): number {
+    return settingNumber('media.retainUnusedDays');
+  },
+  get mediaCleanupHours(): number {
+    return settingNumber('media.cleanupHours');
+  },
   get isProduction(): boolean {
     return process.env.NODE_ENV === 'production';
   },

@@ -3,7 +3,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import { env } from './env';
-import type { PostMedia } from './json';
+import { prisma } from './prisma';
+import { parseMedia, type PostMedia } from './json';
 import type { ResolvedMedia } from './facebook/publish';
 import type { MediaKind } from './constants';
 
@@ -108,6 +109,115 @@ function defaultExtension(mimeType: string): string {
 
 export async function readStoredFile(storageKey: string): Promise<Buffer> {
   return readFile(resolveStoragePath(storageKey));
+}
+
+/**
+ * Posts that would break if this file went away.
+ *
+ * A post's media is a Json array holding the storage key, not a foreign key, so
+ * the database will happily let a file be deleted out from under a scheduled
+ * post. The failure then surfaces at publish time, hours later, as a Graph
+ * error nobody can connect to a deletion.
+ *
+ * Only posts that have yet to go out are counted. A published post keeps its
+ * media reference for the record, but Facebook holds its own copy by then, so
+ * deleting ours changes nothing.
+ */
+export async function postsUsingMedia(options: {
+  workspaceId: string;
+  mediaId: string;
+  storageKey: string | null;
+}): Promise<Array<{ id: string; message: string }>> {
+  const pending = await prisma.post.findMany({
+    where: {
+      workspaceId: options.workspaceId,
+      status: { in: ['draft', 'pending_approval', 'rejected', 'scheduled', 'publishing'] },
+    },
+    select: { id: true, message: true, media: true },
+  });
+
+  // Scanned in memory rather than queried: the media column is an array of
+  // objects, and matching either the id or the storage key inside it is a
+  // Json path query that reads far worse than this loop over a small set.
+  return pending
+    .filter((post) =>
+      parseMedia(post.media).some(
+        (item) =>
+          item.id === options.mediaId ||
+          (options.storageKey !== null && item.storageKey === options.storageKey),
+      ),
+    )
+    .map((post) => ({ id: post.id, message: post.message }));
+}
+
+export interface MediaCleanupResult {
+  removed: number;
+  bytes: number;
+  errors: string[];
+}
+
+/**
+ * Delete uploads that were never attached to anything.
+ *
+ * People upload an image, change their mind, and close the composer. Nothing
+ * ever references that file again, and on a VPS with a local media directory it
+ * sits there until the disk fills.
+ *
+ * A file referenced by *any* post is kept, whatever that post's status. A
+ * published post keeps its media reference for the record and the UI still
+ * renders it, so deleting the row there would turn history into broken images —
+ * this is only for files that were never used at all.
+ */
+export async function deleteUnusedMedia(options: {
+  workspaceId: string;
+  olderThanDays: number;
+  now?: Date;
+}): Promise<MediaCleanupResult> {
+  const now = options.now ?? new Date();
+  const cutoff = new Date(now.getTime() - options.olderThanDays * 24 * 60 * 60 * 1000);
+
+  const result: MediaCleanupResult = { removed: 0, bytes: 0, errors: [] };
+
+  const candidates = await prisma.media.findMany({
+    where: { workspaceId: options.workspaceId, createdAt: { lt: cutoff } },
+  });
+  if (candidates.length === 0) return result;
+
+  // Every reference this workspace holds, gathered once rather than per file.
+  const posts = await prisma.post.findMany({
+    where: { workspaceId: options.workspaceId },
+    select: { media: true },
+  });
+
+  const referenced = new Set<string>();
+  for (const post of posts) {
+    for (const item of parseMedia(post.media)) {
+      referenced.add(item.id);
+      if (item.storageKey) referenced.add(item.storageKey);
+    }
+  }
+
+  for (const file of candidates) {
+    if (referenced.has(file.id) || (file.storageKey && referenced.has(file.storageKey))) continue;
+
+    // The row goes first for the same reason as a manual delete: a row pointing
+    // at a missing file breaks the library, an orphaned file is only waste.
+    await prisma.media.delete({ where: { id: file.id } });
+    result.removed += 1;
+    result.bytes += file.size;
+
+    if (file.storageKey) {
+      try {
+        await deleteStoredFile(file.storageKey);
+      } catch (error) {
+        result.errors.push(
+          `${file.filename}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  }
+
+  return result;
 }
 
 export async function deleteStoredFile(storageKey: string): Promise<void> {

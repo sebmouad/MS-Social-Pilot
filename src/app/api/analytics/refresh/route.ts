@@ -1,20 +1,20 @@
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { decryptSecret } from '@/lib/crypto';
-import { toJson } from '@/lib/json';
-import { fetchPostInsights } from '@/lib/facebook/insights';
-import { asGraphError } from '@/lib/facebook/graph';
+import { env } from '@/lib/env';
+import { syncPostInsights } from '@/lib/analytics';
 import { ok, route } from '@/lib/api';
-
-/** How many published destinations to refresh in one request. */
-const BATCH = 25;
 
 /**
  * Pull fresh engagement numbers for recently published posts.
  *
  * Deliberately batched and stale-first: refreshing everything on every page
- * load would burn the app's rate limit for no benefit, since these counters
- * move slowly.
+ * load would burn the app's rate limit, since these counters move slowly.
+ *
+ * Reads through `syncPostInsights` — the same function the worker's analytics
+ * job uses. It used to call a smaller reader that returned seven fields, so
+ * pressing refresh here *overwrote* the full catalogue the job had stored and
+ * silently emptied the per-post metric explorer until the next scheduled pass.
+ * One reader, one shape.
  */
 export const POST = route(async () => {
   const auth = await requireAuth();
@@ -25,33 +25,25 @@ export const POST = route(async () => {
       remotePostId: { not: null },
       post: { workspaceId: auth.workspace.id },
     },
-    include: { target: { include: { socialAccount: true } } },
     orderBy: [{ insightsSyncedAt: { sort: 'asc', nulls: 'first' } }, { publishedAt: 'desc' }],
-    take: BATCH,
+    // Half the worker's batch: this one runs while somebody waits for it.
+    take: Math.max(1, Math.floor(env.analyticsBatch / 2)),
+    select: { id: true, target: { select: { name: true } } },
   });
 
   let refreshed = 0;
+  let metrics = 0;
   const errors: string[] = [];
 
   for (const row of rows) {
-    const encrypted = row.target.accessToken ?? row.target.socialAccount?.accessToken ?? null;
-    if (!encrypted || !row.remotePostId) continue;
-
-    try {
-      const insights = await fetchPostInsights(row.remotePostId, decryptSecret(encrypted), {
-        // Groups expose no insights edge; skip the call rather than fail it.
-        includeInsights: row.target.type === 'page',
-      });
-
-      await prisma.postTarget.update({
-        where: { id: row.id },
-        data: { insights: toJson(insights), insightsSyncedAt: new Date() },
-      });
+    const result = await syncPostInsights(row.id);
+    if (result.ok) {
       refreshed += 1;
-    } catch (error) {
-      errors.push(`${row.target.name}: ${asGraphError(error).displayMessage}`);
+      metrics += result.metrics;
+    } else if (result.error) {
+      errors.push(`${row.target.name}: ${result.error}`);
     }
   }
 
-  return ok({ refreshed, checked: rows.length, errors });
+  return ok({ refreshed, checked: rows.length, metrics, errors });
 });

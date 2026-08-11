@@ -156,6 +156,12 @@ any in-flight OAuth state.
   and posts published outside this app. It caps comments at the 25 newest posts
   per Page and video insights at 10 videos, so one pass over one Page stays
   bounded however much history the Page has.
+- **Media.** The `media` job (24h) deletes uploads that were never attached to
+  a post and are older than `media.retainUnusedDays` (30 by default). A file
+  referenced by any post is kept for good, whatever that post's status —
+  deleting one a published post still renders would turn history into broken
+  images. On a VPS with a local media directory this is what stops an abandoned
+  composer session filling the disk over a year.
 - **Instagram and Ads.** Both are off unless `FACEBOOK_ENABLE_INSTAGRAM` /
   `FACEBOOK_ENABLE_ADS` is set, and the worker does not schedule the job at all
   while the flag is off — running it unapproved would spend the rate limit on a
