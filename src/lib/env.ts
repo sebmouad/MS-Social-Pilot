@@ -87,7 +87,15 @@ export const env = {
       }
     }
     if (env.instagramEnabled) {
-      for (const scope of ['instagram_basic', 'instagram_manage_insights']) {
+      // `instagram_content_publish` is asked for alongside the read scopes:
+      // Facebook grants what it has been approved for and silently omits the
+      // rest, so asking costs nothing and not asking means a workspace whose
+      // review came through still cannot publish until it reconnects.
+      for (const scope of [
+        'instagram_basic',
+        'instagram_manage_insights',
+        'instagram_content_publish',
+      ]) {
         if (!base.includes(scope)) base.push(scope);
       }
     }

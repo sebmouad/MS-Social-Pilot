@@ -16,6 +16,10 @@ Built to the specification in [docs/PROJECT_SCHEMA.md](docs/PROJECT_SCHEMA.md).
 **Publishing**
 - Many Facebook Pages and Groups from one composer: text, links, photo
   galleries, video.
+- **Instagram Business accounts** as destinations alongside them — single
+  photo, reel, or carousel. Instagram's API takes a URL rather than an upload,
+  so each attachment gets a signed link that names one file and expires in
+  minutes; nothing in the media library becomes publicly readable.
 - Per-destination outcomes. Publishing to five Pages where one token is dead
   succeeds on four and reports the fifth, rather than failing the batch.
 
@@ -164,7 +168,7 @@ runs a chosen subset over HTTP.
 npm test
 ```
 
-728 tests. Unit tests cover token encryption, retry policy, timezone and
+750 tests. Unit tests cover token encryption, retry policy, timezone and
 queue-slot maths, Open Graph and RSS parsing, CSV in and out, link tagging, and
 the Graph publishing decision table.
 
@@ -235,6 +239,13 @@ Group publishing before confirming you can get it.
 **App Review.** Publishing to Pages you do not own needs `pages_manage_posts`
 approved by Meta. Until then the app works only for people with a role on it.
 Days, not minutes.
+
+**Instagram publishing** needs `instagram_content_publish`, a separate review
+from the one that lets you read Instagram insights. Discovered accounts appear
+as destinations but start turned off, saying so, until the permission is
+granted — an Instagram destination offered before then would only be refused.
+Instagram also has no scheduling of its own, so those posts always go out from
+this app's worker rather than being handed over.
 
 **Editing published posts.** Not supported, deliberately: Facebook cannot change
 a published post's attachments, so "edit" would silently do less than it claims.

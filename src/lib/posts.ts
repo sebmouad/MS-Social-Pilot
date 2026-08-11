@@ -174,6 +174,13 @@ export async function createPost(
     if (groups.length > 0) {
       throw errors.nativeGroupsUnsupported(groups.map((group) => group.name).join(', '));
     }
+
+    // Instagram has no equivalent at all: its API publishes immediately, so
+    // "let Instagram hold it" would silently become "publish it now".
+    const instagram = targets.filter((target) => target.type === 'instagram');
+    if (instagram.length > 0) {
+      throw errors.nativeInstagramUnsupported(instagram.map((item) => item.name).join(', '));
+    }
   }
 
   // Cache the link's Open Graph card so the composer preview and the post list

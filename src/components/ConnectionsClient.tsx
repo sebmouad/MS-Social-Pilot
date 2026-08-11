@@ -170,6 +170,9 @@ export function ConnectionsClient({
         const badge = tokenBadge(connection);
         const pages = connection.targets.filter((target) => target.type === 'page');
         const groups = connection.targets.filter((target) => target.type === 'group');
+        const instagramTargets = connection.targets.filter(
+          (target) => target.type === 'instagram',
+        );
 
         return (
           <section key={connection.id} className="card p-4 sm:p-5">
@@ -288,6 +291,23 @@ export function ConnectionsClient({
                 call(id, `/api/targets/${id}`, 'PATCH', { enabled })
               }
             />
+
+            {/* Only once there is one: a workspace with no linked Instagram
+                account should not be shown an empty section explaining a
+                feature it is not using. */}
+            {instagramTargets.length > 0 && (
+              <TargetList
+                title={t('instagramDestinations')}
+                icon="instagram"
+                targets={instagramTargets}
+                empty={t('noPages')}
+                canManage={canManage}
+                busy={busy}
+                onToggle={(id, enabled) =>
+                  call(id, `/api/targets/${id}`, 'PATCH', { enabled })
+                }
+              />
+            )}
           </section>
         );
       })}

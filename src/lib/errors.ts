@@ -88,6 +88,13 @@ export const errors = {
       params: { names },
     }),
 
+  nativeInstagramUnsupported: (names: string) =>
+    new AppError({
+      key: 'errors.nativeInstagramUnsupported',
+      fallback: `Instagram has no scheduling of its own (${names}). Use the built-in scheduler for these.`,
+      params: { names },
+    }),
+
   alreadyPublishing: () =>
     new AppError({
       key: 'errors.alreadyPublishing',

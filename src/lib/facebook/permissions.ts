@@ -84,6 +84,10 @@ const CATALOGUE: Record<string, { label: string; consequence: string }> = {
     label: 'Read your Instagram statistics',
     consequence: 'Instagram analytics stay empty.',
   },
+  instagram_content_publish: {
+    label: 'Publish posts to your Instagram accounts',
+    consequence: 'Instagram accounts can be read but not posted to.',
+  },
   ads_read: {
     label: 'Read your advertising results',
     consequence: 'Ad spend and campaign figures stay empty.',

@@ -29,6 +29,8 @@ enum WorkspaceRole {
 enum TargetType {
   page
   group
+  /// An Instagram Business account, published through the Page it is linked to.
+  instagram
 }
 
 enum PostStatus {

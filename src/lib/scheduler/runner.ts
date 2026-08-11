@@ -4,9 +4,10 @@ import { prisma } from '../prisma';
 import { env } from '../env';
 import { decryptSecret } from '../crypto';
 import { parseMedia, toJsonOrNull } from '../json';
-import { resolveMediaForPublish } from '../media';
+import { resolveMediaForInstagram, resolveMediaForPublish } from '../media';
 import { asGraphError, GraphError } from '../facebook/graph';
 import { publishPost } from '../facebook/publish';
+import { publishToInstagram } from '../facebook/instagram-publish';
 import { decideRetry } from './backoff';
 import { notifyConnectionExpired, notifyPublishFailure } from '../email/notify';
 import { prepareLinks } from '../links';
@@ -309,7 +310,8 @@ async function publishClaimed(
       });
     }
 
-    const media = await resolveMediaForPublish(parseMedia(post.media));
+    const isInstagram = target.type === 'instagram';
+    const attachments = parseMedia(post.media);
 
     // UTM tags and shortening are applied per destination, so a campaign can
     // be attributed to the Page it actually ran on.
@@ -327,18 +329,31 @@ async function publishClaimed(
       targetName: target.name,
     });
 
-    const result = await publishPost({
-      targetType: target.type,
-      targetId: target.providerId,
-      accessToken: decryptSecret(encryptedToken),
-      message: prepared.message,
-      link: prepared.link,
-      media,
-      // The worker publishes at the scheduled moment, so it never asks
-      // Facebook to hold the post as well — native scheduling is handed over
-      // at creation time instead (see src/lib/posts.ts).
-      scheduledPublishTime: null,
-    });
+    const result = isInstagram
+      ? await publishToInstagram({
+          igUserId: target.providerId,
+          accessToken: decryptSecret(encryptedToken),
+          // Instagram captions carry no clickable link, so a shortened URL in
+          // one is a string somebody has to type. The prepared link is appended
+          // anyway when there is one — it is what the post is about — but the
+          // caption is where it lands rather than a link preview.
+          caption: prepared.link
+            ? `${prepared.message}\n\n${prepared.link}`.trim()
+            : prepared.message,
+          media: await resolveMediaForInstagram(attachments),
+        })
+      : await publishPost({
+          targetType: target.type,
+          targetId: target.providerId,
+          accessToken: decryptSecret(encryptedToken),
+          message: prepared.message,
+          link: prepared.link,
+          media: await resolveMediaForPublish(attachments),
+          // The worker publishes at the scheduled moment, so it never asks
+          // Facebook to hold the post as well — native scheduling is handed
+          // over at creation time instead (see src/lib/posts.ts).
+          scheduledPublishTime: null,
+        });
 
     await prisma.postTarget.update({
       where: { id: postTargetId },

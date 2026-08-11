@@ -235,8 +235,9 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     key: 'features.instagram',
     group: 'features',
     type: 'boolean',
-    label: 'Instagram analytics',
-    description: 'Adds instagram_basic and instagram_manage_insights, and schedules the Instagram job.',
+    label: 'Instagram',
+    description:
+      'Adds the Instagram scopes, schedules the Instagram job, and offers linked accounts as publishing destinations.',
     default: false,
     env: 'FACEBOOK_ENABLE_INSTAGRAM',
     workerRestart: true,

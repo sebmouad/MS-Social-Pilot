@@ -375,3 +375,42 @@ export function contentTypeFor(kind: MediaKind, mimeType?: string): string {
   if (mimeType) return mimeType;
   return kind === 'image' ? 'image/jpeg' : 'video/mp4';
 }
+
+/**
+ * The same attachments, as public URLs, for Instagram.
+ *
+ * Instagram's publishing API takes no bytes at all: you give it a URL and
+ * Facebook's own servers fetch the file. A stored upload therefore needs a
+ * link that works without a session, which is what `signMediaUrl` mints —
+ * one file, signed, valid for minutes. Media that already lives at a public
+ * URL is passed straight through.
+ *
+ * The file is checked on disk first, as in `resolveMediaForPublish`: a link to
+ * a file that is not there would fail inside Facebook's fetcher, and come back
+ * as an error about the container rather than about the file.
+ */
+export async function resolveMediaForInstagram(
+  media: PostMedia[],
+): Promise<Array<{ kind: MediaKind; url: string }>> {
+  const { signMediaUrl } = await import('./media-links');
+  const resolved: Array<{ kind: MediaKind; url: string }> = [];
+
+  for (const item of media) {
+    if (item.storageKey) {
+      await stat(resolveStoragePath(item.storageKey));
+      resolved.push({ kind: item.kind, url: signMediaUrl(item.id).url });
+      continue;
+    }
+
+    if (!/^https:\/\//i.test(item.url)) {
+      // Not just "no file": Facebook refuses to fetch over plain http, so an
+      // http URL that works for a Facebook Page post silently will not here.
+      throw new MediaError(
+        `Attachment ${item.id} needs to be an uploaded file or an https URL for Instagram.`,
+      );
+    }
+    resolved.push({ kind: item.kind, url: item.url });
+  }
+
+  return resolved;
+}

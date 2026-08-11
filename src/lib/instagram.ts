@@ -100,6 +100,15 @@ export async function discoverInstagramAccounts(workspaceId: string): Promise<{
         },
       });
 
+      await upsertInstagramTarget({
+        workspaceId,
+        page: target,
+        igUserId: ref.igUserId,
+        username: profile?.username ?? ref.username,
+        pictureUrl: profile?.profilePictureUrl ?? null,
+        followersCount: profile?.followersCount ?? null,
+      });
+
       found += 1;
     } catch (error) {
       errors.push(`${target.name}: ${asGraphError(error).displayMessage}`);
@@ -110,6 +119,66 @@ export async function discoverInstagramAccounts(workspaceId: string): Promise<{
 
   return { found, errors };
 }
+
+/**
+ * Make the Instagram account a place a post can be sent.
+ *
+ * An Instagram account is reached through the Page it is linked to, using that
+ * Page's token — so the destination row is a copy of the Page's credentials
+ * pointed at a different id. Keeping it as a Target rather than a special case
+ * means the composer, the calendar, the queue, the post list and per-destination
+ * failure reporting all work on it without knowing what it is.
+ *
+ * `canPublish` starts false. Publishing to Instagram needs
+ * `instagram_content_publish`, which is a separate App Review from the one that
+ * lets us read insights, and offering a destination that will be refused is
+ * worse than not offering it. The connections screen turns it on once the
+ * permission is actually granted.
+ */
+async function upsertInstagramTarget(options: {
+  workspaceId: string;
+  page: { id: string; socialAccountId: string | null; accessToken: string | null };
+  igUserId: string;
+  username: string;
+  pictureUrl: string | null;
+  followersCount: number | null;
+}): Promise<void> {
+  const shared = {
+    name: `@${options.username}`,
+    pictureUrl: options.pictureUrl,
+    // The Page's own token, because that is what reads and writes this account.
+    accessToken: options.page.accessToken,
+    socialAccountId: options.page.socialAccountId,
+    followersCount: options.followersCount,
+  };
+
+  await prisma.target.upsert({
+    where: {
+      workspaceId_providerId: { workspaceId: options.workspaceId, providerId: options.igUserId },
+    },
+    create: {
+      workspaceId: options.workspaceId,
+      type: TargetType.instagram,
+      providerId: options.igUserId,
+      canPublish: false,
+      publishBlocker: INSTAGRAM_PUBLISH_BLOCKER,
+      ...shared,
+    },
+    // Deliberately not touching `enabled`, `canPublish` or `publishBlocker`:
+    // those are decisions somebody made on the connections screen, and a
+    // routine rediscovery must not quietly undo them.
+    update: shared,
+  });
+}
+
+/**
+ * Why an Instagram destination starts unavailable.
+ *
+ * Shown in the composer's destination list, so it has to say what to do rather
+ * than only what is wrong.
+ */
+export const INSTAGRAM_PUBLISH_BLOCKER =
+  'Publishing to Instagram needs instagram_content_publish from Meta. Turn this destination on once it is granted.';
 
 /** Store one metric's points against an Instagram account. */
 async function storeIgSeries(accountId: string, series: MetricSeries[]): Promise<number> {

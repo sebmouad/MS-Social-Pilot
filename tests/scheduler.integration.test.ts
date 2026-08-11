@@ -651,3 +651,145 @@ describe('fairness between workspaces', () => {
     expect(await runner.findDueForTest(new Date(), 10)).toEqual([]);
   });
 });
+
+/**
+ * Instagram, as a destination like any other.
+ *
+ * The point of putting Instagram behind the same `Target` row as a Page is
+ * that everything above the Graph call — claiming, retrying, per-destination
+ * outcomes, the post list — carries on working without knowing the difference.
+ * These check that it does, and that the one place the difference *is* real —
+ * the container two-step, and a URL instead of an upload — happens.
+ */
+describe('publishing to Instagram', () => {
+  async function seedInstagramPost(options: { media?: unknown[] } = {}) {
+    const { encryptSecret } = await import('../src/lib/crypto');
+    const suffix = randomBytes(4).toString('hex');
+
+    const workspace = await prisma.workspace.create({
+      data: { name: 'Bakery', slug: `ig-${suffix}`, timezone: 'UTC' },
+    });
+    const user = await prisma.user.create({
+      data: {
+        email: `ig-${suffix}@example.com`,
+        name: 'Owner',
+        passwordHash: 'x',
+        memberships: { create: { workspaceId: workspace.id, role: 'owner' } },
+      },
+    });
+    const account = await prisma.socialAccount.create({
+      data: {
+        workspaceId: workspace.id,
+        providerUserId: `u-${suffix}`,
+        name: 'Owner',
+        accessToken: encryptSecret('user-token'),
+      },
+    });
+    const target = await prisma.target.create({
+      data: {
+        workspaceId: workspace.id,
+        socialAccountId: account.id,
+        type: 'instagram',
+        providerId: `ig-${suffix}`,
+        name: '@bakery',
+        // The linked Page's token: that is the credential Instagram accepts.
+        accessToken: encryptSecret('page-token'),
+      },
+    });
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: user.id,
+        message: 'Sourdough, seven tomorrow',
+        status: 'scheduled',
+        publishMode: 'worker',
+        scheduledAt: new Date(Date.now() - 5 * 60 * 1000),
+        media: (options.media ?? [
+          { id: 'm1', kind: 'image', url: 'https://cdn.example.test/loaf.jpg' },
+        ]) as never,
+        targets: { create: { targetId: target.id, status: 'pending' } },
+      },
+      include: { targets: true },
+    });
+
+    return { workspace, target, post, postTarget: post.targets[0]! };
+  }
+
+  it('creates a container and publishes it, then records the post like any other', async () => {
+    responses = [
+      { status: 200, body: { id: 'container_1' } },
+      { status: 200, body: { status_code: 'FINISHED' } },
+      { status: 200, body: { id: 'ig_media_9' } },
+    ];
+
+    const seeded = await seedInstagramPost();
+    await runner.runSchedulerTick({ now: new Date() });
+
+    const after = await prisma.postTarget.findUniqueOrThrow({
+      where: { id: seeded.postTarget.id },
+    });
+    expect(after.status).toBe('published');
+    expect(after.remotePostId).toBe('ig_media_9');
+
+    // The two-step, in order, against the Instagram user id.
+    const posted = received.filter((entry) => entry.body.caption || entry.body.creation_id);
+    expect(posted[0]!.path).toContain(`${seeded.target.providerId}/media`);
+    expect(posted[0]!.body.image_url).toBe('https://cdn.example.test/loaf.jpg');
+    expect(posted[0]!.body.caption).toBe('Sourdough, seven tomorrow');
+    expect(posted[1]!.body.creation_id).toBe('container_1');
+  });
+
+  it('puts the link in the caption, because an Instagram caption has no link', async () => {
+    responses = [
+      { status: 200, body: { id: 'container_1' } },
+      { status: 200, body: { status_code: 'FINISHED' } },
+      { status: 200, body: { id: 'ig_media_10' } },
+    ];
+
+    const seeded = await seedInstagramPost();
+    await prisma.post.update({
+      where: { id: seeded.post.id },
+      data: { link: 'https://bakery.example/opening-times' },
+    });
+
+    await runner.runSchedulerTick({ now: new Date() });
+
+    const create = received.find((entry) => entry.body.caption)!;
+    expect(create.body.caption).toContain('Sourdough, seven tomorrow');
+    expect(create.body.caption).toContain('https://bakery.example/opening-times');
+  });
+
+  it('fails the destination, not the batch, when Instagram rejects the file', async () => {
+    responses = [
+      { status: 200, body: { id: 'container_1' } },
+      { status: 200, body: { status_code: 'ERROR', status: 'Aspect ratio not supported' } },
+    ];
+
+    const seeded = await seedInstagramPost();
+    await runner.runSchedulerTick({ now: new Date() });
+
+    const after = await prisma.postTarget.findUniqueOrThrow({
+      where: { id: seeded.postTarget.id },
+    });
+
+    // A file Instagram will not take is not going to be taken on a retry
+    // either, so this is a final failure with the reason kept.
+    expect(after.status).toBe('failed');
+    expect(after.errorMessage).toContain('Aspect ratio not supported');
+    expect(received.some((entry) => entry.body.creation_id)).toBe(false);
+  });
+
+  it('refuses a caption with nothing attached, before calling Facebook at all', async () => {
+    const seeded = await seedInstagramPost({ media: [] });
+    received = [];
+
+    await runner.runSchedulerTick({ now: new Date() });
+
+    const after = await prisma.postTarget.findUniqueOrThrow({
+      where: { id: seeded.postTarget.id },
+    });
+    expect(after.status).toBe('failed');
+    expect(after.errorMessage).toMatch(/text-only/i);
+    expect(received).toEqual([]);
+  });
+});
