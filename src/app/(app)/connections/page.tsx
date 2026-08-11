@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 
+import { ConnectionHealth } from '@/components/ConnectionHealth';
 import { ConnectionsClient } from '@/components/ConnectionsClient';
 import { Icon } from '@/components/Icon';
 import { requirePage } from '@/lib/auth';
@@ -103,6 +104,11 @@ export default async function ConnectionsPage({
           )}
         </div>
       ) : (
+        <>
+        {/* Above the list: the answer to "is it working" comes before the
+            inventory of what is connected. */}
+        <ConnectionHealth canManage={canManage} />
+
         <ConnectionsClient
           canManage={canManage}
           instagramEnabled={env.instagramEnabled}
@@ -161,6 +167,7 @@ export default async function ConnectionsPage({
               : null,
           }))}
         />
+        </>
       )}
 
       {!env.groupsEnabled && (

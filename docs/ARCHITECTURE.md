@@ -769,6 +769,33 @@ a second and the full reload happens only when it has changed, so staleness is
 bounded at a second and the steady-state cost is one aggregate per second per
 process regardless of traffic.
 
+## Is the connection working?
+
+The question people have after a post fails, answered in one place.
+`src/lib/health.ts` asks Facebook three things and translates the answers:
+
+- **The app itself** (`checkApp`). Worth asking separately, because when the app
+  credentials are wrong *every* connection below reports failure and the screen
+  shows eight problems instead of one. `checkWorkspace` stops there rather than
+  listing consequences.
+- **Each connection** — is the token valid, when does it die, and
+  `/me/permissions` for what was granted. That endpoint says more than the token
+  does: a permission that was *declined* appears there, where the token simply
+  lacks it, and the two have different fixes.
+- **Each destination** — a live read with the token actually stored for it.
+
+The case that repays the whole feature is `granular_scopes`. Someone can grant
+`pages_manage_posts` and then tick only three of their eight Pages in Facebook's
+second dialog. The token carries the permission, so the account looks healthy,
+and publishing fails on exactly the five that were left unticked. That is
+undiagnosable from the outside, and it is the only thing Graph will tell you
+about it.
+
+Every line the screen shows names its own fix, and permissions are shown in
+plain language with the scope name secondary — `pages_read_engagement` tells a
+person nothing about whether they meant to refuse it. The checks are a button,
+not a page render: a workspace with six Pages costs about ten Graph calls.
+
 ## Connections
 
 One screen for everything this workspace is connected to, because the failure

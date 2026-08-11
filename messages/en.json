@@ -679,6 +679,26 @@
     "featureOff": "Turned off in Configuration. Meta reviews this permission separately, and requesting it before approval fails the whole login.",
     "viaPage": "via {page}",
     "noLinkedPage": "No linked page",
-    "groupsOff": "Group publishing is turned off. Meta restricted the Groups API in April 2024, so it needs a separately approved permission and the app installed in each group. Turn it on in Configuration once you have that approval."
+    "groupsOff": "Group publishing is turned off. Meta restricted the Groups API in April 2024, so it needs a separately approved permission and the app installed in each group. Turn it on in Configuration once you have that approval.",
+    "health": {
+      "title": "Connection check",
+      "subtitle": "Ask Facebook what is working right now, permission by permission and Page by Page.",
+      "run": "Run checks",
+      "again": "Check again",
+      "running": "Asking Facebook…",
+      "failed": "The checks could not be run. Try again in a moment.",
+      "checkedAt": "Checked at {when}",
+      "appTitle": "Facebook app",
+      "permissions": "Permissions",
+      "destinations": "Pages and Groups",
+      "declined": "Refused on Facebook. {consequence}",
+      "notRequested": "Not granted. {consequence}",
+      "noAccounts": "No Facebook account is connected yet.",
+      "verdict": {
+        "ok": "Working",
+        "attention": "Needs attention",
+        "broken": "Not working"
+      }
+    }
   }
 }

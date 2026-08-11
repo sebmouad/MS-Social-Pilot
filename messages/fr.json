@@ -679,6 +679,26 @@
     "featureOff": "Désactivé dans la Configuration. Meta examine cette autorisation séparément, et la demander avant approbation fait échouer toute la connexion.",
     "viaPage": "via {page}",
     "noLinkedPage": "Aucune page reliée",
-    "groupsOff": "La publication dans les groupes est désactivée. Meta a restreint l’API Groups en avril 2024 : elle nécessite une autorisation approuvée séparément et l’installation de l’application dans chaque groupe. Activez-la dans la Configuration une fois l’approbation obtenue."
+    "groupsOff": "La publication dans les groupes est désactivée. Meta a restreint l’API Groups en avril 2024 : elle nécessite une autorisation approuvée séparément et l’installation de l’application dans chaque groupe. Activez-la dans la Configuration une fois l’approbation obtenue.",
+    "health": {
+      "title": "Vérification des connexions",
+      "subtitle": "Demandez à Facebook ce qui fonctionne, autorisation par autorisation et Page par Page.",
+      "run": "Lancer la vérification",
+      "again": "Vérifier à nouveau",
+      "running": "Interrogation de Facebook…",
+      "failed": "La vérification n'a pas pu être effectuée. Réessayez dans un instant.",
+      "checkedAt": "Vérifié à {when}",
+      "appTitle": "Application Facebook",
+      "permissions": "Autorisations",
+      "destinations": "Pages et groupes",
+      "declined": "Refusée sur Facebook. {consequence}",
+      "notRequested": "Non accordée. {consequence}",
+      "noAccounts": "Aucun compte Facebook connecté pour le moment.",
+      "verdict": {
+        "ok": "Fonctionne",
+        "attention": "À surveiller",
+        "broken": "Ne fonctionne pas"
+      }
+    }
   }
 }

@@ -250,6 +250,17 @@ export async function fetchGroups(userAccessToken: string): Promise<FacebookGrou
 export interface TokenDebugInfo {
   isValid: boolean;
   scopes: string[];
+  /**
+   * Which assets each permission actually covers.
+   *
+   * The part people are surprised by: someone can grant `pages_manage_posts`
+   * and then tick only three of their eight Pages in the second dialog. The
+   * token then carries the permission, `scopes` lists it, and publishing to the
+   * other five fails anyway. This is the only place Graph admits that, so it is
+   * what the connection screen needs in order to tell somebody *which* Page is
+   * the problem rather than that something, somewhere, is wrong.
+   */
+  granularScopes: Record<string, string[]>;
   expiresAt: Date | null;
   dataAccessExpiresAt: Date | null;
   appId: string | null;
@@ -267,6 +278,7 @@ export async function debugToken(inputToken: string): Promise<TokenDebugInfo> {
     data: {
       is_valid: boolean;
       scopes?: string[];
+      granular_scopes?: Array<{ scope: string; target_ids?: string[] }>;
       expires_at?: number;
       data_access_expires_at?: number;
       app_id?: string;
@@ -278,9 +290,20 @@ export async function debugToken(inputToken: string): Promise<TokenDebugInfo> {
   });
 
   const info = data.data;
+
+  // A permission with no target_ids applies to everything the user has, which
+  // is the common case; an empty list would wrongly read as "no Pages".
+  const granularScopes: Record<string, string[]> = {};
+  for (const entry of info?.granular_scopes ?? []) {
+    if (entry.target_ids && entry.target_ids.length > 0) {
+      granularScopes[entry.scope] = entry.target_ids;
+    }
+  }
+
   return {
     isValid: Boolean(info?.is_valid),
     scopes: info?.scopes ?? [],
+    granularScopes,
     // A zero timestamp is Facebook's way of saying "does not expire".
     expiresAt: info?.expires_at ? new Date(info.expires_at * 1000) : null,
     dataAccessExpiresAt: info?.data_access_expires_at
