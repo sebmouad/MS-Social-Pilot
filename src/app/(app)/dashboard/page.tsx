@@ -4,7 +4,9 @@ import { getTranslations } from 'next-intl/server';
 import { Icon, type IconName } from '@/components/Icon';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requirePage } from '@/lib/auth';
+import { summariseConnections } from '@/lib/connections';
 import { prisma } from '@/lib/prisma';
+import { env } from '@/lib/env';
 import { parseInsights } from '@/lib/json';
 import { sumInsights } from '@/lib/facebook/insights';
 import { formatInZone, relativeTime } from '@/lib/time';
@@ -18,7 +20,8 @@ export default async function DashboardPage() {
   const workspaceId = auth.workspace.id;
   const now = new Date();
 
-  const [upcoming, recent, counts, targetCount, staleAccounts, failures, insightRows] = await Promise.all([
+  const [upcoming, recent, counts, targetCount, staleAccounts, failures, insightRows, health] =
+    await Promise.all([
     prisma.post.findMany({
       where: { workspaceId, status: { in: ['scheduled', 'publishing'] }, scheduledAt: { gte: now } },
       include: { targets: { include: { target: { select: { name: true } } } } },
@@ -38,12 +41,13 @@ export default async function DashboardPage() {
       select: { id: true, name: true, invalidReason: true },
     }),
     prisma.postTarget.count({ where: { status: 'failed', post: { workspaceId } } }),
-    prisma.postTarget.findMany({
-      where: { status: 'published', post: { workspaceId } },
-      select: { insights: true },
-      take: 500,
-    }),
-  ]);
+      prisma.postTarget.findMany({
+        where: { status: 'published', post: { workspaceId } },
+        select: { insights: true },
+        take: 500,
+      }),
+      summariseConnections(workspaceId, { now, warnWithinDays: env.tokenWarningDays }),
+    ]);
 
   const countFor = (status: string) => counts.find((entry) => entry.status === status)?._count ?? 0;
   const totals = sumInsights(insightRows.map((row) => parseInsights(row.insights)));
@@ -94,6 +98,19 @@ export default async function DashboardPage() {
           </ul>
           <Link href="/connections" className="mt-2 inline-block font-medium underline">
             {t('fixOnAccounts')}
+          </Link>
+        </div>
+      )}
+
+      {/* A dead token has a banner above. This one is the warning *before* it
+          happens, which is the difference between a five-minute reconnection
+          and a week of silently failing posts. */}
+      {staleAccounts.length === 0 && health.expiring > 0 && (
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <Icon name="clock" size={16} />
+          {t('tokensExpiring', { count: health.expiring, days: env.tokenWarningDays })}{' '}
+          <Link href="/connections" className="font-medium underline">
+            {t('reviewConnections')}
           </Link>
         </div>
       )}

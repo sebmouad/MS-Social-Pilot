@@ -82,4 +82,54 @@ describe('message catalogues', () => {
   it('covers a meaningful amount of the interface', () => {
     expect(en.length).toBeGreaterThan(150);
   });
+
+  /** Every message that takes a placeholder, with the placeholders it uses. */
+  function placeholders(value: unknown, prefix = ''): Array<[string, string, Set<string>]> {
+    if (typeof value === 'string') {
+      // The name up to the first comma, so `{count, plural, …}` reads as
+      // `count` rather than as the whole ICU body.
+      const names = new Set(
+        [...value.matchAll(/\{\s*([a-zA-Z0-9_]+)\s*[,}]/g)].map((match) => match[1]!),
+      );
+      return names.size > 0 ? [[prefix, value, names]] : [];
+    }
+    if (typeof value !== 'object' || value === null) return [];
+    return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) =>
+      placeholders(child, prefix ? `${prefix}.${key}` : key),
+    );
+  }
+
+  it('uses the same placeholders in both languages', () => {
+    // A French string that forgets {count} renders the sentence without the
+    // number, which reads as finished text and is never reported as a bug.
+    const enPlaceholders = new Map(placeholders(load('en')).map(([key, , names]) => [key, names]));
+    const frPlaceholders = new Map(placeholders(load('fr')).map(([key, , names]) => [key, names]));
+
+    const mismatched: string[] = [];
+    for (const [key, names] of enPlaceholders) {
+      const other = frPlaceholders.get(key) ?? new Set<string>();
+      const same = names.size === other.size && [...names].every((name) => other.has(name));
+      if (!same) mismatched.push(key);
+    }
+
+    expect(mismatched).toEqual([]);
+  });
+
+  it('pluralises every message that counts something', () => {
+    // "1 Facebook connections expire" shipped once. A message whose only
+    // variable is a count, and whose text carries a bare plural noun, has to
+    // go through ICU plural rather than concatenating a number onto a string.
+    const offenders: string[] = [];
+
+    for (const locale of ['en', 'fr']) {
+      for (const [key, text, names] of placeholders(load(locale))) {
+        if (!names.has('count')) continue;
+        if (text.includes('plural')) continue;
+        // Bare `{count} things` where the noun is plural regardless of value.
+        if (/\{count\}\s+\S*(s|x)\b/.test(text)) offenders.push(`${locale}:${key}`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
 });

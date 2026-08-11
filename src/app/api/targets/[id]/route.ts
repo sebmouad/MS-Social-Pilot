@@ -1,30 +1,32 @@
 import { requireAuth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { setTargetEnabled } from '@/lib/connections';
 import { targetUpdateSchema } from '@/lib/validation';
 import { fail, ok, readJson, route } from '@/lib/api';
 
-/** Enable or disable a destination in the composer. */
+/**
+ * Enable or disable a destination in the composer.
+ *
+ * Admin and above: this is not a per-user preference. Turning a page off stops
+ * it appearing for everyone in the workspace and takes it out of every future
+ * post, which is not a contributor's decision to make.
+ */
 export const PATCH = route(async (request: Request, context: { params: Promise<{ id: string }> }) => {
   const auth = await requireAuth();
   const { id } = await context.params;
   const input = targetUpdateSchema.parse(await readJson(request));
 
-  const target = await prisma.target.findFirst({
-    where: { id, workspaceId: auth.workspace.id },
+  const result = await setTargetEnabled({
+    workspaceId: auth.workspace.id,
+    role: auth.role,
+    targetId: id,
+    enabled: input.enabled ?? true,
   });
-  if (!target) return fail('Destination not found.', 404);
 
-  if (input.enabled && !target.canPublish) {
-    return fail(
-      target.publishBlocker ?? 'This destination cannot be published to right now.',
-      409,
-    );
+  if (result.outcome === 'forbidden') {
+    return fail('Only workspace owners and admins can change destinations.', 403);
   }
+  if (result.outcome === 'not_found') return fail('Destination not found.', 404);
+  if (result.outcome === 'blocked') return fail(result.reason ?? 'Cannot enable this destination.', 409);
 
-  const updated = await prisma.target.update({
-    where: { id },
-    data: { enabled: input.enabled ?? target.enabled },
-  });
-
-  return ok({ id: updated.id, enabled: updated.enabled });
+  return ok({ id, enabled: input.enabled ?? true });
 });

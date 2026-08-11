@@ -111,7 +111,9 @@ export function NavBar({
           {/* The wordmark is dropped once the link row appears: ten labels
               plus a workspace switcher already fill the bar, and the product
               name is on the tab, the login screen and every email. */}
-          <span className="text-sm font-semibold text-slate-900 lg:hidden">MS Social Pilot</span>
+          <span className="hidden text-sm font-semibold text-slate-900 sm:inline lg:hidden">
+            MS Social Pilot
+          </span>
         </Link>
 
         {/* Ten links wrap into three ragged rows on a phone and push the page

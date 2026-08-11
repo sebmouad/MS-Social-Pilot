@@ -320,7 +320,18 @@ Token expiry is shown as **days remaining, not a date** — "expires 14 Sep" mak
 the reader do arithmetic before they know whether to act. Granted scopes are
 listed beside it, because a token can be perfectly alive and still be missing
 the permission a job needs, and those two failures look identical from the
-outside.
+outside. The dashboard carries the same warning *before* the token dies, which
+is the difference between a five-minute reconnection and a week of silently
+failing posts.
+
+`src/lib/connections.ts` holds the permission and tenant boundary for all of it
+rather than the route handlers, for one reason: a boundary that only exists
+inside a Next handler cannot be tested without standing up a request. Handlers
+parse, call, and map the outcome to a status. Two rules hold throughout — every
+lookup is scoped by workspace, and **not found, not allowed and done stay three
+distinct answers**. Reporting success for an id that was never touched is how a
+bug hides for months; disconnect did exactly that for an account belonging to
+another workspace until this was written.
 
 ---
 

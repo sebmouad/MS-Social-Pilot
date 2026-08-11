@@ -210,6 +210,79 @@ describe('env reads through the store', () => {
   });
 });
 
+describe('settings reach the worker', () => {
+  it('schedules a job at the interval that was configured', async () => {
+    // The whole chain, end to end: a number typed on the config screen has to
+    // come back out as the interval the worker actually waits.
+    const jobs = await import('../src/lib/scheduler/jobs');
+
+    await settings.writeSetting('scheduler.pollSeconds', 120, null);
+    await settings.ensureSettings();
+
+    const publish = jobs.jobDefinitions().find((job) => job.name === 'publish')!;
+    expect(publish.intervalMs).toBe(120_000);
+  });
+
+  it('does not schedule a job whose feature is switched off', async () => {
+    // Running these unapproved spends the rate limit on a permission error
+    // every pass, so they must not be in the table at all.
+    const jobs = await import('../src/lib/scheduler/jobs');
+
+    await settings.writeSetting('features.instagram', false, null);
+    await settings.writeSetting('features.ads', false, null);
+    await settings.ensureSettings();
+
+    const names = jobs.jobDefinitions().map((job) => job.name);
+    expect(names).not.toContain('instagram');
+    expect(names).not.toContain('ads');
+    // The always-on jobs are unaffected.
+    expect(names).toContain('publish');
+    expect(names).toContain('edges');
+  });
+
+  it('schedules it once the feature is switched on', async () => {
+    const jobs = await import('../src/lib/scheduler/jobs');
+
+    await settings.writeSetting('features.instagram', true, null);
+    await settings.writeSetting('analytics.instagramSyncHours', 6, null);
+    await settings.ensureSettings();
+
+    const instagram = jobs.jobDefinitions().find((job) => job.name === 'instagram');
+    expect(instagram?.intervalMs).toBe(6 * 60 * 60 * 1000);
+  });
+});
+
+describe('the cache', () => {
+  it('serves a change immediately in the process that made it', async () => {
+    await settings.writeSetting('scheduler.maxAttempts', 9, null);
+    // No ensureSettings: writing invalidates, and the next read reloads.
+    await settings.ensureSettings();
+
+    expect(settings.setting('scheduler.maxAttempts')).toBe(9);
+  });
+
+  it('picks up a change written directly to the table once invalidated', async () => {
+    // Stands in for the other process: the worker writes nothing, it only
+    // re-reads, and this is what it sees.
+    await prisma.appSetting.create({ data: { key: 'scheduler.concurrency', value: 7 } });
+
+    settings.invalidateSettings();
+    await settings.ensureSettings();
+
+    expect(settings.setting('scheduler.concurrency')).toBe(7);
+  });
+
+  it('ignores a stored row for a key the code no longer knows', async () => {
+    // Rolling a deploy back must not lose the operator's other values, so an
+    // unknown row is skipped rather than crashing the load.
+    await prisma.appSetting.create({ data: { key: 'removed.setting', value: 'x' } });
+
+    settings.invalidateSettings();
+    await expect(settings.ensureSettings()).resolves.toBeUndefined();
+    expect(settings.setting('scheduler.pollSeconds')).toBe(30);
+  });
+});
+
 describe('registry hygiene', () => {
   it('has no duplicate keys', () => {
     const keys = settings.SETTING_DEFINITIONS.map((row) => row.key);
