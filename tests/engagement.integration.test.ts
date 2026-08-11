@@ -31,12 +31,22 @@ let ads: typeof import('../src/lib/ads');
 let routes: Record<string, () => unknown> = {};
 /** Path suffixes that should answer with a permission error instead. */
 let denied: string[] = [];
+/** Every write Graph received, so a test can check what was actually sent. */
+let received: Array<{ path: string; body: string }> = [];
 
 beforeAll(async () => {
   setTestEnv();
 
   server = createServer((request, response) => {
     const url = new URL(request.url ?? '', 'http://localhost');
+
+    const chunks: Buffer[] = [];
+    request.on('data', (chunk: Buffer) => chunks.push(chunk));
+    request.on('end', () => {
+      if (chunks.length > 0) {
+        received.push({ path: url.pathname, body: Buffer.concat(chunks).toString('utf8') });
+      }
+    });
 
     if (denied.some((suffix) => url.pathname.endsWith(suffix))) {
       response.writeHead(403, { 'content-type': 'application/json' });
@@ -82,6 +92,7 @@ afterAll(async () => {
 beforeEach(async () => {
   routes = {};
   denied = [];
+  received = [];
 
   await prisma.postComment.deleteMany();
   await prisma.conversationMessage.deleteMany();
@@ -1159,5 +1170,289 @@ describe('Ads', () => {
 
     expect(summary.spend).toBe(0);
     expect(await ads.listAdAccounts(mine.workspace.id)).toEqual([]);
+  });
+});
+
+/**
+ * Replying in the Page inbox.
+ *
+ * Two rules decide whether a reply is possible at all, and both belong to
+ * Facebook rather than to us: a Page may answer only within 24 hours of the
+ * person's last message, and only a person can be answered — a thread whose
+ * last word is the Page's has no recipient. Getting either wrong means a
+ * customer message goes unanswered while the screen says it was sent.
+ */
+describe('replying to an inbox thread', () => {
+  const NOW = new Date('2026-08-02T12:00:00Z');
+
+  async function seedThread(options: {
+    lastFrom: 'them' | 'us';
+    theirLastAt: Date;
+  }) {
+    const seed = await seedWorkspace();
+
+    const conversation = await prisma.conversation.create({
+      data: {
+        targetId: seed.target.id,
+        remoteId: 't_1',
+        snippet: 'Are you open on Sunday?',
+        messageCount: 1,
+        participants: ['Ada Byron'],
+        updatedTime: options.theirLastAt,
+      },
+    });
+
+    await prisma.conversationMessage.create({
+      data: {
+        conversationId: conversation.id,
+        remoteId: 'm_them',
+        fromName: 'Ada Byron',
+        fromId: 'psid-ada',
+        message: 'Are you open on Sunday?',
+        createdTime: options.theirLastAt,
+      },
+    });
+
+    if (options.lastFrom === 'us') {
+      // Several replies running: the newest inbound message is buried, which
+      // is exactly the case a "look at the last few messages" check gets wrong.
+      for (let index = 0; index < 3; index += 1) {
+        await prisma.conversationMessage.create({
+          data: {
+            conversationId: conversation.id,
+            remoteId: `m_us_${index}`,
+            fromName: 'client Page',
+            fromId: seed.target.providerId,
+            message: 'Yes, ten until four.',
+            createdTime: new Date(options.theirLastAt.getTime() + (index + 1) * 60_000),
+          },
+        });
+      }
+    }
+
+    return { ...seed, conversation };
+  }
+
+  beforeEach(() => {
+    routes['/messages'] = () => ({ message_id: 'mid.sent' });
+  });
+
+  it('sends the reply and shows it in the thread straight away', async () => {
+    const seed = await seedThread({
+      lastFrom: 'them',
+      theirLastAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+    });
+
+    const result = await engagement.replyToConversationAs({
+      conversationId: seed.conversation.id,
+      workspaceId: seed.workspace.id,
+      userId: seed.user.id,
+      role: WorkspaceRole.owner,
+      message: 'Yes — ten until four.',
+      now: NOW,
+    });
+
+    expect(result.outcome).toBe('ok');
+
+    // Not waiting for the next sync: the thread has to read correctly the
+    // moment the request returns, or it looks like the reply was lost.
+    const messages = await prisma.conversationMessage.findMany({
+      where: { conversationId: seed.conversation.id },
+      orderBy: { createdTime: 'desc' },
+    });
+    expect(messages[0]?.message).toBe('Yes — ten until four.');
+    expect(messages[0]?.fromId).toBe(seed.target.providerId);
+
+    const after = await prisma.conversation.findUniqueOrThrow({
+      where: { id: seed.conversation.id },
+    });
+    expect(after.snippet).toBe('Yes — ten until four.');
+    expect(after.messageCount).toBe(2);
+    expect(after.unreadCount).toBe(0);
+  });
+
+  it('addresses the Send API the way Facebook requires', async () => {
+    const seed = await seedThread({
+      lastFrom: 'them',
+      theirLastAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+    });
+
+    await engagement.replyToConversationAs({
+      conversationId: seed.conversation.id,
+      workspaceId: seed.workspace.id,
+      userId: seed.user.id,
+      role: WorkspaceRole.owner,
+      message: 'Yes — ten until four.',
+      now: NOW,
+    });
+
+    const call = received.find((entry) => entry.path.endsWith('/messages'));
+    expect(call, 'no send reached Graph').toBeDefined();
+    const form = new URLSearchParams(call!.body);
+
+    // The person's page-scoped id, not the thread id: the thread is not an
+    // address Facebook will deliver to.
+    expect(JSON.parse(form.get('recipient')!)).toEqual({ id: 'psid-ada' });
+    expect(JSON.parse(form.get('message')!)).toEqual({ text: 'Yes — ten until four.' });
+
+    // Without RESPONSE this is an unprompted message, which a Page may not send
+    // without a message tag — every reply would come back refused.
+    expect(form.get('messaging_type')).toBe('RESPONSE');
+
+    // And it went to the Page, signed with the Page's own token.
+    expect(call!.path).toContain(seed.target.providerId);
+    expect(form.get('access_token')).toBe('page-token');
+  });
+
+  it('refuses once Facebook’s 24-hour window has closed', async () => {
+    const seed = await seedThread({
+      lastFrom: 'them',
+      theirLastAt: new Date(NOW.getTime() - 25 * 60 * 60 * 1000),
+    });
+
+    const result = await engagement.replyToConversationAs({
+      conversationId: seed.conversation.id,
+      workspaceId: seed.workspace.id,
+      userId: seed.user.id,
+      role: WorkspaceRole.owner,
+      message: 'Sorry for the delay!',
+      now: NOW,
+    });
+
+    expect(result.outcome).toBe('outside_window');
+
+    // Refused here, so Graph was never asked and nothing was written.
+    const count = await prisma.conversationMessage.count({
+      where: { conversationId: seed.conversation.id },
+    });
+    expect(count).toBe(1);
+  });
+
+  it('still finds the recipient behind a run of the page’s own replies', async () => {
+    const seed = await seedThread({
+      lastFrom: 'us',
+      theirLastAt: new Date(NOW.getTime() - 2 * 60 * 60 * 1000),
+    });
+
+    const result = await engagement.replyToConversationAs({
+      conversationId: seed.conversation.id,
+      workspaceId: seed.workspace.id,
+      userId: seed.user.id,
+      role: WorkspaceRole.owner,
+      message: 'One more thing —',
+      now: NOW,
+    });
+
+    expect(result.outcome).toBe('ok');
+  });
+
+  it('has nobody to answer in a thread the page started', async () => {
+    const seed = await seedWorkspace();
+    const conversation = await prisma.conversation.create({
+      data: {
+        targetId: seed.target.id,
+        remoteId: 't_2',
+        messageCount: 1,
+        updatedTime: NOW,
+        messages: {
+          create: {
+            remoteId: 'm_us',
+            fromName: 'client Page',
+            fromId: seed.target.providerId,
+            message: 'Just checking in',
+            createdTime: NOW,
+          },
+        },
+      },
+    });
+
+    const result = await engagement.replyToConversationAs({
+      conversationId: conversation.id,
+      workspaceId: seed.workspace.id,
+      userId: seed.user.id,
+      role: WorkspaceRole.owner,
+      message: 'Hello?',
+      now: NOW,
+    });
+
+    expect(result.outcome).toBe('no_recipient');
+  });
+
+  it('is not open to a contributor', async () => {
+    const seed = await seedThread({
+      lastFrom: 'them',
+      theirLastAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+    });
+
+    const result = await engagement.replyToConversationAs({
+      conversationId: seed.conversation.id,
+      workspaceId: seed.workspace.id,
+      userId: seed.user.id,
+      role: WorkspaceRole.contributor,
+      message: 'Speaking for the business',
+      now: NOW,
+    });
+
+    expect(result.outcome).toBe('forbidden');
+  });
+
+  it('cannot reach another client’s inbox', async () => {
+    const mine = await seedWorkspace('mine');
+    const theirs = await seedThread({
+      lastFrom: 'them',
+      theirLastAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+    });
+
+    const result = await engagement.replyToConversationAs({
+      conversationId: theirs.conversation.id,
+      workspaceId: mine.workspace.id,
+      userId: mine.user.id,
+      role: WorkspaceRole.owner,
+      message: 'Wrong client entirely',
+      now: NOW,
+    });
+
+    expect(result.outcome).toBe('not_found');
+  });
+
+  it('tells the screen which threads can be answered, and until when', async () => {
+    const seed = await seedThread({
+      lastFrom: 'them',
+      theirLastAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+    });
+    const stale = await prisma.conversation.create({
+      data: {
+        targetId: seed.target.id,
+        remoteId: 't_stale',
+        messageCount: 1,
+        updatedTime: new Date(NOW.getTime() - 30 * 60 * 60 * 1000),
+        messages: {
+          create: {
+            remoteId: 'm_old',
+            fromName: 'Grace',
+            fromId: 'psid-grace',
+            message: 'Hello?',
+            createdTime: new Date(NOW.getTime() - 30 * 60 * 60 * 1000),
+          },
+        },
+      },
+    });
+
+    const rows = await engagement.readConversations({
+      workspaceId: seed.workspace.id,
+      now: NOW,
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+
+    const open = byId.get(seed.conversation.id)!.reply;
+    expect(open.state).toBe('open');
+    // 24 hours after their message, not 24 hours from now.
+    if (open.state === 'open') {
+      expect(open.until.toISOString()).toBe(
+        new Date(NOW.getTime() + 23 * 60 * 60 * 1000).toISOString(),
+      );
+    }
+
+    expect(byId.get(stale.id)!.reply.state).toBe('closed');
   });
 });

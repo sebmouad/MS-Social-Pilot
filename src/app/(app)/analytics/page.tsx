@@ -6,6 +6,7 @@ import { AnalyticsClient } from '@/components/AnalyticsClient';
 import { AnalyticsTabs } from '@/components/AnalyticsTabs';
 import { BreakdownBars } from '@/components/BreakdownBars';
 import { CommentsPanel } from '@/components/CommentsPanel';
+import { InboxPanel } from '@/components/InboxPanel';
 import { ExportMenu } from '@/components/ExportMenu';
 import { PagePicker } from '@/components/PagePicker';
 import { PostAnalyticsTable } from '@/components/PostAnalyticsTable';
@@ -180,7 +181,12 @@ export default async function AnalyticsPage({
       )}
 
       {view === 'inbox' && (
-        <InboxView workspaceId={auth.workspace.id} targetId={selected.id} timezone={timezone} />
+        <InboxView
+          workspaceId={auth.workspace.id}
+          targetId={selected.id}
+          timezone={timezone}
+          canReply={canModerateComments(auth.role)}
+        />
       )}
 
       {view === 'external' && (
@@ -518,10 +524,12 @@ async function InboxView({
   workspaceId,
   targetId,
   timezone,
+  canReply,
 }: {
   workspaceId: string;
   targetId: string;
   timezone: string;
+  canReply: boolean;
 }) {
   const t = await getTranslations('engagement');
   const conversations = await readConversations({ workspaceId, targetId });
@@ -537,31 +545,25 @@ async function InboxView({
         <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />
       </div>
 
-      <ul className="space-y-3">
-        {conversations.map((thread) => (
-          <li key={thread.id} className="card p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-sm font-medium text-slate-900">
-                {thread.participants.join(', ') || t('unknownParticipant')}
-              </p>
-              <p className="text-xs text-slate-500">
-                {formatInZone(thread.updatedTime, timezone)} ·{' '}
-                {t('messageCount', { count: thread.messageCount })}
-                {thread.unreadCount > 0 && ` · ${t('unread', { count: thread.unreadCount })}`}
-              </p>
-            </div>
-
-            <ul className="mt-3 space-y-1.5">
-              {[...thread.messages].reverse().map((message) => (
-                <li key={message.id} className="text-sm">
-                  <span className="font-medium text-slate-600">{message.from}: </span>
-                  <span className="text-slate-700">{message.message ?? t('attachmentOnly')}</span>
-                </li>
-              ))}
-            </ul>
-          </li>
-        ))}
-      </ul>
+      <InboxPanel
+        canReply={canReply}
+        threads={conversations.map((thread) => ({
+          id: thread.id,
+          participants: thread.participants.join(', ') || t('unknownParticipant'),
+          updatedLabel: formatInZone(thread.updatedTime, timezone),
+          messageCount: thread.messageCount,
+          unreadCount: thread.unreadCount,
+          messages: thread.messages.map((message) => ({
+            id: message.id,
+            from: message.from,
+            message: message.message,
+          })),
+          reply:
+            thread.reply.state === 'open'
+              ? { state: 'open' as const, untilLabel: formatInZone(thread.reply.until, timezone) }
+              : { state: thread.reply.state },
+        }))}
+      />
     </div>
   );
 }

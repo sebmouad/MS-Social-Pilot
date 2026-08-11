@@ -66,7 +66,7 @@ const CATALOGUE: Record<string, { label: string; consequence: string }> = {
   },
   pages_messaging: {
     label: 'Read and send Page messages',
-    consequence: 'The Page inbox stays empty.',
+    consequence: 'The Page inbox stays empty, and nobody in it can be answered.',
   },
   publish_to_groups: {
     label: 'Publish posts to your Groups',

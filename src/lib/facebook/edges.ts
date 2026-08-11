@@ -405,3 +405,33 @@ export async function replyToComment(
   });
   return data.id;
 }
+
+/**
+ * Reply to somebody in the Page's inbox.
+ *
+ * The Send API rather than posting to the thread: `messaging_type: RESPONSE`
+ * is what tells Facebook this is an answer to a customer rather than an
+ * unprompted message, which is the only kind a Page may send without a message
+ * tag. `recipient` is the person's page-scoped id — the `from.id` on their
+ * messages, which is stable for this Page and meaningless anywhere else.
+ */
+export async function sendPageMessage(
+  pageId: string,
+  accessToken: string,
+  recipientId: string,
+  message: string,
+): Promise<string> {
+  const { data } = await graphRequest<{ message_id?: string; id?: string }>(
+    `${pageId}/messages`,
+    {
+      accessToken,
+      method: 'POST',
+      body: {
+        recipient: { id: recipientId },
+        messaging_type: 'RESPONSE',
+        message: { text: message },
+      },
+    },
+  );
+  return data.message_id ?? data.id ?? '';
+}

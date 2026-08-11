@@ -226,7 +226,8 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     group: 'features',
     type: 'boolean',
     label: 'Page inbox',
-    description: 'Adds pages_messaging and pages_manage_metadata, and enables the Inbox tab.',
+    description:
+      'Adds pages_messaging and pages_manage_metadata, and enables the Inbox tab, where threads can be read and answered.',
     default: false,
     env: 'FACEBOOK_ENABLE_MESSAGING',
   },

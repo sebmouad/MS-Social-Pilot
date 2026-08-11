@@ -17,6 +17,7 @@ import {
   fetchPublishedPosts,
   fetchReviews,
   replyToComment,
+  sendPageMessage,
   setCommentHidden,
 } from './facebook/edges';
 
@@ -193,6 +194,22 @@ export async function readComments(options: {
  * refusal reads to the caller as a comment that was never there.
  */
 export type ModerationOutcome = 'ok' | 'not_found' | 'forbidden';
+
+/**
+ * Replying in the inbox can fail for two reasons moderation cannot, and both
+ * need saying rather than collapsing into "not found".
+ */
+export type ReplyOutcome = ModerationOutcome | 'outside_window' | 'no_recipient';
+
+/**
+ * How long after somebody writes to a Page it may write back.
+ *
+ * Facebook's standard messaging window. Outside it a reply is refused unless
+ * it carries a message tag, and the tags are for a short list of purposes
+ * (a confirmed event, an account update) that a scheduling tool has no
+ * business claiming. So the honest thing is to say the window has closed.
+ */
+export const MESSAGING_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** Look up the Page token behind a stored comment. */
 async function tokenForComment(commentId: string, workspaceId: string) {
@@ -578,12 +595,25 @@ export interface ConversationRow {
   updatedTime: Date;
   targetName: string;
   messages: Array<{ id: string; from: string; message: string | null; createdTime: Date }>;
+  /**
+   * Whether a reply would be accepted, worked out here so the screen can say
+   * why the box is missing instead of letting somebody type a paragraph and
+   * then refusing it.
+   *
+   * A prediction, not the ruling: `replyToConversationAs` checks again against
+   * the whole thread when the reply is actually sent.
+   */
+  reply: { state: 'open'; until: Date } | { state: 'closed' | 'no_recipient' };
 }
+
+/** How many messages back to look; enough for the reply state, more than the screen shows. */
+const CONVERSATION_MESSAGES = 25;
 
 export async function readConversations(options: {
   workspaceId: string;
   targetId?: string;
   limit?: number;
+  now?: Date;
 }): Promise<ConversationRow[]> {
   const rows = await prisma.conversation.findMany({
     where: {
@@ -591,28 +621,45 @@ export async function readConversations(options: {
       ...(options.targetId ? { targetId: options.targetId } : {}),
     },
     include: {
-      target: { select: { name: true } },
-      messages: { orderBy: { createdTime: 'desc' }, take: 10 },
+      target: { select: { name: true, providerId: true } },
+      messages: { orderBy: { createdTime: 'desc' }, take: CONVERSATION_MESSAGES },
     },
     orderBy: { updatedTime: 'desc' },
     take: options.limit ?? 50,
   });
 
-  return rows.map((row) => ({
-    id: row.id,
-    snippet: row.snippet,
-    participants: Array.isArray(row.participants) ? (row.participants as string[]) : [],
-    unreadCount: row.unreadCount,
-    messageCount: row.messageCount,
-    updatedTime: row.updatedTime,
-    targetName: row.target.name,
-    messages: row.messages.map((message) => ({
-      id: message.id,
-      from: message.fromName ?? 'Unknown',
-      message: message.message,
-      createdTime: message.createdTime,
-    })),
-  }));
+  const now = options.now ?? new Date();
+
+  return rows.map((row) => {
+    const theirLast = row.messages.find(
+      (message) => message.fromId !== null && message.fromId !== row.target.providerId,
+    );
+
+    const reply: ConversationRow['reply'] = !theirLast
+      ? { state: 'no_recipient' }
+      : now.getTime() - theirLast.createdTime.getTime() > MESSAGING_WINDOW_MS
+        ? { state: 'closed' }
+        : { state: 'open', until: new Date(theirLast.createdTime.getTime() + MESSAGING_WINDOW_MS) };
+
+    return {
+      id: row.id,
+      snippet: row.snippet,
+      participants: Array.isArray(row.participants) ? (row.participants as string[]) : [],
+      unreadCount: row.unreadCount,
+      messageCount: row.messageCount,
+      updatedTime: row.updatedTime,
+      targetName: row.target.name,
+      // The screen shows a thread, not an archive: the newest handful, from the
+      // wider slice the reply state needed.
+      messages: row.messages.slice(0, 10).map((message) => ({
+        id: message.id,
+        from: message.fromName ?? 'Unknown',
+        message: message.message,
+        createdTime: message.createdTime,
+      })),
+      reply,
+    };
+  });
 }
 
 export interface VideoRow {
@@ -734,4 +781,100 @@ export async function readExternalPosts(options: {
       syncedAt: row.insightsSyncedAt,
     };
   });
+}
+
+/**
+ * Reply to somebody in the Page's inbox, as the Page.
+ *
+ * The person's own last message decides two things: who the reply goes to —
+ * their page-scoped id, which is the only address Facebook accepts — and
+ * whether it may be sent at all. A thread where the last word was the Page's
+ * has nobody to answer, and one where the customer wrote two days ago is
+ * closed. Both are checked here rather than discovered as a Graph error,
+ * because both have a plain explanation and Graph's does not.
+ */
+export async function replyToConversationAs(options: {
+  conversationId: string;
+  workspaceId: string;
+  userId: string;
+  role: WorkspaceRole;
+  message: string;
+  now?: Date;
+}): Promise<{ outcome: ReplyOutcome; remoteId?: string }> {
+  if (!canModerateComments(options.role)) return { outcome: 'forbidden' };
+
+  const conversation = await prisma.conversation.findFirst({
+    where: { id: options.conversationId, target: { workspaceId: options.workspaceId } },
+    include: { target: { include: { socialAccount: true } } },
+  });
+  if (!conversation) return { outcome: 'not_found' };
+
+  const token = tokenFor(conversation.target);
+  if (!token) return { outcome: 'not_found' };
+
+  const pageId = conversation.target.providerId;
+
+  // Straight at the newest inbound message rather than scanning a slice: a
+  // thread the Page has answered several times running would otherwise look
+  // like it had nobody in it.
+  const theirLast = await prisma.conversationMessage.findFirst({
+    where: {
+      conversationId: conversation.id,
+      fromId: { not: null },
+      NOT: { fromId: pageId },
+    },
+    orderBy: { createdTime: 'desc' },
+  });
+  if (!theirLast?.fromId) return { outcome: 'no_recipient' };
+
+  const now = options.now ?? new Date();
+  if (now.getTime() - theirLast.createdTime.getTime() > MESSAGING_WINDOW_MS) {
+    return { outcome: 'outside_window' };
+  }
+
+  const remoteId = await sendPageMessage(pageId, token, theirLast.fromId, options.message);
+
+  // Store our own reply immediately rather than waiting for the next sync, so
+  // the thread reads correctly the moment the request returns. A send with no
+  // id back still gets a row, keyed on the moment, so the reply is not lost
+  // from the screen — the next sync reconciles it.
+  await prisma.$transaction(async (tx) => {
+    await tx.conversationMessage.upsert({
+      where: {
+        conversationId_remoteId: {
+          conversationId: conversation.id,
+          remoteId: remoteId || `local-${now.getTime()}`,
+        },
+      },
+      create: {
+        conversationId: conversation.id,
+        remoteId: remoteId || `local-${now.getTime()}`,
+        fromName: conversation.target.name,
+        fromId: pageId,
+        message: options.message,
+        createdTime: now,
+      },
+      update: {},
+    });
+
+    await tx.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        snippet: options.message.slice(0, 200),
+        updatedTime: now,
+        messageCount: { increment: 1 },
+        // Answered, so nothing in this thread is still waiting to be read.
+        unreadCount: 0,
+      },
+    });
+  });
+
+  await logActivity(
+    options.workspaceId,
+    'conversation.replied',
+    { conversationId: conversation.id, targetName: conversation.target.name },
+    options.userId,
+  );
+
+  return { outcome: 'ok', remoteId };
 }

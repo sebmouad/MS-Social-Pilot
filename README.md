@@ -58,6 +58,11 @@ Built to the specification in [docs/PROJECT_SCHEMA.md](docs/PROJECT_SCHEMA.md).
   expiry.
 - Crashed workers release their locks; several workers can run safely.
 
+**Engagement** — comments moderated from here (reply, hide, delete, each
+writing to Facebook first), Page ratings, and the Page inbox with replies.
+Facebook accepts a reply only within 24 hours of the person's last message, so
+threads outside that window say so instead of offering a box that would refuse.
+
 **Open Graph link previews** — Facebook's own scraper
 (`POST /?id=<url>&scrape=true`), so you see exactly the card Facebook will
 render and its cache is refreshed. Falls back to parsing `og:` tags directly.
@@ -159,7 +164,7 @@ runs a chosen subset over HTTP.
 npm test
 ```
 
-715 tests. Unit tests cover token encryption, retry policy, timezone and
+723 tests. Unit tests cover token encryption, retry policy, timezone and
 queue-slot maths, Open Graph and RSS parsing, CSV in and out, link tagging, and
 the Graph publishing decision table.
 
