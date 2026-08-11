@@ -368,7 +368,8 @@
     "lastOwner": "Un espace de travail doit conserver au moins un propriétaire.",
     "cannotApproveOwn": "Vous ne pouvez pas valider votre propre publication.",
     "notPending": "Cette publication n'est pas en attente de validation.",
-    "variantsNeedApproval": "Les formulations alternatives sont publiées sans validation : seuls les éditeurs et rôles supérieurs peuvent les définir lorsque la validation est activée."
+    "variantsNeedApproval": "Les formulations alternatives sont publiées sans validation : seuls les éditeurs et rôles supérieurs peuvent les définir lorsque la validation est activée.",
+    "bulkTooManyRows": "Ce fichier contient {rows} lignes alors que la limite est de {limit}. Divisez-le en plusieurs imports."
   },
   "email": {
     "invitation": {

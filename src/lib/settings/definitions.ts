@@ -267,6 +267,19 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     workerRestart: true,
   },
 
+  {
+    key: 'scheduler.bulkRowLimit',
+    group: 'scheduler',
+    type: 'number',
+    label: 'Bulk upload row limit',
+    description: 'How many rows one CSV upload may schedule.',
+    default: 500,
+    env: 'BULK_ROW_LIMIT',
+    min: 1,
+    max: 5000,
+    hint: 'Each row can scrape its link for a preview card, so a very large file makes one request that runs for minutes. Raise it only if the deployment has no request timeout.',
+  },
+
   // --- Analytics -------------------------------------------------------------
   {
     key: 'analytics.refreshHours',

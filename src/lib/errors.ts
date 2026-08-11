@@ -125,6 +125,14 @@ export const errors = {
       status: 403,
     }),
 
+  bulkTooManyRows: (rows: number, limit: number) =>
+    new AppError({
+      key: 'errors.bulkTooManyRows',
+      fallback: `That file has ${rows} rows and the limit is ${limit}. Split it into smaller uploads.`,
+      params: { rows, limit },
+      status: 422,
+    }),
+
   aiRateLimited: () =>
     new AppError({
       key: 'errors.aiRateLimited',

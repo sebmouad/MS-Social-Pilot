@@ -161,7 +161,10 @@ export const bulkRowSchema = z.object({
 });
 
 export const bulkUploadSchema = z.object({
-  csv: z.string().min(1, 'The file is empty.'),
+  csv: z
+    .string()
+    .min(1, 'The file is empty.')
+    .max(LIMITS.bulkCsvBytes, 'That file is too large to process in one upload. Split it up.'),
   targetIds: z.array(z.string().min(1)).min(1, 'Choose at least one destination.'),
   timezone: timezone.default('UTC'),
   publishMode: z.nativeEnum(PublishMode).default(PublishMode.worker),

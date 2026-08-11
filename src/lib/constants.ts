@@ -86,6 +86,13 @@ export const LIMITS = {
   mediaPerPost: 10,
   targetsPerPost: 50,
   variantsPerPost: 10,
+  /**
+   * Raw size of an uploaded CSV. Not a product decision like the others — it
+   * is the point past which parsing the string is itself the problem, and it
+   * has to be checked before the row limit because the row limit needs the
+   * parse to have finished.
+   */
+  bulkCsvBytes: 4 * 1024 * 1024,
 } as const;
 
 // ---------------------------------------------------------------------------

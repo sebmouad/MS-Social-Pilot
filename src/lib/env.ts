@@ -115,6 +115,10 @@ export const env = {
   get staleLockMinutes(): number {
     return settingNumber('scheduler.staleLockMinutes');
   },
+  /** How many rows one CSV upload may schedule. */
+  get bulkRowLimit(): number {
+    return settingNumber('scheduler.bulkRowLimit');
+  },
 
   // --- Email (Resend) ---
   get resendApiKey(): string | null {

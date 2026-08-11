@@ -419,6 +419,19 @@ production image.
 
 ---
 
+### Bulk upload
+
+One request, as many posts as the file has rows, and every row that carries a
+link scrapes it. Nothing bounded that: a few thousand rows made a few thousand
+outbound fetches inside a single request, which runs for minutes and, on any
+platform with a request timeout, is killed part-way — leaving posts scheduled
+that the uploader never saw confirmed and cannot tell apart from the ones that
+failed. The row limit is a setting (`scheduler.bulkRowLimit`, default 500) since
+the right number depends on the deployment's timeout, and the raw file size is a
+static ceiling because past it the parse itself is the problem. The whole file
+is refused rather than partly scheduled: nothing happened, so there is nothing
+to reconcile.
+
 ## Link previews and outbound fetches
 
 Composing a post scrapes the link for its Open Graph card, which means the

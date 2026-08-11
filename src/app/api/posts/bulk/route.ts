@@ -1,5 +1,5 @@
 import { requireAuth } from '@/lib/auth';
-import { createPost } from '@/lib/posts';
+import { assertBulkRowsAllowed, createPost } from '@/lib/posts';
 import { parseCsvWithHeader } from '@/lib/csv';
 import { bulkUploadSchema, bulkRowSchema } from '@/lib/validation';
 import { asGraphError } from '@/lib/facebook/graph';
@@ -17,6 +17,9 @@ export const POST = route(async (request: Request) => {
   const input = bulkUploadSchema.parse(await readJson(request));
 
   const rows = parseCsvWithHeader(input.csv);
+
+  assertBulkRowsAllowed(rows.length);
+
   const results: Array<{ row: number; status: 'scheduled' | 'error'; postId?: string; message?: string }> = [];
 
   let rowNumber = 1; // 1 is the header; data starts at 2.

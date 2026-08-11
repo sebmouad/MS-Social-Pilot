@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { env } from './env';
 import { decryptSecret } from './crypto';
 import {
   mediaColumns,
@@ -124,6 +125,21 @@ async function loadTargets(workspaceId: string, targetIds: string[]) {
     throw errors.targetsDisabled(disabled.map((target) => target.name).join(', '));
   }
   return targets;
+}
+
+/**
+ * Refuse a CSV bigger than one request should take on.
+ *
+ * Nothing bounded this. Each row can scrape its link for a preview card, so a
+ * few thousand rows is one request making a few thousand outbound fetches: it
+ * runs for minutes, and on a platform with a request timeout it is killed
+ * part-way, leaving posts scheduled that the uploader never saw confirmed and
+ * cannot tell apart from the ones that failed. Refusing the whole file is the
+ * kinder answer — nothing was scheduled, and there is nothing to reconcile.
+ */
+export function assertBulkRowsAllowed(rows: number): void {
+  const limit = env.bulkRowLimit;
+  if (rows > limit) throw errors.bulkTooManyRows(rows, limit);
 }
 
 export interface CreatePostResult {

@@ -477,6 +477,78 @@ describe('setting recycling variants', () => {
  * nothing ahead of them to have loaded the settings snapshot — and the first
  * thing each needs is the app secret, which lives in the settings store.
  */
+/**
+ * Bulk upload turns one request into as many posts as the file has rows, and
+ * each row can scrape its link. Unbounded, that is a request that runs for
+ * minutes and gets killed part-way by any platform timeout.
+ */
+describe('bulk upload limits', () => {
+  let settings: typeof import('../src/lib/settings');
+  let posts: typeof import('../src/lib/posts');
+  let validation: typeof import('../src/lib/validation');
+  let constants: typeof import('../src/lib/constants');
+
+  beforeAll(async () => {
+    settings = await import('../src/lib/settings');
+    posts = await import('../src/lib/posts');
+    validation = await import('../src/lib/validation');
+    constants = await import('../src/lib/constants');
+  });
+
+  function csvWithRows(count: number): string {
+    const rows = Array.from({ length: count }, (_, index) => `Row ${index + 1},2027-01-01 09:00`);
+    return ['message,scheduled_at', ...rows].join('\n');
+  }
+
+  it('refuses a file with more rows than the configured limit', async () => {
+    await settings.writeSetting('scheduler.bulkRowLimit', 3, null);
+    await settings.ensureSettings();
+
+    try {
+      // The whole file is refused rather than partly scheduled: the uploader
+      // needs to know nothing happened, not guess which rows made it.
+      expect(() => posts.assertBulkRowsAllowed(4)).toThrow(/limit is 3/);
+      expect(() => posts.assertBulkRowsAllowed(3)).not.toThrow();
+    } finally {
+      await settings.clearSetting('scheduler.bulkRowLimit');
+      await settings.ensureSettings();
+    }
+  });
+
+  it('allows a large file when an operator raises the limit', async () => {
+    await settings.writeSetting('scheduler.bulkRowLimit', 2000, null);
+    await settings.ensureSettings();
+
+    try {
+      expect(() => posts.assertBulkRowsAllowed(1500)).not.toThrow();
+    } finally {
+      await settings.clearSetting('scheduler.bulkRowLimit');
+      await settings.ensureSettings();
+    }
+  });
+
+  it('rejects a file too large to be worth parsing', () => {
+    const oversized = 'x'.repeat(constants.LIMITS.bulkCsvBytes + 1);
+    const result = validation.bulkUploadSchema.safeParse({
+      csv: oversized,
+      targetIds: ['t1'],
+      timezone: 'UTC',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a file inside the limit', () => {
+    const result = validation.bulkUploadSchema.safeParse({
+      csv: csvWithRows(2),
+      targetIds: ['t1'],
+      timezone: 'UTC',
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
 describe('Meta callbacks', () => {
   let settings: typeof import('../src/lib/settings');
   let deauthorize: typeof import('../src/app/api/facebook/deauthorize/route');

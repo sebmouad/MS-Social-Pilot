@@ -368,7 +368,8 @@
     "lastOwner": "A workspace must keep at least one owner.",
     "cannotApproveOwn": "You cannot approve your own post.",
     "notPending": "That post is not awaiting approval.",
-    "variantsNeedApproval": "Alternate wordings publish without review, so only editors and above can set them while approval is on."
+    "variantsNeedApproval": "Alternate wordings publish without review, so only editors and above can set them while approval is on.",
+    "bulkTooManyRows": "That file has {rows} rows and the limit is {limit}. Split it into smaller uploads."
   },
   "email": {
     "invitation": {
