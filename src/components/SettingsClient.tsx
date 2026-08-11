@@ -36,6 +36,14 @@ interface Props {
   /** False when the server has no ANTHROPIC_API_KEY. */
   aiConfigured: boolean;
   shortLinkBase: string;
+  /**
+   * False for contributors, who may write posts but not change the workspace.
+   *
+   * The API refuses them either way — that is the boundary. This only stops
+   * them being shown a form where every Save comes back 403, which reads as a
+   * broken product rather than as a permission.
+   */
+  canManage: boolean;
 }
 
 export function SettingsClient({
@@ -48,6 +56,7 @@ export function SettingsClient({
   options,
   aiConfigured,
   shortLinkBase,
+  canManage,
 }: Props) {
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
@@ -116,6 +125,12 @@ export function SettingsClient({
         </div>
       )}
 
+      {!canManage && (
+        <p className="card p-5 text-sm text-slate-600">{t('readOnly')}</p>
+      )}
+
+      {canManage && (
+        <>
       <section className="card p-5">
         <h2 className="text-sm font-semibold text-slate-900">{t('workspace')}</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -379,7 +394,11 @@ export function SettingsClient({
           </button>
         </div>
       </section>
+        </>
+      )}
 
+      {/* Left in for everyone: uploading a spreadsheet of posts creates posts,
+          which is what a contributor is for. They face review like any other. */}
       <BulkUpload targets={targets} timezone={zone} csvTemplate={csvTemplate} />
     </div>
   );

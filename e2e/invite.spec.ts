@@ -80,6 +80,22 @@ test.describe('the invited colleague, in French', () => {
     await page.context().storageState({ path: 'e2e/.auth/colleague.json' });
   });
 
+  test('is not shown a settings form they cannot save', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: 'e2e/.auth/colleague.json' });
+    const page = await context.newPage();
+
+    await open(page, '/settings');
+
+    // An editor is below canManageSettings, so the four workspace sections are
+    // gone and the reason is on screen in their place. Bulk upload stays:
+    // creating posts is what the role is for.
+    await expect(page.getByRole('button', { name: /save|enregistrer/i })).toHaveCount(0);
+    await expect(page.getByText(/only workspace owners and admins|seuls les propriétaires/i))
+      .toBeVisible();
+
+    await context.close();
+  });
+
   // An editor sees fewer screens than an owner; the ones they do see must be
   // whole. A missing French key throws, so rendering at all is the assertion.
   for (const path of SIGNED_IN_SCREENS) {

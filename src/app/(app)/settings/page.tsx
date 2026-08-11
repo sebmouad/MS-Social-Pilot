@@ -1,4 +1,4 @@
-import { canManageInstance } from '@/lib/constants';
+import { canManageInstance, canManageSettings } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 
 import { SettingsNav } from '@/components/SettingsNav';
@@ -70,6 +70,7 @@ export default async function SettingsPage() {
       <SettingsNav showConfig={canManageInstance(auth.role)} />
 
       <SettingsClient
+        canManage={canManageSettings(auth.role)}
         workspaceName={auth.workspace.name}
         timezone={auth.workspace.timezone}
         timezones={timezoneOptions()}

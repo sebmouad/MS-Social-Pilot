@@ -164,7 +164,7 @@ runs a chosen subset over HTTP.
 npm test
 ```
 
-723 tests. Unit tests cover token encryption, retry policy, timezone and
+728 tests. Unit tests cover token encryption, retry policy, timezone and
 queue-slot maths, Open Graph and RSS parsing, CSV in and out, link tagging, and
 the Graph publishing decision table.
 
@@ -181,6 +181,13 @@ covering the failures that actually cost customers:
   evergreen creating a copy, rotating variants, and stopping at its limit.
 - Invitations — wrong address refused, single use, expiry, last-owner
   protection.
+
+One suite is a sweep rather than a list: `api-routes` walks every file under
+`src/app/api`, calls each exported handler with no session, and fails unless it
+refuses. A route that answers has to be added to a `PUBLIC` map with a written
+reason, so a new endpoint is private until somebody says otherwise. A second
+pass signs in as a contributor — the lowest role — and checks the endpoints that
+act on the business rather than on their own drafts.
 
 Tests need a reachable Postgres; each suite creates and drops its own schema.
 Point `TEST_DATABASE_URL` at it if it is not the Compose default.
