@@ -164,6 +164,26 @@ What Facebook itself refuses is not retried: an oversized file comes back as
 code 100 or an HTTP 4xx, both of which classify as `invalid_request`, so the
 post fails once rather than five times.
 
+### One job at a time
+
+The worker stamped a job's next run *before* starting it, so a job taking
+longer than its interval came due again while the previous run was still going,
+and the loop started another — indefinitely.
+
+For `publish` that is harmless: claiming a destination is atomic, and running
+several workers is a supported way to go faster. For the jobs that walk every
+workspace calling Graph — analytics, page insights, edges, Instagram, ads — it
+is not. Two passes over the same Pages spend the app's rate limit twice to
+collect the same numbers, and an installation big enough for a job to overrun
+is the one that can least afford it.
+
+`src/lib/scheduler/loop.ts` skips a job whose previous run is still in flight
+and schedules the next from when that run *finished*. A job taking 45 seconds
+on a 30-second interval settles into every 75 seconds — slower than configured,
+which is the honest answer when the work does not fit in the interval. A slow
+job still does not delay a fast one; they share a loop precisely so that
+publishing keeps its cadence while analytics grinds.
+
 ### Retry policy
 
 `src/lib/scheduler/backoff.ts`. The base delay depends on why the attempt failed:

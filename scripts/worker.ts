@@ -14,6 +14,7 @@
 
 import { prisma } from '../src/lib/prisma';
 import { jobDefinitions, type JobDefinition } from '../src/lib/scheduler/jobs';
+import { createLoopState, dueJobs, markFinished, markStarted } from '../src/lib/scheduler/loop';
 import { ensureSettings } from '../src/lib/settings';
 
 const workerId = `worker-${process.pid}`;
@@ -63,7 +64,7 @@ async function main(): Promise<void> {
       .join(' ')}`,
   );
 
-  const nextRunAt = new Map<string, number>();
+  const state = createLoopState();
 
   while (!stopping) {
     // Re-read configuration every pass (cached, so this is one query a minute
@@ -73,13 +74,15 @@ async function main(): Promise<void> {
     await ensureSettings();
     const jobs = jobDefinitions();
 
-    const now = Date.now();
+    for (const job of dueJobs(jobs, state, Date.now())) {
+      markStarted(state, job);
 
-    for (const job of jobs) {
-      if ((nextRunAt.get(job.name) ?? 0) > now) continue;
-      nextRunAt.set(job.name, now + job.intervalMs);
-
-      const running = runJob(job).finally(() => inFlight.delete(running));
+      const running = runJob(job).finally(() => {
+        // Scheduled from the finish, so a job that overruns its interval
+        // settles into a longer cycle rather than running back to back.
+        markFinished(state, job, Date.now());
+        inFlight.delete(running);
+      });
       inFlight.add(running);
     }
 
