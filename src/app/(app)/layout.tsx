@@ -2,20 +2,15 @@ import { redirect } from 'next/navigation';
 
 import { NavBar } from '@/components/NavBar';
 import { getAuthContext } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { canApprove } from '@/lib/constants';
-import { ApprovalStatus } from '@prisma/client';
+import { pendingApprovalCount } from '@/lib/approvals';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const auth = await getAuthContext();
   if (!auth) redirect('/login');
 
   const showApprovals = canApprove(auth.role) && auth.workspace.requiresApproval;
-  const pendingApprovals = showApprovals
-    ? await prisma.post.count({
-        where: { workspaceId: auth.workspace.id, approvalStatus: ApprovalStatus.pending },
-      })
-    : 0;
+  const pendingApprovals = showApprovals ? await pendingApprovalCount(auth.workspace.id) : 0;
 
   return (
     <div className="min-h-screen">

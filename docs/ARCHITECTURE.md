@@ -282,6 +282,16 @@ the whole form and opening a post must not cost it its approval. Editors and
 above are exempt, since `initialApprovalStatus` grants them `approved` at
 creation anyway — queueing edits they could bypass by reposting is theatre.
 
+Cancelling is the exception that proves the shape of this. It leaves
+`approvalStatus` alone on purpose, so the record of what was asked for
+survives — which means the approval state alone no longer says whether anything
+is waiting. `IN_APPROVAL_QUEUE` pairs it with `status = pending_approval`, and
+the queue, the nav badge, the release sweep and the approve/reject guards all
+read that one definition. Without the status half, a cancelled post sat in a
+reviewer's queue and approving it flipped it back to `scheduled` while every
+destination stayed cancelled: a post that reads as scheduled and can never go
+out.
+
 Evergreen recycling is the third way in, and the widest. Recycled copies are
 created `not_required` on the grounds that repeating an approved post is not a
 new editorial decision — but a *variant* is not a repeat, it is different text

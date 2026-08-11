@@ -594,6 +594,103 @@ describe('retrying a post that is back in the queue', () => {
   });
 });
 
+describe('cancelling something that is waiting for review', () => {
+  async function seedPendingThenCancel() {
+    const owner = await makeUser('Owner');
+    const contributor = await makeUser('Contributor');
+    const { workspace, target } = await makeWorkspace({
+      name: 'Client',
+      ownerId: owner.id,
+      requiresApproval: true,
+    });
+    await prisma.membership.create({
+      data: { userId: contributor.id, workspaceId: workspace.id, role: WorkspaceRole.contributor },
+    });
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: contributor.id,
+        submittedById: contributor.id,
+        submittedAt: new Date(),
+        message: 'Never mind',
+        status: PostStatus.pending_approval,
+        approvalStatus: ApprovalStatus.pending,
+        scheduledAt: new Date(Date.now() + 60 * 60 * 1000),
+        targets: { create: { targetId: target.id } },
+      },
+    });
+
+    await posts.cancelPost({ workspaceId: workspace.id, userId: contributor.id }, post.id);
+    return { workspace, owner, post };
+  }
+
+  it('takes it out of the reviewer queue', async () => {
+    const { workspace } = await seedPendingThenCancel();
+
+    // The approval state is kept as a record of what was asked for; the queue
+    // is what must not show work nobody can act on.
+    expect(await approvals.pendingApprovalCount(workspace.id)).toBe(0);
+  });
+
+  it('refuses to approve it back into existence', async () => {
+    const { workspace, owner, post } = await seedPendingThenCancel();
+
+    await expect(
+      approvals.approvePost({
+        workspaceId: workspace.id,
+        postId: post.id,
+        reviewerId: owner.id,
+        reviewerRole: WorkspaceRole.owner,
+      }),
+    ).rejects.toThrow(/not awaiting approval/i);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.cancelled);
+  });
+
+  it('refuses to reject it either', async () => {
+    const { workspace, owner, post } = await seedPendingThenCancel();
+
+    await expect(
+      approvals.rejectPost({
+        workspaceId: workspace.id,
+        postId: post.id,
+        reviewerId: owner.id,
+        reviewerRole: WorkspaceRole.owner,
+        note: 'Too late.',
+      }),
+    ).rejects.toThrow(/not awaiting approval/i);
+  });
+
+  it('does not revive it when review is switched off', async () => {
+    const { workspace, owner, post } = await seedPendingThenCancel();
+
+    await approvals.releaseHeldPosts({ workspaceId: workspace.id, userId: owner.id });
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.cancelled);
+  });
+
+  it('still counts one that is genuinely waiting', async () => {
+    const { workspace } = await seedPendingThenCancel();
+    const other = await makeUser('Someone');
+    await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: other.id,
+        submittedById: other.id,
+        message: 'Please review',
+        status: PostStatus.pending_approval,
+        approvalStatus: ApprovalStatus.pending,
+        scheduledAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    expect(await approvals.pendingApprovalCount(workspace.id)).toBe(1);
+  });
+});
+
 describe('who needs approval', () => {
   it('holds a contributor post when the workspace requires approval', async () => {
     const owner = await makeUser('Owner');

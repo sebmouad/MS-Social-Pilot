@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { ApprovalStatus } from '@prisma/client';
 
 import { ApprovalsClient } from '@/components/ApprovalsClient';
 import { requirePage } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { canApprove } from '@/lib/constants';
+import { IN_APPROVAL_QUEUE } from '@/lib/approvals';
 import { parseMedia } from '@/lib/json';
 import { formatInZone } from '@/lib/time';
 
@@ -21,7 +21,7 @@ export default async function ApprovalsPage() {
   const timezone = auth.workspace.timezone;
 
   const posts = await prisma.post.findMany({
-    where: { workspaceId: auth.workspace.id, approvalStatus: ApprovalStatus.pending },
+    where: { workspaceId: auth.workspace.id, ...IN_APPROVAL_QUEUE },
     include: {
       targets: { include: { target: { select: { name: true } } } },
       submitter: { select: { name: true } },

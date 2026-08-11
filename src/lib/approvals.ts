@@ -91,7 +91,11 @@ export async function approvePost(options: {
   });
   if (!post) throw errors.postNotFound();
 
-  if (post.approvalStatus !== ApprovalStatus.pending) {
+  // A cancelled post keeps its `pending` approval state as a record, so the
+  // status has to be checked too — approving one would otherwise flip it back
+  // to `scheduled` while every destination stays cancelled, leaving a post that
+  // reads as scheduled and can never publish.
+  if (post.approvalStatus !== ApprovalStatus.pending || post.status !== PostStatus.pending_approval) {
     throw new AppError({
       key: 'errors.notPending',
       fallback: 'That post is not awaiting approval.',
@@ -149,7 +153,11 @@ export async function rejectPost(options: {
   });
   if (!post) throw errors.postNotFound();
 
-  if (post.approvalStatus !== ApprovalStatus.pending) {
+  // A cancelled post keeps its `pending` approval state as a record, so the
+  // status has to be checked too — approving one would otherwise flip it back
+  // to `scheduled` while every destination stays cancelled, leaving a post that
+  // reads as scheduled and can never publish.
+  if (post.approvalStatus !== ApprovalStatus.pending || post.status !== PostStatus.pending_approval) {
     throw new AppError({
       key: 'errors.notPending',
       fallback: 'That post is not awaiting approval.',
@@ -211,7 +219,7 @@ export async function releaseHeldPosts(options: {
   workspaceId: string;
   userId: string;
 }): Promise<number> {
-  const held = { workspaceId: options.workspaceId, approvalStatus: ApprovalStatus.pending };
+  const held = { workspaceId: options.workspaceId, ...IN_APPROVAL_QUEUE };
 
   // Same landing place as an approval: a post with no time set has nothing for
   // the scheduler to act on, so it returns to draft rather than to a scheduled
@@ -244,6 +252,19 @@ export async function releaseHeldPosts(options: {
   return released;
 }
 
+/**
+ * What is actually waiting on a reviewer.
+ *
+ * Both halves matter. `approvalStatus` alone counts posts that have since been
+ * cancelled — cancelling leaves the approval state untouched, deliberately, so
+ * the record of what was asked for survives — and a queue that lists work
+ * nobody can act on trains reviewers to ignore the badge.
+ */
+export const IN_APPROVAL_QUEUE = {
+  approvalStatus: ApprovalStatus.pending,
+  status: PostStatus.pending_approval,
+} as const;
+
 export async function pendingApprovalCount(workspaceId: string): Promise<number> {
-  return prisma.post.count({ where: { workspaceId, approvalStatus: ApprovalStatus.pending } });
+  return prisma.post.count({ where: { workspaceId, ...IN_APPROVAL_QUEUE } });
 }
