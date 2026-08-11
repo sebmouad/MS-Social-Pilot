@@ -496,7 +496,10 @@ describe('bulk upload limits', () => {
   });
 
   function csvWithRows(count: number): string {
-    const rows = Array.from({ length: count }, (_, index) => `Row ${index + 1},2027-01-01 09:00`);
+    // Worked out when the test runs: a literal date is a test that passes
+    // until it does not.
+    const when = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const rows = Array.from({ length: count }, (_, index) => `Row ${index + 1},${when} 09:00`);
     return ['message,scheduled_at', ...rows].join('\n');
   }
 

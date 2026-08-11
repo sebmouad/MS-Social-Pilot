@@ -120,6 +120,19 @@ async function makeWorkspace(options: {
   return { workspace, target };
 }
 
+/**
+ * A wall-clock time comfortably in the future, worked out when the test runs.
+ *
+ * `createPost` refuses a scheduled time that has passed, and it uses the real
+ * clock. A literal date is a test that passes until it does not: the suite goes
+ * red one morning for no reason anyone changed.
+ */
+function futureLocalInput(daysAhead = 30): string {
+  const date = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T09:00`;
+}
+
 describe('approval gating in the scheduler', () => {
   it('does not publish a post awaiting approval, even once it is due', async () => {
     const owner = await makeUser('Owner');
@@ -925,7 +938,7 @@ describe('who needs approval', () => {
         media: [],
         targetIds: [target.id],
         publishMode: 'worker',
-        scheduledAtLocal: '2027-01-01T09:00',
+        scheduledAtLocal: futureLocalInput(),
         timezone: 'UTC',
         useQueue: false,
         saveAsDraft: false,
@@ -961,7 +974,7 @@ describe('who needs approval', () => {
         media: [],
         targetIds: [target.id],
         publishMode: 'worker',
-        scheduledAtLocal: '2027-01-01T09:00',
+        scheduledAtLocal: futureLocalInput(),
         timezone: 'UTC',
         useQueue: false,
         saveAsDraft: false,
@@ -993,7 +1006,7 @@ describe('who needs approval', () => {
         media: [],
         targetIds: [target.id],
         publishMode: 'worker',
-        scheduledAtLocal: '2027-01-01T09:00',
+        scheduledAtLocal: futureLocalInput(),
         timezone: 'UTC',
         useQueue: false,
         saveAsDraft: false,
@@ -1062,7 +1075,7 @@ describe('cross-tenant isolation', () => {
           media: [],
           targetIds: [clientB.target.id],
           publishMode: 'worker',
-          scheduledAtLocal: '2027-01-01T09:00',
+          scheduledAtLocal: futureLocalInput(),
           timezone: 'UTC',
           useQueue: false,
           saveAsDraft: false,
