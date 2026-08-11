@@ -24,6 +24,16 @@ and any job can be run alone from a test or `POST /api/cron/tick?jobs=…`. A jo
 that throws is caught per job: a failing RSS poll must never stop posts going
 out.
 
+The instance-wide jobs walk their tenants through `forEachWorkspace` /
+`forEachEnabledPage` rather than loading every id up front. Cursor paging, not
+offset — `skip` re-scans everything it skips, so the last page of a long list
+costs the most and rows inserted mid-pass shift the window, while a cursor on
+the primary key is stable and costs the same on every page. Failures are caught
+per row as well as per job: one client with a dead token must not end the pass
+for everyone behind them in the list. Rows are handled one at a time on purpose
+— these jobs call Graph, and Facebook throttles per app, so running tenants in
+parallel would spend the rate limit faster without finishing sooner.
+
 ---
 
 ## The central design decision: PostTarget
