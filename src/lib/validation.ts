@@ -153,11 +153,32 @@ export const queueSlotsSchema = z.object({
  * One row of a bulk upload. The CSV columns are:
  * `message,link,scheduled_at,media_url`
  */
+/**
+ * A CSV cell that is either blank or a URL.
+ *
+ * Spreadsheets fill missing values with an empty string rather than omitting
+ * the column, so blank has to mean absent before the URL rule is applied.
+ */
+const optionalCsvUrl = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  httpUrl.optional(),
+);
+
+/**
+ * One row of an uploaded CSV.
+ *
+ * The URL rules match the composer's on purpose. They were missing here, so a
+ * spreadsheet could put anything at all in the link column: it was stored on
+ * the post, rendered as an href on the post list and the approvals screen, and
+ * only discovered to be unusable when Facebook refused it at publish time. A
+ * row that cannot work should be reported as a bad row while the person who
+ * uploaded it is still looking at the upload.
+ */
 export const bulkRowSchema = z.object({
   message: z.string().max(LIMITS.messageLength).default(''),
-  link: z.string().trim().optional(),
+  link: optionalCsvUrl,
   scheduled_at: z.string().trim().optional(),
-  media_url: z.string().trim().optional(),
+  media_url: optionalCsvUrl,
 });
 
 export const bulkUploadSchema = z.object({

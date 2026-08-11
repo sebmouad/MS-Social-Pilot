@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseCsv, parseCsvWithHeader } from '../src/lib/csv';
+import { bulkRowSchema } from '../src/lib/validation';
 
 describe('parseCsv', () => {
   it('parses simple rows', () => {
@@ -66,5 +67,45 @@ describe('parseCsvWithHeader', () => {
 
   it('returns nothing for an empty document', () => {
     expect(parseCsvWithHeader('')).toEqual([]);
+  });
+});
+
+/**
+ * A spreadsheet is not a form: nobody is watching the field as it is typed, and
+ * a whole column can be wrong at once.
+ */
+describe('bulkRowSchema', () => {
+  it('treats an empty cell as no link at all', () => {
+    const parsed = bulkRowSchema.parse({ message: 'Hello', link: '', media_url: '   ' });
+    expect(parsed.link).toBeUndefined();
+    expect(parsed.media_url).toBeUndefined();
+  });
+
+  it('accepts an ordinary link', () => {
+    const parsed = bulkRowSchema.parse({ message: 'Hello', link: 'https://example.com/a' });
+    expect(parsed.link).toBe('https://example.com/a');
+  });
+
+  it('refuses a link that is not a URL', () => {
+    // Reported as a bad row while the uploader is still looking at the upload,
+    // rather than at publish time when Facebook refuses it.
+    expect(bulkRowSchema.safeParse({ message: 'Hi', link: 'not a url' }).success).toBe(false);
+  });
+
+  it('refuses a scheme that is not http or https', () => {
+    // The link is rendered as an href on the post list and the approvals
+    // screen, so this one matters beyond whether Facebook would take it.
+    for (const link of ['javascript:alert(1)', 'data:text/html,<script>', 'file:///etc/passwd']) {
+      expect(bulkRowSchema.safeParse({ message: 'Hi', link }).success).toBe(false);
+    }
+  });
+
+  it('applies the same rule to the media column', () => {
+    expect(bulkRowSchema.safeParse({ message: 'Hi', media_url: 'file:///etc/passwd' }).success).toBe(
+      false,
+    );
+    expect(
+      bulkRowSchema.safeParse({ message: 'Hi', media_url: 'https://cdn.example.com/a.jpg' }).success,
+    ).toBe(true);
   });
 });

@@ -432,6 +432,13 @@ static ceiling because past it the parse itself is the problem. The whole file
 is refused rather than partly scheduled: nothing happened, so there is nothing
 to reconcile.
 
+Per-row URL rules match the composer's, which they did not before: a spreadsheet
+could put anything in the link column, and it was stored on the post and
+rendered as an `href` on the post list and the approvals screen before anyone
+discovered Facebook would not take it. Bad rows are now reported as bad rows,
+which is what the row-by-row result format exists for — one malformed cell
+should not cost a 200-row campaign, and it should not become a post either.
+
 ## Link previews and outbound fetches
 
 Composing a post scrapes the link for its Open Graph card, which means the
