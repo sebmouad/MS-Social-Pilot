@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseCsv, parseCsvWithHeader } from '../src/lib/csv';
+import { bulkCsvTemplate, parseCsv, parseCsvWithHeader } from '../src/lib/csv';
 import { bulkRowSchema } from '../src/lib/validation';
+import { localInputToUtc } from '../src/lib/time';
 
 describe('parseCsv', () => {
   it('parses simple rows', () => {
@@ -165,5 +166,57 @@ describe('bulkRowSchema', () => {
     expect(
       bulkRowSchema.safeParse({ message: 'Hi', media_url: 'https://cdn.example.com/a.jpg' }).success,
     ).toBe(true);
+  });
+});
+
+/**
+ * The file people download to start from. Every rule the uploader enforces has
+ * to accept it, or the product's own example is the first thing that fails.
+ */
+describe('bulkCsvTemplate', () => {
+  const now = new Date('2026-08-11T12:00:00Z');
+
+  it('parses without complaint', () => {
+    const { rows, problems } = parseCsvWithHeader(bulkCsvTemplate(now));
+
+    expect(problems).toEqual([]);
+    expect(rows).toHaveLength(3);
+  });
+
+  it('passes the row rules it will be validated against', () => {
+    const { rows } = parseCsvWithHeader(bulkCsvTemplate(now));
+
+    for (const row of rows) {
+      expect(bulkRowSchema.safeParse(row).success).toBe(true);
+    }
+  });
+
+  it('shows the em dash and the comma-free example intact', () => {
+    const { rows } = parseCsvWithHeader(bulkCsvTemplate(now));
+
+    expect(rows[0]?.message).toBe('Spring sale starts today — 20% off everything.');
+    expect(rows[2]?.link).toBe('');
+    expect(rows[2]?.media_url).toBe('https://example.com/photo.jpg');
+  });
+
+  it('dates the examples in the future, whenever it is downloaded', () => {
+    // Hardcoded dates turn the sample file into one that fails on every row
+    // the moment they pass, for someone using the product for the first time.
+    const { rows } = parseCsvWithHeader(bulkCsvTemplate(now));
+
+    for (const row of rows) {
+      const when = localInputToUtc(row.scheduled_at!.replace(' ', 'T'), 'UTC');
+      expect(when.getTime()).toBeGreaterThan(now.getTime());
+    }
+  });
+
+  it('is still in the future for a download a year from now', () => {
+    const later = new Date('2027-12-31T23:00:00Z');
+    const { rows } = parseCsvWithHeader(bulkCsvTemplate(later));
+
+    for (const row of rows) {
+      const when = localInputToUtc(row.scheduled_at!.replace(' ', 'T'), 'UTC');
+      expect(when.getTime()).toBeGreaterThan(later.getTime());
+    }
   });
 });

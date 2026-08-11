@@ -151,10 +151,27 @@ export function parseCsvWithHeader(input: string): CsvDocument {
   return { rows: parsed, problems };
 }
 
-export const BULK_CSV_TEMPLATE = [
-  'message,link,scheduled_at,media_url',
-  '"Spring sale starts today — 20% off everything.",https://example.com/sale,2026-09-01 09:00,',
-  '"New blog post: how we cut build times in half.",https://example.com/blog/builds,2026-09-02 14:30,',
-  '"Behind the scenes at the workshop.",,2026-09-03 11:00,https://example.com/photo.jpg',
-  '',
-].join('\n');
+/**
+ * The example file offered on the upload screen.
+ *
+ * Dated relative to today rather than fixed, because a scheduled time in the
+ * past is refused: hardcoded dates quietly turn the sample file into one that
+ * fails on every row the moment they pass, and the person it fails for is
+ * someone using the product for the first time.
+ */
+export function bulkCsvTemplate(now: Date = new Date()): string {
+  const day = (offset: number, hour: number, minute: number): string => {
+    const date = new Date(now);
+    date.setDate(date.getDate() + offset);
+    const pad = (value: number) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(hour)}:${pad(minute)}`;
+  };
+
+  return [
+    'message,link,scheduled_at,media_url',
+    `"Spring sale starts today — 20% off everything.",https://example.com/sale,${day(7, 9, 0)},`,
+    `"New blog post: how we cut build times in half.",https://example.com/blog/builds,${day(8, 14, 30)},`,
+    `"Behind the scenes at the workshop.",,${day(9, 11, 0)},https://example.com/photo.jpg`,
+    '',
+  ].join('\n');
+}

@@ -5,7 +5,7 @@ import { SettingsNav } from '@/components/SettingsNav';
 import { SettingsClient } from '@/components/SettingsClient';
 import { requirePage } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { BULK_CSV_TEMPLATE } from '@/lib/csv';
+import { bulkCsvTemplate } from '@/lib/csv';
 import { aiAvailable } from '@/lib/ai';
 import { env } from '@/lib/env';
 
@@ -73,7 +73,7 @@ export default async function SettingsPage() {
         workspaceName={auth.workspace.name}
         timezone={auth.workspace.timezone}
         timezones={timezoneOptions()}
-        csvTemplate={BULK_CSV_TEMPLATE}
+        csvTemplate={bulkCsvTemplate()}
         aiConfigured={aiAvailable()}
         shortLinkBase={env.shortLinkBase}
         options={{
