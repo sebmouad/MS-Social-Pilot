@@ -21,10 +21,27 @@ import { GraphError, graphRequest, graphUpload } from './graph';
  * table is testable without touching the network.
  */
 
+/**
+ * A file to be uploaded, opened only when it is about to be sent.
+ *
+ * `read` rather than a `Buffer`: Graph takes one file per request and this code
+ * uploads them one at a time, so holding all ten of a post's attachments at
+ * once costs ten times what the upload actually needs — multiplied again by the
+ * destinations the worker publishes to in parallel.
+ */
+export interface BinarySource {
+  type: 'binary';
+  read: () => Promise<Buffer>;
+  filename: string;
+  contentType: string;
+}
+
+export type MediaSource = { type: 'url'; url: string } | BinarySource;
+
 /** Media already resolved to something Graph can consume. */
 export type ResolvedMedia =
-  | { kind: 'image'; source: { type: 'url'; url: string } | { type: 'binary'; data: Buffer; filename: string; contentType: string } }
-  | { kind: 'video'; source: { type: 'url'; url: string } | { type: 'binary'; data: Buffer; filename: string; contentType: string } };
+  | { kind: 'image'; source: MediaSource }
+  | { kind: 'video'; source: MediaSource };
 
 export interface PublishRequest {
   targetType: TargetType;
@@ -179,7 +196,7 @@ async function uploadPhoto(
   return graphUpload<PhotoResponse>(`${request.targetId}/photos`, {
     accessToken: request.accessToken,
     file: {
-      data: item.source.data,
+      data: await item.source.read(),
       filename: item.source.filename,
       contentType: item.source.contentType,
     },
@@ -303,7 +320,7 @@ export async function publishPost(request: PublishRequest): Promise<PublishResul
       const data = await graphUpload<{ id: string }>(`${request.targetId}/videos`, {
         accessToken: request.accessToken,
         file: {
-          data: video.source.data,
+          data: await video.source.read(),
           filename: video.source.filename,
           contentType: video.source.contentType,
         },

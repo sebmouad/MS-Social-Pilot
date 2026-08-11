@@ -341,13 +341,21 @@ export async function resolveMediaForPublish(media: PostMedia[]): Promise<Resolv
 
   for (const item of media) {
     if (item.storageKey) {
-      const data = await readStoredFile(item.storageKey);
+      const storageKey = item.storageKey;
+
+      // Checked now so a missing file fails before anything is published,
+      // rather than half way through a post's attachments.
+      await stat(resolveStoragePath(storageKey));
+
       resolved.push({
         kind: item.kind,
         source: {
           type: 'binary',
-          data,
-          filename: path.basename(item.storageKey),
+          // Read when Graph is ready for it, not now: uploads go one at a time,
+          // so holding all of a post's attachments at once costs the sum of
+          // them to send the largest.
+          read: () => readStoredFile(storageKey),
+          filename: path.basename(storageKey),
           contentType: item.mimeType ?? (item.kind === 'image' ? 'image/jpeg' : 'video/mp4'),
         },
       });

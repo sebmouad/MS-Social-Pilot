@@ -526,3 +526,66 @@ describe('opening a stored file', () => {
     await expect(media.openStoredFile('ws-stream/not-here.png')).rejects.toThrow();
   });
 });
+
+/**
+ * Graph takes one file per request and this code uploads them one at a time,
+ * so a post's attachments must not all be in memory to send the first.
+ */
+describe('resolving a post\'s attachments', () => {
+  let media: typeof import('../src/lib/media');
+
+  beforeAll(async () => {
+    media = await import('../src/lib/media');
+  });
+
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 9, 9]);
+
+  async function storeOne(name: string) {
+    return media.storeFile({
+      workspaceId: 'ws-lazy',
+      data: PNG,
+      mimeType: 'image/png',
+      originalName: name,
+    });
+  }
+
+  it('does not read the files until they are asked for', async () => {
+    const files = await Promise.all([storeOne('a.png'), storeOne('b.png'), storeOne('c.png')]);
+
+    const resolved = await media.resolveMediaForPublish(
+      files.map((file, index) => ({
+        id: `m${index}`,
+        kind: 'image' as const,
+        url: '',
+        storageKey: file.storageKey,
+        mimeType: 'image/png',
+      })),
+    );
+
+    expect(resolved).toHaveLength(3);
+    for (const item of resolved) {
+      // The bytes arrive on request, one attachment at a time.
+      expect(item.source.type).toBe('binary');
+      if (item.source.type !== 'binary') continue;
+      expect(await item.source.read()).toEqual(PNG);
+    }
+  });
+
+  it('notices a missing file before anything is published', async () => {
+    // Better here than half way through a post's attachments, with some of
+    // them already live on the page.
+    await expect(
+      media.resolveMediaForPublish([
+        { id: 'gone', kind: 'image', url: '', storageKey: 'ws-lazy/not-here.png' },
+      ]),
+    ).rejects.toThrow();
+  });
+
+  it('passes an external URL straight through', async () => {
+    const [item] = await media.resolveMediaForPublish([
+      { id: 'x', kind: 'image', url: 'https://cdn.example.com/a.jpg' },
+    ]);
+
+    expect(item?.source).toEqual({ type: 'url', url: 'https://cdn.example.com/a.jpg' });
+  });
+});

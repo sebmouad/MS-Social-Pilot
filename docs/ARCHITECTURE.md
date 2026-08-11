@@ -568,9 +568,15 @@ the same time was enough to matter on a small host. `openStoredFile` returns a
 stream and a size instead, so the cost per request is a buffer rather than a
 file.
 
-Publishing still reads the bytes whole. That path hands the file to Graph as one
-multipart upload and genuinely needs it, and it runs on the worker, one
-destination at a time, rather than once per page view.
+Publishing needs the bytes — Graph takes a file as one multipart upload — but it
+needs them one at a time, which is not the same thing. `resolveMediaForPublish`
+hands back a `read()` per attachment rather than a buffer, so a post with ten
+images costs the largest of them to send rather than the sum of all ten, and the
+worker publishing to four destinations at once multiplies the smaller number.
+
+Existence is still checked up front, at resolve time. A file that has gone
+missing should stop the post before anything is published, not half way through
+its attachments with some of them already live on the page.
 
 Range requests are not implemented, so scrubbing a long video re-fetches from
 the start. Worth adding if video ever becomes a common upload; it is not one
