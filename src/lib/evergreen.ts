@@ -137,7 +137,6 @@ export async function runEvergreenCycle(options: {
   return { checked: due.length, created, finished };
 }
 
-/** Turn recycling on or off for a post. */
 /**
  * Turn recycling on or off for a post, and set its alternate wordings.
  *
@@ -195,9 +194,15 @@ export async function setRecycling(options: {
             everyDays,
             limit: options.limit ?? post.recycleLimit,
             count: post.recycleCount,
-            // Measured from publication, so the first repeat is a full
-            // interval after the post actually went out.
-            from: post.publishedAt ?? new Date(),
+            // Measured from publication, so the first repeat is a full interval
+            // after the post actually goes out. Recycling is usually switched on
+            // while composing, before there is a `publishedAt` at all, and
+            // falling straight back to "now" measured the interval from the
+            // click instead: a post scheduled a month out with a monthly repeat
+            // came due for its first repeat the moment it published. The
+            // scheduled time is what the post will go out at, so it is the
+            // honest starting point until publication supplies the real one.
+            from: post.publishedAt ?? post.scheduledAt ?? new Date(),
           })
         : null,
     },

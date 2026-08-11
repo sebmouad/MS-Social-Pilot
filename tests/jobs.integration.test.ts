@@ -386,6 +386,42 @@ describe('setting recycling variants', () => {
     expect((await prisma.post.findUniqueOrThrow({ where: { id: post.id } })).recycleEnabled).toBe(true);
   });
 
+  it('measures the first repeat from when the post will go out', async () => {
+    const { user, workspace, target } = await seedWorkspace();
+    authorId = user.id;
+    const goesOutAt = new Date('2026-10-01T09:00:00Z');
+
+    // Recycling is normally switched on while composing, long before there is
+    // a publishedAt to measure from.
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: user.id,
+        message: 'Scheduled for next month',
+        status: PostStatus.scheduled,
+        approvalStatus: 'not_required',
+        scheduledAt: goesOutAt,
+        targets: { create: { targetId: target.id } },
+      },
+    });
+
+    await call(workspace.id, post.id, WorkspaceRole.owner, false);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    // A full interval after publication, not a full interval after the click —
+    // which would have fallen due the moment the post went out.
+    expect(after.recycleNextAt?.toISOString()).toBe('2026-10-31T09:00:00.000Z');
+  });
+
+  it('measures from publication once there is one', async () => {
+    const { workspace, post } = await seedPublished(false);
+
+    await call(workspace.id, post.id, WorkspaceRole.owner, false);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.recycleNextAt?.toISOString()).toBe('2026-08-31T10:00:00.000Z');
+  });
+
   it('reports a post that is not there instead of claiming success', async () => {
     const { workspace } = await seedPublished(false);
 
