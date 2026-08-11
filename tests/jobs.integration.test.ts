@@ -273,6 +273,45 @@ describe('evergreen recycling', () => {
     expect(original.recycleEnabled).toBe(false);
   });
 
+  it('stops recycling when every destination has been turned off', async () => {
+    const { post, target } = await seedEvergreen();
+    await prisma.target.update({ where: { id: target.id }, data: { enabled: false } });
+
+    const result = await evergreen.runEvergreenCycle({ now, logger });
+    // One dead copy would be a mistake; a new one every interval for ever is a
+    // mess someone has to clean up by hand.
+    expect(result.created).toBe(0);
+    expect(result.finished).toBe(1);
+
+    const original = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(original.recycleEnabled).toBe(false);
+    expect(original.recycleNextAt).toBeNull();
+  });
+
+  it('recycles into the destinations that are still on', async () => {
+    const { post, workspace, target } = await seedEvergreen();
+    const off = await prisma.target.create({
+      data: {
+        workspaceId: workspace.id,
+        type: 'page',
+        providerId: '4000',
+        name: 'Retired Page',
+        enabled: false,
+      },
+    });
+    await prisma.postTarget.create({ data: { postId: post.id, targetId: off.id, status: 'published' } });
+
+    const result = await evergreen.runEvergreenCycle({ now, logger });
+    expect(result.created).toBe(1);
+
+    const copy = await prisma.post.findFirstOrThrow({
+      where: { originPostId: post.id },
+      include: { targets: true },
+    });
+    expect(copy.targets).toHaveLength(1);
+    expect(copy.targets[0]!.targetId).toBe(target.id);
+  });
+
   it('does not recycle a post that never published', async () => {
     const { post } = await seedEvergreen();
     await prisma.post.update({ where: { id: post.id }, data: { status: PostStatus.failed } });

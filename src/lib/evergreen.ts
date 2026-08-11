@@ -69,7 +69,9 @@ export async function runEvergreenCycle(options: {
       // Only a post that actually went out is worth repeating.
       status: { in: [PostStatus.published, PostStatus.partially_failed] },
     },
-    include: { targets: { select: { targetId: true } } },
+    include: {
+      targets: { select: { targetId: true, target: { select: { enabled: true } } } },
+    },
     take: options.limit ?? 50,
   });
 
@@ -81,13 +83,25 @@ export async function runEvergreenCycle(options: {
     const variants = parseVariants(post.variants);
 
     // Stop rather than repeat: a post whose destinations have all been removed
-    // has nowhere to go.
-    if (post.targets.length === 0) {
+    // has nowhere to go. A destination that is merely turned off counts as gone
+    // for this purpose — the copy would be created, skipped on the next tick
+    // for pointing at a Page nobody turned back on, and replaced by another
+    // copy an interval later, for ever. One dead repeat is a mistake; an
+    // unbounded series of them is a mess someone has to clean up by hand.
+    const live = post.targets.filter((row) => row.target.enabled);
+    if (live.length === 0) {
       await prisma.post.update({
         where: { id: post.id },
         data: { recycleEnabled: false, recycleNextAt: null },
       });
       finished += 1;
+      options.logger?.(
+        `Stopped recycling post ${post.id}: none of its destinations are still active.`,
+      );
+      await logActivity(post.workspaceId, 'post.recycleStopped', {
+        postId: post.id,
+        reason: 'no active destinations',
+      });
       continue;
     }
 
@@ -107,7 +121,7 @@ export async function runEvergreenCycle(options: {
         scheduledAt: post.recycleNextAt ?? now,
         timezone: post.timezone,
         originPostId: post.id,
-        targets: { create: post.targets.map((target) => ({ targetId: target.targetId })) },
+        targets: { create: live.map((row) => ({ targetId: row.targetId })) },
       },
     });
 

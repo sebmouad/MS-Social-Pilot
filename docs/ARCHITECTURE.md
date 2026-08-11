@@ -134,6 +134,12 @@ A post every one of whose destinations was skipped reads `failed`, not
 `cancelled`. Nobody cancelled it; calling it cancelled sends the reader looking
 for a colleague who did it.
 
+Evergreen respects the same signal, and has to: a recycled copy pointed at a
+disabled Page would be created, skipped on the next tick, and replaced by
+another copy an interval later, indefinitely. Recycling therefore copies only
+live destinations, and stops altogether when none are left — the same thing it
+already did when the destinations had been deleted outright.
+
 ### Retry policy
 
 `src/lib/scheduler/backoff.ts`. The base delay depends on why the attempt failed:
