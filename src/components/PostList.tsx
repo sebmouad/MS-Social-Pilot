@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { StatusBadge } from './StatusBadge';
+import { ExternalLink } from './ExternalLink';
 
 export interface PostView {
   id: string;
@@ -78,14 +79,12 @@ export function PostList({ posts }: { posts: PostView[] }) {
                   {post.message || <span className="text-slate-400">{t('noText')}</span>}
                 </p>
                 {post.link && (
-                  <a
+                  <ExternalLink
                     href={post.link}
-                    target="_blank"
-                    rel="noreferrer"
                     className="mt-1 block truncate text-xs text-brand-600 hover:underline"
                   >
                     {post.link}
-                  </a>
+                  </ExternalLink>
                 )}
                 <p className="mt-2 text-xs text-slate-500">
                   {post.publishedAtLabel
@@ -106,14 +105,9 @@ export function PostList({ posts }: { posts: PostView[] }) {
                   <span className="font-medium text-slate-700">{target.name}</span>
                   <StatusBadge status={target.status} kind="target" />
                   {target.url && (
-                    <a
-                      href={target.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-brand-600 hover:underline"
-                    >
+                    <ExternalLink href={target.url} className="text-brand-600 hover:underline">
                       {t('viewOnFacebook')}
-                    </a>
+                    </ExternalLink>
                   )}
                   {target.error && (
                     <span className="text-red-600">

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
 import { VIZ, seriesColor } from '@/lib/viz';
+import { ExternalLink } from './ExternalLink';
 
 export interface PostRow {
   postTargetId: string;
@@ -220,14 +221,9 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
                     {post.url && (
                       <>
                         {' · '}
-                        <a
-                          href={post.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-brand-600 hover:underline"
-                        >
+                        <ExternalLink href={post.url} className="text-brand-600 hover:underline">
                           Facebook
-                        </a>
+                        </ExternalLink>
                       </>
                     )}
                   </p>

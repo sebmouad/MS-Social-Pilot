@@ -32,6 +32,7 @@ import {
 import { listInstagramAccounts, readInstagramInsights, readInstagramMedia } from '@/lib/instagram';
 import { listAdAccounts, readAdSummary, readCampaigns } from '@/lib/ads';
 import { formatInZone } from '@/lib/time';
+import { ExternalLink } from '@/components/ExternalLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -384,9 +385,9 @@ async function VideosView({
                 <td className="max-w-xs px-4 py-3">
                   <p className="truncate font-medium text-slate-900" title={video.title}>
                     {video.permalink ? (
-                      <a href={video.permalink} target="_blank" rel="noreferrer" className="hover:underline">
+                      <ExternalLink href={video.permalink} className="hover:underline">
                         {video.title}
-                      </a>
+                      </ExternalLink>
                     ) : (
                       video.title
                     )}
@@ -642,14 +643,9 @@ async function ExternalView({
                   </Link>
                 )}
                 {post.permalink && (
-                  <a
-                    href={post.permalink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-brand-600 hover:underline"
-                  >
+                  <ExternalLink href={post.permalink} className="text-brand-600 hover:underline">
                     {t('viewOnFacebook')}
-                  </a>
+                  </ExternalLink>
                 )}
               </div>
             </li>
@@ -827,9 +823,9 @@ async function InstagramView({
                   <td className="max-w-sm px-4 py-3">
                     <p className="truncate text-slate-900" title={item.caption}>
                       {item.permalink ? (
-                        <a href={item.permalink} target="_blank" rel="noreferrer" className="hover:underline">
+                        <ExternalLink href={item.permalink} className="hover:underline">
                           {item.caption}
-                        </a>
+                        </ExternalLink>
                       ) : (
                         item.caption
                       )}

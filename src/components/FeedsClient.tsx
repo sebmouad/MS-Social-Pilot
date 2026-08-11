@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import type { TargetOption } from './TargetPicker';
+import { ExternalLink } from './ExternalLink';
 
 export interface FeedView {
   id: string;
@@ -219,14 +220,12 @@ export function FeedsClient({ feeds, targets, canManage }: Props) {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-900">{feed.name}</p>
-                <a
+                <ExternalLink
                   href={feed.url}
-                  target="_blank"
-                  rel="noreferrer"
                   className="block truncate text-xs text-brand-600 hover:underline"
                 >
                   {feed.url}
-                </a>
+                </ExternalLink>
                 <p className="mt-1 text-xs text-slate-500">
                   {feed.lastPolledLabel ? t('lastPolled', { when: feed.lastPolledLabel }) : t('neverPolled')}
                   {' · '}

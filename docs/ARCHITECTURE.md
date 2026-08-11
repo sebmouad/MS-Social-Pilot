@@ -439,6 +439,18 @@ discovered Facebook would not take it. Bad rows are now reported as bad rows,
 which is what the row-by-row result format exists for — one malformed cell
 should not cost a 200-row campaign, and it should not become a post either.
 
+### Links rendered from data
+
+Every `href` the app builds from data — a URL somebody typed, a spreadsheet
+column they uploaded, a permalink Graph handed back — goes through
+`ExternalLink`, which builds an anchor only for `http(s)` and otherwise renders
+the same text as a plain span. Validation on the way in is the real defence and
+it is in place, but it only covers rows written since it was added: a post
+stored before the CSV columns were checked still renders, and so would anything
+a future write path forgets. The unsafe value is shown rather than hidden — the
+point is that the address stops being clickable, not that the user stops being
+told what the post says.
+
 ## Link previews and outbound fetches
 
 Composing a post scrapes the link for its Open Graph card, which means the

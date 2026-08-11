@@ -4,6 +4,7 @@ import { requirePage } from '@/lib/auth';
 import { buildReport } from '@/lib/reports';
 import { formatInZone, utcToLocalInput } from '@/lib/time';
 import { ReportControls } from '@/components/ReportControls';
+import { ExternalLink } from '@/components/ExternalLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,9 +115,9 @@ export default async function ReportsPage({
                     {post.url && (
                       <>
                         {' · '}
-                        <a href={post.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
+                        <ExternalLink href={post.url} className="text-brand-600 hover:underline">
                           Facebook
-                        </a>
+                        </ExternalLink>
                       </>
                     )}
                   </p>

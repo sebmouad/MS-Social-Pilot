@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { ExternalLink } from './ExternalLink';
 
 export interface PendingPost {
   id: string;
@@ -74,14 +75,12 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
           </p>
 
           {post.link && (
-            <a
+            <ExternalLink
               href={post.link}
-              target="_blank"
-              rel="noreferrer"
               className="mt-1 block truncate text-xs text-brand-600 hover:underline"
             >
               {post.link}
-            </a>
+            </ExternalLink>
           )}
 
           <p className="mt-2 text-xs text-slate-500">
