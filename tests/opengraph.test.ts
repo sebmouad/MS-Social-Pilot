@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { assertSafePreviewUrl, parseOpenGraphHtml } from '../src/lib/facebook/opengraph';
+import {
+  assertSafePreviewUrl,
+  parseOpenGraphHtml,
+  scrapeWithFetch,
+} from '../src/lib/facebook/opengraph';
 
 describe('parseOpenGraphHtml', () => {
   it('reads the standard og: tags', () => {
@@ -115,5 +119,95 @@ describe('assertSafePreviewUrl', () => {
 
   it('rejects a value that is not a URL at all', () => {
     expect(() => assertSafePreviewUrl('just some text')).toThrow(/valid URL/i);
+  });
+});
+
+/**
+ * The server fetches a link the user typed, so the address check belongs where
+ * the fetch happens — not on one of the three routes that reach it.
+ */
+describe('address ranges that reach inwards', () => {
+  const blocked = [
+    'http://[::ffff:127.0.0.1]/',
+    'http://[fd00::1]/',
+    'http://[fe80::1]/',
+    'http://0.0.0.0/',
+  ];
+
+  for (const url of blocked) {
+    it(`refuses ${url}`, () => {
+      expect(() => assertSafePreviewUrl(url)).toThrow();
+    });
+  }
+
+  it('still allows an ordinary public host', () => {
+    expect(assertSafePreviewUrl('https://example.com/a').hostname).toBe('example.com');
+  });
+});
+
+describe('scrapeWithFetch address checks', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function htmlResponse(body: string) {
+    return new Response(body, {
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+    });
+  }
+
+  function redirectTo(location: string) {
+    return new Response(null, { status: 302, headers: { location } });
+  }
+
+  it('never opens a connection to a private address', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const preview = await scrapeWithFetch('http://169.254.169.254/latest/meta-data/');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(preview.title).toBeNull();
+  });
+
+  it('does not follow a public URL that redirects inwards', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(redirectTo('http://169.254.169.254/latest/meta-data/'));
+
+    // The page's own <title> would otherwise end up stored on the post and
+    // rendered back to whoever asked for the preview.
+    const preview = await scrapeWithFetch('https://example.com/redirector');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(preview.title).toBeNull();
+  });
+
+  it('still follows a redirect that stays public', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(redirectTo('https://example.com/final'))
+      .mockResolvedValueOnce(htmlResponse('<html><head><title>Arrived</title></head></html>'));
+
+    const preview = await scrapeWithFetch('https://example.com/start');
+    expect(preview.title).toBe('Arrived');
+  });
+
+  it('gives up rather than chasing a redirect loop', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(redirectTo('https://example.com/round-and-round'));
+
+    const preview = await scrapeWithFetch('https://example.com/round-and-round');
+
+    expect(fetchSpy.mock.calls.length).toBeLessThanOrEqual(4);
+    expect(preview.title).toBeNull();
+  });
+
+  it('reads an ordinary page as before', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      htmlResponse('<html><head><meta property="og:title" content="Fine" /></head></html>'),
+    );
+
+    expect((await scrapeWithFetch('https://example.com/post')).title).toBe('Fine');
   });
 });

@@ -419,6 +419,29 @@ production image.
 
 ---
 
+## Link previews and outbound fetches
+
+Composing a post scrapes the link for its Open Graph card, which means the
+server fetches a URL somebody typed. Facebook's own scraper is preferred — it
+returns the card Facebook will actually render, and re-scraping is the
+documented fix for a stale one — but the fallback fetches the page ourselves,
+and that is the path that needs guarding.
+
+`assertSafePreviewUrl` lives in `scrapeWithFetch`, the one place the fetch
+happens, rather than on a route. It used to sit on the preview endpoint alone,
+which left the two paths that matter more — creating and editing a post, either
+of which can arrive a few hundred rows at a time from a CSV — fetching whatever
+they were given. The parsed `<title>` is stored on the post and rendered back,
+so an unguarded fetch is not only a request to an internal address but a way to
+read the answer.
+
+Redirects are followed manually, three hops at most, checking each one. A guard
+that inspects only the URL it was handed is walked straight past by a public
+address that 302s to `169.254.169.254`. Hostname checks still cannot catch a
+domain that *resolves* to a private address, so an egress proxy remains the
+right answer for genuinely hostile input; this closes what can be closed in
+process.
+
 ## Media
 
 A post's media lives in a Json array — the composer needs order, alt text and a

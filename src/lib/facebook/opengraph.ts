@@ -152,16 +152,24 @@ function absolutize(candidate: string, base: string): string {
 
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_HTML_BYTES = 512 * 1024;
+const MAX_REDIRECTS = 3;
 
-/** Fetch and parse a URL ourselves. Never throws for ordinary HTTP failures. */
-export async function scrapeWithFetch(url: string): Promise<LinkPreview> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+/**
+ * Fetch a URL, checking every hop rather than only the one we were handed.
+ *
+ * `redirect: 'follow'` would let a perfectly public URL bounce us to
+ * 169.254.169.254 — checking the first address and then handing the rest to
+ * fetch is a guard that any redirect walks straight past. Following manually
+ * costs a loop and closes that.
+ */
+async function fetchChecked(raw: string, signal: AbortSignal): Promise<Response | null> {
+  let current = raw;
 
-  try {
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    const url = assertSafePreviewUrl(current);
     const response = await fetch(url, {
-      redirect: 'follow',
-      signal: controller.signal,
+      redirect: 'manual',
+      signal,
       headers: {
         // Sites commonly serve og: tags only to recognised crawlers.
         'user-agent': 'facebookexternalhit/1.1 (+MS-Social-Pilot link preview)',
@@ -169,7 +177,33 @@ export async function scrapeWithFetch(url: string): Promise<LinkPreview> {
       },
     });
 
-    if (!response.ok || !response.body) return emptyPreview(url);
+    if (response.status < 300 || response.status >= 400) return response;
+
+    const location = response.headers.get('location');
+    if (!location) return null;
+    current = new URL(location, url).toString();
+  }
+
+  return null;
+}
+
+/**
+ * Fetch and parse a URL ourselves. Never throws for ordinary HTTP failures.
+ *
+ * The address check lives here rather than at the callers because this is the
+ * only place the server itself fetches a user-supplied URL. It used to sit on
+ * the preview endpoint alone, which left the two paths that matter more —
+ * creating and editing a post, either of which can arrive a few hundred rows at
+ * a time from a CSV — fetching whatever they were given.
+ */
+export async function scrapeWithFetch(url: string): Promise<LinkPreview> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetchChecked(url, controller.signal);
+
+    if (!response || !response.ok || !response.body) return emptyPreview(url);
 
     const contentType = response.headers.get('content-type') ?? '';
     if (!contentType.includes('html')) return emptyPreview(url);
@@ -261,17 +295,25 @@ export function assertSafePreviewUrl(raw: string): URL {
     throw new Error('Only http and https URLs can be previewed.');
   }
 
-  const host = url.hostname.toLowerCase();
+  // `URL` strips the brackets from an IPv6 host, so these compare bare.
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
   const blocked =
     host === 'localhost' ||
     host === '::1' ||
+    host === '::' ||
+    host === '0.0.0.0' ||
     host.endsWith('.local') ||
     host.endsWith('.internal') ||
     /^127\./.test(host) ||
     /^10\./.test(host) ||
     /^192\.168\./.test(host) ||
     /^169\.254\./.test(host) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+    // IPv6: unique-local (fc00::/7), link-local (fe80::/10), and the
+    // IPv4-mapped form that smuggles 127.0.0.1 past a v4-only check.
+    /^f[cd]/.test(host) ||
+    /^fe[89ab]/.test(host) ||
+    host.startsWith('::ffff:');
 
   if (blocked) {
     throw new Error('That host is not reachable for link previews.');
