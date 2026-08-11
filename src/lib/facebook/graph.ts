@@ -361,6 +361,20 @@ export async function graphUpload<T = unknown>(
       env.graphUploadTimeoutMs,
     );
   } catch (error) {
+    // An abort here is the timeout above, and saying so is the difference
+    // between a person knowing their file is too big for the link this server
+    // sits on and reading "the operation was aborted" five times.
+    if (error instanceof Error && error.name === 'AbortError') {
+      const seconds = Math.round(env.graphUploadTimeoutMs / 1000);
+      const megabytes = (options.file.data.byteLength / (1024 * 1024)).toFixed(1);
+      throw new GraphError({
+        message:
+          `Uploading ${options.file.filename} (${megabytes} MB) did not finish within ${seconds} seconds. ` +
+          'Use a smaller file, or raise the media upload timeout in Configuration.',
+        kind: 'transient',
+      });
+    }
+
     const reason = error instanceof Error ? error.message : String(error);
     throw new GraphError({ message: `Network error uploading media: ${reason}`, kind: 'transient' });
   }

@@ -154,6 +154,16 @@ this codebase keeps having to be talked out of.
 are separate and both configurable, because the right numbers depend on the
 link the server sits on.
 
+A timeout that does fire says so, naming the file, its size and the limit it
+exceeded. It is still classed `transient` and still retried — a slow link is
+usually a passing thing — but the difference between that message and "the
+operation was aborted" is whether the person reading the failed post can tell
+that their video is too big for this server's connection.
+
+What Facebook itself refuses is not retried: an oversized file comes back as
+code 100 or an HTTP 4xx, both of which classify as `invalid_request`, so the
+post fails once rather than five times.
+
 ### Retry policy
 
 `src/lib/scheduler/backoff.ts`. The base delay depends on why the attempt failed:

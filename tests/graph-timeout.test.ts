@@ -56,6 +56,31 @@ describe('graph timeouts', () => {
     expect(env.graphUploadTimeoutMs).toBeGreaterThan(env.graphTimeoutMs);
   });
 
+  it('says which file ran out of time, and how long it had', async () => {
+    process.env.GRAPH_UPLOAD_TIMEOUT_SECONDS = '300';
+    delays.set('/slow-photo', 60_000);
+
+    const { graphUpload } = await import('../src/lib/facebook/graph');
+
+    // Aborted through the caller's signal rather than by waiting five minutes.
+    // Nothing in the app passes one, so in production this branch is only ever
+    // reached by the timeout — which is what the message describes.
+    const aborted = AbortSignal.abort();
+
+    // "The operation was aborted", five times over, tells nobody anything.
+    await expect(
+      graphUpload('slow-photo', {
+        accessToken: 'token',
+        signal: aborted,
+        file: {
+          data: Buffer.alloc(2 * 1024 * 1024),
+          filename: 'holiday.mp4',
+          contentType: 'video/mp4',
+        },
+      }),
+    ).rejects.toThrow(/holiday\.mp4 \(2\.0 MB\) did not finish within 300 seconds/);
+  });
+
   it('abandons a call that outlasts the request timeout', async () => {
     // Five seconds is the registry's minimum for this setting, so the stall
     // has to be longer than that rather than as short as the test would like.
