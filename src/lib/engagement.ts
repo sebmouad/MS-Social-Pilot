@@ -118,6 +118,22 @@ export interface CommentRow {
 }
 
 /**
+ * A row count that makes sense, whatever was asked for.
+ *
+ * Not a ceiling: the CSV export legitimately asks for thousands, and quietly
+ * cutting it to a screen-sized page would be the silent truncation this
+ * codebase keeps having to remove. What is refused is nonsense — Prisma reads
+ * `take: -5` as five rows *backwards*, so a negative number arriving from a
+ * query string returned the oldest comments under a heading that said latest.
+ * The ceiling on untrusted input belongs at the route, where untrusted input
+ * arrives.
+ */
+function rowCount(requested: number | undefined, fallback: number): number {
+  if (requested === undefined || !Number.isFinite(requested) || requested < 1) return fallback;
+  return Math.trunc(requested);
+}
+
+/**
  * The workspace's comment stream, newest first.
  *
  * Scoped through `post.workspaceId` rather than by comment: a comment has no
@@ -150,7 +166,7 @@ export async function readComments(options: {
       },
     },
     orderBy: { createdTime: 'desc' },
-    take: options.limit ?? 100,
+    take: rowCount(options.limit, 100),
   });
 
   return rows.map((row) => ({
@@ -526,7 +542,7 @@ export async function readReviews(options: {
       ...(options.targetId ? { targetId: options.targetId } : {}),
     },
     orderBy: { createdTime: 'desc' },
-    take: options.limit ?? 500,
+    take: rowCount(options.limit, 500),
   });
 
   const rated = rows.map((row) => row.rating).filter((value): value is number => value !== null);

@@ -475,6 +475,58 @@ describe('probing every level', () => {
   });
 });
 
+/**
+ * The number of rows to read arrives from a query string on one path and from
+ * our own code on another, and those want opposite things.
+ */
+describe('how many comments a read returns', () => {
+  async function seedComments(count: number) {
+    const seeded = await seedWorkspace();
+    await prisma.postComment.createMany({
+      data: Array.from({ length: count }, (_, index) => ({
+        postTargetId: seeded.postTarget.id,
+        remoteId: `bulk-${index}`,
+        message: `Comment ${index}`,
+        createdTime: new Date(Date.now() - index * 1000),
+      })),
+    });
+    return seeded;
+  }
+
+  it('defaults to a screenful', async () => {
+    const { workspace } = await seedComments(5);
+    expect(await engagement.readComments({ workspaceId: workspace.id })).toHaveLength(5);
+  });
+
+  it('lets our own code ask for more than a screenful', async () => {
+    // More than the route's ceiling, so a ceiling applied here would show up.
+    // The CSV export asks for thousands, and cutting it to a page would be the
+    // silent truncation this codebase keeps having to remove.
+    const { workspace } = await seedComments(250);
+
+    const rows = await engagement.readComments({ workspaceId: workspace.id, limit: 5000 });
+    expect(rows).toHaveLength(250);
+  });
+
+  it('reads the newest first, whatever nonsense the number is', async () => {
+    const { workspace } = await seedComments(4);
+
+    // Prisma reads a negative take as rows counted backwards, so this used to
+    // return the oldest comments under a heading that said latest.
+    const rows = await engagement.readComments({ workspaceId: workspace.id, limit: -2 });
+
+    expect(rows[0]?.message).toBe('Comment 0');
+    expect(rows).toHaveLength(4);
+  });
+
+  it('ignores a number that is not one', async () => {
+    const { workspace } = await seedComments(3);
+    expect(
+      await engagement.readComments({ workspaceId: workspace.id, limit: Number.NaN }),
+    ).toHaveLength(3);
+  });
+});
+
 describe('comment moderation', () => {
   it('hides a comment on Facebook before recording it locally', async () => {
     const { workspace, target, user } = await seedWorkspace();
