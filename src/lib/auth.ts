@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
-import { Locale, WorkspaceRole } from '@prisma/client';
+import { Locale, Prisma, WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
 import { errors } from './errors';
@@ -78,22 +78,40 @@ export async function createWorkspace(options: {
   timezone?: string;
   locale?: Locale;
 }): Promise<{ id: string; slug: string }> {
-  const slug = await uniqueSlug(options.name, async (candidate) => {
-    const existing = await prisma.workspace.findUnique({ where: { slug: candidate } });
-    return existing !== null;
-  });
+  // Asking whether a slug is free and then inserting it are two steps, and two
+  // people creating "Acme" at the same moment — or one person double-clicking
+  // the button — both see it free and both insert. One of them got a failed
+  // sign-up out of it. Retrying is enough to converge: by the second pass the
+  // winner's row exists, so the check moves on to "acme-2". Only a slug
+  // collision is retried; anything else is a real failure and is rethrown.
+  let workspace: { id: string; slug: string } | null = null;
 
-  const workspace = await prisma.workspace.create({
-    data: {
-      name: options.name,
-      slug,
-      timezone: options.timezone ?? 'UTC',
-      defaultLocale: options.locale ?? Locale.en,
-      memberships: { create: { userId: options.ownerId, role: WorkspaceRole.owner } },
-      queueSlots: { create: DEFAULT_QUEUE_SLOTS },
-      notificationSettings: { create: { userId: options.ownerId } },
-    },
-  });
+  for (let attempt = 0; attempt < 5 && workspace === null; attempt += 1) {
+    const slug = await uniqueSlug(options.name, async (candidate) => {
+      const existing = await prisma.workspace.findUnique({ where: { slug: candidate } });
+      return existing !== null;
+    });
+
+    try {
+      workspace = await prisma.workspace.create({
+        data: {
+          name: options.name,
+          slug,
+          timezone: options.timezone ?? 'UTC',
+          defaultLocale: options.locale ?? Locale.en,
+          memberships: { create: { userId: options.ownerId, role: WorkspaceRole.owner } },
+          queueSlots: { create: DEFAULT_QUEUE_SLOTS },
+          notificationSettings: { create: { userId: options.ownerId } },
+        },
+      });
+    } catch (error) {
+      if (!isSlugTaken(error)) throw error;
+    }
+  }
+
+  if (!workspace) {
+    throw new Error(`Could not find a free slug for workspace "${options.name}".`);
+  }
 
   return { id: workspace.id, slug: workspace.slug };
 }
@@ -123,6 +141,15 @@ export async function mayRegister(email: string): Promise<boolean> {
   ]);
 
   return users === 0 || invitation !== null;
+}
+
+/** A unique-constraint violation on the workspace slug, and nothing else. */
+function isSlugTaken(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002' &&
+    String((error.meta as { target?: string[] } | undefined)?.target ?? '').includes('slug')
+  );
 }
 
 export async function registerUser(input: {

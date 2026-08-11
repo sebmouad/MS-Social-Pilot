@@ -271,6 +271,19 @@ an id from a cookie or URL is a request, not a permission. Workspace scoping is
 therefore a security boundary, with tests that a member of one workspace cannot
 read, publish to, or approve anything in another.
 
+### Slugs under concurrency
+
+Asking whether a slug is free and then inserting it are two steps, so two people
+creating "Acme" at the same moment — or one person double-clicking the button —
+both find it free and both insert. One of them got a failed sign-up out of it.
+
+`createWorkspace` retries, and retrying is enough to converge: by the second
+pass the winner's row exists, so the search moves on to `acme-2`. Only a slug
+collision is retried; anything else is a real failure and is rethrown, which is
+the difference between a race and a broken database. The short-link path already
+worked this way — it collides far more often, being random — so this brings the
+two into line.
+
 ### Who may create an account
 
 Registration is closed by default. This app has to be reachable from the

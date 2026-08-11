@@ -224,6 +224,56 @@ describe('registerUser', () => {
  * The sign-in form is the one unauthenticated thing that does deliberate slow
  * work, so it is both a way to guess passwords and a way to load the server.
  */
+/**
+ * Two people creating a workspace with the same name at the same moment — or
+ * one person double-clicking the button — both find the slug free and both
+ * insert it.
+ */
+describe('creating workspaces at the same moment', () => {
+  it('gives everyone a workspace and nobody an error', async () => {
+    const people = await Promise.all(
+      [1, 2, 3, 4, 5].map(async () => {
+        const address = email();
+        const user = await prisma.user.create({
+          data: { email: address, name: 'Sam', passwordHash: 'x' },
+        });
+        return user.id;
+      }),
+    );
+
+    const created = await Promise.all(
+      people.map((ownerId) => auth.createWorkspace({ name: 'Acme', ownerId })),
+    );
+
+    expect(created).toHaveLength(5);
+    expect(new Set(created.map((workspace) => workspace.slug)).size).toBe(5);
+    for (const workspace of created) {
+      expect(workspace.slug).toMatch(/^acme(-\w+)?$/);
+    }
+  });
+
+  it('does not mistake a real failure for a taken slug', async () => {
+    // Retrying anything that throws would turn a genuine problem — here an
+    // owner who does not exist — into five silent retries and a misleading
+    // "could not find a free slug".
+    await expect(
+      auth.createWorkspace({ name: 'Acme', ownerId: 'no-such-user' }),
+    ).rejects.toThrow(/foreign key|constraint/i);
+  });
+
+  it('still numbers them in order when they arrive one at a time', async () => {
+    const slugs: string[] = [];
+    for (let person = 0; person < 3; person += 1) {
+      const user = await prisma.user.create({
+        data: { email: email(), name: 'Sam', passwordHash: 'x' },
+      });
+      slugs.push((await auth.createWorkspace({ name: 'Acme', ownerId: user.id })).slug);
+    }
+
+    expect(slugs).toEqual(['acme', 'acme-2', 'acme-3']);
+  });
+});
+
 describe('signing in too often', () => {
   let login: typeof import('../src/app/api/auth/login/route');
   let limiter: typeof import('../src/lib/rate-limit');
