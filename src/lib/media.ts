@@ -78,7 +78,25 @@ export async function storeFile(options: {
   }
 
   const kind = kindForMimeType(options.mimeType);
-  const extension = path.extname(options.originalName).toLowerCase().slice(0, 10) || defaultExtension(options.mimeType);
+
+  // The bytes decide. A file whose contents do not match what it says it is
+  // gets rejected now rather than at publish time, when the same problem
+  // arrives as a Graph error about an unsupported file.
+  const actual = sniffMimeType(options.data);
+  if (!actual) {
+    throw new MediaError(
+      'That file is not a JPEG, PNG, GIF, WebP or MP4. Convert it and upload again.',
+    );
+  }
+  if (kindForMimeType(actual) !== kind) {
+    throw new MediaError(
+      `That file is named as ${options.mimeType} but its contents are ${actual}.`,
+    );
+  }
+
+  // The extension follows the verified type, never the uploader's filename:
+  // the name is theirs to choose, and the file it produces on disk is not.
+  const extension = defaultExtension(actual);
   // Workspace-scoped directories keep tenants separated on disk and keep any
   // single directory from growing to an unmanageable number of entries.
   const storageKey = path.join(options.workspaceId, `${randomUUID()}${extension}`);
@@ -93,6 +111,42 @@ export async function storeFile(options: {
     size: options.data.byteLength,
     checksum: createHash('sha256').update(options.data).digest('hex'),
   };
+}
+
+/**
+ * What the bytes actually are, from the handful of signatures we accept.
+ *
+ * The declared type is whatever the browser was told to send, so it is a claim
+ * rather than a fact. Checking it matters in both directions: a file that is
+ * not really an image is rejected here instead of at publish time, where the
+ * failure arrives as a Graph error nobody can act on — and a file stored under
+ * a type it does not match is a trap for anything downstream that trusts the
+ * type, including a future move to object storage, where the served
+ * content-type is usually inferred from the key.
+ *
+ * Exported for direct testing.
+ */
+export function sniffMimeType(data: Buffer): string | null {
+  const startsWith = (...bytes: number[]): boolean =>
+    bytes.every((byte, index) => data[index] === byte);
+
+  if (startsWith(0xff, 0xd8, 0xff)) return 'image/jpeg';
+  if (startsWith(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return 'image/png';
+  if (startsWith(0x47, 0x49, 0x46, 0x38)) return 'image/gif';
+
+  // RIFF....WEBP
+  if (startsWith(0x52, 0x49, 0x46, 0x46) && data.subarray(8, 12).toString('ascii') === 'WEBP') {
+    return 'image/webp';
+  }
+
+  // ISO base media: a box length, then "ftyp", then the brand that separates
+  // an MP4 from a QuickTime file.
+  if (data.subarray(4, 8).toString('ascii') === 'ftyp') {
+    const brand = data.subarray(8, 12).toString('ascii');
+    return brand.startsWith('qt') ? 'video/quicktime' : 'video/mp4';
+  }
+
+  return null;
 }
 
 function defaultExtension(mimeType: string): string {

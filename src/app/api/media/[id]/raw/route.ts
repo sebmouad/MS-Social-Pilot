@@ -26,6 +26,9 @@ export const GET = route(async (_request: Request, context: { params: Promise<{ 
   return new NextResponse(new Uint8Array(data), {
     headers: {
       'content-type': media.mimeType || 'application/octet-stream',
+      // The stored type is verified against the bytes on upload, and this stops
+      // a browser second-guessing it anyway.
+      'x-content-type-options': 'nosniff',
       'content-length': String(data.byteLength),
       'cache-control': 'private, max-age=3600',
       'content-disposition': `inline; filename="${encodeURIComponent(media.filename)}"`,

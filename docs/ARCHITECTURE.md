@@ -559,6 +559,25 @@ process.
 
 ## Media
 
+### What a file claims to be, and what it is
+
+The content type on an upload is whatever the browser was told to send: a claim,
+not a fact. `storeFile` checks it against the first bytes and refuses a file
+whose contents do not match, which is worth doing in both directions. A file
+that is not really an image is rejected at upload, where the person can act on
+it, rather than at publish time, where the same problem arrives as a Graph error
+about an unsupported file. And nothing downstream inherits a lie: the download
+route serves the stored type, so it has to be true.
+
+The extension on disk follows the verified type, never the uploader's filename.
+The name is theirs to choose; the file it produces is not. Nothing today
+executes by extension — files are served through an authenticated route that
+sets the type explicitly, with `nosniff` so a browser cannot second-guess it —
+but the deployment notes contemplate a move to object storage, where the served
+type is usually inferred from the key, and `<uuid>.html` would be live at that
+point.
+
+
 A post's media lives in a Json array — the composer needs order, alt text and a
 mix of stored and external URLs, none of which a foreign key gives you. The cost
 is that the database cannot answer "which posts use this file?", so `Post` also

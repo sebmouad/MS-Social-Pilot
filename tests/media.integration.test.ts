@@ -397,3 +397,86 @@ describe('storageUsage', () => {
     await settings.ensureSettings();
   });
 });
+
+/**
+ * The declared type is whatever the browser was told to send. It is a claim,
+ * not a fact, and everything downstream — the download route's content-type,
+ * the file handed to Facebook, the key a future object store would infer a type
+ * from — is built on it.
+ */
+describe('what a file actually is', () => {
+  let media: typeof import('../src/lib/media');
+
+  beforeAll(async () => {
+    media = await import('../src/lib/media');
+  });
+
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+  const GIF = Buffer.from('GIF89a-and-then-some');
+  const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 ')]);
+  const MP4 = Buffer.concat([Buffer.alloc(4), Buffer.from('ftypisom'), Buffer.alloc(8)]);
+  const MOV = Buffer.concat([Buffer.alloc(4), Buffer.from('ftypqt  '), Buffer.alloc(8)]);
+  const HTML = Buffer.from('<!doctype html><script>alert(1)</script>');
+
+  it('recognises the formats it accepts', () => {
+    expect(media.sniffMimeType(JPEG)).toBe('image/jpeg');
+    expect(media.sniffMimeType(PNG)).toBe('image/png');
+    expect(media.sniffMimeType(GIF)).toBe('image/gif');
+    expect(media.sniffMimeType(WEBP)).toBe('image/webp');
+    expect(media.sniffMimeType(MP4)).toBe('video/mp4');
+    expect(media.sniffMimeType(MOV)).toBe('video/quicktime');
+  });
+
+  it('recognises nothing in something else', () => {
+    expect(media.sniffMimeType(HTML)).toBeNull();
+    expect(media.sniffMimeType(Buffer.alloc(0))).toBeNull();
+  });
+
+  it('stores a real image', async () => {
+    const stored = await media.storeFile({
+      workspaceId: 'ws-real',
+      data: PNG,
+      mimeType: 'image/png',
+      originalName: 'photo.png',
+    });
+
+    expect(stored.kind).toBe('image');
+    expect(stored.storageKey).toMatch(/\.png$/);
+  });
+
+  it('refuses HTML wearing an image content type', async () => {
+    await expect(
+      media.storeFile({
+        workspaceId: 'ws-liar',
+        data: HTML,
+        mimeType: 'image/png',
+        originalName: 'photo.png',
+      }),
+    ).rejects.toThrow(/not a JPEG, PNG, GIF, WebP or MP4/i);
+  });
+
+  it('refuses a video sent as an image', async () => {
+    await expect(
+      media.storeFile({
+        workspaceId: 'ws-mismatch',
+        data: MP4,
+        mimeType: 'image/png',
+        originalName: 'clip.png',
+      }),
+    ).rejects.toThrow(/contents are video\/mp4/i);
+  });
+
+  it('takes the extension from the file, not from the name it was given', async () => {
+    // The name is the uploader's to choose. What it produces on disk is not.
+    const stored = await media.storeFile({
+      workspaceId: 'ws-extension',
+      data: PNG,
+      mimeType: 'image/png',
+      originalName: 'not-really.php',
+    });
+
+    expect(stored.storageKey).toMatch(/\.png$/);
+    expect(stored.storageKey).not.toMatch(/php/);
+  });
+});
