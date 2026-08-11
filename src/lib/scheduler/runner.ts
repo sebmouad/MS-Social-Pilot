@@ -11,10 +11,12 @@ import { decideRetry } from './backoff';
 import { notifyConnectionExpired, notifyPublishFailure } from '../email/notify';
 import { prepareLinks } from '../links';
 import {
+  PUBLISHABLE_APPROVAL_STATUSES,
   TERMINAL_TARGET_STATUSES,
   PostStatus,
   PostTargetStatus,
 } from '../constants';
+import { errors } from '../errors';
 
 /**
  * The scheduler.
@@ -498,6 +500,19 @@ export async function runSchedulerTick(options: TickOptions = {}): Promise<TickR
  */
 export async function publishNow(postId: string, logger?: TickOptions['logger']): Promise<TickResult> {
   const now = new Date();
+
+  // The same approval gate the scheduler applies, and it has to be here rather
+  // than only in the route: "Post now" is the one path that publishes without
+  // ever going through `findDue`, so a post held for review would otherwise go
+  // out the moment its author pressed the button — which is precisely what the
+  // review queue exists to prevent.
+  const post = await prisma.post.findUniqueOrThrow({
+    where: { id: postId },
+    select: { approvalStatus: true },
+  });
+  if (!PUBLISHABLE_APPROVAL_STATUSES.includes(post.approvalStatus)) {
+    throw errors.awaitingApproval();
+  }
 
   await prisma.post.update({
     where: { id: postId },

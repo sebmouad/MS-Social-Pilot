@@ -226,6 +226,69 @@ describe('approval gating in the scheduler', () => {
     expect(after.approvalStatus).toBe(ApprovalStatus.rejected);
     expect(after.reviewNote).toBe('Please shorten it.');
   });
+
+  /**
+   * "Post now" is the one path that publishes without going through the
+   * scheduler's due-work query, so the gate tested above does not cover it. A
+   * held post that its author can push live on demand is not a review workflow.
+   */
+  async function seedHeldPost(state: ApprovalStatus) {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({
+      name: 'Client',
+      ownerId: owner.id,
+      requiresApproval: true,
+    });
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        submittedById: owner.id,
+        message: 'Held for review',
+        status: state === ApprovalStatus.rejected ? PostStatus.rejected : PostStatus.pending_approval,
+        approvalStatus: state,
+        scheduledAt: new Date(Date.now() - 5 * 60 * 1000),
+        targets: { create: { targetId: target.id } },
+      },
+    });
+
+    return { post, workspace, owner };
+  }
+
+  it('refuses to publish a post awaiting approval on demand', async () => {
+    const { post } = await seedHeldPost(ApprovalStatus.pending);
+
+    await expect(runner.publishNow(post.id)).rejects.toThrow(/waiting for approval/i);
+    expect(published).toHaveLength(0);
+
+    // And it is left exactly as it was, not stranded in `publishing`.
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.pending_approval);
+    expect(after.approvalStatus).toBe(ApprovalStatus.pending);
+  });
+
+  it('refuses to publish a rejected post on demand', async () => {
+    const { post } = await seedHeldPost(ApprovalStatus.rejected);
+
+    await expect(runner.publishNow(post.id)).rejects.toThrow(/waiting for approval/i);
+    expect(published).toHaveLength(0);
+  });
+
+  it('publishes on demand once a reviewer has approved it', async () => {
+    const { post, workspace, owner } = await seedHeldPost(ApprovalStatus.pending);
+
+    await approvals.approvePost({
+      workspaceId: workspace.id,
+      postId: post.id,
+      reviewerId: owner.id,
+      reviewerRole: WorkspaceRole.owner,
+    });
+
+    const result = await runner.publishNow(post.id);
+    expect(result.published).toBe(1);
+    expect(published).toHaveLength(1);
+  });
 });
 
 describe('who needs approval', () => {

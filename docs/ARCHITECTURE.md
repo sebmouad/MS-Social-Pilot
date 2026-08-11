@@ -253,8 +253,14 @@ read, publish to, or approve anything in another.
 row, rather than recomputing later from settings that may have changed. The
 load-bearing half is in the scheduler: the due-work query filters
 `approvalStatus IN ('not_required','approved')`, so an unapproved post cannot go
-out when its scheduled time arrives, and "publish now" is not a way around
-review.
+out when its scheduled time arrives.
+
+That query is not the only way out, though, and the second gate matters as much
+as the first. "Post now" calls `publishNow` directly and never touches the
+due-work query, so it checks the same statuses itself before it does anything —
+a held post its author can push live on demand is not a review workflow, and the
+UI hiding the button is not a control. Both gates read the same
+`PUBLISHABLE_APPROVAL_STATUSES`, so there is one definition of publishable.
 
 ---
 
