@@ -247,6 +247,15 @@ an id from a cookie or URL is a request, not a permission. Workspace scoping is
 therefore a security boundary, with tests that a member of one workspace cannot
 read, publish to, or approve anything in another.
 
+### Who may act on a post
+
+Workspace membership was the only check on editing, cancelling, retrying and
+publishing: any member could act on any post in the workspace. `canManageOthersPosts`
+(editor and above) now holds contributors to their own work — a role that exists
+for people whose output is reviewed should not be able to empty a colleague's
+calendar with one call. Duplicating is deliberately exempt: it produces a new
+post authored by the copier, which faces review like anything else they write.
+
 ### Approval workflow
 
 `initialApprovalStatus` decides at creation time and stores the result on the

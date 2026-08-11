@@ -3,7 +3,7 @@ import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
 import { prisma } from './prisma';
 import { mediaColumns, parseMedia, parseVariants, toJson, toJsonOrNull } from './json';
 import { logActivity } from './scheduler/runner';
-import { canPublishWithoutApproval } from './constants';
+import { canManageOthersPosts, canPublishWithoutApproval } from './constants';
 import { errors } from './errors';
 
 /**
@@ -158,6 +158,7 @@ export async function runEvergreenCycle(options: {
 export async function setRecycling(options: {
   workspaceId: string;
   postId: string;
+  userId: string;
   role: WorkspaceRole;
   requiresApproval: boolean;
   enabled: boolean;
@@ -171,6 +172,9 @@ export async function setRecycling(options: {
   // Was a silent success, which told the caller their schedule had been saved
   // when nothing had been written.
   if (!post) throw errors.postNotFound();
+  if (post.authorId !== options.userId && !canManageOthersPosts(options.role)) {
+    throw errors.noPermission();
+  }
 
   const addsVariants = (options.variants?.filter((variant) => variant.trim().length > 0).length ?? 0) > 0;
   if (addsVariants && options.requiresApproval && !canPublishWithoutApproval(options.role)) {

@@ -158,6 +158,20 @@ export function canCompose(): boolean {
 }
 
 /**
+ * Edit, cancel, retry or publish a post somebody else wrote.
+ *
+ * Contributors are held to their own work. The role exists for people whose
+ * output is reviewed, and someone who cannot publish their own words unread has
+ * no business cancelling a colleague's scheduled campaign — a single call from
+ * the wrong account would otherwise empty a client's calendar. Duplicating
+ * another member's post is deliberately not covered: that creates a new post
+ * authored by the copier, which faces review like anything else they write.
+ */
+export function canManageOthersPosts(role: WorkspaceRole): boolean {
+  return atLeast(role, WorkspaceRole.editor);
+}
+
+/**
  * Parse a `?status=` query value into a Post filter.
  *
  * "failed" is deliberately widened to include partial failures: someone

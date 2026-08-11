@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { canManageOthersPosts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { publishNow } from '@/lib/scheduler/runner';
 import { fail, ok, route } from '@/lib/api';
@@ -13,6 +14,9 @@ export const POST = route(async (_request: Request, context: { params: Promise<{
     include: { targets: true },
   });
   if (!post) return fail('Post not found.', 404);
+  if (post.authorId !== auth.user.id && !canManageOthersPosts(auth.role)) {
+    return fail('You can only publish your own posts.', 403);
+  }
 
   if (post.status === 'published') return fail('This post has already been published.', 409);
   if (post.status === 'publishing') return fail('This post is being published right now.', 409);

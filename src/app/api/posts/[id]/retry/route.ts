@@ -7,6 +7,6 @@ export const POST = route(async (_request: Request, context: { params: Promise<{
   const auth = await requireAuth();
   const { id } = await context.params;
 
-  const retried = await retryPost({ workspaceId: auth.workspace.id, userId: auth.user.id }, id);
+  const retried = await retryPost({ workspaceId: auth.workspace.id, userId: auth.user.id, role: auth.role }, id);
   return ok({ retried });
 });

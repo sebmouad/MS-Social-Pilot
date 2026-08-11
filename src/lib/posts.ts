@@ -19,7 +19,11 @@ import { logActivity, publishNow, refreshPostStatus } from './scheduler/runner';
 import type { CreatePostInput, UpdatePostInput } from './validation';
 import type { PublishMode, TargetType } from './constants';
 import { initialApprovalStatus } from './approvals';
-import { canPublishWithoutApproval, PUBLISHABLE_APPROVAL_STATUSES } from './constants';
+import {
+  canManageOthersPosts,
+  canPublishWithoutApproval,
+  PUBLISHABLE_APPROVAL_STATUSES,
+} from './constants';
 import { notifyApprovalRequest } from './email/notify';
 import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
 
@@ -304,6 +308,16 @@ async function summarise(postId: string): Promise<CreatePostResult> {
  * change a post's attachments, and silently doing nothing would be worse than
  * saying so.
  */
+/** Contributors act on their own posts; editors and above on anyone's. */
+function assertMayAct(
+  post: { authorId: string },
+  context: { userId: string; role: WorkspaceRole },
+): void {
+  if (post.authorId !== context.userId && !canManageOthersPosts(context.role)) {
+    throw errors.noPermission();
+  }
+}
+
 /**
  * Whether an edit changes anything the reviewer actually looked at.
  *
@@ -371,6 +385,8 @@ export async function updatePost(
     include: { targets: true },
   });
   if (!post) throw errors.postNotFound();
+
+  assertMayAct(post, context);
 
   if (post.status === 'publishing') throw errors.alreadyPublishing();
   if (post.status === 'published' || post.status === 'partially_failed') {
@@ -496,7 +512,7 @@ export async function updatePost(
  * remotely, because otherwise "cancelled" here would still publish there.
  */
 export async function cancelPost(
-  context: { workspaceId: string; userId: string },
+  context: { workspaceId: string; userId: string; role: WorkspaceRole },
   postId: string,
 ): Promise<{ removedFromFacebook: number; failures: string[] }> {
   const post = await prisma.post.findFirst({
@@ -504,6 +520,7 @@ export async function cancelPost(
     include: { targets: { include: { target: { include: { socialAccount: true } } } } },
   });
   if (!post) throw errors.postNotFound();
+  assertMayAct(post, context);
 
   const failures: string[] = [];
   let removedFromFacebook = 0;
@@ -535,11 +552,12 @@ export async function cancelPost(
 
 /** Reset failed destinations so the scheduler picks them up again. */
 export async function retryPost(
-  context: { workspaceId: string; userId: string },
+  context: { workspaceId: string; userId: string; role: WorkspaceRole },
   postId: string,
 ): Promise<number> {
   const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: context.workspaceId } });
   if (!post) throw errors.postNotFound();
+  assertMayAct(post, context);
 
   const { count } = await prisma.postTarget.updateMany({
     where: { postId, status: 'failed' },

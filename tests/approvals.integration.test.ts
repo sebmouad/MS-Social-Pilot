@@ -555,7 +555,7 @@ describe('retrying a post that is back in the queue', () => {
     });
 
     const retried = await posts.retryPost(
-      { workspaceId: workspace.id, userId: contributor.id },
+      { workspaceId: workspace.id, userId: contributor.id, role: WorkspaceRole.contributor },
       post.id,
     );
     expect(retried).toBe(1);
@@ -584,7 +584,10 @@ describe('retrying a post that is back in the queue', () => {
       },
     });
 
-    await posts.retryPost({ workspaceId: workspace.id, userId: owner.id }, post.id);
+    await posts.retryPost(
+      { workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner },
+      post.id,
+    );
 
     const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
     expect(after.status).toBe(PostStatus.scheduled);
@@ -621,7 +624,10 @@ describe('cancelling something that is waiting for review', () => {
       },
     });
 
-    await posts.cancelPost({ workspaceId: workspace.id, userId: contributor.id }, post.id);
+    await posts.cancelPost(
+      { workspaceId: workspace.id, userId: contributor.id, role: WorkspaceRole.contributor },
+      post.id,
+    );
     return { workspace, owner, post };
   }
 
@@ -688,6 +694,107 @@ describe('cancelling something that is waiting for review', () => {
     });
 
     expect(await approvals.pendingApprovalCount(workspace.id)).toBe(1);
+  });
+});
+
+/**
+ * Contributors are held to their own work. Someone whose own words cannot go
+ * out unread has no business cancelling a colleague's scheduled campaign.
+ */
+describe('acting on someone else\'s post', () => {
+  async function seedOthersPost() {
+    const owner = await makeUser('Owner');
+    const contributor = await makeUser('Contributor');
+    const { workspace, target } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
+    await prisma.membership.create({
+      data: { userId: contributor.id, workspaceId: workspace.id, role: WorkspaceRole.contributor },
+    });
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        message: "The owner's campaign",
+        status: PostStatus.scheduled,
+        approvalStatus: ApprovalStatus.not_required,
+        scheduledAt: new Date(Date.now() + 60 * 60 * 1000),
+        targets: { create: { targetId: target.id, status: 'failed', errorMessage: 'Timed out' } },
+      },
+    });
+
+    return { workspace, owner, contributor, post };
+  }
+
+  const asContributor = (seed: Awaited<ReturnType<typeof seedOthersPost>>) => ({
+    workspaceId: seed.workspace.id,
+    userId: seed.contributor.id,
+    role: WorkspaceRole.contributor,
+  });
+
+  it('will not let a contributor cancel it', async () => {
+    const seed = await seedOthersPost();
+
+    await expect(posts.cancelPost(asContributor(seed), seed.post.id)).rejects.toThrow(/permission/i);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: seed.post.id } });
+    expect(after.status).toBe(PostStatus.scheduled);
+  });
+
+  it('will not let a contributor rewrite it', async () => {
+    const seed = await seedOthersPost();
+
+    await expect(
+      posts.updatePost(
+        { ...asContributor(seed), requiresApproval: false },
+        seed.post.id,
+        { message: 'Something else entirely' },
+      ),
+    ).rejects.toThrow(/permission/i);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: seed.post.id } });
+    expect(after.message).toBe("The owner's campaign");
+  });
+
+  it('will not let a contributor retry it', async () => {
+    const seed = await seedOthersPost();
+
+    await expect(posts.retryPost(asContributor(seed), seed.post.id)).rejects.toThrow(/permission/i);
+  });
+
+  it('lets an editor act on it, which is what the role is for', async () => {
+    const seed = await seedOthersPost();
+    const editor = await makeUser('Editor');
+    await prisma.membership.create({
+      data: { userId: editor.id, workspaceId: seed.workspace.id, role: WorkspaceRole.editor },
+    });
+
+    const retried = await posts.retryPost(
+      { workspaceId: seed.workspace.id, userId: editor.id, role: WorkspaceRole.editor },
+      seed.post.id,
+    );
+    expect(retried).toBe(1);
+  });
+
+  it('leaves a contributor free to manage their own', async () => {
+    const seed = await seedOthersPost();
+    const own = await prisma.post.create({
+      data: {
+        workspaceId: seed.workspace.id,
+        authorId: seed.contributor.id,
+        message: 'Mine',
+        status: PostStatus.draft,
+        approvalStatus: ApprovalStatus.not_required,
+      },
+    });
+
+    await posts.updatePost(
+      { ...asContributor(seed), requiresApproval: false },
+      own.id,
+      { message: 'Mine, edited' },
+    );
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: own.id } });
+    expect(after.message).toBe('Mine, edited');
   });
 });
 

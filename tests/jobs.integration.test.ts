@@ -296,8 +296,11 @@ describe('evergreen recycling', () => {
  * scheduling one.
  */
 describe('setting recycling variants', () => {
+  let authorId = '';
+
   async function seedPublished(requiresApproval: boolean) {
     const { user, workspace, target } = await seedWorkspace();
+    authorId = user.id;
     await prisma.workspace.update({ where: { id: workspace.id }, data: { requiresApproval } });
 
     const post = await prisma.post.create({
@@ -322,10 +325,14 @@ describe('setting recycling variants', () => {
     role: WorkspaceRole,
     requiresApproval: boolean,
     variants?: string[],
+    userId?: string,
   ) {
     return evergreen.setRecycling({
       workspaceId,
       postId,
+      // Defaults to the post's author, so these cases exercise the variant rule
+      // rather than the ownership one.
+      userId: userId ?? authorId,
       role,
       requiresApproval,
       enabled: true,

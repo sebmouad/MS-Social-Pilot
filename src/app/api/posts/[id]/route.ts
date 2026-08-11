@@ -68,6 +68,9 @@ export const DELETE = route(async (_request: Request, context: Context) => {
   const auth = await requireAuth();
   const { id } = await context.params;
 
-  const result = await cancelPost({ workspaceId: auth.workspace.id, userId: auth.user.id }, id);
+  const result = await cancelPost(
+    { workspaceId: auth.workspace.id, userId: auth.user.id, role: auth.role },
+    id,
+  );
   return ok(result);
 });
