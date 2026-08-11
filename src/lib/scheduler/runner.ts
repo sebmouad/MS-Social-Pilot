@@ -11,7 +11,6 @@ import { decideRetry } from './backoff';
 import { notifyConnectionExpired, notifyPublishFailure } from '../email/notify';
 import { prepareLinks } from '../links';
 import {
-  PUBLISHABLE_APPROVAL_STATUSES,
   TERMINAL_TARGET_STATUSES,
   PostStatus,
   PostTargetStatus,
@@ -75,27 +74,68 @@ async function reclaimStaleLocks(now: Date, logger: TickOptions['logger']): Prom
   return count;
 }
 
-/** Candidate destinations that are due: scheduled time reached, or retry due. */
+/**
+ * Candidate destinations that are due: scheduled time reached, or retry due.
+ *
+ * Ordered oldest-first *within each client*, then taken round-robin across
+ * clients rather than globally. Ordering globally by scheduled time is the
+ * obvious thing and it starves people: one workspace that queues five hundred
+ * posts for 09:00 fills every slot of every tick until its backlog drains, so a
+ * different client's single 09:01 post waits minutes behind work that has
+ * nothing to do with them. On a shared installation that is one customer's bulk
+ * import delaying another customer's launch.
+ *
+ * Written as SQL because the fairness *is* the window function: `ROW_NUMBER()
+ * PARTITION BY workspace` numbers each client's due work independently, and
+ * taking the lowest numbers first interleaves them. Prisma has no way to
+ * express that, and doing it in application code would mean fetching the whole
+ * backlog to sort it — which is the cost this avoids.
+ */
 async function findDue(now: Date, limit: number): Promise<string[]> {
-  const rows = await prisma.postTarget.findMany({
-    where: {
-      status: 'pending',
-      OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
-      post: {
-        status: { in: [PostStatus.scheduled, PostStatus.publishing] },
-        scheduledAt: { lte: now },
-        // An unapproved post must never go out, whatever its scheduled time
-        // says. This is the scheduler's half of the approval workflow.
-        approvalStatus: { in: [...PUBLISHABLE_APPROVAL_STATUSES] },
-      },
-      target: { enabled: true },
-    },
-    // Oldest scheduled first, so a backlog drains in the order users expect.
-    orderBy: [{ post: { scheduledAt: 'asc' } }, { createdAt: 'asc' }],
-    take: limit,
-    select: { id: true },
-  });
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM (
+      SELECT
+        pt.id,
+        p."scheduledAt",
+        pt."createdAt",
+        ROW_NUMBER() OVER (
+          PARTITION BY p."workspaceId"
+          ORDER BY p."scheduledAt" ASC, pt."createdAt" ASC
+        ) AS turn
+      FROM "post_targets" pt
+      JOIN "posts" p ON p.id = pt."postId"
+      JOIN "targets" t ON t.id = pt."targetId"
+      WHERE pt.status = 'pending'::"PostTargetStatus"
+        AND (pt."nextAttemptAt" IS NULL OR pt."nextAttemptAt" <= ${now})
+        AND p.status IN ('scheduled'::"PostStatus", 'publishing'::"PostStatus")
+        AND p."scheduledAt" <= ${now}
+        -- An unapproved post must never go out, whatever its scheduled time
+        -- says. This is the scheduler's half of the approval workflow.
+        AND p."approvalStatus" IN (
+          'not_required'::"ApprovalStatus",
+          'approved'::"ApprovalStatus"
+        )
+        AND t.enabled = true
+    ) ranked
+    -- One from each client, then a second from each, and so on. Within a
+    -- client the order is still oldest-first, so a backlog drains the way its
+    -- owner expects.
+    ORDER BY turn ASC, "scheduledAt" ASC, "createdAt" ASC
+    LIMIT ${limit}
+  `;
+
   return rows.map((row) => row.id);
+}
+
+/**
+ * The due-work query, exposed for the fairness tests.
+ *
+ * Claiming a destination mutates it, so a test that went through the whole tick
+ * could not then ask what *would* have been picked next. This is the selection
+ * on its own.
+ */
+export function findDueForTest(now: Date, limit: number): Promise<string[]> {
+  return findDue(now, limit);
 }
 
 /**

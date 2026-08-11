@@ -359,3 +359,152 @@ describe('publishNow', () => {
     expect(result.published).toBe(1);
   });
 });
+
+/**
+ * Fair sharing between clients.
+ *
+ * Ordering purely by scheduled time is the obvious implementation and it
+ * starves people: one workspace that queues a bulk import for 09:00 fills every
+ * slot of every tick until it drains, so another client's single 09:01 post
+ * waits behind work that has nothing to do with them. On a shared installation
+ * that is one customer delaying another.
+ */
+describe('fairness between workspaces', () => {
+  /** A workspace with one page and `count` posts, all due, oldest first. */
+  async function seedBacklog(label: string, count: number, minutesAgo: number) {
+    const { encryptSecret } = await import('../src/lib/crypto');
+    const suffix = randomBytes(4).toString('hex');
+
+    const workspace = await prisma.workspace.create({
+      data: { name: label, slug: `${label}-${suffix}`, timezone: 'UTC' },
+    });
+    const user = await prisma.user.create({
+      data: {
+        email: `${label}-${suffix}@example.com`,
+        name: 'Owner',
+        passwordHash: 'x',
+        memberships: { create: { workspaceId: workspace.id, role: 'owner' } },
+      },
+    });
+    const target = await prisma.target.create({
+      data: {
+        workspaceId: workspace.id,
+        type: 'page',
+        providerId: `page-${suffix}`,
+        name: `${label} Page`,
+        accessToken: encryptSecret('page-token'),
+      },
+    });
+
+    for (let index = 0; index < count; index += 1) {
+      await prisma.post.create({
+        data: {
+          workspaceId: workspace.id,
+          authorId: user.id,
+          message: `${label} post ${index}`,
+          status: 'scheduled',
+          publishMode: 'worker',
+          // All older than the other workspace's, so a global sort would put
+          // every one of them first.
+          scheduledAt: new Date(Date.now() - minutesAgo * 60 * 1000 - index * 1000),
+          targets: { create: { targetId: target.id, status: 'pending' } },
+        },
+      });
+    }
+
+    return { workspace, target };
+  }
+
+  /** Which workspace each claimed destination belongs to. */
+  async function claimedWorkspaces(limit: number) {
+    const ids = await runner.findDueForTest(new Date(), limit);
+    const rows = await prisma.postTarget.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, post: { select: { workspaceId: true } } },
+    });
+
+    // findMany does not preserve the order of `in`, so re-key by id.
+    const byId = new Map(rows.map((row) => [row.id, row.post.workspaceId]));
+    return ids.map((id) => byId.get(id)!);
+  }
+
+  it('does not let one client’s backlog take every slot', async () => {
+    const busy = await seedBacklog('busy', 40, 60);
+    const quiet = await seedBacklog('quiet', 1, 30);
+
+    const owners = await claimedWorkspaces(10);
+
+    // A global sort by scheduled time would return ten busy-workspace rows and
+    // nothing else, because every one of them is older.
+    expect(owners).toContain(quiet.workspace.id);
+    expect(owners.filter((id) => id === busy.workspace.id).length).toBeLessThan(10);
+  });
+
+  it('gives the quiet client its turn on the very first pass', async () => {
+    const busy = await seedBacklog('busy', 100, 60);
+    const quiet = await seedBacklog('quiet', 1, 1);
+
+    const owners = await claimedWorkspaces(4);
+
+    // Round-robin: one each before anyone gets a second.
+    expect(owners[0]).toBe(busy.workspace.id);
+    expect(owners[1]).toBe(quiet.workspace.id);
+  });
+
+  it('still drains one client’s backlog oldest-first', async () => {
+    // Fairness between clients must not reorder work within a client.
+    const { workspace } = await seedBacklog('solo', 5, 60);
+
+    const ids = await runner.findDueForTest(new Date(), 5);
+    const rows = await prisma.postTarget.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, post: { select: { scheduledAt: true, workspaceId: true } } },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row.post.scheduledAt!.getTime()]));
+    const times = ids.map((id) => byId.get(id)!);
+
+    expect(rows.every((row) => row.post.workspaceId === workspace.id)).toBe(true);
+    expect([...times].sort((a, b) => a - b)).toEqual(times);
+  });
+
+  it('shares the slots evenly between two equal backlogs', async () => {
+    const first = await seedBacklog('first', 20, 60);
+    const second = await seedBacklog('second', 20, 60);
+
+    const owners = await claimedWorkspaces(10);
+
+    expect(owners.filter((id) => id === first.workspace.id)).toHaveLength(5);
+    expect(owners.filter((id) => id === second.workspace.id)).toHaveLength(5);
+  });
+
+  it('still respects everything the filter is for', async () => {
+    // Fairness must not become a way for unapproved or paused work to slip out.
+    const { workspace, target } = await seedBacklog('gated', 0, 60);
+    const user = await prisma.user.findFirstOrThrow({ where: { memberships: { some: { workspaceId: workspace.id } } } });
+
+    const make = async (data: Record<string, unknown>) =>
+      prisma.post.create({
+        data: {
+          workspaceId: workspace.id,
+          authorId: user.id,
+          message: 'gated',
+          status: 'scheduled',
+          publishMode: 'worker',
+          scheduledAt: new Date(Date.now() - 60 * 60 * 1000),
+          targets: { create: { targetId: target.id, status: 'pending' } },
+          ...data,
+        },
+      });
+
+    await make({ approvalStatus: 'pending' });
+    await make({ scheduledAt: new Date(Date.now() + 60 * 60 * 1000) });
+    await make({ status: 'draft' });
+
+    expect(await runner.findDueForTest(new Date(), 10)).toEqual([]);
+
+    // And a paused destination is skipped even when the post is ready.
+    await prisma.target.update({ where: { id: target.id }, data: { enabled: false } });
+    await make({});
+    expect(await runner.findDueForTest(new Date(), 10)).toEqual([]);
+  });
+});

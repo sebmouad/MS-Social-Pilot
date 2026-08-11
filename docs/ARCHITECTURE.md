@@ -415,6 +415,24 @@ distinct answers**. Reporting success for an id that was never touched is how a
 bug hides for months; disconnect did exactly that for an account belonging to
 another workspace until this was written.
 
+
+---
+
+## Scheduler fairness
+
+Due work is selected **round-robin across clients**, not in global scheduled-time
+order. The obvious implementation — order everything by `scheduledAt` and take
+the first N — starves people on a shared installation: one workspace that queues
+five hundred posts for 09:00 fills every slot of every tick until its backlog
+drains, so a different client's single 09:01 post waits minutes behind work that
+has nothing to do with them.
+
+`findDue` is therefore raw SQL, because the fairness *is* a window function:
+`ROW_NUMBER() PARTITION BY workspace` numbers each client's due work
+independently, and taking the lowest numbers first interleaves them. Within a
+client the order is still oldest-first, so a backlog drains the way its owner
+expects. Prisma cannot express that, and doing it in application code would mean
+fetching the whole backlog in order to sort it — the exact cost this avoids.
 ---
 
 ## Charts and layout
