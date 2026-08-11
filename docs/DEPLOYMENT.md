@@ -122,6 +122,30 @@ nothing else touches the filesystem.
 
 ---
 
+## Behind a reverse proxy
+
+The contract is short, and it is short on purpose.
+
+**Nothing is derived from the request's `Host`.** Every absolute URL the app
+produces — OAuth redirects, short links, every link in an email — is built from
+`APP_URL`. So a proxy does not have to forward `X-Forwarded-Host` or
+`X-Forwarded-Proto` for links to come out right, and a forged `Host` header
+cannot rewrite the invitation link in an email to a colleague. The cost is that `APP_URL`
+must be correct: it is the app's only idea of where it lives.
+
+**Cookies are marked `secure` when `NODE_ENV=production`,** not when the request
+happens to arrive over TLS. Behind a terminator the app itself sees plain http,
+and deriving the flag from the request would quietly drop `secure` on every
+session cookie in exactly that deployment. The Docker image sets `NODE_ENV`, and
+`next start` sets it too.
+
+**`X-Forwarded-For` is read in one place**: the short-link redirect, which
+hashes it for click counts. Forwarding it makes those counts more accurate;
+forging it skews an estimate and nothing else, since the value never reaches an
+authorisation or rate-limiting decision.
+
+---
+
 ## Health checks
 
 `GET /api/health` is unauthenticated and returns `{"status":"ok"}` with a 200,
