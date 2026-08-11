@@ -56,6 +56,10 @@ const CATALOGUE: Record<string, { label: string; consequence: string }> = {
     label: 'Hide, delete and reply to comments on your Pages',
     consequence: 'Comments can be read but not moderated.',
   },
+  read_insights: {
+    label: "Read your Pages' insights",
+    consequence: 'Reach, impressions and follower figures stay empty.',
+  },
   pages_manage_metadata: {
     label: "Read your Pages' settings and message threads",
     consequence: 'The Page inbox cannot be synced.',
