@@ -7,6 +7,8 @@ import { prisma } from '@/lib/prisma';
 import { parseMedia } from '@/lib/json';
 import { formatInZone } from '@/lib/time';
 import { postStatusFilter } from '@/lib/constants';
+import { Pagination } from '@/components/Pagination';
+import { pageHref, pageNumber, paginate } from '@/lib/paging';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,14 +35,28 @@ export default async function PostsPage({
   const raw = Array.isArray(params.status) ? params.status[0] : params.status;
   const statuses = postStatusFilter(raw);
 
+  const where = {
+    workspaceId: auth.workspace.id,
+    ...(statuses ? { status: { in: statuses } } : {}),
+  };
+
+  // Counted first, so the page number can be clamped against what is actually
+  // there rather than showing an empty screen to somebody who bookmarked a
+  // page that no longer exists.
+  const page = paginate({
+    total: await prisma.post.count({ where }),
+    requested: pageNumber(params.page),
+  });
+
   const posts = await prisma.post.findMany({
-    where: {
-      workspaceId: auth.workspace.id,
-      ...(statuses ? { status: { in: statuses } } : {}),
-    },
+    where,
     include: { targets: { include: { target: { select: { name: true, type: true } } } } },
-    orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],
-    take: 100,
+    // `id` last, and not for tidiness: without a unique tiebreaker two posts
+    // sharing a timestamp can land in a different order on each query, and
+    // then page two repeats a row page one already showed.
+    orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+    skip: page.skip,
+    take: page.take,
   });
 
   const timezone = auth.workspace.timezone;
@@ -95,6 +111,8 @@ export default async function PostsPage({
           })),
         }))}
       />
+
+      <Pagination page={page} href={(next) => pageHref('/posts', params, next)} />
     </div>
   );
 }

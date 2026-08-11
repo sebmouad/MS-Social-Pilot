@@ -205,7 +205,7 @@ how to drive it from a serverless cron instead of a long-running worker.
 npm test
 ```
 
-778 tests, in three layers.
+793 tests, in three layers.
 
 **Unit tests** cover the pure decision-making: which Graph edge a post takes,
 whether a retry is worth attempting, token encryption, timezone and queue-slot

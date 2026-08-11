@@ -207,3 +207,41 @@ test('the history screen says who did what, in words', async ({ page }) => {
 
   expect(failures).toEqual([]);
 });
+
+test('the post list pages rather than stopping at a hundred', async ({ page }) => {
+  const failures = collectFailures(page);
+
+  const workspace = await prisma.workspace.findFirstOrThrow({ where: { name: OWNER.workspace } });
+  const author = await prisma.user.findFirstOrThrow({ where: { email: OWNER.email } });
+
+  // Enough to need a third page at the default size, created flat so the
+  // ordering has nothing but the tiebreaker to go on.
+  await prisma.post.createMany({
+    data: Array.from({ length: 60 }, (_, index) => ({
+      workspaceId: workspace.id,
+      authorId: author.id,
+      message: `Bulk post ${index}`,
+      status: 'draft' as const,
+    })),
+  });
+
+  await open(page, '/posts');
+  const pager = page.getByRole('navigation', { name: /pages/i });
+  await expect(pager).toBeVisible();
+
+  const first = await page.getByRole('article').count();
+  expect(first).toBeLessThanOrEqual(25);
+
+  await pager.getByRole('link', { name: /next/i }).click();
+  await expect(page).toHaveURL(/page=2/);
+  await expect(page.getByRole('article').first()).toBeVisible();
+
+  // Filters survive the jump: a Next button that dropped them would look like
+  // it had gone somewhere else entirely.
+  await open(page, '/posts?status=draft');
+  await pager.getByRole('link', { name: /next/i }).click();
+  await expect(page).toHaveURL(/status=draft/);
+  await expect(page).toHaveURL(/page=2/);
+
+  expect(failures).toEqual([]);
+});

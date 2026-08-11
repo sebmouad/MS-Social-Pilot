@@ -795,6 +795,35 @@ Uploading is deliberately **not** a privileged action. Contributors draft posts,
 so they upload; a role check there would stop people doing their job. What bounds
 the disk is a per-workspace quota, checked before the bytes are written.
 
+## Paging a list somebody is reading
+
+The worker pages with a cursor, deliberately: it walks whole tables, and `skip`
+re-scans everything it skips, so the last page of a long list costs the most.
+The screens page with an offset, equally deliberately and for the opposite
+reason. A person does not walk a list — they look at the first page or two and
+then filter — so the cost never arrives, and page numbers let them see how much
+there is and come back to where they were. A page is a URL, so it survives a
+refresh and can be sent to a colleague.
+
+`src/lib/paging.ts` holds the arithmetic because every mistake in it has the
+same shape — a row shown twice, or never — and none of it is visible until
+somebody has more rows than one page holds, which is when they stop reading
+carefully. A page past the end clamps to the last one rather than rendering
+empty: that happens when somebody bookmarks page nine and rows are deleted
+since, and an empty screen reads as "your posts are gone".
+
+Every paged query carries `id` as its final sort key. Postgres guarantees
+nothing about the order of rows whose sort keys are equal, so without a unique
+tiebreaker a row can appear on two pages while another appears on none. Worth
+knowing what the test for this does and does not prove: on a small,
+freshly-inserted table Postgres returns equal rows in physical order, which is
+stable, so the property test passes with the tiebreaker removed. It breaks once
+a plan changes — a parallel scan, dead tuples after updates, a different index —
+which is the kind of thing that changes in production and not in a test suite.
+The tiebreaker is there because the guarantee does not exist.
+
+---
+
 ## The audit trail, and reading it
 
 `ActivityLog` and `EmailLog` were written faithfully from the beginning and

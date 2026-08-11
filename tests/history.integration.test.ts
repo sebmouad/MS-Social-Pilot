@@ -220,3 +220,66 @@ describe('reading the email log', () => {
     expect(count).toBe(1);
   });
 });
+
+describe('paging through a long history', () => {
+  it('shows every entry exactly once across the pages', async () => {
+    const { workspace } = await seed();
+
+    // Same timestamp on purpose. Postgres guarantees nothing about the order
+    // of rows whose sort keys are equal, so paging over them without a unique
+    // tiebreaker can show one row twice and another never.
+    //
+    // Worth being straight about what this test does and does not prove: on a
+    // small, freshly-inserted table Postgres returns them in physical order,
+    // which is stable, so this passes with the tiebreaker removed. It fails
+    // once a plan changes — a parallel scan, dead tuples after updates, a
+    // different index — which is exactly the kind of thing that changes in
+    // production and not in a test. The tiebreaker is there because the
+    // guarantee does not exist, not because this test forces the issue.
+    const when = new Date('2026-03-01T09:00:00Z');
+    await prisma.activityLog.createMany({
+      data: Array.from({ length: 25 }, () => ({
+        workspaceId: workspace.id,
+        action: 'post.created',
+        createdAt: when,
+      })),
+    });
+
+    const seen = new Set<string>();
+    for (let page = 0; page < 3; page += 1) {
+      const rows = await history.readActivity({
+        workspaceId: workspace.id,
+        skip: page * 10,
+        limit: 10,
+      });
+      for (const row of rows) seen.add(row.id);
+    }
+
+    expect(seen.size).toBe(25);
+  });
+
+  it('counts what there is to page through', async () => {
+    const { workspace } = await seed();
+    await prisma.activityLog.createMany({
+      data: Array.from({ length: 7 }, () => ({
+        workspaceId: workspace.id,
+        action: 'post.updated',
+      })),
+    });
+
+    expect(await history.countActivity(workspace.id)).toBe(7);
+  });
+
+  it('counts only the failures when that is what is being shown', async () => {
+    const { workspace } = await seed();
+    await prisma.emailLog.createMany({
+      data: [
+        { workspaceId: workspace.id, to: 'a@example.com', template: 'x', subject: 'ok', status: 'sent' },
+        { workspaceId: workspace.id, to: 'b@example.com', template: 'x', subject: 'no', status: 'failed' },
+      ],
+    });
+
+    expect(await history.countEmailLog({ workspaceId: workspace.id })).toBe(2);
+    expect(await history.countEmailLog({ workspaceId: workspace.id, failuresOnly: true })).toBe(1);
+  });
+})

@@ -5,11 +5,15 @@ import { SettingsNav } from '@/components/SettingsNav';
 import { requirePage } from '@/lib/auth';
 import { canManageInstance, canManageTeam } from '@/lib/constants';
 import {
+  countActivity,
+  countEmailLog,
   countRecentEmailFailures,
   historyRetention,
   readActivity,
   readEmailLog,
 } from '@/lib/history';
+import { Pagination } from '@/components/Pagination';
+import { pageHref, pageNumber, paginate } from '@/lib/paging';
 import { formatInZone } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
@@ -49,10 +53,22 @@ export default async function HistoryPage({
   const retention = historyRetention();
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+  const workspaceId = auth.workspace.id;
+
+  const page = paginate({
+    total:
+      view === 'email' ? await countEmailLog({ workspaceId }) : await countActivity(workspaceId),
+    requested: pageNumber(params.page),
+  });
+
   const [activity, emails, recentFailures] = await Promise.all([
-    view === 'activity' ? readActivity({ workspaceId: auth.workspace.id }) : Promise.resolve([]),
-    view === 'email' ? readEmailLog({ workspaceId: auth.workspace.id }) : Promise.resolve([]),
-    countRecentEmailFailures({ workspaceId: auth.workspace.id, since: weekAgo }),
+    view === 'activity'
+      ? readActivity({ workspaceId, skip: page.skip, limit: page.take })
+      : Promise.resolve([]),
+    view === 'email'
+      ? readEmailLog({ workspaceId, skip: page.skip, limit: page.take })
+      : Promise.resolve([]),
+    countRecentEmailFailures({ workspaceId, since: weekAgo }),
   ]);
 
   return (
@@ -85,6 +101,8 @@ export default async function HistoryPage({
           whenLabel: formatInZone(row.createdAt, timezone),
         }))}
       />
+
+      <Pagination page={page} href={(next) => pageHref('/settings/history', params, next)} />
     </div>
   );
 }

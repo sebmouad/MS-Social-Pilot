@@ -43,13 +43,21 @@ export function historyRetention(): { activityDays: number; emailDays: number } 
   };
 }
 
+export async function countActivity(workspaceId: string): Promise<number> {
+  return prisma.activityLog.count({ where: { workspaceId } });
+}
+
 export async function readActivity(options: {
   workspaceId: string;
   limit?: number;
+  skip?: number;
 }): Promise<ActivityRow[]> {
   const rows = await prisma.activityLog.findMany({
     where: { workspaceId: options.workspaceId },
-    orderBy: { createdAt: 'desc' },
+    // `id` last so equal timestamps have one settled order; without it a row
+    // can appear on two pages and another on none.
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    skip: options.skip ?? 0,
     take: options.limit ?? 100,
   });
 
@@ -77,9 +85,22 @@ export async function readActivity(options: {
   }));
 }
 
+export async function countEmailLog(options: {
+  workspaceId: string;
+  failuresOnly?: boolean;
+}): Promise<number> {
+  return prisma.emailLog.count({
+    where: {
+      workspaceId: options.workspaceId,
+      ...(options.failuresOnly ? { status: { not: 'sent' } } : {}),
+    },
+  });
+}
+
 export async function readEmailLog(options: {
   workspaceId: string;
   limit?: number;
+  skip?: number;
   failuresOnly?: boolean;
 }): Promise<EmailRow[]> {
   const rows = await prisma.emailLog.findMany({
@@ -87,7 +108,8 @@ export async function readEmailLog(options: {
       workspaceId: options.workspaceId,
       ...(options.failuresOnly ? { status: { not: 'sent' } } : {}),
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    skip: options.skip ?? 0,
     take: options.limit ?? 100,
   });
 
