@@ -49,8 +49,11 @@ export interface SettingDefinition {
   /** Shown under the field: what changing this actually affects. */
   hint?: string;
   /**
-   * True when a change only reaches the worker on its next settings refresh
-   * (at most a minute), rather than immediately.
+   * True when the change lands on the worker rather than on the next request.
+   *
+   * The worker re-reads configuration on each pass of its one-second loop, so
+   * this is seconds rather than a restart — but a job already mid-run finishes
+   * on the old value, which is worth saying on a field like a poll interval.
    */
   workerRestart?: boolean;
 }

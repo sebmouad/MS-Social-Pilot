@@ -346,10 +346,19 @@ silently wipe an API key.
 
 Reads are synchronous (`setting('scheduler.pollSeconds')`) with a cached
 snapshot loaded at two choke points: the API route wrapper for requests, and
-`getAuthContext` for server rendering. The worker re-reads on every pass, so an
-interval changed on the screen takes effect within a minute without a restart —
-that lag is what the "applies within a minute" badge on the form is telling the
-operator.
+`getAuthContext` for server rendering. The worker re-reads on every pass of its
+one-second loop.
+
+The cache is validated against a **version stamp** rather than simply expiring.
+More than one process runs this app — the web server, the worker, and possibly
+several of each behind a load balancer — and a blind TTL let them disagree about
+configuration for its whole length, including the feature switches that decide
+which OAuth scopes a login asks for. The stamp is `max(updatedAt)` together with
+the row count: an update moves the maximum, an insert moves both, and a delete
+moves the count even when it left the maximum alone. It is checked at most once
+a second and the full reload happens only when it has changed, so staleness is
+bounded at a second and the steady-state cost is one aggregate per second per
+process regardless of traffic.
 
 ## Connections
 

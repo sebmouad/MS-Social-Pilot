@@ -14,20 +14,36 @@ import {
  * honoured — but anything set through the config screen wins over it, so an
  * operator never has to edit a file on the server to change a job interval.
  *
- * Values are cached in the process for a short window. Two processes run this
- * app (the web server and the worker), and a change made in one reaches the
- * other on its next refresh rather than instantly; the TTL is what bounds that
- * lag. A write invalidates the cache in its own process immediately.
+ * Values are cached per process, and the cache is validated against a **version
+ * stamp** rather than simply expiring. Several processes run this app — the web
+ * server, the worker, and more than one of each behind a load balancer — and a
+ * blind TTL meant they could disagree about configuration for its whole length,
+ * including feature switches that decide which OAuth scopes a login asks for.
+ *
+ * The stamp is `max(updatedAt)` and the row count together: an update moves the
+ * maximum, an insert moves both, and a delete moves the count (or the maximum,
+ * if it removed the newest row). Reading it is one aggregate over a table with a
+ * few dozen rows, so it is checked at most once a second and the full reload
+ * happens only when it has actually changed. Worst-case staleness is that
+ * second, and steady-state cost is one trivial query per second per process
+ * whatever the traffic.
  */
 
 export type SettingValue = string | number | boolean | string[];
 
-/** How long a loaded snapshot is trusted before it is re-read. */
-const CACHE_TTL_MS = 30_000;
+/** How often the version stamp is checked. Not how long values are trusted. */
+const STAMP_CHECK_MS = 1_000;
+
+/** What identifies a version of the settings table. */
+interface Stamp {
+  count: number;
+  updatedAt: number;
+}
 
 let cache: Map<string, SettingValue> | null = null;
-let loadedAt = 0;
-let inFlight: Promise<Map<string, SettingValue>> | null = null;
+let stamp: Stamp | null = null;
+let checkedAt = 0;
+let inFlight: Promise<void> | null = null;
 
 function parseBoolean(raw: string): boolean {
   return raw === 'true' || raw === '1' || raw === 'yes';
@@ -83,9 +99,25 @@ function fromEnv(definition: SettingDefinition): SettingValue | null {
   return coerce(definition, raw);
 }
 
-async function load(): Promise<Map<string, SettingValue>> {
+async function readStamp(): Promise<Stamp> {
+  const result = await prisma.appSetting.aggregate({
+    _count: { key: true },
+    _max: { updatedAt: true },
+  });
+
+  return {
+    count: result._count.key,
+    updatedAt: result._max.updatedAt?.getTime() ?? 0,
+  };
+}
+
+function sameStamp(left: Stamp | null, right: Stamp): boolean {
+  return left !== null && left.count === right.count && left.updatedAt === right.updatedAt;
+}
+
+async function load(next: Stamp): Promise<void> {
   const rows = await prisma.appSetting.findMany();
-  const next = new Map<string, SettingValue>();
+  const loaded = new Map<string, SettingValue>();
 
   for (const row of rows) {
     const definition = SETTINGS_BY_KEY.get(row.key);
@@ -105,34 +137,46 @@ async function load(): Promise<Map<string, SettingValue>> {
     }
 
     const value = coerce(definition, raw);
-    if (value !== null) next.set(row.key, value);
+    if (value !== null) loaded.set(row.key, value);
   }
 
-  cache = next;
-  loadedAt = Date.now();
-  return next;
+  cache = loaded;
+  stamp = next;
 }
 
 /**
- * Make sure a fresh-enough snapshot is in memory.
+ * Make sure the in-memory snapshot matches the database.
  *
  * Call this once at the top of anything that reads settings. Concurrent callers
- * share a single query rather than each issuing their own.
+ * share a single check rather than each issuing their own.
  */
 export async function ensureSettings(): Promise<void> {
-  if (cache && Date.now() - loadedAt < CACHE_TTL_MS) return;
+  if (cache && Date.now() - checkedAt < STAMP_CHECK_MS) return;
+
   if (!inFlight) {
-    inFlight = load().finally(() => {
-      inFlight = null;
-    });
+    inFlight = (async () => {
+      const next = await readStamp();
+      // The common case: nothing has changed anywhere, so the snapshot stands
+      // and the only cost was the aggregate.
+      if (cache && sameStamp(stamp, next)) return;
+      await load(next);
+    })()
+      .then(() => {
+        checkedAt = Date.now();
+      })
+      .finally(() => {
+        inFlight = null;
+      });
   }
+
   await inFlight;
 }
 
 /** Drop the snapshot so the next read goes to the database. */
 export function invalidateSettings(): void {
   cache = null;
-  loadedAt = 0;
+  stamp = null;
+  checkedAt = 0;
 }
 
 /**

@@ -624,7 +624,7 @@
     "secretKeepHint": "Laissez vide pour conserver la valeur actuelle. La vider ici supprime la surcharge.",
     "listHint": "Séparez les entrées par des virgules.",
     "range": "Entre {min} et {max}.",
-    "workerLag": "effectif sous une minute",
+    "workerLag": "effectif au prochain passage du worker",
     "changedBy": "défini par {name}",
     "source": {
       "database": "Défini ici",

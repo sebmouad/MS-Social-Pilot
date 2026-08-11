@@ -253,6 +253,9 @@ describe('settings reach the worker', () => {
 });
 
 describe('the cache', () => {
+  /** The stamp is only checked once a second; tests should not wait for it. */
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 1100));
+
   it('serves a change immediately in the process that made it', async () => {
     await settings.writeSetting('scheduler.maxAttempts', 9, null);
     // No ensureSettings: writing invalidates, and the next read reloads.
@@ -270,6 +273,39 @@ describe('the cache', () => {
     await settings.ensureSettings();
 
     expect(settings.setting('scheduler.concurrency')).toBe(7);
+  });
+
+  it('picks up another process’s write without being invalidated', async () => {
+    // The property a blind TTL could not give: a second web instance behind a
+    // load balancer must not keep serving the old value for half a minute.
+    await settings.ensureSettings();
+    expect(settings.setting('scheduler.concurrency')).toBe(4);
+
+    // Written as if by another process — this one's cache is left alone.
+    await prisma.appSetting.create({ data: { key: 'scheduler.concurrency', value: 11 } });
+
+    await settle();
+    await settings.ensureSettings();
+
+    expect(settings.setting('scheduler.concurrency')).toBe(11);
+  });
+
+  it('notices a delete as well as an insert', async () => {
+    // A delete leaves max(updatedAt) alone unless it removed the newest row,
+    // which is why the row count is part of the stamp.
+    await settings.writeSetting('scheduler.concurrency', 11, null);
+    await settings.writeSetting('scheduler.maxAttempts', 7, null);
+    await settings.ensureSettings();
+    expect(settings.setting('scheduler.concurrency')).toBe(11);
+
+    // Remove the *older* of the two rows, straight from the table.
+    await prisma.appSetting.delete({ where: { key: 'scheduler.concurrency' } });
+
+    await settle();
+    await settings.ensureSettings();
+
+    expect(settings.setting('scheduler.concurrency')).toBe(4);
+    expect(settings.setting('scheduler.maxAttempts')).toBe(7);
   });
 
   it('ignores a stored row for a key the code no longer knows', async () => {

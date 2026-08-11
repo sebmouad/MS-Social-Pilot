@@ -624,7 +624,7 @@
     "secretKeepHint": "Leave blank to keep the current value. Clearing it here removes the override.",
     "listHint": "Separate entries with commas.",
     "range": "Between {min} and {max}.",
-    "workerLag": "applies within a minute",
+    "workerLag": "applies on the next worker pass",
     "changedBy": "set by {name}",
     "source": {
       "database": "Set here",
