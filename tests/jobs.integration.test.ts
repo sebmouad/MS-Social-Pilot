@@ -552,6 +552,34 @@ describe('bulk upload limits', () => {
   });
 });
 
+/**
+ * The probe everything in front of this app relies on: a load balancer, an
+ * uptime monitor, and the compose healthcheck the worker waits for before it
+ * starts polling a database that may still be migrating.
+ */
+describe('GET /api/health', () => {
+  let health: typeof import('../src/app/api/health/route');
+
+  beforeAll(async () => {
+    health = await import('../src/app/api/health/route');
+  });
+
+  it('reports ok when the database answers', async () => {
+    const response = await health.GET();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'ok' });
+  });
+
+  it('says nothing beyond the status', async () => {
+    // Reachable by anyone who can reach the port, so it must not hand out a
+    // version, a hostname, or the text of a database error.
+    const body = (await (await health.GET()).json()) as Record<string, unknown>;
+
+    expect(Object.keys(body)).toEqual(['status']);
+  });
+});
+
 describe('Meta callbacks', () => {
   let settings: typeof import('../src/lib/settings');
   let deauthorize: typeof import('../src/app/api/facebook/deauthorize/route');

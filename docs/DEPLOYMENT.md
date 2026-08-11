@@ -122,6 +122,20 @@ nothing else touches the filesystem.
 
 ---
 
+## Health checks
+
+`GET /api/health` is unauthenticated and returns `{"status":"ok"}` with a 200,
+or 503 when the database cannot be reached. Point a load balancer, an uptime
+monitor or a container probe at it.
+
+It round-trips to Postgres deliberately. A container that has booted but cannot
+reach the database serves errors on every page, and a check that only proves the
+process is alive would call that healthy. It deliberately returns nothing else —
+no version, no hostname, no error text — because everything that can reach the
+port can read it.
+
+---
+
 ## Key rotation
 
 `ENCRYPTION_KEY` decrypts every stored access token. **Changing it makes every
@@ -192,6 +206,12 @@ Three services from one image — `web`, `worker`, `postgres` — with named
 volumes for the database and for `MEDIA_DIR`. The worker is the same image with
 `command: npm run worker`, so it can never drift out of sync with the code that
 scheduled the work.
+
+The worker waits for `web` to be **healthy**, not merely started. `web` applies
+the migrations, and starting is not the same as having finished them: waiting
+only for the container left the worker polling tables that did not exist yet,
+crashing and restarting until the migration landed. It recovered on its own, but
+every first boot spent a minute producing alarming logs.
 
 For production, drop the `5432` port mapping on `postgres` (it is exposed only
 for local `psql` and Prisma Studio) and put a TLS terminator in front of `web`.

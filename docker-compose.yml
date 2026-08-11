@@ -40,6 +40,21 @@ services:
     # Migrations run here rather than in the worker so that two containers
     # starting together cannot race to apply the same migration.
     command: sh -c "npx prisma migrate deploy && npm start"
+    # node rather than curl or wget: this image is node:22-slim, which ships
+    # neither. start_period covers the migration, which is the slow part of a
+    # first boot and must not count as a failure while it runs.
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
 
   worker:
     build: .
@@ -53,8 +68,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      # Healthy, not merely started: `web` applies the migrations, and starting
+      # is not the same as having finished them. Waiting only for the container
+      # left the worker polling tables that did not exist yet, crashing and
+      # restarting until the migration landed — self-healing, but a minute of
+      # alarming logs on every first boot.
       web:
-        condition: service_started
+        condition: service_healthy
     command: npm run worker
 
 volumes:
