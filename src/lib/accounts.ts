@@ -183,10 +183,22 @@ export interface AccountHealth {
 
 /**
  * Check a connection against Facebook rather than against our own records, so
- * the Accounts page can warn before a scheduled post fails.
+ * the Connections page can warn before a scheduled post fails.
+ *
+ * The workspace is required rather than optional. This reads a token and can
+ * mark an account dead, and an unscoped version was safe only for as long as
+ * every caller remembered to check ownership first — which is exactly the
+ * assumption that made `disconnect` report success for another tenant's
+ * account.
  */
-export async function checkAccountHealth(socialAccountId: string): Promise<AccountHealth> {
-  const account = await prisma.socialAccount.findUniqueOrThrow({ where: { id: socialAccountId } });
+export async function checkAccountHealth(
+  socialAccountId: string,
+  workspaceId: string,
+): Promise<AccountHealth | null> {
+  const account = await prisma.socialAccount.findFirst({
+    where: { id: socialAccountId, workspaceId },
+  });
+  if (!account) return null;
 
   try {
     const info = await debugToken(decryptSecret(account.accessToken));

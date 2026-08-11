@@ -2,7 +2,13 @@ import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
 import { fail, ok, readJson, route } from '@/lib/api';
-import { moderateComment, readComments, removeComment, replyToCommentAs } from '@/lib/engagement';
+import {
+  moderateComment,
+  readComments,
+  removeComment,
+  replyToCommentAs,
+  type ModerationOutcome,
+} from '@/lib/engagement';
 
 /** The workspace comment stream, optionally filtered. */
 export const GET = route(async (request: Request) => {
@@ -44,28 +50,48 @@ export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
   const input = actionSchema.parse(await readJson(request));
 
+  /** One mapping for all four actions, so no branch can forget a case. */
+  const respond = (outcome: ModerationOutcome, body: Record<string, unknown>) => {
+    if (outcome === 'forbidden') {
+      return fail(
+        input.action === 'delete'
+          ? 'Only workspace owners and admins can delete comments on Facebook.'
+          : 'You do not have permission to moderate comments.',
+        403,
+      );
+    }
+    if (outcome === 'not_found') return fail('Comment not found.', 404);
+    return ok(body);
+  };
+
   if (input.action === 'reply') {
-    const remoteId = await replyToCommentAs({
+    const result = await replyToCommentAs({
       commentId: input.commentId,
       workspaceId: auth.workspace.id,
+      role: auth.role,
       message: input.message,
     });
-    return remoteId ? ok({ remoteId }) : fail('Comment not found.', 404);
+    return respond(result.outcome, { remoteId: result.remoteId });
   }
 
   if (input.action === 'delete') {
-    const removed = await removeComment({
-      commentId: input.commentId,
-      workspaceId: auth.workspace.id,
-    });
-    return removed ? ok({ deleted: true }) : fail('Comment not found.', 404);
+    return respond(
+      await removeComment({
+        commentId: input.commentId,
+        workspaceId: auth.workspace.id,
+        role: auth.role,
+      }),
+      { deleted: true },
+    );
   }
 
-  const updated = await moderateComment({
-    commentId: input.commentId,
-    workspaceId: auth.workspace.id,
-    hidden: input.action === 'hide',
-  });
-
-  return updated ? ok({ hidden: input.action === 'hide' }) : fail('Comment not found.', 404);
+  return respond(
+    await moderateComment({
+      commentId: input.commentId,
+      workspaceId: auth.workspace.id,
+      role: auth.role,
+      hidden: input.action === 'hide',
+    }),
+    { hidden: input.action === 'hide' },
+  );
 });

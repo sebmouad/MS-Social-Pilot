@@ -12,6 +12,7 @@ import { PostAnalyticsTable } from '@/components/PostAnalyticsTable';
 import { StatTile } from '@/components/charts/StatTile';
 import { SyncButton } from '@/components/SyncButton';
 import { requirePage } from '@/lib/auth';
+import { canDeleteComments, canModerateComments } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import {
   readAudience,
@@ -164,7 +165,13 @@ export default async function AnalyticsPage({
       )}
 
       {view === 'comments' && (
-        <CommentsView workspaceId={auth.workspace.id} targetId={selected.id} timezone={timezone} />
+        <CommentsView
+          workspaceId={auth.workspace.id}
+          targetId={selected.id}
+          timezone={timezone}
+          canModerate={canModerateComments(auth.role)}
+          canDelete={canDeleteComments(auth.role)}
+        />
       )}
 
       {view === 'reviews' && (
@@ -410,16 +417,22 @@ async function CommentsView({
   workspaceId,
   targetId,
   timezone,
+  canModerate,
+  canDelete,
 }: {
   workspaceId: string;
   targetId: string;
   timezone: string;
+  canModerate: boolean;
+  canDelete: boolean;
 }) {
   const comments = await readComments({ workspaceId, targetId, limit: 200 });
 
   return (
     <CommentsPanel
       targetId={targetId}
+      canModerate={canModerate}
+      canDelete={canDelete}
       comments={comments.map((comment) => ({
         id: comment.id,
         message: comment.message,

@@ -393,6 +393,80 @@ describe('disconnect', () => {
   });
 });
 
+describe('checkAccountHealth', () => {
+  it('will not read another workspace’s token', async () => {
+    // It reads a token and can mark an account dead. Being safe only because
+    // every caller remembered to check ownership first is the same assumption
+    // that let disconnect report success for another tenant.
+    const accounts = await import('../src/lib/accounts');
+    const mine = await seed('mine');
+    const theirs = await seed('theirs');
+
+    expect(await accounts.checkAccountHealth(theirs.account.id, mine.workspace.id)).toBeNull();
+  });
+
+  it('returns null for an id that does not exist at all', async () => {
+    const accounts = await import('../src/lib/accounts');
+    const { workspace } = await seed();
+
+    expect(await accounts.checkAccountHealth('nope', workspace.id)).toBeNull();
+  });
+});
+
+/**
+ * The capability table itself.
+ *
+ * Every hole fixed in this area was a route that forgot to ask. Asserting the
+ * matrix keeps the answers in one place and makes a widened permission a
+ * deliberate, visible change rather than a one-line edit nobody reviews.
+ */
+describe('capabilities', () => {
+  const ROLES = [
+    WorkspaceRole.owner,
+    WorkspaceRole.admin,
+    WorkspaceRole.editor,
+    WorkspaceRole.contributor,
+  ] as const;
+
+  it('matches the intended matrix', async () => {
+    const c = await import('../src/lib/constants');
+
+    const expected: Record<string, WorkspaceRole[]> = {
+      canManageInstance: [WorkspaceRole.owner],
+      canManageAccounts: [WorkspaceRole.owner, WorkspaceRole.admin],
+      canManageTeam: [WorkspaceRole.owner, WorkspaceRole.admin],
+      canManageSettings: [WorkspaceRole.owner, WorkspaceRole.admin],
+      canApprove: [WorkspaceRole.owner, WorkspaceRole.admin],
+      canDeleteComments: [WorkspaceRole.owner, WorkspaceRole.admin],
+      canModerateComments: [WorkspaceRole.owner, WorkspaceRole.admin, WorkspaceRole.editor],
+    };
+
+    for (const [name, allowed] of Object.entries(expected)) {
+      const check = (c as unknown as Record<string, (role: WorkspaceRole) => boolean>)[name]!;
+      for (const role of ROLES) {
+        expect(check(role), `${name}(${role})`).toBe(allowed.includes(role));
+      }
+    }
+  });
+
+  it('never grants a lower role something a higher one lacks', async () => {
+    const c = await import('../src/lib/constants');
+    const checks = Object.entries(c).filter(
+      ([name, value]) => name.startsWith('can') && typeof value === 'function',
+    ) as Array<[string, (role: WorkspaceRole) => boolean]>;
+
+    for (const [name, check] of checks) {
+      // canCompose takes no role; skip anything that ignores its argument.
+      if (check.length === 0) continue;
+      for (let index = 1; index < ROLES.length; index += 1) {
+        const higher = check(ROLES[index - 1]!);
+        const lower = check(ROLES[index]!);
+        expect(!lower || higher, `${name}: ${ROLES[index]} without ${ROLES[index - 1]}`).toBe(true);
+      }
+    }
+  });
+});
+
 describe('summariseConnections', () => {
   const now = new Date('2026-09-01T10:00:00Z');
 

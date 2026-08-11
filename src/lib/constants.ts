@@ -116,6 +116,28 @@ export function canManageInstance(role: WorkspaceRole): boolean {
   return atLeast(role, WorkspaceRole.owner);
 }
 
+/**
+ * Hide, unhide and reply to comments on published posts.
+ *
+ * Editor and above. This is content work — the same people who write the posts
+ * answer the replies — but it is not a contributor's, because every action here
+ * is immediately visible on the client's page.
+ */
+export function canModerateComments(role: WorkspaceRole): boolean {
+  return atLeast(role, WorkspaceRole.editor);
+}
+
+/**
+ * Delete a comment on Facebook.
+ *
+ * Admin and above, a step higher than hiding it. Hiding is reversible from the
+ * same screen; deleting removes a customer's words from the client's page and
+ * nothing brings them back.
+ */
+export function canDeleteComments(role: WorkspaceRole): boolean {
+  return atLeast(role, WorkspaceRole.admin);
+}
+
 /** Approve or reject posts submitted for review. */
 export function canApprove(role: WorkspaceRole): boolean {
   return atLeast(role, WorkspaceRole.admin);

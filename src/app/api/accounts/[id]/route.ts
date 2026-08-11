@@ -1,7 +1,6 @@
 import { requireAuth } from '@/lib/auth';
 import { checkAccountHealth } from '@/lib/accounts';
 import { disconnect } from '@/lib/connections';
-import { prisma } from '@/lib/prisma';
 import { fail, ok, route } from '@/lib/api';
 
 type Context = { params: Promise<{ id: string }> };
@@ -10,12 +9,12 @@ export const GET = route(async (_request: Request, context: Context) => {
   const auth = await requireAuth();
   const { id } = await context.params;
 
-  const account = await prisma.socialAccount.findFirst({
-    where: { id, workspaceId: auth.workspace.id },
-  });
-  if (!account) return fail('Account not found.', 404);
+  // The scoping lives in the service, so this cannot be got wrong by a caller
+  // that forgets to look the account up first.
+  const health = await checkAccountHealth(id, auth.workspace.id);
+  if (!health) return fail('Account not found.', 404);
 
-  return ok({ health: await checkAccountHealth(account.id) });
+  return ok({ health });
 });
 
 export const DELETE = route(async (_request: Request, context: Context) => {

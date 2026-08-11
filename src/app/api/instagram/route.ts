@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
+import { canManageAccounts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { fail, ok, readJson, route } from '@/lib/api';
 import {
@@ -55,6 +56,12 @@ const schema = z.object({
 export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
   const input = schema.parse((await readJson(request).catch(() => ({}))) ?? {});
+
+  // Discovery creates connection rows and a sync spends the app's rate limit,
+  // so both sit behind the same permission as every other connection change.
+  if (!canManageAccounts(auth.role)) {
+    return fail('Only workspace owners and admins can change connections.', 403);
+  }
 
   if (input.action === 'discover') {
     return ok(await discoverInstagramAccounts(auth.workspace.id));

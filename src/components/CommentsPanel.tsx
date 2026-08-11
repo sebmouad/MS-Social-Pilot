@@ -23,8 +23,22 @@ export interface CommentView {
  * Every action writes to Facebook first and only then refreshes — an optimistic
  * update here would show a comment as hidden when Graph had refused, which is
  * exactly the mistake that gets a page reported.
+ *
+ * The controls are hidden from anyone who cannot use them. The API refuses them
+ * either way — that is the boundary — but a Delete button that answers 403
+ * reads as a broken product rather than as a permission.
  */
-export function CommentsPanel({ comments, targetId }: { comments: CommentView[]; targetId: string }) {
+export function CommentsPanel({
+  comments,
+  targetId,
+  canModerate,
+  canDelete,
+}: {
+  comments: CommentView[];
+  targetId: string;
+  canModerate: boolean;
+  canDelete: boolean;
+}) {
   const t = useTranslations('engagement');
   const tCommon = useTranslations('common');
   const router = useRouter();
@@ -79,9 +93,11 @@ export function CommentsPanel({ comments, targetId }: { comments: CommentView[];
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('commentsHint')}</p>
-        <button type="button" className="btn-secondary" onClick={sync} disabled={syncing}>
-          {syncing ? tCommon('working') : t('refresh')}
-        </button>
+        {canModerate && (
+          <button type="button" className="btn-secondary" onClick={sync} disabled={syncing}>
+            {syncing ? tCommon('working') : t('refresh')}
+          </button>
+        )}
       </div>
 
       {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
@@ -121,42 +137,49 @@ export function CommentsPanel({ comments, targetId }: { comments: CommentView[];
                   </span>
                 )}
 
-                <button
-                  type="button"
-                  className="font-medium text-brand-600 hover:underline disabled:opacity-50"
-                  disabled={busy === comment.id}
-                  onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
-                >
-                  {t('reply')}
-                </button>
-                <button
-                  type="button"
-                  className="font-medium text-slate-600 hover:underline disabled:opacity-50"
-                  disabled={busy === comment.id}
-                  onClick={() =>
-                    act(
-                      { action: comment.isHidden ? 'unhide' : 'hide', commentId: comment.id },
-                      comment.id,
-                    )
-                  }
-                >
-                  {comment.isHidden ? t('unhide') : t('hide')}
-                </button>
-                <button
-                  type="button"
-                  className="font-medium text-rose-600 hover:underline disabled:opacity-50"
-                  disabled={busy === comment.id}
-                  onClick={() => {
-                    if (confirm(t('confirmDelete'))) {
-                      void act({ action: 'delete', commentId: comment.id }, comment.id);
-                    }
-                  }}
-                >
-                  {tCommon('delete')}
-                </button>
+                {canModerate && (
+                  <>
+                    <button
+                      type="button"
+                      className="font-medium text-brand-600 hover:underline disabled:opacity-50"
+                      disabled={busy === comment.id}
+                      onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
+                    >
+                      {t('reply')}
+                    </button>
+                    <button
+                      type="button"
+                      className="font-medium text-slate-600 hover:underline disabled:opacity-50"
+                      disabled={busy === comment.id}
+                      onClick={() =>
+                        act(
+                          { action: comment.isHidden ? 'unhide' : 'hide', commentId: comment.id },
+                          comment.id,
+                        )
+                      }
+                    >
+                      {comment.isHidden ? t('unhide') : t('hide')}
+                    </button>
+                  </>
+                )}
+
+                {canDelete && (
+                  <button
+                    type="button"
+                    className="font-medium text-rose-600 hover:underline disabled:opacity-50"
+                    disabled={busy === comment.id}
+                    onClick={() => {
+                      if (confirm(t('confirmDelete'))) {
+                        void act({ action: 'delete', commentId: comment.id }, comment.id);
+                      }
+                    }}
+                  >
+                    {tCommon('delete')}
+                  </button>
+                )}
               </div>
 
-              {replyTo === comment.id && (
+              {canModerate && replyTo === comment.id && (
                 <div className="mt-3 space-y-2">
                   <textarea
                     className="input min-h-[72px]"

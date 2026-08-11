@@ -488,9 +488,10 @@ describe('comment moderation', () => {
       await engagement.moderateComment({
         commentId: comment!.id,
         workspaceId: workspace.id,
+        role: WorkspaceRole.editor,
         hidden: true,
       }),
-    ).toBe(true);
+    ).toBe('ok');
 
     const after = await prisma.postComment.findUniqueOrThrow({ where: { id: comment!.id } });
     expect(after.isHidden).toBe(true);
@@ -508,6 +509,7 @@ describe('comment moderation', () => {
       engagement.moderateComment({
         commentId: comment!.id,
         workspaceId: workspace.id,
+        role: WorkspaceRole.editor,
         hidden: true,
       }),
     ).rejects.toThrow();
@@ -526,13 +528,14 @@ describe('comment moderation', () => {
     const [comment] = await engagement.readComments({ workspaceId: workspace.id });
     routes['/c1/comments'] = () => ({ id: 'reply-1' });
 
-    const remoteId = await engagement.replyToCommentAs({
+    const result = await engagement.replyToCommentAs({
       commentId: comment!.id,
       workspaceId: workspace.id,
+      role: WorkspaceRole.editor,
       message: 'Thanks!',
     });
 
-    expect(remoteId).toBe('reply-1');
+    expect(result.remoteId).toBe('reply-1');
     const reply = await prisma.postComment.findFirst({ where: { remoteId: 'reply-1' } });
     expect(reply?.parentRemoteId).toBe('c1');
   });
@@ -549,9 +552,81 @@ describe('comment moderation', () => {
       await engagement.moderateComment({
         commentId: comment!.id,
         workspaceId: mine.workspace.id,
+        role: WorkspaceRole.owner,
         hidden: true,
       }),
-    ).toBe(false);
+    ).toBe('not_found');
+  });
+
+  it('refuses a contributor', async () => {
+    // Every action here is immediately visible on the client's page.
+    const { workspace, target } = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: target.id });
+
+    const [comment] = await engagement.readComments({ workspaceId: workspace.id });
+    routes['/c1'] = () => ({ success: true });
+
+    expect(
+      await engagement.moderateComment({
+        commentId: comment!.id,
+        workspaceId: workspace.id,
+        role: WorkspaceRole.contributor,
+        hidden: true,
+      }),
+    ).toBe('forbidden');
+
+    expect((await prisma.postComment.findUniqueOrThrow({ where: { id: comment!.id } })).isHidden).toBe(
+      false,
+    );
+  });
+
+  it('lets an editor hide but not delete', async () => {
+    // Hiding is undone from the same screen. Deleting removes a customer's
+    // words from the client's page and nothing brings them back.
+    const { workspace, target } = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: target.id });
+
+    const [comment] = await engagement.readComments({ workspaceId: workspace.id });
+    routes['/c1'] = () => ({ success: true });
+
+    expect(
+      await engagement.removeComment({
+        commentId: comment!.id,
+        workspaceId: workspace.id,
+        role: WorkspaceRole.editor,
+      }),
+    ).toBe('forbidden');
+    expect(await prisma.postComment.count()).toBe(1);
+
+    expect(
+      await engagement.removeComment({
+        commentId: comment!.id,
+        workspaceId: workspace.id,
+        role: WorkspaceRole.admin,
+      }),
+    ).toBe('ok');
+    expect(await prisma.postComment.count()).toBe(0);
+  });
+
+  it('refuses a contributor’s reply', async () => {
+    const { workspace, target } = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: target.id });
+
+    const [comment] = await engagement.readComments({ workspaceId: workspace.id });
+    routes['/c1/comments'] = () => ({ id: 'reply-1' });
+
+    const result = await engagement.replyToCommentAs({
+      commentId: comment!.id,
+      workspaceId: workspace.id,
+      role: WorkspaceRole.contributor,
+      message: 'Thanks!',
+    });
+
+    expect(result.outcome).toBe('forbidden');
+    expect(await prisma.postComment.count({ where: { remoteId: 'reply-1' } })).toBe(0);
   });
 });
 

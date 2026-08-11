@@ -197,6 +197,24 @@ by an older version must degrade to a fallback rather than crash a render.
 ### Multi-tenancy
 
 A client is a `Workspace`; a user may belong to several with different roles.
+
+Every capability answer lives in `src/lib/constants.ts` and nowhere else, so the
+UI and the API cannot disagree about who may do what. The matrix is asserted in
+the test suite rather than only written down — every permission hole found so
+far was a route that simply forgot to ask, and a widened capability should be a
+visible change rather than a one-line edit:
+
+| Capability | Minimum role |
+| --- | --- |
+| `canManageInstance` (configuration) | owner |
+| `canManageAccounts` (connections, tokens, destinations) | admin |
+| `canManageTeam`, `canManageSettings`, `canApprove` | admin |
+| `canDeleteComments` | admin |
+| `canModerateComments` (hide, unhide, reply) | editor |
+
+Deleting a comment sits a step above hiding one deliberately: hiding is undone
+from the same screen, deletion removes a customer's words from the client's page
+and nothing brings them back.
 `getAuthContext` resolves the requested workspace and **re-checks membership** —
 an id from a cookie or URL is a request, not a permission. Workspace scoping is
 therefore a security boundary, with tests that a member of one workspace cannot

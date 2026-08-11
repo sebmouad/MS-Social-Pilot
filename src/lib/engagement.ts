@@ -1,7 +1,8 @@
-import { TargetType } from '@prisma/client';
+import { TargetType, type WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
 import { env } from './env';
+import { canDeleteComments, canModerateComments } from './constants';
 import { decryptSecret } from './crypto';
 import { parseInsights, toJson, toJsonOrNull } from './json';
 import { asGraphError } from './facebook/graph';
@@ -167,6 +168,15 @@ export async function readComments(options: {
   }));
 }
 
+/**
+ * The answer to a moderation request.
+ *
+ * Three outcomes rather than a boolean, for the same reason as connections:
+ * "not yours", "not allowed" and "done" have to stay distinguishable, or a
+ * refusal reads to the caller as a comment that was never there.
+ */
+export type ModerationOutcome = 'ok' | 'not_found' | 'forbidden';
+
 /** Look up the Page token behind a stored comment. */
 async function tokenForComment(commentId: string, workspaceId: string) {
   const comment = await prisma.postComment.findFirst({
@@ -185,17 +195,20 @@ async function tokenForComment(commentId: string, workspaceId: string) {
 export async function moderateComment(options: {
   commentId: string;
   workspaceId: string;
+  role: WorkspaceRole;
   hidden: boolean;
-}): Promise<boolean> {
+}): Promise<ModerationOutcome> {
+  if (!canModerateComments(options.role)) return 'forbidden';
+
   const found = await tokenForComment(options.commentId, options.workspaceId);
-  if (!found) return false;
+  if (!found) return 'not_found';
 
   await setCommentHidden(found.comment.remoteId, found.token, options.hidden);
   await prisma.postComment.update({
     where: { id: options.commentId },
     data: { isHidden: options.hidden },
   });
-  return true;
+  return 'ok';
 }
 
 /**
@@ -207,23 +220,30 @@ export async function moderateComment(options: {
 export async function removeComment(options: {
   commentId: string;
   workspaceId: string;
-}): Promise<boolean> {
+  role: WorkspaceRole;
+}): Promise<ModerationOutcome> {
+  // A step above hiding: hiding is undone from the same screen, this is not.
+  if (!canDeleteComments(options.role)) return 'forbidden';
+
   const found = await tokenForComment(options.commentId, options.workspaceId);
-  if (!found) return false;
+  if (!found) return 'not_found';
 
   await deleteComment(found.comment.remoteId, found.token);
   await prisma.postComment.delete({ where: { id: options.commentId } });
-  return true;
+  return 'ok';
 }
 
 /** Reply to a comment as the Page. */
 export async function replyToCommentAs(options: {
   commentId: string;
   workspaceId: string;
+  role: WorkspaceRole;
   message: string;
-}): Promise<string | null> {
+}): Promise<{ outcome: ModerationOutcome; remoteId?: string }> {
+  if (!canModerateComments(options.role)) return { outcome: 'forbidden' };
+
   const found = await tokenForComment(options.commentId, options.workspaceId);
-  if (!found) return null;
+  if (!found) return { outcome: 'not_found' };
 
   const remoteId = await replyToComment(found.comment.remoteId, found.token, options.message);
 
@@ -243,7 +263,7 @@ export async function replyToCommentAs(options: {
     update: { message: options.message },
   });
 
-  return remoteId;
+  return { outcome: 'ok', remoteId };
 }
 
 // ---------------------------------------------------------------------------
