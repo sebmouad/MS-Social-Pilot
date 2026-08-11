@@ -432,6 +432,15 @@ static ceiling because past it the parse itself is the problem. The whole file
 is refused rather than partly scheduled: nothing happened, so there is nothing
 to reconcile.
 
+A row with more values than the header is reported rather than trimmed. There is
+no reading of that which is deliberate — it means a comma inside an unquoted
+field, so everything after it has shifted and the extras were about to be
+dropped in silence, which is how a client's page ends up with a post whose text
+is a fragment. A row with *fewer* values is still filled in with blanks and says
+nothing: hand-written files leave trailing commas off, and a blank cell already
+means something useful here, since no scheduled time means "use the next queue
+slot".
+
 Per-row URL rules match the composer's, which they did not before: a spreadsheet
 could put anything in the link column, and it was stored on the post and
 rendered as an `href` on the post list and the approvals screen before anyone

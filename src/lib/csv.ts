@@ -79,24 +79,60 @@ export function parseCsv(input: string): string[][] {
   return rows;
 }
 
+export interface CsvProblem {
+  /** Line number in the file, counting the header as line 1. */
+  line: number;
+  message: string;
+}
+
+export interface CsvDocument {
+  rows: Array<Record<string, string>>;
+  /** Rows that were read but look malformed. */
+  problems: CsvProblem[];
+}
+
 /**
  * Parse a CSV with a header row into objects keyed by normalised column name
  * ("Scheduled At" and "scheduled_at" both become `scheduled_at`).
+ *
+ * Two kinds of ragged row, treated differently on purpose:
+ *
+ * - **Fewer values than the header** is filled in with blanks and reported as
+ *   nothing at all. Hand-written files leave trailing commas off, and a blank
+ *   cell already means something useful here — no scheduled time means "use the
+ *   next queue slot".
+ *
+ * - **More values than the header** is reported. There is no reading of that
+ *   which is deliberate: it means a comma inside an unquoted field, so the
+ *   values after it have shifted and the extras were about to be dropped
+ *   silently. Silently is the problem — this file becomes posts on a client's
+ *   page, and a mangled one is worse than a rejected one.
  */
-export function parseCsvWithHeader(input: string): Array<Record<string, string>> {
+export function parseCsvWithHeader(input: string): CsvDocument {
   const rows = parseCsv(input);
   const header = rows.shift();
-  if (!header) return [];
+  if (!header) return { rows: [], problems: [] };
 
   const keys = header.map((name) => name.trim().toLowerCase().replace(/[\s-]+/g, '_'));
+  const problems: CsvProblem[] = [];
 
-  return rows.map((row) => {
+  const parsed = rows.map((row, rowIndex) => {
+    if (row.length > keys.length) {
+      problems.push({
+        // +2: the header is line 1 and rows are zero-indexed.
+        line: rowIndex + 2,
+        message: `This row has ${row.length} values but the header has ${keys.length} columns. A comma inside a field needs the field in "quotes".`,
+      });
+    }
+
     const record: Record<string, string> = {};
     keys.forEach((key, columnIndex) => {
       record[key] = (row[columnIndex] ?? '').trim();
     });
     return record;
   });
+
+  return { rows: parsed, problems };
 }
 
 export const BULK_CSV_TEMPLATE = [

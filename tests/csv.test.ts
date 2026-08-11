@@ -52,21 +52,55 @@ describe('parseCsv', () => {
 
 describe('parseCsvWithHeader', () => {
   it('keys rows by normalised header name', () => {
-    const rows = parseCsvWithHeader('Message,Scheduled At\nHello,2026-09-01 09:00');
+    const { rows } = parseCsvWithHeader('Message,Scheduled At\nHello,2026-09-01 09:00');
     expect(rows).toEqual([{ message: 'Hello', scheduled_at: '2026-09-01 09:00' }]);
   });
 
   it('trims whitespace around values', () => {
-    expect(parseCsvWithHeader('message\n  padded  ')[0]).toEqual({ message: 'padded' });
+    expect(parseCsvWithHeader('message\n  padded  ').rows[0]).toEqual({ message: 'padded' });
   });
 
   it('fills missing trailing columns with empty strings', () => {
-    const rows = parseCsvWithHeader('message,link,scheduled_at\nHello');
+    const { rows, problems } = parseCsvWithHeader('message,link,scheduled_at\nHello');
     expect(rows[0]).toEqual({ message: 'Hello', link: '', scheduled_at: '' });
+    // Hand-written files leave trailing commas off, and a blank cell already
+    // means something useful here, so this is not worth complaining about.
+    expect(problems).toEqual([]);
+  });
+
+  it('reports a row with more values than the header', () => {
+    // The classic mistake: a comma inside a message nobody quoted. Everything
+    // after it has shifted, and the extra value was about to be dropped.
+    const { problems } = parseCsvWithHeader(
+      'message,link\nHello, world,https://example.com/a',
+    );
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.line).toBe(2);
+    expect(problems[0]?.message).toMatch(/quotes/);
+  });
+
+  it('counts lines from the header, so the number matches the file', () => {
+    const { problems } = parseCsvWithHeader(
+      ['message,link', 'Fine,https://example.com/a', 'Also fine,https://example.com/b', 'a,b,c'].join(
+        '\n',
+      ),
+    );
+
+    expect(problems.map((problem) => problem.line)).toEqual([4]);
+  });
+
+  it('says nothing about a properly quoted comma', () => {
+    const { rows, problems } = parseCsvWithHeader(
+      'message,link\n"Hello, world",https://example.com/a',
+    );
+
+    expect(problems).toEqual([]);
+    expect(rows[0]?.message).toBe('Hello, world');
   });
 
   it('returns nothing for an empty document', () => {
-    expect(parseCsvWithHeader('')).toEqual([]);
+    expect(parseCsvWithHeader('')).toEqual({ rows: [], problems: [] });
   });
 });
 

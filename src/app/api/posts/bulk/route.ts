@@ -16,15 +16,26 @@ export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
   const input = bulkUploadSchema.parse(await readJson(request));
 
-  const rows = parseCsvWithHeader(input.csv);
+  const { rows, problems } = parseCsvWithHeader(input.csv);
 
   assertBulkRowsAllowed(rows.length);
 
   const results: Array<{ row: number; status: 'scheduled' | 'error'; postId?: string; message?: string }> = [];
 
+  // A row with more values than the header has shifted, so whatever it would
+  // have scheduled is not what the file says. Reported per row like any other
+  // bad row, rather than dropped on the floor.
+  const malformed = new Map(problems.map((problem) => [problem.line, problem.message]));
+
   let rowNumber = 1; // 1 is the header; data starts at 2.
   for (const raw of rows) {
     rowNumber += 1;
+
+    const structural = malformed.get(rowNumber);
+    if (structural) {
+      results.push({ row: rowNumber, status: 'error', message: structural });
+      continue;
+    }
 
     const parsed = bulkRowSchema.safeParse(raw);
     if (!parsed.success) {
