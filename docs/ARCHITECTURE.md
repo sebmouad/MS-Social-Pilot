@@ -271,6 +271,17 @@ them to `not_required`, landing them where an approval would have (scheduled if
 they have a time, draft if not). Rejected posts keep their decision; turning the
 switch off is not a way to overturn a reviewer.
 
+The other way approval leaks is time. A contributor can edit an approved post
+right up until it publishes, so without a check the decision travels with the
+row rather than with the content — sign-off on one message, a different one goes
+out. `updatePost` compares the incoming edit against the stored row and returns
+the post to `pending` when it changes something the reviewer saw: message, link,
+media, destinations or scheduled time. The comparison is against stored values
+rather than "did the request mention this field", because the composer PATCHes
+the whole form and opening a post must not cost it its approval. Editors and
+above are exempt, since `initialApprovalStatus` grants them `approved` at
+creation anyway — queueing edits they could bypass by reposting is theatre.
+
 ---
 
 ## Time

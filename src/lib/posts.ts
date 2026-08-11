@@ -19,6 +19,7 @@ import { logActivity, publishNow, refreshPostStatus } from './scheduler/runner';
 import type { CreatePostInput, UpdatePostInput } from './validation';
 import type { PublishMode, TargetType } from './constants';
 import { initialApprovalStatus } from './approvals';
+import { canPublishWithoutApproval } from './constants';
 import { notifyApprovalRequest } from './email/notify';
 import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
 
@@ -303,8 +304,65 @@ async function summarise(postId: string): Promise<CreatePostResult> {
  * change a post's attachments, and silently doing nothing would be worse than
  * saying so.
  */
+/**
+ * Whether an edit changes anything the reviewer actually looked at.
+ *
+ * Compared against the stored row rather than assumed from the request,
+ * because the composer PATCHes the whole form: treating every save as a change
+ * would bounce a post back into the queue for opening and closing it.
+ */
+function changesWhatWasReviewed(
+  post: { message: string; link: string | null; mediaKeys: string[]; scheduledAt: Date | null },
+  currentTargetIds: string[],
+  input: UpdatePostInput,
+  nextScheduledAt: Date | null | undefined,
+): boolean {
+  if (input.message !== undefined && input.message !== post.message) return true;
+  if (input.link !== undefined && (input.link ?? null) !== post.link) return true;
+
+  if (input.media !== undefined) {
+    const next = mediaColumns(input.media).mediaKeys;
+    if (next.length !== post.mediaKeys.length) return true;
+    if (next.some((key, index) => key !== post.mediaKeys[index])) return true;
+  }
+
+  if (nextScheduledAt !== undefined) {
+    const before = post.scheduledAt?.getTime() ?? null;
+    const after = nextScheduledAt?.getTime() ?? null;
+    if (before !== after) return true;
+  }
+
+  if (input.targetIds !== undefined) {
+    const before = [...currentTargetIds].sort();
+    const after = [...input.targetIds].sort();
+    if (before.length !== after.length) return true;
+    if (after.some((id, index) => id !== before[index])) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Edit a post.
+ *
+ * The subtle part is approval. A contributor whose post has been approved can
+ * still edit it right up until it publishes, and without this the reviewer's
+ * decision travels with the row rather than with the content — sign-off on one
+ * message, a different one goes out. So an edit by someone who cannot publish
+ * without review sends the post back to the queue.
+ *
+ * Editors and above keep their approval, because they never needed it: in a
+ * workspace with review on, `initialApprovalStatus` already grants them
+ * `approved` at creation, and bouncing their own edits into a queue they are
+ * exempt from would be theatre.
+ */
 export async function updatePost(
-  context: { workspaceId: string; userId: string },
+  context: {
+    workspaceId: string;
+    userId: string;
+    role: WorkspaceRole;
+    requiresApproval: boolean;
+  },
   postId: string,
   input: UpdatePostInput,
 ): Promise<void> {
@@ -347,10 +405,12 @@ export async function updatePost(
     }
   }
 
+  let nextScheduledAt: Date | null | undefined;
   if (input.scheduledAtLocal !== undefined) {
     if (input.scheduledAtLocal === null) {
       data.scheduledAt = null;
       data.status = 'draft';
+      nextScheduledAt = null;
     } else {
       const timezone = input.timezone ?? post.timezone;
       const scheduledAt = localInputToUtc(input.scheduledAtLocal, timezone);
@@ -362,10 +422,34 @@ export async function updatePost(
       }
       data.scheduledAt = scheduledAt;
       data.status = 'scheduled';
+      nextScheduledAt = scheduledAt;
     }
   }
 
   if (input.status !== undefined) data.status = input.status;
+
+  // Send it back for review if the reviewer's decision no longer covers what
+  // is about to go out. Checked before the write, against the stored row.
+  const needsReReview =
+    context.requiresApproval &&
+    post.approvalStatus === ApprovalStatus.approved &&
+    !canPublishWithoutApproval(context.role) &&
+    changesWhatWasReviewed(
+      post,
+      post.targets.map((target) => target.targetId),
+      input,
+      nextScheduledAt,
+    );
+
+  if (needsReReview) {
+    data.approvalStatus = ApprovalStatus.pending;
+    data.status = PostStatus.pending_approval;
+    data.submittedById = context.userId;
+    data.submittedAt = new Date();
+    data.reviewedById = null;
+    data.reviewedAt = null;
+    data.reviewNote = null;
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.post.update({ where: { id: postId }, data });
@@ -386,7 +470,7 @@ export async function updatePost(
     }
 
     // A retried post starts from a clean slate on every destination.
-    if (data.status === 'scheduled') {
+    if (data.status === PostStatus.scheduled) {
       await tx.postTarget.updateMany({
         where: { postId, status: { in: ['failed', 'cancelled'] } },
         data: { status: 'pending', attempts: 0, nextAttemptAt: null, errorCode: null, errorMessage: null },
@@ -395,6 +479,16 @@ export async function updatePost(
   });
 
   await logActivity(context.workspaceId, 'post.updated', { postId }, context.userId);
+
+  if (needsReReview) {
+    const author = await prisma.user.findUniqueOrThrow({ where: { id: context.userId } });
+    await notifyApprovalRequest({
+      workspaceId: context.workspaceId,
+      authorName: author.name,
+      scheduledAt: (data.scheduledAt as Date | null | undefined) ?? post.scheduledAt,
+    });
+    await logActivity(context.workspaceId, 'post.submitted', { postId }, context.userId);
+  }
 }
 
 /**

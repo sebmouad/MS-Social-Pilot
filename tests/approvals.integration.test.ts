@@ -393,6 +393,140 @@ describe('turning the workflow off', () => {
   });
 });
 
+/**
+ * Approval is granted to content, not to a row. A contributor can keep editing
+ * an approved post right up until it publishes, so the reviewer's decision has
+ * to stop covering it once the content moves.
+ */
+describe('editing after approval', () => {
+  async function seedApproved(options: { requiresApproval?: boolean } = {}) {
+    const owner = await makeUser('Owner');
+    const contributor = await makeUser('Contributor');
+    const requiresApproval = options.requiresApproval ?? true;
+    const { workspace, target } = await makeWorkspace({
+      name: 'Client',
+      ownerId: owner.id,
+      requiresApproval,
+    });
+    await prisma.membership.create({
+      data: { userId: contributor.id, workspaceId: workspace.id, role: WorkspaceRole.contributor },
+    });
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: contributor.id,
+        submittedById: contributor.id,
+        submittedAt: new Date(),
+        reviewedById: owner.id,
+        reviewedAt: new Date(),
+        message: 'The approved wording',
+        status: PostStatus.scheduled,
+        approvalStatus: requiresApproval
+          ? ApprovalStatus.approved
+          : ApprovalStatus.not_required,
+        scheduledAt: new Date(Date.now() - 5 * 60 * 1000),
+        targets: { create: { targetId: target.id } },
+      },
+    });
+
+    return { workspace, owner, contributor, post, target, requiresApproval };
+  }
+
+  function asContributor(seed: Awaited<ReturnType<typeof seedApproved>>) {
+    return {
+      workspaceId: seed.workspace.id,
+      userId: seed.contributor.id,
+      role: WorkspaceRole.contributor,
+      requiresApproval: seed.requiresApproval,
+    };
+  }
+
+  it('sends a reworded post back to the queue', async () => {
+    const seed = await seedApproved();
+
+    await posts.updatePost(asContributor(seed), seed.post.id, {
+      message: 'Something the reviewer never saw',
+    });
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: seed.post.id } });
+    expect(after.approvalStatus).toBe(ApprovalStatus.pending);
+    expect(after.status).toBe(PostStatus.pending_approval);
+    // The previous decision is cleared, so the queue shows a clean submission.
+    expect(after.reviewedById).toBeNull();
+    expect(after.reviewedAt).toBeNull();
+
+    // And it is due, so only the approval state is holding it back.
+    const result = await runner.runSchedulerTick();
+    expect(result.claimed).toBe(0);
+    expect(published).toHaveLength(0);
+  });
+
+  it('sends it back when the destinations change', async () => {
+    const seed = await seedApproved();
+    const other = await prisma.target.create({
+      data: {
+        workspaceId: seed.workspace.id,
+        type: 'page',
+        providerId: '2000',
+        name: 'Another Page',
+      },
+    });
+
+    await posts.updatePost(asContributor(seed), seed.post.id, { targetIds: [other.id] });
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: seed.post.id } });
+    expect(after.approvalStatus).toBe(ApprovalStatus.pending);
+  });
+
+  it('leaves it approved when the save changes nothing', async () => {
+    const seed = await seedApproved();
+
+    // The composer PATCHes the whole form, so opening and saving a post must
+    // not cost it its approval.
+    await posts.updatePost(asContributor(seed), seed.post.id, {
+      message: 'The approved wording',
+      targetIds: [seed.target.id],
+    });
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: seed.post.id } });
+    expect(after.approvalStatus).toBe(ApprovalStatus.approved);
+    expect(after.status).toBe(PostStatus.scheduled);
+  });
+
+  it('does not queue an editor, who never needed approval', async () => {
+    const seed = await seedApproved();
+    const editor = await makeUser('Editor');
+    await prisma.membership.create({
+      data: { userId: editor.id, workspaceId: seed.workspace.id, role: WorkspaceRole.editor },
+    });
+
+    await posts.updatePost(
+      {
+        workspaceId: seed.workspace.id,
+        userId: editor.id,
+        role: WorkspaceRole.editor,
+        requiresApproval: true,
+      },
+      seed.post.id,
+      { message: 'Rewritten by someone who can publish directly' },
+    );
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: seed.post.id } });
+    expect(after.approvalStatus).toBe(ApprovalStatus.approved);
+  });
+
+  it('does not queue anyone when the workspace does not require review', async () => {
+    const seed = await seedApproved({ requiresApproval: false });
+
+    await posts.updatePost(asContributor(seed), seed.post.id, { message: 'Edited freely' });
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: seed.post.id } });
+    expect(after.approvalStatus).toBe(ApprovalStatus.not_required);
+    expect(after.status).toBe(PostStatus.scheduled);
+  });
+});
+
 describe('who needs approval', () => {
   it('holds a contributor post when the workspace requires approval', async () => {
     const owner = await makeUser('Owner');

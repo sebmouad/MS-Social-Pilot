@@ -47,7 +47,16 @@ export const PATCH = route(async (request: Request, context: Context) => {
   const { id } = await context.params;
   const input = updatePostSchema.parse(await readJson(request));
 
-  await updatePost({ workspaceId: auth.workspace.id, userId: auth.user.id }, id, input);
+  await updatePost(
+    {
+      workspaceId: auth.workspace.id,
+      userId: auth.user.id,
+      role: auth.role,
+      requiresApproval: auth.workspace.requiresApproval,
+    },
+    id,
+    input,
+  );
   return ok({ ok: true });
 });
 
