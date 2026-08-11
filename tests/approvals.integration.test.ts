@@ -527,6 +527,73 @@ describe('editing after approval', () => {
   });
 });
 
+describe('retrying a post that is back in the queue', () => {
+  it('does not label a held post as scheduled', async () => {
+    const owner = await makeUser('Owner');
+    const contributor = await makeUser('Contributor');
+    const { workspace, target } = await makeWorkspace({
+      name: 'Client',
+      ownerId: owner.id,
+      requiresApproval: true,
+    });
+
+    // An approved post that lost a destination, then went back for review when
+    // its author reworded it.
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: contributor.id,
+        submittedById: contributor.id,
+        message: 'Reworded after one Page failed',
+        status: PostStatus.pending_approval,
+        approvalStatus: ApprovalStatus.pending,
+        scheduledAt: new Date(Date.now() - 5 * 60 * 1000),
+        targets: {
+          create: { targetId: target.id, status: 'failed', errorMessage: 'Token expired' },
+        },
+      },
+    });
+
+    const retried = await posts.retryPost(
+      { workspaceId: workspace.id, userId: contributor.id },
+      post.id,
+    );
+    expect(retried).toBe(1);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.pending_approval);
+
+    // And the promise the old status made is one the scheduler would not keep.
+    const result = await runner.runSchedulerTick();
+    expect(result.claimed).toBe(0);
+  });
+
+  it('still schedules one that is cleared to publish', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        message: 'Try again',
+        status: PostStatus.failed,
+        approvalStatus: ApprovalStatus.not_required,
+        scheduledAt: new Date(Date.now() - 5 * 60 * 1000),
+        targets: { create: { targetId: target.id, status: 'failed', errorMessage: 'Timed out' } },
+      },
+    });
+
+    await posts.retryPost({ workspaceId: workspace.id, userId: owner.id }, post.id);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.scheduled);
+
+    const result = await runner.runSchedulerTick();
+    expect(result.published).toBe(1);
+  });
+});
+
 describe('who needs approval', () => {
   it('holds a contributor post when the workspace requires approval', async () => {
     const owner = await makeUser('Owner');

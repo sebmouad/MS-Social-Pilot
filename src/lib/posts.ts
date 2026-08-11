@@ -19,7 +19,7 @@ import { logActivity, publishNow, refreshPostStatus } from './scheduler/runner';
 import type { CreatePostInput, UpdatePostInput } from './validation';
 import type { PublishMode, TargetType } from './constants';
 import { initialApprovalStatus } from './approvals';
-import { canPublishWithoutApproval } from './constants';
+import { canPublishWithoutApproval, PUBLISHABLE_APPROVAL_STATUSES } from './constants';
 import { notifyApprovalRequest } from './email/notify';
 import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
 
@@ -547,10 +547,21 @@ export async function retryPost(
   });
 
   if (count > 0) {
+    // Held posts must not come back reading "Scheduled". A post can be waiting
+    // for review with failed destinations behind it — an approved post loses
+    // one Page, then the author edits it and it returns to the queue — and a
+    // status that promises publication the scheduler will never perform is the
+    // silent failure this product exists to avoid. The retry still clears the
+    // errors; it just says where the post really stands.
+    const publishable = PUBLISHABLE_APPROVAL_STATUSES.includes(post.approvalStatus);
+
     await prisma.post.update({
       where: { id: postId },
-      // Due immediately: a manual retry should not wait for the original slot.
-      data: { status: 'scheduled', scheduledAt: new Date() },
+      data: {
+        status: publishable ? PostStatus.scheduled : PostStatus.pending_approval,
+        // Due immediately: a manual retry should not wait for the original slot.
+        scheduledAt: new Date(),
+      },
     });
   }
 
