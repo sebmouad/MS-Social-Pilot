@@ -90,3 +90,25 @@ describe('the two answers', () => {
     }
   });
 });
+
+describe('naming a destination', () => {
+  it('has a catalogue key for every kind there is', async () => {
+    const { targetTypeKey, TARGET_TYPES } = await import('../src/lib/constants');
+    const messages = (await import('../messages/en.json')).default as unknown as {
+      targets: Record<string, string>;
+    };
+
+    // A new TargetType with no copy would render as "Page" on two screens,
+    // which is how Instagram was first labelled.
+    for (const type of TARGET_TYPES) {
+      expect(targetTypeKey(type), type).toBe(type);
+      expect(messages.targets[type], `no targets.${type} copy`).toBeTypeOf('string');
+    }
+  });
+
+  it('falls back rather than throwing inside a render', async () => {
+    const { targetTypeKey } = await import('../src/lib/constants');
+
+    expect(targetTypeKey('something-new')).toBe('page');
+  });
+});

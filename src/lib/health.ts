@@ -21,6 +21,13 @@ import { readPermissions, type PermissionState } from './facebook/permissions';
 
 export type Verdict = 'ok' | 'attention' | 'broken';
 
+/** The permission each kind of destination actually publishes with. */
+const PUBLISH_SCOPES: Record<string, string> = {
+  page: 'pages_manage_posts',
+  group: 'publish_to_groups',
+  instagram: 'instagram_content_publish',
+};
+
 export interface AppHealth {
   configured: boolean;
   valid: boolean;
@@ -154,7 +161,15 @@ async function checkDestination(target: {
   // Granted, but only for some Pages. This is the failure nobody diagnoses
   // unaided: the permission is on the token, so everything looks right, and
   // publishing fails on exactly the Pages that were left unticked.
-  const covered = target.granularScopes[target.publishScope];
+  //
+  // Not for Instagram. Facebook keys granular scopes by Page id, and an
+  // Instagram destination's providerId is an Instagram user id — a different
+  // id space, which never matches. Checking one against the other would tell
+  // every Instagram account, confidently and wrongly, that it had been left
+  // unticked. Whether the publish permission is held at all is answered at the
+  // account level, where the whole scope list is read.
+  const covered =
+    target.type === 'instagram' ? undefined : target.granularScopes[target.publishScope];
   if (covered && !covered.includes(target.providerId)) {
     return {
       ...base,
@@ -255,7 +270,7 @@ export async function checkAccount(
         publishBlocker: target.publishBlocker,
         accessToken: target.accessToken,
         fallbackToken: userToken,
-        publishScope: target.type === 'group' ? 'publish_to_groups' : 'pages_manage_posts',
+        publishScope: PUBLISH_SCOPES[target.type] ?? 'pages_manage_posts',
         granularScopes: info.granularScopes,
       }),
     ),

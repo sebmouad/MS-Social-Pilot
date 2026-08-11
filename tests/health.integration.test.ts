@@ -261,6 +261,66 @@ describe('one destination', () => {
     expect((await health.checkAccount(account.id, workspace.id))?.destinations[0]?.verdict).toBe('ok');
   });
 
+  it('does not accuse an Instagram destination of being left unticked', async () => {
+    // Facebook keys granular scopes by Page id — including for the Instagram
+    // permission, because an Instagram account is reached through its Page.
+    // The destination is addressed by its Instagram user id, which is never in
+    // that list, so checking one against the other reported every Instagram
+    // account as un-publishable: on the screen whose whole job is to be
+    // trusted about exactly this.
+    stubHealthy({
+      granular: [
+        { scope: 'pages_manage_posts', target_ids: ['1000'] },
+        { scope: 'instagram_content_publish', target_ids: ['1000'] },
+      ],
+    });
+    const { workspace, account } = await seed();
+
+    await prisma.target.create({
+      data: {
+        workspaceId: workspace.id,
+        socialAccountId: account.id,
+        type: 'instagram',
+        providerId: 'ig-77',
+        name: '@client',
+        accessToken: encryptSecret('page-token'),
+        canPublish: true,
+      },
+    });
+
+    const report = await health.checkAccount(account.id, workspace.id);
+    const instagram = report?.destinations.find((entry) => entry.type === 'instagram');
+
+    expect(instagram?.verdict).toBe('ok');
+    expect(instagram?.canPublish).toBe(true);
+  });
+
+  it('still reports an Instagram destination that is waiting on app review', async () => {
+    // The accurate reason, which the granular check was displacing: a freshly
+    // discovered account carries its own blocker until the permission lands.
+    stubHealthy();
+    const { workspace, account } = await seed();
+
+    await prisma.target.create({
+      data: {
+        workspaceId: workspace.id,
+        socialAccountId: account.id,
+        type: 'instagram',
+        providerId: 'ig-88',
+        name: '@waiting',
+        accessToken: encryptSecret('page-token'),
+        canPublish: false,
+        publishBlocker: 'Publishing to Instagram needs instagram_content_publish from Meta.',
+      },
+    });
+
+    const report = await health.checkAccount(account.id, workspace.id);
+    const instagram = report?.destinations.find((entry) => entry.type === 'instagram');
+
+    expect(instagram?.verdict).toBe('broken');
+    expect(instagram?.headline).toMatch(/instagram_content_publish/);
+  });
+
   it('flags a destination that is only turned off here', async () => {
     stubHealthy();
     const { workspace, account, target } = await seed();

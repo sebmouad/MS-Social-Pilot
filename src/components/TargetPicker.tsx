@@ -2,6 +2,8 @@
 
 import { useTranslations } from 'next-intl';
 
+import { targetTypeKey } from '@/lib/constants';
+
 export interface TargetOption {
   id: string;
   name: string;
@@ -84,11 +86,7 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-slate-900">{target.name}</span>
                 <span className="block truncate text-xs text-slate-500">
-                  {target.type === 'group'
-                    ? t('group')
-                    : target.type === 'instagram'
-                      ? t('instagram')
-                      : t('page')}
+                  {t(targetTypeKey(target.type))}
                   {target.accountName ? ` · ${target.accountName}` : ''}
                   {disabled && target.publishBlocker ? ` · ${target.publishBlocker}` : ''}
                 </span>

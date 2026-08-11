@@ -246,3 +246,16 @@ export function postIsEditable(post: {
 }): boolean {
   return postEditBlocker(post) === null;
 }
+
+/**
+ * The `targets.*` translation key naming a destination's kind.
+ *
+ * The catalogue has one key per {@link TargetType}, so this is nearly the
+ * identity function. It exists because two screens were each writing the
+ * mapping out as a ternary, and adding Instagram made both of them label it
+ * "Page" — the second kind of bug a two-way branch grows into when a third
+ * value arrives.
+ */
+export function targetTypeKey(type: string): string {
+  return (TARGET_TYPES as readonly string[]).includes(type) ? type : TargetType.page;
+}

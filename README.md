@@ -168,7 +168,7 @@ runs a chosen subset over HTTP.
 npm test
 ```
 
-750 tests. Unit tests cover token encryption, retry policy, timezone and
+754 tests. Unit tests cover token encryption, retry policy, timezone and
 queue-slot maths, Open Graph and RSS parsing, CSV in and out, link tagging, and
 the Graph publishing decision table.
 

@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { targetTypeKey } from '@/lib/constants';
+
 export interface AccountView {
   id: string;
   name: string;
@@ -196,7 +198,7 @@ export function AccountsClient({ accounts }: { accounts: AccountView[] }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-slate-900">{target.name}</p>
                   <p className="truncate text-xs text-slate-500">
-                    {target.type === 'group' ? tTargets('group') : tTargets('page')}
+                    {tTargets(targetTypeKey(target.type))}
                     {target.publishBlocker ? ` · ${target.publishBlocker}` : ''}
                   </p>
                 </div>
