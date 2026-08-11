@@ -1,8 +1,10 @@
-import { ApprovalStatus, PostStatus } from '@prisma/client';
+import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
 import { mediaColumns, parseMedia, parseVariants, toJson, toJsonOrNull } from './json';
 import { logActivity } from './scheduler/runner';
+import { canPublishWithoutApproval } from './constants';
+import { errors } from './errors';
 
 /**
  * Evergreen recycling.
@@ -136,9 +138,28 @@ export async function runEvergreenCycle(options: {
 }
 
 /** Turn recycling on or off for a post. */
+/**
+ * Turn recycling on or off for a post, and set its alternate wordings.
+ *
+ * Variants are the part that needs guarding. Every recycled copy is created
+ * `not_required` — repeating a post that was already approved is not a new
+ * editorial decision — but a variant is not a repeat, it is different text that
+ * nobody has read. Without a check, a contributor in a workspace with review on
+ * could get one post approved and then attach any wording they liked to it and
+ * have it published on a timer, which defeats the whole workflow more thoroughly
+ * than editing the post ever could.
+ *
+ * So supplying variants requires the same standing as publishing without review.
+ * Recycling the approved message itself stays open to everyone — that text has
+ * been read. (Facebook rejects identical repeats with error 506, so in practice
+ * a contributor who wants a recycled series needs an editor to word it, which is
+ * the correct outcome rather than a workaround.)
+ */
 export async function setRecycling(options: {
   workspaceId: string;
   postId: string;
+  role: WorkspaceRole;
+  requiresApproval: boolean;
   enabled: boolean;
   everyDays?: number | null;
   limit?: number | null;
@@ -147,7 +168,14 @@ export async function setRecycling(options: {
   const post = await prisma.post.findFirst({
     where: { id: options.postId, workspaceId: options.workspaceId },
   });
-  if (!post) return;
+  // Was a silent success, which told the caller their schedule had been saved
+  // when nothing had been written.
+  if (!post) throw errors.postNotFound();
+
+  const addsVariants = (options.variants?.filter((variant) => variant.trim().length > 0).length ?? 0) > 0;
+  if (addsVariants && options.requiresApproval && !canPublishWithoutApproval(options.role)) {
+    throw errors.variantsNeedApproval();
+  }
 
   const everyDays = options.everyDays ?? post.recycleEveryDays ?? 30;
 

@@ -117,6 +117,14 @@ export const errors = {
       status: 409,
     }),
 
+  variantsNeedApproval: () =>
+    new AppError({
+      key: 'errors.variantsNeedApproval',
+      fallback:
+        'Alternate wordings publish without review, so only editors and above can set them while approval is on.',
+      status: 403,
+    }),
+
   aiRateLimited: () =>
     new AppError({
       key: 'errors.aiRateLimited',

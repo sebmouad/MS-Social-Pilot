@@ -282,6 +282,13 @@ the whole form and opening a post must not cost it its approval. Editors and
 above are exempt, since `initialApprovalStatus` grants them `approved` at
 creation anyway — queueing edits they could bypass by reposting is theatre.
 
+Evergreen recycling is the third way in, and the widest. Recycled copies are
+created `not_required` on the grounds that repeating an approved post is not a
+new editorial decision — but a *variant* is not a repeat, it is different text
+nobody has read, published on a timer. Supplying variants therefore requires the
+same standing as publishing without review; recycling the approved message
+itself stays open to everyone, because that text has been read.
+
 ---
 
 ## Time

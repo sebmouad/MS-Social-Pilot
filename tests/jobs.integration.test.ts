@@ -290,6 +290,104 @@ describe('evergreen recycling', () => {
  * the jobs still run, they just quietly ignore every value on the configuration
  * screen, starting with the secret that lets the caller in at all.
  */
+/**
+ * Alternate wordings are new text, published on a timer under the original
+ * post's approval. Who may write them is therefore an approval question, not a
+ * scheduling one.
+ */
+describe('setting recycling variants', () => {
+  async function seedPublished(requiresApproval: boolean) {
+    const { user, workspace, target } = await seedWorkspace();
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { requiresApproval } });
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: user.id,
+        message: 'The approved wording',
+        status: PostStatus.published,
+        approvalStatus: 'approved',
+        publishedAt: new Date('2026-08-01T10:00:00Z'),
+        scheduledAt: new Date('2026-08-01T10:00:00Z'),
+        targets: { create: { targetId: target.id, status: 'published' } },
+      },
+    });
+
+    return { workspace, post };
+  }
+
+  function call(
+    workspaceId: string,
+    postId: string,
+    role: WorkspaceRole,
+    requiresApproval: boolean,
+    variants?: string[],
+  ) {
+    return evergreen.setRecycling({
+      workspaceId,
+      postId,
+      role,
+      requiresApproval,
+      enabled: true,
+      everyDays: 30,
+      variants,
+    });
+  }
+
+  it('refuses a contributor wording that nobody will review', async () => {
+    const { workspace, post } = await seedPublished(true);
+
+    await expect(
+      call(workspace.id, post.id, WorkspaceRole.contributor, true, ['Anything I like']),
+    ).rejects.toThrow(/only editors and above/i);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.recycleEnabled).toBe(false);
+  });
+
+  it('lets a contributor recycle the wording that was approved', async () => {
+    const { workspace, post } = await seedPublished(true);
+
+    await call(workspace.id, post.id, WorkspaceRole.contributor, true);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.recycleEnabled).toBe(true);
+    expect(after.recycleNextAt).not.toBeNull();
+  });
+
+  it('ignores empty strings rather than treating them as new wording', async () => {
+    const { workspace, post } = await seedPublished(true);
+
+    await call(workspace.id, post.id, WorkspaceRole.contributor, true, ['', '   ']);
+
+    expect((await prisma.post.findUniqueOrThrow({ where: { id: post.id } })).recycleEnabled).toBe(true);
+  });
+
+  it('allows an editor, who could publish the same words directly', async () => {
+    const { workspace, post } = await seedPublished(true);
+
+    await call(workspace.id, post.id, WorkspaceRole.editor, true, ['A second wording']);
+
+    expect((await prisma.post.findUniqueOrThrow({ where: { id: post.id } })).recycleEnabled).toBe(true);
+  });
+
+  it('does not restrict a workspace that has no review step', async () => {
+    const { workspace, post } = await seedPublished(false);
+
+    await call(workspace.id, post.id, WorkspaceRole.contributor, false, ['A second wording']);
+
+    expect((await prisma.post.findUniqueOrThrow({ where: { id: post.id } })).recycleEnabled).toBe(true);
+  });
+
+  it('reports a post that is not there instead of claiming success', async () => {
+    const { workspace } = await seedPublished(false);
+
+    await expect(
+      call(workspace.id, 'no-such-post', WorkspaceRole.owner, false),
+    ).rejects.toThrow(/not found/i);
+  });
+});
+
 describe('POST /api/cron/tick', () => {
   let settings: typeof import('../src/lib/settings');
   let route: typeof import('../src/app/api/cron/tick/route');
