@@ -54,6 +54,10 @@ PLAYWRIGHT_CHROMIUM_PATH=/path/to/chromium npx playwright test
 | `invite.spec.ts` | Inviting a colleague, accepting the invitation, and walking every screen again **in French**. |
 | `signed-out.spec.ts` | That none of it is served to a stranger, and that the public pages still are. |
 
+`compose.spec.ts` also covers correcting a scheduled post in place, and that a
+published one offers no way to rewrite it — the Edit button is absent and the
+URL answers 404.
+
 `compose.spec.ts` puts a pretend Facebook Page straight into the database
 (`e2e/fixtures.ts`) rather than logging in to Facebook. It exists so the screens
 have rows to render; nothing in the walk ever calls the Graph API.
@@ -71,3 +75,15 @@ have rows to render; nothing in the walk ever calls the Graph API.
   uncontrolled now and their contents are adopted on mount.
 - **`/settings/config` rendered with no heading at all** for anyone who is not
   an owner — a card of refusal text and nothing naming the screen.
+- **The settings screen showed contributors four sections they could not save.**
+  Every button answered 403, which reads as a broken product rather than as a
+  permission. They are hidden now, with the reason in their place.
+
+## What it is not for
+
+It asserts that pages render, that the journeys work, and that a stranger is
+turned away. It does not test the rules underneath — which Graph edge a post
+takes, whether a retry is worth attempting, whether one client can reach
+another's data. Those live in `tests/`, run in seconds, and are where a new
+rule should be tested first. Reach for the browser when the question is one only
+a browser can answer.

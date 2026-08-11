@@ -1,13 +1,26 @@
 # MS Social Pilot
 
-A SocialPilot-style scheduler for Facebook Pages and Groups. Compose once,
-publish to many destinations, with approval workflow, RSS auto-posting, AI
-writing help, link tracking and client reporting.
+A SocialPilot-style scheduler for Facebook Pages, Groups and Instagram. Compose
+once, publish to many destinations, with an approval workflow, RSS auto-posting,
+AI writing help, link tracking and client reporting.
 
 Next.js 15 (App Router), TypeScript, Prisma, PostgreSQL, Tailwind. English and
 French.
 
-Built to the specification in [docs/PROJECT_SCHEMA.md](docs/PROJECT_SCHEMA.md).
+### Where to start
+
+| If you want to | Read |
+|---|---|
+| Run it locally, right now | [Quick start](#quick-start), below |
+| Connect it to Facebook | [docs/META_APP_SETUP.md](docs/META_APP_SETUP.md) — the part that blocks people |
+| Put it on a server | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
+| Understand how it works | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Know what it was built to be | [docs/PROJECT_SCHEMA.md](docs/PROJECT_SCHEMA.md) |
+| Run the browser tests | [e2e/README.md](e2e/README.md) |
+
+The app also explains itself as you go: a fresh installation opens on a **Setup**
+screen that says what is done and what is next, and **Connections** shows, per
+account, which permissions were granted and whether publishing actually works.
 
 ---
 
@@ -136,18 +149,30 @@ things, both used here:
 
 ## The worker
 
-Five jobs on independent intervals:
+Ten jobs on independent intervals, every one of them adjustable on the
+configuration screen:
 
 | Job | Default | What it does |
 |---|---|---|
 | `publish` | 30s | Publishes due posts |
+| `edges` | 4h | Comments, ratings, inbox threads, videos, posts made outside this app |
 | `rss` | 15m | Polls feeds, queues new items |
 | `evergreen` | 1h | Creates the next copy of recycling posts |
-| `analytics` | 6h | Refreshes engagement figures, stalest first |
+| `analytics` | 6h | Refreshes post engagement, stalest first |
+| `pageInsights` | 12h | Page-level reach and follower figures |
+| `instagram` | 12h | Instagram profiles, insights and media — only when Instagram is on |
+| `ads` | 12h | Campaign spend and results — only when Ad spend is on |
+| `housekeeping` | 24h | Retention sweeps, orphaned media, expired rows |
 | `tokens` | 24h | Warns before a token expires |
 
-A failing job never stops the others. `POST /api/cron/tick?jobs=publish,rss`
-runs a chosen subset over HTTP.
+The two flagged jobs are not scheduled at all while their switch is off, so an
+app without those permissions does not spend its rate limit on an error every
+twelve hours.
+
+A failing job never stops the others, and a slow one never laps itself — the
+next run is measured from the moment the last one finished.
+`POST /api/cron/tick?jobs=publish,rss` runs a chosen subset over HTTP, which is
+how to drive it from a serverless cron instead of a long-running worker.
 
 ---
 
@@ -170,30 +195,39 @@ runs a chosen subset over HTTP.
 npm test
 ```
 
-756 tests. Unit tests cover token encryption, retry policy, timezone and
-queue-slot maths, Open Graph and RSS parsing, CSV in and out, link tagging, and
-the Graph publishing decision table.
+756 tests, in three layers.
 
-Four integration suites run against a real Postgres schema and a stub Graph API,
-covering the failures that actually cost customers:
+**Unit tests** cover the pure decision-making: which Graph edge a post takes,
+whether a retry is worth attempting, token encryption, timezone and queue-slot
+arithmetic, Open Graph and RSS parsing, CSV in and out, link tagging, and the
+rules for what Instagram will accept.
 
-- **scheduler** — a post going out exactly once, backoff on transient errors, a
-  revoked token failing permanently and flagging the account, partial success
-  across destinations, abandoned locks reclaimed.
+**Sixteen integration suites** run against a real Postgres schema and a stub
+Graph API. They exist for the failures that cost customers rather than the ones
+that annoy developers:
+
+- **scheduler** — a post going out exactly once under concurrency, backoff on
+  transient errors, a revoked token failing permanently and flagging the
+  account, partial success across destinations, abandoned locks reclaimed, and
+  Instagram's container-then-publish two-step.
 - **approvals** — an unapproved post never publishing even when due, "publish
   now" not bypassing review, and one client's workspace unable to read, post to
   or approve anything belonging to another.
-- **jobs** — expiry warnings sent once per token and respecting opt-outs;
-  evergreen creating a copy, rotating variants, and stopping at its limit.
-- Invitations — wrong address refused, single use, expiry, last-owner
-  protection.
+- **api-routes** — every endpoint under `src/app/api` called with no session,
+  and again as a contributor. See below.
+- **engagement** — comments moderated, ratings and inbox threads synced, and
+  replies refused outside Facebook's 24-hour window.
+- **health** — what the connection screen says, including the cases where
+  saying nothing beats saying something wrong.
+- plus **jobs**, **housekeeping**, **settings**, **setup**, **registration**,
+  **connections**, **media**, **notify**, **send**, **ai** and **iterate**.
 
-One suite is a sweep rather than a list: `api-routes` walks every file under
-`src/app/api`, calls each exported handler with no session, and fails unless it
-refuses. A route that answers has to be added to a `PUBLIC` map with a written
-reason, so a new endpoint is private until somebody says otherwise. A second
-pass signs in as a contributor — the lowest role — and checks the endpoints that
-act on the business rather than on their own drafts.
+One of them is a sweep rather than a list, which is the point: `api-routes`
+walks every file under `src/app/api`, calls each exported handler with no
+session, and fails unless it refuses. A route that answers has to be named in a
+`PUBLIC` map with a written reason — so a new endpoint is private until somebody
+says otherwise. A second pass signs in as a contributor, the lowest role, and
+checks the endpoints that act on the business rather than on their own drafts.
 
 Tests need a reachable Postgres; each suite creates and drops its own schema.
 Point `TEST_DATABASE_URL` at it if it is not the Compose default.
@@ -213,17 +247,22 @@ want to run the walk. See [`e2e/README.md`](e2e/README.md).
 ## Project layout
 
 ```
-src/lib/facebook/     Graph client, OAuth, publishing, Open Graph, insights
+src/lib/facebook/     Graph client, OAuth, Facebook and Instagram publishing,
+                      Open Graph, insights, permission catalogue
 src/lib/scheduler/    Claiming, publishing, retry policy, job definitions
 src/lib/rss/          Feed parsing and ingestion
 src/lib/email/        Resend, templates, notification routing
-src/lib/              Auth, posts, approvals, team, links, AI, reports, media
+src/lib/settings/     The configuration registry every tunable comes from
+src/lib/              Auth, posts, approvals, team, links, AI, reports, media,
+                      engagement, connection health, first-run setup
 src/app/api/          REST endpoints
 src/app/(app)/        Dashboard, composer, calendar, posts, approvals,
-                      accounts, feeds, reports, settings
+                      connections, accounts, feeds, analytics, reports, settings
+src/app/setup/        First-run setup screen
 messages/             en.json, fr.json
 scripts/worker.ts     The background worker
 prisma/schema.prisma  Data model
+e2e/                  Browser walk (Playwright, not a declared dependency)
 ```
 
 More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -251,6 +290,13 @@ this app's worker rather than being handed over.
 
 **Editing published posts.** Not supported, deliberately: Facebook cannot change
 a published post's attachments, so "edit" would silently do less than it claims.
+Anything not yet sent is fully editable, and a post Facebook is holding natively
+has to be cancelled and recreated — the app says which, rather than offering a
+button that fails.
+
+**RSS to Instagram.** Not possible: a feed entry is a headline and a link, and
+Instagram publishes neither without a picture. The feeds screen offers Facebook
+destinations only.
 
 **Link clicks** are indicative, not audit-grade. Bot filtering is user-agent
 based, and Facebook's own scraper is excluded so previews do not inflate counts.
@@ -267,7 +313,12 @@ based, and Facebook's own scraper is excluded so previews do not inflate counts.
   database dump cannot be replayed.
 - Workspace scoping is a security boundary between clients, with tests that a
   member of one cannot reach another.
-- Uploaded media served through an authenticated route, not `/public`.
+- Uploaded media served through an authenticated route, not `/public`. The one
+  exception is Instagram publishing, where Facebook fetches the file itself: it
+  gets a link naming one file, signed, expiring in thirty minutes, minted per
+  publish and never stored.
+- Every API endpoint is swept by a test that calls it with no session and fails
+  unless it refuses; anything public has to be listed with a written reason.
 - Link preview fetches refuse loopback and private address ranges (SSRF).
 - `signed_request` verified on Facebook's deauthorize and data-deletion
   callbacks.

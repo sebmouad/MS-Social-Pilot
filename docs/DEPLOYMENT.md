@@ -1,20 +1,49 @@
 # Deployment
 
+Everything here assumes the Meta app already exists. If it does not, start with
+[META_APP_SETUP.md](META_APP_SETUP.md) — that is the part that blocks people.
+
 ## Before going live
 
-- [ ] `SESSION_SECRET` and `ENCRYPTION_KEY` generated fresh (`openssl rand -base64 48` / `-base64 32`)
-- [ ] `APP_URL` uses https and matches the Meta app's OAuth redirect URI exactly
-- [ ] Postgres reachable and migrated (`npm run db:migrate`)
-- [ ] `RESEND_API_KEY` set and its sending domain verified, or failures go unreported
-- [ ] `ANTHROPIC_API_KEY` set if AI captions are wanted (optional)
-- [ ] `SHORTENER_DOMAIN` pointed at this app if link shortening is on (optional)
-- [ ] The scheduler runs — either `npm run worker` or a cron hitting `/api/cron/tick`
-- [ ] Deauthorize and data-deletion callback URLs set in the Meta app and publicly reachable
+**Secrets and identity**
+
+- [ ] `SESSION_SECRET` and `ENCRYPTION_KEY` generated fresh
+      (`openssl rand -base64 48` and `-base64 32`)
+- [ ] `ENCRYPTION_KEY` stored somewhere you can recover it. Lose it and every
+      stored Facebook token is unreadable — see [Key rotation](#key-rotation)
+- [ ] `APP_URL` uses https and matches the Meta app's OAuth redirect URI
+      **exactly**, trailing slash and all
+
+**The things that publish**
+
+- [ ] Postgres reachable and migrated (`npx prisma migrate deploy`)
+- [ ] The scheduler runs — either `npm run worker` or a cron hitting
+      `/api/cron/tick`. Without it, nothing scheduled is ever published
 - [ ] "Require app secret proof" enabled in the Meta app
-- [ ] Registration policy decided: closed by default, so create the first
-      account yourself and invite colleagues, or set `OPEN_REGISTRATION=true`
-- [ ] Backups cover the database **and** `MEDIA_DIR`
-- [ ] `ENCRYPTION_KEY` stored somewhere you can recover it (see key rotation)
+- [ ] Deauthorize and data-deletion callback URLs set, and reachable from
+      outside your network
+- [ ] If you publish to Instagram: `APP_URL` reachable from the public
+      internet, because Facebook fetches your media itself
+      ([why](#instagram-needs-app_url-to-be-publicly-reachable))
+
+**Optional, but decide deliberately**
+
+- [ ] `RESEND_API_KEY` set and its sending domain verified — otherwise nobody
+      is told when a post fails
+- [ ] `ANTHROPIC_API_KEY` if you want AI caption help
+- [ ] `SHORTENER_DOMAIN` pointed at this app if link shortening is on
+- [ ] Registration policy: closed by default, so create the first account
+      yourself and invite colleagues. `OPEN_REGISTRATION=true` opens it
+
+**When it breaks**
+
+- [ ] Backups cover the database **and** `MEDIA_DIR` — they are two halves of
+      one thing
+- [ ] A monitor on `GET /api/health`, which round-trips to Postgres
+
+The app's **Setup** screen checks several of these for you on a fresh
+installation, and **Connections** shows, per account, which permissions were
+actually granted and whether publishing works.
 
 ---
 
@@ -110,17 +139,44 @@ it wastes work.
 ## Media storage
 
 Uploads go to `MEDIA_DIR` (default `./media`) and are served through an
-authenticated route.
+authenticated route, not from `/public`. Unpublished campaign artwork should
+not be fetchable by whoever guesses a filename.
 
-On platforms with an ephemeral filesystem (Vercel, Heroku, most container
-platforms), local files vanish on redeploy — and a scheduled post whose image
-disappeared before its publish time will fail. Either mount a persistent volume,
-or use externally hosted image URLs, which are passed to Facebook to fetch and
-never touch local disk.
+**Give it a persistent volume.** On platforms with an ephemeral filesystem
+(Vercel, Heroku, most container platforms) local files vanish on redeploy, and
+a scheduled post whose image disappeared before its publish time fails at the
+moment it was due. The alternative is externally hosted image URLs, which are
+handed to Facebook to fetch and never touch local disk.
 
-Moving to S3 means replacing the four functions in `src/lib/media.ts`
-(`storeFile`, `readStoredFile`, `deleteStoredFile`, `resolveMediaForPublish`);
-nothing else touches the filesystem.
+**Back it up with the database.** They are two halves of one thing: a database
+restored next to an empty media directory gives you a calendar full of posts
+whose pictures are gone.
+
+### Instagram needs `APP_URL` to be publicly reachable
+
+This one catches people out. Facebook's Instagram API takes no file upload — it
+takes a URL and fetches the file itself, from its own servers. So an
+installation that Facebook cannot reach can publish to Pages perfectly well and
+fail every Instagram post.
+
+The link it fetches is minted per publish: it names one file, is signed, and
+expires in thirty minutes (`src/lib/media-links.ts`). Nothing in the media
+library becomes publicly readable, and no long-lived public URL is ever stored.
+But the route has to be reachable for the length of that one fetch.
+
+If you publish to Instagram, check that `https://your-domain/api/health`
+answers from outside your network before wondering why.
+
+### Moving to S3
+
+Replace the storage functions in `src/lib/media.ts` — `storeFile`,
+`readStoredFile`, `openStoredFile`, `deleteStoredFile` — and the two resolvers
+that hand media to Facebook, `resolveMediaForPublish` and
+`resolveMediaForInstagram`. Nothing else in the codebase touches the
+filesystem.
+
+With object storage you could serve Instagram's fetch from a pre-signed S3 URL
+instead, and skip `signMediaUrl` entirely.
 
 ---
 
@@ -141,10 +197,21 @@ and deriving the flag from the request would quietly drop `secure` on every
 session cookie in exactly that deployment. The Docker image sets `NODE_ENV`, and
 `next start` sets it too.
 
-**`X-Forwarded-For` is read in one place**: the short-link redirect, which
-hashes it for click counts. Forwarding it makes those counts more accurate;
-forging it skews an estimate and nothing else, since the value never reaches an
-authorisation or rate-limiting decision.
+**`X-Forwarded-For` is read in two places**, and it is worth knowing what each
+one does with it:
+
+- The **short-link redirect** hashes it for click counts. Forwarding it makes
+  those counts more accurate; forging it skews an estimate and nothing else.
+- The **sign-in route** uses it as one of two rate-limit keys. The other key is
+  the email address being tried, and that one is the load-bearing half: it
+  cannot be forged, and it is what stops somebody grinding through passwords
+  for a known account. The client key exists to slow down a spray across many
+  addresses, and a forged header does evade *that* half — so put the app behind
+  a proxy that overwrites the header rather than appending to it, which is the
+  default for most.
+
+Neither value ever reaches an authorisation decision. Nothing about who you are
+or what you may do is derived from a header.
 
 ---
 

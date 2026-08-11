@@ -231,6 +231,53 @@ our own media route requires a session cookie, so Facebook cannot fetch it.
 
 ---
 
+## Publishing to Instagram, which is nothing like publishing to Facebook
+
+An Instagram Business account is reached with the token of the Page it is
+linked to — there is no separate Instagram login — so it lives as a `Target`
+row of type `instagram` alongside Pages and Groups. That is the point: the
+composer, the calendar, the queue, the post list, retries and per-destination
+failure reporting all work on it without knowing what it is. Only the Graph
+call differs, in `src/lib/facebook/instagram-publish.ts`.
+
+Three differences shape that file.
+
+**It takes no bytes.** Every other edge here uploads a file. Instagram takes a
+URL and Facebook's own servers fetch it, with no cookie to present — so the
+authenticated media route is unreachable to it. `src/lib/media-links.ts` mints
+a link for exactly that fetch: one file, signed with a key derived from the
+session secret rather than being it, expiring in thirty minutes. The expiry is
+inside the signature so it cannot be extended, and the signature names the file
+so it cannot be pointed at another. Nothing is stored; the link exists for the
+length of one publish.
+
+**It is two steps.** You create a *container* describing the post, Facebook
+downloads and processes the file, and only then may you publish it. Publishing
+early gives an empty post, and for a carousel a parent published before its
+children are ready is missing pictures — neither of which Instagram lets anyone
+fix afterwards. So every container is waited on, children included, and the
+three ways waiting ends (`FINISHED`, `ERROR`, `EXPIRED`) each get their own
+explanation. Facebook's note on a rejected container says which rule the file
+broke — aspect ratio, length, codec — and that is passed straight through,
+because none of it is guessable from here.
+
+**It has no text-only post.** A caption with nothing attached is refused by
+`planInstagramPublish` before any network call, alongside the caption length
+limit and the ten-item carousel maximum. Two consequences follow elsewhere:
+native scheduling is refused for Instagram destinations, because Instagram has
+no scheduling of its own and "let Instagram hold it" would silently mean
+"publish now"; and RSS auto-posting is Facebook-only, since a feed entry is a
+headline and a link and Instagram publishes neither on its own. The feeds
+screen does not offer Instagram destinations and both feed routes refuse them
+through `assertFeedDestinations`.
+
+A discovered account starts with `canPublish: false`, because
+`instagram_content_publish` is a separate App Review from the Instagram reading
+scopes. Rediscovery never overwrites that decision — it is one somebody made on
+the Connections screen.
+
+---
+
 ## Tokens
 
 The lifecycle, and why each step exists:
@@ -539,8 +586,28 @@ never sums them; they measure different things. PDF is a print-styled page
 rather than server-side rendering, which keeps headless Chromium out of the
 production image.
 
+**Editing a post** reuses the composer rather than offering a smaller edit
+form: everything you can say when writing a post you can also say when
+correcting one, and a cut-down form would quietly be missing something.
+`/compose?post=<id>` loads it. Whether a post can still be changed is
+`postEditBlocker` in `src/lib/constants.ts`, asked by two callers — `updatePost`
+refuses the save and turns each reason into its own error, and the post list
+decides whether to show an Edit button at all. One function, because a button
+that leads to a 409 is worse than no button. A whole-form save that changes
+nothing the reviewer looked at does not cost the post its approval; one that
+changes the text, the destinations or the time does.
 
-
+**Answering the inbox** goes through the Send API with `messaging_type:
+RESPONSE`, addressed to the person's page-scoped id — the thread id is not an
+address Facebook will deliver to. Two of Facebook's rules are checked before
+the call rather than discovered as a Graph error, because both have a plain
+explanation and Graph's does not: a Page may answer only within 24 hours of the
+person's last message, and a thread whose last word is the Page's has nobody to
+answer. `readConversations` works both out per thread so the screen can show
+the box only where it will work and say when the window shuts; the send checks
+again against the whole thread. The reply is stored locally the moment Graph
+confirms, as the comment reply already was — waiting for the next sync would
+read as the message having been lost.
 
 
 ---
@@ -655,6 +722,25 @@ Range requests are not implemented, so scrubbing a long video re-fetches from
 the start. Worth adding if video ever becomes a common upload; it is not one
 today.
 
+### The one public door
+
+The media route is authenticated, which is why uploads are not written into
+`/public`: unpublished campaign artwork should not be fetchable by anyone who
+guesses a filename. Instagram makes that impossible for exactly one case — its
+publishing API takes a URL rather than bytes, and Facebook's fetcher has no
+cookie to present.
+
+So `src/lib/media-links.ts` mints a link for that fetch and nothing else. It
+names one file, carries an expiry, and is signed over both — so it cannot be
+extended, and it cannot be pointed at a different file. The key is derived from
+the session secret with a label rather than being the session secret, because
+two things signed with one key can be swapped for one another when a format
+changes. Thirty minutes, because it has to cover a single request. Nothing is
+stored, so there is no long-lived public URL anywhere in the system.
+
+The signature stands in for the workspace check rather than skipping it: it
+already names the file, and cannot be presented for another.
+
 ### What a file claims to be, and what it is
 
 The content type on an upload is whatever the browser was told to send: a claim,
@@ -714,6 +800,59 @@ Two things are deliberately excluded, and the reasons matter more than the code:
 
 Both exclusions are pinned by tests, because they are exactly what a later
 "and anything else old" change would sweep up by accident.
+---
+
+## How this is tested
+
+Roughly seven hundred and fifty tests, in three layers that answer different
+questions.
+
+**Unit tests** cover the pure decision-making: which Graph edge a post takes,
+whether a retry is worth attempting, queue-slot and timezone arithmetic, CSV in
+and out, link tagging, permission catalogues. Fast, and where most of the rules
+actually live.
+
+**Integration suites** run against a real Postgres and a stub Graph API. Each
+creates and drops its own schema, so they need no coordination and can run in
+any order. They exist for the failures that cost customers rather than the ones
+that annoy developers: a post going out exactly once under concurrency, an
+unapproved post never publishing even when due, one agency client unable to
+read or post to another's workspace, a revoked token failing permanently
+instead of retrying for ever.
+
+Two of them are sweeps rather than lists, which matters because a sweep covers
+code nobody remembered to think about:
+
+- `tests/api-routes.integration.test.ts` walks every file under `src/app/api`,
+  calls each exported handler with no session, and fails unless it refuses. A
+  route that answers must be named in a `PUBLIC` map with a written reason — so
+  that map is the API's public surface spelled out, and a new endpoint is
+  private until somebody says otherwise. A second pass signs in as a
+  contributor and checks the endpoints that act on the business rather than on
+  their own drafts.
+- `tests/post-editing.test.ts` checks that every `TargetType` has copy behind
+  it, because a new destination kind with no label renders as "Page".
+
+**A browser walk**, in `e2e/`, opens every screen in both languages, signed in
+and signed out, empty and with a post on the calendar. None of the above
+renders a page, so none of it can notice a server component that throws, a
+missing translation, or a form that submits before React attaches to it — all
+three of which it found the first time it ran. Playwright is deliberately not a
+declared dependency; see [`e2e/README.md`](../e2e/README.md).
+
+### Confirming a test can fail
+
+A test written after a fix usually passes. Whether it passes *because of* the
+fix is a different question, and the only way to answer it is to put the defect
+back and watch the test fail.
+
+That step has earned its place twice in recent memory. A test for the
+connection health screen passed against the bug it was written for, because the
+stub returned the wrong shape of data and the check under test was skipped
+rather than satisfied. And an early version of the contributor sweep sent `{}`
+as a request body, which three routes rejected as malformed before they ever
+consulted the caller's role — three checks passing while testing nothing.
+
 ---
 
 ## Keeping these notes honest
@@ -838,6 +977,17 @@ second dialog. The token carries the permission, so the account looks healthy,
 and publishing fails on exactly the five that were left unticked. That is
 undiagnosable from the outside, and it is the only thing Graph will tell you
 about it.
+
+That check is skipped for Instagram destinations, and the reason is a warning
+about the whole feature. Facebook keys `granular_scopes` by **Page** id —
+including for `instagram_content_publish`, because an Instagram account is
+reached through its Page. An Instagram destination is addressed by its
+Instagram user id, which is never in that list, so comparing the two told every
+Instagram account it had been left unticked: confident, specific, actionable
+and wrong, on the one screen whose whole job is to be trusted about exactly
+this. A diagnosis that is wrong is worse than no diagnosis. Whether the
+publishing permission is held at all is answered at the account level, where
+the whole scope list is read.
 
 Every line the screen shows names its own fix, and permissions are shown in
 plain language with the scope name secondary — `pages_read_engagement` tells a

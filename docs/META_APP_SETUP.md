@@ -53,26 +53,66 @@ a leaked access token cannot be used without your app secret.
 
 ## 4. Permissions
 
-Requested by default (`FACEBOOK_SCOPES` in `.env`):
+### What is asked for by default
 
-| Permission | Why it is needed |
+These six are requested on every login. They are the minimum for scheduling to
+Facebook Pages, and nothing else in the app is switched on until you say so.
+
+| Permission | What you lose without it |
 |---|---|
-| `pages_show_list` | List the Pages the user manages |
-| `pages_read_engagement` | Read Page metadata and post engagement |
-| `pages_manage_posts` | **Create, schedule and delete posts** |
-| `pages_manage_engagement` | Read/manage comments and reactions |
-| `read_insights` | Impressions, reach and clicks |
-| `business_management` | Pages owned through a Business Portfolio |
+| `pages_show_list` | No Pages appear to connect. |
+| `pages_read_engagement` | Page details and post engagement stay empty. |
+| `pages_manage_posts` | **Nothing can be published.** |
+| `pages_manage_engagement` | Comments can be read but not replied to, hidden or deleted. |
+| `read_insights` | Reach, impressions and follower figures stay empty. |
+| `business_management` | Pages owned through a Business Portfolio are invisible. |
 
-While your app is in development mode these work immediately, but **only for
-people with a role on the app** (Settings → Roles: admins, developers, testers).
-Anyone else gets an error at the login dialog.
+### The optional ones
 
-To publish for real users, submit **App Review** for `pages_manage_posts`,
-`pages_read_engagement`, `pages_show_list` and `read_insights`. You will need a
-screencast showing the whole flow — connect, compose, schedule, publish — plus a
-privacy policy URL and test credentials. Reviews commonly take several days and
-are rejected for unclear screencasts more often than for anything technical.
+Each feature switch on **Settings → Configuration** adds its own permissions.
+They are off by default on purpose: **asking for a permission your app has not
+been approved for fails the entire consent dialog**, not just that permission —
+so a switch turned on too early stops anybody connecting at all.
+
+| Switch | Adds | Gives you |
+|---|---|---|
+| Group publishing | `publish_to_groups`, `groups_access_member_info` | Posting to Groups. Read §6 first. |
+| Page inbox | `pages_messaging`, `pages_manage_metadata` | Reading and answering Messenger threads. |
+| Instagram | `instagram_basic`, `instagram_manage_insights`, `instagram_content_publish` | Instagram analytics, and posting to Instagram. |
+| Ad spend | `ads_read` | Campaign spend and results. |
+
+The Instagram switch asks for the publishing permission alongside the two
+reading ones. That is deliberate: Facebook grants what it has approved and
+quietly omits the rest, so asking early costs nothing, and *not* asking would
+mean that the day your review comes through, everybody still has to reconnect
+before they can post.
+
+### Development mode, and getting out of it
+
+In development mode every permission works immediately — but **only for people
+with a role on the app** (Settings → Roles: admins, developers, testers).
+Anyone else gets an error at the login dialog. That is a perfectly good way to
+run the app for yourself or a small team, indefinitely.
+
+To open it to other people, submit **App Review**. You will need a screencast
+of the whole journey — connect, compose, schedule, publish — plus a privacy
+policy URL and test credentials. Reviews take several days and are rejected for
+unclear screencasts far more often than for anything technical.
+
+Review each permission separately, in the order you actually need them:
+
+| Ask for | To be able to |
+|---|---|
+| `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `read_insights` | Schedule and publish for people who have no role on your app |
+| `pages_manage_engagement` | Moderate comments |
+| `pages_messaging` | Read and answer the Page inbox |
+| `instagram_basic`, `instagram_manage_insights` | Instagram analytics |
+| `instagram_content_publish` | **Post to Instagram** — a separate review from the two above |
+| `ads_read` | Ad spend reporting |
+
+Until `instagram_content_publish` is granted, Instagram accounts still appear
+in the app as destinations, but switched off and saying why. Turn them on from
+**Connections** once the review lands.
 
 ---
 
@@ -119,7 +159,31 @@ request and shows Groups in the UI. Two behavioural differences to expect:
 
 ---
 
-## 7. Testing before review
+## 7. Instagram (optional)
+
+An Instagram Business or Creator account, linked to one of your Pages, is
+reached with that **Page's** token — there is no separate Instagram login. So
+the setup is: link the account on Facebook's side, then press **Find Instagram
+accounts** on the Connections screen.
+
+```env
+FACEBOOK_ENABLE_INSTAGRAM="true"
+```
+
+Three things behave differently from Facebook, and they surprise people:
+
+- **Instagram has no text-only post.** A caption with no picture or video is
+  refused before anything is sent. RSS auto-posting is therefore Facebook-only,
+  and the feeds screen does not offer Instagram destinations.
+- **Instagram has no scheduling of its own.** Posts always go out from this
+  app's worker at the moment they are due, so the worker has to be running.
+- **Instagram fetches your media itself.** It takes a URL, not an upload, which
+  means `APP_URL` must be reachable from the public internet for Instagram
+  publishing to work at all. See [DEPLOYMENT.md](DEPLOYMENT.md#media-storage).
+
+---
+
+## 8. Testing before review
 
 Development mode gives you everything you need:
 
@@ -158,3 +222,29 @@ calls the scrape endpoint, which is the documented way to bust Facebook's cache.
 
 **Groups list is empty** — expected unless a Group admin has installed your app
 in that Group. See section 6.
+
+**No Instagram accounts found** — the account must be Business or Creator (not
+personal) and linked to a Page you have connected here. Check it on Facebook
+first: Page → Settings → Linked accounts.
+
+**Instagram post fails with "could not process the file"** — Facebook is
+quoting its own rule about the file: aspect ratio, length, or codec. The exact
+reason is passed through to the post list.
+
+**Instagram post fails and the Page is fine** — `instagram_content_publish` is
+a separate App Review from the Instagram reading permissions. The Connections
+screen says which destinations are waiting on it.
+
+**Everything worked and now no one can connect** — you turned on a feature
+switch whose permission is not approved yet. Facebook fails the *whole* consent
+dialog in that case, not just the one permission. Turn the switch back off.
+
+---
+
+## Where to go next
+
+- [DEPLOYMENT.md](DEPLOYMENT.md) — going live, the worker, backups, key rotation
+- [ARCHITECTURE.md](ARCHITECTURE.md) — how publishing, scheduling and tokens work
+- The app's own **Setup** screen walks a fresh installation through the first
+  few steps, and **Connections** tells you which permissions are actually
+  granted for each connected account.

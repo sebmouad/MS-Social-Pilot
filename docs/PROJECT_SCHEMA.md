@@ -505,9 +505,11 @@ and `published_posts` — the last of these being what stops every Page-level
 report from understating a Page whose team also posts from the Facebook app.
 
 **Instagram Business analytics and Ads Insights** are read through the same
-connected Page and user tokens. Instagram is analytics only; publishing to it is
-a separate piece of work. Ads is read-only — `ads_read` is requested and
+connected Page and user tokens. Ads is read-only — `ads_read` is requested and
 `ads_management` never is.
+
+> Instagram was analytics-only when this amendment was written. Publishing to
+> it was added later; see [amendment 13](#13-amendment--instagram-publishing-editing-and-replies).
 
 ### Permissions
 
@@ -517,7 +519,7 @@ separately and requesting an unapproved one fails the entire consent dialog:
 | Flag | Scopes | Unlocks |
 | --- | --- | --- |
 | `FACEBOOK_ENABLE_MESSAGING` | `pages_messaging`, `pages_manage_metadata` | Inbox tab |
-| `FACEBOOK_ENABLE_INSTAGRAM` | `instagram_basic`, `instagram_manage_insights` | Instagram tab and job |
+| `FACEBOOK_ENABLE_INSTAGRAM` | `instagram_basic`, `instagram_manage_insights`, `instagram_content_publish` | Instagram tab, job, and publishing |
 | `FACEBOOK_ENABLE_ADS` | `ads_read` | Ads tab and job |
 
 Comments, ratings, videos and `published_posts` need only `pages_read_engagement`
@@ -535,3 +537,61 @@ app does not spend its rate limit on a permission error every twelve hours.
 6. **App review** — Instagram insights and Ads read both need Meta review
    against a live app. Do you want those submitted, or should the product ship
    Facebook-only with the flags left off?
+
+---
+
+## 13. Amendment — Instagram publishing, editing and replies
+
+Agreed after the analytics amendment. Three things the product could see but
+not do, plus the housekeeping each of them turned up.
+
+### Instagram is a destination, not just a report
+
+An Instagram Business account now appears alongside Pages and Groups as a
+`Target` of type `instagram`, so it inherits the composer, the calendar, the
+queue, per-destination outcomes and retry policy without any of them knowing
+what it is. Only the Graph call differs.
+
+What Instagram will not do, and what the product does about it:
+
+| Instagram's rule | What the app does |
+| --- | --- |
+| No text-only post | Refuses a caption with no attachment before calling Graph |
+| No scheduling of its own | Refuses native mode; the worker always publishes |
+| Takes a URL, not an upload | Mints a signed link per publish, expiring in 30 minutes |
+| Caption carries no clickable link | Appends the post's link to the caption |
+| At most 10 carousel items, 2,200 characters | Refused with the limit named |
+
+RSS auto-posting is therefore Facebook-only: a feed entry is a headline and a
+link, and Instagram publishes neither on its own.
+
+Publishing needs `instagram_content_publish`, a separate Meta review from the
+insights scopes. Discovered accounts appear as destinations but start switched
+off, saying why, so nobody is offered a destination that would be refused.
+
+### A scheduled post can be edited
+
+`PATCH /api/posts/[id]` existed from the original build and nothing in the
+interface called it, so correcting a typo meant cancelling the post and writing
+it again. `/compose?post=<id>` now opens it in the composer it was written in.
+Whether a post can still be changed is one function asked by both the API and
+the post list, so a button can never lead to a refusal.
+
+### The inbox can be answered
+
+Comments could be replied to, hidden and deleted; the inbox one tab away could
+only be read. Threads now take replies, within Facebook's 24-hour window, which
+the screen shows rather than discovering on send.
+
+### Answered, from section 11
+
+1. **Short link domain** — still open; blank falls back to `APP_URL/l/<slug>`.
+2. **French copy** — written and shipped; a native review is still worth doing.
+3. **AI model** — configurable in the settings registry rather than fixed.
+4. **Resend sending domain** — still needs DNS verification before it can send
+   to arbitrary addresses.
+5. **Approval granularity** — per-workspace, as specified. No demand for
+   per-destination has appeared.
+6. **App review** — Facebook publishing works today in development mode with
+   app roles. Instagram publishing, Instagram insights and Ads read each need
+   their own submission.
