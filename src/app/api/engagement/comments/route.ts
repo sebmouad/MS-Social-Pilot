@@ -68,6 +68,7 @@ export const POST = route(async (request: Request) => {
     const result = await replyToCommentAs({
       commentId: input.commentId,
       workspaceId: auth.workspace.id,
+      userId: auth.user.id,
       role: auth.role,
       message: input.message,
     });
@@ -79,6 +80,7 @@ export const POST = route(async (request: Request) => {
       await removeComment({
         commentId: input.commentId,
         workspaceId: auth.workspace.id,
+        userId: auth.user.id,
         role: auth.role,
       }),
       { deleted: true },
@@ -89,6 +91,7 @@ export const POST = route(async (request: Request) => {
     await moderateComment({
       commentId: input.commentId,
       workspaceId: auth.workspace.id,
+      userId: auth.user.id,
       role: auth.role,
       hidden: input.action === 'hide',
     }),

@@ -7,6 +7,7 @@ import { decryptSecret } from './crypto';
 import { parseInsights, toJson, toJsonOrNull } from './json';
 import { asGraphError } from './facebook/graph';
 import { fetchInsights } from './facebook/analytics';
+import { logActivity } from './scheduler/runner';
 import { syncExternalPostInsights } from './analytics';
 import {
   deleteComment,
@@ -195,6 +196,7 @@ async function tokenForComment(commentId: string, workspaceId: string) {
 export async function moderateComment(options: {
   commentId: string;
   workspaceId: string;
+  userId: string;
   role: WorkspaceRole;
   hidden: boolean;
 }): Promise<ModerationOutcome> {
@@ -208,6 +210,13 @@ export async function moderateComment(options: {
     where: { id: options.commentId },
     data: { isHidden: options.hidden },
   });
+
+  await logActivity(
+    options.workspaceId,
+    options.hidden ? 'comment.hidden' : 'comment.unhidden',
+    { commentId: options.commentId, remoteId: found.comment.remoteId },
+    options.userId,
+  );
   return 'ok';
 }
 
@@ -220,6 +229,7 @@ export async function moderateComment(options: {
 export async function removeComment(options: {
   commentId: string;
   workspaceId: string;
+  userId: string;
   role: WorkspaceRole;
 }): Promise<ModerationOutcome> {
   // A step above hiding: hiding is undone from the same screen, this is not.
@@ -230,6 +240,20 @@ export async function removeComment(options: {
 
   await deleteComment(found.comment.remoteId, found.token);
   await prisma.postComment.delete({ where: { id: options.commentId } });
+
+  // The one moderation action nothing can undo, on a page belonging to
+  // somebody else's business. Its author, its text and who removed it are kept
+  // here because Facebook keeps none of it once the delete lands.
+  await logActivity(
+    options.workspaceId,
+    'comment.deleted',
+    {
+      remoteId: found.comment.remoteId,
+      author: found.comment.fromName,
+      message: found.comment.message,
+    },
+    options.userId,
+  );
   return 'ok';
 }
 
@@ -237,6 +261,7 @@ export async function removeComment(options: {
 export async function replyToCommentAs(options: {
   commentId: string;
   workspaceId: string;
+  userId: string;
   role: WorkspaceRole;
   message: string;
 }): Promise<{ outcome: ModerationOutcome; remoteId?: string }> {

@@ -230,7 +230,7 @@ function stubEverything(): void {
 
 describe('syncTargetEdges', () => {
   it('stores every edge in one pass', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
 
     const result = await engagement.syncTargetEdges({ targetId: target.id });
@@ -296,7 +296,7 @@ describe('syncTargetEdges', () => {
   });
 
   it('attaches video-level insights to the video', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
 
     await engagement.syncTargetEdges({ targetId: target.id });
@@ -349,7 +349,7 @@ describe('external post insights', () => {
   it('reads the full catalogue for a post nobody scheduled here', async () => {
     // Without this the list can say a colleague posted from the Facebook app
     // but not whether anyone saw it, and Page-level totals stay wrong.
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
     stubPostCatalogue();
 
@@ -364,7 +364,7 @@ describe('external post insights', () => {
   });
 
   it('backfills the permalink Graph reported', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
     stubPostCatalogue();
 
@@ -376,7 +376,7 @@ describe('external post insights', () => {
 
   it('stores the post without insights when the catalogue is refused', async () => {
     // A refused insights edge must not lose the post itself.
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
     denied = ['/insights'];
 
@@ -390,7 +390,7 @@ describe('external post insights', () => {
 
 describe('readPostMetrics', () => {
   it('returns every stored metric with its catalogue description', async () => {
-    const { workspace, target, postTarget } = await seedWorkspace();
+    const { workspace, target, postTarget, user } = await seedWorkspace();
     routes['/insights'] = () => ({
       data: [
         { name: 'post_impressions', period: 'lifetime', values: [{ value: 900 }] },
@@ -477,7 +477,7 @@ describe('probing every level', () => {
 
 describe('comment moderation', () => {
   it('hides a comment on Facebook before recording it locally', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
     await engagement.syncTargetEdges({ targetId: target.id });
 
@@ -488,6 +488,7 @@ describe('comment moderation', () => {
       await engagement.moderateComment({
         commentId: comment!.id,
         workspaceId: workspace.id,
+        userId: user.id,
         role: WorkspaceRole.editor,
         hidden: true,
       }),
@@ -498,7 +499,7 @@ describe('comment moderation', () => {
   });
 
   it('leaves the row alone when Facebook refuses the hide', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
     await engagement.syncTargetEdges({ targetId: target.id });
 
@@ -509,6 +510,7 @@ describe('comment moderation', () => {
       engagement.moderateComment({
         commentId: comment!.id,
         workspaceId: workspace.id,
+        userId: user.id,
         role: WorkspaceRole.editor,
         hidden: true,
       }),
@@ -521,7 +523,7 @@ describe('comment moderation', () => {
   });
 
   it('stores our own reply immediately', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
     await engagement.syncTargetEdges({ targetId: target.id });
 
@@ -531,6 +533,7 @@ describe('comment moderation', () => {
     const result = await engagement.replyToCommentAs({
       commentId: comment!.id,
       workspaceId: workspace.id,
+      userId: user.id,
       role: WorkspaceRole.editor,
       message: 'Thanks!',
     });
@@ -552,15 +555,71 @@ describe('comment moderation', () => {
       await engagement.moderateComment({
         commentId: comment!.id,
         workspaceId: mine.workspace.id,
+        userId: mine.user.id,
         role: WorkspaceRole.owner,
         hidden: true,
       }),
     ).toBe('not_found');
   });
 
+  it('records who deleted a comment, and what it said', async () => {
+    const { workspace, target, user } = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: target.id });
+
+    const [comment] = await engagement.readComments({ workspaceId: workspace.id });
+    routes['/c1'] = () => ({ success: true });
+
+    expect(
+      await engagement.removeComment({
+        commentId: comment!.id,
+        workspaceId: workspace.id,
+        userId: user.id,
+        role: WorkspaceRole.owner,
+      }),
+    ).toBe('ok');
+
+    // Facebook keeps nothing once the delete lands, and the local row is gone
+    // too, so this entry is the only remaining account of what happened on
+    // somebody else's page.
+    const entry = await prisma.activityLog.findFirstOrThrow({
+      where: { workspaceId: workspace.id, action: 'comment.deleted' },
+    });
+    expect(entry.actorId).toBe(user.id);
+    expect(JSON.stringify(entry.detail)).toContain('c1');
+  });
+
+  it('records a hide, and the unhide that follows it', async () => {
+    const { workspace, target, user } = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: target.id });
+
+    const [comment] = await engagement.readComments({ workspaceId: workspace.id });
+    routes['/c1'] = () => ({ success: true });
+
+    const moderate = (hidden: boolean) =>
+      engagement.moderateComment({
+        commentId: comment!.id,
+        workspaceId: workspace.id,
+        userId: user.id,
+        role: WorkspaceRole.editor,
+        hidden,
+      });
+
+    expect(await moderate(true)).toBe('ok');
+    expect(await moderate(false)).toBe('ok');
+
+    const actions = await prisma.activityLog.findMany({
+      where: { workspaceId: workspace.id, action: { startsWith: 'comment.' } },
+      orderBy: { createdAt: 'asc' },
+      select: { action: true },
+    });
+    expect(actions.map((entry) => entry.action)).toEqual(['comment.hidden', 'comment.unhidden']);
+  });
+
   it('refuses a contributor', async () => {
     // Every action here is immediately visible on the client's page.
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
     await engagement.syncTargetEdges({ targetId: target.id });
 
@@ -571,6 +630,7 @@ describe('comment moderation', () => {
       await engagement.moderateComment({
         commentId: comment!.id,
         workspaceId: workspace.id,
+        userId: user.id,
         role: WorkspaceRole.contributor,
         hidden: true,
       }),
@@ -584,7 +644,7 @@ describe('comment moderation', () => {
   it('lets an editor hide but not delete', async () => {
     // Hiding is undone from the same screen. Deleting removes a customer's
     // words from the client's page and nothing brings them back.
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
     await engagement.syncTargetEdges({ targetId: target.id });
 
@@ -595,6 +655,7 @@ describe('comment moderation', () => {
       await engagement.removeComment({
         commentId: comment!.id,
         workspaceId: workspace.id,
+        userId: user.id,
         role: WorkspaceRole.editor,
       }),
     ).toBe('forbidden');
@@ -604,6 +665,7 @@ describe('comment moderation', () => {
       await engagement.removeComment({
         commentId: comment!.id,
         workspaceId: workspace.id,
+        userId: user.id,
         role: WorkspaceRole.admin,
       }),
     ).toBe('ok');
@@ -611,7 +673,7 @@ describe('comment moderation', () => {
   });
 
   it('refuses a contributor’s reply', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
     await engagement.syncTargetEdges({ targetId: target.id });
 
@@ -621,6 +683,7 @@ describe('comment moderation', () => {
     const result = await engagement.replyToCommentAs({
       commentId: comment!.id,
       workspaceId: workspace.id,
+      userId: user.id,
       role: WorkspaceRole.contributor,
       message: 'Thanks!',
     });
@@ -729,7 +792,7 @@ describe('CSV export', () => {
   });
 
   it('exports the edges and the ad spend', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubEverything();
     await engagement.syncTargetEdges({ targetId: target.id });
 
@@ -804,7 +867,7 @@ describe('Instagram', () => {
   }
 
   it('discovers the account behind a Page', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubInstagram(target.providerId);
 
     const result = await instagram.discoverInstagramAccounts(workspace.id);
@@ -817,7 +880,7 @@ describe('Instagram', () => {
   });
 
   it('does not duplicate an account across repeated discovery', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubInstagram(target.providerId);
 
     await instagram.discoverInstagramAccounts(workspace.id);
@@ -827,7 +890,7 @@ describe('Instagram', () => {
   });
 
   it('stores account insights and per-media figures', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     stubInstagram(target.providerId);
     await instagram.discoverInstagramAccounts(workspace.id);
 
@@ -850,7 +913,7 @@ describe('Instagram', () => {
   });
 
   it('skips a Page with no linked account rather than failing', async () => {
-    const { workspace, target } = await seedWorkspace();
+    const { workspace, target, user } = await seedWorkspace();
     routes[`/${target.providerId}`] = () => ({ id: target.providerId });
 
     const result = await instagram.discoverInstagramAccounts(workspace.id);

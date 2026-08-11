@@ -362,6 +362,21 @@ go back to the email and click the link again. `afterAuthPath` is now the one
 definition of where someone goes after signing in, used by both auth pages and
 the form itself.
 
+### Moderating comments
+
+Three writes reach somebody else's Facebook page: hide, unhide and delete. The
+protections around them were already in place — a role check first
+(`canModerateComments` for hiding, `canDeleteComments` for deleting, since one
+is undone from the same screen and the other is not), and a lookup scoped to the
+caller's workspace, so the id Graph is aimed at comes from the row that lookup
+found rather than from the request.
+
+What was missing was the record. Every other consequential action here writes an
+activity entry, and deleting a client's comment is the least reversible thing
+this app can do: Facebook keeps nothing afterwards, and the local row goes too.
+The entry now holds the comment's author and text, so afterwards there is still
+an account of what was removed and by whom.
+
 ### Who may act on a post
 
 Workspace membership was the only check on editing, cancelling, retrying and
