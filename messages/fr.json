@@ -15,7 +15,8 @@
     "settings": "Paramètres",
     "signOut": "Se déconnecter",
     "switchWorkspace": "Changer de client",
-    "analytics": "Statistiques"
+    "analytics": "Statistiques",
+    "menu": "Menu"
   },
   "auth": {
     "signIn": "Se connecter",
@@ -498,7 +499,18 @@
     "export_videos": "Vidéos — tous les indicateurs",
     "export_instagram": "Statistiques Instagram",
     "export_instagram_media": "Contenus Instagram — tous les indicateurs",
-    "export_ads": "Dépenses publicitaires"
+    "export_ads": "Dépenses publicitaires",
+    "showTable": "Tableau",
+    "showChart": "Graphique",
+    "category": "Catégorie",
+    "value": "Valeur",
+    "date": "Date",
+    "vsEarlier": "vs première moitié",
+    "servedOf": "{available} sur {catalogue}",
+    "coverageKey": "Le foncé est fourni par Facebook ; le clair a été demandé et refusé. Le reste n’a pas encore été testé.",
+    "chooseView": "Choisir une vue",
+    "sortBy": "Trier par",
+    "showLess": "Afficher moins"
   },
   "engagement": {
     "refresh": "Récupérer depuis Facebook",

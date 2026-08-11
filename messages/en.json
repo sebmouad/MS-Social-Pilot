@@ -15,7 +15,8 @@
     "settings": "Settings",
     "signOut": "Sign out",
     "switchWorkspace": "Switch client",
-    "analytics": "Analytics"
+    "analytics": "Analytics",
+    "menu": "Menu"
   },
   "auth": {
     "signIn": "Sign in",
@@ -498,7 +499,18 @@
     "export_videos": "Videos — every metric",
     "export_instagram": "Instagram insights",
     "export_instagram_media": "Instagram media — every metric",
-    "export_ads": "Ad spend"
+    "export_ads": "Ad spend",
+    "showTable": "Table",
+    "showChart": "Chart",
+    "category": "Category",
+    "value": "Value",
+    "date": "Date",
+    "vsEarlier": "vs earlier half",
+    "servedOf": "{available} of {catalogue}",
+    "coverageKey": "Darker is served by Facebook; lighter was asked for and refused. The remainder has not been tested yet.",
+    "chooseView": "Choose a view",
+    "sortBy": "Sort by",
+    "showLess": "Show less"
   },
   "engagement": {
     "refresh": "Pull from Facebook",

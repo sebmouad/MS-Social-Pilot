@@ -272,6 +272,55 @@ rather than server-side rendering, which keeps headless Chromium out of the
 production image.
 
 
+
+---
+
+## Charts and layout
+
+Charts live in `src/components/charts/` and are hand-drawn SVG. A charting
+library would be several times the weight of what is actually drawn here — one
+polyline per series, a hairline grid, a bar list.
+
+The palette is in `src/lib/viz.ts` as CSS custom properties, so light and dark
+values swap in `globals.css` alone and nothing references a hex. Eight
+categorical hues, **assigned in fixed order and never cycled**: the ordering is
+what keeps adjacent pairs apart under colour-vision deficiency, so it is a
+guarantee rather than a preference. Validated against the white card surface —
+worst adjacent CVD ΔE 9.1, worst adjacent normal-vision ΔE 19.6. Past eight
+series the tail folds into "Other"; a generated ninth hue is indistinguishable
+from an existing one and breaks the check.
+
+Three of the eight sit below 3:1 contrast against white, which is allowed only
+with relief. That relief is `ChartFrame`'s **table view**: every chart can be
+read as numbers, so colour never carries a value alone and a tooltip enhances
+rather than gates. Keyboard focus on a line chart shows the same readout as
+hover.
+
+Marks follow one spec throughout: 2px lines, ≥8px end markers with a 2px surface
+ring, 4px rounded data-ends on bars, solid hairline gridlines, area fills at 10%.
+Values are direct-labelled *selectively* — the endpoint and the extreme, never a
+number on every point. Trend colour states whether a direction is welcome, not
+which direction it is: the arrow does that, and `DOWN_IS_GOOD` keeps the app from
+congratulating a page on more unlikes.
+
+The line chart measures its container with a `ResizeObserver` and redraws at the
+real width. Scaling a fixed viewBox instead would either letterbox the plot
+inside its own card or, with `preserveAspectRatio="none"`, stretch the 2px
+strokes and the labels along with it.
+
+### Responsive layout
+
+The app is used on phones between client meetings, so every screen is checked at
+360px: no page scrolls horizontally at any width. Three patterns do the work.
+Wide tables scroll inside `.scroll-x` rather than moving the page. The ten-column
+post table becomes **cards** below `sm` — a horizontally scrolling table on a
+narrow screen is technically readable and practically not, because the post text
+scrolls out of view exactly when the numbers come into it. Eleven analytics views
+and ten nav links become a **select** and a **menu** rather than wrapping into
+ragged rows that push content below the fold.
+
+Inputs are 16px on small screens: below that, iOS Safari zooms the page on focus
+and never zooms back out.
 ---
 
 ## Analytics

@@ -35,6 +35,7 @@ export function NavBar({
   const pathname = usePathname();
   const router = useRouter();
   const [switching, setSwitching] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const links = [
     { href: '/dashboard', label: t('dashboard') },
@@ -69,44 +70,52 @@ export function NavBar({
     setSwitching(false);
   }
 
+  const navLinks = (
+    <>
+      {links.map((link) => {
+        const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            onClick={() => setMenuOpen(false)}
+            aria-current={active ? 'page' : undefined}
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors lg:px-2.5 lg:py-1.5 ${
+              active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            {link.label}
+            {'badge' in link && typeof link.badge === 'number' && link.badge > 0 && (
+              <span className="rounded-full bg-violet-100 px-1.5 text-[10px] font-semibold text-violet-700">
+                {link.badge}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+    </>
+  );
+
   return (
-    <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-6 py-3">
-        <Link href="/dashboard" className="flex items-center gap-2">
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="mx-auto flex max-w-7xl items-center gap-x-4 px-4 py-3 sm:px-6">
+        <Link href="/dashboard" className="flex shrink-0 items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white">
             SP
           </span>
           <span className="hidden text-sm font-semibold text-slate-900 sm:inline">MS Social Pilot</span>
         </Link>
 
-        <nav className="flex flex-1 flex-wrap items-center gap-1">
-          {links.map((link) => {
-            const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {link.label}
-                {'badge' in link && typeof link.badge === 'number' && link.badge > 0 && (
-                  <span className="rounded-full bg-violet-100 px-1.5 text-[10px] font-semibold text-violet-700">
-                    {link.badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
+        {/* Ten links wrap into three ragged rows on a phone and push the page
+            below the fold. Below `lg` they live behind a menu instead. */}
+        <nav className="hidden flex-1 flex-wrap items-center gap-1 lg:flex">{navLinks}</nav>
 
-        <div className="flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {workspaces.length > 1 ? (
-            <label className="flex flex-col text-right">
+            <label>
               <span className="sr-only">{t('switchWorkspace')}</span>
               <select
-                className="rounded-lg border border-slate-300 px-2 py-1 text-sm font-medium text-slate-900"
+                className="max-w-[9rem] rounded-lg border border-slate-300 px-2 py-1.5 text-sm font-medium text-slate-900"
                 value={workspaceId}
                 disabled={switching}
                 onChange={(event) => switchTo(event.target.value)}
@@ -122,15 +131,35 @@ export function NavBar({
             <p className="hidden text-sm font-medium text-slate-900 sm:block">{workspaceName}</p>
           )}
 
-          <p className="hidden text-xs text-slate-500 lg:block">
+          <p className="hidden text-xs text-slate-500 2xl:block">
             {userName} · {timezone}
           </p>
 
-          <button type="button" onClick={signOut} className="btn-secondary">
+          <button type="button" onClick={signOut} className="btn-secondary hidden lg:inline-flex">
             {t('signOut')}
+          </button>
+
+          <button
+            type="button"
+            className="btn-secondary lg:hidden"
+            aria-expanded={menuOpen}
+            aria-controls="main-menu"
+            onClick={() => setMenuOpen((value) => !value)}
+          >
+            <span className="sr-only">{t('menu')}</span>
+            <span aria-hidden>{menuOpen ? '✕' : '☰'}</span>
           </button>
         </div>
       </div>
+
+      {menuOpen && (
+        <div id="main-menu" className="border-t border-slate-200 px-4 py-3 lg:hidden">
+          <nav className="grid grid-cols-2 gap-1">{navLinks}</nav>
+          <button type="button" onClick={signOut} className="btn-secondary mt-3 w-full">
+            {t('signOut')}
+          </button>
+        </div>
+      )}
     </header>
   );
 }

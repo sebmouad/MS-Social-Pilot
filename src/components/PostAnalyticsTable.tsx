@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
+import { VIZ, seriesColor } from '@/lib/viz';
+
 export interface PostRow {
   postTargetId: string;
   message: string;
@@ -89,12 +91,98 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
     return <div className="card p-8 text-center text-sm text-slate-600">{t('noPosts')}</div>;
   }
 
+  const biggestReach = Math.max(...posts.map((post) => post.reach), 1);
+
   return (
-    <section className="card p-5">
-      <h2 className="mb-3 text-sm font-semibold text-slate-900">{t('byPost')}</h2>
+    <section className="card-viz">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">{t('byPost')}</h2>
+
+        {/* A ten-column table has no sortable headers on a phone, so the sort
+            moves into a control the card layout can use too. */}
+        <label className="sm:hidden">
+          <span className="sr-only">{t('sortBy')}</span>
+          <select
+            className="input"
+            value={sort}
+            onChange={(event) => toggle(event.target.value as SortKey)}
+          >
+            {columns.map((column) => (
+              <option key={column.key} value={column.key}>
+                {column.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {/* Phones get cards. A horizontally scrolling ten-column table on a
+          320px screen is technically readable and practically not: the post
+          text scrolls out of view exactly when the numbers come into it. */}
+      <ul className="mt-3 space-y-3 sm:hidden">
+        {sorted.map((post) => (
+          <li key={post.postTargetId} className="rounded-lg border border-slate-200 p-3">
+            <Link
+              href={`/analytics/post/${post.postTargetId}`}
+              className="line-clamp-3 text-sm text-slate-800"
+            >
+              {post.message || '—'}
+            </Link>
+
+            <p className="mt-1 text-xs text-slate-500">
+              {post.targetName}
+              {post.publishedLabel ? ` · ${post.publishedLabel}` : ''}
+              {post.paid > 0 && ` · ${t('paid')}`}
+            </p>
+
+            {/* Reach against the best-performing post in the range: the one
+                comparison a single row cannot make on its own. */}
+            <span
+              className="mt-2 block h-1.5 w-full overflow-hidden rounded-sm"
+              style={{ background: VIZ.grid }}
+              aria-hidden
+            >
+              <span
+                className="block h-full"
+                style={{
+                  width: `${Math.max(2, (post.reach / biggestReach) * 100)}%`,
+                  background: seriesColor(0),
+                  borderTopRightRadius: 4,
+                  borderBottomRightRadius: 4,
+                }}
+              />
+            </span>
+
+            <dl className="mt-2 grid grid-cols-3 gap-2">
+              {columns.slice(0, 6).map((column) => {
+                const value = post[column.key];
+                return (
+                  <div key={column.key}>
+                    {/* One line each, so the values below them share a
+                        baseline instead of stepping down the card. */}
+                    <dt
+                      className="truncate text-[10px] uppercase tracking-wide text-slate-500"
+                      title={column.label}
+                    >
+                      {column.label}
+                    </dt>
+                    <dd className="nums text-sm font-medium text-slate-900">
+                      {value === null
+                        ? '—'
+                        : column.key === 'engagementRate'
+                          ? `${value}%`
+                          : Number(value).toLocaleString()}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </li>
+        ))}
+      </ul>
 
       {/* Wide table: scrolls inside its own container, never the page. */}
-      <div className="overflow-x-auto">
+      <div className="scroll-x mt-3 hidden sm:block">
         <table className="w-full min-w-[56rem] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -147,7 +235,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
                 {columns.map((column) => {
                   const value = post[column.key];
                   return (
-                    <td key={column.key} className="py-2 pr-3 text-right text-slate-600">
+                    <td key={column.key} className="nums py-2 pr-3 text-right text-slate-600">
                       {value === null
                         ? '—'
                         : column.key === 'engagementRate'

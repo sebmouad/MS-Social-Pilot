@@ -4,7 +4,12 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
+import { BarList } from './charts/BarList';
+import { ChartFrame } from './charts/ChartFrame';
+import { StatTile } from './charts/StatTile';
+import { TimeSeries } from './charts/TimeSeries';
 import { Sparkline } from './Sparkline';
+import { VIZ, compact } from '@/lib/viz';
 
 export interface SeriesView {
   metric: string;
@@ -53,17 +58,29 @@ interface Props {
   };
 }
 
-function formatNumber(value: number): string {
-  return value.toLocaleString();
+/** Turn a breakdown map into a plain record, dropping anything non-numeric. */
+function asMap(value: number | Record<string, number> | null): Record<string, number> {
+  if (!value || typeof value === 'number') return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(([, count]) => typeof count === 'number'),
+  );
 }
 
-/** Turn a breakdown map into a sorted list, longest bar first. */
-function breakdownRows(value: number | Record<string, number> | null): Array<[string, number]> {
-  if (!value || typeof value === 'number') return [];
-  return Object.entries(value)
-    .filter(([, count]) => typeof count === 'number' && count > 0)
-    .sort((a, b) => b[1] - a[1]);
-}
+/**
+ * Metrics where a rising number is bad news.
+ *
+ * Colouring every upward arrow green would congratulate a page on more unlikes
+ * and more people hiding its posts.
+ */
+const DOWN_IS_GOOD = /unlike|negative_feedback|fan_removes|unfollows|blocked|reported|spam/;
+
+/** The metric a page's overview should lead with, in order of preference. */
+const HEADLINE = [
+  'page_impressions_unique',
+  'page_impressions',
+  'page_post_engagements',
+  'page_engaged_users',
+];
 
 export function AnalyticsClient({
   targetId,
@@ -83,6 +100,25 @@ export function AnalyticsClient({
   const [error, setError] = useState<string | null>(null);
   const [showUnavailable, setShowUnavailable] = useState(false);
   const [filter, setFilter] = useState('');
+  const [featured, setFeatured] = useState<string | null>(null);
+
+  /** Metrics that are a time series — the ones worth plotting. */
+  const plottable = useMemo(
+    () => series.filter((entry) => !entry.breakdown && entry.points.length > 1),
+    [series],
+  );
+
+  const featuredSeries = useMemo(() => {
+    if (featured) {
+      const chosen = plottable.find((entry) => `${entry.metric}::${entry.period}` === featured);
+      if (chosen) return chosen;
+    }
+    for (const name of HEADLINE) {
+      const match = plottable.find((entry) => entry.metric === name);
+      if (match) return match;
+    }
+    return plottable[0];
+  }, [plottable, featured]);
 
   const categories = useMemo(() => {
     const grouped = new Map<string, SeriesView[]>();
@@ -99,6 +135,7 @@ export function AnalyticsClient({
     return [...grouped.entries()];
   }, [series, filter]);
 
+  const shown = categories.reduce((sum, [, rows]) => sum + rows.length, 0);
   const unavailable = availability.filter((entry) => !entry.available);
 
   async function sync() {
@@ -130,7 +167,7 @@ export function AnalyticsClient({
    * Ask Graph what it will actually serve, level by level.
    *
    * Separate from `sync` because it is a different question: sync fetches the
-   * numbers, this establishes which of the 354 catalogue names exist for this
+   * numbers, this establishes which of the catalogue names exist for this
    * destination at all — against a real Page, a real post, a real video and,
    * when linked, a real Instagram account.
    */
@@ -160,32 +197,14 @@ export function AnalyticsClient({
     setProbing(false);
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            className="input w-56"
-            placeholder={t('filterPlaceholder')}
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-          />
-          <span className="text-xs text-slate-500">
-            {t('metricsShown', { count: series.length })}
-          </span>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" className="btn-secondary" onClick={probeAll} disabled={probing}>
-            {probing ? tCommon('working') : t('probeAll')}
-          </button>
-          <button type="button" className="btn-primary" onClick={sync} disabled={syncing}>
-            {syncing ? tCommon('working') : t('syncNow')}
-          </button>
-        </div>
-      </div>
+  const busy = syncing || probing;
 
+  return (
+    <div className={`space-y-6 ${busy ? 'is-stale' : ''}`}>
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
       )}
       {message && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
@@ -193,138 +212,219 @@ export function AnalyticsClient({
         </div>
       )}
 
-      {/* Profile counters: no insights permission needed, so these survive when
-          everything else is restricted. */}
-      <section className="grid gap-4 sm:grid-cols-3">
-        {[
-          { label: t('fans'), value: profile.fanCount },
-          { label: t('followers'), value: profile.followersCount },
-          { label: t('talkingAbout'), value: profile.talkingAboutCount },
-        ].map((card) => (
-          <div key={card.label} className="card p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">
-              {card.value === null ? '—' : formatNumber(card.value)}
-            </p>
-          </div>
-        ))}
+      {/* Profile counters lead: they need no insights permission, so they still
+          land when everything below is restricted. */}
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatTile label={t('fans')} value={profile.fanCount} hero />
+        <StatTile label={t('followers')} value={profile.followersCount} />
+        <StatTile label={t('talkingAbout')} value={profile.talkingAboutCount} />
+        {featuredSeries && (
+          <StatTile
+            label={featuredSeries.label}
+            value={featuredSeries.total}
+            delta={featuredSeries.trend}
+            deltaLabel={t('vsEarlier')}
+            upIsGood={!DOWN_IS_GOOD.test(featuredSeries.metric)}
+            trend={featuredSeries.points
+              .map((point) => point.value)
+              .filter((value): value is number => typeof value === 'number')}
+          />
+        )}
       </section>
+
+      {/* One featured chart, chosen by the reader. A wall of forty small
+          charts is unreadable; one large one plus a browsable list is not. */}
+      {featuredSeries && (
+        <ChartFrame
+          title={featuredSeries.label}
+          description={featuredSeries.description}
+          table={{
+            head: [t('date'), t('value')],
+            rows: featuredSeries.points
+              .filter((point) => typeof point.value === 'number')
+              .map((point) => [
+                new Date(point.endTime).toLocaleDateString(),
+                point.value as number,
+              ]),
+          }}
+        >
+          <TimeSeries
+            lines={[
+              {
+                label: featuredSeries.label,
+                colorIndex: 0,
+                points: featuredSeries.points
+                  .filter((point) => typeof point.value === 'number')
+                  .map((point) => ({ x: point.endTime, y: point.value as number })),
+              },
+            ]}
+            formatX={(iso) =>
+              new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+            }
+          />
+        </ChartFrame>
+      )}
 
       {/* Catalogue coverage: what we know to ask for, against what this
           destination has actually been shown to serve. A level with nothing
           checked has never been probed, which is not the same as refused. */}
-      <section className="card p-5">
-        <h2 className="text-sm font-semibold text-slate-900">{t('coverageTitle')}</h2>
-        <p className="mt-0.5 text-xs text-slate-500">{t('coverageHint')}</p>
-
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[420px] text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="pb-2">{t('level')}</th>
-                <th className="pb-2 text-right">{t('catalogue')}</th>
-                <th className="pb-2 text-right">{t('confirmed')}</th>
-                <th className="pb-2 text-right">{t('refused')}</th>
-                <th className="pb-2 text-right">{t('untested')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {coverage.map((row) => (
-                <tr key={row.level}>
-                  <td className="py-2 font-medium text-slate-900">{row.levelLabel}</td>
-                  <td className="py-2 text-right text-slate-600">{row.catalogue}</td>
-                  <td className="py-2 text-right font-medium text-emerald-700">{row.available}</td>
-                  <td className="py-2 text-right text-amber-700">{row.unavailable}</td>
-                  <td className="py-2 text-right text-slate-400">
-                    {Math.max(0, row.catalogue - row.checked)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <section className="card-viz">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">{t('coverageTitle')}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">{t('coverageHint')}</p>
+          </div>
+          <button type="button" className="btn-secondary" onClick={probeAll} disabled={busy}>
+            {probing ? tCommon('working') : t('probeAll')}
+          </button>
         </div>
+
+        <ul className="mt-4 space-y-3">
+          {coverage.map((row) => {
+            const served = row.catalogue > 0 ? (row.available / row.catalogue) * 100 : 0;
+            const refused = row.catalogue > 0 ? (row.unavailable / row.catalogue) * 100 : 0;
+
+            return (
+              <li key={row.level}>
+                <div className="flex items-baseline justify-between gap-2 text-xs">
+                  <span className="font-medium text-slate-800">{row.levelLabel}</span>
+                  <span className="nums text-slate-500">
+                    {t('servedOf', { available: row.available, catalogue: row.catalogue })}
+                  </span>
+                </div>
+
+                {/* A meter, not a chart: one ratio against a limit. The
+                    unfilled track is the same ramp a step lighter, so the
+                    state reads across the whole bar. */}
+                <div
+                  className="mt-1 flex h-2 w-full overflow-hidden rounded-sm"
+                  style={{ background: VIZ.grid }}
+                  role="img"
+                  aria-label={t('servedOf', { available: row.available, catalogue: row.catalogue })}
+                >
+                  <span style={{ width: `${served}%`, background: 'var(--viz-seq-400)' }} />
+                  {/* A 2px surface gap does the separating; no border. */}
+                  {refused > 0 && (
+                    <>
+                      <span style={{ width: 2, background: VIZ.surface }} />
+                      <span style={{ width: `${refused}%`, background: 'var(--viz-seq-250)' }} />
+                    </>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        <p className="mt-3 text-[11px] text-slate-500">{t('coverageKey')}</p>
       </section>
+
+      {/* The browsable catalogue. Filter row above the content it scopes. */}
+      <div className="filter-row justify-between">
+        <input
+          className="input w-full sm:w-64"
+          placeholder={t('filterPlaceholder')}
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+        />
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-500">{t('metricsShown', { count: shown })}</span>
+          <button type="button" className="btn-primary" onClick={sync} disabled={busy}>
+            {syncing ? tCommon('working') : t('syncNow')}
+          </button>
+        </div>
+      </div>
 
       {series.length === 0 ? (
         <div className="card p-8 text-center">
           <p className="text-sm text-slate-600">{t('noData')}</p>
-          <button type="button" className="btn-primary mt-4" onClick={sync} disabled={syncing}>
+          <button type="button" className="btn-primary mt-4" onClick={sync} disabled={busy}>
             {syncing ? tCommon('working') : t('syncNow')}
           </button>
         </div>
       ) : (
         categories.map(([category, metrics]) => (
-          <section key={category} className="card p-5">
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">{category}</h2>
+          <section key={category} className="card-viz">
+            <h2 className="text-sm font-semibold text-slate-900">{category}</h2>
 
-            <div className="space-y-4">
+            <ul className="mt-3 divide-y divide-slate-100">
               {metrics.map((entry) => {
+                const key = `${entry.metric}::${entry.period}`;
                 const numeric = entry.points
                   .map((point) => point.value)
                   .filter((value): value is number => typeof value === 'number');
-                const rows = breakdownRows(entry.latest);
-                const largest = rows[0]?.[1] ?? 1;
+                const map = asMap(entry.latest);
+                const isFeatured = featuredSeries && key === `${featuredSeries.metric}::${featuredSeries.period}`;
 
-                return (
-                  <div key={`${entry.metric}-${entry.period}`} className="border-b border-slate-100 pb-4 last:border-0 last:pb-0">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900">{entry.label}</p>
-                        <p className="text-xs text-slate-500">{entry.description}</p>
-                        <p className="mt-0.5 font-mono text-[10px] text-slate-400">
-                          {entry.metric} · {entry.period}
-                        </p>
-                      </div>
-
-                      {!entry.breakdown && (
-                        <div className="flex items-center gap-3">
-                          <Sparkline values={numeric} />
-                          <div className="text-right">
-                            <p className="text-lg font-semibold text-slate-900">
-                              {entry.total !== null ? formatNumber(entry.total) : '—'}
-                            </p>
-                            {entry.trend !== null && (
-                              <p
-                                className={`text-xs ${
-                                  entry.trend >= 0 ? 'text-emerald-600' : 'text-orange-600'
-                                }`}
-                              >
-                                {entry.trend >= 0 ? '+' : ''}
-                                {entry.trend}%
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                const body = (
+                  <div className="flex w-full flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-900">{entry.label}</p>
+                      <p className="text-xs text-slate-500">{entry.description}</p>
+                      <p className="mt-0.5 font-mono text-[10px] text-slate-400">
+                        {entry.metric} · {entry.period}
+                      </p>
                     </div>
 
-                    {entry.breakdown && rows.length > 0 && (
-                      <ul className="mt-3 space-y-1">
-                        {rows.slice(0, 10).map(([key, value]) => (
-                          <li key={key} className="flex items-center gap-2 text-xs">
-                            <span className="w-32 shrink-0 truncate text-slate-600">{key}</span>
-                            <span className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                              <span
-                                className="block h-full rounded-full bg-brand-400"
-                                style={{ width: `${Math.round((value / largest) * 100)}%` }}
-                              />
+                    {!entry.breakdown && (
+                      <div className="flex shrink-0 items-center gap-3">
+                        <span className="hidden sm:block">
+                          <Sparkline values={numeric} />
+                        </span>
+                        <span className="text-right">
+                          <span className="block text-lg font-semibold text-slate-900">
+                            {entry.total !== null ? compact(entry.total) : '—'}
+                          </span>
+                          {entry.trend !== null && (
+                            <span
+                              className="block text-xs font-medium"
+                              style={{
+                                color:
+                                  entry.trend >= 0 !== DOWN_IS_GOOD.test(entry.metric)
+                                    ? VIZ.goodText
+                                    : VIZ.critical,
+                              }}
+                            >
+                              {/* The arrow states the direction; colour only
+                                  says whether that direction is welcome. */}
+                              {entry.trend >= 0 ? '↑' : '↓'} {Math.abs(entry.trend)}%
                             </span>
-                            <span className="w-16 shrink-0 text-right font-medium text-slate-700">
-                              {formatNumber(value)}
-                            </span>
-                          </li>
-                        ))}
-                        {rows.length > 10 && (
-                          <li className="text-[10px] text-slate-400">
-                            {t('andMore', { count: rows.length - 10 })}
-                          </li>
-                        )}
-                      </ul>
+                          )}
+                        </span>
+                      </div>
                     )}
                   </div>
                 );
+
+                return (
+                  <li key={key} className="py-3">
+                    {/* A plottable metric is a button that features itself in
+                        the chart above; a breakdown is not, because it has
+                        nothing to plot over time. */}
+                    {entry.breakdown || numeric.length < 2 ? (
+                      body
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setFeatured(key)}
+                        aria-pressed={Boolean(isFeatured)}
+                        className={`-mx-2 flex w-[calc(100%+1rem)] rounded-lg px-2 py-1 text-left transition-colors hover:bg-slate-50 ${
+                          isFeatured ? 'bg-brand-50/60' : ''
+                        }`}
+                      >
+                        {body}
+                      </button>
+                    )}
+
+                    {entry.breakdown && Object.keys(map).length > 0 && (
+                      <div className="mt-3">
+                        <BarList data={map} limit={6} />
+                      </div>
+                    )}
+                  </li>
+                );
               })}
-            </div>
+            </ul>
           </section>
         ))
       )}
@@ -332,10 +432,11 @@ export function AnalyticsClient({
       {/* Meta removes metrics between versions. Saying so is more useful than
           silently omitting them. */}
       {unavailable.length > 0 && (
-        <section className="card p-5">
+        <section className="card-viz">
           <button
             type="button"
-            className="flex w-full items-center justify-between text-left"
+            className="flex w-full items-center justify-between gap-2 text-left"
+            aria-expanded={showUnavailable}
             onClick={() => setShowUnavailable((value) => !value)}
           >
             <span className="text-sm font-semibold text-slate-900">
@@ -367,7 +468,10 @@ export function AnalyticsClient({
         </section>
       )}
 
-      <p className="text-xs text-slate-500">{t('footnote', { name: targetName })}</p>
+      <p className="text-xs text-slate-500">
+        {t('footnote', { name: targetName })}
+        {profile.syncedLabel && ` · ${t('syncedAt', { when: profile.syncedLabel })}`}
+      </p>
     </div>
   );
 }

@@ -13,10 +13,13 @@ export function PagePicker({
   pages,
   selectedId,
   days,
+  view = 'overview',
 }: {
   pages: Array<{ id: string; name: string }>;
   selectedId: string;
   days: number;
+  /** Kept so switching destination does not also throw away the current tab. */
+  view?: string;
 }) {
   const t = useTranslations('analytics');
   const router = useRouter();
@@ -27,9 +30,11 @@ export function PagePicker({
     <label>
       <span className="sr-only">{t('choosePage')}</span>
       <select
-        className="input"
+        className="input w-auto max-w-[14rem]"
         value={selectedId}
-        onChange={(event) => router.push(`/analytics?target=${event.target.value}&days=${days}`)}
+        onChange={(event) =>
+          router.push(`/analytics?view=${view}&target=${event.target.value}&days=${days}`)
+        }
       >
         {pages.map((page) => (
           <option key={page.id} value={page.id}>

@@ -9,6 +9,7 @@ import { CommentsPanel } from '@/components/CommentsPanel';
 import { ExportMenu } from '@/components/ExportMenu';
 import { PagePicker } from '@/components/PagePicker';
 import { PostAnalyticsTable } from '@/components/PostAnalyticsTable';
+import { StatTile } from '@/components/charts/StatTile';
 import { SyncButton } from '@/components/SyncButton';
 import { requirePage } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -80,43 +81,41 @@ export default async function AnalyticsPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {t('subtitle')} · {formatInZone(from, timezone, 'd MMM')} –{' '}
-            {formatInZone(to, timezone, 'd MMM yyyy')}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <PagePicker
-            pages={pages.map((page) => ({ id: page.id, name: page.name }))}
-            selectedId={selected.id}
-            days={window}
-          />
-
-          <ExportMenu
-            targetId={selected.id}
-            from={from.toISOString()}
-            to={to.toISOString()}
-          />
-
-          <div className="flex gap-1">
-            {[7, 30, 90].map((option) => (
-              <Link
-                key={option}
-                href={`/analytics?target=${selected.id}&days=${option}`}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                  option === window ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {t('lastDays', { count: option })}
-              </Link>
-            ))}
-          </div>
-        </div>
+      <header>
+        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
+        <p className="mt-1 text-sm text-slate-600">
+          {t('subtitle')} · {formatInZone(from, timezone, 'd MMM')} –{' '}
+          {formatInZone(to, timezone, 'd MMM yyyy')}
+        </p>
       </header>
+
+      {/* One filter row, above everything it scopes: the date range first,
+          because it is the control every reader reaches for. Per-view filters
+          would let two panels disagree about which window they are showing. */}
+      <div className="filter-row">
+        <div className="segmented">
+          {[7, 30, 90].map((option) => (
+            <Link
+              key={option}
+              href={`/analytics?view=${view}&target=${selected.id}&days=${option}`}
+              className={`segmented-item ${option === window ? 'segmented-item-active' : ''}`}
+            >
+              {t('lastDays', { count: option })}
+            </Link>
+          ))}
+        </div>
+
+        <PagePicker
+          pages={pages.map((page) => ({ id: page.id, name: page.name }))}
+          selectedId={selected.id}
+          days={window}
+          view={view}
+        />
+
+        <div className="ml-auto">
+          <ExportMenu targetId={selected.id} from={from.toISOString()} to={to.toISOString()} />
+        </div>
+      </div>
 
       <AnalyticsTabs current={view} />
 
@@ -265,14 +264,9 @@ async function InteractionsView({
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-6">
         {cards.map((card) => (
-          <div key={card.label} className="card p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
-            <p className="mt-1 text-xl font-semibold text-slate-900">
-              {card.value.toLocaleString()}
-            </p>
-          </div>
+          <StatTile key={card.label} label={card.label} value={card.value} />
         ))}
       </section>
 
@@ -309,14 +303,15 @@ async function AudienceView({ targetId, from, to }: { targetId: string; from: Da
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      {/* Losing likes is not an achievement, whichever way the arrow points. */}
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-6">
         {cards.map((card) => (
-          <div key={card.label} className="card p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
-            <p className="mt-1 text-xl font-semibold text-slate-900">
-              {card.value === null ? '—' : card.value.toLocaleString()}
-            </p>
-          </div>
+          <StatTile
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            upIsGood={card.label !== t('lostLikes')}
+          />
         ))}
       </section>
 
@@ -472,12 +467,9 @@ async function ReviewsView({
         <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {cards.map((card) => (
-          <div key={card.label} className="card p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
-            <p className="mt-1 text-xl font-semibold text-slate-900">{card.value}</p>
-          </div>
+          <StatTile key={card.label} label={card.label} value={card.value} />
         ))}
       </section>
 
@@ -763,14 +755,9 @@ async function InstagramView({
         </div>
       )}
 
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         {cards.map((card) => (
-          <div key={card.label} className="card p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
-            <p className="mt-1 text-xl font-semibold text-slate-900">
-              {card.value === null ? '—' : card.value.toLocaleString()}
-            </p>
-          </div>
+          <StatTile key={card.label} label={card.label} value={card.value} />
         ))}
       </section>
 
@@ -925,12 +912,9 @@ async function AdsView({
         </div>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-3 lg:grid-cols-7">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-7">
         {cards.map((card) => (
-          <div key={card.label} className="card p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">{card.value}</p>
-          </div>
+          <StatTile key={card.label} label={card.label} value={card.value} />
         ))}
       </section>
 

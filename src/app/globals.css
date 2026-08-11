@@ -5,10 +5,105 @@
 @layer base {
   :root {
     color-scheme: light;
+
+    /* ---------------------------------------------------------------------
+     * Data-visualisation tokens.
+     *
+     * Charts are written against these roles, never raw hex, so the whole
+     * system moves together. The categorical order is fixed and validated:
+     * slots are assigned in order and never cycled, because the ordering is
+     * what keeps adjacent pairs apart under colour-vision deficiency, not a
+     * cosmetic choice. Validated against the white card surface —
+     * worst adjacent CVD ΔE 9.1, worst adjacent normal-vision ΔE 19.6.
+     *
+     * Aqua, yellow and magenta sit below 3:1 against white. That is allowed
+     * only with relief: every chart using them ships visible value labels
+     * and a table view, so colour never carries the number alone.
+     * ------------------------------------------------------------------- */
+    --viz-surface: #ffffff;
+    --viz-plane: #f8fafc;
+    --viz-ink: #0b0b0b;
+    --viz-ink-secondary: #52514e;
+    --viz-ink-muted: #898781;
+    --viz-grid: #e8e8e3;
+    --viz-axis: #c3c2b7;
+
+    --viz-1: #2a78d6;
+    --viz-2: #eb6834;
+    --viz-3: #1baf7a;
+    --viz-4: #eda100;
+    --viz-5: #e87ba4;
+    --viz-6: #008300;
+    --viz-7: #4a3aa7;
+    --viz-8: #e34948;
+
+    /* The de-emphasis grey: context series, unfilled meter track, the "rest"
+       in an emphasis chart. Never an identity. */
+    --viz-muted-mark: #cbd5e1;
+
+    /* Sequential ramp (one hue, light to dark) for magnitude. */
+    --viz-seq-100: #cde2fb;
+    --viz-seq-250: #86b6ef;
+    --viz-seq-400: #3987e5;
+    --viz-seq-550: #1c5cab;
+    --viz-seq-700: #0d366b;
+
+    /* Status is reserved: it means good/bad, never "series 4", and always
+       ships with a label beside it. */
+    --viz-good: #0ca30c;
+    --viz-warning: #fab219;
+    --viz-serious: #ec835a;
+    --viz-critical: #d03b3b;
+    /* Success *text* needs more contrast than the success mark. */
+    --viz-good-text: #006300;
+  }
+
+  /* Inert until a theme toggle sets it: the app shell is light-only, and a
+     dark chart on a light page would be worse than no dark mode. The steps
+     are the same eight hues re-stepped for a dark surface, kept here so the
+     charts are ready the day the shell is. */
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+
+    --viz-surface: #1a1a19;
+    --viz-plane: #0d0d0d;
+    --viz-ink: #ffffff;
+    --viz-ink-secondary: #c3c2b7;
+    --viz-ink-muted: #898781;
+    --viz-grid: #2c2c2a;
+    --viz-axis: #383835;
+
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-4: #c98500;
+    --viz-5: #d55181;
+    --viz-6: #008300;
+    --viz-7: #9085e9;
+    --viz-8: #e66767;
+
+    --viz-muted-mark: #3f3f46;
+    --viz-good-text: #0ca30c;
   }
 
   body {
     @apply bg-slate-50 text-slate-900 antialiased;
+  }
+
+  /* Long metric names and Facebook's own copy arrive unwrapped; without this
+     one 40-character token forces the whole card to scroll sideways. */
+  body {
+    overflow-wrap: break-word;
+  }
+
+  /* Respect the OS setting rather than animating regardless. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
@@ -18,9 +113,17 @@
     @apply rounded-xl border border-slate-200 bg-white shadow-sm;
   }
 
+  /* A card that is itself the chart surface. */
+  .card-viz {
+    @apply card p-4 sm:p-5;
+  }
+
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium
-      transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+      transition-colors disabled:cursor-not-allowed disabled:opacity-50
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2;
+    /* Comfortably tappable: below this, a thumb hits the neighbour. */
+    min-height: 2.5rem;
   }
 
   .btn-primary {
@@ -35,9 +138,23 @@
     @apply btn border border-red-200 bg-white text-red-600 hover:bg-red-50;
   }
 
+  /* A quiet button for tertiary actions inside dense lists. */
+  .btn-ghost {
+    @apply btn px-2 text-slate-600 hover:bg-slate-100;
+  }
+
   .input {
     @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900
       placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+    /* 16px on small screens: anything smaller makes iOS Safari zoom the page
+       on focus, which then never zooms back out. */
+    font-size: 16px;
+  }
+
+  @screen sm {
+    .input {
+      font-size: 0.875rem;
+    }
   }
 
   .label {
@@ -55,9 +172,52 @@
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
   }
+
+  /* A segmented control: view switchers, period pickers, level pickers. */
+  .segmented {
+    @apply flex gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1;
+    scrollbar-width: none;
+  }
+
+  .segmented::-webkit-scrollbar {
+    display: none;
+  }
+
+  .segmented-item {
+    @apply whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium text-slate-600
+      transition-colors hover:text-slate-900;
+  }
+
+  .segmented-item-active {
+    @apply bg-white text-slate-900 shadow-sm;
+  }
+
+  /* Wide content — tables, wide charts — scrolls inside its own box so the
+     page body never scrolls sideways on a phone. */
+  .scroll-x {
+    @apply -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0;
+    scrollbar-width: thin;
+  }
+
+  /* The filter row: one row, above everything it scopes. */
+  .filter-row {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  /* Data that reloads holds its previous render rather than flashing a
+     skeleton, so nothing jumps. */
+  .is-stale {
+    @apply pointer-events-none opacity-50 transition-opacity;
+  }
 }
 
 @layer utilities {
+  /* Columns of numbers align only when every digit is the same width. Never
+     put this on a big standalone figure — 121 reads loose at display size. */
+  .nums {
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Reports are printed or saved as PDF for clients, so navigation,
      controls and interactive chrome are dropped and cards flattened. */
   @media print {
@@ -69,13 +229,18 @@
     .btn,
     .btn-primary,
     .btn-secondary,
-    .btn-danger {
+    .btn-danger,
+    .btn-ghost {
       display: none !important;
     }
 
     .card {
       @apply border-slate-300 shadow-none;
       break-inside: avoid;
+    }
+
+    .scroll-x {
+      overflow: visible !important;
     }
   }
 }
