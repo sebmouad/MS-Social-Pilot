@@ -183,3 +183,30 @@ describe('selectNewEntries', () => {
     expect(selectNewEntries({ entries, seenGuids: new Set(), ingestFrom, max: 10 })).toHaveLength(10);
   });
 });
+
+describe('which destinations a feed may have', () => {
+  it('takes Facebook Pages and Groups', async () => {
+    const { assertFeedDestinations } = await import('../src/lib/feeds');
+
+    expect(() =>
+      assertFeedDestinations([
+        { name: 'Client Page', type: 'page' },
+        { name: 'Client Group', type: 'group' },
+      ]),
+    ).not.toThrow();
+  });
+
+  it('refuses Instagram, naming the accounts', async () => {
+    const { assertFeedDestinations } = await import('../src/lib/feeds');
+
+    // Every item would have been created, sat in the calendar looking fine,
+    // and failed when it came due: a feed entry is a headline and a link, and
+    // Instagram has no post that is only those.
+    expect(() =>
+      assertFeedDestinations([
+        { name: 'Client Page', type: 'page' },
+        { name: '@client', type: 'instagram' },
+      ]),
+    ).toThrow(/@client/);
+  });
+})

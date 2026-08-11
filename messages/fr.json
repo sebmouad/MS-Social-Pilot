@@ -363,6 +363,7 @@
     "connectionNeedsRenewal": "La connexion Facebook de cette destination doit être renouvelée.",
     "correctFields": "Veuillez corriger les champs signalés.",
     "csvUnterminatedQuote": "Un champ entre guillemets commençant à la ligne {line} n’est jamais fermé : tout ce qui suit a été lu comme une seule valeur. Ajoutez le guillemet manquant et réimportez le fichier.",
+    "feedInstagramUnsupported": "Un élément de flux est un titre et un lien, et Instagram n’accepte ni l’un ni l’autre sans image ({names}). Choisissez des destinations Facebook pour ce flux.",
     "generic": "Une erreur est survenue. Veuillez réessayer.",
     "lastOwner": "Un espace de travail doit conserver au moins un propriétaire.",
     "nativeGroupsUnsupported": "Facebook ne peut pas planifier nativement les publications de groupe ({names}). Utilisez le planificateur intégré.",

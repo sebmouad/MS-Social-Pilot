@@ -6,6 +6,7 @@ import { canManageSettings } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { parseTargetIds, toJson } from '@/lib/json';
 import { errors } from '@/lib/errors';
+import { assertFeedDestinations } from '@/lib/feeds';
 import { ok, readJson, route } from '@/lib/api';
 
 const createSchema = z.object({
@@ -50,9 +51,10 @@ export const POST = route(async (request: Request) => {
   // Destination ids come from the client, so confirm they belong here.
   const valid = await prisma.target.findMany({
     where: { id: { in: input.targetIds }, workspaceId: auth.workspace.id },
-    select: { id: true },
+    select: { id: true, name: true, type: true },
   });
   if (valid.length !== input.targetIds.length) throw errors.targetsUnavailable();
+  assertFeedDestinations(valid);
 
   const source = await prisma.feedSource.create({
     data: {

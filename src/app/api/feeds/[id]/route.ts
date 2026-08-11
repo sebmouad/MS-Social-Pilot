@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { pollSource } from '@/lib/rss/poll';
 import { toJson } from '@/lib/json';
 import { errors } from '@/lib/errors';
+import { assertFeedDestinations } from '@/lib/feeds';
 import { fail, ok, readJson, route } from '@/lib/api';
 
 const patchSchema = z.object({
@@ -32,9 +33,10 @@ export const PATCH = route(async (request: Request, context: Context) => {
   if (input.targetIds) {
     const valid = await prisma.target.findMany({
       where: { id: { in: input.targetIds }, workspaceId: auth.workspace.id },
-      select: { id: true },
+      select: { id: true, name: true, type: true },
     });
     if (valid.length !== input.targetIds.length) throw errors.targetsUnavailable();
+    assertFeedDestinations(valid);
     targetIds = valid.map((target) => target.id);
   }
 

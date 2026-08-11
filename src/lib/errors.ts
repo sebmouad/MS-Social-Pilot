@@ -95,6 +95,14 @@ export const errors = {
       params: { names },
     }),
 
+  feedInstagramUnsupported: (names: string) =>
+    new AppError({
+      key: 'errors.feedInstagramUnsupported',
+      fallback: `A feed item is a headline and a link, and Instagram takes neither without a picture (${names}). Choose Facebook destinations for this feed.`,
+      params: { names },
+      status: 422,
+    }),
+
   alreadyPublishing: () =>
     new AppError({
       key: 'errors.alreadyPublishing',

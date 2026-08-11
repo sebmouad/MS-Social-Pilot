@@ -50,6 +50,8 @@ Built to the specification in [docs/PROJECT_SCHEMA.md](docs/PROJECT_SCHEMA.md).
 **Automation**
 - **RSS auto-posting** with conditional polling, guid de-duplication, and a
   first-poll cutoff so subscribing to a blog does not queue its archive.
+  Facebook destinations only: a feed item is a headline and a link, and
+  Instagram publishes neither without a picture.
 - **AI captions** via the Claude API, seeded by the workspace's brand voice.
 - **Link shortener + UTM tagging** applied at publish time, per destination.
 
@@ -168,7 +170,7 @@ runs a chosen subset over HTTP.
 npm test
 ```
 
-754 tests. Unit tests cover token encryption, retry policy, timezone and
+756 tests. Unit tests cover token encryption, retry policy, timezone and
 queue-slot maths, Open Graph and RSS parsing, CSV in and out, link tagging, and
 the Graph publishing decision table.
 

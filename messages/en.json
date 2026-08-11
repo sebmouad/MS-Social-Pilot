@@ -363,6 +363,7 @@
     "connectionNeedsRenewal": "The Facebook connection for this destination needs to be renewed.",
     "correctFields": "Please correct the highlighted fields.",
     "csvUnterminatedQuote": "A quoted field starting on line {line} is never closed, so everything after it was read as one value. Add the missing quote and upload again.",
+    "feedInstagramUnsupported": "A feed item is a headline and a link, and Instagram takes neither without a picture ({names}). Choose Facebook destinations for this feed.",
     "generic": "Something went wrong. Please try again.",
     "lastOwner": "A workspace must keep at least one owner.",
     "nativeGroupsUnsupported": "Facebook cannot natively schedule Group posts ({names}). Use the built-in scheduler for these.",

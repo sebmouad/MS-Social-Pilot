@@ -1,3 +1,4 @@
+import { TargetType } from '@prisma/client';
 import { getTranslations } from 'next-intl/server';
 
 import { FeedsClient } from '@/components/FeedsClient';
@@ -20,8 +21,10 @@ export default async function FeedsPage() {
       include: { _count: { select: { items: true } } },
       orderBy: { createdAt: 'desc' },
     }),
+    // Facebook only: see `assertNoInstagram`. Offering a destination every
+    // item would fail on is worse than not offering it.
     prisma.target.findMany({
-      where: { workspaceId: auth.workspace.id },
+      where: { workspaceId: auth.workspace.id, type: { not: TargetType.instagram } },
       include: { socialAccount: { select: { name: true } } },
       orderBy: [{ type: 'asc' }, { name: 'asc' }],
     }),
