@@ -9,6 +9,7 @@ import { syncTargetEdges } from '../engagement';
 import { discoverInstagramAccounts, syncWorkspaceInstagram } from '../instagram';
 import { discoverAdAccounts, syncWorkspaceAds } from '../ads';
 import { deleteUnusedMedia } from '../media';
+import { pruneHistory, prunedTotal } from '../housekeeping';
 
 /**
  * The worker's job set.
@@ -29,7 +30,7 @@ export type JobName =
   | 'edges'
   | 'instagram'
   | 'ads'
-  | 'media'
+  | 'housekeeping'
   | 'tokens';
 
 export interface JobContext {
@@ -258,34 +259,42 @@ export async function runAdsSync(context: JobContext): Promise<string | null> {
 }
 
 /**
- * Sweep uploads that were never attached to anything.
+ * Sweep what nothing will ever read again.
  *
- * People upload an image, change their mind, and close the composer. Nothing
- * references that file again, and on a VPS with a local media directory it sits
- * there until the disk fills. A file used by any post is kept, whatever that
- * post's status — deleting one a published post still shows would turn history
- * into broken images.
+ * Two kinds of growth, one pass. Uploads nobody attached to a post — someone
+ * adds an image, changes their mind, closes the composer — and the append-only
+ * records of things that already happened: the audit trail, the email log, the
+ * click detail, the AI spend log.
+ *
+ * A media file used by any post is kept whatever that post's status; deleting
+ * one a published post still renders turns history into broken images. What is
+ * deliberately *not* swept, and why, is documented in `src/lib/housekeeping.ts`
+ * — the RSS de-duplication ledger above all, because pruning it would re-post a
+ * feed's entire archive.
  */
-export async function runMediaCleanup(context: JobContext): Promise<string | null> {
+export async function runHousekeeping(context: JobContext): Promise<string | null> {
   const workspaces = await prisma.workspace.findMany({ select: { id: true } });
 
-  let removed = 0;
+  let files = 0;
   let bytes = 0;
+  let records = 0;
 
   for (const workspace of workspaces) {
-    const result = await deleteUnusedMedia({
+    const media = await deleteUnusedMedia({
       workspaceId: workspace.id,
       olderThanDays: env.mediaRetainUnusedDays,
       now: context.now,
     });
 
-    removed += result.removed;
-    bytes += result.bytes;
-    for (const error of result.errors) context.logger(`Media cleanup: ${error}`);
+    files += media.removed;
+    bytes += media.bytes;
+    for (const error of media.errors) context.logger(`Media cleanup: ${error}`);
+
+    records += prunedTotal(await pruneHistory({ workspaceId: workspace.id, now: context.now }));
   }
 
-  if (removed === 0) return null;
-  return `removed ${removed} unused file(s), ${Math.round(bytes / 1024)}KB`;
+  if (files === 0 && records === 0) return null;
+  return `pruned ${records} record(s), removed ${files} unused file(s) (${Math.round(bytes / 1024)}KB)`;
 }
 
 export function jobDefinitions(): JobDefinition[] {
@@ -360,9 +369,9 @@ export function jobDefinitions(): JobDefinition[] {
         ]
       : []),
     {
-      name: 'media',
-      intervalMs: env.mediaCleanupHours * 60 * 60 * 1000,
-      run: runMediaCleanup,
+      name: 'housekeeping',
+      intervalMs: env.housekeepingHours * 60 * 60 * 1000,
+      run: runHousekeeping,
     },
     {
       name: 'tokens',

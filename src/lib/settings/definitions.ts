@@ -29,7 +29,8 @@ export type SettingGroup =
   | 'ai'
   | 'email'
   | 'links'
-  | 'media';
+  | 'media'
+  | 'retention';
 
 export interface SettingDefinition {
   key: string;
@@ -446,6 +447,61 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     hint: 'Blank puts short links under the application URL. Point the DNS at this installation before setting it.',
   },
 
+  // --- Retention -------------------------------------------------------------
+  {
+    key: 'retention.activityDays',
+    group: 'retention',
+    type: 'number',
+    label: 'Activity log',
+    description: 'Days the audit trail of publishes, syncs and setting changes is kept.',
+    default: 180,
+    min: 7,
+    max: 3650,
+  },
+  {
+    key: 'retention.emailDays',
+    group: 'retention',
+    type: 'number',
+    label: 'Email log',
+    description: 'Days the record of sent invitations and alerts is kept.',
+    default: 180,
+    min: 7,
+    max: 3650,
+  },
+  {
+    key: 'retention.clickDays',
+    group: 'retention',
+    type: 'number',
+    label: 'Short link clicks',
+    description: 'Days individual click records are kept.',
+    default: 365,
+    min: 7,
+    max: 3650,
+    hint: 'The total on each link is stored separately and is never pruned — this only affects the day-by-day breakdown.',
+  },
+  {
+    key: 'retention.aiDays',
+    group: 'retention',
+    type: 'number',
+    label: 'AI generations',
+    description: 'Days caption requests and their token counts are kept.',
+    default: 365,
+    min: 7,
+    max: 3650,
+    hint: 'This is the spend audit trail. "Why was the bill that size" is a question asked months later.',
+  },
+  {
+    key: 'retention.sweepHours',
+    group: 'retention',
+    type: 'number',
+    label: 'Housekeeping interval',
+    description: 'How often old records and unused uploads are swept, in hours.',
+    default: 24,
+    min: 1,
+    max: 168,
+    workerRestart: true,
+  },
+
   // --- Media -----------------------------------------------------------------
   {
     key: 'media.dir',
@@ -481,17 +537,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     workerRestart: true,
   },
   {
-    key: 'media.cleanupHours',
-    group: 'media',
-    type: 'number',
-    label: 'Cleanup interval',
-    description: 'How often unused uploads are swept, in hours.',
-    default: 24,
-    min: 1,
-    max: 168,
-    workerRestart: true,
-  },
-  {
     key: 'media.maxUploadMb',
     group: 'media',
     type: 'number',
@@ -516,6 +561,7 @@ export const GROUP_LABELS: Record<SettingGroup, string> = {
   email: 'Email',
   links: 'Link shortener',
   media: 'Media uploads',
+  retention: 'Data retention',
 };
 
 /** The order groups appear on the config screen. */
@@ -529,4 +575,5 @@ export const GROUP_ORDER: SettingGroup[] = [
   'email',
   'links',
   'media',
+  'retention',
 ];

@@ -156,12 +156,15 @@ any in-flight OAuth state.
   and posts published outside this app. It caps comments at the 25 newest posts
   per Page and video insights at 10 videos, so one pass over one Page stays
   bounded however much history the Page has.
-- **Media.** The `media` job (24h) deletes uploads that were never attached to
-  a post and are older than `media.retainUnusedDays` (30 by default). A file
-  referenced by any post is kept for good, whatever that post's status —
-  deleting one a published post still renders would turn history into broken
-  images. On a VPS with a local media directory this is what stops an abandoned
-  composer session filling the disk over a year.
+- **Housekeeping.** The `housekeeping` job (24h) does two sweeps. It deletes
+  uploads that were never attached to a post and are older than
+  `media.retainUnusedDays` (30 by default) — a file referenced by any post is
+  kept for good, whatever that post's status, because deleting one a published
+  post still renders turns history into broken images. And it prunes the
+  append-only tables on their own windows: activity log and email log at 180
+  days, click detail and AI generations at 365. The RSS de-duplication ledger
+  and the insight snapshots are never pruned; see the architecture notes for
+  why.
 - **Instagram and Ads.** Both are off unless `FACEBOOK_ENABLE_INSTAGRAM` /
   `FACEBOOK_ENABLE_ADS` is set, and the worker does not schedule the job at all
   while the flag is off — running it unapproved would spend the rate limit on a

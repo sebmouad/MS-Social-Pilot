@@ -204,8 +204,8 @@ export const env = {
   get mediaRetainUnusedDays(): number {
     return settingNumber('media.retainUnusedDays');
   },
-  get mediaCleanupHours(): number {
-    return settingNumber('media.cleanupHours');
+  get housekeepingHours(): number {
+    return settingNumber('retention.sweepHours');
   },
   get isProduction(): boolean {
     return process.env.NODE_ENV === 'production';

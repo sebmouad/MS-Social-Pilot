@@ -17,7 +17,7 @@ error-classification rules cannot drift apart.
 
 **The worker runs up to ten jobs** on independent intervals — publish (30s),
 rss (15m), evergreen (1h), analytics (6h), pageInsights (12h), edges (4h),
-media (24h), tokens (24h), plus instagram (12h) and ads (12h) when those
+housekeeping (24h), tokens (24h), plus instagram (12h) and ads (12h) when those
 permissions are enabled. Each is a plain async
 function with one shape, so the loop is a table rather than a pile of branches,
 and any job can be run alone from a test or `POST /api/cron/tick?jobs=…`. A job
@@ -316,6 +316,27 @@ published post still renders turns history into broken images.
 Uploading is deliberately **not** a privileged action. Contributors draft posts,
 so they upload; a role check there would stop people doing their job. What bounds
 the disk is a per-workspace quota, checked before the bytes are written.
+
+## Retention
+
+Several tables are append-only records of things that already happened — an
+audit entry per publish, an email log per notification, a row per short-link
+click, a row per AI call. On a busy agency workspace they outgrow everything
+else within a year while being the rows nobody reads past the first month, so
+the `housekeeping` job prunes each on its own configurable window.
+
+Two things are deliberately excluded, and the reasons matter more than the code:
+
+- **`FeedItem` is a de-duplication ledger, not history.** Its guids are what
+  stop an RSS feed republishing its archive. Pruning it would re-post years-old
+  articles the moment a feed was touched — the worst failure this product could
+  have. It grows, and it stays.
+- **Insight snapshots are the product.** `PageInsight` and its siblings exist
+  precisely because Graph serves only about two years; deleting them to save
+  space throws away the thing the analytics module was built to keep.
+
+Both exclusions are pinned by tests, because they are exactly what a later
+"and anything else old" change would sweep up by accident.
 ---
 
 ## Configuration
