@@ -700,5 +700,52 @@
         "broken": "Not working"
       }
     }
+  },
+  "setup": {
+    "title": "Set up MS Social Pilot",
+    "subtitle": "Four things stand between this server and a scheduled post. This page keeps track of them.",
+    "subtitleComplete": "Everything is in place. This page stays here in case a connection needs looking at later.",
+    "optional": "Optional",
+    "saving": "Saving…",
+    "saveFailed": "That could not be saved. Check the values and try again.",
+    "signInFirst": "Sign in to continue",
+    "readyTitle": "Ready to publish",
+    "readyBody": "Write your first post, or invite a colleague from the Team screen.",
+    "readyAction": "Write a post",
+    "steps": {
+      "account": {
+        "title": "Create the owner account",
+        "body": "The first account owns this installation and can invite everybody else. Registration closes to strangers as soon as it exists.",
+        "done": "An account exists, and new colleagues now arrive by invitation.",
+        "action": "Create the account"
+      },
+      "facebookApp": {
+        "title": "Add your Facebook app",
+        "body": "Publishing goes through a Meta app that you own. Create one at developers.facebook.com, then paste its ID and secret here.",
+        "done": "Facebook app credentials are stored.",
+        "hint": "While the app is in Development mode, everything works for people who hold a role on it — Admin, Developer or Tester — with no review from Meta. Add your colleagues there and you can skip app review entirely.",
+        "appId": "App ID",
+        "appSecret": "App secret",
+        "action": "Save credentials"
+      },
+      "connect": {
+        "title": "Connect a Facebook account",
+        "body": "Sign in with Facebook so this app can see the Pages and Groups you manage.",
+        "done": "A Facebook account is connected.",
+        "action": "Connect Facebook"
+      },
+      "destination": {
+        "title": "Turn on a Page or Group",
+        "body": "Choose which of your Pages and Groups this workspace may publish to. Nothing goes out until at least one is on.",
+        "done": "At least one destination is ready to publish.",
+        "action": "Choose destinations"
+      },
+      "email": {
+        "title": "Set up email",
+        "body": "Without it, a failed post fails silently: nobody is told, and it is found when a client asks why their page went quiet.",
+        "done": "Email is configured, so failures reach somebody.",
+        "action": "Configure email"
+      }
+    }
   }
 }

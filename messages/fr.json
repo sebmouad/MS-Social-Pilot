@@ -700,5 +700,52 @@
         "broken": "Ne fonctionne pas"
       }
     }
+  },
+  "setup": {
+    "title": "Configurer MS Social Pilot",
+    "subtitle": "Quatre étapes séparent ce serveur d’une publication programmée. Cette page en assure le suivi.",
+    "subtitleComplete": "Tout est en place. Cette page reste disponible si une connexion doit être vérifiée plus tard.",
+    "optional": "Facultatif",
+    "saving": "Enregistrement…",
+    "saveFailed": "L'enregistrement a échoué. Vérifiez les valeurs et réessayez.",
+    "signInFirst": "Connectez-vous pour continuer",
+    "readyTitle": "Prêt à publier",
+    "readyBody": "Rédigez votre première publication, ou invitez un collègue depuis l’écran Équipe.",
+    "readyAction": "Rédiger une publication",
+    "steps": {
+      "account": {
+        "title": "Créer le compte propriétaire",
+        "body": "Le premier compte est propriétaire de cette installation et peut inviter tous les autres. Les inscriptions se ferment dès sa création.",
+        "done": "Un compte existe : les nouveaux collègues arrivent désormais sur invitation.",
+        "action": "Créer le compte"
+      },
+      "facebookApp": {
+        "title": "Ajouter votre application Facebook",
+        "body": "La publication passe par une application Meta qui vous appartient. Créez-la sur developers.facebook.com, puis collez son identifiant et sa clé secrète ici.",
+        "done": "Les identifiants de l’application Facebook sont enregistrés.",
+        "hint": "Tant que l’application est en mode Développement, tout fonctionne pour les personnes ayant un rôle dessus — administrateur, développeur ou testeur — sans validation par Meta. Ajoutez-y vos collègues et vous pouvez éviter entièrement la validation.",
+        "appId": "Identifiant de l’application",
+        "appSecret": "Clé secrète",
+        "action": "Enregistrer"
+      },
+      "connect": {
+        "title": "Connecter un compte Facebook",
+        "body": "Connectez-vous avec Facebook pour que l’application voie les Pages et groupes que vous gérez.",
+        "done": "Un compte Facebook est connecté.",
+        "action": "Connecter Facebook"
+      },
+      "destination": {
+        "title": "Activer une Page ou un groupe",
+        "body": "Choisissez les Pages et groupes sur lesquels cet espace peut publier. Rien ne part tant qu’aucun n’est activé.",
+        "done": "Au moins une destination est prête à publier.",
+        "action": "Choisir les destinations"
+      },
+      "email": {
+        "title": "Configurer l’e-mail",
+        "body": "Sans cela, un échec de publication reste silencieux : personne n’est prévenu, et on le découvre quand un client demande pourquoi sa page est muette.",
+        "done": "L’e-mail est configuré : les échecs sont signalés.",
+        "action": "Configurer l’e-mail"
+      }
+    }
   }
 }

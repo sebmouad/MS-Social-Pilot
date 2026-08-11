@@ -769,6 +769,34 @@ a second and the full reload happens only when it has changed, so staleness is
 bounded at a second and the steady-state cost is one aggregate per second per
 process regardless of traffic.
 
+## First run
+
+A fresh deployment used to answer the browser with a sign-in form for an account
+that does not exist. `/` and `/login` now send whoever just deployed it to
+`/setup` while the database holds no accounts.
+
+The checklist is **derived, never stored**. A wizard that remembers which step
+you reached is wrong the moment anything changes underneath it — the last
+connection is removed, credentials are rotated — and it cannot be resumed from a
+different machine. `readSetupState` asks four counts and a setting on every
+read, so a step that stops being satisfied simply reopens. The order is the
+order things depend on each other: an account to sign in with, an app to
+authenticate against, a connection made through it, a destination reached by it.
+
+Two details are load-bearing. A destination counts only when it is both enabled
+*and* publishable, because calling a Page ready when Facebook will not let this
+account post there sends somebody off to write a post that cannot go out. And
+credentials supplied through the environment count as done, since precedence is
+database → environment → default and an installation configured by `.env` has
+already finished that step.
+
+`maySetUp` is the whole security of the screen, which is why it is a pure
+function with its own tests rather than a condition inside two route handlers.
+It is open while no account exists — requiring a sign-in to create the first
+account is a deadlock — and owner-only from the first registration onwards. The
+open door is keyed to a user count, the one fact about this that cannot be
+faked from outside.
+
 ## Is the connection working?
 
 The question people have after a post fails, answered in one place.
