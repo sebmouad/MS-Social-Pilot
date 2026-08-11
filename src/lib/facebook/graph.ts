@@ -135,7 +135,15 @@ export interface GraphResponse<T> {
   appUsagePercent: number | null;
 }
 
-const REQUEST_TIMEOUT_MS = 60_000;
+/**
+ * Sending a file is not a request that answers in a moment.
+ *
+ * One timeout covered both, at a minute, which is generous for a JSON call and
+ * short for a video: a 25 MB upload needs better than 3.5 Mbit/s upstream to
+ * finish in time, and when it does not the abort arrives as a network error,
+ * is classed transient, and retries until the attempt limit — so the post fails
+ * with a message that says nothing about the actual problem.
+ */
 
 function buildUrl(path: string, version: string): URL {
   const normalized = path.startsWith('/') ? path.slice(1) : path;
@@ -238,8 +246,9 @@ export async function graphRequest<T = unknown>(
 
   let response: Response;
   try {
-    response = await withTimeout((signal) =>
-      fetch(url, { ...init, signal: options.signal ?? signal }),
+    response = await withTimeout(
+      (signal) => fetch(url, { ...init, signal: options.signal ?? signal }),
+      env.graphTimeoutMs,
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
@@ -339,14 +348,17 @@ export async function graphUpload<T = unknown>(
   form.set('appsecret_proof', appSecretProof(options.accessToken));
   form.set(
     'source',
-    new Blob([new Uint8Array(options.file.data)], { type: options.file.contentType }),
+    // No `new Uint8Array(...)` around this: a Buffer is one already, and the
+    // wrapper only copies the file a second time on its way into the Blob.
+    new Blob([options.file.data], { type: options.file.contentType }),
     options.file.filename,
   );
 
   let response: Response;
   try {
-    response = await withTimeout((signal) =>
-      fetch(url, { method: 'POST', body: form, signal: options.signal ?? signal }),
+    response = await withTimeout(
+      (signal) => fetch(url, { method: 'POST', body: form, signal: options.signal ?? signal }),
+      env.graphUploadTimeoutMs,
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
@@ -363,9 +375,9 @@ export async function graphUpload<T = unknown>(
   return parsed as T;
 }
 
-function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   return run(controller.signal).finally(() => clearTimeout(timer));
 }
 

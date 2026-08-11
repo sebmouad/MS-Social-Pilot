@@ -140,6 +140,20 @@ another copy an interval later, indefinitely. Recycling therefore copies only
 live destinations, and stops altogether when none are left — the same thing it
 already did when the destinations had been deleted outright.
 
+### Timeouts
+
+Sending a file is not a request that answers in a moment, and one timeout used
+to cover both: a minute, which is generous for a JSON call and short for a
+video. A 25 MB upload needs better than 3.5 Mbit/s upstream to finish inside
+that, and when it does not the abort arrives as a network error, is classed
+`transient`, and retries until the attempt limit — so the post fails with a
+message that says nothing about what actually went wrong, which is the failure
+this codebase keeps having to be talked out of.
+
+`facebook.requestTimeoutSeconds` (60) and `facebook.uploadTimeoutSeconds` (300)
+are separate and both configurable, because the right numbers depend on the
+link the server sits on.
+
 ### Retry policy
 
 `src/lib/scheduler/backoff.ts`. The base delay depends on why the attempt failed:

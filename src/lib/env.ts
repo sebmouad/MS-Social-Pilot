@@ -61,6 +61,14 @@ export const env = {
   get graphBaseUrl(): string {
     return settingString('facebook.graphBaseUrl').replace(/\/+$/, '');
   },
+  /** How long an ordinary Graph call may take. */
+  get graphTimeoutMs(): number {
+    return settingNumber('facebook.requestTimeoutSeconds') * 1000;
+  },
+  /** How long sending one file to Facebook may take. */
+  get graphUploadTimeoutMs(): number {
+    return settingNumber('facebook.uploadTimeoutSeconds') * 1000;
+  },
   get facebookScopes(): string[] {
     const base = [...settingList('facebook.scopes')];
 
