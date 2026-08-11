@@ -262,6 +262,15 @@ a held post its author can push live on demand is not a review workflow, and the
 UI hiding the button is not a control. Both gates read the same
 `PUBLISHABLE_APPROVAL_STATUSES`, so there is one definition of publishable.
 
+Because the workflow is a per-workspace switch, it can be turned off while posts
+are still queued behind it — and those two gates are exactly what would then
+strand them: the scheduler skips a `pending` post, `publishNow` refuses it, and
+the Approvals screen that would clear it is hidden as soon as the setting is
+off. `releaseHeldPosts` runs whenever the setting is written as off and moves
+them to `not_required`, landing them where an approval would have (scheduled if
+they have a time, draft if not). Rejected posts keep their decision; turning the
+switch off is not a way to overturn a reviewer.
+
 ---
 
 ## Time

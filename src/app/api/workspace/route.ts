@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { releaseHeldPosts } from '@/lib/approvals';
 import { canManageSettings } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { workspaceSettingsSchema } from '@/lib/validation';
@@ -32,6 +33,12 @@ export const PATCH = route(async (request: Request) => {
   assign('aiBrandVoice', input.aiBrandVoice);
 
   const workspace = await prisma.workspace.update({ where: { id: auth.workspace.id }, data });
+
+  // Turning review off has to free whatever it was holding, or those posts sit
+  // in `pending` for ever with the screen that would clear them now hidden.
+  if (input.requiresApproval === false) {
+    await releaseHeldPosts({ workspaceId: auth.workspace.id, userId: auth.user.id });
+  }
 
   return ok({ id: workspace.id, name: workspace.name, timezone: workspace.timezone });
 });

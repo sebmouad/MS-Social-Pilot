@@ -291,6 +291,108 @@ describe('approval gating in the scheduler', () => {
   });
 });
 
+/**
+ * The workflow is a per-workspace switch, so it can be turned off while posts
+ * are still queued behind it.
+ */
+describe('turning the workflow off', () => {
+  async function seedPending(options: { scheduled: boolean }) {
+    const owner = await makeUser('Owner');
+    const contributor = await makeUser('Contributor');
+    const { workspace, target } = await makeWorkspace({
+      name: 'Client',
+      ownerId: owner.id,
+      requiresApproval: true,
+    });
+    await prisma.membership.create({
+      data: { userId: contributor.id, workspaceId: workspace.id, role: WorkspaceRole.contributor },
+    });
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: contributor.id,
+        submittedById: contributor.id,
+        submittedAt: new Date(),
+        message: 'Queued behind review',
+        status: PostStatus.pending_approval,
+        approvalStatus: ApprovalStatus.pending,
+        scheduledAt: options.scheduled ? new Date(Date.now() - 5 * 60 * 1000) : null,
+        targets: { create: { targetId: target.id } },
+      },
+    });
+
+    return { workspace, owner, post };
+  }
+
+  it('releases a post that was waiting, and lets it publish', async () => {
+    const { workspace, owner, post } = await seedPending({ scheduled: true });
+
+    const released = await approvals.releaseHeldPosts({
+      workspaceId: workspace.id,
+      userId: owner.id,
+    });
+    expect(released).toBe(1);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.approvalStatus).toBe(ApprovalStatus.not_required);
+    expect(after.status).toBe(PostStatus.scheduled);
+
+    // The point of releasing it: it is no longer stuck.
+    const result = await runner.runSchedulerTick();
+    expect(result.published).toBe(1);
+  });
+
+  it('returns one with no scheduled time to draft rather than to a time it cannot honour', async () => {
+    const { workspace, owner, post } = await seedPending({ scheduled: false });
+
+    await approvals.releaseHeldPosts({ workspaceId: workspace.id, userId: owner.id });
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.draft);
+    expect(after.approvalStatus).toBe(ApprovalStatus.not_required);
+  });
+
+  it('does not overturn a reviewer who said no', async () => {
+    const { workspace, owner, post } = await seedPending({ scheduled: true });
+    await approvals.rejectPost({
+      workspaceId: workspace.id,
+      postId: post.id,
+      reviewerId: owner.id,
+      reviewerRole: WorkspaceRole.owner,
+      note: 'Off-brand.',
+    });
+
+    expect(await approvals.releaseHeldPosts({ workspaceId: workspace.id, userId: owner.id })).toBe(0);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.approvalStatus).toBe(ApprovalStatus.rejected);
+
+    const result = await runner.runSchedulerTick();
+    expect(result.claimed).toBe(0);
+  });
+
+  it('records why the posts moved', async () => {
+    const { workspace, owner } = await seedPending({ scheduled: true });
+    await approvals.releaseHeldPosts({ workspaceId: workspace.id, userId: owner.id });
+
+    const entry = await prisma.activityLog.findFirstOrThrow({
+      where: { workspaceId: workspace.id, action: 'approvals.disabled' },
+    });
+    expect(entry.actorId).toBe(owner.id);
+  });
+
+  it('leaves another workspace alone', async () => {
+    const first = await seedPending({ scheduled: true });
+    const second = await seedPending({ scheduled: true });
+
+    await approvals.releaseHeldPosts({ workspaceId: first.workspace.id, userId: first.owner.id });
+
+    const untouched = await prisma.post.findUniqueOrThrow({ where: { id: second.post.id } });
+    expect(untouched.approvalStatus).toBe(ApprovalStatus.pending);
+  });
+});
+
 describe('who needs approval', () => {
   it('holds a contributor post when the workspace requires approval', async () => {
     const owner = await makeUser('Owner');

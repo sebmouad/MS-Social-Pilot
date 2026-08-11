@@ -189,6 +189,61 @@ export async function rejectPost(options: {
   );
 }
 
+/**
+ * Let go of posts still waiting for review, because nobody is reviewing them
+ * any more.
+ *
+ * Turning the workflow off leaves posts already sitting in `pending` with
+ * nowhere to go: the scheduler skips them, `publishNow` refuses them, and the
+ * Approvals screen they would be cleared from is hidden the moment the setting
+ * is off. Without this they are stranded permanently and invisibly — a client's
+ * post that simply never goes out and never appears anywhere to explain why.
+ *
+ * Rejected posts are deliberately left alone. A reviewer made a decision on
+ * those, and switching the workflow off is not a way to overturn it; their
+ * author edits and reschedules them, which is the same route back as before.
+ *
+ * Called whenever the setting is written as off rather than only on the
+ * transition, so a workspace already carrying stranded posts is healed the next
+ * time an admin saves that page.
+ */
+export async function releaseHeldPosts(options: {
+  workspaceId: string;
+  userId: string;
+}): Promise<number> {
+  const held = { workspaceId: options.workspaceId, approvalStatus: ApprovalStatus.pending };
+
+  // Same landing place as an approval: a post with no time set has nothing for
+  // the scheduler to act on, so it returns to draft rather than to a scheduled
+  // state it cannot honour. One whose time has already passed goes out on the
+  // next tick, which is also what approving it would have done.
+  const [scheduled, drafts] = await prisma.$transaction([
+    prisma.post.updateMany({
+      where: { ...held, scheduledAt: { not: null } },
+      data: { approvalStatus: ApprovalStatus.not_required, status: PostStatus.scheduled },
+    }),
+    prisma.post.updateMany({
+      where: { ...held, scheduledAt: null },
+      data: { approvalStatus: ApprovalStatus.not_required, status: PostStatus.draft },
+    }),
+  ]);
+
+  const released = scheduled.count + drafts.count;
+  if (released > 0) {
+    // One audit entry rather than an email per author: this is a deliberate
+    // administrative change, and a burst of "your post was approved" messages
+    // nobody approved would be worse than none.
+    await logActivity(
+      options.workspaceId,
+      'approvals.disabled',
+      { released },
+      options.userId,
+    );
+  }
+
+  return released;
+}
+
 export async function pendingApprovalCount(workspaceId: string): Promise<number> {
   return prisma.post.count({ where: { workspaceId, approvalStatus: ApprovalStatus.pending } });
 }
