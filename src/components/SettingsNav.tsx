@@ -7,7 +7,14 @@ import { useTranslations } from 'next-intl';
 import { Icon, type IconName } from './Icon';
 
 /** Sub-navigation shared by every settings screen. */
-export function SettingsNav({ showConfig = false }: { showConfig?: boolean }) {
+export function SettingsNav({
+  showConfig = false,
+  showHistory = true,
+}: {
+  showConfig?: boolean;
+  /** Hidden from anyone who would only reach a refusal by clicking it. */
+  showHistory?: boolean;
+}) {
   const t = useTranslations();
   const pathname = usePathname();
 
@@ -16,6 +23,9 @@ export function SettingsNav({ showConfig = false }: { showConfig?: boolean }) {
     { href: '/settings/team', label: t('team.title'), icon: 'team' },
     { href: '/settings/notifications', label: t('notifications.title'), icon: 'bell' },
     { href: '/settings/media', label: t('media.title'), icon: 'image' },
+    ...(showHistory
+      ? [{ href: '/settings/history', label: t('history.title'), icon: 'clock' as IconName }]
+      : []),
     // Instance configuration is owner-only, so the tab is not shown to anyone
     // who would only reach a refusal by clicking it.
     ...(showConfig

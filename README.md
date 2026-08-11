@@ -93,6 +93,12 @@ and per post, with CSV export and a print-styled page for PDF.
 holding up, and how much of the storage allowance is gone. A file a scheduled
 post still needs cannot be deleted, and the screen links to the posts using it.
 
+**History** — who did what, in sentences rather than event names, and every
+email the app tried to send. Email failures are silent by design, so the screen
+says how many there were rather than waiting to be asked. Owner and admin only:
+it names people, and for a deleted comment it holds the only copy of what was
+deleted, because Facebook keeps none.
+
 ---
 
 ## Quick start
@@ -199,7 +205,7 @@ how to drive it from a serverless cron instead of a long-running worker.
 npm test
 ```
 
-762 tests, in three layers.
+778 tests, in three layers.
 
 **Unit tests** cover the pure decision-making: which Graph edge a post takes,
 whether a retry is worth attempting, token encryption, timezone and queue-slot

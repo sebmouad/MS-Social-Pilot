@@ -180,3 +180,30 @@ test('the media library shows what a post is holding, and will not delete it', a
 
   expect(failures).toEqual([]);
 });
+
+test('the history screen says who did what, in words', async ({ page }) => {
+  const failures = collectFailures(page);
+
+  await open(page, '/settings/history');
+
+  // Everything above this test has been creating, editing and cancelling
+  // posts, so the log is not empty — and it reads as sentences rather than as
+  // the event names underneath them.
+  const entry = page
+    .getByRole('listitem')
+    .filter({ hasText: /created a post/i })
+    .first();
+
+  // Scoped to the row, not the page: the nav bar carries the user's name too,
+  // in an element that is hidden at this width.
+  await expect(entry).toBeVisible();
+  await expect(entry).toContainText(OWNER.name);
+  await expect(page.getByText('post.created')).toHaveCount(0);
+
+  // The email tab is a click away and renders whether or not anything sent.
+  await page.getByRole('link', { name: /^email$/i }).click();
+  await expect(page).toHaveURL(/view=email/);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+  expect(failures).toEqual([]);
+});

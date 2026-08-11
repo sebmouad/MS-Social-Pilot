@@ -521,6 +521,76 @@
     "deleteConfirm": "Supprimer ce flux ? Les publications déjà créées sont conservées.",
     "errorCount": "{count, plural, one {# erreur consécutive} other {# erreurs consécutives}}"
   },
+  "history": {
+    "actions": {
+      "account": {
+        "connected": "a connecté un compte Facebook",
+        "disconnected": "a déconnecté un compte Facebook"
+      },
+      "ads": {
+        "discovered": "a trouvé des comptes publicitaires"
+      },
+      "analytics": {
+        "synced": "a actualisé les statistiques"
+      },
+      "approvals": {
+        "disabled": "a désactivé la validation, libérant les publications retenues"
+      },
+      "comment": {
+        "deleted": "a supprimé un commentaire sur Facebook",
+        "hidden": "a masqué un commentaire",
+        "unhidden": "a réaffiché un commentaire"
+      },
+      "conversation": {
+        "replied": "a répondu dans la boîte de réception"
+      },
+      "instagram": {
+        "discovered": "a trouvé des comptes Instagram"
+      },
+      "post": {
+        "approved": "a validé une publication",
+        "cancelled": "a annulé une publication",
+        "created": "a créé une publication",
+        "recycleStopped": "a arrêté le recyclage d’une publication, sa limite étant atteinte",
+        "recycled": "a créé la copie suivante d’une publication recyclée",
+        "rejected": "a renvoyé une publication pour modification",
+        "retried": "a relancé une publication en échec",
+        "submitted": "a soumis une publication pour validation",
+        "updated": "a modifié une publication"
+      },
+      "settings": {
+        "changed": "a modifié les réglages de l’espace de travail"
+      },
+      "team": {
+        "invitationRevoked": "a annulé une invitation",
+        "invited": "a invité quelqu’un dans l’espace de travail",
+        "joined": "a rejoint l’espace de travail",
+        "removed": "a retiré quelqu’un de l’espace de travail",
+        "roleChanged": "a changé le rôle d’une personne"
+      }
+    },
+    "byDeparted": "Une personne qui n’est plus dans cet espace",
+    "bySystem": "L’application",
+    "detailLabel": "Détails",
+    "emailStatus": "Statut",
+    "emailSubject": "Objet",
+    "emailTo": "Destinataire",
+    "emailWhen": "Quand",
+    "emptyActivity": "Rien d’enregistré pour l’instant.",
+    "emptyEmail": "Aucun e-mail envoyé pour l’instant.",
+    "failuresBanner": "{count, plural, one {# e-mail a échoué} other {# e-mails ont échoué}} la semaine dernière. Personne n’a été prévenu.",
+    "keptFor": "Conservé {days, plural, one {# jour} other {# jours}}, puis supprimé. Modifiable dans la configuration.",
+    "ownerOnly": "Seuls les propriétaires et administrateurs peuvent voir l’historique.",
+    "skippedHint": "Aucun fournisseur d’e-mail n’est configuré : rien n’a été envoyé. Définissez RESEND_API_KEY pour les activer.",
+    "statusFailed": "Échec",
+    "statusSent": "Envoyé",
+    "statusSkipped": "Non envoyé",
+    "subtitle": "Ce qui s’est passé dans cet espace de travail, et ce qui a été envoyé par e-mail.",
+    "tabActivity": "Activité",
+    "tabEmail": "E-mails",
+    "title": "Historique",
+    "unknownAction": "a fait quelque chose que l’application ne sait plus nommer ({action})"
+  },
   "instagram": {
     "none": "Aucun compte professionnel Instagram n’est encore relié à une page connectée.",
     "discover": "Rechercher les comptes",

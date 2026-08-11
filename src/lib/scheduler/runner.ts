@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { prisma } from '../prisma';
+import type { ActivityAction } from '../activity';
 import { env } from '../env';
 import { decryptSecret } from '../crypto';
 import { parseMedia, toJsonOrNull } from '../json';
@@ -634,7 +635,7 @@ export async function publishNow(postId: string, logger?: TickOptions['logger'])
 /** Record an audit entry. Never throws — logging must not break a publish. */
 export async function logActivity(
   workspaceId: string,
-  action: string,
+  action: ActivityAction,
   detail?: unknown,
   actorId?: string,
 ): Promise<void> {

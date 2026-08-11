@@ -56,6 +56,7 @@ export const SIGNED_IN_SCREENS = [
   '/settings/config',
   '/settings/notifications',
   '/settings/media',
+  '/settings/history',
   '/setup',
 ];
 

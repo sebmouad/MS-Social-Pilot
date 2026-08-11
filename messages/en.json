@@ -521,6 +521,76 @@
     "deleteConfirm": "Remove this feed? Posts already created from it are kept.",
     "errorCount": "{count, plural, one {# consecutive error} other {# consecutive errors}}"
   },
+  "history": {
+    "actions": {
+      "account": {
+        "connected": "connected a Facebook account",
+        "disconnected": "disconnected a Facebook account"
+      },
+      "ads": {
+        "discovered": "found ad accounts"
+      },
+      "analytics": {
+        "synced": "refreshed analytics"
+      },
+      "approvals": {
+        "disabled": "turned off approval, releasing the posts it was holding"
+      },
+      "comment": {
+        "deleted": "deleted a comment on Facebook",
+        "hidden": "hid a comment",
+        "unhidden": "un-hid a comment"
+      },
+      "conversation": {
+        "replied": "replied in the Page inbox"
+      },
+      "instagram": {
+        "discovered": "found Instagram accounts"
+      },
+      "post": {
+        "approved": "approved a post",
+        "cancelled": "cancelled a post",
+        "created": "created a post",
+        "recycleStopped": "stopped a post recycling, having reached its limit",
+        "recycled": "created the next copy of a recycling post",
+        "rejected": "sent a post back for changes",
+        "retried": "retried a failed post",
+        "submitted": "submitted a post for approval",
+        "updated": "edited a post"
+      },
+      "settings": {
+        "changed": "changed the workspace settings"
+      },
+      "team": {
+        "invitationRevoked": "withdrew an invitation",
+        "invited": "invited someone to the workspace",
+        "joined": "joined the workspace",
+        "removed": "removed someone from the workspace",
+        "roleChanged": "changed someone’s role"
+      }
+    },
+    "byDeparted": "Someone no longer in this workspace",
+    "bySystem": "The app",
+    "detailLabel": "Details",
+    "emailStatus": "Status",
+    "emailSubject": "Subject",
+    "emailTo": "To",
+    "emailWhen": "When",
+    "emptyActivity": "Nothing recorded yet.",
+    "emptyEmail": "No email sent yet.",
+    "failuresBanner": "{count, plural, one {# email failed} other {# emails failed}} in the last week. Nobody was told what it was about.",
+    "keptFor": "Kept for {days, plural, one {# day} other {# days}}, then deleted. Change this in Configuration.",
+    "ownerOnly": "Only workspace owners and admins can see the history.",
+    "skippedHint": "No email provider is configured, so nothing was sent. Set RESEND_API_KEY to turn these on.",
+    "statusFailed": "Failed",
+    "statusSent": "Sent",
+    "statusSkipped": "Not sent",
+    "subtitle": "What happened in this workspace, and what was emailed about it.",
+    "tabActivity": "Activity",
+    "tabEmail": "Email",
+    "title": "History",
+    "unknownAction": "did something the app no longer has a name for ({action})"
+  },
   "instagram": {
     "none": "No Instagram business account is linked to a connected page yet.",
     "discover": "Find accounts",

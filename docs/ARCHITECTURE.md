@@ -795,6 +795,42 @@ Uploading is deliberately **not** a privileged action. Contributors draft posts,
 so they upload; a role check there would stop people doing their job. What bounds
 the disk is a per-workspace quota, checked before the bytes are written.
 
+## The audit trail, and reading it
+
+`ActivityLog` and `EmailLog` were written faithfully from the beginning and
+read by nothing except the sweeper that deletes them. Two cases make that worth
+fixing rather than tidying away:
+
+- Deleting a comment on a client's Page is irreversible and invisible
+  afterwards, so the author, the text and who removed it are recorded
+  **because Facebook keeps none of it**. That entry is the only copy there is.
+- Email failure is quiet by design. A workspace whose Resend domain was never
+  verified sends nothing and is told nothing, so the log is the only place that
+  says so — which is why the screen leads with a count of recent failures
+  rather than waiting to be asked.
+
+`actorId` is a plain column rather than a relation, and deliberately: an entry
+has to outlive the person, because somebody leaving the agency does not un-delete
+the comment they deleted. A foreign key would have to cascade or block, and both
+are wrong. The name is looked up separately and may legitimately be absent —
+which the screen distinguishes from the app having acted on its own.
+
+The action names are a union type in `src/lib/activity.ts` rather than a free
+string. That started as a test scraping `logActivity` calls with a regex, which
+missed four actions — two written through a ternary, two with a capital letter
+after the dot — and so reported their copy as stale. Typing the parameter moved
+the question to the compiler, which cannot miss a call site. What is left for a
+test is the part a compiler cannot check: whether somebody wrote the sentence,
+in both languages.
+
+Those sentences are stored nested — `actions.post.created`, not a flat key
+`"post.created"` — because next-intl reads a dot as nesting and refuses a key
+containing one. The flat version threw on every page load, and only the browser
+walk noticed: no unit test renders a page, and the catalogue parity test
+compares the two languages to each other rather than to what next-intl accepts.
+
+---
+
 ## Retention
 
 Several tables are append-only records of things that already happened — an
