@@ -141,6 +141,14 @@ export const errors = {
       status: 422,
     }),
 
+  tooManyAttempts: (minutes: number) =>
+    new AppError({
+      key: 'errors.tooManyAttempts',
+      fallback: `Too many sign-in attempts. Try again in ${minutes} minute(s).`,
+      params: { minutes },
+      status: 429,
+    }),
+
   registrationClosed: () =>
     new AppError({
       key: 'errors.registrationClosed',

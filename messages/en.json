@@ -373,7 +373,8 @@
     "variantsNeedApproval": "Alternate wordings publish without review, so only editors and above can set them while approval is on.",
     "bulkTooManyRows": "That file has {rows} rows and the limit is {limit}. Split it into smaller uploads.",
     "csvUnterminatedQuote": "A quoted field starting on line {line} is never closed, so everything after it was read as one value. Add the missing quote and upload again.",
-    "registrationClosed": "This server does not accept new accounts. Ask an administrator to invite you."
+    "registrationClosed": "This server does not accept new accounts. Ask an administrator to invite you.",
+    "tooManyAttempts": "{minutes, plural, one {Too many sign-in attempts. Try again in a minute.} other {Too many sign-in attempts. Try again in # minutes.}}"
   },
   "email": {
     "invitation": {

@@ -285,6 +285,30 @@ someone who could admit them. The check lives in `registerUser`, which every
 sign-up passes through; the register screen also asks first, so nobody fills in
 a form only to be refused.
 
+### Slowing down the sign-in form
+
+Sign-in is the one unauthenticated endpoint that does deliberate slow work: a
+password is checked with a hash that is expensive on purpose, and it is checked
+even for addresses nobody has registered, so response timing does not reveal
+which addresses exist. Both properties are right, and together they make an
+unlimited form a cheap way to keep every core busy as well as a way to guess
+passwords.
+
+Two keys, because they stop different things. The **address** bounds guessing at
+one account however many machines the guesses come from. The **client** bounds
+one machine working through a list of addresses, and bounds the load. A success
+clears both: for the address so a person who mistypes twice starts from zero,
+and for the client because a whole office behind one address would otherwise
+spend its allowance on people signing in successfully and turn away the tenth
+colleague of the morning. Somebody who can sign in is not who the limit is for.
+
+The counters are in memory, not in the database. What is being defended against
+is a flood of requests, and a table write per attempt hands the attacker a
+second, cheaper way to do damage — the defence would become the amplifier. The
+cost is that counts are per process and reset on restart, which is the right
+trade here: this is a brake, not an access control, and the hashed password is
+still underneath it.
+
 ### Accepting an invitation
 
 The token lives only in the email: the row stores a SHA-256 of it, so a database

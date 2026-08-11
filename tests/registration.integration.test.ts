@@ -1,4 +1,20 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+/**
+ * A cookie jar, because signing in sets one and `next/headers` only works
+ * inside a real request. Mocking the framework boundary is what lets the
+ * success path be tested at all; everything below it is the real thing.
+ */
+const cookieJar = new Map<string, string>();
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      cookieJar.has(name) ? { name, value: cookieJar.get(name)! } : undefined,
+    set: (name: string, value: string) => cookieJar.set(name, value),
+    delete: (name: string) => cookieJar.delete(name),
+  }),
+  headers: async () => new Headers(),
+}));
 import { randomBytes } from 'node:crypto';
 import { Locale, WorkspaceRole } from '@prisma/client';
 
@@ -204,6 +220,124 @@ describe('registerUser', () => {
  * The app must be reachable from the internet for Facebook to call back, so an
  * open sign-up form is open to everyone who finds the address.
  */
+/**
+ * The sign-in form is the one unauthenticated thing that does deliberate slow
+ * work, so it is both a way to guess passwords and a way to load the server.
+ */
+describe('signing in too often', () => {
+  let login: typeof import('../src/app/api/auth/login/route');
+  let limiter: typeof import('../src/lib/rate-limit');
+  let settings: typeof import('../src/lib/settings');
+
+  beforeAll(async () => {
+    login = await import('../src/app/api/auth/login/route');
+    limiter = await import('../src/lib/rate-limit');
+    settings = await import('../src/lib/settings');
+  });
+
+  beforeEach(() => {
+    limiter.reset();
+  });
+
+  function attempt(address: string, password: string, client = '198.51.100.7') {
+    return login.POST(
+      new Request('http://localhost/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-forwarded-for': client },
+        body: JSON.stringify({ email: address, password }),
+      }),
+    );
+  }
+
+  async function withLimit(attempts: number, body: () => Promise<void>) {
+    await settings.writeSetting('auth.loginAttempts', attempts, null);
+    await settings.ensureSettings();
+    try {
+      await body();
+    } finally {
+      await settings.clearSetting('auth.loginAttempts');
+      await settings.ensureSettings();
+    }
+  }
+
+  it('stops guessing at one address', async () => {
+    const address = email();
+    await auth.registerUser({ email: address, password: 'a-long-enough-password', name: 'Robin' });
+
+    await withLimit(3, async () => {
+      for (let guess = 0; guess < 3; guess += 1) {
+        expect((await attempt(address, 'wrong-password')).status).toBe(401);
+      }
+
+      const refused = await attempt(address, 'wrong-password');
+      expect(refused.status).toBe(429);
+
+      // And the right password does not get through either, or the limit would
+      // only slow down the guess that was going to fail anyway.
+      expect((await attempt(address, 'a-long-enough-password')).status).toBe(429);
+    });
+  });
+
+  it('stops one machine working through a list of addresses', async () => {
+    await withLimit(3, async () => {
+      for (let guess = 0; guess < 3; guess += 1) {
+        expect((await attempt(email(), 'wrong-password')).status).toBe(401);
+      }
+
+      // A different address every time, so only the client key can catch this.
+      expect((await attempt(email(), 'wrong-password')).status).toBe(429);
+    });
+  });
+
+  it('does not punish someone else on a different connection', async () => {
+    await withLimit(3, async () => {
+      for (let guess = 0; guess < 3; guess += 1) {
+        await attempt(email(), 'wrong-password', '203.0.113.1');
+      }
+
+      expect((await attempt(email(), 'wrong-password', '203.0.113.99')).status).toBe(401);
+    });
+  });
+
+  it('does not spend an office\'s allowance on people signing in successfully', async () => {
+    // Everyone behind one address shares the client key, so counting their
+    // successful sign-ins would turn the tenth colleague of the morning away.
+    const people: string[] = [];
+    for (let person = 0; person < 5; person += 1) {
+      const address = email();
+      await auth.registerUser({
+        email: address,
+        password: 'a-long-enough-password',
+        name: `Colleague ${person}`,
+      });
+      people.push(address);
+    }
+
+    await withLimit(3, async () => {
+      for (const address of people) {
+        expect((await attempt(address, 'a-long-enough-password')).status).toBe(200);
+      }
+    });
+  });
+
+  it('forgives the address once the password is right', async () => {
+    const address = email();
+    await auth.registerUser({ email: address, password: 'a-long-enough-password', name: 'Robin' });
+
+    await withLimit(3, async () => {
+      await attempt(address, 'wrong-password');
+      await attempt(address, 'wrong-password');
+      expect((await attempt(address, 'a-long-enough-password')).status).toBe(200);
+
+      // Two earlier mistakes must not leave them one slip from being locked
+      // out for the rest of the window.
+      await attempt(address, 'wrong-password');
+      await attempt(address, 'wrong-password');
+      expect((await attempt(address, 'a-long-enough-password')).status).toBe(200);
+    });
+  });
+});
+
 describe('who may register', () => {
   let settings: typeof import('../src/lib/settings');
 

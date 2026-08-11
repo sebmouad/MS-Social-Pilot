@@ -197,6 +197,13 @@ export const env = {
     return settingNumber('analytics.tokenWarningDays');
   },
 
+  /** Failed sign-ins allowed per address, and per client, in one window. */
+  get loginAttempts(): number {
+    return settingNumber('auth.loginAttempts');
+  },
+  get loginWindowMs(): number {
+    return settingNumber('auth.loginWindowMinutes') * 60 * 1000;
+  },
   /** Whether a stranger may create an account. Invitations always may. */
   get openRegistration(): boolean {
     return settingBoolean('auth.openRegistration');

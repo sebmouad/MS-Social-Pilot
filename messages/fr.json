@@ -373,7 +373,8 @@
     "variantsNeedApproval": "Les formulations alternatives sont publiées sans validation : seuls les éditeurs et rôles supérieurs peuvent les définir lorsque la validation est activée.",
     "bulkTooManyRows": "Ce fichier contient {rows} lignes alors que la limite est de {limit}. Divisez-le en plusieurs imports.",
     "csvUnterminatedQuote": "Un champ entre guillemets commençant à la ligne {line} n’est jamais fermé : tout ce qui suit a été lu comme une seule valeur. Ajoutez le guillemet manquant et réimportez le fichier.",
-    "registrationClosed": "Ce serveur n’accepte pas de nouveaux comptes. Demandez à un administrateur de vous inviter."
+    "registrationClosed": "Ce serveur n’accepte pas de nouveaux comptes. Demandez à un administrateur de vous inviter.",
+    "tooManyAttempts": "{minutes, plural, one {Trop de tentatives de connexion. Réessayez dans une minute.} other {Trop de tentatives de connexion. Réessayez dans # minutes.}}"
   },
   "email": {
     "invitation": {
