@@ -41,6 +41,15 @@ import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
  *               afterwards means deleting it on Facebook and re-creating it.
  */
 
+/**
+ * The slice of the client both `prisma` and a transaction handle satisfy.
+ *
+ * Queue allocation has to be able to run inside the same transaction as the
+ * post it is allocating for; everything else keeps calling it with the plain
+ * client and never notices.
+ */
+type PrismaClientLike = Pick<typeof prisma, 'queueSlot' | 'post'>;
+
 export interface ResolvedSchedule {
   scheduledAt: Date | null;
   timezone: string;
@@ -56,6 +65,8 @@ export async function resolveSchedule(
   workspaceId: string,
   input: Pick<CreatePostInput, 'publishMode' | 'scheduledAtLocal' | 'timezone' | 'useQueue' | 'saveAsDraft'>,
   now: Date = new Date(),
+  /** Runs inside the caller's transaction when the queue is being allocated. */
+  client: PrismaClientLike = prisma,
 ): Promise<ResolvedSchedule> {
   if (input.saveAsDraft) {
     return { scheduledAt: null, timezone: input.timezone, publishMode: input.publishMode, usedQueueSlot: false };
@@ -67,8 +78,8 @@ export async function resolveSchedule(
 
   if (input.useQueue) {
     const [slots, taken] = await Promise.all([
-      prisma.queueSlot.findMany({ where: { workspaceId } }),
-      prisma.post.findMany({
+      client.queueSlot.findMany({ where: { workspaceId } }),
+      client.post.findMany({
         where: {
           workspaceId,
           status: { in: [...QUEUE_OCCUPYING_STATUSES] },
@@ -129,7 +140,6 @@ export async function createPost(
   now: Date = new Date(),
 ): Promise<CreatePostResult> {
   const targets = await loadTargets(context.workspaceId, input.targetIds);
-  const schedule = await resolveSchedule(context.workspaceId, input, now);
 
   // Decided once, here, and stored on the row: recomputing it later from
   // settings that may since have changed would let a post slip through.
@@ -142,7 +152,7 @@ export async function createPost(
 
   // Native scheduling is a Pages-only Graph feature; fall back cleanly rather
   // than letting Graph reject the whole batch.
-  if (schedule.publishMode === 'native') {
+  if (input.publishMode === 'native') {
     const groups = targets.filter((target) => target.type === 'group');
     if (groups.length > 0) {
       throw errors.nativeGroupsUnsupported(groups.map((group) => group.name).join(', '));
@@ -160,35 +170,65 @@ export async function createPost(
     }
   }
 
-  const status: PostStatus = input.saveAsDraft
-    ? PostStatus.draft
-    : needsApproval
-      ? PostStatus.pending_approval
-      : schedule.publishMode === 'immediate'
-        ? PostStatus.publishing
-        : PostStatus.scheduled;
+  /**
+   * Pick the time and write the row together.
+   *
+   * Split apart, they race: two people pressing "add to queue" both read the
+   * same set of taken slots and are both handed the same one. The window is not
+   * theoretical — the Open Graph scrape above sits between the two halves, so it
+   * can be seconds wide, and the result is the double-booking the queue exists
+   * to prevent.
+   */
+  const write = async (client: PrismaClientLike, at: Date = now) => {
+    const schedule = await resolveSchedule(context.workspaceId, input, at, client);
 
-  const post = await prisma.post.create({
-    data: {
-      workspaceId: context.workspaceId,
-      authorId: context.userId,
-      message: input.message,
-      link: input.link ?? null,
-      linkPreview: toJsonOrNull(linkPreview),
-      ...mediaColumns(input.media),
-      status,
-      approvalStatus,
-      submittedById: needsApproval ? context.userId : null,
-      submittedAt: needsApproval ? now : null,
-      publishMode: schedule.publishMode,
-      scheduledAt: schedule.scheduledAt,
-      timezone: schedule.timezone,
-      targets: {
-        create: targets.map((target) => ({ targetId: target.id, status: 'pending' })),
+    const status: PostStatus = input.saveAsDraft
+      ? PostStatus.draft
+      : needsApproval
+        ? PostStatus.pending_approval
+        : schedule.publishMode === 'immediate'
+          ? PostStatus.publishing
+          : PostStatus.scheduled;
+
+    const created = await client.post.create({
+      data: {
+        workspaceId: context.workspaceId,
+        authorId: context.userId,
+        message: input.message,
+        link: input.link ?? null,
+        linkPreview: toJsonOrNull(linkPreview),
+        ...mediaColumns(input.media),
+        status,
+        approvalStatus,
+        submittedById: needsApproval ? context.userId : null,
+        submittedAt: needsApproval ? now : null,
+        publishMode: schedule.publishMode,
+        scheduledAt: schedule.scheduledAt,
+        timezone: schedule.timezone,
+        targets: {
+          create: targets.map((target) => ({ targetId: target.id, status: 'pending' })),
+        },
       },
-    },
-    include: { targets: true },
-  });
+      include: { targets: true },
+    });
+
+    return { post: created, schedule, status };
+  };
+
+  const allocatesSlot = !input.saveAsDraft && input.publishMode !== 'immediate' && input.useQueue;
+
+  const written = allocatesSlot
+    ? await prisma.$transaction(async (tx) => {
+        // Serialised per workspace, so concurrent requests queue up behind each
+        // other rather than reading the same free slot. Transaction-scoped, so
+        // it is released with the transaction whatever happens — including a
+        // rollback — and one workspace never blocks another.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${context.workspaceId}))`;
+        return write(tx);
+      })
+    : await write(prisma);
+
+  const { post, schedule, status } = written;
 
   await logActivity(context.workspaceId, 'post.created', {
     postId: post.id,

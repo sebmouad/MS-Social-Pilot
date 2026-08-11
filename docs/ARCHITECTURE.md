@@ -291,6 +291,16 @@ approved — the queue quietly doing the opposite of its job. Drafts hold nothin
 because they have no time; rejected and cancelled posts release theirs, because
 they are not going out.
 
+Reading the free slots and writing the row also have to happen together, or two
+people pressing "add to queue" both read the same set and are both handed the
+same slot. The window is not theoretical: the Open Graph scrape for a post's
+link sits between the two halves and can be seconds wide. `createPost` takes a
+transaction-scoped `pg_advisory_xact_lock` keyed on the workspace for the queue
+path only, so concurrent requests serialise behind each other, the lock is
+released with the transaction whatever happens, and one workspace never blocks
+another. The RSS poller needs no lock: it schedules a feed's entries
+sequentially, re-reading the taken slots for each.
+
 ### Approval workflow
 
 `initialApprovalStatus` decides at creation time and stores the result on the

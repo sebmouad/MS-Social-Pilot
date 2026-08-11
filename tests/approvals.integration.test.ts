@@ -862,6 +862,24 @@ describe('queue slots and posts awaiting review', () => {
     expect(second.scheduledAt?.getTime()).not.toBe(first.scheduledAt?.getTime());
   });
 
+  it('does not hand the same slot to two requests arriving together', async () => {
+    const seed = await seedQueued();
+
+    // The real window is wider than this: composing a post with a link puts an
+    // Open Graph scrape between reading the free slots and writing the row.
+    const [first, second] = await Promise.all([
+      queued(seed, seed.owner.id, WorkspaceRole.owner),
+      queued(seed, seed.contributor.id, WorkspaceRole.contributor),
+    ]);
+
+    const one = await prisma.post.findUniqueOrThrow({ where: { id: first.postId } });
+    const two = await prisma.post.findUniqueOrThrow({ where: { id: second.postId } });
+
+    expect(one.scheduledAt).not.toBeNull();
+    expect(two.scheduledAt).not.toBeNull();
+    expect(one.scheduledAt?.getTime()).not.toBe(two.scheduledAt?.getTime());
+  });
+
   it('frees the slot again when the post is rejected', async () => {
     const seed = await seedQueued();
     const held = await queued(seed, seed.contributor.id, WorkspaceRole.contributor);
