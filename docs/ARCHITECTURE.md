@@ -681,6 +681,20 @@ Both exclusions are pinned by tests, because they are exactly what a later
 "and anything else old" change would sweep up by accident.
 ---
 
+## Keeping these notes honest
+
+This document explains decisions by naming the code that implements them, which
+is what makes it worth reading and also what makes it rot: a rename leaves prose
+pointing at a function nobody can find, and nothing fails — the reader just
+stops trusting the rest of it.
+
+`tests/documentation.test.ts` checks that every symbol these notes name still
+exists and that every file path they point at is still there. Deliberately
+shallow: it cannot ask whether the prose is still true, only whether the things
+it points at still exist, which is the part a machine can answer. The same
+applies to configuration, where `tests/configuration-docs.test.ts` compares the
+registry against both files that describe it.
+
 ## Configuration
 
 Almost nothing is hardcoded. `src/lib/settings/definitions.ts` is a registry of
