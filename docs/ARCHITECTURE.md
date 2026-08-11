@@ -169,7 +169,7 @@ credentials do not.
 | `Invitation` | Pending team invitations; token stored hashed |
 | `SocialAccount` | A connected Facebook user; holds the long-lived user token |
 | `Target` | A Page or Group; Pages carry their own token |
-| `Post` | What was written, and when it should go out |
+| `Post` | What was written, and when it should go out (`mediaKeys` mirrors its media references for indexed lookup) |
 | `PostTarget` | One post × one destination: status, attempts, remote id, insights |
 | `Media` | Uploaded files |
 | `QueueSlot` | Recurring publishing times |
@@ -292,6 +292,30 @@ production image.
 
 
 
+
+---
+
+## Media
+
+A post's media lives in a Json array — the composer needs order, alt text and a
+mix of stored and external URLs, none of which a foreign key gives you. The cost
+is that the database cannot answer "which posts use this file?", so `Post` also
+carries **`mediaKeys`**: the same ids and storage keys flattened into a
+GIN-indexed `text[]`. `mediaColumns()` in `src/lib/json.ts` writes both, and
+nothing writes one without the other — a post with stale keys would let its own
+file be swept out from under it, which is the failure the array exists to
+prevent.
+
+That lookup guards deletion in both directions. A manual delete refuses while
+any unpublished post still references the file, because the alternative surfaces
+hours later at publish time as a Graph error nobody can trace back. The `media`
+job sweeps the opposite case — uploads nobody ever attached — after 30 days, and
+keeps anything referenced by *any* post whatever its status: deleting one a
+published post still renders turns history into broken images.
+
+Uploading is deliberately **not** a privileged action. Contributors draft posts,
+so they upload; a role check there would stop people doing their job. What bounds
+the disk is a per-workspace quota, checked before the bytes are written.
 ---
 
 ## Configuration

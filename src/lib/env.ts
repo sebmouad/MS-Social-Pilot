@@ -198,6 +198,9 @@ export const env = {
   get maxUploadBytes(): number {
     return settingNumber('media.maxUploadMb') * 1024 * 1024;
   },
+  get mediaQuotaBytes(): number {
+    return settingNumber('media.workspaceQuotaMb') * 1024 * 1024;
+  },
   get mediaRetainUnusedDays(): number {
     return settingNumber('media.retainUnusedDays');
   },

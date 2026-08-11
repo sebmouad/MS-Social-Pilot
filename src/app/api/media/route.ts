@@ -1,7 +1,7 @@
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
-import { MediaError, storeFile } from '@/lib/media';
+import { MediaError, storageUsage, storeFile } from '@/lib/media';
 import { fail, ok, route } from '@/lib/api';
 
 /** Upload a file into the workspace media library. */
@@ -15,6 +15,19 @@ export const POST = route(async (request: Request) => {
   }
   if (file.size > env.maxUploadBytes) {
     return fail(`That file is larger than the ${Math.round(env.maxUploadBytes / (1024 * 1024))} MB limit.`, 413);
+  }
+
+  // Uploading is not a privileged action — contributors draft posts, so they
+  // upload too. A quota is what bounds the disk, rather than a role check that
+  // would stop people doing their job.
+  const usage = await storageUsage(auth.workspace.id);
+  if (usage.bytes + file.size > usage.quotaBytes) {
+    return fail(
+      `This client has used ${Math.round(usage.bytes / (1024 * 1024))} MB of its ` +
+        `${Math.round(usage.quotaBytes / (1024 * 1024))} MB media allowance. ` +
+        'Delete some files, or raise the limit in Configuration.',
+      413,
+    );
   }
 
   const data = Buffer.from(await file.arrayBuffer());

@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { env } from './env';
 import { prisma } from './prisma';
-import { parseMedia, type PostMedia } from './json';
+import type { PostMedia } from './json';
 import type { ResolvedMedia } from './facebook/publish';
 import type { MediaKind } from './constants';
 
@@ -128,26 +128,42 @@ export async function postsUsingMedia(options: {
   mediaId: string;
   storageKey: string | null;
 }): Promise<Array<{ id: string; message: string }>> {
-  const pending = await prisma.post.findMany({
+  const keys = [options.mediaId, ...(options.storageKey ? [options.storageKey] : [])];
+
+  // `mediaKeys` is the post's media references flattened into an indexed array
+  // (GIN), so this is a lookup rather than a scan of every post's Json.
+  return prisma.post.findMany({
     where: {
       workspaceId: options.workspaceId,
       status: { in: ['draft', 'pending_approval', 'rejected', 'scheduled', 'publishing'] },
+      mediaKeys: { hasSome: keys },
     },
-    select: { id: true, message: true, media: true },
+    select: { id: true, message: true },
+  });
+}
+
+export interface StorageUsage {
+  bytes: number;
+  quotaBytes: number;
+  /** How much of the quota is spent, 0–100. */
+  percent: number;
+}
+
+/** What this workspace is holding, against what it is allowed. */
+export async function storageUsage(workspaceId: string): Promise<StorageUsage> {
+  const total = await prisma.media.aggregate({
+    where: { workspaceId },
+    _sum: { size: true },
   });
 
-  // Scanned in memory rather than queried: the media column is an array of
-  // objects, and matching either the id or the storage key inside it is a
-  // Json path query that reads far worse than this loop over a small set.
-  return pending
-    .filter((post) =>
-      parseMedia(post.media).some(
-        (item) =>
-          item.id === options.mediaId ||
-          (options.storageKey !== null && item.storageKey === options.storageKey),
-      ),
-    )
-    .map((post) => ({ id: post.id, message: post.message }));
+  const bytes = total._sum.size ?? 0;
+  const quotaBytes = env.mediaQuotaBytes;
+
+  return {
+    bytes,
+    quotaBytes,
+    percent: quotaBytes > 0 ? Math.min(100, Math.round((bytes / quotaBytes) * 100)) : 0,
+  };
 }
 
 export interface MediaCleanupResult {
@@ -183,19 +199,20 @@ export async function deleteUnusedMedia(options: {
   });
   if (candidates.length === 0) return result;
 
-  // Every reference this workspace holds, gathered once rather than per file.
-  const posts = await prisma.post.findMany({
-    where: { workspaceId: options.workspaceId },
-    select: { media: true },
-  });
+  // One indexed query for the whole candidate set rather than one per file, or
+  // a scan of every post's Json.
+  const keys = candidates.flatMap((file) =>
+    file.storageKey ? [file.id, file.storageKey] : [file.id],
+  );
 
-  const referenced = new Set<string>();
-  for (const post of posts) {
-    for (const item of parseMedia(post.media)) {
-      referenced.add(item.id);
-      if (item.storageKey) referenced.add(item.storageKey);
-    }
-  }
+  const referenced = new Set(
+    (
+      await prisma.post.findMany({
+        where: { workspaceId: options.workspaceId, mediaKeys: { hasSome: keys } },
+        select: { mediaKeys: true },
+      })
+    ).flatMap((post) => post.mediaKeys),
+  );
 
   for (const file of candidates) {
     if (referenced.has(file.id) || (file.storageKey && referenced.has(file.storageKey))) continue;

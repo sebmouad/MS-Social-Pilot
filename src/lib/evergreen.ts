@@ -1,7 +1,7 @@
 import { ApprovalStatus, PostStatus } from '@prisma/client';
 
 import { prisma } from './prisma';
-import { parseVariants, toJson, toJsonOrNull } from './json';
+import { mediaColumns, parseMedia, parseVariants, toJson, toJsonOrNull } from './json';
 import { logActivity } from './scheduler/runner';
 
 /**
@@ -96,7 +96,7 @@ export async function runEvergreenCycle(options: {
         message: variantForRun(post.message, variants, count),
         link: post.link,
         linkPreview: toJsonOrNull(post.linkPreview),
-        media: toJson(post.media),
+        ...mediaColumns(parseMedia(post.media)),
         status: PostStatus.scheduled,
         // Already approved once as the original; repeating it is not a new
         // editorial decision.

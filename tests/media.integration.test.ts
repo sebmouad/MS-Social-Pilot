@@ -36,6 +36,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await prisma.postTarget.deleteMany();
   await prisma.post.deleteMany();
+  await prisma.appSetting.deleteMany();
   await prisma.media.deleteMany();
   await prisma.membership.deleteMany();
   await prisma.user.deleteMany();
@@ -71,22 +72,35 @@ async function seed(label = 'client') {
   return { user, workspace, file };
 }
 
-/** A post carrying one media reference, in whatever state. */
+/**
+ * A post carrying one media reference, in whatever state.
+ *
+ * Written through `mediaColumns`, the same helper the application uses, because
+ * the payload and the indexed key array must never be written apart — a fixture
+ * that set only one of them would be testing a state the app cannot produce.
+ */
 async function postWith(
   workspaceId: string,
   userId: string,
   status: 'draft' | 'scheduled' | 'published' | 'cancelled' | 'pending_approval',
   item: { id: string; storageKey?: string },
 ) {
+  const { mediaColumns } = await import('../src/lib/json');
+
   return prisma.post.create({
     data: {
       workspaceId,
       authorId: userId,
       message: `A ${status} post`,
       status,
-      media: [
-        { id: item.id, kind: 'image', url: '/x.jpg', ...(item.storageKey ? { storageKey: item.storageKey } : {}) },
-      ],
+      ...mediaColumns([
+        {
+          id: item.id,
+          kind: 'image',
+          url: '/x.jpg',
+          ...(item.storageKey ? { storageKey: item.storageKey } : {}),
+        },
+      ]),
     },
   });
 }
@@ -207,6 +221,7 @@ describe('postsUsingMedia', () => {
         message: 'Odd row',
         status: 'draft',
         media: ['not-an-object', { kind: 'image' }] as never,
+        mediaKeys: [],
       },
     });
 
@@ -317,5 +332,68 @@ describe('deleteUnusedMedia', () => {
 
     expect(result.removed).toBe(1);
     expect(await prisma.media.count()).toBe(0);
+  });
+});
+
+describe('mediaColumns', () => {
+  it('keeps the payload and the key array in step', async () => {
+    const { mediaColumns } = await import('../src/lib/json');
+
+    const columns = mediaColumns([
+      { id: 'a', kind: 'image', url: '/a.jpg', storageKey: 'uploads/a.jpg' },
+      { id: 'b', kind: 'video', url: '/b.mp4' },
+    ]);
+
+    expect(columns.mediaKeys.sort()).toEqual(['a', 'b', 'uploads/a.jpg']);
+  });
+
+  it('does not repeat a key shared by two references', async () => {
+    const { mediaColumns } = await import('../src/lib/json');
+
+    const columns = mediaColumns([
+      { id: 'a', kind: 'image', url: '/a.jpg', storageKey: 'uploads/same.jpg' },
+      { id: 'b', kind: 'image', url: '/b.jpg', storageKey: 'uploads/same.jpg' },
+    ]);
+
+    expect(columns.mediaKeys.filter((key) => key === 'uploads/same.jpg')).toHaveLength(1);
+  });
+
+  it('produces an empty array for a post with no media', async () => {
+    const { mediaColumns } = await import('../src/lib/json');
+    expect(mediaColumns([]).mediaKeys).toEqual([]);
+  });
+});
+
+describe('storageUsage', () => {
+  it('sums only this workspace', async () => {
+    const mine = await seed('mine');
+    const theirs = await seed('theirs');
+    await prisma.media.update({ where: { id: theirs.file.id }, data: { size: 999_999 } });
+
+    const usage = await media.storageUsage(mine.workspace.id);
+    expect(usage.bytes).toBe(1024);
+  });
+
+  it('reports zero for a workspace holding nothing', async () => {
+    const { workspace, file } = await seed();
+    await prisma.media.delete({ where: { id: file.id } });
+
+    expect((await media.storageUsage(workspace.id)).bytes).toBe(0);
+  });
+
+  it('caps the percentage at 100 rather than reporting 340%', async () => {
+    // A quota lowered below what is already stored must still render.
+    const settings = await import('../src/lib/settings');
+    const { workspace, file } = await seed();
+    await prisma.media.update({ where: { id: file.id }, data: { size: 50 * 1024 * 1024 } });
+
+    await settings.writeSetting('media.workspaceQuotaMb', 1, null);
+    await settings.ensureSettings();
+
+    const usage = await media.storageUsage(workspace.id);
+    expect(usage.percent).toBe(100);
+
+    await settings.clearSetting('media.workspaceQuotaMb');
+    await settings.ensureSettings();
   });
 });

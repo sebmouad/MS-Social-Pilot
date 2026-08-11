@@ -455,6 +455,17 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     workerRestart: true,
   },
   {
+    key: 'media.workspaceQuotaMb',
+    group: 'media',
+    type: 'number',
+    label: 'Storage per client',
+    description: 'Total megabytes of media one workspace may hold.',
+    default: 2048,
+    min: 1,
+    max: 1_048_576,
+    hint: 'Uploading is not a privileged action — contributors draft posts, so they upload too. This is what bounds the disk instead of a role check.',
+  },
+  {
     key: 'media.retainUnusedDays',
     group: 'media',
     type: 'number',

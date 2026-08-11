@@ -1,6 +1,7 @@
 import { prisma } from './prisma';
 import { decryptSecret } from './crypto';
 import {
+  mediaColumns,
   toJson,
   toJsonOrNull,
   parseMedia,
@@ -164,7 +165,7 @@ export async function createPost(
       message: input.message,
       link: input.link ?? null,
       linkPreview: toJsonOrNull(linkPreview),
-      media: toJson(input.media),
+      ...mediaColumns(input.media),
       status,
       approvalStatus,
       submittedById: needsApproval ? context.userId : null,
@@ -323,7 +324,12 @@ export async function updatePost(
 
   const data: Record<string, unknown> = {};
   if (input.message !== undefined) data.message = input.message;
-  if (input.media !== undefined) data.media = toJson(input.media);
+  if (input.media !== undefined) {
+    // Both columns or neither: stale keys would let a file in use be swept.
+    const columns = mediaColumns(input.media);
+    data.media = columns.media;
+    data.mediaKeys = columns.mediaKeys;
+  }
   if (input.publishMode !== undefined) data.publishMode = input.publishMode;
   if (input.timezone !== undefined) data.timezone = input.timezone;
 
@@ -475,7 +481,7 @@ export async function duplicatePost(
       message: post.message,
       link: post.link,
       linkPreview: toJsonOrNull(parseLinkPreview(post.linkPreview)),
-      media: toJson(parseMedia(post.media)),
+      ...mediaColumns(parseMedia(post.media)),
       status: 'draft',
       publishMode: post.publishMode,
       timezone: post.timezone,

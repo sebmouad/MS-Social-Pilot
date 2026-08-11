@@ -105,6 +105,28 @@ export function parseTargetIds(value: JsonValue): string[] {
   return value.filter((item): item is string => typeof item === 'string');
 }
 
+/**
+ * The two columns a post's media lives in, written together.
+ *
+ * `media` is the payload the composer and the publisher read; `mediaKeys` is
+ * the same references flattened into an indexed array so "which posts use this
+ * file?" is a lookup rather than a scan of every post's Json. They must never
+ * be written apart — a post whose keys are stale would let its file be swept
+ * or deleted out from under it, which is the exact failure the array exists to
+ * prevent.
+ */
+export function mediaColumns(media: PostMedia[]): {
+  media: Prisma.InputJsonValue;
+  mediaKeys: string[];
+} {
+  const keys = new Set<string>();
+  for (const item of media) {
+    if (item.id) keys.add(item.id);
+    if (item.storageKey) keys.add(item.storageKey);
+  }
+  return { media: toJson(media), mediaKeys: [...keys] };
+}
+
 /** Cast a plain object for a Json column write. */
 export function toJson<T>(value: T): Prisma.InputJsonValue {
   return value as unknown as Prisma.InputJsonValue;

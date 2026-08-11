@@ -316,6 +316,10 @@ model Post {
   link        String?
   /// Cached Open Graph metadata for `link`.
   linkPreview Json?
+  /// Every media id and storage key this post references, flattened out of
+  /// `media` so "which posts use this file?" is an indexed lookup rather than a
+  /// scan of every post's Json.
+  mediaKeys   String[] @default([])
   /// Ordered attachments (PostMedia[]).
   media       Json    @default("[]")
 
@@ -360,6 +364,7 @@ model Post {
   feedItem  FeedItem?    @relation(fields: [sourceFeedItemId], references: [id])
 
   @@index([workspaceId, status])
+  @@index([mediaKeys], type: Gin)
   @@index([scheduledAt])
   @@index([workspaceId, approvalStatus])
   @@index([recycleEnabled, recycleNextAt])
