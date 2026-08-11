@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { TargetPicker, type TargetOption } from './TargetPicker';
@@ -40,6 +40,8 @@ export function Composer({
   const tAuth = useTranslations('auth');
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
+  const messageBox = useRef<HTMLTextAreaElement>(null);
+  const linkBox = useRef<HTMLInputElement>(null);
 
   const [message, setMessage] = useState('');
   const [link, setLink] = useState('');
@@ -53,6 +55,49 @@ export function Composer({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
+
+  /**
+   * Keep the two text boxes uncontrolled, and read them once on mount.
+   *
+   * They used to be controlled by `message` and `link`. That is fine once React
+   * is running and wrong for the second before it is: the page paints, someone
+   * starts typing straight into the box — it is the first thing on the screen
+   * and the cursor is already in it — and hydration then resets the field to
+   * the empty string it was rendered with. The first words of the post
+   * disappear as they are typed.
+   *
+   * Uncontrolled fields survive hydration untouched, so the only thing missing
+   * afterwards is the state, which this picks up.
+   */
+  useEffect(() => {
+    const typed = messageBox.current?.value ?? '';
+    if (typed) setMessage(typed);
+
+    const pasted = linkBox.current?.value ?? '';
+    if (pasted) {
+      setLink(pasted);
+      void loadPreview(pasted);
+    }
+    // Once, on mount: after this the change handlers keep both in step.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Put text in the box from code rather than from the keyboard.
+   *
+   * The box is uncontrolled, so setting the state alone would leave what is on
+   * screen unchanged — the AI suggestion would be accepted and invisible, and
+   * the box would still hold the last post after a successful send.
+   */
+  const writeMessage = useCallback((text: string) => {
+    setMessage(text);
+    if (messageBox.current) messageBox.current.value = text;
+  }, []);
+
+  const writeLink = useCallback((text: string) => {
+    setLink(text);
+    if (linkBox.current) linkBox.current.value = text;
+  }, []);
 
   const selectedTargets = targets.filter((target) => selected.includes(target.id));
   const hasGroupSelected = selectedTargets.some((target) => target.type === 'group');
@@ -159,8 +204,8 @@ export function Composer({
             ? t('publishedOk')
             : t('scheduledOk'),
     );
-    setMessage('');
-    setLink('');
+    writeMessage('');
+    writeLink('');
     setPreview(null);
     setMedia([]);
     setPending(false);
@@ -183,15 +228,16 @@ export function Composer({
           </label>
           <textarea
             id="message"
+            ref={messageBox}
             className="input min-h-[160px] resize-y"
             placeholder={t('placeholder')}
-            value={message}
+            defaultValue=""
             maxLength={LIMITS.messageLength}
             onChange={(event) => setMessage(event.target.value)}
           />
           <p className="hint">{t('characters', { count: message.length })}</p>
 
-          {aiEnabled && <AiAssist draft={message} onResult={setMessage} />}
+          {aiEnabled && <AiAssist draft={message} onResult={writeMessage} />}
 
           <div className="mt-5">
             <label className="label" htmlFor="link">
@@ -200,9 +246,10 @@ export function Composer({
             <div className="flex gap-2">
               <input
                 id="link"
+                ref={linkBox}
                 className="input"
                 placeholder={t('linkPlaceholder')}
-                value={link}
+                defaultValue=""
                 onChange={(event) => setLink(event.target.value)}
                 onBlur={(event) => loadPreview(event.target.value)}
               />

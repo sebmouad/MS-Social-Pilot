@@ -1,0 +1,67 @@
+import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * End-to-end walk of the screens.
+ *
+ * The Vitest suites cover the libraries underneath; nothing until now actually
+ * rendered a page. A server component that throws — a missing translation key,
+ * a query against a column that moved — is invisible to those suites and very
+ * visible to whoever opens the app. This config exists to open the app.
+ *
+ * Playwright is not a declared dependency: see e2e/README.md.
+ */
+const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3100';
+
+const databaseUrl = new URL(
+  process.env.E2E_DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:5432/social_pilot_test',
+);
+databaseUrl.searchParams.set('schema', 'e2e');
+
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: false,
+  // One worker: the walk registers the first account, and "first" is a property
+  // of the whole database rather than of a worker.
+  workers: 1,
+  forbidOnly: Boolean(process.env.CI),
+  retries: 0,
+  reporter: process.env.CI ? 'list' : [['list']],
+  timeout: 60_000,
+  expect: { timeout: 15_000 },
+  use: {
+    baseURL,
+    trace: 'retain-on-failure',
+    // The image ships a browser; a version-matched download is not always
+    // possible offline. Point at it when it is there, otherwise let Playwright
+    // resolve its own.
+    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH
+      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
+      : {},
+  },
+  projects: [
+    // Registering the first account is both the first-run test and the sign-in
+    // every other spec needs, so it runs once and saves the session.
+    { name: 'setup', testMatch: /auth\.setup\.ts/ },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/owner.json' },
+      dependencies: ['setup'],
+    },
+  ],
+  webServer: {
+    command: 'npx tsx e2e/prepare.ts && npx next dev --port 3100 --hostname 127.0.0.1',
+    url: baseURL,
+    reuseExistingServer: false,
+    timeout: 180_000,
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: {
+      DATABASE_URL: databaseUrl.toString(),
+      APP_URL: baseURL,
+      SESSION_SECRET: 'e2e-session-secret-not-a-real-one',
+      ENCRYPTION_KEY: 'c3aCfAcoo9L+9hMqSB+2x2mSjeyLwAyhNamW5DsCikc=',
+      FACEBOOK_APP_ID: '000000000000000',
+      FACEBOOK_APP_SECRET: 'e2e-placeholder',
+    },
+  },
+});

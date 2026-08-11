@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -27,6 +27,23 @@ export function AuthForm({ mode, inviteToken }: Props) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+
+  /**
+   * Whether the submit handler below is actually attached yet.
+   *
+   * Until React hydrates this component, `onSubmit` does not exist and the
+   * browser handles a click itself: a plain GET to the current URL with every
+   * field in the query string. That puts the visitor's password in their
+   * history, in the Referer header of the next request, and in the server's
+   * access log. On a fast connection the window is milliseconds; on a slow
+   * phone it is long enough to click.
+   *
+   * So the button starts disabled and the form is marked POST, and neither the
+   * click nor an Enter keypress can submit anything until the handler is there
+   * to intercept it.
+   */
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
 
   const isRegister = mode === 'register';
 
@@ -76,7 +93,7 @@ export function AuthForm({ mode, inviteToken }: Props) {
         </p>
       </div>
 
-      <form onSubmit={onSubmit} className="card space-y-4 p-6">
+      <form onSubmit={onSubmit} method="post" className="card space-y-4 p-6">
         {isRegister && (
           <div>
             <label className="label" htmlFor="name">
@@ -134,7 +151,7 @@ export function AuthForm({ mode, inviteToken }: Props) {
           </div>
         )}
 
-        <button type="submit" className="btn-primary w-full" disabled={pending}>
+        <button type="submit" className="btn-primary w-full" disabled={pending || !ready}>
           {pending ? t('pleaseWait') : isRegister ? t('createWorkspace') : t('signIn')}
         </button>
       </form>

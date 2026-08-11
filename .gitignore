@@ -24,3 +24,8 @@ prisma/dev.db*
 .DS_Store
 npm-debug.log*
 coverage/
+
+# End-to-end walk: saved sessions, traces and reports
+e2e/.auth/
+test-results/
+playwright-report/

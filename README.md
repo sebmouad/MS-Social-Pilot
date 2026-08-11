@@ -156,7 +156,7 @@ runs a chosen subset over HTTP.
 npm test
 ```
 
-211 tests. Unit tests cover token encryption, retry policy, timezone and
+706 tests. Unit tests cover token encryption, retry policy, timezone and
 queue-slot maths, Open Graph and RSS parsing, CSV in and out, link tagging, and
 the Graph publishing decision table.
 
@@ -176,6 +176,16 @@ covering the failures that actually cost customers:
 
 Tests need a reachable Postgres; each suite creates and drops its own schema.
 Point `TEST_DATABASE_URL` at it if it is not the Compose default.
+
+### The browser walk
+
+None of the above renders a page. `e2e/` holds a Playwright pass over every
+screen — in English and in French, signed in and signed out, with a post on the
+calendar — that catches what only a browser can: a server component that throws,
+a missing translation, a form that submits before React attaches to it.
+
+Playwright is deliberately **not** a declared dependency; install it when you
+want to run the walk. See [`e2e/README.md`](e2e/README.md).
 
 ---
 
