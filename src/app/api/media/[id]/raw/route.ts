@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { readStoredFile } from '@/lib/media';
+import { openStoredFile } from '@/lib/media';
 import { fail, route } from '@/lib/api';
 
 /**
@@ -21,15 +21,18 @@ export const GET = route(async (_request: Request, context: { params: Promise<{ 
   });
   if (!media?.storageKey) return fail('File not found.', 404);
 
-  const data = await readStoredFile(media.storageKey);
+  // Streamed rather than read into memory: uploads run to tens of megabytes,
+  // and a few people opening the media library at once should not each cost a
+  // whole video's worth of heap.
+  const file = await openStoredFile(media.storageKey);
 
-  return new NextResponse(new Uint8Array(data), {
+  return new NextResponse(file.body, {
     headers: {
       'content-type': media.mimeType || 'application/octet-stream',
       // The stored type is verified against the bytes on upload, and this stops
       // a browser second-guessing it anyway.
       'x-content-type-options': 'nosniff',
-      'content-length': String(data.byteLength),
+      'content-length': String(file.size),
       'cache-control': 'private, max-age=3600',
       'content-disposition': `inline; filename="${encodeURIComponent(media.filename)}"`,
     },

@@ -480,3 +480,49 @@ describe('what a file actually is', () => {
     expect(stored.storageKey).not.toMatch(/php/);
   });
 });
+
+/**
+ * Serving a file must not cost a copy of it in memory: uploads run to tens of
+ * megabytes, and a few people opening the media library at once would each pay
+ * for a whole video.
+ */
+describe('opening a stored file', () => {
+  let media: typeof import('../src/lib/media');
+
+  beforeAll(async () => {
+    media = await import('../src/lib/media');
+  });
+
+  it('returns the bytes and the size without reading it whole', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+    const stored = await media.storeFile({
+      workspaceId: 'ws-stream',
+      data: png,
+      mimeType: 'image/png',
+      originalName: 'photo.png',
+    });
+
+    const opened = await media.openStoredFile(stored.storageKey);
+    expect(opened.size).toBe(png.byteLength);
+
+    const chunks: Uint8Array[] = [];
+    const reader = opened.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
+    }
+
+    expect(Buffer.concat(chunks).equals(png)).toBe(true);
+  });
+
+  it('refuses a key that climbs out of the media directory', async () => {
+    // The key comes from the database, but the check is here regardless: this
+    // is the function that turns a string into a file handle.
+    await expect(media.openStoredFile('../../etc/passwd')).rejects.toThrow(/invalid media path/i);
+  });
+
+  it('reports a missing file rather than serving nothing', async () => {
+    await expect(media.openStoredFile('ws-stream/not-here.png')).rejects.toThrow();
+  });
+});

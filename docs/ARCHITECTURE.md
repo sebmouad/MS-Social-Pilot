@@ -559,6 +559,23 @@ process.
 
 ## Media
 
+### Serving a file without holding it
+
+Uploads run to `media.maxUploadMb`, so serving one by reading it into memory
+cost tens of megabytes per request — twice over, once for the read and once for
+the copy handed to the response — and a few people opening the media library at
+the same time was enough to matter on a small host. `openStoredFile` returns a
+stream and a size instead, so the cost per request is a buffer rather than a
+file.
+
+Publishing still reads the bytes whole. That path hands the file to Graph as one
+multipart upload and genuinely needs it, and it runs on the worker, one
+destination at a time, rather than once per page view.
+
+Range requests are not implemented, so scrubbing a long video re-fetches from
+the start. Worth adding if video ever becomes a common upload; it is not one
+today.
+
 ### What a file claims to be, and what it is
 
 The content type on an upload is whatever the browser was told to send: a claim,

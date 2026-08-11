@@ -1,4 +1,6 @@
-import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile, unlink } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { Readable } from 'node:stream';
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 
@@ -163,6 +165,33 @@ function defaultExtension(mimeType: string): string {
 
 export async function readStoredFile(storageKey: string): Promise<Buffer> {
   return readFile(resolveStoragePath(storageKey));
+}
+
+export interface StoredStream {
+  body: ReadableStream<Uint8Array>;
+  size: number;
+}
+
+/**
+ * Open a stored file for sending, without reading it into memory first.
+ *
+ * The whole point is the ceiling. Uploads go up to `media.maxUploadMb`, so
+ * buffering a video meant tens of megabytes held per request — twice over, once
+ * for the read and once for the copy handed to the response — and a handful of
+ * people opening the media library at the same time was enough to matter on a
+ * small host. Streaming makes the cost per request a buffer, not a file.
+ *
+ * Publishing still reads the bytes (`resolveMediaForPublish`): that path hands
+ * the file to Graph as one multipart upload and genuinely needs it whole.
+ */
+export async function openStoredFile(storageKey: string): Promise<StoredStream> {
+  const absolute = resolveStoragePath(storageKey);
+  const info = await stat(absolute);
+
+  return {
+    body: Readable.toWeb(createReadStream(absolute)) as ReadableStream<Uint8Array>,
+    size: info.size,
+  };
 }
 
 /**
