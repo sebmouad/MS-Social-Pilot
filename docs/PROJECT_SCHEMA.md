@@ -4,10 +4,14 @@ The agreed design for the full product. Every choice below was decided
 explicitly; where something was not asked, it is marked **[assumption]** so you
 can overrule it before implementation starts.
 
-Status: **implemented**. Every section below has been built on
-`claude/social-scheduler-facebook-api-c6kuza`. Where the implementation departed
-from this document, the document has been corrected. The open questions in §11
-remain open — they need answers from you, not code.
+Status: **implemented**, on `main`. Where the implementation departed from this
+document, the document has been corrected. The open questions in §11 remain
+open — they need answers from you, not code.
+
+One thing this document described that was never built: S3 media storage. Files
+live on local disk. `docs/DEPLOYMENT.md` names the four functions in
+`src/lib/media.ts` that would have to change, and the ephemeral-filesystem
+warning that makes it matter.
 
 ---
 
@@ -25,7 +29,7 @@ remain open — they need answers from you, not code.
 | Notifications | Email on publish failure, token expiry warnings, exportable reports |
 | Hosting | Docker on a VPS (web + worker + Postgres) |
 | Email provider | Resend |
-| Media storage | Local disk, behind a storage interface ready for S3 |
+| Media storage | Local disk. S3 was planned and is not built — see the status note above |
 | Delivery | Everything in one delivery |
 
 **[assumption] AI provider:** the Claude API (`claude-sonnet-5` for caption
@@ -352,10 +356,8 @@ AI_RATE_LIMIT_PER_HOUR=100
 SHORTENER_DOMAIN=          # e.g. go.yourdomain.com; blank uses APP_URL/l/
 
 # Media
-MEDIA_STORAGE=local        # local | s3
 MEDIA_DIR=./media
 MAX_UPLOAD_MB=25
-# S3_BUCKET= S3_REGION= S3_ACCESS_KEY_ID= S3_SECRET_ACCESS_KEY= S3_ENDPOINT=
 
 # i18n
 DEFAULT_LOCALE=en          # en | fr
@@ -366,7 +368,11 @@ CRON_SECRET=               # blank disables POST /api/cron/tick
 
 Every variable above except `DATABASE_URL`, `SESSION_SECRET` and
 `ENCRYPTION_KEY` is also editable on Settings → Configuration, which wins over
-the environment. `src/lib/settings/definitions.ts` is the source of truth for
+the environment. The traffic runs the other way too: thirteen settings —
+analytics batch sizes, retention windows, the media quota — exist only on that
+screen, with no environment fallback at all. They are the numbers an operator
+tunes once they can see how the installation behaves, which is after it is
+running, so there is nothing to preset in a file. `src/lib/settings/definitions.ts` is the source of truth for
 all three lists, and `tests/configuration-docs.test.ts` fails if this block,
 `.env.example` and the registry stop agreeing.
 
@@ -422,7 +428,7 @@ Not built, so nobody is surprised:
 | **AI cost runs away** | Unexpected bill | Per-workspace hourly cap, every call logged with token counts. |
 | **RSS floods the queue** | Dozens of posts at once | First poll takes only items newer than subscription; per-poll item cap. |
 | **Client data leaking across workspaces** | Serious | Workspace scoping becomes a security boundary with dedicated cross-tenant tests. |
-| **Local media on one VPS** | Loss on disk failure | Persistent volume plus backups; S3 interface ready if it outgrows one box. |
+| **Local media on one VPS** | Loss on disk failure | Persistent volume plus backups. Moving to S3 means rewriting four functions in `src/lib/media.ts`; nothing else touches the filesystem. |
 
 ---
 

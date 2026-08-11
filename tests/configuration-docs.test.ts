@@ -55,6 +55,16 @@ describe('configuration documentation', () => {
     expect(stale).toEqual([]);
   });
 
+  it('promises no variable in the schema notes that the code ignores', () => {
+    // The schema notes call themselves implemented, so an env block entry
+    // nothing reads is a trap: MEDIA_STORAGE=s3 was listed there for a feature
+    // that does not exist, and setting it would have silently kept local disk.
+    const stale = namesAssignedIn(schemaNotes).filter(
+      (name) => !BOOTSTRAP_ONLY.has(name) && !registryEnvNames.includes(name),
+    );
+    expect(stale).toEqual([]);
+  });
+
   it('gives every setting a unique environment variable', () => {
     const seen = new Set<string>();
     const duplicated = registryEnvNames.filter((name) => !seen.add(name) && true);
