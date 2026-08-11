@@ -280,6 +280,17 @@ for people whose output is reviewed should not be able to empty a colleague's
 calendar with one call. Duplicating is deliberately exempt: it produces a new
 post authored by the copier, which faces review like anything else they write.
 
+### Queue slots
+
+"Add to queue" drops a post into the next free publishing slot, which only works
+if every post that still intends to use its slot counts as holding it.
+`QUEUE_OCCUPYING_STATUSES` is that set, and `pending_approval` belongs in it: a
+contributor's queued post sat in review, the next person to use the queue was
+handed the same slot, and both went out together the moment the first was
+approved — the queue quietly doing the opposite of its job. Drafts hold nothing
+because they have no time; rejected and cancelled posts release theirs, because
+they are not going out.
+
 ### Approval workflow
 
 `initialApprovalStatus` decides at creation time and stores the result on the

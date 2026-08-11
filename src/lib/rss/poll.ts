@@ -3,6 +3,7 @@ import { ApprovalStatus, PostStatus, type FeedSource } from '@prisma/client';
 import { prisma } from './../prisma';
 import { parseTargetIds } from '../json';
 import { nextAvailableSlot } from '../time';
+import { QUEUE_OCCUPYING_STATUSES } from '../constants';
 import { parseFeed, renderTemplate, type FeedEntry } from './parse';
 
 /**
@@ -98,7 +99,7 @@ async function scheduleEntry(options: {
   const taken = await prisma.post.findMany({
     where: {
       workspaceId: source.workspaceId,
-      status: { in: [PostStatus.scheduled, PostStatus.publishing] },
+      status: { in: [...QUEUE_OCCUPYING_STATUSES] },
       scheduledAt: { gte: options.now },
     },
     select: { scheduledAt: true },

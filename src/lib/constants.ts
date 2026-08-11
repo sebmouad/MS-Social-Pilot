@@ -48,6 +48,23 @@ export const TERMINAL_TARGET_STATUSES: readonly PostTargetStatus[] = [
 ];
 
 /**
+ * Post states that hold a queue slot.
+ *
+ * A queued post's whole purpose is to space publications out, so anything that
+ * still intends to go out at its time must count as occupying that slot —
+ * including one waiting for review, which is the case that was missing. A
+ * contributor's queued post sat in `pending_approval`, the next person to use
+ * the queue was handed the same slot, and both went out together the moment the
+ * first was approved. Drafts hold nothing (they have no time), and rejected or
+ * cancelled posts release theirs, because they are not going out.
+ */
+export const QUEUE_OCCUPYING_STATUSES: readonly PostStatus[] = [
+  PostStatus.scheduled,
+  PostStatus.publishing,
+  PostStatus.pending_approval,
+];
+
+/**
  * Approval states in which the scheduler may publish a post. Anything else —
  * notably `pending` — must never go out, whatever its scheduled time says.
  */

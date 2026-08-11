@@ -798,6 +798,90 @@ describe('acting on someone else\'s post', () => {
   });
 });
 
+/**
+ * The queue exists to space publications out. A slot that is still intended to
+ * be used has to count as occupied, whatever the post is waiting on.
+ */
+describe('queue slots and posts awaiting review', () => {
+  async function seedQueued() {
+    const owner = await makeUser('Owner');
+    const contributor = await makeUser('Contributor');
+    const { workspace, target } = await makeWorkspace({
+      name: 'Client',
+      ownerId: owner.id,
+      requiresApproval: true,
+    });
+    await prisma.membership.create({
+      data: { userId: contributor.id, workspaceId: workspace.id, role: WorkspaceRole.contributor },
+    });
+    await prisma.queueSlot.createMany({
+      data: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+        workspaceId: workspace.id,
+        dayOfWeek,
+        hour: 9,
+        minute: 0,
+      })),
+    });
+
+    return { workspace, owner, contributor, target };
+  }
+
+  function queued(seed: Awaited<ReturnType<typeof seedQueued>>, userId: string, role: WorkspaceRole) {
+    return posts.createPost(
+      {
+        workspaceId: seed.workspace.id,
+        userId,
+        role,
+        requiresApproval: true,
+      },
+      {
+        message: `Queued by ${role}`,
+        media: [],
+        targetIds: [seed.target.id],
+        publishMode: 'worker',
+        timezone: 'UTC',
+        useQueue: true,
+        saveAsDraft: false,
+      },
+    );
+  }
+
+  it('does not hand the same slot to two people', async () => {
+    const seed = await seedQueued();
+
+    // The contributor's post is held for review, but it still intends to go out
+    // at that time, so the slot is spoken for.
+    const held = await queued(seed, seed.contributor.id, WorkspaceRole.contributor);
+    const next = await queued(seed, seed.owner.id, WorkspaceRole.owner);
+
+    const first = await prisma.post.findUniqueOrThrow({ where: { id: held.postId } });
+    const second = await prisma.post.findUniqueOrThrow({ where: { id: next.postId } });
+
+    expect(first.status).toBe(PostStatus.pending_approval);
+    expect(first.scheduledAt).not.toBeNull();
+    expect(second.scheduledAt?.getTime()).not.toBe(first.scheduledAt?.getTime());
+  });
+
+  it('frees the slot again when the post is rejected', async () => {
+    const seed = await seedQueued();
+    const held = await queued(seed, seed.contributor.id, WorkspaceRole.contributor);
+    const taken = await prisma.post.findUniqueOrThrow({ where: { id: held.postId } });
+
+    await approvals.rejectPost({
+      workspaceId: seed.workspace.id,
+      postId: held.postId,
+      reviewerId: seed.owner.id,
+      reviewerRole: WorkspaceRole.owner,
+      note: 'No thanks.',
+    });
+
+    // It is not going out, so holding the slot would waste it.
+    const next = await queued(seed, seed.owner.id, WorkspaceRole.owner);
+    const reused = await prisma.post.findUniqueOrThrow({ where: { id: next.postId } });
+    expect(reused.scheduledAt?.getTime()).toBe(taken.scheduledAt?.getTime());
+  });
+});
+
 describe('who needs approval', () => {
   it('holds a contributor post when the workspace requires approval', async () => {
     const owner = await makeUser('Owner');

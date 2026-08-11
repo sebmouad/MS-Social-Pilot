@@ -23,6 +23,7 @@ import {
   canManageOthersPosts,
   canPublishWithoutApproval,
   PUBLISHABLE_APPROVAL_STATUSES,
+  QUEUE_OCCUPYING_STATUSES,
 } from './constants';
 import { notifyApprovalRequest } from './email/notify';
 import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
@@ -68,7 +69,11 @@ export async function resolveSchedule(
     const [slots, taken] = await Promise.all([
       prisma.queueSlot.findMany({ where: { workspaceId } }),
       prisma.post.findMany({
-        where: { workspaceId, status: { in: ['scheduled', 'publishing'] }, scheduledAt: { gte: now } },
+        where: {
+          workspaceId,
+          status: { in: [...QUEUE_OCCUPYING_STATUSES] },
+          scheduledAt: { gte: now },
+        },
         select: { scheduledAt: true },
       }),
     ]);
