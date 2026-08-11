@@ -10,6 +10,7 @@ import { discoverInstagramAccounts, syncWorkspaceInstagram } from '../instagram'
 import { discoverAdAccounts, syncWorkspaceAds } from '../ads';
 import { deleteUnusedMedia } from '../media';
 import { pruneHistory, prunedTotal } from '../housekeeping';
+import { forEachEnabledPage, forEachWorkspace } from './iterate';
 
 /**
  * The worker's job set.
@@ -129,14 +130,12 @@ export async function runAnalyticsRefresh(context: JobContext): Promise<string |
  * about two years of history and drops metrics between versions.
  */
 export async function runPageInsightsSync(context: JobContext): Promise<string | null> {
-  const workspaces = await prisma.workspace.findMany({ select: { id: true } });
-
   let stored = 0;
   let failed = 0;
 
-  for (const workspace of workspaces) {
+  const pass = await forEachWorkspace(async (workspaceId) => {
     const results = await syncWorkspaceAnalytics({
-      workspaceId: workspace.id,
+      workspaceId,
       // A week back each run, so a missed day is filled in on the next.
       since: new Date(context.now.getTime() - 7 * 24 * 60 * 60 * 1000),
       until: context.now,
@@ -149,7 +148,10 @@ export async function runPageInsightsSync(context: JobContext): Promise<string |
         context.logger(`${result.targetName}: ${result.error}`);
       }
     }
-  }
+  });
+
+  failed += pass.failures.length;
+  for (const failure of pass.failures) context.logger(`Workspace ${failure.id}: ${failure.message}`);
 
   if (stored === 0 && failed === 0) return null;
   return `stored=${stored} failed=${failed}`;
@@ -163,19 +165,14 @@ export async function runPageInsightsSync(context: JobContext): Promise<string |
  * cheap per call and stale comments are the ones people notice.
  */
 export async function runEdgeSync(context: JobContext): Promise<string | null> {
-  const targets = await prisma.target.findMany({
-    where: { type: 'page', enabled: true },
-    select: { id: true },
-  });
-
   let comments = 0;
   let reviews = 0;
   let conversations = 0;
   let external = 0;
   let failed = 0;
 
-  for (const target of targets) {
-    const result = await syncTargetEdges({ targetId: target.id, now: context.now });
+  const pass = await forEachEnabledPage(async (targetId) => {
+    const result = await syncTargetEdges({ targetId, now: context.now });
     comments += result.comments;
     reviews += result.reviews;
     conversations += result.conversations;
@@ -185,7 +182,10 @@ export async function runEdgeSync(context: JobContext): Promise<string | null> {
       failed += 1;
       context.logger(`${result.targetName} ${error.edge}: ${error.message}`);
     }
-  }
+  });
+
+  failed += pass.failures.length;
+  for (const failure of pass.failures) context.logger(`Page ${failure.id}: ${failure.message}`);
 
   if (comments + reviews + conversations + external + failed === 0) return null;
   return `comments=${comments} reviews=${reviews} threads=${conversations} external=${external} failed=${failed}`;
@@ -198,18 +198,16 @@ export async function runEdgeSync(context: JobContext): Promise<string | null> {
  * Page at any time, and there is no webhook that tells us when.
  */
 export async function runInstagramSync(context: JobContext): Promise<string | null> {
-  const workspaces = await prisma.workspace.findMany({ select: { id: true } });
-
   let accounts = 0;
   let stored = 0;
   let failed = 0;
 
-  for (const workspace of workspaces) {
-    const discovery = await discoverInstagramAccounts(workspace.id);
+  const pass = await forEachWorkspace(async (workspaceId) => {
+    const discovery = await discoverInstagramAccounts(workspaceId);
     for (const error of discovery.errors) context.logger(`Instagram discovery: ${error}`);
 
     const results = await syncWorkspaceInstagram({
-      workspaceId: workspace.id,
+      workspaceId,
       since: new Date(context.now.getTime() - env.edgeWindowDays * 24 * 60 * 60 * 1000),
       until: context.now,
     });
@@ -222,7 +220,10 @@ export async function runInstagramSync(context: JobContext): Promise<string | nu
         context.logger(`Instagram ${result.username}: ${result.error}`);
       }
     }
-  }
+  });
+
+  failed += pass.failures.length;
+  for (const failure of pass.failures) context.logger(`Workspace ${failure.id}: ${failure.message}`);
 
   if (accounts === 0 && failed === 0) return null;
   return `accounts=${accounts} stored=${stored} failed=${failed}`;
@@ -230,17 +231,15 @@ export async function runInstagramSync(context: JobContext): Promise<string | nu
 
 /** Discover and refresh ad accounts, so spend can sit next to organic reach. */
 export async function runAdsSync(context: JobContext): Promise<string | null> {
-  const workspaces = await prisma.workspace.findMany({ select: { id: true } });
-
   let rows = 0;
   let failed = 0;
 
-  for (const workspace of workspaces) {
-    const discovery = await discoverAdAccounts(workspace.id);
+  const pass = await forEachWorkspace(async (workspaceId) => {
+    const discovery = await discoverAdAccounts(workspaceId);
     for (const error of discovery.errors) context.logger(`Ads discovery: ${error}`);
 
     const results = await syncWorkspaceAds({
-      workspaceId: workspace.id,
+      workspaceId,
       since: new Date(context.now.getTime() - env.adWindowDays * 24 * 60 * 60 * 1000),
       until: context.now,
     });
@@ -252,7 +251,10 @@ export async function runAdsSync(context: JobContext): Promise<string | null> {
         context.logger(`Ads ${result.name}: ${result.error}`);
       }
     }
-  }
+  });
+
+  failed += pass.failures.length;
+  for (const failure of pass.failures) context.logger(`Workspace ${failure.id}: ${failure.message}`);
 
   if (rows === 0 && failed === 0) return null;
   return `rows=${rows} failed=${failed}`;
@@ -273,15 +275,13 @@ export async function runAdsSync(context: JobContext): Promise<string | null> {
  * feed's entire archive.
  */
 export async function runHousekeeping(context: JobContext): Promise<string | null> {
-  const workspaces = await prisma.workspace.findMany({ select: { id: true } });
-
   let files = 0;
   let bytes = 0;
   let records = 0;
 
-  for (const workspace of workspaces) {
+  const pass = await forEachWorkspace(async (workspaceId) => {
     const media = await deleteUnusedMedia({
-      workspaceId: workspace.id,
+      workspaceId,
       olderThanDays: env.mediaRetainUnusedDays,
       now: context.now,
     });
@@ -290,10 +290,12 @@ export async function runHousekeeping(context: JobContext): Promise<string | nul
     bytes += media.bytes;
     for (const error of media.errors) context.logger(`Media cleanup: ${error}`);
 
-    records += prunedTotal(await pruneHistory({ workspaceId: workspace.id, now: context.now }));
-  }
+    records += prunedTotal(await pruneHistory({ workspaceId, now: context.now }));
+  });
 
-  if (files === 0 && records === 0) return null;
+  for (const failure of pass.failures) context.logger(`Workspace ${failure.id}: ${failure.message}`);
+
+  if (files === 0 && records === 0 && pass.failures.length === 0) return null;
   return `pruned ${records} record(s), removed ${files} unused file(s) (${Math.round(bytes / 1024)}KB)`;
 }
 
