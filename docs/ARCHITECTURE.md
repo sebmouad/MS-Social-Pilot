@@ -741,6 +741,21 @@ stored, so there is no long-lived public URL anywhere in the system.
 The signature stands in for the workspace check rather than skipping it: it
 already names the file, and cannot be presented for another.
 
+### The library screen
+
+Uploads were reachable and deletable through the API from the start with
+nothing on screen for either, which mattered more than a missing screen usually
+does: when the storage quota fills, the upload is refused with "delete some
+files" — an instruction the app gave nobody a way to follow.
+
+`readMediaLibrary` exists because `postsUsingMedia` answers one file at a time.
+That is right for the delete route and wrong for a page of two hundred files,
+so the library asks once for every post referencing anything in the list and
+groups the result. Two details the per-file version got right for free: a post
+storing both the media id and the storage key is one post rather than two, and
+a post that has already gone out holds nothing — it is on Facebook, and our
+copy of the file is history.
+
 ### What a file claims to be, and what it is
 
 The content type on an upload is whatever the browser was told to send: a claim,

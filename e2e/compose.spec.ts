@@ -132,3 +132,51 @@ test('a scheduled post can be cancelled from the list', async ({ page }) => {
 
   expect(failures).toEqual([]);
 });
+
+test('the media library shows what a post is holding, and will not delete it', async ({ page }) => {
+  const failures = collectFailures(page);
+
+  // A file attached to a post that has not gone out yet. Uploaded through the
+  // API the way the composer does, so the row and the indexed key array are
+  // written together.
+  const upload = await page.request.post('/api/media', {
+    multipart: {
+      file: {
+        name: 'loaf.png',
+        mimeType: 'image/png',
+        // The smallest valid PNG: the upload route checks the bytes against
+        // the declared type, so a fake one is rejected.
+        buffer: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+          'base64',
+        ),
+      },
+    },
+  });
+  expect(upload.status(), await upload.text()).toBe(201);
+  const file = (await upload.json()) as { id: string; url: string; kind: string };
+
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const created = await page.request.post('/api/posts', {
+    data: {
+      message: 'With a picture',
+      media: [{ id: file.id, kind: file.kind, url: file.url }],
+      targetIds: [target.id],
+      publishMode: 'worker',
+      scheduledAtLocal: null,
+      timezone: 'UTC',
+      saveAsDraft: true,
+    },
+  });
+  expect(created.status(), await created.text()).toBe(201);
+
+  await open(page, '/settings/media');
+  await expect(page.getByText('loaf.png')).toBeVisible();
+
+  // Held, so the button is out of reach and the screen says by what.
+  await expect(page.getByRole('button', { name: /delete/i })).toBeDisabled();
+  await expect(page.getByText(/has not gone out yet/i)).toBeVisible();
+  await expect(page.getByRole('link', { name: /with a picture/i })).toBeVisible();
+
+  expect(failures).toEqual([]);
+});

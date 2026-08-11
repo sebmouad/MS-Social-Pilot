@@ -15,6 +15,7 @@ export function SettingsNav({ showConfig = false }: { showConfig?: boolean }) {
     { href: '/settings', label: t('settings.workspace'), icon: 'settings' },
     { href: '/settings/team', label: t('team.title'), icon: 'team' },
     { href: '/settings/notifications', label: t('notifications.title'), icon: 'bell' },
+    { href: '/settings/media', label: t('media.title'), icon: 'image' },
     // Instance configuration is owner-only, so the tab is not shown to anyone
     // who would only reach a refusal by clicking it.
     ...(showConfig

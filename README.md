@@ -89,6 +89,10 @@ render and its cache is refreshed. Falls back to parsing `og:` tags directly.
 **Reporting** — impressions, reach, engagement and link clicks per destination
 and per post, with CSV export and a print-styled page for PDF.
 
+**Media library** — everything uploaded for a client, what each file is still
+holding up, and how much of the storage allowance is gone. A file a scheduled
+post still needs cannot be deleted, and the screen links to the posts using it.
+
 ---
 
 ## Quick start
@@ -195,7 +199,7 @@ how to drive it from a serverless cron instead of a long-running worker.
 npm test
 ```
 
-756 tests, in three layers.
+762 tests, in three layers.
 
 **Unit tests** cover the pure decision-making: which Graph edge a post takes,
 whether a retry is worth attempting, token encryption, timezone and queue-slot

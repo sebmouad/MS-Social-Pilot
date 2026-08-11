@@ -589,3 +589,102 @@ describe('resolving a post\'s attachments', () => {
     expect(item?.source).toEqual({ type: 'url', url: 'https://cdn.example.com/a.jpg' });
   });
 });
+
+/**
+ * The library screen's own query.
+ *
+ * `postsUsingMedia` answers one file at a time, which is right for the delete
+ * route and wrong for a page listing two hundred of them. `readMediaLibrary`
+ * asks once and groups the answer, so these check the grouping — the part that
+ * a per-file loop got right for free and a bulk query can quietly get wrong.
+ */
+describe('readMediaLibrary', () => {
+  it('lists files newest first, with nothing holding them', async () => {
+    const { workspace } = await seed();
+
+    const library = await media.readMediaLibrary(workspace.id);
+
+    expect(library.files).toHaveLength(1);
+    expect(library.files[0]?.heldBy).toEqual([]);
+    expect(library.truncated).toBe(false);
+  });
+
+  it('reports what is holding each file, and only what is holding it', async () => {
+    const { workspace, user, file } = await seed();
+
+    const other = await prisma.media.create({
+      data: {
+        workspaceId: workspace.id,
+        kind: 'image',
+        filename: 'unused.jpg',
+        mimeType: 'image/jpeg',
+        size: 2048,
+        storageKey: 'uploads/unused.jpg',
+        url: '/api/media/unused/raw',
+      },
+    });
+
+    await postWith(workspace.id, user.id, 'scheduled', {
+      id: file.id,
+      storageKey: file.storageKey!,
+    });
+
+    const library = await media.readMediaLibrary(workspace.id);
+    const byId = new Map(library.files.map((row) => [row.id, row]));
+
+    expect(byId.get(file.id)?.heldBy).toHaveLength(1);
+    // The grouping has to keep files apart. One post holding one file must not
+    // mark every file in the library as in use.
+    expect(byId.get(other.id)?.heldBy).toEqual([]);
+  });
+
+  it('counts a post once even though it references the id and the storage key', async () => {
+    const { workspace, user, file } = await seed();
+
+    // Both are stored deliberately — the id for the app, the storage key for
+    // the sweeper — so a naive union counts the post twice and the screen says
+    // "used by 2 posts" about one.
+    await postWith(workspace.id, user.id, 'draft', {
+      id: file.id,
+      storageKey: file.storageKey!,
+    });
+
+    const library = await media.readMediaLibrary(workspace.id);
+
+    expect(library.files[0]?.heldBy).toHaveLength(1);
+  });
+
+  it('does not count a post that has already gone out', async () => {
+    const { workspace, user, file } = await seed();
+
+    // The post is on Facebook; our copy of the file is history, and deleting it
+    // cannot break anything that has not already happened.
+    await postWith(workspace.id, user.id, 'published', {
+      id: file.id,
+      storageKey: file.storageKey!,
+    });
+
+    const library = await media.readMediaLibrary(workspace.id);
+
+    expect(library.files[0]?.heldBy).toEqual([]);
+  });
+
+  it('cannot see another client’s files', async () => {
+    const mine = await seed('mine');
+    await seed('theirs');
+
+    const library = await media.readMediaLibrary(mine.workspace.id);
+
+    expect(library.files).toHaveLength(1);
+    expect(library.files[0]?.id).toBe(mine.file.id);
+  });
+
+  it('reports usage against the quota', async () => {
+    const { workspace } = await seed();
+
+    const library = await media.readMediaLibrary(workspace.id);
+
+    expect(library.usage.bytes).toBe(1024);
+    expect(library.usage.quotaBytes).toBeGreaterThan(0);
+  });
+})

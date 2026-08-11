@@ -414,3 +414,98 @@ export async function resolveMediaForInstagram(
 
   return resolved;
 }
+
+export interface MediaLibraryRow {
+  id: string;
+  filename: string;
+  kind: MediaKind;
+  mimeType: string;
+  size: number;
+  url: string;
+  createdAt: Date;
+  /**
+   * Posts that have not gone out yet and still reference this file.
+   *
+   * Empty means it can be deleted. Non-empty is the reason it cannot, and the
+   * screen shows them, because "still used by 2 posts" is only useful if you
+   * can find out which two.
+   */
+  heldBy: Array<{ id: string; message: string }>;
+}
+
+export interface MediaLibrary {
+  files: MediaLibraryRow[];
+  usage: StorageUsage;
+  /** True when there are more files than this page shows. */
+  truncated: boolean;
+}
+
+const LIBRARY_PAGE = 200;
+
+/**
+ * Everything in the workspace's media library, with what is holding each file.
+ *
+ * `postsUsingMedia` answers this one file at a time, which is right for the
+ * delete route and wrong here: two hundred files would be two hundred queries.
+ * This asks once for every post that references anything in the list and
+ * groups the answer, so the page costs three queries whatever its length.
+ */
+export async function readMediaLibrary(workspaceId: string): Promise<MediaLibrary> {
+  const [files, usage, total] = await Promise.all([
+    prisma.media.findMany({
+      where: { workspaceId },
+      orderBy: { createdAt: 'desc' },
+      take: LIBRARY_PAGE,
+    }),
+    storageUsage(workspaceId),
+    prisma.media.count({ where: { workspaceId } }),
+  ]);
+
+  const keys = files.flatMap((file) => [file.id, ...(file.storageKey ? [file.storageKey] : [])]);
+
+  const holders = keys.length
+    ? await prisma.post.findMany({
+        where: {
+          workspaceId,
+          status: { in: ['draft', 'pending_approval', 'rejected', 'scheduled', 'publishing'] },
+          mediaKeys: { hasSome: keys },
+        },
+        select: { id: true, message: true, mediaKeys: true },
+      })
+    : [];
+
+  // key → the posts holding it, so each file is a lookup rather than a scan.
+  const byKey = new Map<string, Array<{ id: string; message: string }>>();
+  for (const post of holders) {
+    for (const key of post.mediaKeys) {
+      const existing = byKey.get(key);
+      const entry = { id: post.id, message: post.message };
+      if (existing) existing.push(entry);
+      else byKey.set(key, [entry]);
+    }
+  }
+
+  return {
+    usage,
+    truncated: total > files.length,
+    files: files.map((file) => {
+      const held = [
+        ...(byKey.get(file.id) ?? []),
+        ...(file.storageKey ? byKey.get(file.storageKey) ?? [] : []),
+      ];
+      // A post referencing both the id and the storage key is one post, not two.
+      const seen = new Map(held.map((post) => [post.id, post]));
+
+      return {
+        id: file.id,
+        filename: file.filename,
+        kind: file.kind,
+        mimeType: file.mimeType,
+        size: file.size,
+        url: file.url,
+        createdAt: file.createdAt,
+        heldBy: [...seen.values()],
+      };
+    }),
+  };
+}
