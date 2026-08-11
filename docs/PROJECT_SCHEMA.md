@@ -362,6 +362,9 @@ MAX_UPLOAD_MB=25
 # i18n
 DEFAULT_LOCALE=en          # en | fr
 
+# Accounts
+OPEN_REGISTRATION=false    # the first account, and invitees, are always allowed
+
 # Serverless trigger
 CRON_SECRET=               # blank disables POST /api/cron/tick
 ```

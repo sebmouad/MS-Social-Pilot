@@ -11,6 +11,8 @@
 - [ ] The scheduler runs — either `npm run worker` or a cron hitting `/api/cron/tick`
 - [ ] Deauthorize and data-deletion callback URLs set in the Meta app and publicly reachable
 - [ ] "Require app secret proof" enabled in the Meta app
+- [ ] Registration policy decided: closed by default, so create the first
+      account yourself and invite colleagues, or set `OPEN_REGISTRATION=true`
 - [ ] Backups cover the database **and** `MEDIA_DIR`
 - [ ] `ENCRYPTION_KEY` stored somewhere you can recover it (see key rotation)
 

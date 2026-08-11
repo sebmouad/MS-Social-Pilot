@@ -141,6 +141,13 @@ export const errors = {
       status: 422,
     }),
 
+  registrationClosed: () =>
+    new AppError({
+      key: 'errors.registrationClosed',
+      fallback: 'This server does not accept new accounts. Ask an administrator to invite you.',
+      status: 403,
+    }),
+
   aiRateLimited: () =>
     new AppError({
       key: 'errors.aiRateLimited',

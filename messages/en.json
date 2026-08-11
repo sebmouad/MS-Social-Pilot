@@ -32,7 +32,9 @@
     "haveAccount": "Already have an account?",
     "noAccount": "No account yet?",
     "createOne": "Create one",
-    "somethingWrong": "Something went wrong."
+    "somethingWrong": "Something went wrong.",
+    "registrationClosedTitle": "Registration is closed",
+    "registrationClosedBody": "This server only accepts people who have been invited. Ask an administrator to send you an invitation."
   },
   "common": {
     "save": "Save",
@@ -370,7 +372,8 @@
     "notPending": "That post is not awaiting approval.",
     "variantsNeedApproval": "Alternate wordings publish without review, so only editors and above can set them while approval is on.",
     "bulkTooManyRows": "That file has {rows} rows and the limit is {limit}. Split it into smaller uploads.",
-    "csvUnterminatedQuote": "A quoted field starting on line {line} is never closed, so everything after it was read as one value. Add the missing quote and upload again."
+    "csvUnterminatedQuote": "A quoted field starting on line {line} is never closed, so everything after it was read as one value. Add the missing quote and upload again.",
+    "registrationClosed": "This server does not accept new accounts. Ask an administrator to invite you."
   },
   "email": {
     "invitation": {

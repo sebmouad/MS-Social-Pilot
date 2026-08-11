@@ -4,6 +4,7 @@ import { cache } from 'react';
 import { Locale, WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
+import { errors } from './errors';
 import { ensureSettings } from './settings';
 import { env } from './env';
 import { hashPassword, hashToken, randomToken, verifyPassword } from './crypto';
@@ -97,16 +98,52 @@ export async function createWorkspace(options: {
   return { id: workspace.id, slug: workspace.slug };
 }
 
+/**
+ * Whether this address may create an account.
+ *
+ * Open registration is off by default, because this app has to be reachable
+ * from the internet for Facebook to call back, which makes an open sign-up form
+ * open to everyone who finds the address. Two exceptions keep that from locking
+ * anybody out:
+ *
+ * - **The first account.** A fresh installation has nobody to invite anyone, so
+ *   the first registration is always allowed.
+ * - **An invitation.** Someone holding a live invitation to their own address
+ *   was already admitted by a person who could admit them.
+ */
+export async function mayRegister(email: string): Promise<boolean> {
+  if (env.openRegistration) return true;
+
+  const [users, invitation] = await Promise.all([
+    prisma.user.count(),
+    prisma.invitation.findFirst({
+      where: { email, acceptedAt: null, expiresAt: { gt: new Date() } },
+      select: { id: true },
+    }),
+  ]);
+
+  return users === 0 || invitation !== null;
+}
+
 export async function registerUser(input: {
   email: string;
   password: string;
   name: string;
   workspaceName?: string;
   locale?: Locale;
-  /** Skip workspace creation when the user is registering to accept an invite. */
+  /**
+   * Skip workspace creation when the user is registering to accept an invite.
+   *
+   * Nothing passes this today, and wiring it needs care: a user with no
+   * membership reads as signed out (see `getAuthContext`), so someone who
+   * registers this way and then closes the tab without accepting is left with
+   * an account they cannot use.
+   */
   skipWorkspace?: boolean;
 }): Promise<{ userId: string; token: string }> {
   const email = input.email.trim().toLowerCase();
+
+  if (!(await mayRegister(email))) throw errors.registrationClosed();
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {

@@ -36,6 +36,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await prisma.queueSlot.deleteMany();
   await prisma.notificationSetting.deleteMany();
+  await prisma.invitation.deleteMany();
   await prisma.membership.deleteMany();
   await prisma.session.deleteMany();
   await prisma.user.deleteMany();
@@ -43,6 +44,17 @@ beforeEach(async () => {
 });
 
 const email = () => `new-${randomBytes(4).toString('hex')}@example.com`;
+
+/**
+ * These suites are about sign-up working, not about who is allowed to use it,
+ * so they register several unrelated people and need the door open. The policy
+ * itself is exercised in "who may register" below.
+ */
+beforeEach(async () => {
+  const settings = await import('../src/lib/settings');
+  await settings.writeSetting('auth.openRegistration', true, null);
+  await settings.ensureSettings();
+});
 
 describe('registerUser', () => {
   it('creates a user, a workspace and an owner membership', async () => {
@@ -185,6 +197,147 @@ describe('registerUser', () => {
 
     expect(await prisma.membership.count({ where: { userId } })).toBe(0);
     expect(await prisma.workspace.count()).toBe(0);
+  });
+});
+
+/**
+ * The app must be reachable from the internet for Facebook to call back, so an
+ * open sign-up form is open to everyone who finds the address.
+ */
+describe('who may register', () => {
+  let settings: typeof import('../src/lib/settings');
+
+  beforeAll(async () => {
+    settings = await import('../src/lib/settings');
+  });
+
+  async function withRegistrationClosed(body: () => Promise<void>) {
+    // Closed is the default; the suite-wide beforeEach opens it for the tests
+    // that only care about sign-up mechanics, so close it again here.
+    await settings.writeSetting('auth.openRegistration', false, null);
+    await settings.ensureSettings();
+    try {
+      await body();
+    } finally {
+      await settings.writeSetting('auth.openRegistration', true, null);
+      await settings.ensureSettings();
+    }
+  }
+
+  it('lets the first account through, so a new installation can be set up', async () => {
+    await withRegistrationClosed(async () => {
+      expect(await prisma.user.count()).toBe(0);
+
+      const { userId } = await auth.registerUser({
+        email: email(),
+        password: 'a-long-enough-password',
+        name: 'First',
+      });
+
+      expect(userId).toBeTruthy();
+    });
+  });
+
+  it('turns away a stranger once somebody is here', async () => {
+    await withRegistrationClosed(async () => {
+      await auth.registerUser({
+        email: email(),
+        password: 'a-long-enough-password',
+        name: 'First',
+      });
+
+      await expect(
+        auth.registerUser({
+          email: email(),
+          password: 'a-long-enough-password',
+          name: 'Stranger',
+        }),
+      ).rejects.toThrow(/does not accept new accounts/i);
+    });
+  });
+
+  it('admits someone holding a live invitation to their own address', async () => {
+    await withRegistrationClosed(async () => {
+      const owner = await auth.registerUser({
+        email: email(),
+        password: 'a-long-enough-password',
+        name: 'Owner',
+      });
+      const workspace = await prisma.workspace.findFirstOrThrow();
+      const invited = email();
+
+      await prisma.invitation.create({
+        data: {
+          workspaceId: workspace.id,
+          email: invited,
+          role: 'contributor',
+          tokenHash: `hash-${invited}`,
+          invitedById: owner.userId,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+
+      const { userId } = await auth.registerUser({
+        email: invited,
+        password: 'a-long-enough-password',
+        name: 'Invited',
+      });
+      expect(userId).toBeTruthy();
+    });
+  });
+
+  it('does not admit someone whose invitation has expired', async () => {
+    await withRegistrationClosed(async () => {
+      const owner = await auth.registerUser({
+        email: email(),
+        password: 'a-long-enough-password',
+        name: 'Owner',
+      });
+      const workspace = await prisma.workspace.findFirstOrThrow();
+      const invited = email();
+
+      await prisma.invitation.create({
+        data: {
+          workspaceId: workspace.id,
+          email: invited,
+          role: 'contributor',
+          tokenHash: `hash-${invited}`,
+          invitedById: owner.userId,
+          expiresAt: new Date(Date.now() - 60 * 1000),
+        },
+      });
+
+      await expect(
+        auth.registerUser({
+          email: invited,
+          password: 'a-long-enough-password',
+          name: 'Too late',
+        }),
+      ).rejects.toThrow(/does not accept new accounts/i);
+    });
+  });
+
+  it('lets anyone in when an operator opens registration', async () => {
+    await settings.writeSetting('auth.openRegistration', true, null);
+    await settings.ensureSettings();
+
+    try {
+      await auth.registerUser({
+        email: email(),
+        password: 'a-long-enough-password',
+        name: 'First',
+      });
+
+      const { userId } = await auth.registerUser({
+        email: email(),
+        password: 'a-long-enough-password',
+        name: 'Second',
+      });
+      expect(userId).toBeTruthy();
+    } finally {
+      await settings.clearSetting('auth.openRegistration');
+      await settings.ensureSettings();
+    }
   });
 });
 

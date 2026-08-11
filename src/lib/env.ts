@@ -197,6 +197,10 @@ export const env = {
     return settingNumber('analytics.tokenWarningDays');
   },
 
+  /** Whether a stranger may create an account. Invitations always may. */
+  get openRegistration(): boolean {
+    return settingBoolean('auth.openRegistration');
+  },
   /** Language for a visitor who has not signed in and whose browser is silent. */
   get defaultLocale(): string {
     return settingString('i18n.defaultLocale');

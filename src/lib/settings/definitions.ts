@@ -72,6 +72,16 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     hint: 'Used for OAuth redirects and every link in an email. Facebook rejects a redirect that is not https outside localhost.',
   },
   {
+    key: 'auth.openRegistration',
+    group: 'general',
+    type: 'boolean',
+    label: 'Anyone may create an account',
+    description: 'When off, only people holding an invitation can register.',
+    default: false,
+    env: 'OPEN_REGISTRATION',
+    hint: 'This app has to be reachable from the internet for Facebook to call back, so an open sign-up form is open to everyone who finds it. The very first account is always allowed, so a fresh installation can be set up.',
+  },
+  {
     key: 'i18n.defaultLocale',
     group: 'general',
     type: 'select',

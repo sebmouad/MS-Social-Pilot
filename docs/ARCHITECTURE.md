@@ -271,6 +271,20 @@ an id from a cookie or URL is a request, not a permission. Workspace scoping is
 therefore a security boundary, with tests that a member of one workspace cannot
 read, publish to, or approve anything in another.
 
+### Who may create an account
+
+Registration is closed by default. This app has to be reachable from the
+internet for Facebook to call back, which makes an open sign-up form open to
+everyone who finds the address — and a workspace here holds live Page tokens.
+`auth.openRegistration` turns it back on for installations that want it.
+
+Two exceptions keep closed from meaning locked out: the **first** account is
+always allowed, because a fresh installation has nobody to invite anyone, and
+anyone holding a live invitation to their own address was already admitted by
+someone who could admit them. The check lives in `registerUser`, which every
+sign-up passes through; the register screen also asks first, so nobody fills in
+a form only to be refused.
+
 ### Accepting an invitation
 
 The token lives only in the email: the row stores a SHA-256 of it, so a database
