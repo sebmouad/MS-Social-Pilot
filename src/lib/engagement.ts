@@ -441,14 +441,12 @@ export async function syncTargetEdges(options: {
   const since =
     options.since ?? new Date(now.getTime() - env.edgeWindowDays * 24 * 60 * 60 * 1000);
 
-  const target = await prisma.target.findUniqueOrThrow({
-    where: { id: options.targetId },
-    include: { socialAccount: true },
-  });
-
+  // Total, like the analytics readers: `errors` is the channel, and every
+  // caller is a loop over Pages. The name is only unknown when the row itself
+  // cannot be read.
   const result: EdgeSyncResult = {
-    targetId: target.id,
-    targetName: target.name,
+    targetId: options.targetId,
+    targetName: 'Unknown destination',
     comments: 0,
     reviews: 0,
     conversations: 0,
@@ -457,14 +455,33 @@ export async function syncTargetEdges(options: {
     errors: [],
   };
 
-  if (target.type === TargetType.group) {
-    result.errors.push({ edge: 'all', message: 'Groups expose none of these edges.' });
-    return result;
-  }
+  let target: Awaited<ReturnType<typeof prisma.target.findUniqueOrThrow>> & {
+    socialAccount: { accessToken: string } | null;
+  };
+  let token: string;
 
-  const token = tokenFor(target);
-  if (!token) {
-    result.errors.push({ edge: 'all', message: 'No access token stored for this destination.' });
+  try {
+    target = await prisma.target.findUniqueOrThrow({
+      where: { id: options.targetId },
+      include: { socialAccount: true },
+    });
+    result.targetName = target.name;
+
+    if (target.type === TargetType.group) {
+      result.errors.push({ edge: 'all', message: 'Groups expose none of these edges.' });
+      return result;
+    }
+
+    // Inside the guard because decrypting it throws when the stored value
+    // predates a key rotation, which is not something the row can express.
+    const decrypted = tokenFor(target);
+    if (!decrypted) {
+      result.errors.push({ edge: 'all', message: 'No access token stored for this destination.' });
+      return result;
+    }
+    token = decrypted;
+  } catch (error) {
+    result.errors.push({ edge: 'all', message: asGraphError(error).displayMessage });
     return result;
   }
 
@@ -728,14 +745,12 @@ export interface WorkspaceEdgeSync {
 /**
  * Refresh every enabled Page in one workspace, or a single named one.
  *
- * The isolation is the point. `syncTargetEdges` already records a failure per
- * *edge* so that a Page whose token cannot read the inbox still reports the
- * comments it did fetch — but a Page that disappears mid-pass, or whose row
- * cannot be read at all, throws before it reaches that code. Called in a bare
- * loop, one such Page discards everything the pass had already gathered and
- * answers a 500 to somebody who pressed Refresh. The worker's own edge job has
- * always isolated per Page, through `forEachEnabledPage`; this is the same
- * promise for the manual button, in the shape the response already has.
+ * A bare loop, and safely so: `syncTargetEdges` is total. It records a failure
+ * per *edge* so a Page whose token cannot read the inbox still reports the
+ * comments it did fetch, and it records a Page that fails before its edges are
+ * reached the same way, so nothing here can throw past the result list. The
+ * guarantee lives in one place rather than being re-implemented by each caller,
+ * which is how the manual button came to lack what the worker's job had.
  */
 export async function syncWorkspaceEdges(options: {
   workspaceId: string;
@@ -749,7 +764,7 @@ export async function syncWorkspaceEdges(options: {
       enabled: true,
       ...(options.targetId ? { id: options.targetId } : {}),
     },
-    select: { id: true, name: true },
+    select: { id: true },
     orderBy: { id: 'asc' },
   });
 
@@ -757,22 +772,7 @@ export async function syncWorkspaceEdges(options: {
 
   const results: EdgeSyncResult[] = [];
   for (const target of targets) {
-    try {
-      results.push(await syncTargetEdges({ targetId: target.id, since: options.since }));
-    } catch (error) {
-      // Same shape as a token failure, so the screen has nothing new to learn:
-      // a named Page with a reason beside it, and the rest of the pass intact.
-      results.push({
-        targetId: target.id,
-        targetName: target.name,
-        comments: 0,
-        reviews: 0,
-        conversations: 0,
-        externalPosts: 0,
-        videos: 0,
-        errors: [{ edge: 'all', message: asGraphError(error).displayMessage }],
-      });
-    }
+    results.push(await syncTargetEdges({ targetId: target.id, since: options.since }));
   }
 
   return { results, empty: false };

@@ -2409,6 +2409,61 @@ describe('a post the installation cannot read', () => {
     expect(stored.insightsSyncedAt).not.toBeNull();
   });
 
+  it('reports it from the edge sync too, rather than throwing', async () => {
+    const { target } = await withUnreadableToken();
+
+    // The guarantee lives in `syncTargetEdges` itself, so every caller gets it
+    // without re-implementing a catch — which is how the manual refresh came
+    // to lack what the worker's job already had.
+    const result = await engagement.syncTargetEdges({ targetId: target.id });
+
+    expect(result.targetName).toBe(target.name);
+    expect(result.errors.map((error) => error.edge)).toEqual(['all']);
+    expect(result.comments).toBe(0);
+  });
+
+  it('names a destination it cannot even look up', async () => {
+    const result = await engagement.syncTargetEdges({ targetId: 'deleted-before-its-turn' });
+
+    // Nothing better to say: the row that held the name is gone.
+    expect(result.targetId).toBe('deleted-before-its-turn');
+    expect(result.targetName).toBe('Unknown destination');
+    expect(result.errors.map((error) => error.edge)).toEqual(['all']);
+  });
+
+  it('reports a Page whose insights cannot be read, and keeps the batch going', async () => {
+    const broken = await withUnreadableToken();
+    const { syncTargetAnalytics, syncWorkspaceAnalytics } = await import('../src/lib/analytics');
+
+    const single = await syncTargetAnalytics({ targetId: broken.target.id });
+    expect(single.targetName).toBe(broken.target.name);
+    expect(single.error).toMatch(/envelope|encrypted/i);
+    expect(single.stored).toBe(0);
+
+    // A second Page in the same workspace, reachable, listed after the broken
+    // one — the order in which a throw would have cost the most.
+    stubEverything();
+    const { encryptSecret } = await import('../src/lib/crypto');
+    await prisma.target.create({
+      data: {
+        workspaceId: broken.workspace.id,
+        socialAccountId: broken.account.id,
+        type: 'page',
+        providerId: 'page-working',
+        name: 'Working Page',
+        // Its own readable token: the seeded account's was corrupted too.
+        accessToken: encryptSecret('page-token'),
+      },
+    });
+    routes['/page-working'] = () => ({ fan_count: 10, followers_count: 12 });
+    routes['/insights'] = () => ({ data: [] });
+
+    const results = await syncWorkspaceAnalytics({ workspaceId: broken.workspace.id });
+    expect(results).toHaveLength(2);
+    expect(results.filter((result) => result.error)).toHaveLength(1);
+    expect(results.find((result) => result.targetName === 'Working Page')?.error).toBeUndefined();
+  });
+
   it('reports an external post the same way', async () => {
     const seeded = await withUnreadableToken();
     const external = await prisma.externalPost.create({

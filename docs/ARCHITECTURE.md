@@ -1935,29 +1935,33 @@ forever — and every sync **catches per edge**, so a Page whose token cannot re
 the inbox still gets its comments. A refused edge is reported in the result, not
 swallowed.
 
-That promise has to hold one level up as well. A Page can fail *before* its
-edges are reached — a stored token this installation can no longer read after a
-key rotation, a row deleted while the pass was running — and that throws past
-every per-edge catch. The worker's job has always isolated per Page through
-`forEachEnabledPage`; the manual Refresh button looped bare, so one such Page
-discarded every result the pass had already gathered and answered a 500 to the
-person waiting. `syncWorkspaceEdges` now owns both the loop and the catch, and
-records a failed Page in the same shape as a refused edge — named, with a
-reason, and the rest of the pass intact — so the route cannot hold one half of
-the promise without the other.
+That promise has to hold before the edges are reached, too, and the rule that
+makes it hold is one line: **a function whose return type is its error channel
+must not also throw.** `syncTargetEdges` (`errors[]`), `syncTargetAnalytics`
+(`error`), `syncPostInsights` and `syncExternalPostInsights` (`{ ok, error }`)
+are all of that shape, and every caller of every one of them is a loop over
+rows. A second exit past the channel is not a stricter version of the same
+promise; it ends the batch.
 
-The per-post readers answer the same question at the row level, and the rule
-there is simpler: **a function whose return type is its error channel must not
-also throw.** `syncPostInsights` and `syncExternalPostInsights` both return
-`{ ok, metrics, error }`, and every caller is a loop — the worker's analytics
-job, the Refresh button, the edge sync's external-post pass. A second exit past
-that channel is not a stricter version of the same promise; it ends the batch.
-Both had their row lookup and their token decryption outside the guard, which
-are precisely the two steps that fail for reasons the row itself cannot
-express: a post deleted after its id was read into the batch, and a token this
-installation can no longer decrypt after a key rotation. One such row discarded
-every post already refreshed ahead of it. The guard now covers the whole body,
-so the contract is total and no call site needs to know.
+All four had the same two steps outside their guard — the row lookup and the
+token decryption — and those are precisely the steps that fail for reasons the
+row itself cannot express: a record deleted after its id was read into the
+batch, and a token this installation can no longer decrypt after an
+`ENCRYPTION_KEY` rotation. One such row discarded everything already gathered
+ahead of it; for the manual Refresh button that meant a 500 in place of a
+partial result, and for the worker jobs the rest of that tenant's pass.
+`forEachWorkspace` and `forEachEnabledPage` isolate the *worker* per tenant and
+per Page, which is why the jobs degraded rather than died and the manual routes
+did not.
+
+The guard now covers the whole body of each, so the contract is total and no
+call site has to know — `syncWorkspaceEdges` and `syncWorkspaceAnalytics` are
+plain loops again. Putting the catch in the callers instead would work exactly
+once: it is a guarantee each new caller has to remember, and the manual refresh
+lacking what the worker job already had is what that looks like. The one thing
+lost by moving it inward is the name of a destination whose row cannot be read
+at all, which is honest — the row that held the name is gone, and the result
+says so rather than inventing one.
 
 `published_posts` is the reconciliation edge. Posts made from the Facebook app,
 by another tool, or by a colleague who never opened this product are invisible

@@ -99,27 +99,34 @@ export async function syncTargetAnalytics(options: {
   until?: Date;
   periods?: MetricPeriod[];
 }): Promise<SyncResult> {
-  const target = await prisma.target.findUniqueOrThrow({
-    where: { id: options.targetId },
-    include: { socialAccount: true },
-  });
-
+  // Total, like `syncPostInsights`: `error` is the channel, and the caller is a
+  // loop over every Page in a workspace. The name is only unknown when the row
+  // itself cannot be read, which is the one case where there is nothing better
+  // to say than that the destination is gone.
   const base: SyncResult = {
-    targetId: target.id,
-    targetName: target.name,
+    targetId: options.targetId,
+    targetName: 'Unknown destination',
     stored: 0,
     metrics: 0,
     unavailable: [],
   };
 
-  if (target.type === TargetType.group) {
-    return { ...base, error: 'Facebook does not expose insights for Groups.' };
-  }
-
-  const token = tokenFor(target);
-  if (!token) return { ...base, error: 'No access token stored for this destination.' };
-
   try {
+    const target = await prisma.target.findUniqueOrThrow({
+      where: { id: options.targetId },
+      include: { socialAccount: true },
+    });
+    base.targetName = target.name;
+
+    if (target.type === TargetType.group) {
+      return { ...base, error: 'Facebook does not expose insights for Groups.' };
+    }
+
+    // Inside the guard because decrypting it throws when the stored value
+    // predates a key rotation, which is not something the row can express.
+    const token = tokenFor(target);
+    if (!token) return { ...base, error: 'No access token stored for this destination.' };
+
     // Profile figures first: they need no insights permission, so they still
     // land even if everything below is refused.
     const profile = await fetchPageProfile(target.providerId, token);
