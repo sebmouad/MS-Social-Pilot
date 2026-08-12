@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+
+import en from '../messages/en.json';
+import fr from '../messages/fr.json';
 
 import { reportToCsv, spreadClicks, type Report } from '../src/lib/reports';
 
@@ -112,5 +116,38 @@ describe('spreadClicks', () => {
   it('keeps the shares as close together as they can be', () => {
     const shares = spreadClicks(11, 4);
     expect(Math.max(...shares) - Math.min(...shares)).toBeLessThanOrEqual(1);
+  });
+});
+
+/**
+ * The summary card and the per-destination table count different things. The
+ * card counts posts; the column counts the times each destination was posted
+ * to, so one post to three Pages is 1 in the card and 1+1+1 in the column.
+ * Both are useful, and both were labelled "Posts published" — which made the
+ * table look like broken arithmetic to the client reading it.
+ */
+describe('the report labels', () => {
+  const page = readFileSync('src/app/(app)/reports/page.tsx', 'utf8');
+  const table = page.slice(page.indexOf('<thead>'), page.indexOf('</thead>'));
+
+  it('does not head the destination column with the summary figure', () => {
+    expect(table).toContain("t('postsSent')");
+    expect(table).not.toContain("t('postsPublished')");
+  });
+
+  it('says something different in each language, not just under a different key', () => {
+    // A second key translated to the same words puts the reader back where
+    // they started.
+    for (const [language, messages] of [['en', en], ['fr', fr]] as const) {
+      const reports = messages.reports as Record<string, string>;
+      expect(reports.postsSent, language).toBeTruthy();
+      expect(reports.postsSent, language).not.toBe(reports.postsPublished);
+    }
+  });
+
+  it('heads the name column with a noun rather than the section title', () => {
+    // "By destination" titles the section; as a column header over a list of
+    // Page names it reads like a leftover.
+    expect(table).toContain("t('destination')");
   });
 });

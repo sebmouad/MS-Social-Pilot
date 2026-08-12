@@ -700,10 +700,12 @@
     "downloadCsv": "Download CSV",
     "print": "Print or save as PDF",
     "postsPublished": "Posts published",
+    "postsSent": "Posts sent",
     "totalReach": "Total reach",
     "totalEngagement": "Total engagement",
     "linkClicks": "Link clicks",
     "byDestination": "By destination",
+    "destination": "Destination",
     "topPosts": "Top posts",
     "noData": "No published posts in this range."
   },

@@ -80,8 +80,12 @@ export default async function ReportsPage({
               <table className="w-full min-w-[42rem] text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-                    <th className="py-2 pr-3 font-medium">{t('byDestination')}</th>
-                    <th className="py-2 pr-3 text-right font-medium">{t('postsPublished')}</th>
+                    <th className="py-2 pr-3 font-medium">{t('destination')}</th>
+                    {/* Not the headline figure: that counts posts, this counts
+                        the times each destination was posted to, so one post to
+                        three Pages is 1 up there and 1+1+1 here. Sharing a
+                        label made the column look like broken arithmetic. */}
+                    <th className="py-2 pr-3 text-right font-medium">{t('postsSent')}</th>
                     <th className="py-2 pr-3 text-right font-medium">Impressions</th>
                     <th className="py-2 pr-3 text-right font-medium">{t('totalReach')}</th>
                     <th className="py-2 pr-3 text-right font-medium">{t('totalEngagement')}</th>

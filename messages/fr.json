@@ -700,10 +700,12 @@
     "downloadCsv": "Télécharger le CSV",
     "print": "Imprimer ou enregistrer en PDF",
     "postsPublished": "Publications parues",
+    "postsSent": "Publications envoyées",
     "totalReach": "Portée totale",
     "totalEngagement": "Engagement total",
     "linkClicks": "Clics sur les liens",
     "byDestination": "Par destination",
+    "destination": "Destination",
     "topPosts": "Meilleures publications",
     "noData": "Aucune publication parue sur cette période."
   },

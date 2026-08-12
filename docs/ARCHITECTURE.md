@@ -1669,6 +1669,13 @@ happened, ten across three rounds to three each and loses one. `spreadClicks`
 hands the remainder out a click at a time instead — arbitrary in which
 destination gets the extra, exact in the total.
 
+The summary card and the per-destination table also count different things,
+and used to say so with the same words. The card counts *posts*; the column
+counts the times each destination was posted to, so one post to three Pages is
+1 in the card and 1+1+1 in the column. Both figures are worth having — the
+label was the bug, and a client reading "Posts published" twice with different
+arithmetic under each has no way to know that.
+
 ### Beyond /insights
 
 Insights say a post reached 4,000 people. They do not say what those people
