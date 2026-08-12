@@ -70,7 +70,7 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
 
       {posts.map((post) => (
         <article key={post.id} className="card p-5">
-          <p className="whitespace-pre-wrap text-sm text-slate-800">
+          <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-800">
             {post.message || <span className="text-slate-400">{tPosts('noText')}</span>}
           </p>
 

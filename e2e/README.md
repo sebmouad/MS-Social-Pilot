@@ -53,6 +53,7 @@ PLAYWRIGHT_CHROMIUM_PATH=/path/to/chromium npx playwright test
 | `compose.spec.ts` | Writing a post, scheduling it, finding it on the list, the calendar and the dashboard, correcting it in place, and cancelling it. |
 | `invite.spec.ts` | Inviting a colleague, accepting the invitation, and walking every screen again **in French**. |
 | `signed-out.spec.ts` | That none of it is served to a stranger, and that the public pages still are. |
+| `phone.spec.ts` | Every screen at phone width: nothing slides sideways, and the navigation is reachable behind the menu. Its own Playwright project. |
 
 `compose.spec.ts` also covers correcting a scheduled post in place, and that a
 published one offers no way to rewrite it — the Edit button is absent and the
@@ -75,6 +76,12 @@ have rows to render; nothing in the walk ever calls the Graph API.
   uncontrolled now and their contents are adopted on mount.
 - **`/settings/config` rendered with no heading at all** for anyone who is not
   an owner — a card of refusal text and nothing naming the screen.
+- **A post containing a long URL made the dashboard slide sideways on a phone**,
+  taking the heading off the edge with it. `break-words` had been the obvious
+  fix and is the wrong one: it stops a word painting outside its box but does
+  not change the box's min-content width, so inside a flex row the box still
+  demands the width of the longest word. `overflow-wrap: anywhere` is the
+  property that shrinks the intrinsic width too.
 - **The settings screen showed contributors four sections they could not save.**
   Every button answered 403, which reads as a broken product rather than as a
   permission. They are hidden now, with the reason in their place.

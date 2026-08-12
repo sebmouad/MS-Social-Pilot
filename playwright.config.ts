@@ -44,7 +44,19 @@ export default defineConfig({
     { name: 'setup', testMatch: /auth\.setup\.ts/ },
     {
       name: 'chromium',
+      // Everything except the phone walk, which has its own project below and
+      // asserts things that are only true at a narrow width.
+      testIgnore: /phone\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/owner.json' },
+      dependencies: ['setup'],
+    },
+    // The app has real responsive machinery — a menu below `lg`, columns that
+    // swap at `sm`, navs that scroll sideways — and every test above runs at
+    // one width. This runs the screens at the width most people check them at.
+    {
+      name: 'phone',
+      testMatch: /phone\.spec\.ts/,
+      use: { ...devices['Pixel 7'], storageState: 'e2e/.auth/owner.json' },
       dependencies: ['setup'],
     },
   ],

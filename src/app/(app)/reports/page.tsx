@@ -106,7 +106,7 @@ export default async function ReportsPage({
             <ol className="space-y-3">
               {report.topPosts.map((post, index) => (
                 <li key={`${post.postId}-${index}`} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                  <p className="line-clamp-2 text-sm text-slate-800">{post.message || '—'}</p>
+                  <p className="line-clamp-2 [overflow-wrap:anywhere] text-sm text-slate-800">{post.message || '—'}</p>
                   <p className="mt-1 text-xs text-slate-500">
                     {post.targetName}
                     {post.publishedLabel ? ` · ${post.publishedLabel}` : ''} ·{' '}

@@ -570,7 +570,7 @@ async function ReviewsView({
                   : t('doesNotRecommend')}
             </p>
             {review.text && (
-              <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{review.text}</p>
+              <p className="mt-2 whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-700">{review.text}</p>
             )}
           </li>
         ))}
@@ -678,7 +678,7 @@ async function ExternalView({
                 </p>
               </div>
 
-              <p className="mt-1.5 whitespace-pre-wrap text-sm text-slate-700">{post.message}</p>
+              <p className="mt-1.5 whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-700">{post.message}</p>
 
               {post.syncedAt && (
                 <dl className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">

@@ -120,7 +120,7 @@ export function CommentsPanel({
                 </p>
               </div>
 
-              <p className="mt-1.5 whitespace-pre-wrap text-sm text-slate-700">{comment.message}</p>
+              <p className="mt-1.5 whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-700">{comment.message}</p>
 
               <p className="mt-2 truncate text-xs text-slate-400" title={comment.postMessage}>
                 {t('onPost', { post: comment.postMessage })}

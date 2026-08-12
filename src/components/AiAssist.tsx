@@ -120,7 +120,7 @@ export function AiAssist({ draft, onResult }: Props) {
 
       {suggestion && (
         <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-          <p className="whitespace-pre-wrap text-sm text-slate-800">{suggestion}</p>
+          <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-800">{suggestion}</p>
           <div className="mt-2 flex gap-2">
             <button
               type="button"

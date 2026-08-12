@@ -280,7 +280,7 @@ export function FeedsClient({ feeds, targets, canManage }: Props) {
               </p>
             )}
 
-            <p className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-50 p-2 font-mono text-xs text-slate-600">
+            <p className="mt-3 whitespace-pre-wrap [overflow-wrap:anywhere] rounded-lg bg-slate-50 p-2 font-mono text-xs text-slate-600">
               {feed.messageTemplate}
             </p>
           </section>

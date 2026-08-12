@@ -163,7 +163,7 @@ export default async function CalendarPage({
                             {post.scheduledAt ? formatInZone(post.scheduledAt, timezone, 'HH:mm') : ''}
                           </span>
                         </span>
-                        <span className="mt-0.5 line-clamp-2 block text-[11px] leading-tight text-slate-700">
+                        <span className="mt-0.5 line-clamp-2 block [overflow-wrap:anywhere] text-[11px] leading-tight text-slate-700">
                           {post.message || post.link || tPosts('mediaOnly')}
                         </span>
                       </Link>

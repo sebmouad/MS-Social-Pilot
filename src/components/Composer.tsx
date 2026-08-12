@@ -331,7 +331,7 @@ export function Composer({
                     {preview.title ?? t('noTitleFound')}
                   </p>
                   {preview.description && (
-                    <p className="line-clamp-2 text-sm text-slate-600">{preview.description}</p>
+                    <p className="line-clamp-2 [overflow-wrap:anywhere] text-sm text-slate-600">{preview.description}</p>
                   )}
                   <p className="text-xs text-slate-400">
                     {t('readVia', {

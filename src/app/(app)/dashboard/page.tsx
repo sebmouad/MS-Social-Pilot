@@ -187,7 +187,7 @@ export default async function DashboardPage() {
               {upcoming.map((post) => (
                 <li key={post.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="line-clamp-2 flex-1 text-sm text-slate-800">
+                    <p className="line-clamp-2 min-w-0 flex-1 [overflow-wrap:anywhere] text-sm text-slate-800">
                       {post.message || post.link || tPosts('mediaOnly')}
                     </p>
                     <StatusBadge status={post.status} />

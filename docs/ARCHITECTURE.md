@@ -924,7 +924,12 @@ code nobody remembered to think about:
   it, because a new destination kind with no label renders as "Page".
 
 **A browser walk**, in `e2e/`, opens every screen in both languages, signed in
-and signed out, empty and with a post on the calendar. None of the above
+and signed out, empty and with a post on the calendar — and again at phone
+width, where it checks that no page scrolls sideways. That last assertion is
+worth more than it looks: one element wider than the screen moves the whole
+page under the thumb, and it is invisible at any width where the element fits.
+The check ignores anything inside a container that scrolls its own overflow,
+because a tab strip that slides sideways is doing the right thing. None of the above
 renders a page, so none of it can notice a server component that throws, a
 missing translation, or a form that submits before React attaches to it — all
 three of which it found the first time it ran. Playwright is deliberately not a

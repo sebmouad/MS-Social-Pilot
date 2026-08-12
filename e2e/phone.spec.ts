@@ -1,0 +1,179 @@
+import { expect, test } from '@playwright/test';
+
+import { collectFailures, open, OWNER, SIGNED_IN_SCREENS } from './helpers';
+import { connectPretendPage, PAGE_NAME, prisma } from './fixtures';
+
+/**
+ * The same screens, on a phone.
+ *
+ * Everything else runs at desktop width, which leaves an entire dimension of
+ * the app untested: a navigation bar that collapses into a menu below `lg`,
+ * tables that swap to cards at `sm`, tab strips that scroll sideways. None of
+ * that is exercised by a test that never narrows the window.
+ *
+ * The assertion that earns its place here is horizontal overflow. A single
+ * element wider than the screen makes the whole page slide under the thumb —
+ * the heading drifts off, buttons sit half off the edge — and it is invisible
+ * at any width where the element fits.
+ */
+
+/** How far past the viewport a page is allowed to reach. */
+const SLACK = 2;
+
+/**
+ * The content that actually breaks a narrow layout.
+ *
+ * An empty screen fits on anything. Overflow arrives with a filename nobody
+ * would shorten, a URL with no spaces in it, a table with one more column than
+ * the screen has room for — so the walk seeds those before looking.
+ */
+test.beforeAll(async () => {
+  const targetId = await connectPretendPage(OWNER.workspace);
+  const workspace = await prisma.workspace.findFirstOrThrow({
+    where: { name: OWNER.workspace },
+  });
+  const author = await prisma.user.findFirstOrThrow({ where: { email: OWNER.email } });
+
+  const post = await prisma.post.create({
+    data: {
+      workspaceId: workspace.id,
+      authorId: author.id,
+      message:
+        'Sourdough https://an-unreasonably-long-example-domain-for-testing.example/with/a/path/that/never/wraps?because=it+has+no+spaces',
+      status: 'scheduled',
+      scheduledAt: new Date(Date.now() + 60 * 60 * 1000),
+      targets: { create: { targetId, status: 'pending' } },
+    },
+    include: { targets: true },
+  });
+
+  await prisma.media.create({
+    data: {
+      workspaceId: workspace.id,
+      kind: 'image',
+      filename: 'a-photograph-of-the-bakery-taken-on-a-tuesday-morning-in-november.jpg',
+      mimeType: 'image/jpeg',
+      size: 2_400_000,
+      storageKey: 'uploads/long-name.jpg',
+      // A real (tiny) image rather than a path to a file that is not there.
+      // A URL that 404s would make this walk fail on a broken image of its own
+      // making, which teaches nothing about the app.
+      url:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    },
+  });
+
+  await prisma.postComment.create({
+    data: {
+      postTargetId: post.targets[0]!.id,
+      remoteId: 'phone_c1',
+      fromName: 'Someone With A Notably Long Display Name',
+      message: 'Supercalifragilisticexpialidociousandthensomemoreletterswithnobreaks',
+      createdTime: new Date(),
+    },
+  });
+
+  await prisma.activityLog.create({
+    data: { workspaceId: workspace.id, actorId: author.id, action: 'post.created' },
+  });
+});
+
+test.afterAll(async () => {
+  await prisma.$disconnect();
+});
+
+async function overflowingElements(page: import('@playwright/test').Page): Promise<string[]> {
+  return page.evaluate((slack) => {
+    const limit = document.documentElement.clientWidth + slack;
+    const guilty: string[] = [];
+
+    for (const element of Array.from(document.body.querySelectorAll('*'))) {
+      const box = element.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) continue;
+      if (box.right <= limit) continue;
+
+      // Anything inside a container that scrolls its own overflow is doing the
+      // right thing: a wide table or a tab strip that slides sideways is fine,
+      // the page sliding is not. The container can be any ancestor, not just
+      // the parent — an icon three levels inside a scrolling nav is still
+      // inside it.
+      let inScroller = false;
+      for (
+        let node: Element | null = element;
+        node && node !== document.body;
+        node = node.parentElement
+      ) {
+        if (['auto', 'scroll'].includes(window.getComputedStyle(node).overflowX)) {
+          inScroller = true;
+          break;
+        }
+      }
+      if (inScroller) continue;
+
+      const name = element.tagName.toLowerCase();
+      const classes = (element.getAttribute('class') ?? '').slice(0, 60);
+      guilty.push(`${name}.${classes} → ${Math.round(box.right)}px`);
+    }
+
+    return guilty;
+  }, SLACK);
+}
+
+for (const path of SIGNED_IN_SCREENS) {
+  test(`${path} fits on a phone`, async ({ page }) => {
+    const failures = collectFailures(page);
+
+    await open(page, path);
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+
+    // The page itself must not slide sideways under the thumb.
+    expect(await overflowingElements(page), `${path} has elements past the edge`).toEqual([]);
+
+    const scrollable = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(scrollable, `${path} scrolls ${scrollable}px sideways`).toBeLessThanOrEqual(SLACK);
+
+    expect(failures, `${path} reported browser errors`).toEqual([]);
+  });
+}
+
+test('the analytics tabs stay usable when there is data behind them', async ({ page }) => {
+  const failures = collectFailures(page);
+
+  await open(page, '/analytics?view=comments');
+  await expect(page.getByText(PAGE_NAME).first()).toBeVisible();
+
+  const scrollable = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(scrollable, `the comments tab scrolls ${scrollable}px sideways`).toBeLessThanOrEqual(SLACK);
+  expect(await overflowingElements(page)).toEqual([]);
+  expect(failures).toEqual([]);
+});
+
+test('the navigation is reachable behind the menu', async ({ page }) => {
+  await open(page, '/dashboard');
+
+  // Ten links do not fit across a phone, so they live behind a button. If that
+  // button is missing or does nothing, the app is one screen deep.
+  const menu = page.getByRole('button', { name: /menu/i });
+  await expect(menu).toBeVisible();
+
+  // Retry until the button reports itself open. The handler is attached at
+  // hydration, and on a development build that can be a second after the
+  // button is on screen — a single click can land before React is listening.
+  await expect(async () => {
+    await menu.click();
+    await expect(menu).toHaveAttribute('aria-expanded', 'true', { timeout: 1_500 });
+  }).toPass({ timeout: 30_000 });
+
+  const posts = page.getByRole('link', { name: /^posts$/i });
+  await expect(posts).toBeVisible();
+
+  await posts.click();
+  await page.waitForURL(/\/posts/);
+
+  // And it closes on the way, rather than covering the screen it navigated to.
+  await expect(page.getByRole('link', { name: /^calendar$/i })).toHaveCount(0);
+});

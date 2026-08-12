@@ -125,7 +125,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
           <li key={post.postTargetId} className="rounded-lg border border-slate-200 p-3">
             <Link
               href={`/analytics/post/${post.postTargetId}`}
-              className="line-clamp-3 text-sm text-slate-800"
+              className="line-clamp-3 [overflow-wrap:anywhere] text-sm text-slate-800"
             >
               {post.message || '—'}
             </Link>

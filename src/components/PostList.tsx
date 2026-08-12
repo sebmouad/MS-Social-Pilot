@@ -79,7 +79,7 @@ export function PostList({ posts }: { posts: PostView[] }) {
           <article key={post.id} className="card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <p className="whitespace-pre-wrap text-sm text-slate-800">
+                <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-800">
                   {post.message || <span className="text-slate-400">{t('noText')}</span>}
                 </p>
                 {post.link && (
