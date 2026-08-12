@@ -66,6 +66,8 @@ export async function runTokenExpiryCheck(context: JobContext): Promise<string |
     take: 100,
   });
 
+  let warned = 0;
+
   for (const account of accounts) {
     if (!account.tokenExpiresAt) continue;
 
@@ -74,20 +76,30 @@ export async function runTokenExpiryCheck(context: JobContext): Promise<string |
       Math.ceil((account.tokenExpiresAt.getTime() - context.now.getTime()) / (24 * 60 * 60 * 1000)),
     );
 
+    // Claim the warning before sending it. "Once per token" has to hold across
+    // workers, not just across runs: every worker runs every job, so each one
+    // read this same unwarned account and would send the client its own copy.
+    //
+    // Marking first costs nothing that was not already lost — `notifyTokenExpiring`
+    // swallows its own failures, so the send result was never consulted here
+    // anyway, and a failed send is recorded in the email log either way.
+
+    const { count: claimed } = await prisma.socialAccount.updateMany({
+      where: { id: account.id, expiryWarningSentAt: null },
+      data: { expiryWarningSentAt: context.now },
+    });
+    if (claimed === 0) continue;
+
     await notifyTokenExpiring({
       workspaceId: account.workspaceId,
       accountName: account.name,
       expiresAt: account.tokenExpiresAt,
       days,
     });
-
-    await prisma.socialAccount.update({
-      where: { id: account.id },
-      data: { expiryWarningSentAt: context.now },
-    });
+    warned += 1;
   }
 
-  return accounts.length > 0 ? `warned about ${accounts.length} expiring token(s)` : null;
+  return warned > 0 ? `warned about ${warned} expiring token(s)` : null;
 }
 
 /**

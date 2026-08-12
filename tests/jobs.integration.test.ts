@@ -119,6 +119,49 @@ describe('token expiry warnings', () => {
     expect(await prisma.emailLog.count({ where: { template: 'tokenExpiring' } })).toBe(1);
   });
 
+  it('warns only once even when several workers run the check together', async () => {
+    const { account } = await seedWorkspace();
+    await prisma.socialAccount.update({
+      where: { id: account.id },
+      data: { tokenExpiresAt: new Date('2026-09-05T10:00:00Z') },
+    });
+
+    // "Warn once per token" has to hold across workers, not just across runs.
+    // Every worker runs every job, and this one read the unwarned account,
+    // emailed, and only then marked it — so each worker sent the client its
+    // own copy of the same warning.
+    //
+    // A row lock on the account holds every run at the moment it writes, so
+    // they have all read the same unwarned row before any of them acts.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+
+    const holding = prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM social_accounts WHERE id = ${account.id} FOR UPDATE`;
+        locked();
+        await held;
+      },
+      { timeout: 30_000 },
+    );
+    await ready;
+
+    const checks = Array.from({ length: 4 }, () => jobs.runTokenExpiryCheck({ now, logger }));
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    release();
+    await holding;
+    await Promise.all(checks);
+
+    expect(await prisma.emailLog.count({ where: { template: 'tokenExpiring' } })).toBe(1);
+  });
+
   it('ignores a token that is not near expiry', async () => {
     const { account } = await seedWorkspace();
     await prisma.socialAccount.update({
