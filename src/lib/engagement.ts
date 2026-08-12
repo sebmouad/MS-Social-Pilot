@@ -599,6 +599,7 @@ export async function syncTargetEdges(options: {
 
   await attempt('conversations', async () => {
     const conversations = await fetchConversations(target.providerId, token);
+    const pending: Array<{ conversationId: string } & (typeof conversations)[number]['messages'][number]> = [];
 
     for (const conversation of conversations) {
       const stored = await prisma.conversation.upsert({
@@ -623,17 +624,20 @@ export async function syncTargetEdges(options: {
       });
 
       for (const message of conversation.messages) {
-        await prisma.conversationMessage.upsert({
-          where: {
-            conversationId_remoteId: {
-              conversationId: stored.id,
-              remoteId: message.remoteId,
-            },
-          },
-          create: { conversationId: stored.id, ...message },
-          update: { message: message.message },
-        });
+        pending.push({ conversationId: stored.id, ...message });
       }
+    }
+
+    // One insert for every message in every thread, rather than one round trip
+    // each. A Page can hold a hundred and fifty threads of twenty-five
+    // messages, and almost all of them are already stored — the old loop spent
+    // thousands of round trips per sync to write what was already there.
+    //
+    // Insert-only, with no update: a message on Facebook cannot be edited
+    // after it is sent, so a row that exists is already right. `skipDuplicates`
+    // is what makes that true in one statement rather than a check each.
+    if (pending.length > 0) {
+      await prisma.conversationMessage.createMany({ data: pending, skipDuplicates: true });
     }
 
     return conversations.length;

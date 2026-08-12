@@ -2160,3 +2160,79 @@ describe('writing reviews in batches', () => {
     expect(second.fetchedAt.getTime()).toBeGreaterThan(first.fetchedAt.getTime());
   });
 });
+
+/**
+ * Storing an inbox without a round trip per message.
+ *
+ * A Page can hold a hundred and fifty threads of twenty-five messages, and a
+ * sync re-reads all of them. Almost every message is already stored, so the
+ * work that matters is recognising that cheaply.
+ */
+describe('writing inbox messages in batches', () => {
+  it('stores the messages in a thread', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    const stored = await prisma.conversationMessage.findMany({});
+    expect(stored.length).toBeGreaterThan(0);
+    expect(stored.map((row) => row.message)).toContain('Are you open?');
+  });
+
+  it('does not store a message twice across syncs', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+    const first = await prisma.conversationMessage.count();
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+    expect(await prisma.conversationMessage.count()).toBe(first);
+  });
+
+  it('adds a message that arrived since the last sync', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+    const before = await prisma.conversationMessage.count();
+
+    const existing = routes['/conversations']!;
+    routes['/conversations'] = (url) => {
+      const answer = existing(url) as { data: Array<Record<string, unknown>> };
+      const thread = answer.data[0] as { messages: { data: Array<Record<string, unknown>> } };
+      thread.messages.data.push({
+        id: 'm-new',
+        message: 'And on bank holidays?',
+        created_time: '2026-08-03T09:00:00+0000',
+        from: { id: 'u9', name: 'Grace' },
+      });
+      return answer;
+    };
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    expect(await prisma.conversationMessage.count()).toBe(before + 1);
+    const added = await prisma.conversationMessage.findFirstOrThrow({ where: { remoteId: 'm-new' } });
+    expect(added.message).toBe('And on bank holidays?');
+  });
+
+  it('still keeps the thread itself up to date', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    // The thread row does change — snippet, unread count, last activity — so
+    // batching the messages must not have taken the conversation write with it.
+    const existing = routes['/conversations']!;
+    routes['/conversations'] = (url) => {
+      const answer = existing(url) as { data: Array<Record<string, unknown>> };
+      answer.data[0]!.unread_count = 7;
+      return answer;
+    };
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    const thread = await prisma.conversation.findFirstOrThrow({ where: { remoteId: 't1' } });
+    expect(thread.unreadCount).toBe(7);
+  });
+});
