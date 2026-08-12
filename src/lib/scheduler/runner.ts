@@ -274,9 +274,38 @@ async function claim(postTargetId: string, workerId: string, now: Date): Promise
 
 type PublishOutcome = 'published' | 'failed' | 'retrying';
 
+/**
+ * Write a result, but only while we still hold the lock.
+ *
+ * `staleLockMinutes` can hand a destination to a second worker while the
+ * first is still talking to Facebook — that is what the timeout is for, and a
+ * slow upload triggers it without anything having gone wrong. The first worker
+ * then comes back with a result for a row somebody else owns.
+ *
+ * Writing it anyway is worse than losing it. On success it replaces the second
+ * worker's claim with `published`, so the post it is still publishing has no
+ * lock and no record. On failure it writes `pending` with the lock cleared,
+ * which frees a destination that is *actively being published* — a third
+ * worker claims it and sends the post again. One reclaimed lock becomes an
+ * unbounded number of posts.
+ *
+ * Returns false when the lock was lost, so the caller can say so out loud.
+ */
+async function writeIfStillOurs(
+  postTargetId: string,
+  workerId: string,
+  data: Parameters<typeof prisma.postTarget.updateMany>[0]['data'],
+): Promise<boolean> {
+  const { count } = await prisma.postTarget.updateMany({
+    where: { id: postTargetId, lockedBy: workerId },
+    data,
+  });
+  return count === 1;
+}
+
 async function publishClaimed(
   postTargetId: string,
-  options: { now: Date; maxAttempts: number; logger: TickOptions['logger'] },
+  options: { now: Date; maxAttempts: number; workerId: string; logger: TickOptions['logger'] },
 ): Promise<PublishOutcome> {
   const row = await prisma.postTarget.findUnique({
     where: { id: postTargetId },
@@ -356,21 +385,30 @@ async function publishClaimed(
           scheduledPublishTime: null,
         });
 
-    await prisma.postTarget.update({
-      where: { id: postTargetId },
-      data: {
-        status: 'published',
-        remotePostId: result.remotePostId,
-        remoteUrl: result.remoteUrl,
-        publishedAt: options.now,
-        attempts,
-        errorCode: null,
-        errorMessage: null,
-        lockedAt: null,
-        lockedBy: null,
-        nextAttemptAt: null,
-      },
+    const kept = await writeIfStillOurs(postTargetId, options.workerId, {
+      status: 'published',
+      remotePostId: result.remotePostId,
+      remoteUrl: result.remoteUrl,
+      publishedAt: options.now,
+      attempts,
+      errorCode: null,
+      errorMessage: null,
+      lockedAt: null,
+      lockedBy: null,
+      nextAttemptAt: null,
     });
+
+    if (!kept) {
+      // The post is live on Facebook and nothing in our database points at it.
+      // Log the permalink loudly: it is the only way anyone finds the orphan,
+      // and the worker that now owns the row is probably about to publish a
+      // second copy.
+      options.logger?.(
+        `Published post ${post.id} to ${target.name} after losing the lock — the destination was reclaimed mid-publish and this copy is not recorded.`,
+        { url: result.remoteUrl, remotePostId: result.remotePostId, orphaned: true },
+      );
+      return 'published';
+    }
 
     options.logger?.(`Published post ${post.id} to ${target.name}.`, { url: result.remoteUrl });
     return 'published';
@@ -383,18 +421,25 @@ async function publishClaimed(
       now: options.now,
     });
 
-    await prisma.postTarget.update({
-      where: { id: postTargetId },
-      data: {
-        status: decision.shouldRetry ? 'pending' : 'failed',
-        attempts,
-        nextAttemptAt: decision.nextAttemptAt,
-        errorCode: graphError.code ? String(graphError.code) : graphError.kind,
-        errorMessage: `${graphError.displayMessage} ${decision.reason}`.trim(),
-        lockedAt: null,
-        lockedBy: null,
-      },
+    const kept = await writeIfStillOurs(postTargetId, options.workerId, {
+      status: decision.shouldRetry ? 'pending' : 'failed',
+      attempts,
+      nextAttemptAt: decision.nextAttemptAt,
+      errorCode: graphError.code ? String(graphError.code) : graphError.kind,
+      errorMessage: `${graphError.displayMessage} ${decision.reason}`.trim(),
+      lockedAt: null,
+      lockedBy: null,
     });
+
+    if (!kept) {
+      // Leave the row alone — another worker is publishing it and will write
+      // its own result. Our failure says nothing about their attempt.
+      options.logger?.(
+        `Failed to publish post ${post.id} to ${target.name}, but the destination had already been reclaimed — leaving it to the worker that holds it.`,
+        { kind: graphError.kind, attempts },
+      );
+      return 'failed';
+    }
 
     // A dead token affects every destination on the account, so flag it once
     // here rather than letting each scheduled post rediscover it — and tell
@@ -556,7 +601,7 @@ export async function runSchedulerTick(options: TickOptions = {}): Promise<TickR
   });
 
   const outcomes = await runWithConcurrency(claimed, concurrency, (id) =>
-    publishClaimed(id, { now, maxAttempts, logger }),
+    publishClaimed(id, { now, maxAttempts, workerId, logger }),
   );
 
   for (const { postId } of postIds) {
@@ -616,7 +661,7 @@ export async function publishNow(postId: string, logger?: TickOptions['logger'])
   }
 
   const outcomes = await runWithConcurrency(claimed, env.concurrency, (id) =>
-    publishClaimed(id, { now, maxAttempts: env.maxAttempts, logger }),
+    publishClaimed(id, { now, maxAttempts: env.maxAttempts, workerId, logger }),
   );
 
   await refreshPostStatus(postId, now);

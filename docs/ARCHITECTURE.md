@@ -99,6 +99,22 @@ can double-post. Facebook's own duplicate detection (error 506) catches
 identical content. The alternative, never reclaiming, silently drops posts,
 which is worse for a scheduling product.
 
+**Results are written only while the lock is still held.** Both the success and
+the failure write are `updateMany … where { id, lockedBy: workerId }`, and a
+count of zero means the destination was reclaimed mid-publish. This bounds the
+risk above at *one* extra post. Without it the failure write is the dangerous
+one: it sets `pending` and clears the lock, which frees a destination another
+worker is actively publishing, so a third worker claims it and posts again —
+one reclaimed lock turning into an unbounded number of posts.
+
+A worker that loses its lock does nothing else either: no failure email, and no
+condemning the connected account on an auth error. The worker that holds the row
+is about to hit the same error and will report it, and acting on a result we
+were not allowed to write risks disabling a working account on a misclassified
+one. A *successful* publish that loses its lock is logged with the permalink and
+`orphaned: true` — the post is live on Facebook and nothing in the database
+points at it, so the log line is the only way anyone finds it.
+
 ### Editing a post the worker has already started
 
 The claim above moves a *destination* to `processing`, but the *post* stays

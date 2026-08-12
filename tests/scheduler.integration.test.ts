@@ -24,6 +24,12 @@ interface Recorded {
 }
 let received: Recorded[] = [];
 
+/**
+ * Runs while the stub is holding a request open, so a test can change the
+ * world underneath a publish that is already in flight.
+ */
+let duringRequest: (() => Promise<void>) | null = null;
+
 /** Per-path queue of canned responses; falls back to a generic success. */
 let responses: Array<{ status: number; body: unknown }> = [];
 
@@ -45,8 +51,12 @@ beforeAll(async () => {
       received.push({ path: request.url ?? '', body });
 
       const next = responses.shift() ?? { status: 200, body: { id: '1000_2000' } };
-      response.writeHead(next.status, { 'content-type': 'application/json' });
-      response.end(JSON.stringify(next.body));
+      const hook = duringRequest;
+      duringRequest = null;
+      void Promise.resolve(hook?.()).then(() => {
+        response.writeHead(next.status, { 'content-type': 'application/json' });
+        response.end(JSON.stringify(next.body));
+      });
     });
   });
 
@@ -122,6 +132,7 @@ async function seedDuePost(options: { message?: string; link?: string } = {}) {
 beforeEach(async () => {
   received = [];
   responses = [];
+  duringRequest = null;
   // Order matters: children before parents.
   await prisma.postTarget.deleteMany();
   await prisma.post.deleteMany();
@@ -895,3 +906,91 @@ describe('publishedTotals', () => {
     expect(totals).toMatchObject({ impressions: 0, reach: 0, reactions: 0, comments: 0, posts: 0 });
   });
 })
+
+/**
+ * What the *first* worker does when its lock has already been taken away.
+ *
+ * `staleLockMinutes` exists so a crashed worker does not strand a post for
+ * ever, and it necessarily fires sometimes on a worker that is alive — a slow
+ * video upload outlasting the timeout is the ordinary case. So a second worker
+ * can be publishing the same destination while the first is still talking to
+ * Facebook, and then the first one comes back with a result to write.
+ *
+ * That the post may go out twice is the documented, accepted cost of
+ * reclaiming at all. What is not acceptable is the first worker's write
+ * landing on a row it no longer owns.
+ */
+describe('a worker whose lock was reclaimed while it was publishing', () => {
+  /** Reclaim the row and hand it to a second worker, as a real tick would. */
+  async function stealLock(postTargetId: string, thief: string) {
+    await prisma.postTarget.update({
+      where: { id: postTargetId },
+      data: { status: 'pending', lockedAt: null, lockedBy: null },
+    });
+    await prisma.postTarget.updateMany({
+      where: { id: postTargetId, status: 'pending' },
+      data: { status: 'processing', lockedAt: new Date(), lockedBy: thief },
+    });
+  }
+
+  it('does not overwrite the result of the worker that now owns the row', async () => {
+    const { postTarget } = await seedDuePost();
+    duringRequest = () => stealLock(postTarget.id, 'worker-b');
+
+    await runner.runSchedulerTick({ workerId: 'worker-a' });
+
+    const after = await prisma.postTarget.findUnique({ where: { id: postTarget.id } });
+
+    // Worker B is still mid-publish. Its claim has to survive: it is the only
+    // thing stopping a third worker picking the row up and posting again.
+    expect(after?.status).toBe('processing');
+    expect(after?.lockedBy).toBe('worker-b');
+  });
+
+  it('does not unlock a row a second worker is publishing when it fails', async () => {
+    const { postTarget } = await seedDuePost();
+    // A retryable failure, so the old code writes `pending` with no lock.
+    responses = [
+      { status: 500, body: { error: { message: 'Temporary', code: 2, type: 'OAuthException' } } },
+    ];
+    duringRequest = () => stealLock(postTarget.id, 'worker-b');
+
+    await runner.runSchedulerTick({ workerId: 'worker-a' });
+
+    const after = await prisma.postTarget.findUnique({ where: { id: postTarget.id } });
+
+    // This is the bad one: worker A's failure unlocking the row frees a
+    // destination worker B is actively publishing, so a third worker can claim
+    // it and send the same post a third time. One stale lock, unbounded posts.
+    expect(after?.status).toBe('processing');
+    expect(after?.lockedBy).toBe('worker-b');
+  });
+
+  it('does not condemn the account on a failure it no longer owns', async () => {
+    const { account, postTarget } = await seedDuePost();
+    responses = [
+      {
+        status: 400,
+        body: {
+          error: {
+            message: 'Error validating access token: the session has been invalidated.',
+            code: 190,
+            error_subcode: 460,
+            type: 'OAuthException',
+          },
+        },
+      },
+    ];
+    duringRequest = () => stealLock(postTarget.id, 'worker-b');
+
+    await runner.runSchedulerTick({ workerId: 'worker-a' });
+
+    // Marking the connection dead disables every destination on it and emails
+    // the client. If the token really is dead, worker B is about to hit the
+    // same error on the row it actually owns and will say so. Acting on a
+    // result we were not allowed to write risks tearing down a working
+    // account on a misclassified error, and gains nothing when we are right.
+    const flagged = await prisma.socialAccount.findUniqueOrThrow({ where: { id: account.id } });
+    expect(flagged.invalidatedAt).toBeNull();
+  });
+});
