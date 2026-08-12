@@ -1798,6 +1798,18 @@ when the walk has reached the start so later syncs stop spending a request to
 re-learn it. The walk only stops on a window that comes back *short* of the
 ceiling: a full one means there was more behind it.
 
+Reviews are stored a batch at a time rather than a row at a time. A row at a
+time is a round trip at a time — a thousand reviews measured at 1.6 seconds
+against a database on the same machine, and several times that across a
+network — while every sync re-reads the newest five hundred, almost none of
+which have changed. Batched, the same work is 19 milliseconds, because the
+common case becomes one read that finds nothing to do. `createMany` uses
+`skipDuplicates` because a page boundary can repeat a row, and one repeat would
+otherwise fail the insert and lose the whole batch rather than the duplicate.
+`fetchedAt` is still moved for every review seen, so it keeps meaning "when we
+last had this from Facebook" rather than quietly becoming "when it last
+changed".
+
 This is also why there is no bulk reconciliation of deleted comments. Rows
 absent from a fetch are not necessarily gone — on a busy post they are simply
 past the ceiling — so deleting them would destroy live comments. Removal stays

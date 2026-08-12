@@ -2051,3 +2051,112 @@ describe('walking back through a long rating history', () => {
     expect(summary.byRating['1']).toBe(1);
   });
 })
+
+/**
+ * Storing a batch of reviews without a round trip per review.
+ *
+ * The behaviour has to survive the change: a review that Facebook has edited
+ * still updates, one that has not is left alone, and the same review arriving
+ * in two overlapping windows does not become two rows.
+ */
+describe('writing reviews in batches', () => {
+  it('stores what came back', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    const stored = await prisma.pageReview.findMany({ where: { targetId: seed.target.id } });
+    expect(stored).toHaveLength(2);
+    expect(stored.map((row) => row.rating).sort()).toEqual([3, 5]);
+  });
+
+  it('picks up a review that was edited on Facebook', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    routes['/ratings'] = () => ({
+      data: [
+        {
+          created_time: '2026-07-01T10:00:00+0000',
+          rating: 1,
+          review_text: 'Changed my mind',
+          reviewer: { name: 'Ada' },
+          open_graph_story: { id: 's1' },
+        },
+      ],
+    });
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    const row = await prisma.pageReview.findFirstOrThrow({
+      where: { targetId: seed.target.id, remoteId: 's1' },
+    });
+    expect(row.rating).toBe(1);
+    expect(row.reviewText).toBe('Changed my mind');
+  });
+
+  it('survives Facebook returning the same review twice in one response', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+
+    // A page boundary can repeat a row. Inserting the batch in one statement
+    // means one repeat would otherwise fail the whole sync, losing every
+    // review in it rather than the one duplicate.
+    const review = {
+      created_time: '2026-07-01T10:00:00+0000',
+      rating: 5,
+      reviewer: { name: 'Ada' },
+      open_graph_story: { id: 'repeated' },
+    };
+    routes['/ratings'] = () => ({ data: [review, review] });
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    expect(await prisma.pageReview.count({ where: { targetId: seed.target.id } })).toBe(1);
+  });
+
+  it('does not duplicate a review seen in two overlapping windows', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+
+    // The backfill window ends where the stored history begins, so the review
+    // on that boundary is fetched twice.
+    routes['/ratings'] = () => ({
+      data: [
+        {
+          created_time: '2026-07-01T10:00:00+0000',
+          rating: 5,
+          reviewer: { name: 'Ada' },
+          open_graph_story: { id: 'dup' },
+        },
+      ],
+    });
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    expect(await prisma.pageReview.count({ where: { targetId: seed.target.id } })).toBe(1);
+  });
+
+  it('records that it saw a review even when nothing about it changed', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    const first = await prisma.pageReview.findFirstOrThrow({
+      where: { targetId: seed.target.id, remoteId: 's1' },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    const second = await prisma.pageReview.findFirstOrThrow({
+      where: { targetId: seed.target.id, remoteId: 's1' },
+    });
+
+    // Skipping the write for unchanged rows is the whole speed-up, but it must
+    // not turn "when we last had this from Facebook" into "when it last
+    // changed".
+    expect(second.fetchedAt.getTime()).toBeGreaterThan(first.fetchedAt.getTime());
+  });
+});
