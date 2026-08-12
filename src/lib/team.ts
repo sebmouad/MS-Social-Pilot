@@ -1,8 +1,9 @@
 import { WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
+import { atLeast } from './constants';
 import { hashToken, randomToken } from './crypto';
-import { AppError } from './errors';
+import { AppError, errors } from './errors';
 import { sendEmail } from './email/send';
 import { invitationEmail } from './email/templates';
 import { logActivity } from './scheduler/runner';
@@ -17,6 +18,23 @@ import { logActivity } from './scheduler/runner';
 
 const INVITATION_TTL_DAYS = 7;
 
+/**
+ * Nobody may hand out, or take away, a role above their own.
+ *
+ * The capability check on the route only asks whether the caller may manage
+ * the team at all, and admins may. That is not the same question as whether an
+ * admin may create an owner. Owner is not a bigger admin: `canManageInstance`
+ * is owner-only and deliberately not scoped to a workspace — it gates the Graph
+ * credentials, the API version and the feature switches for every client on the
+ * installation. An admin who can promote themselves, promote a friend, or
+ * demote the owner standing above them has taken the installation, so the rank
+ * is enforced in both directions, on the role being granted and on the member
+ * being changed.
+ */
+function assertRankPermits(actorRole: WorkspaceRole, affectedRole: WorkspaceRole): void {
+  if (!atLeast(actorRole, affectedRole)) throw errors.noPermission();
+}
+
 export class InvitationError extends AppError {}
 
 export interface InvitationResult {
@@ -30,9 +48,13 @@ export interface InvitationResult {
 export async function inviteMember(options: {
   workspaceId: string;
   invitedById: string;
+  /** The inviter's own role, so nobody invites somebody above themselves. */
+  actorRole: WorkspaceRole;
   email: string;
   role: WorkspaceRole;
 }): Promise<InvitationResult> {
+  assertRankPermits(options.actorRole, options.role);
+
   const email = options.email.trim().toLowerCase();
 
   const [workspace, inviter] = await Promise.all([
@@ -211,11 +233,17 @@ export async function revokeInvitation(workspaceId: string, invitationId: string
  * The last owner cannot be removed: a workspace with no owner cannot be
  * administered, invited to, or deleted by anyone.
  */
-export async function removeMember(workspaceId: string, userId: string): Promise<void> {
+export async function removeMember(
+  workspaceId: string,
+  userId: string,
+  actorRole: WorkspaceRole,
+): Promise<void> {
   const membership = await prisma.membership.findUnique({
     where: { userId_workspaceId: { userId, workspaceId } },
   });
   if (!membership) return;
+
+  assertRankPermits(actorRole, membership.role);
 
   if (membership.role === WorkspaceRole.owner) {
     const owners = await prisma.membership.count({
@@ -238,11 +266,18 @@ export async function changeRole(
   workspaceId: string,
   userId: string,
   role: WorkspaceRole,
+  actorRole: WorkspaceRole,
 ): Promise<void> {
   const membership = await prisma.membership.findUnique({
     where: { userId_workspaceId: { userId, workspaceId } },
   });
   if (!membership) throw new AppError({ key: 'errors.notFound', fallback: 'Not found.', status: 404 });
+
+  // Both ends of the change: the role being granted, and the role being taken
+  // away. Promoting somebody to owner and demoting the sitting owner arrive at
+  // the same place.
+  assertRankPermits(actorRole, role);
+  assertRankPermits(actorRole, membership.role);
 
   // Same guard as removal, by another route: demoting the last owner would
   // leave the workspace unadministrable.

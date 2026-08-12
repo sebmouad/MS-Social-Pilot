@@ -732,6 +732,18 @@ visible change rather than a one-line edit:
 Deleting a comment sits a step above hiding one deliberately: hiding is undone
 from the same screen, deletion removes a customer's words from the client's page
 and nothing brings them back.
+
+`canManageTeam` is where a capability check is not by itself the whole answer.
+It asks whether the caller may manage the team, and admins may — but "may manage
+the team" is not "may create an owner". Owner is the one role that reaches past
+the workspace: `canManageInstance` gates the Graph credentials, the API version
+and the feature switches for the whole installation, so an agency admin who can
+promote themselves has taken every other client on the box with them. `inviteMember`,
+`changeRole` and `removeMember` therefore take the caller's own role and refuse
+to grant, or to withdraw, a role above it — the second half mattering just as
+much, since demoting the sitting owner arrives at the same place as promoting
+yourself. The team screen filters its dropdowns by the same rank, so nobody is
+offered a control that would come back a 403.
 `getAuthContext` resolves the requested workspace and **re-checks membership** —
 an id from a cookie or URL is a request, not a permission. Workspace scoping is
 therefore a security boundary, with tests that a member of one workspace cannot

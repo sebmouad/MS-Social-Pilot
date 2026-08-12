@@ -10,13 +10,19 @@ const patchSchema = z.object({ role: z.nativeEnum(WorkspaceRole) });
 
 type Context = { params: Promise<{ id: string }> };
 
-/** Change a member's role. `id` is the user id. */
+/**
+ * Change a member's role. `id` is the user id.
+ *
+ * The caller's own role goes down with the request: `canManageTeam` lets admins
+ * in, and an admin creating an owner would be handing themselves the
+ * instance-wide settings.
+ */
 export const PATCH = route(async (request: Request, context: Context) => {
   const auth = await requireCapability(canManageTeam);
   const { id } = await context.params;
   const { role } = patchSchema.parse(await readJson(request));
 
-  await changeRole(auth.workspace.id, id, role);
+  await changeRole(auth.workspace.id, id, role, auth.role);
   return ok({ ok: true });
 });
 
@@ -34,7 +40,7 @@ export const DELETE = route(async (request: Request, context: Context) => {
   if (type === 'invitation') {
     await revokeInvitation(auth.workspace.id, id);
   } else {
-    await removeMember(auth.workspace.id, id);
+    await removeMember(auth.workspace.id, id, auth.role);
   }
 
   return ok({ ok: true });

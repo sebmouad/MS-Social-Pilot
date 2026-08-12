@@ -56,7 +56,8 @@ account, which permissions were granted and whether publishing actually works.
 - Several clients per account, each its own workspace with its own
   destinations, queue, branding and language.
 - Roles: owner, admin, editor, contributor. Email invitations with hashed,
-  expiring tokens.
+  expiring tokens. Nobody can grant, or take away, a role above their own — an
+  admin cannot make themselves an owner and inherit the instance settings.
 - **Approval workflow**: contributors submit, admins approve or send back with a
   note. Enforced in the scheduler, not just the UI.
 

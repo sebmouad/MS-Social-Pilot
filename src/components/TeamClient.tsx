@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+/** Ordered strongest first, so a position in this list is a rank. */
 const ROLES = ['owner', 'admin', 'editor', 'contributor'] as const;
 
 export interface Member {
@@ -25,11 +26,13 @@ interface Props {
   members: Member[];
   invitations: PendingInvitation[];
   canManage: boolean;
+  /** The viewer's own role. Nobody is offered a role above it. */
+  viewerRole: string;
   /** False when RESEND_API_KEY is unset — the link is shown instead. */
   emailConfigured: boolean;
 }
 
-export function TeamClient({ members, invitations, canManage, emailConfigured }: Props) {
+export function TeamClient({ members, invitations, canManage, viewerRole, emailConfigured }: Props) {
   const t = useTranslations('team');
   const tCommon = useTranslations('common');
   const router = useRouter();
@@ -40,6 +43,14 @@ export function TeamClient({ members, invitations, canManage, emailConfigured }:
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [manualLink, setManualLink] = useState<string | null>(null);
+
+  // The API refuses to grant or withdraw a role above the caller's own, so an
+  // admin is not shown an "owner" option that would come back a 403, and is not
+  // offered the controls for a member standing above them.
+  const viewerRank = ROLES.indexOf(viewerRole as (typeof ROLES)[number]);
+  const grantable = viewerRank < 0 ? [] : ROLES.slice(viewerRank);
+  const canManageMember = (member: Member) =>
+    canManage && !member.isSelf && ROLES.indexOf(member.role as (typeof ROLES)[number]) >= viewerRank;
 
   async function invite() {
     setPending(true);
@@ -126,11 +137,13 @@ export function TeamClient({ members, invitations, canManage, emailConfigured }:
                 value={role}
                 onChange={(event) => setRole(event.target.value)}
               >
-                {ROLES.filter((option) => option !== 'owner').map((option) => (
-                  <option key={option} value={option}>
-                    {t(`roles.${option}`)}
-                  </option>
-                ))}
+                {grantable
+                  .filter((option) => option !== 'owner')
+                  .map((option) => (
+                    <option key={option} value={option}>
+                      {t(`roles.${option}`)}
+                    </option>
+                  ))}
               </select>
             </div>
             <button
@@ -188,7 +201,7 @@ export function TeamClient({ members, invitations, canManage, emailConfigured }:
                 <span className="block truncate text-xs text-slate-500">{member.email}</span>
               </span>
 
-              {canManage && !member.isSelf ? (
+              {canManageMember(member) ? (
                 <>
                   <select
                     className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
@@ -201,7 +214,7 @@ export function TeamClient({ members, invitations, canManage, emailConfigured }:
                       })
                     }
                   >
-                    {ROLES.map((option) => (
+                    {grantable.map((option) => (
                       <option key={option} value={option}>
                         {t(`roles.${option}`)}
                       </option>

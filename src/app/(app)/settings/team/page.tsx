@@ -46,6 +46,7 @@ export default async function TeamPage() {
 
       <TeamClient
         canManage={canManageTeam(auth.role)}
+        viewerRole={auth.role}
         emailConfigured={emailEnabled()}
         members={members.map((membership) => ({
           userId: membership.user.id,

@@ -1199,6 +1199,7 @@ describe('invitations', () => {
     const invitation = await team.inviteMember({
       workspaceId: workspace.id,
       invitedById: owner.id,
+      actorRole: WorkspaceRole.owner,
       email: invitee.email,
       role: WorkspaceRole.editor,
     });
@@ -1221,6 +1222,7 @@ describe('invitations', () => {
     const invitation = await team.inviteMember({
       workspaceId: workspace.id,
       invitedById: owner.id,
+      actorRole: WorkspaceRole.owner,
       email: intended.email,
       role: WorkspaceRole.admin,
     });
@@ -1244,6 +1246,7 @@ describe('invitations', () => {
     const invitation = await team.inviteMember({
       workspaceId: workspace.id,
       invitedById: owner.id,
+      actorRole: WorkspaceRole.owner,
       email: invitee.email,
       role: WorkspaceRole.contributor,
     });
@@ -1261,6 +1264,7 @@ describe('invitations', () => {
     const invitation = await team.inviteMember({
       workspaceId: workspace.id,
       invitedById: owner.id,
+      actorRole: WorkspaceRole.owner,
       email: invitee.email,
       role: WorkspaceRole.contributor,
     });
@@ -1281,12 +1285,14 @@ describe('invitations', () => {
     const first = await team.inviteMember({
       workspaceId: workspace.id,
       invitedById: owner.id,
+      actorRole: WorkspaceRole.owner,
       email: 'new@example.com',
       role: WorkspaceRole.contributor,
     });
     const second = await team.inviteMember({
       workspaceId: workspace.id,
       invitedById: owner.id,
+      actorRole: WorkspaceRole.owner,
       email: 'new@example.com',
       role: WorkspaceRole.editor,
     });
@@ -1304,7 +1310,9 @@ describe('invitations', () => {
     const { workspace } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
 
     // Otherwise the workspace becomes unadministrable.
-    await expect(team.removeMember(workspace.id, owner.id)).rejects.toThrow(/at least one owner/i);
+    await expect(team.removeMember(workspace.id, owner.id, WorkspaceRole.owner)).rejects.toThrow(
+      /at least one owner/i,
+    );
   });
 
   it('will not demote the last owner', async () => {
@@ -1312,8 +1320,130 @@ describe('invitations', () => {
     const { workspace } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
 
     await expect(
-      team.changeRole(workspace.id, owner.id, WorkspaceRole.admin),
+      team.changeRole(workspace.id, owner.id, WorkspaceRole.admin, WorkspaceRole.owner),
     ).rejects.toThrow(/at least one owner/i);
+  });
+
+  /**
+   * The escalation this whole file exists to prevent, in its shortest form.
+   *
+   * Owner is not simply a bigger admin. `canManageInstance` is owner-only and
+   * is not scoped to a workspace: it gates the Graph credentials, the API
+   * version and the feature switches for every client on the installation. An
+   * agency admin who can hand themselves that role has taken over the box, not
+   * their own workspace.
+   */
+  it('does not let an admin make themselves an owner', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
+    const admin = await makeUser('Admin');
+    await prisma.membership.create({
+      data: { userId: admin.id, workspaceId: workspace.id, role: WorkspaceRole.admin },
+    });
+
+    await expect(
+      team.changeRole(workspace.id, admin.id, WorkspaceRole.owner, WorkspaceRole.admin),
+    ).rejects.toThrow(/permission/i);
+
+    const membership = await prisma.membership.findUniqueOrThrow({
+      where: { userId_workspaceId: { userId: admin.id, workspaceId: workspace.id } },
+    });
+    expect(membership.role).toBe(WorkspaceRole.admin);
+  });
+
+  it('does not let an admin promote somebody else to owner', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
+    const editor = await makeUser('Editor');
+    await prisma.membership.create({
+      data: { userId: editor.id, workspaceId: workspace.id, role: WorkspaceRole.editor },
+    });
+
+    // The long way round to the same place: promote a friend, be promoted back.
+    await expect(
+      team.changeRole(workspace.id, editor.id, WorkspaceRole.owner, WorkspaceRole.admin),
+    ).rejects.toThrow(/permission/i);
+  });
+
+  /**
+   * Escalation by subtraction. A second owner exists, so the last-owner guard
+   * does not fire, and an admin could otherwise demote or delete the person
+   * standing above them.
+   */
+  it('does not let an admin demote an owner', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
+    const second = await makeUser('Second owner');
+    const admin = await makeUser('Admin');
+    await prisma.membership.createMany({
+      data: [
+        { userId: second.id, workspaceId: workspace.id, role: WorkspaceRole.owner },
+        { userId: admin.id, workspaceId: workspace.id, role: WorkspaceRole.admin },
+      ],
+    });
+
+    await expect(
+      team.changeRole(workspace.id, owner.id, WorkspaceRole.editor, WorkspaceRole.admin),
+    ).rejects.toThrow(/permission/i);
+
+    await expect(
+      team.removeMember(workspace.id, owner.id, WorkspaceRole.admin),
+    ).rejects.toThrow(/permission/i);
+
+    expect(
+      await prisma.membership.count({ where: { workspaceId: workspace.id, role: WorkspaceRole.owner } }),
+    ).toBe(2);
+  });
+
+  it('lets an owner hand ownership over and step down', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
+    const successor = await makeUser('Successor');
+    await prisma.membership.create({
+      data: { userId: successor.id, workspaceId: workspace.id, role: WorkspaceRole.admin },
+    });
+
+    await team.changeRole(workspace.id, successor.id, WorkspaceRole.owner, WorkspaceRole.owner);
+    await team.changeRole(workspace.id, owner.id, WorkspaceRole.admin, WorkspaceRole.owner);
+
+    const memberships = await prisma.membership.findMany({ where: { workspaceId: workspace.id } });
+    expect(memberships.find((row) => row.userId === successor.id)?.role).toBe(WorkspaceRole.owner);
+    expect(memberships.find((row) => row.userId === owner.id)?.role).toBe(WorkspaceRole.admin);
+  });
+
+  it('lets an admin manage the roles below their own', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
+    const contributor = await makeUser('Contributor');
+    await prisma.membership.create({
+      data: { userId: contributor.id, workspaceId: workspace.id, role: WorkspaceRole.contributor },
+    });
+
+    await team.changeRole(workspace.id, contributor.id, WorkspaceRole.editor, WorkspaceRole.admin);
+
+    const membership = await prisma.membership.findUniqueOrThrow({
+      where: { userId_workspaceId: { userId: contributor.id, workspaceId: workspace.id } },
+    });
+    expect(membership.role).toBe(WorkspaceRole.editor);
+  });
+
+  it('does not let an admin invite a new owner', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
+
+    // The same escalation with an extra step: invite an address you control as
+    // an owner, accept it, and the workspace has a second owner who is you.
+    await expect(
+      team.inviteMember({
+        workspaceId: workspace.id,
+        invitedById: owner.id,
+        actorRole: WorkspaceRole.admin,
+        email: 'friend@example.com',
+        role: WorkspaceRole.owner,
+      }),
+    ).rejects.toThrow(/permission/i);
+
+    expect(await prisma.invitation.count({ where: { workspaceId: workspace.id } })).toBe(0);
   });
 });
 

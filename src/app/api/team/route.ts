@@ -51,6 +51,7 @@ export const POST = route(async (request: Request) => {
   const result = await inviteMember({
     workspaceId: auth.workspace.id,
     invitedById: auth.user.id,
+    actorRole: auth.role,
     email: input.email,
     role: input.role,
   });
