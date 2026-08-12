@@ -1685,7 +1685,23 @@ the file records the range either.
 An inverted range is refused rather than run, for the same reason the labels
 matter: it returns nothing, and a report of nothing is indistinguishable from a
 month in which the client's pages were silent, so a typo in the dates reads as
-bad news about their account.
+bad news about their account. The screen says so rather than falling back to a
+default period — numbers that are real but for dates nobody asked for is the
+one thing this page is best placed to hide.
+
+**A day means a day where the client is.** The dates come from a date picker,
+so "1 August" is a day on the workspace's calendar, not midnight UTC. Reading
+them as UTC moved both boundaries by the offset: a Los Angeles workspace asking
+for August got seven hours of 31 July at one end and lost the last seven hours
+of 31 August at the other. The visible half was worse — the field redisplayed
+their "1 August" as "31 July", because it renders the parsed instant back in
+local time.
+
+`parseReportRange` resolves a bare `YYYY-MM-DD` through `firstRealInstant`, so
+a day that a clock change makes 23 hours long still starts at its first real
+instant. The end of a range is the start of the next day minus a millisecond:
+`23:59:59` would drop anything published in the final second and lands in the
+wrong place in a zone that changes its clocks at midnight.
 
 ### Beyond /insights
 

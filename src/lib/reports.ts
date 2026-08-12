@@ -2,7 +2,7 @@ import { PostTargetStatus } from '@prisma/client';
 
 import { prisma } from './prisma';
 import { parseInsights, type PostInsights } from './json';
-import { formatInZone } from './time';
+import { DEFAULT_TIMEZONE, firstRealInstant, formatInZone, isValidTimeZone } from './time';
 import { toCsv } from './csv';
 
 /**
@@ -67,11 +67,34 @@ export type RangeResult =
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
+/** A bare calendar day, as an `<input type="date">` submits it. */
+const BARE_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The calendar day after this one, by calendar arithmetic rather than +24h. */
+function dayAfter(day: string): string {
+  const next = new Date(`${day}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
 /**
  * Work out which period a report covers.
  *
- * Shared by the report and the analytics exports, which asked the same
- * question in the same way and got the same two things wrong.
+ * Shared by the report screen and the two CSV routes, which asked the same
+ * question three ways and disagreed with each other.
+ *
+ * **A day means a day where the client is.** The dates come from a date
+ * picker, so "1 August" is a day on the workspace's calendar, not the instant
+ * midnight UTC. Reading them as UTC moved the boundary by the offset: a Los
+ * Angeles workspace asking for August got seven hours of 31 July at one end
+ * and lost the last seven hours of 31 August at the other — and the date field
+ * redisplayed their "1 August" as "31 July", which is the version they could
+ * actually see.
+ *
+ * The end of the range is the last instant of its final day, taken as the
+ * start of the day after minus a millisecond. Writing `23:59:59` instead would
+ * drop anything published in the final second, and would land in the wrong
+ * place in a zone that changes its clocks at midnight.
  *
  * An inverted range is refused rather than run. It returns nothing, and a
  * report of nothing is indistinguishable from a month in which the client's
@@ -81,12 +104,27 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 export function parseReportRange(params: {
   from: string | null;
   to: string | null;
+  timeZone?: string;
   now?: Date;
 }): RangeResult {
-  const to = params.to ? new Date(params.to) : (params.now ?? new Date());
+  const zone = params.timeZone && isValidTimeZone(params.timeZone) ? params.timeZone : DEFAULT_TIMEZONE;
+
+  const startOfDay = (day: string) => firstRealInstant(`${day}T00:00`, zone);
+  const endOfDay = (day: string) => new Date(startOfDay(dayAfter(day)).getTime() - 1);
+
+  const to = params.to
+    ? BARE_DAY.test(params.to)
+      ? endOfDay(params.to)
+      : new Date(params.to)
+    : (params.now ?? new Date());
+
   // Last 30 days by default: long enough to be meaningful, short enough to
   // load quickly.
-  const from = params.from ? new Date(params.from) : new Date(to.getTime() - THIRTY_DAYS_MS);
+  const from = params.from
+    ? BARE_DAY.test(params.from)
+      ? startOfDay(params.from)
+      : new Date(params.from)
+    : new Date(to.getTime() - THIRTY_DAYS_MS);
 
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
     return { ok: false, message: 'Enter a valid date range.' };

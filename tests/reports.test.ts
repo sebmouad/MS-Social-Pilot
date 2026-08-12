@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { utcToLocalInput } from '../src/lib/time';
 import en from '../messages/en.json';
 import fr from '../messages/fr.json';
 
@@ -196,6 +197,69 @@ describe('parseReportRange', () => {
     if (!range.ok) return;
     expect(range.from.toISOString()).toBe('2026-08-10T00:00:00.000Z');
     expect(range.to.toISOString()).toBe(now.toISOString());
+  });
+});
+
+describe('parseReportRange across time zones', () => {
+  const tz = 'America/Los_Angeles';
+
+  it('starts the range at midnight where the client is', () => {
+    const range = parseReportRange({ from: '2026-08-01', to: '2026-08-31', timeZone: tz });
+    expect(range.ok).toBe(true);
+    if (!range.ok) return;
+
+    // Read as UTC this began at 17:00 on 31 July local, so the report opened
+    // with seven hours of the previous month in it.
+    expect(utcToLocalInput(range.from, tz)).toBe('2026-08-01T00:00');
+  });
+
+  it('runs to the last instant of the final day, not to 23:59:59 UTC', () => {
+    const range = parseReportRange({ from: '2026-08-01', to: '2026-08-31', timeZone: tz });
+    expect(range.ok).toBe(true);
+    if (!range.ok) return;
+
+    // Read as UTC this stopped at 16:59 local, losing the last seven hours of
+    // the client's final day — the busiest part of it, in this zone.
+    expect(utcToLocalInput(range.to, tz)).toBe('2026-08-31T23:59');
+    // And the final second belongs to the range: `23:59:59` would drop
+    // anything published inside it.
+    expect(range.to.getTime() % 1000).toBe(999);
+  });
+
+  it('round-trips what the date field submitted', () => {
+    // The visible half of the bug: typing 1 August and reloading showed 31
+    // July, because the control redisplays the parsed instant in local time.
+    for (const day of ['2026-01-15', '2026-08-01', '2026-12-31']) {
+      const range = parseReportRange({ from: day, to: day, timeZone: tz });
+      expect(range.ok, day).toBe(true);
+      if (!range.ok) return;
+      expect(utcToLocalInput(range.from, tz).slice(0, 10), day).toBe(day);
+      expect(utcToLocalInput(range.to, tz).slice(0, 10), day).toBe(day);
+    }
+  });
+
+  it('covers a day that a clock change makes shorter', () => {
+    // Spring forward in Los Angeles: 8 March 2026, 02:00 becomes 03:00. The
+    // day still has to start at its first real instant and end at the last.
+    const range = parseReportRange({ from: '2026-03-08', to: '2026-03-08', timeZone: tz });
+    expect(range.ok).toBe(true);
+    if (!range.ok) return;
+    expect(utcToLocalInput(range.from, tz)).toBe('2026-03-08T00:00');
+    expect(range.to.getTime() - range.from.getTime()).toBe(23 * 60 * 60 * 1000 - 1);
+  });
+
+  it('leaves a full timestamp alone', () => {
+    const range = parseReportRange({ from: '2026-08-01T12:34:00Z', to: '2026-08-02', timeZone: tz });
+    expect(range.ok).toBe(true);
+    if (!range.ok) return;
+    expect(range.from.toISOString()).toBe('2026-08-01T12:34:00.000Z');
+  });
+
+  it('falls back to UTC rather than throwing on a zone it cannot read', () => {
+    const range = parseReportRange({ from: '2026-08-01', to: '2026-08-01', timeZone: 'Mars/Olympus' });
+    expect(range.ok).toBe(true);
+    if (!range.ok) return;
+    expect(range.from.toISOString()).toBe('2026-08-01T00:00:00.000Z');
   });
 });
 

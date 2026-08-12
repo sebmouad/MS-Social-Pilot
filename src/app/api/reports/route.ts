@@ -12,6 +12,7 @@ export const GET = route(async (request: Request) => {
   const range = parseReportRange({
     from: url.searchParams.get('from'),
     to: url.searchParams.get('to'),
+    timeZone: auth.workspace.timezone,
   });
   if (!range.ok) return NextResponse.json({ error: range.message }, { status: 400 });
   const { from, to } = range;

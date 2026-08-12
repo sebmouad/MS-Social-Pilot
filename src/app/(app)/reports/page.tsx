@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
-import { buildReport } from '@/lib/reports';
+import { buildReport, parseReportRange } from '@/lib/reports';
 import { formatInZone, utcToLocalInput } from '@/lib/time';
 import { ReportControls } from '@/components/ReportControls';
 import { ExternalLink } from '@/components/ExternalLink';
@@ -27,22 +27,35 @@ export default async function ReportsPage({
 
   const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
-  const toParam = first(params.to);
-  const fromParam = first(params.from);
+  // The same parsing the CSV routes use, so the screen and the download can
+  // never describe different periods — and so "1 August" means that day here,
+  // not midnight UTC.
+  const range = parseReportRange({
+    from: first(params.from) ?? null,
+    to: first(params.to) ?? null,
+    timeZone: timezone,
+  });
+  // A rejected range must not quietly become a different one. Reporting the
+  // last thirty days under dates nobody asked for is the failure this screen
+  // is most able to hide: the numbers look real, and they are — for a period
+  // the reader is not looking at.
+  const rangeError = range.ok ? null : range.message;
+  const { from, to } = range.ok
+    ? range
+    : { from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), to: new Date() };
 
-  const to = toParam ? new Date(`${toParam}T23:59:59Z`) : new Date();
-  const from = fromParam
-    ? new Date(`${fromParam}T00:00:00Z`)
-    : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const report = rangeError
+    ? null
+    : await buildReport({ workspaceId: auth.workspace.id, timezone, from, to });
 
-  const report = await buildReport({ workspaceId: auth.workspace.id, timezone, from, to });
-
-  const cards = [
-    { label: t('postsPublished'), value: report.postsPublished },
-    { label: t('totalReach'), value: report.totals.reach },
-    { label: t('totalEngagement'), value: report.totals.engagement },
-    { label: t('linkClicks'), value: report.totals.linkClicks },
-  ];
+  const cards = report
+    ? [
+        { label: t('postsPublished'), value: report.postsPublished },
+        { label: t('totalReach'), value: report.totals.reach },
+        { label: t('totalEngagement'), value: report.totals.engagement },
+        { label: t('linkClicks'), value: report.totals.linkClicks },
+      ]
+    : [];
 
   return (
     <div className="space-y-6">
@@ -69,7 +82,9 @@ export default async function ReportsPage({
         ))}
       </div>
 
-      {report.destinations.length === 0 ? (
+      {rangeError ? (
+        <div className="card p-8 text-center text-sm text-amber-700">{rangeError}</div>
+      ) : !report || report.destinations.length === 0 ? (
         <div className="card p-8 text-center text-sm text-slate-600">{t('noData')}</div>
       ) : (
         <>
