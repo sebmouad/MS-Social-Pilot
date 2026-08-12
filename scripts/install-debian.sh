@@ -150,6 +150,8 @@ EnvironmentFile=${APP_DIR}/.env
 ExecStart=/usr/bin/npm start
 Restart=always
 RestartSec=5
+# So PORT=80 or 443 in .env works without running the whole app as root.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target
@@ -195,5 +197,10 @@ cat <<SUMMARY
     Set APP_URL in ${APP_DIR}/.env to the address people will actually use,
     including https://, before connecting Facebook — the OAuth redirect has to
     match it exactly.
+
+    The app listens on PORT (3000 by default) and serves plain HTTP. For a
+    public server put a TLS terminator in front of it on 443 — the app has no
+    certificate handling of its own. To serve directly without one, set PORT=80
+    in .env; the unit installed here already carries the capability to bind it.
 
 SUMMARY

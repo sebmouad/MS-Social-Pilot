@@ -26,6 +26,21 @@ const schemaNotes = readFileSync('docs/PROJECT_SCHEMA.md', 'utf8');
  */
 const BOOTSTRAP_ONLY = new Set(['DATABASE_URL', 'ENCRYPTION_KEY', 'SESSION_SECRET']);
 
+/**
+ * Variables read before the app exists, so they cannot be settings either.
+ *
+ * A setting is stored in the database and changed from the configuration
+ * screen. These decide where the process listens, which has to be known before
+ * anything can be served — including the screen that would change it. Each is
+ * asserted below to be read by something in the repository, so this list
+ * cannot become a place to hide a name nothing uses.
+ */
+const PROCESS_ONLY = new Map([
+  ['PORT', 'scripts/start.mjs'],
+  ['HOST', 'scripts/start.mjs'],
+  ['APP_PORT', 'docker-compose.yml'],
+]);
+
 const registryEnvNames = SETTING_DEFINITIONS.flatMap((definition) =>
   definition.env ? [definition.env] : [],
 );
@@ -50,9 +65,25 @@ describe('configuration documentation', () => {
     // somebody wired straight to process.env — which keeps it off the config
     // screen — or one that was removed and left behind in the docs.
     const stale = namesAssignedIn(envExample).filter(
-      (name) => !BOOTSTRAP_ONLY.has(name) && !registryEnvNames.includes(name),
+      (name) =>
+        !BOOTSTRAP_ONLY.has(name) && !PROCESS_ONLY.has(name) && !registryEnvNames.includes(name),
     );
     expect(stale).toEqual([]);
+  });
+
+  it('has something reading every variable that is not a setting', () => {
+    // The exemption above is the loophole in this file, so it is closed here:
+    // an entry that names a file which does not mention it is a variable
+    // nothing reads, documented as though it worked.
+    // Quoted or interpolated — the forms a name takes when it is being read.
+    // Backticks are deliberately not accepted: this file's own prose names
+    // PORT in a comment, and prose describing a variable is exactly what must
+    // not count as reading it.
+    const unread = [...PROCESS_ONLY].filter(([name, file]) => {
+      const reading = new RegExp(`(['"]${name}['"]|\\$\\{${name}[:}])`);
+      return !reading.test(readFileSync(file, 'utf8'));
+    });
+    expect(unread.map(([name]) => name)).toEqual([]);
   });
 
   it('promises no variable in the schema notes that the code ignores', () => {
@@ -60,7 +91,8 @@ describe('configuration documentation', () => {
     // nothing reads is a trap: MEDIA_STORAGE=s3 was listed there for a feature
     // that does not exist, and setting it would have silently kept local disk.
     const stale = namesAssignedIn(schemaNotes).filter(
-      (name) => !BOOTSTRAP_ONLY.has(name) && !registryEnvNames.includes(name),
+      (name) =>
+        !BOOTSTRAP_ONLY.has(name) && !PROCESS_ONLY.has(name) && !registryEnvNames.includes(name),
     );
     expect(stale).toEqual([]);
   });

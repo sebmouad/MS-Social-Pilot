@@ -30,8 +30,15 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-social_pilot}?schema=public
+      # Fixed inside the container whatever .env says, so the mapping above and
+      # the healthcheck below stay true.
+      PORT: '3000'
+      HOST: '0.0.0.0'
     ports:
-      - '3000:3000'
+      # Host side is configurable, container side is not: inside the network the
+      # app is always on 3000, so the healthcheck and the worker do not have to
+      # know what an operator chose outside. Set APP_PORT=80 to serve directly.
+      - '${APP_PORT:-3000}:3000'
     volumes:
       - media:/app/media
     depends_on:

@@ -147,6 +147,11 @@ Both processes are needed: the web app schedules, the worker publishes. A
 serverless alternative to the long-running worker is `POST /api/cron/tick` —
 see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
+The app listens on `PORT` (3000 by default) and speaks plain HTTP, so 443
+belongs to a TLS terminator in front of it. `PORT=80` serves directly; that is a
+privileged port, and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) says how to bind
+it without running as root.
+
 ### Then, in the browser
 
 Open <http://localhost:3000>.
@@ -233,7 +238,7 @@ how to drive it from a serverless cron instead of a long-running worker.
 npm test
 ```
 
-1049 tests, in three layers.
+1050 tests, in three layers.
 
 **Unit tests** cover the pure decision-making: which Graph edge a post takes,
 whether a retry is worth attempting, token encryption, timezone and queue-slot

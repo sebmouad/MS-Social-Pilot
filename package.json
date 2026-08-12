@@ -8,7 +8,7 @@
     "dev": "next dev",
     "dev:worker": "node --env-file-if-exists=.env --import tsx --watch scripts/worker.ts",
     "build": "prisma generate && next build",
-    "start": "next start",
+    "start": "node scripts/start.mjs",
     "worker": "node --env-file-if-exists=.env --import tsx scripts/worker.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

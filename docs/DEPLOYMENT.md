@@ -208,6 +208,35 @@ instead, and skip `signMediaUrl` entirely.
 
 ---
 
+## Ports
+
+The app listens on **`PORT`, 3000 by default**, on the interface named by
+**`HOST`**, and it speaks **plain HTTP**. There is no certificate handling in
+it, so **443 is a proxy's job** — see the next section. Under Docker, `PORT`
+inside the container is fixed at 3000 and `APP_PORT` chooses the host port the
+mapping publishes.
+
+`APP_URL` is a separate question and is the *public* address. Behind a
+terminator the two differ on purpose: the app listens on 3000 and the world
+sees `https://your.domain`. Nothing is derived from the request, so `APP_URL`
+has to be right on its own.
+
+To serve directly with no proxy, set `PORT=80`. Ports below 1024 are
+privileged, and the honest choices are:
+
+```bash
+# Grant the capability once, and keep running as an ordinary user.
+sudo setcap 'cap_net_bind_service=+ep' "$(command -v node)"
+```
+
+The systemd unit written by `scripts/install-debian.sh` already carries
+`AmbientCapabilities=CAP_NET_BIND_SERVICE`, which does the same thing for that
+unit alone and is narrower than the `setcap` above. Running the whole app as
+root to reach port 80 is the option to avoid.
+
+`HOST=127.0.0.1` binds loopback only, which is what you want when a proxy on
+the same machine is the only thing that should reach it.
+
 ## Behind a reverse proxy
 
 The contract is short, and it is short on purpose.
