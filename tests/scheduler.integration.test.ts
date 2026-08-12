@@ -38,6 +38,7 @@ type Runner = typeof import('../src/lib/scheduler/runner');
 
 let prisma: Prisma;
 let runner: Runner;
+let jobs: typeof import('../src/lib/scheduler/jobs');
 
 beforeAll(async () => {
   // A stub Graph API. It records what it was asked to do and replies with
@@ -71,6 +72,7 @@ beforeAll(async () => {
   // Imported after the environment is set so Prisma picks up DATABASE_URL.
   ({ prisma } = await import('../src/lib/prisma'));
   runner = await import('../src/lib/scheduler/runner');
+  jobs = await import('../src/lib/scheduler/jobs');
 }, 120_000);
 
 afterAll(async () => {
@@ -1066,5 +1068,120 @@ describe('recomputing a post status while another one is in flight', () => {
     // destinations were still in flight — `scheduled` — on a post that has
     // already gone out to both, with no later refresh to correct it.
     expect(after.status).toBe('published');
+  });
+});
+
+/**
+ * Catching up with the posts Facebook is holding.
+ *
+ * Native scheduling hands the post over at creation time and Facebook
+ * publishes it later on its own, telling us nothing. Left unasked, a
+ * `scheduled_remote` destination stays that way for ever: the post reads
+ * "Scheduled" months after it went live, never gets a `publishedAt`, and is
+ * invisible to the analytics refresh, which only looks at published rows.
+ */
+describe('reconciling posts scheduled inside Facebook', () => {
+  const now = new Date('2026-09-01T12:00:00Z');
+  const logger = () => undefined;
+
+
+  async function seedHandedOff(overrides: { scheduledFor?: Date } = {}) {
+    const { post, postTarget } = await seedDuePost();
+    const scheduledFor = overrides.scheduledFor ?? new Date('2026-09-01T11:00:00Z');
+
+    await prisma.post.update({
+      where: { id: post.id },
+      data: { status: 'scheduled', publishMode: 'native', scheduledAt: scheduledFor },
+    });
+    await prisma.postTarget.update({
+      where: { id: postTarget.id },
+      data: {
+        status: 'scheduled_remote',
+        remotePostId: '1000_4242',
+        nativeScheduledFor: scheduledFor,
+      },
+    });
+
+    return { post, postTarget };
+  }
+
+  it('marks a destination published once Facebook says it went out', async () => {
+    const { post, postTarget } = await seedHandedOff();
+    responses = [
+      { status: 200, body: { id: '1000_4242', is_published: true, created_time: '2026-09-01T11:00:05+0000' } },
+    ];
+
+    const summary = await jobs.runNativeReconcile({ now, logger });
+    expect(summary).toMatch(/1 published/);
+
+    const after = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(after.status).toBe('published');
+    // Facebook's own timestamp, not the moment we happened to ask — otherwise
+    // every report puts the post at whenever the worker next ran.
+    expect(after.publishedAt?.toISOString()).toBe('2026-09-01T11:00:05.000Z');
+
+    const parent = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(parent.status).toBe('published');
+  });
+
+  it('leaves a destination alone while Facebook is still holding it', async () => {
+    const { postTarget } = await seedHandedOff();
+    responses = [
+      { status: 200, body: { id: '1000_4242', is_published: false, created_time: '2026-09-01T10:00:00+0000' } },
+    ];
+
+    expect(await jobs.runNativeReconcile({ now, logger })).toBeNull();
+
+    const after = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(after.status).toBe('scheduled_remote');
+    expect(after.publishedAt).toBeNull();
+  });
+
+  it('does not ask about a post whose moment has not arrived', async () => {
+    await seedHandedOff({ scheduledFor: new Date('2026-09-02T09:00:00Z') });
+    received = [];
+
+    expect(await jobs.runNativeReconcile({ now, logger })).toBeNull();
+    expect(received).toEqual([]);
+  });
+
+  it('says so when the post was deleted on Facebook', async () => {
+    const { post, postTarget } = await seedHandedOff();
+    responses = [
+      {
+        status: 400,
+        body: {
+          error: {
+            message: 'Unsupported get request. Object does not exist.',
+            code: 100,
+            type: 'GraphMethodException',
+          },
+        },
+      },
+    ];
+
+    const summary = await jobs.runNativeReconcile({ now, logger });
+    expect(summary).toMatch(/1 gone from Facebook/);
+
+    const after = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    // Left as `scheduled_remote` it would claim for ever that it is about to
+    // go out, when in fact it never will.
+    expect(after.status).toBe('failed');
+    expect(after.errorCode).toBe('deleted_on_facebook');
+
+    const parent = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(parent.status).toBe('failed');
+  });
+
+  it('keeps waiting when Facebook will not say either way', async () => {
+    const { postTarget } = await seedHandedOff();
+    // No `is_published` in the reply at all. Absent is not "no", and guessing
+    // costs a post marked published that never went out.
+    responses = [{ status: 200, body: { id: '1000_4242' } }];
+
+    expect(await jobs.runNativeReconcile({ now, logger })).toBeNull();
+
+    const after = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(after.status).toBe('scheduled_remote');
   });
 });

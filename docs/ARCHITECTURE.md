@@ -15,10 +15,10 @@ The web app never waits on a scheduled publish; it writes rows. The worker owns
 everything time-based. Both call Graph through the same client, so retry and
 error-classification rules cannot drift apart.
 
-**The worker runs up to ten jobs** on independent intervals — publish (30s),
-rss (15m), evergreen (1h), analytics (6h), pageInsights (12h), edges (4h),
-housekeeping (24h), tokens (24h), plus instagram (12h) and ads (12h) when those
-permissions are enabled. Each is a plain async
+**The worker runs up to eleven jobs** on independent intervals — publish (30s),
+nativeReconcile (15m), rss (15m), evergreen (1h), analytics (6h), pageInsights
+(12h), edges (4h), housekeeping (24h), tokens (24h), plus instagram (12h) and
+ads (12h) when those permissions are enabled. Each is a plain async
 function with one shape, so the loop is a table rather than a pile of branches,
 and any job can be run alone from a test or `POST /api/cron/tick?jobs=…`. A job
 that throws is caught per job: a failing RSS poll must never stop posts going
@@ -76,6 +76,23 @@ entirely. The costs: Pages only, minimum 10 minutes and maximum 6 months ahead,
 and editing means deleting it on Facebook and recreating it. Destinations in
 this state get the `scheduled_remote` status so our scheduler leaves them alone,
 and cancelling deletes the remote post rather than silently letting it publish.
+
+**Facebook never tells us when it publishes one.** A natively scheduled post
+exists on Facebook from the moment it is created and flips to published on its
+own, so without asking, a `scheduled_remote` destination stays that way for
+ever: the post reads "Scheduled" months after it went live, never gets a
+`publishedAt`, and is invisible to the analytics refresh, which only looks at
+published rows. Choosing native mode to survive our downtime therefore cost the
+post its place in every report.
+
+`runNativeReconcile` asks, once the scheduled moment has passed, and only then
+— one Graph call per post rather than a poll. `is_published` decides it, and
+only a literal `true` counts: absent is not "no", and guessing would mark a post
+published that never went out. The timestamp comes from Facebook's own
+`created_time` rather than the moment the worker happened to ask, so reports put
+the post where it actually happened. A post that has been deleted on Facebook
+(code 100) is recorded as failed rather than left claiming for ever that it is
+about to go out.
 
 **When that deletion fails, the destination is not marked cancelled.** The copy
 that matters lives on Facebook, so a post reading "Cancelled" here while

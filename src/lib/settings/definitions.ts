@@ -327,6 +327,19 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     workerRestart: true,
   },
   {
+    key: 'scheduler.nativeReconcileMinutes',
+    group: 'scheduler',
+    type: 'number',
+    label: 'Native schedule check',
+    description:
+      'How often Facebook is asked whether the posts it is holding have gone out yet, in minutes. Only affects posts scheduled inside Facebook.',
+    default: 15,
+    env: 'NATIVE_RECONCILE_MINUTES',
+    min: 1,
+    max: 1440,
+    workerRestart: true,
+  },
+  {
     key: 'scheduler.tokenExpiryCheckHours',
     group: 'scheduler',
     type: 'number',

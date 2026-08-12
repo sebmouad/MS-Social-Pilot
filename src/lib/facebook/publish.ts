@@ -335,6 +335,39 @@ export async function publishPost(request: PublishRequest): Promise<PublishResul
   }
 }
 
+/**
+ * What Facebook currently thinks of a post we handed it.
+ *
+ * `is_published` is the whole point: a natively scheduled post exists on
+ * Facebook from the moment it is created, and only flips to published when the
+ * scheduled time arrives. Nothing tells us when that happens, so the only way
+ * to know is to ask.
+ */
+export interface RemotePostState {
+  isPublished: boolean | null;
+  /** When Facebook says it went out, if it says. */
+  createdTime: Date | null;
+}
+
+export async function fetchRemotePostState(
+  remotePostId: string,
+  accessToken: string,
+): Promise<RemotePostState> {
+  const { data } = await graphRequest<Record<string, unknown>>(remotePostId, {
+    accessToken,
+    params: { fields: 'is_published,created_time' },
+  });
+
+  const raw = typeof data.created_time === 'string' ? new Date(data.created_time) : null;
+
+  return {
+    isPublished: typeof data.is_published === 'boolean' ? data.is_published : null,
+    // Facebook moves `created_time` to the publication moment for a scheduled
+    // post, but an unparseable value must not become an Invalid Date on a row.
+    createdTime: raw && !Number.isNaN(raw.getTime()) ? raw : null,
+  };
+}
+
 /** Delete a published post. Used by "delete from Facebook too". */
 export async function deleteRemotePost(remotePostId: string, accessToken: string): Promise<void> {
   await graphRequest(remotePostId, { method: 'DELETE', accessToken });

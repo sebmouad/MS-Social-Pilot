@@ -172,6 +172,9 @@ export const env = {
   get evergreenCheckMinutes(): number {
     return settingNumber('scheduler.evergreenCheckMinutes');
   },
+  get nativeReconcileMinutes(): number {
+    return settingNumber('scheduler.nativeReconcileMinutes');
+  },
   get tokenExpiryCheckHours(): number {
     return settingNumber('scheduler.tokenExpiryCheckHours');
   },

@@ -3,7 +3,7 @@ import { env } from '../env';
 import { notifyTokenExpiring } from '../email/notify';
 import { runEvergreenCycle } from '../evergreen';
 import { pollDueSources } from '../rss/poll';
-import { runSchedulerTick } from './runner';
+import { refreshPostStatus, runSchedulerTick } from './runner';
 import { syncPostInsights, syncWorkspaceAnalytics } from '../analytics';
 import { syncTargetEdges } from '../engagement';
 import { discoverInstagramAccounts, syncWorkspaceInstagram } from '../instagram';
@@ -11,6 +11,9 @@ import { discoverAdAccounts, syncWorkspaceAds } from '../ads';
 import { deleteUnusedMedia } from '../media';
 import { pruneHistory, prunedTotal } from '../housekeeping';
 import { forEachEnabledPage, forEachWorkspace } from './iterate';
+import { fetchRemotePostState } from '../facebook/publish';
+import { asGraphError } from '../facebook/graph';
+import { decryptSecret } from '../crypto';
 
 /**
  * The worker's job set.
@@ -24,6 +27,7 @@ import { forEachEnabledPage, forEachWorkspace } from './iterate';
 
 export type JobName =
   | 'publish'
+  | 'nativeReconcile'
   | 'rss'
   | 'evergreen'
   | 'analytics'
@@ -100,6 +104,94 @@ export async function runTokenExpiryCheck(context: JobContext): Promise<string |
   }
 
   return warned > 0 ? `warned about ${warned} expiring token(s)` : null;
+}
+
+/**
+ * Find out whether the posts Facebook is holding have gone out yet.
+ *
+ * Native scheduling hands the post to Facebook at creation time and Facebook
+ * publishes it later on its own. Nothing tells us when that happens. Without
+ * asking, a `scheduled_remote` destination stays that way for ever: the post
+ * reads "Scheduled" months after it went live, never gets a `publishedAt`, and
+ * is invisible to the analytics refresh, which only looks at published rows.
+ * So the whole point of choosing native mode — the post survives our downtime
+ * — came at the price of the post vanishing from every report.
+ *
+ * Only destinations whose scheduled moment has passed are worth asking about,
+ * which keeps this to one Graph call per post, once.
+ */
+export async function runNativeReconcile(context: JobContext): Promise<string | null> {
+  const rows = await prisma.postTarget.findMany({
+    where: {
+      status: 'scheduled_remote',
+      remotePostId: { not: null },
+      nativeScheduledFor: { lte: context.now },
+    },
+    include: { target: { include: { socialAccount: true } } },
+    orderBy: { nativeScheduledFor: 'asc' },
+    take: 100,
+  });
+
+  let published = 0;
+  let missing = 0;
+  const touched = new Set<string>();
+
+  for (const row of rows) {
+    const encrypted = row.target.accessToken ?? row.target.socialAccount?.accessToken ?? null;
+    if (!encrypted || !row.remotePostId) continue;
+
+    try {
+      const state = await fetchRemotePostState(row.remotePostId, decryptSecret(encrypted));
+      // `null` means Facebook did not tell us, which is not the same as "no".
+      // Leaving the row alone costs one more check next pass; guessing costs a
+      // post marked published that never went out.
+      if (state.isPublished !== true) continue;
+
+      const { count } = await prisma.postTarget.updateMany({
+        where: { id: row.id, status: 'scheduled_remote' },
+        data: {
+          status: 'published',
+          publishedAt: state.createdTime ?? row.nativeScheduledFor ?? context.now,
+        },
+      });
+      if (count === 0) continue;
+
+      published += 1;
+      touched.add(row.postId);
+    } catch (error) {
+      const graphError = asGraphError(error);
+
+      // Code 100 on a post we hold an id for means it is not there any more —
+      // somebody deleted it in Facebook. Saying so is the point: the post
+      // never went out, and left as `scheduled_remote` it would claim for ever
+      // that it is about to.
+      if (graphError.code === 100) {
+        const { count } = await prisma.postTarget.updateMany({
+          where: { id: row.id, status: 'scheduled_remote' },
+          data: {
+            status: 'failed',
+            errorCode: 'deleted_on_facebook',
+            errorMessage:
+              'This post is no longer on Facebook. It was most likely deleted there, so it never went out.',
+          },
+        });
+        if (count > 0) {
+          missing += 1;
+          touched.add(row.postId);
+        }
+        continue;
+      }
+
+      context.logger(
+        `Could not check ${row.target.name} on Facebook: ${graphError.displayMessage}`,
+      );
+    }
+  }
+
+  for (const postId of touched) await refreshPostStatus(postId, context.now);
+
+  if (published === 0 && missing === 0) return null;
+  return `native: ${published} published, ${missing} gone from Facebook`;
 }
 
 /**
@@ -329,6 +421,11 @@ export function jobDefinitions(): JobDefinition[] {
               `abandoned=${result.abandonedStale} skipped=${result.skipped}`
           : null;
       },
+    },
+    {
+      name: 'nativeReconcile',
+      intervalMs: env.nativeReconcileMinutes * 60 * 1000,
+      run: runNativeReconcile,
     },
     {
       name: 'rss',
