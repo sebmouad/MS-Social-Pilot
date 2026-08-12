@@ -110,6 +110,7 @@ export async function syncAccountTargets(socialAccountId: string): Promise<SyncS
         accessToken: encryptSecret(page.accessToken),
         canPublish,
         publishBlocker: canPublish ? null : 'Your Facebook role on this Page does not allow creating posts.',
+        publishBlockerCode: canPublish ? null : 'role',
         lastSyncedAt: new Date(),
       },
       update: {
@@ -120,6 +121,7 @@ export async function syncAccountTargets(socialAccountId: string): Promise<SyncS
         accessToken: encryptSecret(page.accessToken),
         canPublish,
         publishBlocker: canPublish ? null : 'Your Facebook role on this Page does not allow creating posts.',
+        publishBlockerCode: canPublish ? null : 'role',
         lastSyncedAt: new Date(),
       },
     });
@@ -140,6 +142,7 @@ export async function syncAccountTargets(socialAccountId: string): Promise<SyncS
         pictureUrl: group.pictureUrl,
         canPublish: group.appInstalled,
         publishBlocker: group.appInstalled ? null : 'Add this app to the Group before publishing to it.',
+        publishBlockerCode: group.appInstalled ? null : 'group_app',
         lastSyncedAt: new Date(),
       },
       update: {
@@ -148,6 +151,7 @@ export async function syncAccountTargets(socialAccountId: string): Promise<SyncS
         pictureUrl: group.pictureUrl,
         canPublish: group.appInstalled,
         publishBlocker: group.appInstalled ? null : 'Add this app to the Group before publishing to it.',
+        publishBlockerCode: group.appInstalled ? null : 'group_app',
         lastSyncedAt: new Date(),
       },
     });
@@ -161,6 +165,7 @@ export async function syncAccountTargets(socialAccountId: string): Promise<SyncS
     data: {
       canPublish: false,
       publishBlocker: 'This destination is no longer accessible with the connected Facebook account.',
+      publishBlockerCode: 'inaccessible',
     },
   });
 
@@ -314,6 +319,7 @@ export async function disconnectAccount(
         enabled: false,
         canPublish: false,
         publishBlocker: 'The Facebook account for this destination was disconnected.',
+        publishBlockerCode: 'disconnected',
       },
     }),
     prisma.postTarget.updateMany({

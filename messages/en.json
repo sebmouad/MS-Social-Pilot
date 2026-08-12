@@ -354,7 +354,14 @@
     "tokenValid": "Token is valid.",
     "tokenValidUntil": "Token is valid until {when}.",
     "userToken": "Uses the account token",
-    "viaPage": "via {page}"
+    "viaPage": "via {page}",
+    "blocked": {
+      "role": "Your Facebook role on this Page does not allow creating posts.",
+      "group_app": "Add this app to the Group before publishing to it.",
+      "inaccessible": "This destination is no longer reachable with the connected Facebook account.",
+      "disconnected": "The Facebook account for this destination was disconnected.",
+      "instagram_permission": "Publishing to Instagram needs Meta to grant instagram_content_publish. Turn this destination on once it is approved."
+    }
   },
   "dashboard": {
     "title": "Dashboard",

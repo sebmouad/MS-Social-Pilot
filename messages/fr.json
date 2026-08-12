@@ -354,7 +354,14 @@
     "tokenValid": "Le jeton est valide.",
     "tokenValidUntil": "Jeton valide jusqu’au {when}.",
     "userToken": "Utilise le jeton du compte",
-    "viaPage": "via {page}"
+    "viaPage": "via {page}",
+    "blocked": {
+      "role": "Votre rôle Facebook sur cette Page ne permet pas de créer des publications.",
+      "group_app": "Ajoutez cette application au groupe avant d’y publier.",
+      "inaccessible": "Cette destination n’est plus accessible avec le compte Facebook connecté.",
+      "disconnected": "Le compte Facebook de cette destination a été déconnecté.",
+      "instagram_permission": "Publier sur Instagram nécessite l’autorisation instagram_content_publish de Meta. Réactivez cette destination une fois qu’elle est accordée."
+    }
   },
   "dashboard": {
     "title": "Tableau de bord",

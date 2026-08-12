@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import { Icon, type IconName } from './Icon';
+import { blockerMessage } from './blockerMessage';
 
 export interface TargetView {
   id: string;
@@ -14,6 +15,7 @@ export interface TargetView {
   enabled: boolean;
   canPublish: boolean;
   publishBlocker: string | null;
+  publishBlockerCode: string | null;
   /** Whether a Page token of its own is stored, rather than borrowing the user's. */
   hasOwnToken: boolean;
   followers: number | null;
@@ -388,7 +390,15 @@ function TargetList({
         <p className="mt-2 text-sm text-slate-500">{empty}</p>
       ) : (
         <ul className="mt-2 divide-y divide-slate-100">
-          {targets.map((target) => (
+          {targets.map((target) => {
+            const blocked = blockerMessage(
+              target.publishBlockerCode,
+              target.publishBlocker,
+              (key) => t(key as Parameters<typeof t>[0]),
+              (key) => t.has(key as Parameters<typeof t>[0]),
+            );
+
+            return (
             <li key={target.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
               <div className="flex min-w-0 items-center gap-2.5">
                 {target.pictureUrl ? (
@@ -408,9 +418,9 @@ function TargetList({
                     {target.hasOwnToken ? t('ownToken') : t('userToken')}
                     {target.followers !== null && ` · ${t('followers', { count: target.followers })}`}
                   </p>
-                  {!target.canPublish && target.publishBlocker && (
+                  {!target.canPublish && blocked && (
                     <p className="mt-0.5 flex items-center gap-1 text-xs text-amber-700">
-                      <Icon name="warning" size={12} /> {target.publishBlocker}
+                      <Icon name="warning" size={12} /> {blocked}
                     </p>
                   )}
                 </div>
@@ -427,7 +437,8 @@ function TargetList({
                 {target.enabled ? t('active') : t('paused')}
               </label>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

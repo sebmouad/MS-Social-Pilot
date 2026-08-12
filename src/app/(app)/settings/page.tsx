@@ -106,6 +106,7 @@ export default async function SettingsPage() {
           pictureUrl: target.pictureUrl,
           canPublish: target.canPublish && target.enabled,
           publishBlocker: target.publishBlocker,
+          publishBlockerCode: target.publishBlockerCode,
           accountName: target.socialAccount?.name ?? null,
         }))}
       />

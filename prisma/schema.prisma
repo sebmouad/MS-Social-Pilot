@@ -302,6 +302,10 @@ model Target {
   instagramAccounts InstagramAccount[]
 
   @@unique([workspaceId, providerId])
+  /// Why publishing is blocked, as a code the interface can translate. The
+  /// sentence in `publishBlocker` stays as the fallback.
+  publishBlockerCode String?
+
   /// Set once the whole rating history has been walked back to its start. One
   /// fetch reaches five hundred, so a Page with more is read over several
   /// syncs and the average is partial until this is true.

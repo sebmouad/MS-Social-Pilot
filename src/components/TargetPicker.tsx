@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 
 import { targetTypeKey } from '@/lib/constants';
+import { blockerMessage } from './blockerMessage';
 
 export interface TargetOption {
   id: string;
@@ -11,6 +12,7 @@ export interface TargetOption {
   pictureUrl: string | null;
   canPublish: boolean;
   publishBlocker: string | null;
+  publishBlockerCode: string | null;
   accountName: string | null;
 }
 
@@ -22,6 +24,9 @@ interface Props {
 
 export function TargetPicker({ targets, selected, onChange }: Props) {
   const t = useTranslations('targets');
+  // The blocker copy lives with the connections screen, which is where the
+  // reasons are acted on; this screen only repeats them.
+  const tBlocked = useTranslations('connections');
 
   function toggle(id: string) {
     onChange(selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id]);
@@ -60,10 +65,16 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
       <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-lg border border-slate-200 p-2">
         {targets.map((target) => {
           const disabled = !target.canPublish;
+          const blocked = blockerMessage(
+            target.publishBlockerCode,
+            target.publishBlocker,
+            (key) => tBlocked(key as Parameters<typeof tBlocked>[0]),
+            (key) => tBlocked.has(key as Parameters<typeof tBlocked>[0]),
+          );
           return (
             <label
               key={target.id}
-              title={target.publishBlocker ?? undefined}
+              title={blocked ?? undefined}
               className={`flex items-center gap-3 rounded-lg px-2 py-2 ${
                 disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-slate-50'
               }`}
@@ -88,7 +99,7 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
                 <span className="block truncate text-xs text-slate-500">
                   {t(targetTypeKey(target.type))}
                   {target.accountName ? ` · ${target.accountName}` : ''}
-                  {disabled && target.publishBlocker ? ` · ${target.publishBlocker}` : ''}
+                  {disabled && blocked ? ` · ${blocked}` : ''}
                 </span>
               </span>
             </label>

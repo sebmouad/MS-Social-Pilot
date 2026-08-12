@@ -127,6 +127,19 @@ many will still publish, because those can each be cancelled while the account
 is connected. `removeLinkedAccount` needs none of this: it only covers
 Instagram and ad accounts, and native scheduling is refused for Instagram.
 
+**Why a destination will not publish is stored as a code, not a sentence.** The
+reason is decided by a background sync that has no idea who will read it, and
+half this product's audience reads French — so a French agency was told in
+English why a client's Page had stopped working, at the moment they are least
+able to guess. `Target.publishBlockerCode` carries one of five reasons and the
+interface picks the words; `publishBlocker` keeps the English text as a
+fallback, for rows synced before the column existed and for any writer that
+forgets a code. Showing the wrong language beats showing nothing: a destination
+that refuses to publish and gives no reason is the version that wastes
+somebody's afternoon. A test pins that every writer of the sentence also writes
+the code, because forgetting one puts a reader back where they started and
+nothing would look wrong.
+
 Both counts travel all the way to the screen. Working them out and returning
 them into a route that drops them would put the silence one layer further out,
 so the routes pass them on and the connections page shows them — as a warning

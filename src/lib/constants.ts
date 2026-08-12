@@ -281,3 +281,23 @@ export function targetTypeKey(type: string): string {
  * post is due. Kept in step by a test.
  */
 export const IG_CAPTION_LIMIT = 2_200;
+
+/**
+ * Why a destination cannot be published to.
+ *
+ * A code rather than a sentence, because the sentence is written by a
+ * background job that has no idea who will read it — and half this product's
+ * audience reads French. The text is still stored alongside as a fallback for
+ * rows written before this existed, and for anything a future writer forgets
+ * to give a code.
+ */
+export const TARGET_BLOCK_REASONS = [
+  'role',
+  'group_app',
+  'inaccessible',
+  'disconnected',
+  'instagram_permission',
+] as const;
+
+export type TargetBlockReason = (typeof TARGET_BLOCK_REASONS)[number];
+

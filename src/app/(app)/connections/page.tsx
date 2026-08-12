@@ -146,6 +146,7 @@ export default async function ConnectionsPage({
               enabled: target.enabled,
               canPublish: target.canPublish,
               publishBlocker: target.publishBlocker,
+              publishBlockerCode: target.publishBlockerCode,
               hasOwnToken: target.accessToken !== null,
               followers: target.followersCount ?? target.fanCount,
               lastSyncedLabel: target.lastSyncedAt

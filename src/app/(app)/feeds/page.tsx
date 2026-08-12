@@ -66,6 +66,7 @@ export default async function FeedsPage() {
           pictureUrl: target.pictureUrl,
           canPublish: target.canPublish && target.enabled,
           publishBlocker: target.publishBlocker,
+          publishBlockerCode: target.publishBlockerCode,
           accountName: target.socialAccount?.name ?? null,
         }))}
       />

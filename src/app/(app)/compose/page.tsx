@@ -88,6 +88,9 @@ export default async function ComposePage({
           pictureUrl: target.pictureUrl,
           canPublish: target.canPublish && target.enabled,
           publishBlocker: target.enabled ? target.publishBlocker : t('targetPaused'),
+          // A paused destination is explained here rather than by a code: the
+          // pause is our own state, not something Facebook told us.
+          publishBlockerCode: target.enabled ? target.publishBlockerCode : null,
           accountName: target.socialAccount?.name ?? null,
         }))}
       />

@@ -162,6 +162,7 @@ async function upsertInstagramTarget(options: {
       providerId: options.igUserId,
       canPublish: false,
       publishBlocker: INSTAGRAM_PUBLISH_BLOCKER,
+      publishBlockerCode: 'instagram_permission',
       ...shared,
     },
     // Deliberately not touching `enabled`, `canPublish` or `publishBlocker`:
