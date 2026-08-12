@@ -419,6 +419,8 @@
       "subject": "{author} submitted a post for approval",
       "heading": "A post is waiting for your review",
       "body": "{author} submitted a post in {workspace} scheduled for {when}.",
+      "bodyOverdue": "{author} submitted a post in {workspace}. Its scheduled time has already passed, so approving it will publish it straight away.",
+      "bodyNoTime": "{author} submitted a post in {workspace}. It has no time set yet.",
       "cta": "Review it"
     },
     "approvalDecision": {

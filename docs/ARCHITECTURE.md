@@ -140,6 +140,17 @@ somebody's afternoon. A test pins that every writer of the sentence also writes
 the code, because forgetting one puts a reader back where they started and
 nothing would look wrong.
 
+**The reviewer's email says the same thing before the decision, not after.**
+They are the one who can still say no, so it describes the post they are
+actually being asked about: a scheduled moment that has already passed means
+approving publishes it straight away, which naming the time gave no hint of.
+A post submitted with no time at all read as "scheduled for —".
+
+The equivalent placeholder in the publish-failure email is left alone. A post
+only reaches the publisher through `findDue`, which requires a scheduled time,
+or through "post now", which sets one — so that branch is unreachable, and
+writing copy for it would be inventing a case to test.
+
 **An approval email says what is about to happen, not what was planned.** A
 post held for review keeps the time its author chose, and approving it after
 that moment has passed leaves the scheduler to publish on the next tick — which

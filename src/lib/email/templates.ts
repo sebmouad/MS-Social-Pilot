@@ -249,17 +249,37 @@ export function approvalRequestEmail(options: {
   const t = (key: string, params?: Record<string, string | number>) =>
     translate(options.locale, key, params);
 
-  const when = options.scheduledAt
-    ? formatDate(options.scheduledAt, options.locale, options.timezone)
-    : '—';
+  /**
+   * The reviewer is the one who can still say no, so this has to describe the
+   * post they are actually being asked about. A post whose moment has passed
+   * publishes as soon as it is approved — naming the time gives no hint of
+   * that — and a post with no time at all read as "scheduled for —".
+   */
+  const body = () => {
+    if (!options.scheduledAt) {
+      return t('email.approvalRequest.bodyNoTime', {
+        author: options.author,
+        workspace: options.workspace,
+      });
+    }
+
+    if (options.scheduledAt.getTime() <= Date.now()) {
+      return t('email.approvalRequest.bodyOverdue', {
+        author: options.author,
+        workspace: options.workspace,
+      });
+    }
+
+    return t('email.approvalRequest.body', {
+      author: options.author,
+      workspace: options.workspace,
+      when: formatDate(options.scheduledAt, options.locale, options.timezone),
+    });
+  };
 
   const block = layout({
     heading: t('email.approvalRequest.heading'),
-    body: t('email.approvalRequest.body', {
-      author: options.author,
-      workspace: options.workspace,
-      when,
-    }),
+    body: body(),
     cta: { label: t('email.approvalRequest.cta'), url: `${env.appUrl}/approvals` },
     footer: t('email.footer', { workspace: options.workspace }),
   });

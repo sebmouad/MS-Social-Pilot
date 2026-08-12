@@ -419,6 +419,8 @@
       "subject": "{author} a soumis une publication à validation",
       "heading": "Une publication attend votre relecture",
       "body": "{author} a soumis une publication dans {workspace}, prévue pour {when}.",
+      "bodyOverdue": "{author} a soumis une publication dans {workspace}. L’heure prévue est déjà passée : la valider la fera paraître immédiatement.",
+      "bodyNoTime": "{author} a soumis une publication dans {workspace}. Aucune heure n’est encore définie.",
       "cta": "La relire"
     },
     "approvalDecision": {

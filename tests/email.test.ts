@@ -290,3 +290,51 @@ describe('an approval that arrives after the scheduled time', () => {
     expect(email.html).not.toContain('—');
   });
 });
+
+/**
+ * What a reviewer is told before they decide.
+ *
+ * The reviewer is the one who can still say no, so the email has to describe
+ * the post they are actually being asked about. A post whose scheduled time
+ * has already passed publishes the moment it is approved — the sentence
+ * "scheduled for Tuesday 9am" gives no hint of that, and a post with no time
+ * at all rendered as "scheduled for —".
+ */
+describe('the email asking for a review', () => {
+  const base = {
+    locale: Locale.en,
+    workspace: 'Acme',
+    author: 'Wren',
+    timezone: 'Europe/Paris',
+  };
+
+  it('warns that approving will publish it straight away', () => {
+    const email = approvalRequestEmail({
+      ...base,
+      scheduledAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
+
+    expect(email.html).toMatch(/passed|straight away|immediately/i);
+  });
+
+  it('names the time while it is still ahead', () => {
+    const scheduledAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    const email = approvalRequestEmail({ ...base, scheduledAt });
+
+    expect(email.html).toContain(
+      new Intl.DateTimeFormat('en', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Europe/Paris',
+      }).format(scheduledAt),
+    );
+    expect(email.html).not.toMatch(/passed/i);
+  });
+
+  it('says there is no time set rather than printing a dash', () => {
+    const email = approvalRequestEmail({ ...base, scheduledAt: null });
+
+    expect(email.html).not.toContain('—');
+    expect(email.html).toMatch(/no time/i);
+  });
+});
