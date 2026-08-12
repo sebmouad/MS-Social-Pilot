@@ -7,7 +7,7 @@ beforeAll(() => {
   process.env.APP_URL = 'https://social.example.com';
 });
 
-const { applyUtm, extractUrls, isProbablyBot, shortLinkUrl } = await import('../src/lib/links');
+const { applyUtm, extractUrls, hashVisitorIp, isProbablyBot, shortLinkUrl } = await import('../src/lib/links');
 
 describe('applyUtm', () => {
   const settings = {
@@ -124,5 +124,39 @@ describe('isProbablyBot', () => {
   it('treats a missing user agent as a bot', () => {
     // Anything that declines to identify itself is not a click worth counting.
     expect(isProbablyBot(null)).toBe(true);
+  });
+});
+
+/**
+ * The address of somebody who clicked a client's link.
+ *
+ * The column exists so a repeat visitor can be told apart from a new one. It
+ * must not double as a record of who visited what.
+ */
+describe('hashVisitorIp', () => {
+  const secret = 'a-real-deployment-secret';
+
+  it('gives the same answer for the same visitor', () => {
+    expect(hashVisitorIp('203.0.113.7', secret)).toBe(hashVisitorIp('203.0.113.7', secret));
+  });
+
+  it('tells two visitors apart', () => {
+    expect(hashVisitorIp('203.0.113.7', secret)).not.toBe(hashVisitorIp('203.0.113.8', secret));
+  });
+
+  it('cannot be reversed by trying every address', () => {
+    // The point of keying it. There are only about four billion IPv4
+    // addresses, so a bare digest is a lookup table away from being the
+    // address itself — this checks the secret actually participates, by
+    // showing the same address under a different secret is a different value.
+    expect(hashVisitorIp('203.0.113.7', secret)).not.toBe(
+      hashVisitorIp('203.0.113.7', 'a-different-deployment'),
+    );
+  });
+
+  it('is a fixed-width hex value', () => {
+    for (const ip of ['1.2.3.4', '203.0.113.7', '2001:db8::1']) {
+      expect(hashVisitorIp(ip, secret), ip).toMatch(/^[0-9a-f]{32}$/);
+    }
   });
 });

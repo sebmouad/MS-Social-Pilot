@@ -878,6 +878,14 @@ whatever URL appears in a post to build its preview card, so an interstitial
 would publish the post with a blank card. Facebook's scraper is excluded from
 click counts for the same reason: it hits every shortened link at publish time.
 
+A visitor's IP is stored only as a keyed digest, so a repeat visitor can be
+recognised without the address being recoverable. Keyed, not a bare hash: an
+IPv4 address has about four billion possible values, so a plain SHA-256 of one
+can be reversed by working through them, and a column of those is a column of
+IP addresses wearing a hat. `hashVisitorIp` derives a purpose-specific key from
+the app secret, which is what the surrounding comment had always claimed and
+the code had not been doing.
+
 **Evergreen recycling** creates a copy each cycle rather than re-running the
 original row, keeping per-attempt history intact. Text variants rotate because
 Facebook rejects identical repeated content with error 506.

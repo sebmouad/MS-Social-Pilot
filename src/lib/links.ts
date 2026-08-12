@@ -1,8 +1,7 @@
-import { createHash } from 'node:crypto';
-
 import { prisma } from './prisma';
 import { env } from './env';
 import { shortSlug } from './slug';
+import { hmacHex } from './crypto';
 
 /**
  * Link tagging and shortening.
@@ -172,6 +171,23 @@ export async function prepareLinks(options: {
 }
 
 /**
+ * Fingerprint a visitor's address without keeping it.
+ *
+ * Keyed, not a bare digest. An IPv4 address has about four billion possible
+ * values, so a plain SHA-256 of one is reversible by working through them —
+ * minutes of laptop time — and a column of those hashes is a column of IP
+ * addresses wearing a hat. Without the app secret there is nothing to work
+ * through: the same address still hashes to the same value, so a repeat
+ * visitor is still recognisable, but only to us.
+ *
+ * Truncated to 128 bits, which is far past the point where two addresses
+ * collide and keeps the column narrow.
+ */
+export function hashVisitorIp(ip: string, secret: string): string {
+  return hmacHex(hmacHex(secret, 'click-ip-v1'), ip).slice(0, 32);
+}
+
+/**
  * Record a click. IPs are hashed with the app secret so a repeat visitor can
  * be recognised without the raw address ever being stored.
  */
@@ -185,7 +201,7 @@ export async function recordClick(options: {
     prisma.linkClick.create({
       data: {
         shortLinkId: options.shortLinkId,
-        ipHash: options.ip ? createHash('sha256').update(options.ip).digest('hex').slice(0, 32) : null,
+        ipHash: options.ip ? hashVisitorIp(options.ip, env.sessionSecret) : null,
         userAgent: options.userAgent?.slice(0, 500) ?? null,
         referer: options.referer?.slice(0, 500) ?? null,
       },
