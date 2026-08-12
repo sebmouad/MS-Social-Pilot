@@ -1655,6 +1655,20 @@ JSON rather than collapsed to a number that would mean nothing.
 
 Groups are skipped throughout: Facebook exposes no insights edge for a Group.
 
+### Link clicks in a client report
+
+A short link belongs to the post, not to any one destination, so there is no
+way to know which Page earned a click. The per-destination column is therefore
+a presentational split, not a measurement — but it still has to add up, because
+a client reads this report and a table that sums to something other than the
+headline beside it costs more credibility than the rounding ever bought.
+
+Rounding each equal share on its own fails in both directions: five clicks
+across two destinations rounds to three each and claims six that never
+happened, ten across three rounds to three each and loses one. `spreadClicks`
+hands the remainder out a click at a time instead — arbitrary in which
+destination gets the extra, exact in the total.
+
 ### Beyond /insights
 
 Insights say a post reached 4,000 people. They do not say what those people

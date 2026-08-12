@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { reportToCsv, type Report } from '../src/lib/reports';
+import { reportToCsv, spreadClicks, type Report } from '../src/lib/reports';
 
 function report(overrides: Partial<Report> = {}): Report {
   return {
@@ -68,5 +68,49 @@ describe('reportToCsv', () => {
 
   it('ends with a newline, as a well-formed CSV should', () => {
     expect(reportToCsv(report()).endsWith('\n')).toBe(true);
+  });
+});
+
+/**
+ * The per-destination click column has to add up to the total beside it. A
+ * client reads this report; a table that sums to something other than the
+ * headline number costs more credibility than the rounding ever bought.
+ */
+describe('spreadClicks', () => {
+  it('adds up to the total, whatever the split', () => {
+    for (let total = 0; total <= 40; total += 1) {
+      for (let parts = 1; parts <= 7; parts += 1) {
+        const shares = spreadClicks(total, parts);
+        expect(shares, `${total} over ${parts}`).toHaveLength(parts);
+        expect(
+          shares.reduce((sum, share) => sum + share, 0),
+          `${total} over ${parts}`,
+        ).toBe(total);
+      }
+    }
+  });
+
+  it('never invents clicks that did not happen', () => {
+    // Rounding each equal share on its own gave three each here, claiming six.
+    expect(spreadClicks(5, 2)).toEqual([3, 2]);
+  });
+
+  it('never loses one either', () => {
+    // And three each here, losing the tenth.
+    expect(spreadClicks(10, 3)).toEqual([4, 3, 3]);
+  });
+
+  it('splits evenly when it divides', () => {
+    expect(spreadClicks(9, 3)).toEqual([3, 3, 3]);
+    expect(spreadClicks(0, 3)).toEqual([0, 0, 0]);
+  });
+
+  it('has nothing to split when a post reached nowhere', () => {
+    expect(spreadClicks(7, 0)).toEqual([]);
+  });
+
+  it('keeps the shares as close together as they can be', () => {
+    const shares = spreadClicks(11, 4);
+    expect(Math.max(...shares) - Math.min(...shares)).toBeLessThanOrEqual(1);
   });
 });

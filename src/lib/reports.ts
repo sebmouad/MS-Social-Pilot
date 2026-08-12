@@ -60,6 +60,30 @@ function engagementOf(insights: PostInsights | null): number {
   return number(insights.reactions) + number(insights.comments) + number(insights.shares);
 }
 
+/**
+ * Split one post's clicks across the destinations it went to.
+ *
+ * A short link is shared by every destination, so there is no way to know
+ * which of them earned a click — the split is a presentational convenience,
+ * not a measurement. What matters is that it adds up: this is a report a
+ * client reads, and a destination column that does not sum to the total beside
+ * it costs more credibility than the rounding ever bought.
+ *
+ * Rounding each equal share independently fails both ways. Five clicks across
+ * two destinations rounds to three each and claims six clicks that never
+ * happened; ten across three rounds to three each and loses one. So the
+ * remainder is handed out a click at a time instead, to the first destinations
+ * in order — arbitrary, but exact.
+ */
+export function spreadClicks(total: number, parts: number): number[] {
+  if (parts <= 0) return [];
+
+  const base = Math.floor(total / parts);
+  const remainder = total - base * parts;
+
+  return Array.from({ length: parts }, (_, index) => base + (index < remainder ? 1 : 0));
+}
+
 export async function buildReport(options: {
   workspaceId: string;
   timezone: string;
@@ -143,11 +167,11 @@ export async function buildReport(options: {
   for (const [postId, clicks] of clicksByPost) {
     totals.linkClicks += clicks;
     const destinations = published.filter((row) => row.post.id === postId);
-    const share = destinations.length > 0 ? clicks / destinations.length : 0;
-    for (const row of destinations) {
+    const shares = spreadClicks(clicks, destinations.length);
+    destinations.forEach((row, index) => {
       const entry = byDestination.get(row.target.id);
-      if (entry) entry.clicks += Math.round(share);
-    }
+      if (entry) entry.clicks += shares[index] ?? 0;
+    });
   }
 
   return {
