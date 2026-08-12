@@ -140,6 +140,16 @@ somebody's afternoon. A test pins that every writer of the sentence also writes
 the code, because forgetting one puts a reader back where they started and
 nothing would look wrong.
 
+**The media sweep reads `mediaKeys`, not the `media` payload**, so the two have
+to be written together or a post keeps showing pictures the sweep counts as
+orphans — and thirty days later a published post on a client's Page has broken
+images, with nothing having looked wrong in between. `mediaColumns` produces
+both and is the only producer, which the fixtures in the media suite use by
+construction. That is exactly why they cannot catch an application path that
+forgets: the tests that matter drive `createPost` and `updatePost` and then run
+the sweep, including the case where an edit *removes* an attachment and the
+file should go.
+
 **Turning review off is the same situation at its largest.** One switch frees
 everything the queue was holding, and the posts whose moment has gone publish
 on the next tick — deliberate, and the same thing approving them would have

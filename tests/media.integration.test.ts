@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { WorkspaceRole } from '@prisma/client';
@@ -688,3 +690,118 @@ describe('readMediaLibrary', () => {
     expect(library.usage.quotaBytes).toBeGreaterThan(0);
   });
 })
+
+/**
+ * The pairing the unattended sweep depends on, through the real paths.
+ *
+ * `deleteUnusedMedia` decides what is unreferenced from `mediaKeys`, not from
+ * the `media` Json. The fixtures in this file write both by construction, so
+ * they cannot catch an application path that sets one and forgets the other —
+ * and that path's posts keep showing their images while the sweep counts them
+ * as orphans. Thirty days later a published post on a client's Page has broken
+ * pictures, with nothing having looked wrong in between.
+ */
+describe('media survives the sweep when a real path stored it', () => {
+  const now = new Date('2026-09-01T10:00:00Z');
+  const long_ago = new Date('2026-01-01T10:00:00Z');
+
+  async function seedTarget(workspaceId: string) {
+    return prisma.target.create({
+      data: { workspaceId, type: 'page', providerId: '1000', name: 'Page' },
+    });
+  }
+
+  /** Age the file past the retention window so the sweep considers it. */
+  async function age(fileId: string) {
+    await prisma.media.update({ where: { id: fileId }, data: { createdAt: long_ago } });
+  }
+
+  it('keeps a file attached by the composer', async () => {
+    const { user, workspace, file } = await seed();
+    const target = await seedTarget(workspace.id);
+    await age(file.id);
+
+    const posts = await import('../src/lib/posts');
+    await posts.createPost(
+      { workspaceId: workspace.id, userId: user.id, role: WorkspaceRole.owner, requiresApproval: false },
+      {
+        message: 'With a picture',
+        media: [{ id: file.id, kind: 'image', url: file.url, storageKey: file.storageKey! }],
+        targetIds: [target.id],
+        publishMode: 'worker',
+        scheduledAtLocal: null,
+        timezone: 'UTC',
+        useQueue: false,
+        saveAsDraft: true,
+      },
+    );
+
+    const result = await media.deleteUnusedMedia({ workspaceId: workspace.id, olderThanDays: 30, now });
+
+    expect(result.removed, 'the sweep took a file a post is still using').toBe(0);
+    expect(await prisma.media.count({ where: { id: file.id } })).toBe(1);
+  });
+
+  it('keeps a file attached by an edit', async () => {
+    const { user, workspace, file } = await seed();
+    const target = await seedTarget(workspace.id);
+    await age(file.id);
+
+    const posts = await import('../src/lib/posts');
+    const context = {
+      workspaceId: workspace.id,
+      userId: user.id,
+      role: WorkspaceRole.owner,
+      requiresApproval: false,
+    };
+    const created = await posts.createPost(context, {
+      message: 'No picture yet',
+      media: [],
+      targetIds: [target.id],
+      publishMode: 'worker',
+      scheduledAtLocal: null,
+      timezone: 'UTC',
+      useQueue: false,
+      saveAsDraft: true,
+    });
+
+    // Added afterwards, which is the path a fixture never exercises.
+    await posts.updatePost(context, created.postId, {
+      media: [{ id: file.id, kind: 'image', url: file.url, storageKey: file.storageKey! }],
+    });
+
+    const result = await media.deleteUnusedMedia({ workspaceId: workspace.id, olderThanDays: 30, now });
+    expect(result.removed).toBe(0);
+  });
+
+  it('still takes one that an edit removed', async () => {
+    const { user, workspace, file } = await seed();
+    const target = await seedTarget(workspace.id);
+    await age(file.id);
+
+    const posts = await import('../src/lib/posts');
+    const context = {
+      workspaceId: workspace.id,
+      userId: user.id,
+      role: WorkspaceRole.owner,
+      requiresApproval: false,
+    };
+    const created = await posts.createPost(context, {
+      message: 'With a picture',
+      media: [{ id: file.id, kind: 'image', url: file.url, storageKey: file.storageKey! }],
+      targetIds: [target.id],
+      publishMode: 'worker',
+      scheduledAtLocal: null,
+      timezone: 'UTC',
+      useQueue: false,
+      saveAsDraft: true,
+    });
+
+    await posts.updatePost(context, created.postId, { media: [] });
+
+    // The other half of the same rule: keys left behind would keep a file
+    // nobody uses for ever, which is why both columns are written together.
+    const result = await media.deleteUnusedMedia({ workspaceId: workspace.id, olderThanDays: 30, now });
+    expect(result.removed).toBe(1);
+  });
+});
