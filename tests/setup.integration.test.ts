@@ -202,6 +202,12 @@ describe('what is left to do', () => {
       },
     });
 
+    // A worker has to have reported in: an installation with every box ticked
+    // and nothing running publishes nothing.
+    await prisma.workerHeartbeat.create({
+      data: { workerId: 'test-worker', seenAt: new Date(), jobs: ['publish'] },
+    });
+
     const state = await setup.readSetupState(workspace.id);
 
     expect(state.complete).toBe(true);
@@ -250,5 +256,130 @@ describe('who may set up the installation', () => {
       await seedWorkspace();
       expect(await setup.isFirstRun()).toBe(false);
     })();
+  });
+});
+
+/**
+ * What the machine can do, as opposed to what somebody has configured.
+ *
+ * Each of these lets an installation look finished on screen and then fail at
+ * the first post, hours later, with nothing connecting the two.
+ */
+describe('the runtime checks', () => {
+  beforeEach(async () => {
+    // A heartbeat left behind by another test would make "never started" pass
+    // for the wrong reason.
+    await prisma.workerHeartbeat.deleteMany();
+  });
+
+  it('is not complete while a required check fails, however many boxes are ticked', async () => {
+    const { workspace } = await seedWorkspace();
+    await settings.writeSetting('facebook.appId', '123', null);
+    await settings.writeSetting('facebook.appSecret', 'shh', null);
+    await settings.ensureSettings();
+
+    const account = await prisma.socialAccount.create({
+      data: { workspaceId: workspace.id, providerUserId: '9', name: 'Sam', accessToken: 'x' },
+    });
+    await prisma.target.create({
+      data: {
+        workspaceId: workspace.id,
+        socialAccountId: account.id,
+        type: 'page',
+        providerId: '9000',
+        name: 'Page',
+        enabled: true,
+        canPublish: true,
+      },
+    });
+
+    // Every step done, and no worker. Calling that complete is how somebody
+    // finds out days later that nothing was ever published.
+    const withoutWorker = await setup.readSetupState(workspace.id);
+    expect(withoutWorker.steps.filter((step) => !step.optional).every((step) => step.done)).toBe(
+      true,
+    );
+    expect(withoutWorker.complete).toBe(false);
+
+    await prisma.workerHeartbeat.create({ data: { workerId: 'running', seenAt: new Date() } });
+    expect((await setup.readSetupState(workspace.id)).complete).toBe(true);
+  });
+
+  it('says the worker is not running when none has reported', async () => {
+    const checks = await setup.readSetupChecks();
+    const worker = checks.find((check) => check.id === 'worker')!;
+
+    expect(worker.ok).toBe(false);
+    expect(worker.optional).toBe(false);
+    expect(worker.detail).toBe('never started');
+  });
+
+  it('accepts a worker seen a moment ago and rejects one from an hour back', async () => {
+    await prisma.workerHeartbeat.create({
+      data: { workerId: 'fresh', seenAt: new Date(), jobs: ['publish'] },
+    });
+    expect((await setup.readSetupChecks()).find((check) => check.id === 'worker')?.ok).toBe(true);
+
+    await prisma.workerHeartbeat.update({
+      where: { workerId: 'fresh' },
+      data: { seenAt: new Date(Date.now() - 60 * 60 * 1000) },
+    });
+    expect((await setup.readSetupChecks()).find((check) => check.id === 'worker')?.ok).toBe(false);
+  });
+
+  it('reads the newest heartbeat, not just any one', async () => {
+    // Several workers is a supported deployment, and one that has stopped must
+    // not make a running fleet look dead.
+    await prisma.workerHeartbeat.createMany({
+      data: [
+        { workerId: 'stopped', seenAt: new Date(Date.now() - 60 * 60 * 1000), jobs: [] },
+        { workerId: 'running', seenAt: new Date(), jobs: ['publish'] },
+      ],
+    });
+
+    expect((await setup.readSetupChecks()).find((check) => check.id === 'worker')?.ok).toBe(true);
+  });
+
+  it('rejects an encryption key that is not 32 bytes', async () => {
+    const original = process.env.ENCRYPTION_KEY;
+    // AES-256-GCM takes no other length, so a wrong one fails at the first
+    // token rather than here — which is hours later and looks unrelated.
+    process.env.ENCRYPTION_KEY = Buffer.from('too short').toString('base64');
+
+    const key = (await setup.readSetupChecks()).find((check) => check.id === 'encryptionKey')!;
+    expect(key.ok).toBe(false);
+    expect(key.detail).toMatch(/not 32/);
+
+    process.env.ENCRYPTION_KEY = original;
+    expect((await setup.readSetupChecks()).find((check) => check.id === 'encryptionKey')?.ok).toBe(
+      true,
+    );
+  });
+
+  it('rejects a session secret short enough to brute-force', async () => {
+    const original = process.env.SESSION_SECRET;
+    process.env.SESSION_SECRET = 'short';
+
+    const secret = (await setup.readSetupChecks()).find((check) => check.id === 'sessionSecret')!;
+    expect(secret.ok).toBe(false);
+
+    process.env.SESSION_SECRET = original;
+  });
+
+  it('reports a writable media directory, and says which one', async () => {
+    const media = (await setup.readSetupChecks()).find((check) => check.id === 'mediaDir')!;
+
+    expect(media.ok).toBe(true);
+    expect(media.detail).toBeTruthy();
+  });
+
+  it('only warns about a localhost APP_URL outside production', async () => {
+    // Correct in development and fatal in production, so the severity moves
+    // rather than the check.
+    const check = (await setup.readSetupChecks()).find((entry) => entry.id === 'appUrl')!;
+
+    expect(check.detail).toContain('localhost');
+    expect(check.optional).toBe(true);
+    expect(check.ok).toBe(true);
   });
 });

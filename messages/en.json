@@ -327,7 +327,7 @@
       }
     },
     "instagramDestinations": "Instagram accounts you can post to",
-    "instagramHint": "Business accounts reachable through a connected page. Analytics only — publishing to Instagram is not built.",
+    "instagramHint": "Business accounts reachable through a connected page. Usable as destinations once instagram_content_publish is approved; until then they appear turned off.",
     "instagramTitle": "Instagram accounts",
     "noGroups": "No groups. Group publishing needs a separately approved permission.",
     "noLinkedPage": "No linked page",
@@ -824,7 +824,7 @@
   },
   "setup": {
     "title": "Set up MS Social Pilot",
-    "subtitle": "Four things stand between this server and a scheduled post. This page keeps track of them.",
+    "subtitle": "What stands between this server and a scheduled post, and what the installation itself can and cannot do. This page keeps track of both.",
     "subtitleComplete": "Everything is in place. This page stays here in case a connection needs looking at later.",
     "optional": "Optional",
     "saving": "Saving…",
@@ -866,6 +866,34 @@
         "body": "Without it, a failed post fails silently: nobody is told, and it is found when a client asks why their page went quiet.",
         "done": "Email is configured, so failures reach somebody.",
         "action": "Configure email"
+      }
+    },
+    "checks": {
+      "title": "Installation checks",
+      "summary": "{failing, plural, =0 {all {total} passing} one {# needs attention} other {# need attention}}",
+      "sessionSecret": {
+        "title": "Session secret set",
+        "fix": "SESSION_SECRET is missing or too short. Run npm run setup, or generate one with openssl rand -base64 48, then restart."
+      },
+      "encryptionKey": {
+        "title": "Encryption key valid",
+        "fix": "ENCRYPTION_KEY must be exactly 32 bytes, base64-encoded. Run npm run setup, or generate one with openssl rand -base64 32, then restart."
+      },
+      "appUrl": {
+        "title": "Public address configured",
+        "fix": "APP_URL still points at localhost. Facebook cannot reach a loopback address, and the OAuth redirect has to match this exactly. Set it to the address people will use, including https://."
+      },
+      "database": {
+        "title": "Database reachable",
+        "fix": "The database did not answer. Check DATABASE_URL and that PostgreSQL is running."
+      },
+      "mediaDir": {
+        "title": "Media directory writable",
+        "fix": "Uploads cannot be written. Check MEDIA_DIR exists and that the app's user owns it."
+      },
+      "worker": {
+        "title": "Scheduler worker running",
+        "fix": "No worker has reported in. Nothing will publish until one runs: npm run worker, or systemctl start social-pilot-worker."
       }
     }
   },

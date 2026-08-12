@@ -1678,6 +1678,32 @@ A fresh deployment has no account to sign in to, so a sign-in form is the wrong
 first screen. `/` and `/login` send whoever just deployed it to `/setup` while
 the database holds no accounts.
 
+The screen answers two different questions side by side. The **checklist** asks
+whether somebody has done something: an account, the Facebook app credentials, a
+connection, a destination, and email. The **checks** ask whether the machine can
+do its job — the session secret and the encryption key are present and the right
+size, `APP_URL` is not still localhost on a public server, the database answers,
+the media directory is writable, and a scheduler worker has reported in.
+
+That second half exists because each of those lets an installation look finished
+and then fail at the first post, hours later, with nothing on screen connecting
+the two. The commonest by far is a worker nobody started: posts sit at
+"scheduled" and every other indicator is green. The worker writes a
+`WorkerHeartbeat` row every thirty seconds and the screen allows four missed
+beats, so a restart is not an alarm but a stopped worker is. `complete` requires
+both halves — every required step done *and* every required check passing —
+because an installation with every box ticked and nothing running publishes
+nothing.
+
+A failing check names the evidence and the remedy separately: what was found
+(`23 bytes, not 32`) sits under the translated sentence saying what to do about
+it, and never contains a secret — a key is reported by its length. Passing
+checks stay on screen rather than collapsing away, because "no news" and "not
+checked" look identical when a row is missing, and this is the one screen whose
+job is to say what is wrong.
+
+![The setup screen](images/setup.png)
+
 The checklist is **derived, never stored**. A wizard that remembers which step
 you reached is wrong the moment anything changes underneath it — the last
 connection is removed, credentials are rotated — and it cannot be resumed from a

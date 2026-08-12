@@ -17,9 +17,9 @@ export function generateMetadata() {
 /**
  * What to do first, on a server nobody has used yet.
  *
- * A fresh deployment used to answer the browser with a sign-in form for an
- * account that does not exist. This is the screen that should meet somebody
- * instead: what is done, what is not, and the next thing to press.
+ * A fresh deployment has no account to sign in to, so this is the screen that
+ * meets whoever just installed it: what is done, what is not, what the machine
+ * itself cannot do, and the next thing to press.
  */
 export default async function SetupPage() {
   const auth = await getAuthContext();

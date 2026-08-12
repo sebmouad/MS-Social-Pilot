@@ -961,6 +961,24 @@ model AppSetting {
   @@map("app_settings")
 }
 
+/// The last time a scheduler worker was alive.
+///
+/// One row per worker process. Nothing publishes without a worker running, and
+/// a fresh installation whose worker was never started looks exactly like one
+/// that is working — posts sit at "scheduled" and nobody is told why. The setup
+/// screen reads this to say so.
+model WorkerHeartbeat {
+  workerId String   @id
+  /// Written explicitly by the worker rather than by `@updatedAt`, so a test
+  /// and an operator can both put a heartbeat in the past on purpose.
+  seenAt   DateTime @default(now())
+  /// Which jobs this process is configured to run, for an operator reading it.
+  jobs     String[]
+
+  @@index([seenAt])
+  @@map("worker_heartbeats")
+}
+
 model ActivityLog {
   id          String   @id @default(cuid())
   workspaceId String

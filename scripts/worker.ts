@@ -17,7 +17,10 @@ import { jobDefinitions, type JobDefinition } from '../src/lib/scheduler/jobs';
 import { createLoopState, dueJobs, markFinished, markStarted } from '../src/lib/scheduler/loop';
 import { ensureSettings } from '../src/lib/settings';
 
-const workerId = `worker-${process.pid}`;
+const workerId = `${process.env.HOSTNAME ?? 'host'}-${process.pid}`;
+
+/** How often this process records that it is alive. */
+const HEARTBEAT_MS = 30_000;
 let stopping = false;
 /** Jobs currently mid-run, so shutdown can wait for them. */
 const inFlight = new Set<Promise<unknown>>();
@@ -65,6 +68,7 @@ async function main(): Promise<void> {
   );
 
   const state = createLoopState();
+  let lastHeartbeat = 0;
 
   while (!stopping) {
     // Re-read configuration every pass (cached, so this is one query a minute
@@ -86,7 +90,26 @@ async function main(): Promise<void> {
       inFlight.add(running);
     }
 
-    // One-second heartbeat: fine-grained enough that a 30-second job fires on
+    // Record that this process is alive, every half minute rather than every
+    // pass. Nothing publishes without a worker, and an installation whose
+    // worker was never started otherwise looks exactly like one that works —
+    // posts sit at "scheduled" and nobody is told why. The setup screen reads
+    // this row to say so.
+    if (Date.now() - lastHeartbeat > HEARTBEAT_MS) {
+      lastHeartbeat = Date.now();
+      const names = jobs.map((job) => job.name);
+      // Never fatal: a worker that cannot write its heartbeat should keep
+      // publishing, which is the thing it exists to do.
+      await prisma.workerHeartbeat
+        .upsert({
+          where: { workerId },
+          create: { workerId, jobs: names },
+          update: { jobs: names, seenAt: new Date() },
+        })
+        .catch((error: unknown) => log('heartbeat failed', error));
+    }
+
+    // One-second loop: fine-grained enough that a 30-second job fires on
     // time, cheap enough to be free.
     await sleep(1000);
   }

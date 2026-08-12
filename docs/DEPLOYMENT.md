@@ -1,5 +1,33 @@
 # Deployment
 
+## Fresh Debian server, in one command
+
+```bash
+sudo bash scripts/install-debian.sh
+```
+
+Node.js 22, PostgreSQL 16, the build packages, a database and role, `.env` with
+generated secrets, dependencies, migrations, a production build, and optional
+systemd units for the web app and the worker. Re-runnable: each step checks for
+its own result first, so a run after a failure resumes, and an existing `.env`
+or an encryption key already in use is never overwritten.
+
+Two units rather than one, because a slow publish must never block a page load
+and either can be restarted alone:
+
+```bash
+systemctl status social-pilot social-pilot-worker
+journalctl -u social-pilot-worker -f
+```
+
+**The worker is not optional.** Nothing publishes without it. The Setup screen
+reports whether one has reported in within the last two minutes, which is the
+one first-install mistake that otherwise looks like nothing at all — posts sit
+at "scheduled" and no screen says why.
+
+![The setup screen reporting the installation checks](images/setup.png)
+
+
 Everything here assumes the Meta app already exists. If it does not, start with
 [META_APP_SETUP.md](META_APP_SETUP.md) — that is the part that blocks people.
 

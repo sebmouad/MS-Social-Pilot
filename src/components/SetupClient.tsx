@@ -15,9 +15,19 @@ interface SetupStep {
   optional: boolean;
 }
 
+type CheckId = 'sessionSecret' | 'encryptionKey' | 'appUrl' | 'database' | 'mediaDir' | 'worker';
+
+interface SetupCheck {
+  id: CheckId;
+  ok: boolean;
+  optional: boolean;
+  detail?: string;
+}
+
 interface SetupState {
   firstRun: boolean;
   steps: SetupStep[];
+  checks: SetupCheck[];
   complete: boolean;
   nextStep: StepId | null;
 }
@@ -187,6 +197,8 @@ export function SetupClient({ state, signedIn }: { state: SetupState; signedIn: 
         );
       })}
 
+      <ChecksPanel checks={state.checks} />
+
       {state.complete && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
           <p className="text-sm font-medium text-emerald-900">{t('readyTitle')}</p>
@@ -197,5 +209,72 @@ export function SetupClient({ state, signedIn }: { state: SetupState; signedIn: 
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * What the installation itself can and cannot do.
+ *
+ * Separate from the checklist above because it answers a different question.
+ * The steps ask whether somebody has done something; these ask whether the
+ * machine works — and every one of them is a way for an installation to look
+ * finished and then fail hours later at the first post, with nothing on screen
+ * connecting the two. The commonest by far is a worker nobody started.
+ *
+ * Passing checks stay visible rather than collapsing away. "No news" and "not
+ * checked" look identical when the row is missing, and on the one screen whose
+ * job is to say what is wrong, that is the wrong ambiguity to introduce.
+ */
+function ChecksPanel({ checks }: { checks: SetupCheck[] }) {
+  const t = useTranslations('setup');
+  const failing = checks.filter((check) => !check.ok);
+
+  return (
+    <section className="rounded-xl border border-slate-200 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">{t('checks.title')}</h2>
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs ${
+            failing.length === 0
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-amber-100 text-amber-800'
+          }`}
+        >
+          {t('checks.summary', { failing: failing.length, total: checks.length })}
+        </span>
+      </div>
+
+      <ul className="mt-3 space-y-2">
+        {checks.map((check) => (
+          <li key={check.id} className="flex items-start gap-2.5">
+            <span
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                check.ok
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : check.optional
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-red-100 text-red-700'
+              }`}
+            >
+              <Icon name={check.ok ? 'check' : 'warning'} className="h-3 w-3" />
+            </span>
+
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm text-slate-900">{t(`checks.${check.id}.title`)}</span>
+              {!check.ok && (
+                <span className="block text-xs text-slate-600">
+                  {t(`checks.${check.id}.fix`)}
+                </span>
+              )}
+              {/* The evidence, not the remedy: what was actually found, so a
+                  reader can tell a wrong value from a missing one. */}
+              {check.detail && (
+                <span className="block truncate text-xs text-slate-400">{check.detail}</span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

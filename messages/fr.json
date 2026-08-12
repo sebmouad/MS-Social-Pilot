@@ -327,7 +327,7 @@
       }
     },
     "instagramDestinations": "Comptes Instagram où publier",
-    "instagramHint": "Comptes professionnels accessibles via une page connectée. Statistiques uniquement — la publication Instagram n’est pas implémentée.",
+    "instagramHint": "Comptes professionnels accessibles via une page connectée. Utilisables comme destinations une fois instagram_content_publish approuvé ; jusque-là, ils apparaissent désactivés.",
     "instagramTitle": "Comptes Instagram",
     "noGroups": "Aucun groupe. La publication dans les groupes nécessite une autorisation approuvée séparément.",
     "noLinkedPage": "Aucune page reliée",
@@ -824,7 +824,7 @@
   },
   "setup": {
     "title": "Configurer MS Social Pilot",
-    "subtitle": "Quatre étapes séparent ce serveur d’une publication programmée. Cette page en assure le suivi.",
+    "subtitle": "Ce qui sépare ce serveur d’une publication programmée, et ce que l’installation elle-même peut ou ne peut pas faire. Cette page suit les deux.",
     "subtitleComplete": "Tout est en place. Cette page reste disponible si une connexion doit être vérifiée plus tard.",
     "optional": "Facultatif",
     "saving": "Enregistrement…",
@@ -866,6 +866,34 @@
         "body": "Sans cela, un échec de publication reste silencieux : personne n’est prévenu, et on le découvre quand un client demande pourquoi sa page est muette.",
         "done": "L’e-mail est configuré : les échecs sont signalés.",
         "action": "Configurer l’e-mail"
+      }
+    },
+    "checks": {
+      "title": "Vérifications de l’installation",
+      "summary": "{failing, plural, =0 {les {total} vérifications passent} one {# point à corriger} other {# points à corriger}}",
+      "sessionSecret": {
+        "title": "Secret de session défini",
+        "fix": "SESSION_SECRET est absent ou trop court. Lancez npm run setup, ou générez-en un avec openssl rand -base64 48, puis redémarrez."
+      },
+      "encryptionKey": {
+        "title": "Clé de chiffrement valide",
+        "fix": "ENCRYPTION_KEY doit faire exactement 32 octets, encodés en base64. Lancez npm run setup, ou générez-en une avec openssl rand -base64 32, puis redémarrez."
+      },
+      "appUrl": {
+        "title": "Adresse publique configurée",
+        "fix": "APP_URL pointe encore vers localhost. Facebook ne peut pas joindre une adresse de bouclage, et la redirection OAuth doit correspondre exactement. Indiquez l’adresse réellement utilisée, avec https://."
+      },
+      "database": {
+        "title": "Base de données joignable",
+        "fix": "La base de données n’a pas répondu. Vérifiez DATABASE_URL et que PostgreSQL fonctionne."
+      },
+      "mediaDir": {
+        "title": "Dossier média accessible en écriture",
+        "fix": "Les téléversements ne peuvent pas être écrits. Vérifiez que MEDIA_DIR existe et appartient à l’utilisateur de l’application."
+      },
+      "worker": {
+        "title": "Worker de planification actif",
+        "fix": "Aucun worker ne s’est signalé. Rien ne sera publié tant qu’il n’en tourne pas un : npm run worker, ou systemctl start social-pilot-worker."
       }
     }
   },

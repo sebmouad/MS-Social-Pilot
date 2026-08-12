@@ -19,12 +19,17 @@ French.
 | Run the browser tests | [e2e/README.md](e2e/README.md) |
 
 The app also explains itself as you go: a fresh installation opens on a **Setup**
-screen that says what is done and what is next, and **Connections** shows, per
-account, which permissions were granted and whether publishing actually works.
+screen that says what is done, what is next, and what the installation itself
+cannot do — including the commonest first-install mistake, a scheduler worker
+nobody started.
+
+![The setup screen: five configuration steps and six installation checks, with the scheduler worker flagged as not running](docs/images/setup.png)
 
 ---
 
 ## What it does
+
+![The composer: message, link card, media, destinations and the three scheduling modes](docs/images/compose.png)
 
 **Publishing**
 - Many Facebook Pages and Groups from one composer: text, links, photo
@@ -156,6 +161,8 @@ Open <http://localhost:3000>.
    permissions were granted and whether publishing actually works, so a missing
    permission is visible here rather than at publish time.
 
+![Connections: one Facebook user, the permissions it granted, and the Pages behind it](docs/images/connections.png)
+
 Getting the Meta app itself right is the part that blocks people:
 [docs/META_APP_SETUP.md](docs/META_APP_SETUP.md).
 
@@ -209,6 +216,8 @@ how to drive it from a serverless cron instead of a long-running worker.
 | Command | What it does |
 |---|---|
 | `npm run setup` | Write `.env` and generate the per-installation secrets |
+| `sudo bash scripts/install-debian.sh` | Whole-server install on fresh Debian |
+| `npm run screenshots` | Retake the documentation images (needs Playwright) |
 | `npm run dev` / `npm run dev:worker` | Dev server / worker |
 | `npm run build` / `npm start` | Production build and server |
 | `npm run worker` | Worker (production) |
@@ -224,7 +233,7 @@ how to drive it from a serverless cron instead of a long-running worker.
 npm test
 ```
 
-1041 tests, in three layers.
+1049 tests, in three layers.
 
 **Unit tests** cover the pure decision-making: which Graph edge a post takes,
 whether a retry is worth attempting, token encryption, timezone and queue-slot
