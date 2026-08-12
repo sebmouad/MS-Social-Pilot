@@ -27,6 +27,13 @@ export interface ConnectionResult {
   outcome: ConnectionOutcome;
   /** Set when the outcome is `blocked`: why Facebook will not accept this. */
   reason?: string;
+  /**
+   * Set by `disconnect`: posts Facebook is still holding that we could not
+   * delete on the way out. They will publish on schedule and nobody has the
+   * credentials to stop them any more, so this has to reach the person who
+   * pressed the button.
+   */
+  stillScheduledOnFacebook?: number;
 }
 
 const OK: ConnectionResult = { outcome: 'ok' };
@@ -130,8 +137,8 @@ export async function disconnect(options: {
   });
   if (!account) return { outcome: 'not_found' };
 
-  await disconnectAccount(options.workspaceId, account.id);
-  return OK;
+  const { stillScheduledOnFacebook } = await disconnectAccount(options.workspaceId, account.id);
+  return stillScheduledOnFacebook > 0 ? { outcome: 'ok', stillScheduledOnFacebook } : OK;
 }
 
 export interface ConnectionSummary {

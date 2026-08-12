@@ -260,12 +260,51 @@ export async function invalidateAccountsForFacebookUser(providerUserId: string, 
  * database. Anything still queued for those destinations is cancelled, since
  * it can no longer be published.
  */
-export async function disconnectAccount(workspaceId: string, socialAccountId: string): Promise<void> {
+export async function disconnectAccount(
+  workspaceId: string,
+  socialAccountId: string,
+): Promise<{ stillScheduledOnFacebook: number }> {
   const targets = await prisma.target.findMany({
     where: { socialAccountId, workspaceId },
-    select: { id: true },
+    select: { id: true, name: true, accessToken: true },
   });
   const targetIds = targets.map((target) => target.id);
+
+  // Posts Facebook is already holding are the one thing disconnecting cannot
+  // stop by forgetting about them: they publish on their own. And this is the
+  // last moment anything can be done about it — the tokens that could delete
+  // them are wiped below, and the account row goes with them.
+  const account = await prisma.socialAccount.findFirst({
+    where: { id: socialAccountId, workspaceId },
+    select: { accessToken: true },
+  });
+
+  const handedOff = await prisma.postTarget.findMany({
+    where: { targetId: { in: targetIds }, status: 'scheduled_remote', remotePostId: { not: null } },
+    select: { id: true, remotePostId: true, targetId: true },
+  });
+
+  const tokenByTarget = new Map(targets.map((target) => [target.id, target.accessToken]));
+  const stopped: string[] = [];
+  let stillScheduledOnFacebook = 0;
+
+  for (const row of handedOff) {
+    const encrypted = tokenByTarget.get(row.targetId) ?? account?.accessToken ?? null;
+    if (!encrypted || !row.remotePostId) {
+      stillScheduledOnFacebook += 1;
+      continue;
+    }
+
+    try {
+      const { deleteRemotePost } = await import('./facebook/publish');
+      await deleteRemotePost(row.remotePostId, decryptSecret(encrypted));
+      stopped.push(row.id);
+    } catch {
+      // Reported rather than swallowed: the post is still going to publish,
+      // and after this call nobody has the credentials to try again.
+      stillScheduledOnFacebook += 1;
+    }
+  }
 
   await prisma.$transaction([
     prisma.target.updateMany({
@@ -285,8 +324,25 @@ export async function disconnectAccount(workspaceId: string, socialAccountId: st
         errorMessage: 'Cancelled because the Facebook account was disconnected.',
       },
     }),
+    // Only the ones Facebook confirmed it had dropped. A destination still
+    // holding a post keeps saying so, because it is still true.
+    prisma.postTarget.updateMany({
+      where: { id: { in: stopped } },
+      data: {
+        status: 'cancelled',
+        nextAttemptAt: null,
+        errorMessage: 'Cancelled because the Facebook account was disconnected.',
+      },
+    }),
     prisma.socialAccount.deleteMany({ where: { id: socialAccountId, workspaceId } }),
   ]);
 
-  await logActivity(workspaceId, 'account.disconnected', { socialAccountId, targets: targetIds.length });
+  await logActivity(workspaceId, 'account.disconnected', {
+    socialAccountId,
+    targets: targetIds.length,
+    removedFromFacebook: stopped.length,
+    stillScheduledOnFacebook,
+  });
+
+  return { stillScheduledOnFacebook };
 }

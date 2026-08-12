@@ -106,6 +106,18 @@ the post where it actually happened. A post that has been deleted on Facebook
 (code 100) is recorded as failed rather than left claiming for ever that it is
 about to go out.
 
+**Disconnecting an account has to do the same thing.** It is the strongest
+"stop everything" gesture the product has, and it cancelled queued work while
+leaving posts Facebook was already holding to publish on their own — for an
+account the customer believes they removed. Worse, disconnecting is the last
+moment anyone could act: it wipes the page tokens and deletes the account row,
+so afterwards there is nothing left to authenticate a deletion with. The remote
+posts are now deleted first, while the credentials still exist, and only the
+ones Facebook confirmed it dropped are marked cancelled. The account still goes
+either way — refusing would leave a customer unable to disconnect at all — but
+the count that could not be stopped is returned to the caller, because nobody
+will get another chance.
+
 **When that deletion fails, the destination is not marked cancelled.** The copy
 that matters lives on Facebook, so a post reading "Cancelled" here while
 Facebook publishes it on schedule is the worst outcome available: the client

@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createServer, type Server } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { WorkspaceRole } from '@prisma/client';
 
@@ -22,8 +23,34 @@ type Prisma = typeof import('../src/lib/prisma')['prisma'];
 let prisma: Prisma;
 let connections: typeof import('../src/lib/connections');
 
+/** A stub Graph API, so a disconnect can be watched deleting remote posts. */
+let server: Server;
+/** Every request Graph received: method and path. */
+let received: Array<{ method: string; path: string }> = [];
+/** Paths the stub refuses, for testing what happens when a delete fails. */
+let denied: string[] = [];
+
 beforeAll(async () => {
-  setTestEnv();
+  server = createServer((request, response) => {
+    const url = new URL(request.url ?? '', 'http://localhost');
+    received.push({ method: request.method ?? 'GET', path: url.pathname });
+
+    request.on('data', () => undefined);
+    request.on('end', () => {
+      if (denied.some((suffix) => url.pathname.endsWith(suffix))) {
+        response.writeHead(400, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ error: { message: 'Cannot delete', code: 10 } }));
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ success: true }));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (typeof address === 'string' || address === null) throw new Error('no port');
+
+  setTestEnv({ FACEBOOK_GRAPH_BASE_URL: `http://127.0.0.1:${address.port}` });
   database = setupTestDatabase('connections');
 
   ({ prisma } = await import('../src/lib/prisma'));
@@ -32,10 +59,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma?.$disconnect();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
   database?.drop();
 });
 
 beforeEach(async () => {
+  received = [];
+  denied = [];
   await prisma.postTarget.deleteMany();
   await prisma.post.deleteMany();
   await prisma.instagramAccount.deleteMany();
@@ -522,5 +552,102 @@ describe('summariseConnections', () => {
     const summary = await connections.summariseConnections(mine.workspace.id, { now });
     expect(summary.accounts).toBe(1);
     expect(summary.instagram).toBe(1);
+  });
+});
+
+/**
+ * Disconnecting an account that Facebook is still holding posts for.
+ *
+ * Disconnecting is the strongest "stop everything" gesture the product has,
+ * and natively scheduled posts are the one thing it cannot stop by forgetting
+ * about them: they live on Facebook and publish on their own. Worse, the
+ * tokens that could delete them are wiped by the disconnect itself, so once it
+ * has run there is no way back — the posts keep arriving on a client's Page
+ * for an account the customer believes they removed.
+ */
+describe('disconnecting while Facebook holds scheduled posts', () => {
+  async function seedHandedOff() {
+    const seeded = await seed();
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: seeded.workspace.id,
+        authorId: seeded.user.id,
+        message: 'Facebook has this one',
+        status: 'scheduled',
+        publishMode: 'native',
+        scheduledAt: new Date(Date.now() + 3 * 60 * 60 * 1000),
+        targets: {
+          create: {
+            targetId: seeded.page.id,
+            status: 'scheduled_remote',
+            remotePostId: '1000_4242',
+            nativeScheduledFor: new Date(Date.now() + 3 * 60 * 60 * 1000),
+          },
+        },
+      },
+      include: { targets: true },
+    });
+    return { ...seeded, postTarget: post.targets[0]! };
+  }
+
+  it('deletes them on Facebook while it still can', async () => {
+    const seeded = await seedHandedOff();
+
+    const result = await connections.disconnect({
+      workspaceId: seeded.workspace.id,
+      role: WorkspaceRole.owner,
+      socialAccountId: seeded.account.id,
+    });
+    expect(result.outcome).toBe('ok');
+
+    // The delete has to happen before the tokens are wiped; afterwards there
+    // is nothing left to authenticate with.
+    expect(received.some((call) => call.method === 'DELETE' && call.path.includes('1000_4242'))).toBe(
+      true,
+    );
+
+    const after = await prisma.postTarget.findUniqueOrThrow({ where: { id: seeded.postTarget.id } });
+    expect(after.status).toBe('cancelled');
+  });
+
+  it('says which ones it could not stop', async () => {
+    const seeded = await seedHandedOff();
+    denied = ['1000_4242'];
+
+    const result = await connections.disconnect({
+      workspaceId: seeded.workspace.id,
+      role: WorkspaceRole.owner,
+      socialAccountId: seeded.account.id,
+    });
+
+    // The account still goes: the customer asked for it, and refusing would
+    // leave them unable to disconnect at all. But a post that is still going
+    // to publish must not be recorded as cancelled, and the caller has to be
+    // told, because this is the last moment anyone could have acted on it.
+    expect(result.outcome).toBe('ok');
+    expect(result.stillScheduledOnFacebook).toBe(1);
+
+    const after = await prisma.postTarget.findUniqueOrThrow({ where: { id: seeded.postTarget.id } });
+    expect(after.status).toBe('scheduled_remote');
+    expect(await prisma.socialAccount.count()).toBe(0);
+  });
+
+  it('leaves ordinary queued work cancelled as before', async () => {
+    const seeded = await seedHandedOff();
+    await prisma.postTarget.update({
+      where: { id: seeded.postTarget.id },
+      data: { status: 'pending', remotePostId: null },
+    });
+
+    await connections.disconnect({
+      workspaceId: seeded.workspace.id,
+      role: WorkspaceRole.owner,
+      socialAccountId: seeded.account.id,
+    });
+
+    // Nothing was handed to Facebook, so nothing should have been asked of it.
+    expect(received.some((call) => call.method === 'DELETE')).toBe(false);
+    const after = await prisma.postTarget.findUniqueOrThrow({ where: { id: seeded.postTarget.id } });
+    expect(after.status).toBe('cancelled');
   });
 });
