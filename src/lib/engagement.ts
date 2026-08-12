@@ -141,22 +141,48 @@ function rowCount(requested: number | undefined, fallback: number): number {
  * workspace of its own, and joining through the post is what keeps one client's
  * inbox out of another's.
  */
+/**
+ * The filter every comment query shares.
+ *
+ * Written once so the count and the page cannot disagree: a count taken over
+ * different criteria than the rows gives a pager that offers a page with
+ * nothing on it.
+ */
+function commentWhere(options: {
+  workspaceId: string;
+  targetId?: string;
+  hidden?: boolean;
+  search?: string;
+}) {
+  return {
+    postTarget: {
+      post: { workspaceId: options.workspaceId },
+      ...(options.targetId ? { targetId: options.targetId } : {}),
+    },
+    ...(options.hidden === undefined ? {} : { isHidden: options.hidden }),
+    ...(options.search ? { message: { contains: options.search, mode: 'insensitive' as const } } : {}),
+  };
+}
+
+export async function countComments(options: {
+  workspaceId: string;
+  targetId?: string;
+  hidden?: boolean;
+  search?: string;
+}): Promise<number> {
+  return prisma.postComment.count({ where: commentWhere(options) });
+}
+
 export async function readComments(options: {
   workspaceId: string;
   targetId?: string;
   hidden?: boolean;
   search?: string;
   limit?: number;
+  skip?: number;
 }): Promise<CommentRow[]> {
   const rows = await prisma.postComment.findMany({
-    where: {
-      postTarget: {
-        post: { workspaceId: options.workspaceId },
-        ...(options.targetId ? { targetId: options.targetId } : {}),
-      },
-      ...(options.hidden === undefined ? {} : { isHidden: options.hidden }),
-      ...(options.search ? { message: { contains: options.search, mode: 'insensitive' } } : {}),
-    },
+    where: commentWhere(options),
     include: {
       postTarget: {
         select: {
@@ -166,7 +192,10 @@ export async function readComments(options: {
         },
       },
     },
-    orderBy: { createdTime: 'desc' },
+    // `id` last: without a unique tiebreaker, comments sharing a timestamp can
+    // land on two pages while another lands on none.
+    orderBy: [{ createdTime: 'desc' }, { id: 'desc' }],
+    skip: options.skip ?? 0,
     take: rowCount(options.limit, 100),
   });
 

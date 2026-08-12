@@ -805,6 +805,16 @@ then filter — so the cost never arrives, and page numbers let them see how muc
 there is and come back to where they were. A page is a URL, so it survives a
 refresh and can be sent to a colleague.
 
+The comment stream needed more than a pager. `readComments` had supported a
+text search and a hidden/visible filter from the beginning and the screen
+offered neither, so a Page with three hundred comments showed the newest two
+hundred with no way to reach the rest and no way to find one. Moderation is an
+action rather than a browse — hiding the comment somebody complained about
+means being able to get to it — so the three arrived together, and the count
+and the rows are taken through one shared `where` clause. A count over
+different criteria than the rows gives a pager offering a page with nothing on
+it.
+
 `src/lib/paging.ts` holds the arithmetic because every mistake in it has the
 same shape — a row shown twice, or never — and none of it is visible until
 somebody has more rows than one page holds, which is when they stop reading

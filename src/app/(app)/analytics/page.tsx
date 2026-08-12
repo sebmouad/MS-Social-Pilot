@@ -14,6 +14,8 @@ import { StatTile } from '@/components/charts/StatTile';
 import { SyncButton } from '@/components/SyncButton';
 import { requirePage } from '@/lib/auth';
 import { canDeleteComments, canModerateComments } from '@/lib/constants';
+import { Pagination } from '@/components/Pagination';
+import { pageHref, pageNumber, paginate } from '@/lib/paging';
 import { prisma } from '@/lib/prisma';
 import {
   readAudience,
@@ -24,6 +26,7 @@ import {
   readStoredAnalytics,
 } from '@/lib/analytics';
 import {
+  countComments,
   readComments,
   readConversations,
   readExternalPosts,
@@ -37,6 +40,9 @@ import { ExternalLink } from '@/components/ExternalLink';
 
 export const dynamic = 'force-dynamic';
 
+/** A query parameter that may arrive repeated. */
+const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+
 export default async function AnalyticsPage({
   searchParams,
 }: {
@@ -47,7 +53,6 @@ export default async function AnalyticsPage({
   const params = await searchParams;
   const timezone = auth.workspace.timezone;
 
-  const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
   // Groups have no insights edge, so they are not offered here at all.
   const pages = await prisma.target.findMany({
@@ -173,6 +178,7 @@ export default async function AnalyticsPage({
           timezone={timezone}
           canModerate={canModerateComments(auth.role)}
           canDelete={canDeleteComments(auth.role)}
+          params={params}
         />
       )}
 
@@ -426,16 +432,67 @@ async function CommentsView({
   timezone,
   canModerate,
   canDelete,
+  params,
 }: {
   workspaceId: string;
   targetId: string;
   timezone: string;
   canModerate: boolean;
   canDelete: boolean;
+  params: Record<string, string | string[] | undefined>;
 }) {
-  const comments = await readComments({ workspaceId, targetId, limit: 200 });
+  const t = await getTranslations('engagement');
+
+  const search = (first(params.q) ?? '').trim();
+  const shown = first(params.shown);
+  const hidden = shown === 'hidden' ? true : shown === 'visible' ? false : undefined;
+
+  // The three go together. Two hundred comments with no way to search them and
+  // no way to reach the two hundred and first is not a moderation screen, and a
+  // busy Page passes that in a week.
+  const filter = { workspaceId, targetId, ...(hidden === undefined ? {} : { hidden }), ...(search ? { search } : {}) };
+  const page = paginate({
+    total: await countComments(filter),
+    requested: pageNumber(params.page),
+    size: 50,
+  });
+
+  const comments = await readComments({ ...filter, skip: page.skip, limit: page.take });
+
+  const href = (next: number) =>
+    pageHref('/analytics', { ...params, view: 'comments' }, next);
 
   return (
+    <div className="space-y-4">
+      <form method="get" className="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="view" value="comments" />
+        {typeof params.target === 'string' && (
+          <input type="hidden" name="target" value={params.target} />
+        )}
+
+        <div className="min-w-[12rem] flex-1">
+          <label className="label" htmlFor="q">
+            {t('searchComments')}
+          </label>
+          <input id="q" name="q" className="input" defaultValue={search} placeholder={t('searchPlaceholder')} />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="shown">
+            {t('show')}
+          </label>
+          <select id="shown" name="shown" className="input" defaultValue={shown ?? 'all'}>
+            <option value="all">{t('showAll')}</option>
+            <option value="visible">{t('showVisible')}</option>
+            <option value="hidden">{t('showHidden')}</option>
+          </select>
+        </div>
+
+        <button type="submit" className="btn-secondary">
+          {t('applyFilter')}
+        </button>
+      </form>
+
     <CommentsPanel
       targetId={targetId}
       canModerate={canModerate}
@@ -453,6 +510,9 @@ async function CommentsView({
         targetName: comment.targetName,
       }))}
     />
+
+      <Pagination page={page} href={href} />
+    </div>
   );
 }
 

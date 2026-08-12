@@ -245,3 +245,36 @@ test('the post list pages rather than stopping at a hundred', async ({ page }) =
 
   expect(failures).toEqual([]);
 });
+
+test('comments can be searched and paged rather than only skimmed', async ({ page }) => {
+  const failures = collectFailures(page);
+
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const postTarget = await prisma.postTarget.findFirstOrThrow({ where: { targetId: target.id } });
+
+  await prisma.postComment.createMany({
+    data: Array.from({ length: 60 }, (_, index) => ({
+      postTargetId: postTarget.id,
+      remoteId: `walk_c_${index}`,
+      fromName: 'Ada Byron',
+      message: index === 7 ? 'The delivery never arrived' : `Ordinary comment ${index}`,
+      createdTime: new Date('2026-08-01T10:00:00Z'),
+    })),
+  });
+
+  await open(page, '/analytics?view=comments');
+
+  // Sixty comments, fifty to a page: there is a second page and the screen
+  // says so rather than stopping silently.
+  const pager = page.getByRole('navigation', { name: /pages/i });
+  await expect(pager).toBeVisible();
+
+  // And the one somebody complained about is reachable without paging to it.
+  await page.getByLabel(/search comments/i).fill('never arrived');
+  await page.getByRole('button', { name: /^filter$/i }).click();
+
+  await expect(page.getByText('The delivery never arrived')).toBeVisible();
+  await expect(page.getByText(/Ordinary comment/).first()).toHaveCount(0);
+
+  expect(failures).toEqual([]);
+});

@@ -1456,3 +1456,105 @@ describe('replying to an inbox thread', () => {
     expect(byId.get(stale.id)!.reply.state).toBe('closed');
   });
 });
+
+/**
+ * Finding a comment among many.
+ *
+ * A Page with a few hundred comments is normal, and moderation is an action
+ * rather than a browse: hiding the one somebody complained about means being
+ * able to reach it. The screen offered two hundred, newest first, with no
+ * search and no way past them — so the reader has to page, and the count it
+ * pages against has to be taken over the same criteria as the rows.
+ */
+describe('searching and paging comments', () => {
+  async function seedComments(count: number, prefix = 'Comment') {
+    const seed = await seedWorkspace();
+
+    await prisma.postComment.createMany({
+      data: Array.from({ length: count }, (_, index) => ({
+        postTargetId: seed.postTarget.id,
+        remoteId: `c_${index}`,
+        fromName: 'Ada',
+        message: `${prefix} number ${index}`,
+        createdTime: new Date('2026-08-01T10:00:00Z'),
+        isHidden: index % 5 === 0,
+      })),
+    });
+
+    return seed;
+  }
+
+  it('counts the same rows it returns', async () => {
+    const seed = await seedComments(30);
+
+    const total = await engagement.countComments({ workspaceId: seed.workspace.id });
+    const all = await engagement.readComments({ workspaceId: seed.workspace.id, limit: 500 });
+
+    // A count taken over different criteria than the rows gives a pager that
+    // offers a page with nothing on it.
+    expect(total).toBe(all.length);
+  });
+
+  it('agrees with itself when a filter is applied', async () => {
+    const seed = await seedComments(30);
+
+    for (const filter of [{ hidden: true }, { hidden: false }, { search: 'number 1' }]) {
+      const total = await engagement.countComments({ workspaceId: seed.workspace.id, ...filter });
+      const rows = await engagement.readComments({
+        workspaceId: seed.workspace.id,
+        ...filter,
+        limit: 500,
+      });
+      expect(total, JSON.stringify(filter)).toBe(rows.length);
+    }
+  });
+
+  it('finds a comment by its words, ignoring case', async () => {
+    const seed = await seedWorkspace();
+    await prisma.postComment.create({
+      data: {
+        postTargetId: seed.postTarget.id,
+        remoteId: 'c_special',
+        fromName: 'Grace',
+        message: 'The delivery never ARRIVED',
+        createdTime: new Date('2026-08-01T10:00:00Z'),
+      },
+    });
+
+    const found = await engagement.readComments({
+      workspaceId: seed.workspace.id,
+      search: 'arrived',
+    });
+
+    expect(found).toHaveLength(1);
+    expect(found[0]?.message).toContain('never ARRIVED');
+  });
+
+  it('walks every comment across pages without repeating one', async () => {
+    const seed = await seedComments(25);
+
+    const seen = new Set<string>();
+    for (let page = 0; page < 3; page += 1) {
+      const rows = await engagement.readComments({
+        workspaceId: seed.workspace.id,
+        skip: page * 10,
+        limit: 10,
+      });
+      for (const row of rows) seen.add(row.id);
+    }
+
+    expect(seen.size).toBe(25);
+  });
+
+  it('keeps one client’s comments out of another’s search', async () => {
+    const mine = await seedComments(3, 'Mine');
+    await seedComments(3, 'Theirs');
+
+    const found = await engagement.readComments({
+      workspaceId: mine.workspace.id,
+      search: 'Theirs',
+    });
+
+    expect(found).toEqual([]);
+  });
+})

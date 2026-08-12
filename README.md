@@ -78,7 +78,9 @@ account, which permissions were granted and whether publishing actually works.
 - Crashed workers release their locks; several workers can run safely.
 
 **Engagement** — comments moderated from here (reply, hide, delete, each
-writing to Facebook first), Page ratings, and the Page inbox with replies.
+writing to Facebook first), searchable and filterable by whether they are
+hidden, because a busy Page has more comments than anybody scrolls. Page
+ratings, and the Page inbox with replies.
 Facebook accepts a reply only within 24 hours of the person's last message, so
 threads outside that window say so instead of offering a box that would refuse.
 
@@ -205,7 +207,7 @@ how to drive it from a serverless cron instead of a long-running worker.
 npm test
 ```
 
-793 tests, in three layers.
+798 tests, in three layers.
 
 **Unit tests** cover the pure decision-making: which Graph edge a post takes,
 whether a retry is worth attempting, token encryption, timezone and queue-slot
