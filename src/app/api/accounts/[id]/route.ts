@@ -34,5 +34,7 @@ export const DELETE = route(async (_request: Request, context: Context) => {
   // is indistinguishable from a disconnection that silently did nothing.
   if (result.outcome === 'not_found') return fail('Account not found.', 404);
 
-  return ok({ ok: true });
+  // Posts this could not stop on the way out. Nobody has the credentials to
+  // try again now, so this is the last chance to say so.
+  return ok({ ok: true, stillScheduledOnFacebook: result.stillScheduledOnFacebook });
 });

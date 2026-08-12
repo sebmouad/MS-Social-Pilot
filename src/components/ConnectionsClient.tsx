@@ -103,6 +103,28 @@ export function ConnectionsClient({
     }
   }
 
+  /**
+   * Both of these leave Facebook holding posts that will publish anyway, and
+   * the service layer counts them. Saying nothing here would put the silence
+   * back one layer: somebody turns a Page off, a post appears on it the next
+   * morning, and nothing they saw suggested that could happen.
+   */
+  async function disconnectAccount(accountId: string) {
+    const body = (await call(accountId, `/api/accounts/${accountId}`, 'DELETE')) as {
+      stillScheduledOnFacebook?: number;
+    } | null;
+    const stranded = body?.stillScheduledOnFacebook ?? 0;
+    if (stranded > 0) setError(t('stillScheduledGone', { count: stranded }));
+  }
+
+  async function toggleTarget(id: string, enabled: boolean) {
+    const body = (await call(id, `/api/targets/${id}`, 'PATCH', { enabled })) as {
+      stillScheduledOnFacebook?: number;
+    } | null;
+    const waiting = body?.stillScheduledOnFacebook ?? 0;
+    if (waiting > 0) setNotice(t('stillScheduledOff', { count: waiting }));
+  }
+
   async function sync(accountId: string) {
     const body = (await call(accountId, `/api/accounts/${accountId}/sync`, 'POST')) as {
       pages?: number;
@@ -259,7 +281,7 @@ export function ConnectionsClient({
                   disabled={busy === connection.id}
                   onClick={() => {
                     if (window.confirm(t('disconnectConfirm', { name: connection.name }))) {
-                      void call(connection.id, `/api/accounts/${connection.id}`, 'DELETE');
+                      void disconnectAccount(connection.id);
                     }
                   }}
                 >
@@ -275,9 +297,7 @@ export function ConnectionsClient({
               empty={t('noPages')}
               canManage={canManage}
               busy={busy}
-              onToggle={(id, enabled) =>
-                call(id, `/api/targets/${id}`, 'PATCH', { enabled })
-              }
+              onToggle={(id, enabled) => toggleTarget(id, enabled)}
             />
 
             <TargetList
@@ -287,9 +307,7 @@ export function ConnectionsClient({
               empty={t('noGroups')}
               canManage={canManage}
               busy={busy}
-              onToggle={(id, enabled) =>
-                call(id, `/api/targets/${id}`, 'PATCH', { enabled })
-              }
+              onToggle={(id, enabled) => toggleTarget(id, enabled)}
             />
 
             {/* Only once there is one: a workspace with no linked Instagram
@@ -303,9 +321,7 @@ export function ConnectionsClient({
                 empty={t('noPages')}
                 canManage={canManage}
                 busy={busy}
-                onToggle={(id, enabled) =>
-                  call(id, `/api/targets/${id}`, 'PATCH', { enabled })
-                }
+                onToggle={(id, enabled) => toggleTarget(id, enabled)}
               />
             )}
           </section>

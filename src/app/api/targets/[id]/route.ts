@@ -28,5 +28,12 @@ export const PATCH = route(async (request: Request, context: { params: Promise<{
   if (result.outcome === 'not_found') return fail('Destination not found.', 404);
   if (result.outcome === 'blocked') return fail(result.reason ?? 'Cannot enable this destination.', 409);
 
-  return ok({ id, enabled: input.enabled ?? true });
+  // Passed on rather than dropped: turning a destination off does not stop
+  // Facebook publishing what it already holds, and this is the moment somebody
+  // would want to know that.
+  return ok({
+    id,
+    enabled: input.enabled ?? true,
+    stillScheduledOnFacebook: result.stillScheduledOnFacebook,
+  });
 });

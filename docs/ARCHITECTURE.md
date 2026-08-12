@@ -127,6 +127,14 @@ many will still publish, because those can each be cancelled while the account
 is connected. `removeLinkedAccount` needs none of this: it only covers
 Instagram and ad accounts, and native scheduling is refused for Instagram.
 
+Both counts travel all the way to the screen. Working them out and returning
+them into a route that drops them would put the silence one layer further out,
+so the routes pass them on and the connections page shows them — as a warning
+when a destination is switched off, and as an error after a disconnect, where
+nothing can be done about it any more. Each destination list wires its toggle
+through the same helper, since one wired straight to `call` would quietly lose
+the warning for that kind of destination alone.
+
 **When that deletion fails, the destination is not marked cancelled.** The copy
 that matters lives on Facebook, so a post reading "Cancelled" here while
 Facebook publishes it on schedule is the worst outcome available: the client

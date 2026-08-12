@@ -345,6 +345,8 @@
     "syncTargets": "Actualiser les pages",
     "synced": "synchronisé {when}",
     "syncedResult": "{pages} pages et {groups} groupes trouvés.",
+    "stillScheduledOff": "{count, plural, =1 {Une publication est déjà programmée dans Facebook et paraîtra malgré tout. Annulez-la depuis la liste des publications pour l’en empêcher.} other {# publications sont déjà programmées dans Facebook et paraîtront malgré tout. Annulez-les depuis la liste des publications pour l’en empêcher.}}",
+    "stillScheduledGone": "{count, plural, =1 {Une publication n’a pas pu être retirée de Facebook et paraîtra malgré tout. Le compte étant déconnecté, elle ne peut plus être annulée ici.} other {# publications n’ont pas pu être retirées de Facebook et paraîtront malgré tout. Le compte étant déconnecté, elles ne peuvent plus être annulées ici.}}",
     "title": "Connexions",
     "tokenDays": "Jeton valide encore {count, plural, one {# jour} other {# jours}}",
     "tokenDead": "Reconnexion nécessaire",

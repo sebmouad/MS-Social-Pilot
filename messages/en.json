@@ -345,6 +345,8 @@
     "syncTargets": "Refresh pages",
     "synced": "synced {when}",
     "syncedResult": "Found {pages} pages and {groups} groups.",
+    "stillScheduledOff": "{count, plural, =1 {One post is already scheduled inside Facebook and will still publish. Cancel it from the posts list to stop it.} other {# posts are already scheduled inside Facebook and will still publish. Cancel them from the posts list to stop them.}}",
+    "stillScheduledGone": "{count, plural, =1 {One post could not be removed from Facebook and will still publish. The account is disconnected, so it can no longer be cancelled from here.} other {# posts could not be removed from Facebook and will still publish. The account is disconnected, so they can no longer be cancelled from here.}}",
     "title": "Connections",
     "tokenDays": "Token valid {count, plural, one {# more day} other {# more days}}",
     "tokenDead": "Reconnect required",

@@ -1,9 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createServer, type Server } from 'node:http';
+import { readFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { WorkspaceRole } from '@prisma/client';
 
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
+import en from '../messages/en.json';
+import fr from '../messages/fr.json';
 
 /**
  * Managing connections: destinations, Instagram accounts, ad accounts, tokens.
@@ -780,5 +783,48 @@ describe('turning off a destination with posts inside Facebook', () => {
 
     // Switching it on is not a moment anyone needs warning about.
     expect(result.stillScheduledOnFacebook).toBeUndefined();
+  });
+});
+
+/**
+ * The counts have to survive the trip to the screen.
+ *
+ * `disconnect` and `setTargetEnabled` both work out how many posts Facebook
+ * will publish regardless, and both were returning it into a route that threw
+ * it away. A warning nobody renders is the same silence one layer further out.
+ */
+describe('reporting what Facebook will still publish', () => {
+  const targetRoute = readFileSync('src/app/api/targets/[id]/route.ts', 'utf8');
+  const accountRoute = readFileSync('src/app/api/accounts/[id]/route.ts', 'utf8');
+  const client = readFileSync('src/components/ConnectionsClient.tsx', 'utf8');
+
+  it('is passed on by the route that turns a destination off', () => {
+    expect(targetRoute).toContain('stillScheduledOnFacebook: result.stillScheduledOnFacebook');
+  });
+
+  it('is passed on by the route that disconnects an account', () => {
+    expect(accountRoute).toContain('stillScheduledOnFacebook: result.stillScheduledOnFacebook');
+  });
+
+  it('is shown to whoever pressed the button', () => {
+    expect(client).toContain("t('stillScheduledOff'");
+    expect(client).toContain("t('stillScheduledGone'");
+  });
+
+  it('goes through the toggle helper on every destination list', () => {
+    // Pages, Groups and Instagram each render their own list, and one wired
+    // straight to `call` would silently drop the warning for that kind.
+    expect(client.match(/onToggle=\{\(id, enabled\) => toggleTarget\(id, enabled\)\}/g)).toHaveLength(3);
+    const lists = client.slice(client.indexOf('<TargetList'));
+    expect(lists).not.toMatch(/onToggle=\{\(id, enabled\) =>\s*call\(/);
+  });
+
+  it('says it in both languages, counting properly', () => {
+    for (const [language, messages] of [['en', en], ['fr', fr]] as const) {
+      const connections = messages.connections as unknown as Record<string, string>;
+      for (const key of ['stillScheduledOff', 'stillScheduledGone']) {
+        expect(connections[key], `${language} ${key}`).toContain('{count, plural,');
+      }
+    }
   });
 });
