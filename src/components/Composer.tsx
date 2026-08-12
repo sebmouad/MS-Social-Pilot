@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { TargetPicker, type TargetOption } from './TargetPicker';
+import { ExternalLink } from './ExternalLink';
 import { AiAssist } from './AiAssist';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 import { LIMITS } from '@/lib/constants';
@@ -83,6 +84,8 @@ export function Composer({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  /** Permalinks for a post that has just gone out, so it can be checked. */
+  const [published, setPublished] = useState<Array<{ name: string; url: string }>>([]);
 
   /**
    * Keep the two text boxes uncontrolled, and read them once on mount.
@@ -177,6 +180,7 @@ export function Composer({
     setPending(true);
     setError(null);
     setResult(null);
+    setPublished([]);
 
     const publishMode = timing === 'now' ? 'immediate' : handler;
 
@@ -219,7 +223,7 @@ export function Composer({
       fields?: Record<string, string>;
       postId?: string;
       scheduledAt?: string | null;
-      results?: Array<{ targetName: string; status: string; error?: string }>;
+      results?: Array<{ targetName: string; status: string; url?: string; error?: string }>;
     };
 
     if (!response.ok) {
@@ -255,6 +259,12 @@ export function Composer({
     // The queue picks the time on the server, so this is the only place the
     // author is told which slot they got. "Scheduled" on its own leaves them
     // to go and find out.
+    setPublished(
+      (body.results ?? [])
+        .filter((item) => item.status === 'published' && item.url)
+        .map((item) => ({ name: item.targetName, url: item.url! })),
+    );
+
     const queuedFor =
       timing === 'queue' && body.scheduledAt
         ? formatInZone(new Date(body.scheduledAt), timezone)
@@ -511,7 +521,22 @@ export function Composer({
         )}
         {result && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            {result}
+            <p>{result}</p>
+            {/* The permalink comes back with the publish and is thrown away
+                everywhere else. Right after posting is when somebody wants to
+                look at what went out — telling them it worked and making them
+                go and find it is the wrong half of the answer. */}
+            {published.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {published.map((item) => (
+                  <li key={item.url}>
+                    <ExternalLink href={item.url} className="underline underline-offset-2">
+                      {t('viewOn', { destination: item.name })}
+                    </ExternalLink>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 

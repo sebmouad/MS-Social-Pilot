@@ -249,6 +249,7 @@
     "scheduleForTime": "Schedule for a specific time",
     "scheduledOk": "Scheduled. You can see it on the calendar.",
     "queuedOk": "Queued for {when}. You can see it on the calendar.",
+    "viewOn": "View on {destination}",
     "submitForApproval": "Submit for approval",
     "submittedOk": "Submitted for approval.",
     "subtitle": "Write once, publish to any number of Facebook pages and groups.",

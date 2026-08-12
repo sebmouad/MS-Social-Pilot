@@ -182,3 +182,53 @@ describe('the confirmation for a queued post', () => {
     }
   });
 });
+
+/**
+ * What the composer offers after a post has actually gone out.
+ *
+ * Graph hands back a permalink with every successful publish and the API
+ * passes it through. Right after posting is exactly when somebody wants to
+ * look at what went out, so telling them it worked and making them go and find
+ * it is the wrong half of the answer.
+ */
+describe('the confirmation for a post that has published', () => {
+  const source = readFileSync('src/components/Composer.tsx', 'utf8');
+
+  it('keeps the permalink the API returned', () => {
+    // The response type used to declare only name, status and error, so the
+    // url was dropped before anything could render it.
+    expect(source).toMatch(/results\?: Array<\{[^}]*url\?: string/);
+  });
+
+  it('offers a link only for destinations that actually published', () => {
+    const blockStart = source.indexOf('setPublished(');
+    const block = source.slice(blockStart, source.indexOf('const queuedFor', blockStart));
+    expect(block).toContain("item.status === 'published'");
+    expect(block).toContain('item.url');
+  });
+
+  it('renders them through the guarded link component', () => {
+    // A permalink is data from Graph, so it goes through the same check as
+    // every other external href rather than straight into an anchor.
+    expect(source).toContain("import { ExternalLink } from './ExternalLink'");
+    const bannerStart = source.indexOf('{result && (');
+    const banner = source.slice(bannerStart, source.indexOf('<div className="flex gap-2">', bannerStart));
+    expect(banner).toContain('<ExternalLink');
+    expect(banner).not.toMatch(/<a\s+href=\{/);
+  });
+
+  it('clears the previous links when a new submit starts', () => {
+    // Otherwise a failed second attempt still shows the first post's links,
+    // which reads as though the failed one went out too.
+    const submitStart = source.indexOf('async function submit(');
+    const submit = source.slice(submitStart, source.indexOf('const publishMode =', submitStart));
+    expect(submit).toContain('setPublished([])');
+  });
+
+  it('names the destination in both languages', () => {
+    for (const [language, messages] of [['en', en], ['fr', fr]] as const) {
+      const compose = messages.compose as Record<string, string>;
+      expect(compose.viewOn, language).toContain('{destination}');
+    }
+  });
+});

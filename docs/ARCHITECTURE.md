@@ -285,6 +285,14 @@ composer names the slot it got back rather than saying "Scheduled" and leaving
 them to go and find it on the calendar. The confirmation carries the hour, not
 just the day: "goes out Tuesday" omits the part they need.
 
+A post that went out immediately gets its permalinks in the same banner. Graph
+returns one with every successful publish and the API passes it through; right
+after posting is when somebody wants to look at what went out, so confirming it
+worked and making them go and find it is the wrong half of the answer. Only
+destinations that actually published are linked, and they render through
+`ExternalLink` like every other href that came from data rather than from the
+code.
+
 **The calendar grid needs it for a different reason.** Four real zones —
 Santiago, Havana, Beirut and Cairo — change their clocks at midnight, so on one
 day a year those zones have no 00:00 at all. `monthGrid` built every square by
