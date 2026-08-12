@@ -25,6 +25,7 @@ export const POST = route(async (request: Request, context: { params: Promise<{ 
         workspaceId: auth.workspace.id,
         postId: id,
         userId: auth.user.id,
+        role: auth.role,
       });
       break;
 

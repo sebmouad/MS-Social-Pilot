@@ -2,7 +2,7 @@ import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
 import { AppError, errors } from './errors';
-import { canApprove, canPublishWithoutApproval } from './constants';
+import { canApprove, canManageOthersPosts, canPublishWithoutApproval } from './constants';
 import { notifyApprovalDecision, notifyApprovalRequest } from './email/notify';
 import { logActivity } from './scheduler/runner';
 
@@ -39,15 +39,48 @@ export function isPublishable(status: ApprovalStatus): boolean {
   return status === ApprovalStatus.not_required || status === ApprovalStatus.approved;
 }
 
+/**
+ * The states a post can be sent for review from.
+ *
+ * Everything that has not been sent and still might be. A published or
+ * publishing post is already gone, and putting one back in the queue leaves it
+ * reading as awaiting a decision nobody can now make while its copy sits on
+ * Facebook. `cancelled` stays out because reviving it through the review queue
+ * is not what cancelling meant, and `failed` stays out because retrying is the
+ * path that actually sends it — approving a failed post changes its status
+ * while every destination stays failed, so nothing goes anywhere.
+ */
+const SUBMITTABLE_STATUSES = [
+  PostStatus.draft,
+  PostStatus.rejected,
+  PostStatus.scheduled,
+  PostStatus.pending_approval,
+] as const;
+
 export async function submitForApproval(options: {
   workspaceId: string;
   postId: string;
   userId: string;
+  role: WorkspaceRole;
 }): Promise<void> {
   const post = await prisma.post.findFirst({
     where: { id: options.postId, workspaceId: options.workspaceId },
   });
   if (!post) throw errors.postNotFound();
+
+  // Submitting changes a post's state on the author's behalf, the same as
+  // editing or cancelling it does, and those both check whose post it is.
+  if (post.authorId !== options.userId && !canManageOthersPosts(options.role)) {
+    throw errors.noPermission();
+  }
+
+  if (!(SUBMITTABLE_STATUSES as readonly PostStatus[]).includes(post.status)) {
+    throw new AppError({
+      key: 'errors.notSubmittable',
+      fallback: 'That post cannot be sent for review.',
+      status: 409,
+    });
+  }
 
   const [user, workspace] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: options.userId } }),

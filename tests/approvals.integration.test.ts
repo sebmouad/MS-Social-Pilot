@@ -2076,3 +2076,128 @@ describe('releasing everything review was holding', () => {
     expect(entry.detail).toMatchObject({ released: 2, publishingNow: 1 });
   });
 });
+
+/**
+ * Who may put a post into the review queue, and which posts can go there.
+ *
+ * Editing, cancelling and retrying all check that the post is yours unless
+ * your role covers other people's work. Submitting is the one that changes a
+ * post's state on somebody else's behalf and it checked nothing at all — and
+ * nothing checked *which* post either, so a published one could be pushed back
+ * into the queue reading as unpublished while its copy sat on Facebook.
+ */
+describe('submitting a post for review', () => {
+  async function seedTwoContributors() {
+    const owner = await makeUser('Owner');
+    const author = await makeUser('Author');
+    const other = await makeUser('Other');
+    const { workspace, target } = await makeWorkspace({
+      name: 'Client',
+      ownerId: owner.id,
+      requiresApproval: true,
+    });
+    for (const user of [author, other]) {
+      await prisma.membership.create({
+        data: { userId: user.id, workspaceId: workspace.id, role: WorkspaceRole.contributor },
+      });
+    }
+    return { workspace, owner, author, other, target };
+  }
+
+  async function draftBy(
+    workspaceId: string,
+    authorId: string,
+    targetId: string,
+    status: PostStatus = PostStatus.draft,
+  ) {
+    return prisma.post.create({
+      data: {
+        workspaceId,
+        authorId,
+        message: 'A post',
+        status,
+        scheduledAt: status === PostStatus.draft ? null : new Date(Date.now() + 3_600_000),
+        targets: { create: { targetId } },
+      },
+    });
+  }
+
+  it('lets the author submit their own', async () => {
+    const seed = await seedTwoContributors();
+    const post = await draftBy(seed.workspace.id, seed.author.id, seed.target.id);
+
+    await approvals.submitForApproval({
+      workspaceId: seed.workspace.id,
+      postId: post.id,
+      userId: seed.author.id,
+      role: WorkspaceRole.contributor,
+    });
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.pending_approval);
+  });
+
+  it('refuses a contributor submitting a draft that is not theirs', async () => {
+    const seed = await seedTwoContributors();
+    const post = await draftBy(seed.workspace.id, seed.author.id, seed.target.id);
+
+    await expect(
+      approvals.submitForApproval({
+        workspaceId: seed.workspace.id,
+        postId: post.id,
+        userId: seed.other.id,
+        role: WorkspaceRole.contributor,
+      }),
+    ).rejects.toThrow(/permission/i);
+  });
+
+  it('lets an owner submit on behalf of a contributor', async () => {
+    const seed = await seedTwoContributors();
+    const post = await draftBy(seed.workspace.id, seed.author.id, seed.target.id);
+
+    await approvals.submitForApproval({
+      workspaceId: seed.workspace.id,
+      postId: post.id,
+      userId: seed.owner.id,
+      role: WorkspaceRole.owner,
+    });
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.pending_approval);
+  });
+
+  it('refuses to put a published post back in the queue', async () => {
+    const seed = await seedTwoContributors();
+    const post = await draftBy(seed.workspace.id, seed.author.id, seed.target.id, PostStatus.published);
+
+    // It is already on Facebook. Reading as "awaiting review" afterwards
+    // describes a decision nobody can now make.
+    await expect(
+      approvals.submitForApproval({
+        workspaceId: seed.workspace.id,
+        postId: post.id,
+        userId: seed.author.id,
+        role: WorkspaceRole.contributor,
+      }),
+    ).rejects.toThrow();
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.published);
+  });
+
+  it('lets a rejected post be sent back after changes', async () => {
+    const seed = await seedTwoContributors();
+    const post = await draftBy(seed.workspace.id, seed.author.id, seed.target.id, PostStatus.rejected);
+
+    await approvals.submitForApproval({
+      workspaceId: seed.workspace.id,
+      postId: post.id,
+      userId: seed.author.id,
+      role: WorkspaceRole.contributor,
+    });
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.pending_approval);
+    expect(after.reviewNote).toBeNull();
+  });
+});

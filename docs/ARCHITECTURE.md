@@ -162,6 +162,18 @@ forgets: the tests that matter drive `createPost` and `updatePost` and then run
 the sweep, including the case where an edit *removes* an attachment and the
 file should go.
 
+**Submitting for review checks whose post it is, and which post it is.**
+Editing, cancelling and retrying all refuse a post that is not yours unless
+your role covers other people's work; submitting changes a post's state on the
+author's behalf just as much and checked nothing at all, so any member could
+push a colleague's draft in front of a reviewer. Nor did anything check the
+post's own state: a published one could be put back in the queue, where it read
+as awaiting a decision nobody could make any more while its copy sat on
+Facebook. `SUBMITTABLE_STATUSES` allows draft, rejected, scheduled and a
+resubmission — `cancelled` stays out because reviving it through the queue is
+not what cancelling meant, and `failed` stays out because retrying is the path
+that actually sends it.
+
 **Turning review off is the same situation at its largest.** One switch frees
 everything the queue was holding, and the posts whose moment has gone publish
 on the next tick — deliberate, and the same thing approving them would have
