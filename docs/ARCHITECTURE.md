@@ -77,6 +77,17 @@ and editing means deleting it on Facebook and recreating it. Destinations in
 this state get the `scheduled_remote` status so our scheduler leaves them alone,
 and cancelling deletes the remote post rather than silently letting it publish.
 
+**When that deletion fails, the destination is not marked cancelled.** The copy
+that matters lives on Facebook, so a post reading "Cancelled" here while
+Facebook publishes it on schedule is the worst outcome available: the client
+sees a post they were told would never go out, and nobody is looking for it
+because our own records agree it is gone. A destination we could not delete
+stays `scheduled_remote`, the reason is returned to the caller, and the post's
+own status is derived rather than asserted — so it reads as scheduled, which is
+what it is. A destination with no stored token counts as a failure for the same
+reason: there is no way to reach the post at all, and passing over it silently
+reported a clean cancellation for something still going out.
+
 ### Claiming work without row locks
 
 Claiming is a conditional update rather than a row lock — simpler, and already

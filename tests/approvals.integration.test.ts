@@ -22,6 +22,9 @@ let published: string[] = [];
  * happen while the code under test is waiting on a network call.
  */
 let duringGraphRequest: (() => Promise<void>) | null = null;
+/** Lets a test make the fake Graph server refuse the next call. */
+let graphStatus = 200;
+let graphBody: unknown = { id: '1000_5000' };
 
 type Prisma = typeof import('../src/lib/prisma')['prisma'];
 let prisma: Prisma;
@@ -39,8 +42,8 @@ beforeAll(async () => {
       const hook = duringGraphRequest;
       duringGraphRequest = null;
       void Promise.resolve(hook?.()).then(() => {
-        response.writeHead(200, { 'content-type': 'application/json' });
-        response.end(JSON.stringify({ id: '1000_5000' }));
+        response.writeHead(graphStatus, { 'content-type': 'application/json' });
+        response.end(JSON.stringify(graphBody));
       });
     });
   });
@@ -67,6 +70,8 @@ afterAll(async () => {
 beforeEach(async () => {
   published = [];
   duringGraphRequest = null;
+  graphStatus = 200;
+  graphBody = { id: '1000_5000' };
   await prisma.postTarget.deleteMany();
   await prisma.post.deleteMany();
   await prisma.target.deleteMany();
@@ -1550,3 +1555,115 @@ describe('editing a post whose destination a worker has claimed', () => {
     expect(after.map((row) => row.targetId).sort()).toEqual([target.id, second.id].sort());
   });
 })
+
+/**
+ * Cancelling a post Facebook is already holding.
+ *
+ * Native scheduling hands the post to Facebook at creation time, so the copy
+ * that matters lives there, not here. Cancelling has to delete it there too —
+ * and when that fails, the one thing it must not do is say the post was
+ * cancelled anyway. "Cancelled" in our UI while Facebook publishes on schedule
+ * is the worst outcome available: the client sees a post they were told would
+ * never go out, and nobody is looking for it because our records agree it is
+ * gone.
+ */
+describe('cancelling a post Facebook is holding', () => {
+  async function seedHandedOff(options: { withToken?: boolean } = {}) {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Handed', ownerId: owner.id });
+
+    if (options.withToken === false) {
+      // A destination whose page token was cleared — a reconnect that did not
+      // finish, or a Page removed from the account.
+      await prisma.target.update({
+        where: { id: target.id },
+        data: { accessToken: null, socialAccountId: null },
+      });
+    }
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        message: 'Facebook has this one',
+        status: PostStatus.scheduled,
+        scheduledAt: new Date(Date.now() + 60 * 60 * 1000),
+        targets: {
+          create: {
+            targetId: target.id,
+            status: 'scheduled_remote',
+            remotePostId: '1000_4242',
+            nativeScheduledFor: new Date(Date.now() + 60 * 60 * 1000),
+          },
+        },
+      },
+    });
+
+    return { owner, workspace, target, post };
+  }
+
+  const asOwner = (workspaceId: string, userId: string) => ({
+    workspaceId,
+    userId,
+    role: WorkspaceRole.owner,
+  });
+
+  it('leaves the destination alone when Facebook refuses the deletion', async () => {
+    const seed = await seedHandedOff();
+    graphStatus = 400;
+    graphBody = {
+      error: { message: 'Unsupported delete request.', code: 100, type: 'GraphMethodException' },
+    };
+
+    const result = await posts.cancelPost(
+      asOwner(seed.workspace.id, seed.owner.id),
+      seed.post.id,
+    );
+
+    expect(result.failures).toHaveLength(1);
+    expect(result.removedFromFacebook).toBe(0);
+
+    // Still scheduled, here and there, because that is the truth.
+    const targets = await prisma.postTarget.findMany({ where: { postId: seed.post.id } });
+    expect(targets.map((row) => row.status)).toEqual(['scheduled_remote']);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: seed.post.id } });
+    expect(after.status).not.toBe(PostStatus.cancelled);
+  });
+
+  it('reports a destination it cannot even ask about, rather than skipping it', async () => {
+    const seed = await seedHandedOff({ withToken: false });
+
+    const result = await posts.cancelPost(
+      asOwner(seed.workspace.id, seed.owner.id),
+      seed.post.id,
+    );
+
+    // With no token there is no way to reach the post on Facebook. Passing
+    // over it silently is worse than failing: it reports a clean cancellation
+    // for a post that is still going out.
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]).toMatch(/still/i);
+
+    const targets = await prisma.postTarget.findMany({ where: { postId: seed.post.id } });
+    expect(targets.map((row) => row.status)).toEqual(['scheduled_remote']);
+  });
+
+  it('cancels normally when Facebook accepts the deletion', async () => {
+    const seed = await seedHandedOff();
+
+    const result = await posts.cancelPost(
+      asOwner(seed.workspace.id, seed.owner.id),
+      seed.post.id,
+    );
+
+    expect(result.failures).toEqual([]);
+    expect(result.removedFromFacebook).toBe(1);
+
+    const targets = await prisma.postTarget.findMany({ where: { postId: seed.post.id } });
+    expect(targets.map((row) => row.status)).toEqual(['cancelled']);
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: seed.post.id } });
+    expect(after.status).toBe(PostStatus.cancelled);
+  });
+});

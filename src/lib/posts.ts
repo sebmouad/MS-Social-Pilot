@@ -609,30 +609,56 @@ export async function cancelPost(
   assertMayAct(post, context);
 
   const failures: string[] = [];
+  // Destinations whose copy is still sitting in Facebook's queue. These must
+  // not be marked cancelled: a post reading "Cancelled" here while Facebook
+  // publishes it on schedule is the worst outcome available, because nobody is
+  // looking for it — our own records agree it is gone.
+  const stillLive: string[] = [];
   let removedFromFacebook = 0;
 
   for (const postTarget of post.targets) {
     if (postTarget.status === 'scheduled_remote' && postTarget.remotePostId) {
+      const encrypted = postTarget.target.accessToken ?? postTarget.target.socialAccount?.accessToken ?? null;
+      if (!encrypted) {
+        // No credential means no way to reach the post at all. Passing over it
+        // silently reports a clean cancellation for something still going out.
+        failures.push(
+          `${postTarget.target.name}: no stored token, so this post is still scheduled on Facebook. Reconnect the account and cancel again.`,
+        );
+        stillLive.push(postTarget.id);
+        continue;
+      }
+
       try {
-        const encrypted = postTarget.target.accessToken ?? postTarget.target.socialAccount?.accessToken ?? null;
-        if (encrypted) {
-          const { deleteRemotePost } = await import('./facebook/publish');
-          await deleteRemotePost(postTarget.remotePostId, decryptSecret(encrypted));
-          removedFromFacebook += 1;
-        }
+        const { deleteRemotePost } = await import('./facebook/publish');
+        await deleteRemotePost(postTarget.remotePostId, decryptSecret(encrypted));
+        removedFromFacebook += 1;
       } catch (error) {
         failures.push(`${postTarget.target.name}: ${asGraphError(error).displayMessage}`);
+        stillLive.push(postTarget.id);
       }
     }
   }
 
   await prisma.postTarget.updateMany({
-    where: { postId, status: { in: ['pending', 'scheduled_remote', 'failed'] } },
+    where: {
+      postId,
+      id: { notIn: stillLive },
+      status: { in: ['pending', 'scheduled_remote', 'failed'] },
+    },
     data: { status: 'cancelled', nextAttemptAt: null },
   });
-  await prisma.post.update({ where: { id: postId }, data: { status: 'cancelled' } });
 
-  await logActivity(context.workspaceId, 'post.cancelled', { postId, removedFromFacebook }, context.userId);
+  // Derived rather than asserted, so a post with a destination still queued at
+  // Facebook reads as scheduled — which it is — instead of cancelled.
+  await refreshPostStatus(postId);
+
+  await logActivity(
+    context.workspaceId,
+    'post.cancelled',
+    { postId, removedFromFacebook, stillLive: stillLive.length },
+    context.userId,
+  );
   return { removedFromFacebook, failures };
 }
 
