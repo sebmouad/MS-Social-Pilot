@@ -302,6 +302,11 @@ model Target {
   instagramAccounts InstagramAccount[]
 
   @@unique([workspaceId, providerId])
+  /// Set once the whole rating history has been walked back to its start. One
+  /// fetch reaches five hundred, so a Page with more is read over several
+  /// syncs and the average is partial until this is true.
+  reviewsBackfilled Boolean @default(false)
+
   @@index([socialAccountId])
   @@map("targets")
 }

@@ -15,6 +15,8 @@ import { graphPaged, graphRequest } from './graph';
 /** Hard ceilings, chosen so one sync of one destination stays bounded. */
 const MAX_COMMENT_PAGES = 5;
 const MAX_REVIEW_PAGES = 5;
+/** How many reviews one fetch can reach, which is also "there may be more". */
+export const REVIEW_FETCH_CEILING = MAX_REVIEW_PAGES * 100;
 const MAX_CONVERSATION_PAGES = 3;
 const MAX_POST_PAGES = 5;
 const MAX_VIDEO_PAGES = 3;
@@ -127,7 +129,7 @@ interface RawReview {
 export async function fetchReviews(
   pageId: string,
   accessToken: string,
-  options: { signal?: AbortSignal } = {},
+  options: { until?: Date; signal?: AbortSignal } = {},
 ): Promise<GraphReview[]> {
   const raw = await graphPaged<RawReview>(`${pageId}/ratings`, {
     accessToken,
@@ -136,6 +138,9 @@ export async function fetchReviews(
     signal: options.signal,
     params: {
       fields: 'created_time,rating,recommendation_type,review_text,reviewer{id,name},open_graph_story{id}',
+      // Walking backwards. One fetch reaches five hundred reviews; a Page with
+      // more needs several, each ending where the last one started.
+      until: options.until ? Math.floor(options.until.getTime() / 1000) : undefined,
     },
   });
 

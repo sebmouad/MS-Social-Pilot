@@ -1896,3 +1896,158 @@ describe('draining a backlog across several syncs', () => {
     expect(await prisma.postComment.count()).toBe(2);
   });
 });
+
+/**
+ * Reading a Page's whole rating history, not just its recent end.
+ *
+ * One ratings fetch reaches five hundred reviews. A business with more — a
+ * restaurant, a hotel — would have had its average computed from the newest
+ * five hundred and reported to it as its rating. A partial sum can only
+ * understate and somebody may notice; a partial average is wrong in either
+ * direction with nothing to signal which.
+ */
+describe('walking back through a long rating history', () => {
+  const untilAsked = () =>
+    asked.filter((call) => call.path.endsWith('/ratings')).map((call) => call.params.get('until'));
+
+  /** `count` reviews ending at `endAt`, one an hour apart going backwards. */
+  function ratings(count: number, endAt: string) {
+    const end = new Date(endAt).getTime();
+    return Array.from({ length: count }, (_, index) => ({
+      created_time: new Date(end - index * 3_600_000).toISOString(),
+      rating: 5,
+      review_text: `Review ${index}`,
+      reviewer: { name: 'Ada' },
+      open_graph_story: { id: `s-${endAt}-${index}` },
+    }));
+  }
+
+  it('stops after one fetch when the whole history fits', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    // Two reviews is plainly everything, so there is nothing to walk back to
+    // and no second request should be spent finding that out.
+    expect(untilAsked()).toEqual([null]);
+    const after = await prisma.target.findUniqueOrThrow({ where: { id: seed.target.id } });
+    expect(after.reviewsBackfilled).toBe(true);
+  });
+
+  it('asks for the window before the oldest it holds when the fetch was full', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    routes['/ratings'] = () => ({ data: ratings(500, '2026-07-01T10:00:00Z') });
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    // A full fetch means there may be more behind it, so the same sync reaches
+    // back past the oldest review it just stored.
+    const [first, second] = untilAsked();
+    expect(first).toBeNull();
+    expect(second).toBeTruthy();
+
+    const oldest = await prisma.pageReview.findFirstOrThrow({
+      where: { targetId: seed.target.id },
+      orderBy: { createdTime: 'asc' },
+    });
+    expect(Number(second) * 1000).toBe(oldest.createdTime.getTime());
+  });
+
+  it('keeps walking until a window comes back short', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    routes['/ratings'] = (url) =>
+      url.searchParams.get('until')
+        ? { data: ratings(3, '2026-06-01T10:00:00Z') }
+        : { data: ratings(500, '2026-07-01T10:00:00Z') };
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    // The short window is the end of the history, so the walk is done and the
+    // average now covers everything.
+    const after = await prisma.target.findUniqueOrThrow({ where: { id: seed.target.id } });
+    expect(after.reviewsBackfilled).toBe(true);
+    expect(await prisma.pageReview.count({ where: { targetId: seed.target.id } })).toBe(503);
+  });
+
+  it('does not keep reaching back once the history is complete', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    asked = [];
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    // Every later sync costs one request, not two. Spending a call each time
+    // to re-learn that the history is complete is a rate limit somebody else
+    // needed.
+    expect(untilAsked()).toEqual([null]);
+  });
+
+  it('takes more than one sync when one window is not enough', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+
+    // Two full windows of history behind the newest one. Each sync spends a
+    // single backfill request, so this Page needs three passes to finish —
+    // marking it complete after the first would freeze the average partway
+    // through, which is worse than not walking at all because nothing would
+    // ever come back for the rest.
+    routes['/ratings'] = (url) => {
+      const until = url.searchParams.get('until');
+      if (!until) return { data: ratings(500, '2026-07-01T10:00:00Z') };
+      return Number(until) * 1000 > new Date('2026-06-01T00:00:00Z').getTime()
+        ? { data: ratings(500, '2026-06-10T15:00:00Z') }
+        : { data: ratings(3, '2026-05-20T20:00:00Z') };
+    };
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+    expect(
+      (await prisma.target.findUniqueOrThrow({ where: { id: seed.target.id } })).reviewsBackfilled,
+      'called complete after one window',
+    ).toBe(false);
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+    expect(
+      (await prisma.target.findUniqueOrThrow({ where: { id: seed.target.id } })).reviewsBackfilled,
+    ).toBe(true);
+
+    expect(await prisma.pageReview.count({ where: { targetId: seed.target.id } })).toBe(1003);
+    // A thousand reviews stored one upsert at a time is a thousand round
+    // trips, which is slow but not wrong. The default timeout is written for
+    // tests that do not move a Page's whole history.
+  }, 30_000);
+
+  it('counts the reviews it walked back to in the average', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+
+    // A full newest window of five-star reviews, and one one-star review
+    // behind it. Only the recent end and this Page averages five stars.
+    routes['/ratings'] = (url) =>
+      url.searchParams.get('until')
+        ? {
+            data: [
+              {
+                created_time: '2026-06-01T10:00:00Z',
+                rating: 1,
+                reviewer: { name: 'Grace' },
+                open_graph_story: { id: 'old-1' },
+              },
+            ],
+          }
+        : { data: ratings(500, '2026-07-01T10:00:00Z') };
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+    const summary = await engagement.readReviews({ workspaceId: seed.workspace.id });
+
+    expect(summary.count).toBe(501);
+    // 500 fives and a one: 4.99 to two places, 5.0 rounded to one — so the
+    // count is what shows the walk happened, and the average is checked
+    // against the arithmetic rather than against a guess.
+    expect(summary.averageRating).toBe(Math.round((2501 / 501) * 10) / 10);
+    expect(summary.byRating['1']).toBe(1);
+  });
+})

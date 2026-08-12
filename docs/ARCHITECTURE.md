@@ -1786,6 +1786,18 @@ The other paged readers do not ask for chronological order, so their ceilings
 truncate the far end of a Page's history rather than its newest activity;
 `published_posts` is anchored with `since` as well.
 
+**Ratings are walked backwards for the same reason comments are walked
+forwards.** One fetch reaches five hundred reviews, so a restaurant or hotel
+with more had its average computed from the newest five hundred and reported to
+it as its rating — a partial sum can only understate and somebody may notice,
+but a partial average is wrong in either direction with nothing to signal
+which. Each sync reads the newest window, then, if that window came back full,
+one more ending where the stored history begins. A Page with thousands
+therefore completes over several syncs, and `Target.reviewsBackfilled` records
+when the walk has reached the start so later syncs stop spending a request to
+re-learn it. The walk only stops on a window that comes back *short* of the
+ceiling: a full one means there was more behind it.
+
 This is also why there is no bulk reconciliation of deleted comments. Rows
 absent from a fetch are not necessarily gone — on a busy post they are simply
 past the ceiling — so deleting them would destroy live comments. Removal stays

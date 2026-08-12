@@ -12,6 +12,7 @@ import { syncExternalPostInsights } from './analytics';
 import {
   deleteComment,
   fetchComments,
+  REVIEW_FETCH_CEILING,
   fetchConversations,
   fetchPageVideos,
   fetchPublishedPosts,
@@ -491,20 +492,62 @@ export async function syncTargetEdges(options: {
   });
 
   await attempt('reviews', async () => {
+    const store = async (batch: Awaited<ReturnType<typeof fetchReviews>>) => {
+      for (const review of batch) {
+        await prisma.pageReview.upsert({
+          where: { targetId_remoteId: { targetId: target.id, remoteId: review.remoteId } },
+          create: { targetId: target.id, ...review },
+          update: {
+            rating: review.rating,
+            recommendationType: review.recommendationType,
+            reviewText: review.reviewText,
+            fetchedAt: new Date(),
+          },
+        });
+      }
+    };
+
+    // Newest first, which is what Facebook returns without a window, so this
+    // always picks up anything new.
     const reviews = await fetchReviews(target.providerId, token);
-    for (const review of reviews) {
-      await prisma.pageReview.upsert({
-        where: { targetId_remoteId: { targetId: target.id, remoteId: review.remoteId } },
-        create: { targetId: target.id, ...review },
-        update: {
-          rating: review.rating,
-          recommendationType: review.recommendationType,
-          reviewText: review.reviewText,
-          fetchedAt: new Date(),
-        },
+    await store(reviews);
+
+    // A full fetch means there may be more behind it. Walk backwards from the
+    // oldest review now held — including the ones just stored, so a Page with
+    // a long history starts closing the gap on its first sync rather than its
+    // second.
+    //
+    // Until that walk reaches the beginning the average rating covers part of
+    // the history, and that is the number an agency reports to the business it
+    // belongs to. A partial sum can only understate and somebody may notice; a
+    // partial average is wrong in either direction with nothing to signal
+    // which.
+    let older: Awaited<ReturnType<typeof fetchReviews>> = [];
+    let complete = reviews.length < REVIEW_FETCH_CEILING;
+
+    if (!target.reviewsBackfilled && !complete) {
+      const oldest = await prisma.pageReview.findFirst({
+        where: { targetId: target.id },
+        orderBy: { createdTime: 'asc' },
+        select: { createdTime: true },
+      });
+
+      if (oldest) {
+        older = await fetchReviews(target.providerId, token, { until: oldest.createdTime });
+        await store(older);
+        // Short of the ceiling means there was nothing more to give.
+        complete = older.length < REVIEW_FETCH_CEILING;
+      }
+    }
+
+    if (complete && !target.reviewsBackfilled) {
+      await prisma.target.update({
+        where: { id: target.id },
+        data: { reviewsBackfilled: true },
       });
     }
-    return reviews.length;
+
+    return reviews.length + older.length;
   });
 
   await attempt('conversations', async () => {
