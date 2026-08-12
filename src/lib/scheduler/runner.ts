@@ -479,57 +479,74 @@ async function publishClaimed(
 /**
  * Recompute a post's status from its destinations, so the UI can show one
  * headline state per post.
+ *
+ * Serialised per post with an advisory lock, because the status is *derived*:
+ * read every destination, work out one word, write it back. Two workers reach
+ * here at once in the ordinary multi-worker case — they claim different
+ * destinations of the same post and each refreshes it at the end of its tick —
+ * and interleaved, the one that read first can write last, leaving its stale
+ * snapshot on the row.
+ *
+ * Nothing corrects that afterwards. A refresh only happens when there is
+ * publishing activity, and by then there is none left, so the post is stuck
+ * reading `scheduled` or `publishing` with every destination long finished. It
+ * never shows as published, and `postEditBlocker` refuses to edit a publishing
+ * post, so it cannot be edited either.
  */
 export async function refreshPostStatus(postId: string, now: Date = new Date()): Promise<PostStatus> {
-  const targets = await prisma.postTarget.findMany({
-    where: { postId },
-    select: { status: true, publishedAt: true },
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${postId}))`;
+
+    const targets = await tx.postTarget.findMany({
+      where: { postId },
+      select: { status: true, publishedAt: true },
+    });
+
+    const skipped = targets.filter((target) => target.status === 'skipped');
+    const active = targets.filter((target) => target.status !== 'cancelled' && target.status !== 'skipped');
+    const published = active.filter((target) => target.status === 'published');
+    const remoteScheduled = active.filter((target) => target.status === 'scheduled_remote');
+    const failed = active.filter((target) => target.status === 'failed');
+    const settled = active.filter((target) =>
+      (TERMINAL_TARGET_STATUSES as readonly string[]).includes(target.status),
+    );
+
+    let status: PostStatus;
+    if (active.length === 0) {
+      // Nothing left to do. "Cancelled" is only honest when a person cancelled
+      // it: a post every one of whose destinations was skipped was not cancelled
+      // by anyone, it simply never went anywhere, and calling that cancelled
+      // sends the reader looking for a colleague who did it.
+      status = skipped.length > 0 ? 'failed' : 'cancelled';
+    } else if (settled.length < active.length) {
+      // Still working: some destinations are pending or in flight.
+      status = published.length > 0 || failed.length > 0 ? 'publishing' : 'scheduled';
+    } else if (failed.length === active.length) {
+      status = 'failed';
+    } else if (failed.length > 0) {
+      status = 'partially_failed';
+    } else if (published.length === 0 && remoteScheduled.length > 0) {
+      // Everything is queued inside Facebook and nothing has gone live yet.
+      status = 'scheduled';
+    } else {
+      status = 'published';
+    }
+
+    const publishedAt =
+      published.length > 0
+        ? published
+            .map((target) => target.publishedAt)
+            .filter((date): date is Date => Boolean(date))
+            .sort((a, b) => a.getTime() - b.getTime())[0] ?? now
+        : null;
+
+    await tx.post.update({
+      where: { id: postId },
+      data: { status, publishedAt },
+    });
+
+    return status;
   });
-
-  const skipped = targets.filter((target) => target.status === 'skipped');
-  const active = targets.filter((target) => target.status !== 'cancelled' && target.status !== 'skipped');
-  const published = active.filter((target) => target.status === 'published');
-  const remoteScheduled = active.filter((target) => target.status === 'scheduled_remote');
-  const failed = active.filter((target) => target.status === 'failed');
-  const settled = active.filter((target) =>
-    (TERMINAL_TARGET_STATUSES as readonly string[]).includes(target.status),
-  );
-
-  let status: PostStatus;
-  if (active.length === 0) {
-    // Nothing left to do. "Cancelled" is only honest when a person cancelled
-    // it: a post every one of whose destinations was skipped was not cancelled
-    // by anyone, it simply never went anywhere, and calling that cancelled
-    // sends the reader looking for a colleague who did it.
-    status = skipped.length > 0 ? 'failed' : 'cancelled';
-  } else if (settled.length < active.length) {
-    // Still working: some destinations are pending or in flight.
-    status = published.length > 0 || failed.length > 0 ? 'publishing' : 'scheduled';
-  } else if (failed.length === active.length) {
-    status = 'failed';
-  } else if (failed.length > 0) {
-    status = 'partially_failed';
-  } else if (published.length === 0 && remoteScheduled.length > 0) {
-    // Everything is queued inside Facebook and nothing has gone live yet.
-    status = 'scheduled';
-  } else {
-    status = 'published';
-  }
-
-  const publishedAt =
-    published.length > 0
-      ? published
-          .map((target) => target.publishedAt)
-          .filter((date): date is Date => Boolean(date))
-          .sort((a, b) => a.getTime() - b.getTime())[0] ?? now
-      : null;
-
-  await prisma.post.update({
-    where: { id: postId },
-    data: { status, publishedAt },
-  });
-
-  return status;
 }
 
 /** Run a bounded number of tasks at a time. */

@@ -994,3 +994,77 @@ describe('a worker whose lock was reclaimed while it was publishing', () => {
     expect(flagged.invalidatedAt).toBeNull();
   });
 });
+
+/**
+ * The headline status a post shows in the UI is *derived*: read every
+ * destination, work out one word for the post, write it back. Read and write
+ * are separate, so two of these racing can leave the losing snapshot on the
+ * row — and nothing recomputes it afterwards, because a refresh only happens
+ * when there is publishing activity and by then there is none left.
+ *
+ * A post stuck this way is not a cosmetic problem. Whichever stale word wins,
+ * the post never shows as published; and if the word is `publishing`,
+ * `postEditBlocker` refuses to edit it, so it cannot be corrected by hand
+ * either.
+ *
+ * Two workers reaching this at once is the ordinary multi-worker case — they
+ * claim different destinations of the same post and both refresh it at the end
+ * of their tick.
+ */
+describe('recomputing a post status while another one is in flight', () => {
+  it('reads the destinations only after the refresh ahead of it has finished', async () => {
+    const { workspace, post, postTarget } = await seedDuePost();
+    // A second destination, because a post only reaches this race when two
+    // workers are each holding one of its destinations.
+    const otherTarget = await prisma.target.create({
+      data: { workspaceId: workspace.id, type: 'page', providerId: '1001', name: 'Other Page' },
+    });
+    const second = await prisma.postTarget.create({
+      data: { postId: post.id, targetId: otherTarget.id, status: 'processing' },
+    });
+    await prisma.postTarget.update({
+      where: { id: postTarget.id },
+      data: { status: 'processing' },
+    });
+    await prisma.post.update({ where: { id: post.id }, data: { status: 'publishing' } });
+
+    // Stand in for the refresh that is already running: hold the lock this one
+    // has to wait for, then finish the destinations while it waits.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let acquired!: () => void;
+    const locked = new Promise<void>((resolve) => {
+      acquired = resolve;
+    });
+
+    const holding = prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${post.id}))`;
+        acquired();
+        await held;
+      },
+      { timeout: 20_000 },
+    );
+    await locked;
+
+    const refreshing = runner.refreshPostStatus(post.id);
+
+    await prisma.postTarget.updateMany({
+      where: { id: { in: [postTarget.id, second.id] } },
+      data: { status: 'published', publishedAt: new Date(), lockedAt: null, lockedBy: null },
+    });
+
+    release();
+    await holding;
+    await refreshing;
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+
+    // Reading before and writing after leaves the snapshot taken while both
+    // destinations were still in flight — `scheduled` — on a post that has
+    // already gone out to both, with no later refresh to correct it.
+    expect(after.status).toBe('published');
+  });
+});

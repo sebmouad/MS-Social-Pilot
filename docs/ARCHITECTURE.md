@@ -138,6 +138,26 @@ worker can claim between them. With the narrowed delete, the worst a lost race
 can do is leave a stale destination behind — recoverable, and visible. Deleting
 the claimed row is neither.
 
+### One headline status per post
+
+A post shows one word in the UI, derived from its destinations:
+`refreshPostStatus` reads them all, works out the word, and writes it back.
+That read and that write are separate, and in the ordinary multi-worker case
+two ticks reach it at once — each having claimed a different destination of the
+same post. Interleaved, the refresh that read first can write last, leaving its
+stale snapshot behind.
+
+Nothing corrects that afterwards: a refresh only happens when there is
+publishing activity, and by then there is none left. The post is stuck reading
+`scheduled` or `publishing` with every destination long finished — it never
+shows as published, and if the stale word is `publishing` it cannot be edited
+either, because that is exactly what an edit refuses.
+
+So the whole read-compute-write runs in one transaction behind
+`pg_advisory_xact_lock(hashtext(postId))`. Per post, not global: refreshes for
+different posts still run in parallel, and the lock is released with the
+transaction whatever happens.
+
 ### Reclaiming abandoned locks
 
 How long a destination may stay in `processing` before another worker takes it
