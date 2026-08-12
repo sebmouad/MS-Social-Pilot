@@ -158,7 +158,8 @@
     "rejected": "Renvoyée à l'auteur.",
     "rejectedBadge": "Refusée",
     "reviewNote": "Note du relecteur",
-    "resubmit": "Soumettre à nouveau"
+    "resubmit": "Soumettre à nouveau",
+    "overdue": "Heure dépassée — la valider la publie maintenant"
   },
   "auth": {
     "signIn": "Se connecter",

@@ -149,3 +149,34 @@ describe('the failures this app writes itself', () => {
     }
   });
 });
+
+/**
+ * The approvals screen, where the decision is actually made.
+ *
+ * A post whose scheduled moment has passed publishes as soon as it is
+ * approved. The email says so now; the screen is where a reviewer works
+ * through a queue of them, and it showed "scheduled for Tuesday 9am" with
+ * nothing to mark it apart from one due next week. Approving a batch after a
+ * week away sends every overdue one out at once.
+ */
+describe('the approvals screen', () => {
+  const page = readFileSync('src/app/(app)/approvals/page.tsx', 'utf8');
+  const client = readFileSync('src/components/ApprovalsClient.tsx', 'utf8');
+
+  it('works out whether the moment has passed', () => {
+    // Server-side, against the same clock the scheduler uses.
+    expect(page).toMatch(/overdue:/);
+  });
+
+  it('marks it apart from a post that is merely upcoming', () => {
+    expect(client).toContain('post.overdue');
+    expect(client).toMatch(/t\('overdue'\)|tPosts\('overdue'\)/);
+  });
+
+  it('has words for it in both languages', () => {
+    for (const [language, messages] of [['en', en], ['fr', fr]] as const) {
+      const approvals = messages.approvals as Record<string, string>;
+      expect(approvals.overdue, `${language} is missing the overdue note`).toBeTruthy();
+    }
+  });
+});

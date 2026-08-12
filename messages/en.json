@@ -158,7 +158,8 @@
     "rejected": "Sent back to the author.",
     "rejectedBadge": "Rejected",
     "reviewNote": "Reviewer note",
-    "resubmit": "Resubmit"
+    "resubmit": "Resubmit",
+    "overdue": "Time has passed — approving publishes it now"
   },
   "auth": {
     "signIn": "Sign in",

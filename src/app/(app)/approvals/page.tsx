@@ -50,6 +50,10 @@ export default async function ApprovalsPage() {
           message: post.message,
           link: post.link,
           scheduledLabel: post.scheduledAt ? formatInZone(post.scheduledAt, timezone) : null,
+          // Worked out here, against the same clock the scheduler reads: a
+          // post whose moment has gone publishes as soon as it is approved,
+          // and this is the screen where somebody decides that.
+          overdue: post.scheduledAt !== null && post.scheduledAt.getTime() <= Date.now(),
           submittedBy: post.submitter?.name ?? post.author.name,
           submittedLabel: post.submittedAt ? formatInZone(post.submittedAt, timezone) : null,
           targets: post.targets.map((postTarget) => postTarget.target.name),

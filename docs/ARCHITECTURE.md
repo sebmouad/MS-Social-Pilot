@@ -140,6 +140,13 @@ somebody's afternoon. A test pins that every writer of the sentence also writes
 the code, because forgetting one puts a reader back where they started and
 nothing would look wrong.
 
+**The approvals screen marks an overdue post too**, because that is where the
+decision is usually made rather than from the email. A reviewer working
+through a queue after a week away has no way to tell a post due next Tuesday
+from one whose moment went last Tuesday, and approving the batch sends every
+overdue one out at once. The flag is worked out on the server against the same
+clock the scheduler reads.
+
 **The reviewer's email says the same thing before the decision, not after.**
 They are the one who can still say no, so it describes the post they are
 actually being asked about: a scheduled moment that has already passed means

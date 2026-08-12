@@ -10,6 +10,8 @@ export interface PendingPost {
   message: string;
   link: string | null;
   scheduledLabel: string | null;
+  /** Its scheduled moment has gone, so approving publishes it immediately. */
+  overdue: boolean;
   submittedBy: string;
   submittedLabel: string | null;
   targets: string[];
@@ -89,6 +91,14 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
             {post.scheduledLabel ? ` · ${tPosts('scheduledFor', { when: post.scheduledLabel })}` : ''}
             {post.mediaCount > 0 ? ` · ${tPosts('attachments', { count: post.mediaCount })}` : ''}
           </p>
+
+          {/* A queue worked through after a week away is where this matters:
+              every overdue post in it goes out the moment it is approved. */}
+          {post.overdue && (
+            <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+              {t('overdue')}
+            </p>
+          )}
 
           <p className="mt-1 text-xs text-slate-500">{post.targets.join(', ')}</p>
 
