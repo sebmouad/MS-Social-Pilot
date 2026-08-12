@@ -1,4 +1,5 @@
 import { GraphError, graphRequest } from './graph';
+import { countCharacters } from '../text';
 
 /**
  * Publishing to Instagram, which is not publishing to Facebook.
@@ -65,7 +66,9 @@ export function planInstagramPublish(request: IgPublishRequest): IgPublishPlan {
     });
   }
 
-  if (request.caption.length > IG_LIMITS.captionLength) {
+  // Counted in characters, not UTF-16 units: an Instagram caption is where
+  // emoji are normal and the limit is genuinely reachable.
+  if (countCharacters(request.caption) > IG_LIMITS.captionLength) {
     throw new GraphError({
       message: `An Instagram caption cannot be longer than ${IG_LIMITS.captionLength} characters.`,
       kind: 'invalid_request',

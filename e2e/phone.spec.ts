@@ -76,6 +76,24 @@ test.beforeAll(async () => {
   await prisma.activityLog.create({
     data: { workspaceId: workspace.id, actorId: author.id, action: 'post.created' },
   });
+
+  // A second destination, of the kind whose row carries the longest secondary
+  // line: type, account name, and the note explaining why it is switched off.
+  const page = await prisma.target.findFirstOrThrow({ where: { id: targetId } });
+  await prisma.target.upsert({
+    where: { workspaceId_providerId: { workspaceId: workspace.id, providerId: 'ig-phone' } },
+    create: {
+      workspaceId: workspace.id,
+      socialAccountId: page.socialAccountId,
+      type: 'instagram',
+      providerId: 'ig-phone',
+      name: '@halloway_bakery_official',
+      accessToken: page.accessToken,
+      enabled: false,
+      canPublish: false,
+    },
+    update: {},
+  });
 });
 
 test.afterAll(async () => {

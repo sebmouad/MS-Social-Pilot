@@ -367,3 +367,38 @@ test('the dashboard totals every published post, not a sample of them', async ({
   // which is what made the old cap worth fixing rather than documenting.
   await expect(page.getByText('6,000')).toBeVisible();
 });
+
+test('a caption too long for Instagram is flagged while it is being written', async ({ page }) => {
+  // Instagram's limit is a fifth of Facebook's, so a caption that is fine for
+  // a Page is refused there. Without this, the post is scheduled, sits on the
+  // calendar looking correct, and fails on that one destination hours later.
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const instagram = await prisma.target.upsert({
+    where: { workspaceId_providerId: { workspaceId: target.workspaceId, providerId: 'ig-walk' } },
+    create: {
+      workspaceId: target.workspaceId,
+      socialAccountId: target.socialAccountId,
+      type: 'instagram',
+      providerId: 'ig-walk',
+      name: '@walkbakery',
+      accessToken: target.accessToken,
+      canPublish: true,
+    },
+    update: { canPublish: true, enabled: true },
+  });
+
+  await open(page, '/compose');
+  await page.getByLabel(/what do you want to say/i).fill('x'.repeat(2_300));
+
+  const box = page.getByRole('checkbox').nth(
+    (await page.getByRole('checkbox').count()) - 1,
+  );
+  await expect(async () => {
+    await box.click();
+    await expect(page.getByText(/Instagram takes 2,?200/i)).toBeVisible({ timeout: 1_500 });
+  }).toPass({ timeout: 30_000 });
+
+  // Removed rather than disabled: a row left behind is state one spec hands
+  // to another, and a failure in the second is then nobody's obvious fault.
+  await prisma.target.delete({ where: { id: instagram.id } });
+});

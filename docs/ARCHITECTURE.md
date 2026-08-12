@@ -178,6 +178,29 @@ slot is moved. The difference is what the two things are: a typed-in time is a
 statement about one post, and silently changing it is a lie, while a weekly slot
 is a standing instruction that must not break one Sunday a year.
 
+### Counting characters
+
+`String.length` counts UTF-16 code units, which is neither what a person means
+by a character nor what Meta's limits are measured in. An emoji is two units, a
+flag four. It does not matter against Facebook's 63,206 and it matters a great
+deal against Instagram's 2,200, which long captions full of hashtags and emoji
+reach as a matter of course: a caption of exactly 2,200 characters with fifty
+emoji counted as 2,250 and was refused by our own check before Facebook was
+ever asked.
+
+The direction is why it was worth fixing rather than documenting. Over-counting
+turns valid content away with a message the person cannot act on — the caption
+really is 2,200 characters, and the app says it is not. `countCharacters` uses
+code points: neither code points nor grapheme clusters is exactly what Meta
+counts and Meta does not say, but code points is the closer of the two to what
+an API means, and clustering would fold a flag into one where Meta near
+certainly sees two.
+
+The composer also warns while somebody is still writing, rather than letting a
+long caption fail on the Instagram destinations hours later when the post is
+due. The limit is written twice for that — once where it is enforced, once
+where a client component can see it — and a test keeps the two in step.
+
 ### One zone per screen
 
 A post carries the zone it was created in, and every screen renders in the
@@ -618,6 +641,29 @@ A one-off scheduled time is refused when it falls in the gap; a recurring queue
 slot is moved. The difference is what the two things are: a typed-in time is a
 statement about one post, and silently changing it is a lie, while a weekly slot
 is a standing instruction that must not break one Sunday a year.
+
+### Counting characters
+
+`String.length` counts UTF-16 code units, which is neither what a person means
+by a character nor what Meta's limits are measured in. An emoji is two units, a
+flag four. It does not matter against Facebook's 63,206 and it matters a great
+deal against Instagram's 2,200, which long captions full of hashtags and emoji
+reach as a matter of course: a caption of exactly 2,200 characters with fifty
+emoji counted as 2,250 and was refused by our own check before Facebook was
+ever asked.
+
+The direction is why it was worth fixing rather than documenting. Over-counting
+turns valid content away with a message the person cannot act on — the caption
+really is 2,200 characters, and the app says it is not. `countCharacters` uses
+code points: neither code points nor grapheme clusters is exactly what Meta
+counts and Meta does not say, but code points is the closer of the two to what
+an API means, and clustering would fold a flag into one where Meta near
+certainly sees two.
+
+The composer also warns while somebody is still writing, rather than letting a
+long caption fail on the Instagram destinations hours later when the post is
+due. The limit is written twice for that — once where it is enforced, once
+where a client component can see it — and a test keeps the two in step.
 
 ### One zone per screen
 

@@ -225,6 +225,7 @@
     "facebook": "Facebook.",
     "facebookGroupWarning": ", et indisponible si un groupe est sélectionné",
     "facebookHint": "Publie même si cette application est hors ligne. Pages uniquement, au moins 10 minutes à l'avance",
+    "instagramTooLong": "Cela fait {count, plural, one {# caractère} other {# caractères}}. Instagram en accepte {limit} : les destinations Instagram le refuseront.",
     "link": "Lien",
     "linkHint": "Facebook construit l'aperçu à partir des balises Open Graph de la page. Utilisez « Actualiser l'aperçu » si vous venez de les modifier.",
     "linkPlaceholder": "https://exemple.com/article",

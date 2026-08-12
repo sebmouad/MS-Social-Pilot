@@ -259,3 +259,14 @@ export function postIsEditable(post: {
 export function targetTypeKey(type: string): string {
   return (TARGET_TYPES as readonly string[]).includes(type) ? type : TargetType.page;
 }
+
+
+/**
+ * Instagram's caption limit, repeated here for the composer.
+ *
+ * The publishing module owns the rule and refuses anything past it. This is
+ * the same number where a client component can see it, so somebody writing a
+ * long caption is told while they are writing rather than hours later when the
+ * post is due. Kept in step by a test.
+ */
+export const IG_CAPTION_LIMIT = 2_200;

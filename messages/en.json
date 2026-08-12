@@ -225,6 +225,7 @@
     "facebook": "Facebook.",
     "facebookGroupWarning": ", and unavailable while a group is selected",
     "facebookHint": "Publishes even if this app is offline. Pages only, at least 10 minutes ahead",
+    "instagramTooLong": "That is {count, plural, one {# character} other {# characters}}. Instagram takes {limit}, so the Instagram destinations will refuse it.",
     "link": "Link",
     "linkHint": "Facebook builds the preview card from the page's Open Graph tags. Use \"Refresh card\" if you have just changed them.",
     "linkPlaceholder": "https://example.com/article",

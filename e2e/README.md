@@ -77,6 +77,11 @@ have rows to render; nothing in the walk ever calls the Graph API.
   uncontrolled now and their contents are adopted on mount.
 - **`/settings/config` rendered with no heading at all** for anyone who is not
   an owner — a card of refusal text and nothing naming the screen.
+- **A destination row with a long name pushed the composer 100px off a phone
+  screen.** A grid track sizes itself to its content's minimum width, so one
+  wide row grew the column and every other column stretched to match. `truncate`
+  does not help — it clips what is painted without reducing the width the box
+  asks for — and the fix is `min-w-0` on the grid children.
 - **A post containing a long URL made the dashboard slide sideways on a phone**,
   taking the heading off the edge with it. `break-words` had been the obvious
   fix and is the wrong one: it stops a word painting outside its box but does

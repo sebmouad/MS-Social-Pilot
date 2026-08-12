@@ -8,6 +8,8 @@ import { TargetPicker, type TargetOption } from './TargetPicker';
 import { AiAssist } from './AiAssist';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 import { LIMITS } from '@/lib/constants';
+import { countCharacters } from '@/lib/text';
+import { IG_CAPTION_LIMIT } from '@/lib/constants';
 
 interface Props {
   targets: TargetOption[];
@@ -126,6 +128,7 @@ export function Composer({
 
   const selectedTargets = targets.filter((target) => selected.includes(target.id));
   const hasGroupSelected = selectedTargets.some((target) => target.type === 'group');
+  const hasInstagramSelected = selectedTargets.some((target) => target.type === 'instagram');
 
   const loadPreview = useCallback(
     async (url: string, refresh = false) => {
@@ -273,7 +276,14 @@ export function Composer({
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-6 lg:col-span-2">
+      {/* `min-w-0` on both columns, and it is load-bearing. A grid track sizes
+          itself to its content's minimum width, and a destination row carrying
+          a long name, an account and the note saying why it is switched off
+          has a wide one — so without this the column grows past the screen on a
+          phone and every other column stretches to match. `truncate` does not
+          help: like `overflow-wrap: break-word`, it clips what is painted
+          without reducing the width the box asks for. */}
+      <div className="min-w-0 space-y-6 lg:col-span-2">
         <section className="card p-5">
           <label className="label" htmlFor="message">
             {t('whatToSay')}
@@ -287,7 +297,20 @@ export function Composer({
             maxLength={LIMITS.messageLength}
             onChange={(event) => setMessage(event.target.value)}
           />
-          <p className="hint">{t('characters', { count: message.length })}</p>
+          {/* What a person means by a character: one emoji is one, not two. */}
+          <p className="hint">{t('characters', { count: countCharacters(message) })}</p>
+
+          {/* Instagram's limit is a fifth of Facebook's and genuinely
+              reachable. Said here rather than discovered at the scheduled
+              moment, hours later, as a failed destination on the post list. */}
+          {hasInstagramSelected && countCharacters(message) > IG_CAPTION_LIMIT && (
+            <p className="mt-1 text-xs text-amber-700">
+              {t('instagramTooLong', {
+                count: countCharacters(message),
+                limit: IG_CAPTION_LIMIT,
+              })}
+            </p>
+          )}
 
           {aiEnabled && <AiAssist draft={message} onResult={writeMessage} />}
 
@@ -386,7 +409,7 @@ export function Composer({
         </section>
       </div>
 
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <section className="card p-5">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">{t('whereToPost')}</h2>
           <TargetPicker targets={targets} selected={selected} onChange={setSelected} />

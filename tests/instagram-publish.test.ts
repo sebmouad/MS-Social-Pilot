@@ -250,3 +250,32 @@ describe('a carousel', () => {
     expect(lastChildPoll).toBeLessThan(parentIndex);
   });
 });
+
+describe('a caption measured in characters', () => {
+  it('accepts one that is exactly at the limit despite its emoji', () => {
+    // 2,150 plain characters and fifty emoji: 2,200 characters, and 2,250
+    // UTF-16 units. Counted the second way, a caption that Instagram would
+    // have taken is turned away by us before Facebook is ever asked.
+    const caption = 'x'.repeat(2_150) + '🎉'.repeat(50);
+
+    expect(() =>
+      publish.planInstagramPublish({
+        ...BASE,
+        caption,
+        media: [{ kind: 'image', url: 'https://example.test/a.jpg' }],
+      }),
+    ).not.toThrow();
+  });
+
+  it('still refuses one that is genuinely too long', () => {
+    const caption = '🎉'.repeat(2_201);
+
+    expect(() =>
+      publish.planInstagramPublish({
+        ...BASE,
+        caption,
+        media: [{ kind: 'image', url: 'https://example.test/a.jpg' }],
+      }),
+    ).toThrow(/2200 characters/);
+  });
+})
