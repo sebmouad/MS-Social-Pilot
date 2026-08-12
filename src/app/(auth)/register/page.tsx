@@ -7,6 +7,13 @@ import { getTranslations } from 'next-intl/server';
 import { getAuthContext, mayRegister } from '@/lib/auth';
 import { findInvitation } from '@/lib/team';
 import { afterAuthPath } from '@/lib/invite-path';
+import { screenMetadata } from '@/lib/metadata';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('auth.createWorkspace');
+}
+
 
 export default async function RegisterPage({
   searchParams,

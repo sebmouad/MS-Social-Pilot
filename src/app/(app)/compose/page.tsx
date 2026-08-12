@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { Composer, type EditingPost } from '@/components/Composer';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { parseMedia } from '@/lib/json';
 import { utcToLocalInput } from '@/lib/time';
@@ -10,6 +11,12 @@ import { postIsEditable, canManageOthersPosts, canPublishWithoutApproval } from 
 import { aiAvailable } from '@/lib/ai';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('compose.title');
+}
+
 
 /**
  * Write a post, or change one that has not gone out yet.

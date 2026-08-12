@@ -4,12 +4,19 @@ import { ConnectionHealth } from '@/components/ConnectionHealth';
 import { ConnectionsClient } from '@/components/ConnectionsClient';
 import { Icon } from '@/components/Icon';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { canManageAccounts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
 import { formatInZone } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('connections.title');
+}
+
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

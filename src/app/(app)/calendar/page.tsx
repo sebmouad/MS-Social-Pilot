@@ -2,11 +2,18 @@ import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { formatInZone, monthGrid } from '@/lib/time';
 import { StatusBadge } from '@/components/StatusBadge';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('calendar.title');
+}
+
 
 const STATUS_DOT: Record<string, string> = {
   scheduled: 'bg-blue-500',

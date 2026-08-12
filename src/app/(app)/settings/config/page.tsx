@@ -3,10 +3,17 @@ import { getTranslations } from 'next-intl/server';
 import { ConfigClient } from '@/components/ConfigClient';
 import { SettingsNav } from '@/components/SettingsNav';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { canManageInstance } from '@/lib/constants';
 import { GROUP_LABELS, GROUP_ORDER, describeSettings } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('config.title');
+}
+
 
 /**
  * Instance configuration.

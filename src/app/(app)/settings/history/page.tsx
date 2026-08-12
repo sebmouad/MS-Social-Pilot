@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { HistoryClient } from '@/components/HistoryClient';
 import { SettingsNav } from '@/components/SettingsNav';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { canManageInstance, canManageTeam } from '@/lib/constants';
 import {
   countActivity,
@@ -17,6 +18,12 @@ import { pageHref, pageNumber, paginate } from '@/lib/paging';
 import { formatInZone } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('history.title');
+}
+
 
 /**
  * What happened, and what was emailed about it.

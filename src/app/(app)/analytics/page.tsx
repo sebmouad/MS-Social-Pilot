@@ -13,6 +13,7 @@ import { PostAnalyticsTable } from '@/components/PostAnalyticsTable';
 import { StatTile } from '@/components/charts/StatTile';
 import { SyncButton } from '@/components/SyncButton';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { canDeleteComments, canModerateComments } from '@/lib/constants';
 import { Pagination } from '@/components/Pagination';
 import { pageHref, pageNumber, paginate } from '@/lib/paging';
@@ -39,6 +40,12 @@ import { formatInZone } from '@/lib/time';
 import { ExternalLink } from '@/components/ExternalLink';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('analytics.title');
+}
+
 
 /** A query parameter that may arrive repeated. */
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);

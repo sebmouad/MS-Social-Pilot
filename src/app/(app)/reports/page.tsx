@@ -1,12 +1,19 @@
 import { getTranslations } from 'next-intl/server';
 
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { buildReport } from '@/lib/reports';
 import { formatInZone, utcToLocalInput } from '@/lib/time';
 import { ReportControls } from '@/components/ReportControls';
 import { ExternalLink } from '@/components/ExternalLink';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('reports.title');
+}
+
 
 export default async function ReportsPage({
   searchParams,

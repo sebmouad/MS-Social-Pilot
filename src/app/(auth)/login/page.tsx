@@ -4,6 +4,13 @@ import { AuthForm } from '@/components/AuthForm';
 import { getAuthContext } from '@/lib/auth';
 import { afterAuthPath } from '@/lib/invite-path';
 import { isFirstRun } from '@/lib/setup';
+import { screenMetadata } from '@/lib/metadata';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('auth.signIn');
+}
+
 
 export default async function LoginPage({
   searchParams,

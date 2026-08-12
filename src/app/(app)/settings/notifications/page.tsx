@@ -4,10 +4,17 @@ import { getTranslations } from 'next-intl/server';
 import { NotificationsClient } from '@/components/NotificationsClient';
 import { SettingsNav } from '@/components/SettingsNav';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { emailEnabled } from '@/lib/email/send';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('notifications.title');
+}
+
 
 export default async function NotificationsSettingsPage() {
   const auth = await requirePage();

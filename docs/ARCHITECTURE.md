@@ -827,6 +827,24 @@ All three are walked by the browser, including a route that throws on demand
 behind an environment flag the walk sets and nothing else does. Error handling
 nobody has exercised is the kind that fails when it is finally needed.
 
+### What the tab says
+
+Twenty-five pages inherited one title from the root layout, so every tab read
+"MS Social Pilot". That is a small thing on a product used one window at a time
+and a real one here: this app exists to run several clients, has a switcher for
+exactly that, and an agency with three open sees three identical tabs.
+
+`screenMetadata` builds "screen · client". The screen goes first because a tab
+strip crops from the right, and the client after it because that is what
+separates three windows once they are down to a favicon and six characters. It
+falls back to the app's name for anybody not signed in.
+
+Six pages deliberately keep the generic title, each with its reason written
+down in `tests/metadata.test.ts`: a redirect nobody sees a tab for, a legal
+notice, the invitation page shown before the invitee belongs to anything, the
+single-post analytics screen whose subject is not known until it is fetched,
+and the two routes that exist only for the browser walk.
+
 ### And while a page is still coming
 
 Every screen behind the sign-in wall is `force-dynamic`, so a navigation waits

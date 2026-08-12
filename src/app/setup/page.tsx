@@ -3,9 +3,16 @@ import { getTranslations } from 'next-intl/server';
 
 import { SetupClient } from '@/components/SetupClient';
 import { getAuthContext } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { isFirstRun, maySetUp, readSetupState } from '@/lib/setup';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('setup.title');
+}
+
 
 /**
  * What to do first, on a server nobody has used yet.

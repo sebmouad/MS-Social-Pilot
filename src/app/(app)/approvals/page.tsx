@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { ApprovalsClient } from '@/components/ApprovalsClient';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { canApprove } from '@/lib/constants';
 import { IN_APPROVAL_QUEUE } from '@/lib/approvals';
@@ -10,6 +11,12 @@ import { parseMedia } from '@/lib/json';
 import { formatInZone } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('approvals.title');
+}
+
 
 export default async function ApprovalsPage() {
   const auth = await requirePage();

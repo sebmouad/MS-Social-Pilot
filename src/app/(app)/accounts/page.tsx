@@ -1,4 +1,11 @@
 import { redirect } from 'next/navigation';
+import { screenMetadata } from '@/lib/metadata';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('nav.accounts');
+}
+
 
 /**
  * The old accounts screen.

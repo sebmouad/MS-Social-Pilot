@@ -41,3 +41,21 @@ test('the nav offers every screen it links to', async ({ page }) => {
       .toBeLessThan(400);
   }
 });
+
+test('each screen names itself in the tab, with the client it belongs to', async ({ page }) => {
+  const seen = new Map<string, string>();
+
+  for (const path of ['/dashboard', '/posts', '/calendar', '/settings/team']) {
+    await open(page, path);
+    const title = await page.title();
+
+    // The screen first — a tab strip crops from the right — and the client
+    // after it, which is what tells three open windows apart.
+    expect(title, `${path} has no title of its own`).not.toBe('MS Social Pilot');
+    expect(title, `${path} does not name the client`).toContain('Halloway Studio');
+
+    const clash = seen.get(title);
+    expect(clash, `${path} and ${clash} share the title "${title}"`).toBeUndefined();
+    seen.set(title, path);
+  }
+});

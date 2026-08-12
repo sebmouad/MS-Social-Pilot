@@ -4,12 +4,19 @@ import { SettingsNav } from '@/components/SettingsNav';
 
 import { TeamClient } from '@/components/TeamClient';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { canManageInstance, canManageTeam } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { emailEnabled } from '@/lib/email/send';
 import { formatInZone } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('team.title');
+}
+
 
 export default async function TeamPage() {
   const auth = await requirePage();

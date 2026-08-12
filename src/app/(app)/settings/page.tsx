@@ -4,12 +4,19 @@ import { getTranslations } from 'next-intl/server';
 import { SettingsNav } from '@/components/SettingsNav';
 import { SettingsClient } from '@/components/SettingsClient';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { bulkCsvTemplate } from '@/lib/csv';
 import { aiAvailable } from '@/lib/ai';
 import { env } from '@/lib/env';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('settings.workspace');
+}
+
 
 /**
  * Timezone list. `Intl.supportedValuesOf` gives the full IANA set on modern

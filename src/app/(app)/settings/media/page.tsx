@@ -3,11 +3,18 @@ import { getTranslations } from 'next-intl/server';
 import { MediaLibrary } from '@/components/MediaLibrary';
 import { SettingsNav } from '@/components/SettingsNav';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { canManageInstance } from '@/lib/constants';
 import { readMediaLibrary } from '@/lib/media';
 import { formatInZone } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('media.title');
+}
+
 
 /**
  * What this workspace is holding, and what can be thrown away.

@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { PostList } from '@/components/PostList';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { parseMedia } from '@/lib/json';
 import { formatInZone } from '@/lib/time';
@@ -11,6 +12,12 @@ import { Pagination } from '@/components/Pagination';
 import { pageHref, pageNumber, paginate } from '@/lib/paging';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('posts.title');
+}
+
 
 const FILTERS = [
   { value: '', label: 'All' },

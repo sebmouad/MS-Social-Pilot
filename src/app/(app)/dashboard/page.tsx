@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { Icon, type IconName } from '@/components/Icon';
 import { StatusBadge } from '@/components/StatusBadge';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { summariseConnections } from '@/lib/connections';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
@@ -12,6 +13,12 @@ import { sumInsights } from '@/lib/facebook/insights';
 import { formatInZone, relativeTime } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('dashboard.title');
+}
+
 
 export default async function DashboardPage() {
   const auth = await requirePage();

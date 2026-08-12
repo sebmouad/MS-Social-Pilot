@@ -3,12 +3,19 @@ import { getTranslations } from 'next-intl/server';
 
 import { FeedsClient } from '@/components/FeedsClient';
 import { requirePage } from '@/lib/auth';
+import { screenMetadata } from '@/lib/metadata';
 import { canManageSettings } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { parseTargetIds } from '@/lib/json';
 import { formatInZone } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
+
+/** The tab says which screen and which client, so several open at once stay apart. */
+export function generateMetadata() {
+  return screenMetadata('feeds.title');
+}
+
 
 export default async function FeedsPage() {
   const auth = await requirePage();
