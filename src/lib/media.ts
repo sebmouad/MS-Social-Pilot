@@ -8,6 +8,7 @@ import { env } from './env';
 import { prisma } from './prisma';
 import type { PostMedia } from './json';
 import type { ResolvedMedia } from './facebook/publish';
+import { GraphError } from './facebook/graph';
 import type { MediaKind } from './constants';
 
 /**
@@ -330,6 +331,32 @@ export async function deleteStoredFile(storageKey: string): Promise<void> {
 }
 
 /**
+ * Confirm an attachment is still on disk, before anything is published.
+ *
+ * Checked up front so a missing file fails the post rather than stranding it
+ * half way through its attachments. What is thrown matters as much as the
+ * check: `stat` raises Node's own error, whose message is
+ * "ENOENT: no such file or directory, stat '/var/.../uploads/x.jpg'" — and that
+ * string is stored on the destination and shown on the posts list, telling the
+ * reader nothing they can act on while putting the server's directory layout
+ * on a customer's screen.
+ *
+ * `invalid_request` rather than the default transient, because a file that has
+ * been swept is not coming back: retrying spends the attempt budget a real blip
+ * would need, and delays the post reaching a state somebody can act on.
+ */
+async function assertFilePresent(storageKey: string, attachmentId: string): Promise<void> {
+  try {
+    await stat(resolveStoragePath(storageKey));
+  } catch {
+    throw new GraphError({
+      message: `The file for attachment ${attachmentId} is no longer stored, so this post cannot be published. Attach it again.`,
+      kind: 'invalid_request',
+    });
+  }
+}
+
+/**
  * Turn stored attachments into something {@link publishPost} can send.
  *
  * Locally stored files are read into memory and uploaded as binary. Remote
@@ -343,9 +370,7 @@ export async function resolveMediaForPublish(media: PostMedia[]): Promise<Resolv
     if (item.storageKey) {
       const storageKey = item.storageKey;
 
-      // Checked now so a missing file fails before anything is published,
-      // rather than half way through a post's attachments.
-      await stat(resolveStoragePath(storageKey));
+      await assertFilePresent(storageKey, item.id);
 
       resolved.push({
         kind: item.kind,
@@ -397,7 +422,7 @@ export async function resolveMediaForInstagram(
 
   for (const item of media) {
     if (item.storageKey) {
-      await stat(resolveStoragePath(item.storageKey));
+      await assertFilePresent(item.storageKey, item.id);
       resolved.push({ kind: item.kind, url: signMediaUrl(item.id).url });
       continue;
     }

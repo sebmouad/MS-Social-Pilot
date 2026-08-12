@@ -140,6 +140,18 @@ somebody's afternoon. A test pins that every writer of the sentence also writes
 the code, because forgetting one puts a reader back where they started and
 nothing would look wrong.
 
+**A file that has gone fails the post in words, not in `stat`'s.** Attachments
+are checked before anything is published, so a missing one fails the post
+rather than stranding it half way through — that part was right. What was
+thrown was not: Node's own error, whose message is "ENOENT: no such file or
+directory, stat '/var/.../uploads/x.jpg'". That string is stored on the
+destination and rendered on the posts list, so it told the reader nothing they
+could act on while putting the server's directory layout on a customer's
+screen. It is now a `GraphError` naming the attachment, classified
+`invalid_request` rather than falling through to the transient default — a
+swept file is not coming back, and retrying it spends the attempt budget a real
+blip would need.
+
 **The media sweep reads `mediaKeys`, not the `media` payload**, so the two have
 to be written together or a post keeps showing pictures the sweep counts as
 orphans — and thirty days later a published post on a client's Page has broken

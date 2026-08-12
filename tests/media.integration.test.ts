@@ -805,3 +805,43 @@ describe('media survives the sweep when a real path stored it', () => {
     expect(result.removed).toBe(1);
   });
 });
+
+/**
+ * What a post says when its picture is gone.
+ *
+ * The check before publishing is right — better to fail than to send half a
+ * post's attachments. But `stat` throws Node's own error, and that string
+ * becomes the failure shown on the posts list and stored in the database:
+ * "ENOENT: no such file or directory, stat '/var/lib/social-pilot/uploads/…'".
+ * It tells the reader nothing they can act on and puts the server's directory
+ * layout on a customer's screen.
+ *
+ * It was also classified as transient, so a file that is never coming back was
+ * retried on a backoff until the attempt limit ran out.
+ */
+describe('publishing a post whose file has gone', () => {
+  const missing = [
+    { id: 'gone-1', kind: 'image' as const, url: '/api/media/gone-1/raw', storageKey: 'uploads/not-here.jpg' },
+  ];
+
+  it('says what is wrong in words the reader can use', async () => {
+    await expect(media.resolveMediaForPublish(missing)).rejects.toThrow(/attachment|file/i);
+  });
+
+  it('keeps the server paths off the screen', async () => {
+    await expect(media.resolveMediaForPublish(missing)).rejects.not.toThrow(/ENOENT|\/uploads\//);
+  });
+
+  it('does not ask Facebook again for a file that will not come back', async () => {
+    // Retrying costs the attempt budget that a genuinely transient failure
+    // needs, and delays the post reaching a state somebody can act on.
+    const error = await media.resolveMediaForPublish(missing).catch((caught) => caught);
+    expect(error.kind).toBe('invalid_request');
+  });
+
+  it('says the same for an Instagram post', async () => {
+    const error = await media.resolveMediaForInstagram(missing).catch((caught) => caught);
+    expect(error.message).not.toMatch(/ENOENT/);
+    expect(error.kind).toBe('invalid_request');
+  });
+});
