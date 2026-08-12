@@ -827,6 +827,25 @@ All three are walked by the browser, including a route that throws on demand
 behind an environment flag the walk sets and nothing else does. Error handling
 nobody has exercised is the kind that fails when it is finally needed.
 
+### And while a page is still coming
+
+Every screen behind the sign-in wall is `force-dynamic`, so a navigation waits
+on the server — fourteen queries on the analytics screen. Without a loading
+boundary Next leaves the *previous* page up meanwhile, and a click that takes
+two seconds to do anything looks like a click that missed. `ScreenSkeleton` is
+what fills the gap: shapes rather than a spinner, because a spinner says "wait"
+and shapes say "a heading and some rows are coming".
+
+Each screen re-exports it as its own `loading.tsx` rather than one file
+covering the whole group, and that is not tidiness. **A loading boundary makes
+Next flush the response before the page has finished deciding**, so a page that
+then calls `notFound()` answers 200 with the not-found page in the body. Both
+pages that call it — the composer opening a post that has since been published,
+the single-post analytics screen — are reached by links that were valid
+yesterday, so neither has a boundary and both keep answering 404. The browser
+walk caught this the moment the group-wide boundary went in: a test that had
+asserted 404 for years started seeing 200.
+
 ---
 
 ## Paging a list somebody is reading

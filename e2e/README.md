@@ -93,6 +93,10 @@ have rows to render; nothing in the walk ever calls the Graph API.
 
 ## The route that throws on purpose
 
+`src/app/(app)/e2e-slow` sleeps, so the loading skeleton can be seen: it is by
+nature the thing nobody looks at, appearing for as long as the server takes and
+then gone, which makes it the easiest piece of a UI to break without noticing.
+
 `src/app/(app)/e2e-throw` exists only to prove the error boundary works. It is
 a 404 unless `E2E_ALLOW_THROW=true`, which this config sets and nothing else
 does. It is not named with a leading underscore, tempting as that was: Next

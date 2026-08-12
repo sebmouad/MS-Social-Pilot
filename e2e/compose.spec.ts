@@ -109,7 +109,9 @@ test('a published post offers no way to rewrite it', async ({ page }) => {
   await open(page, '/posts');
   await expect(page.getByRole('link', { name: /^edit$/i })).toHaveCount(0);
 
-  // And the URL is refused even when typed by hand.
+  // And the URL is refused even when typed by hand — with a 404, not a 200
+  // carrying an apology. `/compose` has no loading boundary for this reason:
+  // one would flush the response before the page decided.
   const response = await page.goto(`/compose?post=${published.id}`);
   expect(response?.status()).toBe(404);
 
@@ -309,4 +311,23 @@ test('a page that throws offers a way out rather than a blank apology', async ({
   // And a way back that does not depend on the broken segment recovering.
   await page.getByRole('link', { name: /dashboard/i }).click();
   await page.waitForURL(/\/dashboard/);
+});
+
+test('a slow page shows a skeleton rather than nothing at all', async ({ page }) => {
+  await open(page, '/dashboard');
+
+  // Navigate without waiting, so the intermediate state is observable. Without
+  // a loading boundary Next leaves the previous page up while the server
+  // works, and a click on a screen that takes two seconds looks like a click
+  // that missed.
+  const arrived = page.getByRole('heading', { name: /eventually/i });
+  await page.goto('/e2e-slow', { waitUntil: 'commit' });
+
+  // The navigation bar stays: the boundary is beside the layout, not inside it.
+  await expect(page.getByRole('banner')).toBeVisible();
+  await expect(page.locator('.animate-pulse').first()).toBeVisible({ timeout: 5_000 });
+
+  // And it gives way to the real thing.
+  await expect(arrived).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.animate-pulse')).toHaveCount(0);
 });
