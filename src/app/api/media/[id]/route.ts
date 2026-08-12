@@ -1,37 +1,37 @@
 import { requireAuth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { deleteStoredFile, postsUsingMedia } from '@/lib/media';
+import { deleteMedia } from '@/lib/media';
 import { fail, ok, route } from '@/lib/api';
 
+/**
+ * Remove a file from the library.
+ *
+ * Editor and above. Uploading is unprivileged because contributors draft posts,
+ * but deleting is not the same act: the library is shared, the file leaves the
+ * disk, and nothing brings it back.
+ */
 export const DELETE = route(async (_request: Request, context: { params: Promise<{ id: string }> }) => {
   const auth = await requireAuth();
   const { id } = await context.params;
 
-  const media = await prisma.media.findFirst({ where: { id, workspaceId: auth.workspace.id } });
-  if (!media) return fail('File not found.', 404);
-
-  // A post's media is a Json array, not a foreign key, so nothing stops this
-  // file being deleted out from under a post that has not gone out yet. The
-  // failure would surface hours later at publish time as a Graph error nobody
-  // could connect back to a deletion.
-  const inUse = await postsUsingMedia({
+  const result = await deleteMedia({
     workspaceId: auth.workspace.id,
-    mediaId: media.id,
-    storageKey: media.storageKey,
+    role: auth.role,
+    mediaId: id,
   });
 
-  if (inUse.length > 0) {
+  if (result.outcome === 'forbidden') {
+    return fail('Only editors and above can delete files from the library.', 403);
+  }
+  if (result.outcome === 'not_found') return fail('File not found.', 404);
+  if (result.outcome === 'in_use') {
+    // Named rather than counted alone: "remove it from them first" is only
+    // actionable if the reader can find out which posts those are.
     return fail(
-      `This file is still used by ${inUse.length} post(s) that have not gone out yet. Remove it from them first.`,
+      `This file is still used by ${result.posts.length} post(s) that have not gone out yet. Remove it from them first.`,
       409,
-      { fields: { posts: inUse.map((post) => post.id).join(',') } },
+      { fields: { posts: result.posts.map((post) => post.id).join(',') } },
     );
   }
-
-  // Remove the row first: a stale row pointing at a missing file breaks the
-  // library UI, whereas an orphaned file on disk is merely wasted space.
-  await prisma.media.delete({ where: { id } });
-  if (media.storageKey) await deleteStoredFile(media.storageKey);
 
   return ok({ ok: true });
 });

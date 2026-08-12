@@ -728,6 +728,7 @@ visible change rather than a one-line edit:
 | `canManageTeam`, `canManageSettings`, `canApprove` | admin |
 | `canDeleteComments` | admin |
 | `canModerateComments` (hide, unhide, reply) | editor |
+| `canDeleteMedia` | editor |
 
 Deleting a comment sits a step above hiding one deliberately: hiding is undone
 from the same screen, deletion removes a customer's words from the client's page
@@ -1286,6 +1287,17 @@ published post still renders turns history into broken images.
 Uploading is deliberately **not** a privileged action. Contributors draft posts,
 so they upload; a role check there would stop people doing their job. What bounds
 the disk is a per-workspace quota, checked before the bytes are written.
+
+**Deleting is the opposite shape**, and `canDeleteMedia` is editor and above.
+The library is shared, so there is no per-uploader ownership to fall back on,
+and the file leaves the disk — the same argument that holds contributors to
+their own posts holds them away from everybody's assets. The role is checked
+before the file is looked up, so a refusal cannot be used to find out which
+media ids the workspace holds, and the whole decision sits in `deleteMedia`
+rather than in the route: the role question and the in-use question are
+different questions, both have to pass, and a caller that held only one of them
+would be the bug. The screen hides the button rather than letting it 409, for
+the same reason it disables it for a file a post still needs.
 
 ## When something goes wrong
 

@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { randomBytes } from 'node:crypto';
@@ -905,5 +905,98 @@ describe('a file a failed post would still need', () => {
         storageKey: file.storageKey,
       }),
     ).toEqual([]);
+  });
+});
+
+/**
+ * Who may delete a file, and what a refusal is allowed to reveal.
+ *
+ * Uploading is deliberately unprivileged — contributors draft posts, and a role
+ * check there would stop them working. Deleting is the opposite shape: the
+ * library is shared, so there is no per-uploader ownership to fall back on, and
+ * the file leaves the disk. A freelancer who cannot publish their own words
+ * unread should not be able to empty a client's asset library.
+ */
+describe('deleting a file from the library', () => {
+  it('refuses a contributor', async () => {
+    const { workspace, file } = await seed('assets');
+
+    const result = await media.deleteMedia({
+      workspaceId: workspace.id,
+      role: WorkspaceRole.contributor,
+      mediaId: file.id,
+    });
+
+    expect(result.outcome).toBe('forbidden');
+    expect(await prisma.media.count({ where: { id: file.id } })).toBe(1);
+  });
+
+  it('refuses a contributor before looking the file up', async () => {
+    const { workspace } = await seed('assets');
+
+    // Otherwise the status code is an oracle: 404 for an id that does not
+    // exist, 403 for one that does, and a refused caller has learned which
+    // files the workspace holds.
+    const missing = await media.deleteMedia({
+      workspaceId: workspace.id,
+      role: WorkspaceRole.contributor,
+      mediaId: 'no-such-file',
+    });
+
+    expect(missing.outcome).toBe('forbidden');
+  });
+
+  it('lets an editor delete an unused file, and takes the file with it', async () => {
+    const { workspace, file } = await seed('assets');
+    const { writeFile, mkdir } = await import('node:fs/promises');
+    const stored = media.resolveStoragePath(file.storageKey!);
+    await mkdir(join(stored, '..'), { recursive: true });
+    await writeFile(stored, 'bytes');
+
+    const result = await media.deleteMedia({
+      workspaceId: workspace.id,
+      role: WorkspaceRole.editor,
+      mediaId: file.id,
+    });
+
+    expect(result.outcome).toBe('ok');
+    expect(await prisma.media.count({ where: { id: file.id } })).toBe(0);
+    expect(existsSync(stored)).toBe(false);
+  });
+
+  it('still refuses an owner when a post that has not gone out needs the file', async () => {
+    const { user, workspace, file } = await seed('assets');
+    const post = await postWith(workspace.id, user.id, 'scheduled', {
+      id: file.id,
+      storageKey: file.storageKey!,
+    });
+
+    // The two guards answer different questions, and the stronger role does
+    // not answer the second one.
+    const result = await media.deleteMedia({
+      workspaceId: workspace.id,
+      role: WorkspaceRole.owner,
+      mediaId: file.id,
+    });
+
+    expect(result.outcome).toBe('in_use');
+    // Named, not just counted: "remove it from them first" needs a way to find
+    // out which posts those are.
+    expect(result.outcome === 'in_use' && result.posts.map((row) => row.id)).toEqual([post.id]);
+    expect(await prisma.media.count({ where: { id: file.id } })).toBe(1);
+  });
+
+  it('does not reach into another workspace', async () => {
+    const mine = await seed('mine');
+    const theirs = await seed('theirs');
+
+    const result = await media.deleteMedia({
+      workspaceId: mine.workspace.id,
+      role: WorkspaceRole.owner,
+      mediaId: theirs.file.id,
+    });
+
+    expect(result.outcome).toBe('not_found');
+    expect(await prisma.media.count({ where: { id: theirs.file.id } })).toBe(1);
   });
 });

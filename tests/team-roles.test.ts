@@ -68,7 +68,7 @@ function rowFor(markup: string, name: string): string {
 function optionsForMember(markup: string, name: string): string[] {
   const row = rowFor(markup, name);
   if (!row.includes('<select')) return [];
-  return [...row.matchAll(/value="([a-z]+)"/g)].map((match) => match[1]);
+  return [...row.matchAll(/value="([a-z]+)"/g)].map((match) => match[1]!);
 }
 
 describe('the roles the team screen offers', () => {
@@ -101,7 +101,7 @@ describe('the roles the team screen offers', () => {
       const markup = await render(viewer, viewer === 'owner' ? OWNER.userId : ADMIN.userId);
       const select = markup.indexOf('id="inviteRole"');
       const end = markup.indexOf('</select>', select);
-      const offered = [...markup.slice(select, end).matchAll(/value="([a-z]+)"/g)].map((m) => m[1]);
+      const offered = [...markup.slice(select, end).matchAll(/value="([a-z]+)"/g)].map((m) => m[1]!);
       // An owner arrives by promotion, watched, not through an email link.
       expect(offered).not.toContain('owner');
     }

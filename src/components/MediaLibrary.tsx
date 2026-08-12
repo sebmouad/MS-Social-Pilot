@@ -22,6 +22,8 @@ interface Props {
   files: MediaFileView[];
   usage: { bytes: number; quotaBytes: number; percent: number };
   truncated: boolean;
+  /** Editor and above. Contributors upload but do not delete. */
+  canDelete: boolean;
 }
 
 function megabytes(bytes: number): string {
@@ -37,9 +39,10 @@ function megabytes(bytes: number): string {
  * deleting a file out from under a scheduled post would fail hours later as a
  * Graph error nobody could connect back to a deletion — but a Delete button
  * that answers 409 teaches somebody the product is broken rather than that the
- * file is in use.
+ * file is in use. A contributor is shown no Delete button at all, for the same
+ * reason: the API refuses them, and a button that always fails reads as a bug.
  */
-export function MediaLibrary({ files, usage, truncated }: Props) {
+export function MediaLibrary({ files, usage, truncated, canDelete }: Props) {
   const t = useTranslations('media');
   const tCommon = useTranslations('common');
   const router = useRouter();
@@ -149,16 +152,18 @@ export function MediaLibrary({ files, usage, truncated }: Props) {
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  className="btn-danger shrink-0"
-                  disabled={held || busy === file.id}
-                  title={held ? t('heldTooltip') : undefined}
-                  onClick={() => void remove(file)}
-                >
-                  <Icon name="trash" size={15} />{' '}
-                  {busy === file.id ? tCommon('working') : tCommon('delete')}
-                </button>
+                {canDelete && (
+                  <button
+                    type="button"
+                    className="btn-danger shrink-0"
+                    disabled={held || busy === file.id}
+                    title={held ? t('heldTooltip') : undefined}
+                    onClick={() => void remove(file)}
+                  >
+                    <Icon name="trash" size={15} />{' '}
+                    {busy === file.id ? tCommon('working') : tCommon('delete')}
+                  </button>
+                )}
               </li>
             );
           })}

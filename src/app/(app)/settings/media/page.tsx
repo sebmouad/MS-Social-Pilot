@@ -4,7 +4,7 @@ import { MediaLibrary } from '@/components/MediaLibrary';
 import { SettingsNav } from '@/components/SettingsNav';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
-import { canManageInstance } from '@/lib/constants';
+import { canDeleteMedia, canManageInstance } from '@/lib/constants';
 import { readMediaLibrary } from '@/lib/media';
 import { formatInZone } from '@/lib/time';
 
@@ -40,6 +40,7 @@ export default async function MediaPage() {
       <SettingsNav showConfig={canManageInstance(auth.role)} />
 
       <MediaLibrary
+        canDelete={canDeleteMedia(auth.role)}
         usage={library.usage}
         truncated={library.truncated}
         files={library.files.map((file) => ({

@@ -59,7 +59,8 @@ account, which permissions were granted and whether publishing actually works.
   expiring tokens. Nobody can grant, or take away, a role above their own — an
   admin cannot make themselves an owner and inherit the instance settings.
 - **Approval workflow**: contributors submit, admins approve or send back with a
-  note. Enforced in the scheduler, not just the UI.
+  note. Enforced in the scheduler, not just the UI. Contributors upload media —
+  they draft posts — but deleting from the shared library is editor and above.
 
 **Automation**
 - **RSS auto-posting** with conditional polling, guid de-duplication, and a

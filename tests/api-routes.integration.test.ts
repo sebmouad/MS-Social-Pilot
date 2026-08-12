@@ -190,6 +190,7 @@ const CONTRIBUTOR_MUST_NOT: Array<[Method, string]> = [
   ['DELETE', 'accounts/[id]'],
   ['POST', 'accounts/[id]/sync'],
   ['PATCH', 'targets/[id]'],
+  ['DELETE', 'media/[id]'],
   ['POST', 'feeds'],
   ['PATCH', 'feeds/[id]'],
   ['DELETE', 'feeds/[id]'],

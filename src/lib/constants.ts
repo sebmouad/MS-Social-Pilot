@@ -182,6 +182,22 @@ export function canCompose(): boolean {
 }
 
 /**
+ * Delete a file from the media library.
+ *
+ * Editor and above, and deliberately not the same answer as uploading. Uploading
+ * is unprivileged because contributors draft posts and would otherwise be unable
+ * to do their job; deleting is the opposite shape. The library is shared — there
+ * is no per-uploader ownership to fall back on — the file leaves the disk, and a
+ * contributor who cannot publish their own words unread has no business
+ * destroying a client's brand assets. The in-use guard is a separate question
+ * and still applies: it stops a file going out from under a post that has not
+ * been sent, whoever is asking.
+ */
+export function canDeleteMedia(role: WorkspaceRole): boolean {
+  return atLeast(role, WorkspaceRole.editor);
+}
+
+/**
  * Edit, cancel, retry or publish a post somebody else wrote.
  *
  * Contributors are held to their own work. The role exists for people whose

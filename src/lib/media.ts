@@ -1,3 +1,5 @@
+import type { WorkspaceRole } from '@prisma/client';
+
 import { mkdir, readFile, stat, writeFile, unlink } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { Readable } from 'node:stream';
@@ -9,7 +11,7 @@ import { prisma } from './prisma';
 import type { PostMedia } from './json';
 import type { ResolvedMedia } from './facebook/publish';
 import { GraphError } from './facebook/graph';
-import type { MediaKind } from './constants';
+import { canDeleteMedia, type MediaKind } from './constants';
 
 /**
  * Media storage.
@@ -254,6 +256,55 @@ export async function postsUsingMedia(options: {
     },
     select: { id: true, message: true },
   });
+}
+
+export type MediaDeletion =
+  | { outcome: 'ok' }
+  | { outcome: 'forbidden' }
+  | { outcome: 'not_found' }
+  /** Refused: these posts have not gone out and still reference the file. */
+  | { outcome: 'in_use'; posts: Array<{ id: string; message: string }> };
+
+/**
+ * Delete one file from the library.
+ *
+ * The whole decision lives here rather than in the route, so the role check and
+ * the in-use guard cannot be got half right by a caller. They answer different
+ * questions and both have to pass: whether this person may delete anything at
+ * all, and whether this particular file is still needed.
+ *
+ * The role is asked first, deliberately. A contributor who is refused should
+ * not be able to learn from the status code which media ids exist.
+ */
+export async function deleteMedia(options: {
+  workspaceId: string;
+  role: WorkspaceRole;
+  mediaId: string;
+}): Promise<MediaDeletion> {
+  if (!canDeleteMedia(options.role)) return { outcome: 'forbidden' };
+
+  const media = await prisma.media.findFirst({
+    where: { id: options.mediaId, workspaceId: options.workspaceId },
+  });
+  if (!media) return { outcome: 'not_found' };
+
+  // A post's media is a Json array, not a foreign key, so nothing else stops
+  // this file being deleted out from under a post that has not gone out yet.
+  // The failure would surface hours later at publish time as a Graph error
+  // nobody could connect back to a deletion.
+  const posts = await postsUsingMedia({
+    workspaceId: options.workspaceId,
+    mediaId: media.id,
+    storageKey: media.storageKey,
+  });
+  if (posts.length > 0) return { outcome: 'in_use', posts };
+
+  // Row first: a stale row pointing at a missing file breaks the library UI,
+  // whereas an orphaned file on disk is merely wasted space.
+  await prisma.media.delete({ where: { id: media.id } });
+  if (media.storageKey) await deleteStoredFile(media.storageKey);
+
+  return { outcome: 'ok' };
 }
 
 export interface StorageUsage {
