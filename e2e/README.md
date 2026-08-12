@@ -96,6 +96,19 @@ have rows to render; nothing in the walk ever calls the Graph API.
   look like a label; the other sat between a label and the textarea that label
   actually named.
 
+## Seeds have to reach the screen
+
+The phone walk seeds a long filename, an unbreakable URL, a feed with both, a
+long email address and a destination whose row carries a name, an account and
+the note saying why it is switched off. None of that is decoration: an empty
+screen fits on anything, and the first version of this walk passed on every
+screen because there was nothing on them.
+
+There is a test whose only job is to assert the seeded strings are actually
+rendered on the screens the overflow checks then visit. Without it a fixture
+that quietly stops reaching a page turns the checks around it into a thorough
+looking suite that exercises an empty layout.
+
 ## The route that throws on purpose
 
 `src/app/(app)/e2e-slow` sleeps, so the loading skeleton can be seen: it is by

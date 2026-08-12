@@ -77,6 +77,35 @@ test.beforeAll(async () => {
     data: { workspaceId: workspace.id, actorId: author.id, action: 'post.created' },
   });
 
+  // A feed: the name and the URL are both user-supplied, and a URL is the
+  // longest unbreakable string the app ever renders.
+  await prisma.feedSource.upsert({
+    where: { id: 'phone-feed' },
+    create: {
+      id: 'phone-feed',
+      workspaceId: workspace.id,
+      name: 'The Halloway Bakery Journal — everything from the ovens, weekly',
+      url: 'https://an-unreasonably-long-example-domain-for-testing.example/feeds/journal/everything.atom',
+      messageTemplate: '{{title}}\n\n{{link}}',
+      targetIds: [targetId],
+    },
+    update: {},
+  });
+
+  // A colleague whose name and address are both long, for the team screen.
+  await prisma.invitation.upsert({
+    where: { workspaceId_email: { workspaceId: workspace.id, email: 'a-very-long-address-indeed@an-unreasonably-long-example-domain.example' } },
+    create: {
+      workspaceId: workspace.id,
+      email: 'a-very-long-address-indeed@an-unreasonably-long-example-domain.example',
+      role: 'editor',
+      tokenHash: 'phone-walk-not-a-real-token',
+      invitedById: author.id,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+    update: {},
+  });
+
   // A second destination, of the kind whose row carries the longest secondary
   // line: type, account name, and the note explaining why it is switched off.
   const page = await prisma.target.findFirstOrThrow({ where: { id: targetId } });
@@ -155,6 +184,62 @@ for (const path of SIGNED_IN_SCREENS) {
     expect(failures, `${path} reported browser errors`).toEqual([]);
   });
 }
+
+test('the per-post metrics screen fits, with a caption that does not wrap', async ({ page }) => {
+  // Reached from the analytics table rather than the nav, so the walk over
+  // SIGNED_IN_SCREENS never sees it — and it renders the post's whole message
+  // above a table of metric names, which is the combination that overflows.
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const post = await prisma.post.create({
+    data: {
+      workspaceId: target.workspaceId,
+      authorId: (await prisma.user.findFirstOrThrow({ where: { email: OWNER.email } })).id,
+      message:
+        'Read the whole thing at https://an-unreasonably-long-example-domain-for-testing.example/journal/the-sourdough-post',
+      status: 'published',
+      publishedAt: new Date(),
+      targets: {
+        create: {
+          targetId: target.id,
+          status: 'published',
+          remotePostId: 'ig_metrics_walk',
+          publishedAt: new Date(),
+          insights: { impressions: 120, reach: 90, reactions: 12, comments: 3 },
+        },
+      },
+    },
+    include: { targets: true },
+  });
+
+  const failures = collectFailures(page);
+  await open(page, `/analytics/post/${post.targets[0]!.id}`);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+  expect(await overflowingElements(page), 'the metrics screen has elements past the edge').toEqual([]);
+
+  const scrollable = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(scrollable, `the metrics screen scrolls ${scrollable}px sideways`).toBeLessThanOrEqual(SLACK);
+  expect(failures).toEqual([]);
+});
+
+test('the seeded long content actually reaches the screens that are checked', async ({ page }) => {
+  // Without this the seeding above is decoration: a fixture that never renders
+  // makes the overflow checks look thorough while exercising an empty page,
+  // which is exactly how the first version of this walk passed on every screen.
+  await open(page, '/feeds');
+  await expect(page.getByText(/Halloway Bakery Journal/i)).toBeVisible();
+
+  await open(page, '/settings/team');
+  await expect(page.getByText(/a-very-long-address-indeed/i)).toBeVisible();
+
+  await open(page, '/compose');
+  await expect(page.getByText(/halloway_bakery_official/i)).toBeVisible();
+
+  await open(page, '/settings/media');
+  await expect(page.getByText(/a-photograph-of-the-bakery/i)).toBeVisible();
+});
 
 test('the analytics tabs stay usable when there is data behind them', async ({ page }) => {
   const failures = collectFailures(page);
