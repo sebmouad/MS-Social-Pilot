@@ -1676,6 +1676,17 @@ counts the times each destination was posted to, so one post to three Pages is
 label was the bug, and a client reading "Posts published" twice with different
 arithmetic under each has no way to know that.
 
+Both CSV downloads name the file after the whole period rather than its last
+day. Stamping only the end date gave the same name to every range ending
+today, so a client sent last month and last quarter received two files called
+the same thing and the browser renamed one without saying so. Nothing inside
+the file records the range either.
+
+An inverted range is refused rather than run, for the same reason the labels
+matter: it returns nothing, and a report of nothing is indistinguishable from a
+month in which the client's pages were silent, so a typo in the dates reads as
+bad news about their account.
+
 ### Beyond /insights
 
 Insights say a post reached 4,000 people. They do not say what those people

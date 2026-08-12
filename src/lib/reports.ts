@@ -60,6 +60,58 @@ function engagementOf(insights: PostInsights | null): number {
   return number(insights.reactions) + number(insights.comments) + number(insights.shares);
 }
 
+/** A resolved date range, or the reason it could not be. */
+export type RangeResult =
+  | { ok: true; from: Date; to: Date }
+  | { ok: false; message: string };
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Work out which period a report covers.
+ *
+ * Shared by the report and the analytics exports, which asked the same
+ * question in the same way and got the same two things wrong.
+ *
+ * An inverted range is refused rather than run. It returns nothing, and a
+ * report of nothing is indistinguishable from a month in which the client's
+ * pages were silent — so a typo in the dates reads as bad news about their
+ * account instead of a typo.
+ */
+export function parseReportRange(params: {
+  from: string | null;
+  to: string | null;
+  now?: Date;
+}): RangeResult {
+  const to = params.to ? new Date(params.to) : (params.now ?? new Date());
+  // Last 30 days by default: long enough to be meaningful, short enough to
+  // load quickly.
+  const from = params.from ? new Date(params.from) : new Date(to.getTime() - THIRTY_DAYS_MS);
+
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+    return { ok: false, message: 'Enter a valid date range.' };
+  }
+
+  if (from.getTime() > to.getTime()) {
+    return { ok: false, message: 'The start of the range comes after its end. Swap the dates.' };
+  }
+
+  return { ok: true, from, to };
+}
+
+/**
+ * Name a downloaded CSV after the period it covers, not just its last day.
+ *
+ * Stamping only the end date gives the same name to every range ending today,
+ * so a client sent last month and last quarter receives two files called the
+ * same thing — and the browser quietly renames the second rather than saying
+ * so. Nothing inside the file records the range either.
+ */
+export function csvFilename(prefix: string, slug: string, range: { from: Date; to: Date }): string {
+  const day = (date: Date) => date.toISOString().slice(0, 10);
+  return `${prefix}-${slug}-${day(range.from)}_${day(range.to)}.csv`;
+}
+
 /**
  * Split one post's clicks across the destinations it went to.
  *

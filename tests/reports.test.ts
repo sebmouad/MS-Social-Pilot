@@ -4,7 +4,13 @@ import { describe, expect, it } from 'vitest';
 import en from '../messages/en.json';
 import fr from '../messages/fr.json';
 
-import { reportToCsv, spreadClicks, type Report } from '../src/lib/reports';
+import {
+  csvFilename,
+  parseReportRange,
+  reportToCsv,
+  spreadClicks,
+  type Report,
+} from '../src/lib/reports';
 
 function report(overrides: Partial<Report> = {}): Report {
   return {
@@ -149,5 +155,66 @@ describe('the report labels', () => {
     // "By destination" titles the section; as a column header over a list of
     // Page names it reads like a leftover.
     expect(table).toContain("t('destination')");
+  });
+});
+
+describe('parseReportRange', () => {
+  const now = new Date('2026-08-31T12:00:00Z');
+
+  it('defaults to the last thirty days', () => {
+    const range = parseReportRange({ from: null, to: null, now });
+    expect(range.ok).toBe(true);
+    if (!range.ok) return;
+    expect(range.to.toISOString()).toBe(now.toISOString());
+    expect(range.from.toISOString()).toBe('2026-08-01T12:00:00.000Z');
+  });
+
+  it('refuses a range that runs backwards', () => {
+    const range = parseReportRange({ from: '2026-08-31', to: '2026-08-01', now });
+
+    // Running it returns nothing, and a report of nothing looks exactly like a
+    // month in which the client's pages were silent — so a typo in the dates
+    // reads as bad news about their account.
+    expect(range.ok).toBe(false);
+    if (range.ok) return;
+    expect(range.message).toMatch(/after its end/i);
+  });
+
+  it('accepts a range of a single instant', () => {
+    const range = parseReportRange({ from: '2026-08-01', to: '2026-08-01', now });
+    expect(range.ok).toBe(true);
+  });
+
+  it('refuses a date it cannot read', () => {
+    expect(parseReportRange({ from: 'last tuesday', to: null, now }).ok).toBe(false);
+    expect(parseReportRange({ from: null, to: 'soon', now }).ok).toBe(false);
+  });
+
+  it('keeps an explicit start with a defaulted end', () => {
+    const range = parseReportRange({ from: '2026-08-10', to: null, now });
+    expect(range.ok).toBe(true);
+    if (!range.ok) return;
+    expect(range.from.toISOString()).toBe('2026-08-10T00:00:00.000Z');
+    expect(range.to.toISOString()).toBe(now.toISOString());
+  });
+});
+
+describe('csvFilename', () => {
+  const range = { from: new Date('2026-06-01T00:00:00Z'), to: new Date('2026-08-31T00:00:00Z') };
+
+  it('names the file after the whole period', () => {
+    expect(csvFilename('report', 'acme', range)).toBe('report-acme-2026-06-01_2026-08-31.csv');
+  });
+
+  it('tells two ranges ending on the same day apart', () => {
+    const shorter = { from: new Date('2026-08-01T00:00:00Z'), to: range.to };
+
+    // A client sent last quarter and last month otherwise receives two files
+    // with the same name, and the browser renames one without saying so.
+    expect(csvFilename('report', 'acme', shorter)).not.toBe(csvFilename('report', 'acme', range));
+  });
+
+  it('keeps the export kind in front', () => {
+    expect(csvFilename('posts', 'acme', range)).toMatch(/^posts-/);
   });
 });

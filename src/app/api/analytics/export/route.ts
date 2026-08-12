@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { fail, route } from '@/lib/api';
 import { EXPORT_KINDS, buildExport, type ExportKind } from '@/lib/analytics-export';
+import { csvFilename, parseReportRange } from '@/lib/reports';
 
 /**
  * CSV export of any part of the analytics catalogue.
@@ -20,14 +21,12 @@ export const GET = route(async (request: Request) => {
     return fail(`Unknown export. Choose one of: ${EXPORT_KINDS.join(', ')}.`, 400);
   }
 
-  const to = url.searchParams.get('to') ? new Date(url.searchParams.get('to')!) : new Date();
-  const from = url.searchParams.get('from')
-    ? new Date(url.searchParams.get('from')!)
-    : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-    return fail('Enter a valid date range.', 400);
-  }
+  const range = parseReportRange({
+    from: url.searchParams.get('from'),
+    to: url.searchParams.get('to'),
+  });
+  if (!range.ok) return fail(range.message, 400);
+  const { from, to } = range;
 
   // A target id arrives from the client, so it is checked against the caller's
   // workspace before it reaches a query.
@@ -47,11 +46,10 @@ export const GET = route(async (request: Request) => {
     targetId: requestedTarget ?? undefined,
   });
 
-  const stamp = to.toISOString().slice(0, 10);
   return new NextResponse(csv, {
     headers: {
       'content-type': 'text/csv; charset=utf-8',
-      'content-disposition': `attachment; filename="${kind}-${auth.workspace.slug}-${stamp}.csv"`,
+      'content-disposition': `attachment; filename="${csvFilename(kind, auth.workspace.slug, range)}"`,
     },
   });
 });
