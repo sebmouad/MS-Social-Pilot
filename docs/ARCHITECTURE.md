@@ -140,6 +140,17 @@ somebody's afternoon. A test pins that every writer of the sentence also writes
 the code, because forgetting one puts a reader back where they started and
 nothing would look wrong.
 
+**Emails already pick the recipient's language; they now pick the workspace's
+clock too.** Three of the five templates passed a timezone for a post's
+scheduled time. The two that carry a *deadline* — an invitation expiry and a
+token expiry — formatted in UTC, and `formatDate` uses `timeStyle: 'short'`, so
+they printed an hour as well as a date. A Sydney workspace was told its
+connection expired at 2pm on the third when locally it expires at midnight on
+the fourth: the wrong hour and the wrong day, in the one message whose whole
+job is to say when something runs out. UTC survives as the fallback for a
+caller with no zone, which is defensible rather than correct — so a test pins
+that both senders actually pass one.
+
 **A failed destination gets the same treatment, with one deliberate
 exception.** `PostTarget.errorCode` already carried a code, but it carries two
 kinds: Facebook's own codes and error kinds, and four reasons this app composed

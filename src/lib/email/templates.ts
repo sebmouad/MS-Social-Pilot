@@ -111,7 +111,15 @@ function escapeAttribute(value: string): string {
   return escapeHtml(value).replace(/'/g, '&#39;');
 }
 
-function formatDate(date: Date, locale: Locale, timeZone = 'UTC'): string {
+/**
+ * A moment as the reader's workspace sees it.
+ *
+ * `timeStyle: 'short'` means these carry an hour, so formatting in UTC gets
+ * both the time and, near midnight, the day wrong — in the messages whose
+ * whole job is to say when something runs out. UTC remains the fallback for a
+ * caller with no zone to offer, which is defensible rather than correct.
+ */
+function formatDate(date: Date, locale: Locale, timeZone: string | undefined = 'UTC'): string {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -130,6 +138,8 @@ export function invitationEmail(options: {
   role: string;
   token: string;
   expiresAt: Date;
+  /** The workspace's zone. A deadline printed in UTC is the wrong deadline. */
+  timezone?: string;
 }): RenderedEmail {
   const t = (key: string, params?: Record<string, string | number>) =>
     translate(options.locale, key, params);
@@ -142,7 +152,11 @@ export function invitationEmail(options: {
       workspace: options.workspace,
       role: roleLabel,
     }),
-    details: [t('email.invitation.expiry', { date: formatDate(options.expiresAt, options.locale) })],
+    details: [
+      t('email.invitation.expiry', {
+        date: formatDate(options.expiresAt, options.locale, options.timezone),
+      }),
+    ],
     cta: { label: t('email.invitation.cta'), url: `${env.appUrl}/invite/${options.token}` },
   });
 
@@ -203,6 +217,8 @@ export function tokenExpiringEmail(options: {
   account: string;
   expiresAt: Date;
   days: number;
+  /** The workspace's zone. A deadline printed in UTC is the wrong deadline. */
+  timezone?: string;
 }): RenderedEmail {
   const t = (key: string, params?: Record<string, string | number>) =>
     translate(options.locale, key, params);
@@ -211,7 +227,7 @@ export function tokenExpiringEmail(options: {
     heading: t('email.tokenExpiring.heading'),
     body: t('email.tokenExpiring.body', {
       account: options.account,
-      date: formatDate(options.expiresAt, options.locale),
+      date: formatDate(options.expiresAt, options.locale, options.timezone),
     }),
     cta: { label: t('email.tokenExpiring.cta'), url: `${env.appUrl}/connections` },
     footer: t('email.footer', { workspace: options.workspace }),

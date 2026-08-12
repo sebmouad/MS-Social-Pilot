@@ -160,6 +160,7 @@ export async function notifyTokenExpiring(options: {
         account: options.accountName,
         expiresAt: options.expiresAt,
         days: options.days,
+        timezone: workspace.timezone,
       });
       await sendEmail({
         to: recipient.email,

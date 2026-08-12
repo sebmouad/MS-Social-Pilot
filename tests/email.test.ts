@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Locale } from '@prisma/client';
 
@@ -160,5 +161,80 @@ describe('escaping', () => {
     expect(email.html).not.toContain('<script>');
     expect(email.html).toContain('&lt;script&gt;');
     expect(email.html).toContain('Acme &amp; Co');
+  });
+});
+
+/**
+ * Deadlines in the reader's own clock.
+ *
+ * These two emails print a date *and a time*, and both were formatted in UTC.
+ * A Sydney workspace was told its connection expired at 14:00 on the third
+ * when locally it expires at midnight on the fourth — the wrong hour and the
+ * wrong day, in the one message whose whole job is to say when something runs
+ * out.
+ */
+describe('the deadlines in emails', () => {
+  const expiresAt = new Date('2026-09-03T14:00:00Z');
+
+  it('states an invitation expiry in the workspace timezone', () => {
+    const email = invitationEmail({
+      locale: Locale.en,
+      inviter: 'Sam',
+      workspace: 'Acme',
+      role: 'editor',
+      token: 'abc123',
+      expiresAt,
+      timezone: 'Australia/Sydney',
+    });
+
+    // Midnight on the fourth in Sydney, not 2pm on the third.
+    expect(email.html).toContain('Sep 4, 2026');
+    expect(email.html).not.toContain('Sep 3, 2026');
+  });
+
+  it('states a token expiry in the workspace timezone', () => {
+    const email = tokenExpiringEmail({
+      locale: Locale.en,
+      workspace: 'Acme',
+      account: 'Acme FB',
+      expiresAt,
+      days: 5,
+      timezone: 'Australia/Sydney',
+    });
+
+    expect(email.html).toContain('Sep 4, 2026');
+    expect(email.html).not.toContain('Sep 3, 2026');
+  });
+
+  it('is given a zone by every sender', () => {
+    // The template accepting a zone is worth nothing if the caller omits it,
+    // and the fallback means that mistake renders perfectly well in UTC.
+    const notify = readFileSync('src/lib/email/notify.ts', 'utf8');
+    const tokenCall = notify.slice(
+      notify.indexOf('tokenExpiringEmail({'),
+      notify.indexOf('});', notify.indexOf('tokenExpiringEmail({')),
+    );
+    expect(tokenCall).toContain('timezone: workspace.timezone');
+
+    const team = readFileSync('src/lib/team.ts', 'utf8');
+    const inviteCall = team.slice(
+      team.indexOf('invitationEmail({'),
+      team.indexOf('});', team.indexOf('invitationEmail({')),
+    );
+    expect(inviteCall).toContain('timezone: workspace.timezone');
+  });
+
+  it('falls back to UTC when no zone is given', () => {
+    // Every workspace has a timezone, but a caller that forgets one should get
+    // a defensible answer rather than a crash.
+    const email = tokenExpiringEmail({
+      locale: Locale.en,
+      workspace: 'Acme',
+      account: 'Acme FB',
+      expiresAt,
+      days: 5,
+    });
+
+    expect(email.html).toContain('Sep 3, 2026');
   });
 });

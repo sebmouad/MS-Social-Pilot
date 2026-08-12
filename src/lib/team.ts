@@ -89,6 +89,7 @@ export async function inviteMember(options: {
     role: options.role,
     token,
     expiresAt,
+    timezone: workspace.timezone,
   });
 
   const result = await sendEmail({
