@@ -206,7 +206,7 @@ export const WEEKDAY_NAMES = [
 
 /** Days of a calendar month grid (Monday-first), as UTC day boundaries. */
 export function monthGrid(year: number, month: number, timeZone: string): Date[] {
-  const first = fromZonedTime(`${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00`, timeZone);
+  const first = firstRealInstant(`${year}-${String(month + 1).padStart(2, '0')}-01T00:00`, timeZone);
   const localFirst = toZonedTime(first, timeZone);
 
   // Monday-first: Sunday (0) becomes the 7th column.
@@ -217,8 +217,13 @@ export function monthGrid(year: number, month: number, timeZone: string): Date[]
     const day = addDays(gridStart, index);
     const stamp = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(
       day.getDate(),
-    ).padStart(2, '0')}T00:00:00`;
-    return fromZonedTime(stamp, timeZone);
+    ).padStart(2, '0')}T00:00`;
+    // `firstRealInstant`, not `fromZonedTime`: in the zones that change their
+    // clocks at midnight — Santiago, Havana, Beirut, Cairo — that day has no
+    // 00:00, and `fromZonedTime` answers with 23:00 the day before. The grid
+    // then held the previous day twice and no cell for the day that lost its
+    // midnight, so every post scheduled on it disappeared from the calendar.
+    return firstRealInstant(stamp, timeZone);
   });
 }
 

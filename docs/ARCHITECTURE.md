@@ -280,6 +280,16 @@ the calendar agrees with itself, showing the time it moved to rather than the
 time somebody set. So scheduling into the gap is refused, with a message that
 says which hour is missing and why.
 
+**The calendar grid needs it for a different reason.** Four real zones —
+Santiago, Havana, Beirut and Cairo — change their clocks at midnight, so on one
+day a year those zones have no 00:00 at all. `monthGrid` built every square by
+asking `fromZonedTime` for that day's midnight, and got back 23:00 the evening
+before. The grid then held the previous day twice and had no square for the day
+that lost its midnight, so every post scheduled on it had a bucket key matching
+no cell and simply vanished from the calendar. Each square is now
+`firstRealInstant`, which lands on 01:00 that morning and formats as the right
+day.
+
 `wallClockExists` is a round trip: convert to an instant and back, and if the
 wall clock that returns is not the one that went in, the one that went in never
 existed. `firstRealInstant` finds the moment the clocks land, for callers that

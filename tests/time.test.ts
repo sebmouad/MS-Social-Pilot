@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { firstRealInstant, isValidTimeZone, localInputToUtc, nextAvailableSlot, type QueueSlotDefinition, utcToLocalInput, wallClockExists } from '../src/lib/time';
+import { firstRealInstant, isValidTimeZone, localInputToUtc, monthGrid, nextAvailableSlot, type QueueSlotDefinition, utcToLocalInput, wallClockExists } from '../src/lib/time';
 
 describe('timezone conversion', () => {
   it('interprets wall-clock input in the given zone', () => {
@@ -208,5 +208,86 @@ describe('a recurring slot on the morning the clocks change', () => {
     });
 
     expect(utcToLocalInput(slot!, 'Europe/London')).toBe('2026-06-17T09:00');
+  });
+});
+
+/**
+ * The calendar grid.
+ *
+ * Every square is one local day, and the page buckets posts into them by
+ * formatting `scheduledAt` in the workspace zone. So a square that is not
+ * actually the day it claims to be does not merely look wrong — the posts
+ * scheduled for the missing day have nowhere to render and vanish.
+ *
+ * Four real zones change their clocks at midnight, which is where this bites.
+ */
+describe('monthGrid', () => {
+  /** Zone, month index, and the day that has no midnight in 2026. */
+  const MIDNIGHT_GAPS = [
+    ['America/Santiago', 8, '2026-09-06'],
+    ['America/Havana', 2, '2026-03-08'],
+    ['Asia/Beirut', 2, '2026-03-29'],
+    ['Africa/Cairo', 3, '2026-04-24'],
+  ] as const;
+
+  const localDays = (year: number, month: number, zone: string) =>
+    monthGrid(year, month, zone).map((cell) => utcToLocalInput(cell, zone).slice(0, 10));
+
+  it('always returns six weeks', () => {
+    expect(monthGrid(2026, 7, 'Europe/Paris')).toHaveLength(42);
+  });
+
+  it('starts on a Monday and runs without a break', () => {
+    const days = localDays(2026, 7, 'Europe/Paris');
+    for (let index = 1; index < days.length; index += 1) {
+      const previous = new Date(`${days[index - 1]}T00:00:00Z`);
+      const current = new Date(`${days[index]}T00:00:00Z`);
+      expect(current.getTime() - previous.getTime(), `${days[index - 1]} to ${days[index]}`).toBe(
+        24 * 60 * 60 * 1000,
+      );
+    }
+  });
+
+  it.each(MIDNIGHT_GAPS)('gives %s a square for the day that loses its midnight', (zone, month, gap) => {
+    const days = localDays(2026, month, zone);
+
+    // `fromZonedTime` answered 23:00 the day before for this cell, so the grid
+    // held the previous day twice and never showed this one.
+    expect(days).toContain(gap);
+    expect(days.filter((day) => day === gap)).toHaveLength(1);
+  });
+
+  it.each(MIDNIGHT_GAPS)('never repeats a day in %s', (zone, month) => {
+    const days = localDays(2026, month, zone);
+    expect(new Set(days).size).toBe(days.length);
+  });
+
+  it('handles a month that begins on the day with no midnight', () => {
+    // Asuncion, 1 October 2023 — the only month start in a fifteen-year sweep
+    // of every zone that lands on a midnight gap. Getting the first of the
+    // month wrong shifts which weekday the grid opens on, so every square
+    // after it is a day out.
+    const days = localDays(2023, 9, 'America/Asuncion');
+
+    expect(days).toContain('2023-10-01');
+    expect(new Set(days).size).toBe(days.length);
+    // 1 October 2023 was a Sunday, so a Monday-first grid opens on 25
+    // September and the target day is the last square of the first row.
+    expect(days[0]).toBe('2023-09-25');
+    expect(days[6]).toBe('2023-10-01');
+  });
+
+  it('puts every square at the first real moment of its day', () => {
+    for (const [zone, month] of MIDNIGHT_GAPS) {
+      for (const cell of monthGrid(2026, month, zone)) {
+        const local = utcToLocalInput(cell, zone);
+        // Midnight everywhere it exists; the first minute that does where it
+        // does not. Never the day before.
+        expect(wallClockExists(local, zone), `${zone} ${local}`).toBe(true);
+        expect(firstRealInstant(`${local.slice(0, 10)}T00:00`, zone).getTime(), local).toBe(
+          cell.getTime(),
+        );
+      }
+    }
   });
 });
