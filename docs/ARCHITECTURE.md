@@ -1764,6 +1764,22 @@ otherwise, and every Page-level report that ignores them understates the Page.
 Posts this app published are filtered out by remote id before storing, or the
 totals would count them twice.
 
+**The comment sync asks only for what is new.** Every reader pages with a hard
+ceiling, and for comments that is five pages of a hundred in chronological
+order — so a post that passes five hundred comments would return the same
+oldest five hundred on every sync and never show a new one again. The inbox
+would go quiet on exactly the posts a client cares most about, with nothing
+anywhere saying so. Each sync anchors `since` to the newest comment it already
+holds, less a day: `since` filters on when a comment was written, so anchoring
+exactly would mean never re-reading one, and a comment being hidden or argued
+over is the one worth another look. A first sync has nothing to anchor to and
+reads the history it can.
+
+This is also why there is no bulk reconciliation of deleted comments. Rows
+absent from a fetch are not necessarily gone — on a busy post they are simply
+past the ceiling — so deleting them would destroy live comments. Removal stays
+on-demand, driven by Graph saying the object does not exist.
+
 A comment that has gone from Facebook is an outcome, not an error. Authors
 delete their own comments and page owners moderate from Facebook's own app, so
 our copy is only as fresh as the last sync — acting on a comment from the inbox

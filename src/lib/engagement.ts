@@ -60,7 +60,27 @@ export interface EdgeSyncResult {
 // Comments
 // ---------------------------------------------------------------------------
 
-/** Pull comments for one published destination and store them. */
+/**
+ * How far back a sync looks past the newest comment it already has.
+ *
+ * `since` is on created_time, so without an overlap a comment that is edited,
+ * liked or hidden after we first read it would never be looked at again. A day
+ * covers the window in which a comment is actually being argued over, and also
+ * absorbs any clock difference between us and Facebook.
+ */
+const COMMENT_SYNC_OVERLAP_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Pull comments for one published destination and store them.
+ *
+ * Asks only for what is new. The fetch is capped at five pages of a hundred in
+ * chronological order, so a post that passes five hundred comments would
+ * otherwise return the same oldest five hundred on every sync and never show a
+ * new one again — the inbox would go quiet on exactly the posts a client cares
+ * most about. Anchoring to the newest comment we hold means each sync starts
+ * where the last one stopped, and the ceiling applies to what arrived since
+ * rather than to the post's whole history.
+ */
 export async function syncCommentsFor(postTargetId: string): Promise<number> {
   const row = await prisma.postTarget.findUniqueOrThrow({
     where: { id: postTargetId },
@@ -71,7 +91,16 @@ export async function syncCommentsFor(postTargetId: string): Promise<number> {
   const token = tokenFor(row.target);
   if (!token) return 0;
 
-  const comments = await fetchComments(row.remotePostId, token);
+  const newest = await prisma.postComment.findFirst({
+    where: { postTargetId },
+    orderBy: { createdTime: 'desc' },
+    select: { createdTime: true },
+  });
+
+  const comments = await fetchComments(row.remotePostId, token, {
+    // Nothing stored yet means a first sync, which reads the history it can.
+    since: newest ? new Date(newest.createdTime.getTime() - COMMENT_SYNC_OVERLAP_MS) : undefined,
+  });
 
   for (const comment of comments) {
     await prisma.postComment.upsert({

@@ -35,12 +35,16 @@ let denied: string[] = [];
 let vanished: string[] = [];
 /** Every write Graph received, so a test can check what was actually sent. */
 let received: Array<{ path: string; body: string }> = [];
+/** Every request's path and query, for asserting on what a read asked for. */
+let asked: Array<{ path: string; params: URLSearchParams }> = [];
 
 beforeAll(async () => {
   setTestEnv();
 
   server = createServer((request, response) => {
     const url = new URL(request.url ?? '', 'http://localhost');
+
+    asked.push({ path: url.pathname, params: url.searchParams });
 
     const chunks: Buffer[] = [];
     request.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -109,6 +113,7 @@ beforeEach(async () => {
   routes = {};
   denied = [];
   vanished = [];
+  asked = [];
   received = [];
 
   await prisma.postComment.deleteMany();
@@ -1752,5 +1757,74 @@ describe('a comment that has gone from Facebook', () => {
     ).rejects.toThrow();
 
     expect(await prisma.postComment.count({ where: { id: seed.comment.id } })).toBe(1);
+  });
+});
+
+/**
+ * Asking Facebook only for what is new.
+ *
+ * The comments fetch is capped at five pages of a hundred, in chronological
+ * order. Without an anchor, a post that passes five hundred comments returns
+ * the same oldest five hundred on every sync and never shows a new one again —
+ * the inbox goes quiet on exactly the posts a client cares most about, and
+ * nothing anywhere says so.
+ */
+describe('keeping up with a busy post', () => {
+  const commentsQuery = () => asked.filter((call) => call.path.endsWith('/comments')).at(-1);
+
+  it('reads the history it can on a first sync', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    // Nothing stored yet, so there is nothing to anchor to and no reason to
+    // exclude anything.
+    expect(commentsQuery()?.params.get('since')).toBeNull();
+  });
+
+  it('starts the next sync where the last one stopped', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    asked = [];
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    const since = commentsQuery()?.params.get('since');
+    expect(since, 'the second sync asked for the whole history again').toBeTruthy();
+
+    // Graph takes `since` as unix seconds.
+    const anchored = new Date(Number(since) * 1000);
+    const newest = new Date('2026-08-01T12:00:00Z');
+    expect(anchored.getTime()).toBeLessThan(newest.getTime());
+  });
+
+  it('looks back far enough to notice a comment being edited or hidden', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    asked = [];
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    // `since` filters on when a comment was written, so anchoring exactly to
+    // the newest one we hold would mean never looking at it again — and a
+    // comment being hidden or argued over is the one worth re-reading.
+    const since = Number(commentsQuery()?.params.get('since')) * 1000;
+    const newest = new Date('2026-08-01T12:00:00Z').getTime();
+    expect(newest - since).toBeGreaterThanOrEqual(24 * 60 * 60 * 1000);
+  });
+
+  it('still stores what comes back', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    // The anchor must not turn a working sync into one that quietly stores
+    // nothing.
+    const comments = await engagement.readComments({ workspaceId: seed.workspace.id });
+    expect(comments).toHaveLength(1);
   });
 });
