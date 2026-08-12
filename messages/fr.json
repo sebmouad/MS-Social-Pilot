@@ -248,6 +248,7 @@
     "schedule": "Planifier",
     "scheduleForTime": "Planifier à une date précise",
     "scheduledOk": "Planifiée. Vous la retrouverez dans le calendrier.",
+    "queuedOk": "Mise en file pour le {when}. Vous pouvez la voir dans le calendrier.",
     "submitForApproval": "Soumettre à validation",
     "submittedOk": "Soumise à validation.",
     "subtitle": "Rédigez une fois, publiez sur autant de pages et de groupes Facebook que vous voulez.",

@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+
+import en from '../messages/en.json';
+import fr from '../messages/fr.json';
 
 import { postIsEditable, postEditBlocker } from '../src/lib/constants';
 
@@ -136,6 +140,45 @@ describe('a post with a destination in flight', () => {
         postIsEditable({ status: 'scheduled', targets: [{ status }] }),
         status,
       ).toBe(true);
+    }
+  });
+});
+
+/**
+ * What the composer says after a queued post is saved.
+ *
+ * The queue picks the time on the server, so the response is the only place
+ * the author can learn which slot they got. Falling back to the generic
+ * "Scheduled" leaves them to go and find out on the calendar.
+ */
+describe('the confirmation for a queued post', () => {
+  const source = readFileSync('src/components/Composer.tsx', 'utf8');
+
+  it('reads the time the server picked', () => {
+    expect(source).toContain('body.scheduledAt');
+    expect(source).toMatch(/t\('queuedOk', \{ when/);
+  });
+
+  it('names the hour, not just the day', () => {
+    // `formatInZone` defaults to a pattern carrying the time; a date-only
+    // format would tell somebody their post goes out "on Tuesday" and leave
+    // the part they actually need out of it.
+    const start = source.indexOf('const queuedFor');
+    const call = source.slice(start, source.indexOf('setResult(', start));
+    expect(call).toContain('formatInZone(');
+
+    // Either no explicit pattern — the default carries the time — or one that
+    // names an hour. A date-only format would tell somebody their post goes
+    // out "on Tuesday" and leave out the part they actually need.
+    const pattern = call.match(/formatInZone\([\s\S]*?,\s*timezone\s*,\s*'([^']*)'/)?.[1];
+    expect(pattern === undefined || /[Hh]/.test(pattern), `pattern: ${pattern}`).toBe(true);
+  });
+
+  it('is offered in both languages, with the time in it', () => {
+    for (const [language, messages] of [['en', en], ['fr', fr]] as const) {
+      const compose = messages.compose as Record<string, string>;
+      expect(compose.queuedOk, language).toContain('{when}');
+      expect(compose.queuedOk, language).not.toBe(compose.scheduledOk);
     }
   });
 });

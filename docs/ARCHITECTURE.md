@@ -280,6 +280,11 @@ the calendar agrees with itself, showing the time it moved to rather than the
 time somebody set. So scheduling into the gap is refused, with a message that
 says which hour is missing and why.
 
+The queue is the one mode where the author does not choose the time, so the
+composer names the slot it got back rather than saying "Scheduled" and leaving
+them to go and find it on the calendar. The confirmation carries the hour, not
+just the day: "goes out Tuesday" omits the part they need.
+
 **The calendar grid needs it for a different reason.** Four real zones —
 Santiago, Havana, Beirut and Cairo — change their clocks at midnight, so on one
 day a year those zones have no 00:00 at all. `monthGrid` built every square by

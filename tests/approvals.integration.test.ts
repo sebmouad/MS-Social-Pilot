@@ -874,6 +874,33 @@ describe('queue slots and posts awaiting review', () => {
     );
   }
 
+  it('tells the caller which slot it picked', async () => {
+    const seed = await seedQueued();
+    const created = await queued(seed, seed.owner.id, WorkspaceRole.owner);
+
+    // The queue chooses the time on the server, so this value is the only way
+    // the author learns when their post goes out — the composer has nothing
+    // else to show them, and "Scheduled" on its own leaves them to go looking.
+    expect(created.scheduledAt).not.toBeNull();
+
+    const stored = await prisma.post.findUniqueOrThrow({ where: { id: created.postId } });
+    expect(created.scheduledAt?.getTime()).toBe(stored.scheduledAt?.getTime());
+
+    // And it is a slot the workspace actually configured, not just any future
+    // moment: minutes and hour have to match one of them.
+    const slots = await prisma.queueSlot.findMany({ where: { workspaceId: seed.workspace.id } });
+    const picked = created.scheduledAt!;
+    expect(
+      slots.some(
+        (slot) =>
+          slot.dayOfWeek === picked.getUTCDay() &&
+          slot.hour === picked.getUTCHours() &&
+          slot.minute === picked.getUTCMinutes(),
+      ),
+      `${picked.toISOString()} is not one of the configured slots`,
+    ).toBe(true);
+  });
+
   it('does not hand the same slot to two people', async () => {
     const seed = await seedQueued();
 

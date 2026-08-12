@@ -9,6 +9,7 @@ import { AiAssist } from './AiAssist';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 import { LIMITS } from '@/lib/constants';
 import { countCharacters } from '@/lib/text';
+import { formatInZone } from '@/lib/time';
 import { IG_CAPTION_LIMIT } from '@/lib/constants';
 
 interface Props {
@@ -217,6 +218,7 @@ export function Composer({
       error?: string;
       fields?: Record<string, string>;
       postId?: string;
+      scheduledAt?: string | null;
       results?: Array<{ targetName: string; status: string; error?: string }>;
     };
 
@@ -250,6 +252,14 @@ export function Composer({
       return;
     }
 
+    // The queue picks the time on the server, so this is the only place the
+    // author is told which slot they got. "Scheduled" on its own leaves them
+    // to go and find out.
+    const queuedFor =
+      timing === 'queue' && body.scheduledAt
+        ? formatInZone(new Date(body.scheduledAt), timezone)
+        : null;
+
     setResult(
       saveAsDraft
         ? t('savedDraft')
@@ -257,7 +267,9 @@ export function Composer({
           ? t('submittedOk')
           : timing === 'now'
             ? t('publishedOk')
-            : t('scheduledOk'),
+            : queuedFor
+              ? t('queuedOk', { when: queuedFor })
+              : t('scheduledOk'),
     );
     writeMessage('');
     writeLink('');
