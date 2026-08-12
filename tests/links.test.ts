@@ -7,7 +7,8 @@ beforeAll(() => {
   process.env.APP_URL = 'https://social.example.com';
 });
 
-const { applyUtm, extractUrls, hashVisitorIp, isProbablyBot, shortLinkUrl } = await import('../src/lib/links');
+const { applyUtm, extractUrls, hashVisitorIp, isProbablyBot, shortLinkUrl, CLICK_DEDUPE_MS } = await import('../src/lib/links');
+const { SETTING_DEFINITIONS } = await import('../src/lib/settings/definitions');
 
 describe('applyUtm', () => {
   const settings = {
@@ -158,5 +159,24 @@ describe('hashVisitorIp', () => {
     for (const ip of ['1.2.3.4', '203.0.113.7', '2001:db8::1']) {
       expect(hashVisitorIp(ip, secret), ip).toMatch(/^[0-9a-f]{32}$/);
     }
+  });
+});
+
+/**
+ * Two settings in different files that have to stay in step.
+ *
+ * Click de-duplication asks whether this visitor followed this link recently,
+ * and it can only see rows housekeeping has not swept. If the window ever
+ * grows past the shortest retention an operator can configure, a repeat
+ * visitor starts being counted twice again — quietly, and only for the
+ * workspaces that set the shortest retention.
+ */
+describe('the de-duplication window against click retention', () => {
+  it('is shorter than the least history anyone can keep', () => {
+    const clickDays = SETTING_DEFINITIONS.find((row) => row.key === 'retention.clickDays');
+    expect(clickDays, 'retention.clickDays has been renamed or removed').toBeDefined();
+
+    const floorMs = (clickDays!.min ?? 0) * 24 * 60 * 60 * 1000;
+    expect(floorMs).toBeGreaterThan(CLICK_DEDUPE_MS);
   });
 });

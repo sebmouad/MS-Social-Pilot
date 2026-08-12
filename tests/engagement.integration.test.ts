@@ -31,6 +31,8 @@ let ads: typeof import('../src/lib/ads');
 let routes: Record<string, () => unknown> = {};
 /** Path suffixes that should answer with a permission error instead. */
 let denied: string[] = [];
+/** Paths Graph says are not there any more, as it does for a deleted comment. */
+let vanished: string[] = [];
 /** Every write Graph received, so a test can check what was actually sent. */
 let received: Array<{ path: string; body: string }> = [];
 
@@ -47,6 +49,20 @@ beforeAll(async () => {
         received.push({ path: url.pathname, body: Buffer.concat(chunks).toString('utf8') });
       }
     });
+
+    if (vanished.some((suffix) => url.pathname.endsWith(suffix))) {
+      response.writeHead(400, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          error: {
+            message: 'Unsupported get request. Object with ID does not exist.',
+            code: 100,
+            type: 'GraphMethodException',
+          },
+        }),
+      );
+      return;
+    }
 
     if (denied.some((suffix) => url.pathname.endsWith(suffix))) {
       response.writeHead(403, { 'content-type': 'application/json' });
@@ -92,6 +108,7 @@ afterAll(async () => {
 beforeEach(async () => {
   routes = {};
   denied = [];
+  vanished = [];
   received = [];
 
   await prisma.postComment.deleteMany();
@@ -1646,3 +1663,94 @@ describe('the review summary', () => {
     expect(summary.averageRating).toBe(5);
   });
 })
+
+/**
+ * Moderating a comment that is no longer on Facebook.
+ *
+ * Comment authors delete their own comments and page owners moderate from
+ * Facebook's own app, so our copy is only as fresh as the last sync. Somebody
+ * acting from the inbox can be acting on a comment that has already gone.
+ */
+describe('a comment that has gone from Facebook', () => {
+  async function seedComment() {
+    const seed = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+    const [comment] = await engagement.readComments({ workspaceId: seed.workspace.id });
+    return { ...seed, comment: comment! };
+  }
+
+  it('says so and drops our copy rather than failing', async () => {
+    const seed = await seedComment();
+    vanished = ['/c1'];
+
+    // Before, this threw a raw Graph error and left the row in place, so the
+    // next attempt from the same list failed exactly the same way.
+    expect(
+      await engagement.moderateComment({
+        commentId: seed.comment.id,
+        workspaceId: seed.workspace.id,
+        userId: seed.user.id,
+        role: WorkspaceRole.editor,
+        hidden: true,
+      }),
+    ).toBe('gone');
+
+    expect(await prisma.postComment.count({ where: { id: seed.comment.id } })).toBe(0);
+  });
+
+  it('treats deleting an already-deleted comment as done', async () => {
+    const seed = await seedComment();
+    vanished = ['/c1'];
+
+    expect(
+      await engagement.removeComment({
+        commentId: seed.comment.id,
+        workspaceId: seed.workspace.id,
+        userId: seed.user.id,
+        role: WorkspaceRole.owner,
+      }),
+    ).toBe('gone');
+
+    expect(await prisma.postComment.count({ where: { id: seed.comment.id } })).toBe(0);
+  });
+
+  it('does not record a deletion nobody performed', async () => {
+    const seed = await seedComment();
+    vanished = ['/c1'];
+
+    await engagement.removeComment({
+      commentId: seed.comment.id,
+      workspaceId: seed.workspace.id,
+      userId: seed.user.id,
+      role: WorkspaceRole.owner,
+    });
+
+    // The audit trail keeps a deleted comment's text because Facebook keeps
+    // none of it. Writing that entry for a comment somebody else removed would
+    // put this user's name against an action they did not take.
+    const logged = await prisma.activityLog.count({
+      where: { workspaceId: seed.workspace.id, action: 'comment.deleted' },
+    });
+    expect(logged).toBe(0);
+  });
+
+  it('keeps the row when the failure is anything else', async () => {
+    const seed = await seedComment();
+    denied = ['/c1'];
+
+    // A dead token or a rate limit says nothing about whether the comment is
+    // still there. Deleting our copy would lose it.
+    await expect(
+      engagement.moderateComment({
+        commentId: seed.comment.id,
+        workspaceId: seed.workspace.id,
+        userId: seed.user.id,
+        role: WorkspaceRole.editor,
+        hidden: true,
+      }),
+    ).rejects.toThrow();
+
+    expect(await prisma.postComment.count({ where: { id: seed.comment.id } })).toBe(1);
+  });
+});

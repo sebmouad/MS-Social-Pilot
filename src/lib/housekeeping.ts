@@ -68,7 +68,11 @@ export async function pruneHistory(options: {
       where: { workspaceId, createdAt: { lt: cutoff(now, settingNumber('retention.emailDays')) } },
     }),
     // The headline number lives on ShortLink.clickCount, so removing the detail
-    // rows costs the per-day breakdown and nothing else.
+    // rows costs the per-day breakdown and nothing else — but they also back
+    // the check that stops a refresh counting twice, so this is only safe
+    // while the shortest retention anyone can set stays longer than
+    // `CLICK_DEDUPE_MS`. Seven days against thirty minutes, and pinned by a
+    // test rather than left to whoever changes one of them next.
     prisma.linkClick.deleteMany({
       where: {
         shortLink: { workspaceId },

@@ -40,6 +40,10 @@ function respond(outcome: ReplyOutcome, body: Record<string, unknown>) {
       return fail('You do not have permission to reply to messages.', 403);
     case 'not_found':
       return fail('Conversation not found.', 404);
+    case 'gone':
+      // Only reachable through the shared outcome type: a conversation is not
+      // something Facebook reports as deleted mid-reply.
+      return fail('This conversation is no longer on Facebook.', 410);
     case 'no_recipient':
       return fail(
         'Nobody to reply to: the last message in this thread is the Page’s own.',

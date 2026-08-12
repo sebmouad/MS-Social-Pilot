@@ -1764,6 +1764,17 @@ otherwise, and every Page-level report that ignores them understates the Page.
 Posts this app published are filtered out by remote id before storing, or the
 totals would count them twice.
 
+A comment that has gone from Facebook is an outcome, not an error. Authors
+delete their own comments and page owners moderate from Facebook's own app, so
+our copy is only as fresh as the last sync — acting on a comment from the inbox
+can mean acting on one that is no longer there. Graph says so with code 100,
+and only code 100: the local row is dropped so the list agrees with Facebook,
+while a dead token or a rate limit leaves it alone, because those say nothing
+about whether the comment still exists. Deleting one that was already gone is
+reported as done rather than as a failure, but no deletion is written to the
+audit trail, since putting a user's name against a removal somebody else
+performed is worse than recording nothing.
+
 Comment moderation writes to Facebook **first** and mirrors the change locally
 only after Graph confirms. An optimistic update would show a comment as hidden
 while it was still public, which is the failure that gets a page reported.

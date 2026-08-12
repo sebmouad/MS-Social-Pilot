@@ -65,6 +65,17 @@ export const POST = route(async (request: Request) => {
       );
     }
     if (outcome === 'not_found') return fail('Comment not found.', 404);
+    if (outcome === 'gone') {
+      // Deleting something already deleted is the outcome that was wanted, so
+      // it is not an error — the row has gone from our copy too, and the list
+      // will agree with Facebook once it refreshes.
+      return input.action === 'delete'
+        ? ok({ deleted: true, alreadyGone: true })
+        : fail(
+            'That comment is no longer on Facebook — somebody deleted it there. It has been removed from this list.',
+            410,
+          );
+    }
     return ok(body);
   };
 

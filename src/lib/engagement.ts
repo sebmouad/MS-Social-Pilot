@@ -222,7 +222,35 @@ export async function readComments(options: {
  * "not yours", "not allowed" and "done" have to stay distinguishable, or a
  * refusal reads to the caller as a comment that was never there.
  */
-export type ModerationOutcome = 'ok' | 'not_found' | 'forbidden';
+export type ModerationOutcome = 'ok' | 'not_found' | 'forbidden' | 'gone';
+
+/**
+ * Run a moderation action, treating "it is not there any more" as an answer.
+ *
+ * Comment authors delete their own comments, and page owners moderate from
+ * Facebook's own app. Our copy only refreshes when a sync runs, so somebody
+ * acting on a comment from the inbox can be acting on one that no longer
+ * exists. Graph says so with code 100.
+ *
+ * Left alone that surfaced a raw Graph error and the comment stayed in the
+ * list, so the next attempt failed the same way. Dropping the row instead
+ * makes the list agree with Facebook, and the caller gets an outcome that says
+ * what happened rather than an error that reads like a bug.
+ *
+ * Only code 100. Every other failure — a dead token, a rate limit, a network
+ * blip — leaves the row alone, because the comment is probably still there and
+ * deleting our copy would lose it.
+ */
+async function actOnComment(commentId: string, action: () => Promise<void>): Promise<'ok' | 'gone'> {
+  try {
+    await action();
+    return 'ok';
+  } catch (error) {
+    if (asGraphError(error).code !== 100) throw error;
+    await prisma.postComment.deleteMany({ where: { id: commentId } });
+    return 'gone';
+  }
+}
 
 /**
  * Replying in the inbox can fail for two reasons moderation cannot, and both
@@ -267,7 +295,11 @@ export async function moderateComment(options: {
   const found = await tokenForComment(options.commentId, options.workspaceId);
   if (!found) return 'not_found';
 
-  await setCommentHidden(found.comment.remoteId, found.token, options.hidden);
+  const outcome = await actOnComment(options.commentId, () =>
+    setCommentHidden(found.comment.remoteId, found.token, options.hidden),
+  );
+  if (outcome === 'gone') return 'gone';
+
   await prisma.postComment.update({
     where: { id: options.commentId },
     data: { isHidden: options.hidden },
@@ -300,7 +332,14 @@ export async function removeComment(options: {
   const found = await tokenForComment(options.commentId, options.workspaceId);
   if (!found) return 'not_found';
 
-  await deleteComment(found.comment.remoteId, found.token);
+  // Already gone on Facebook is the outcome this action was asking for, so the
+  // local row goes either way — but the log below only records a deletion we
+  // actually performed.
+  const outcome = await actOnComment(options.commentId, () =>
+    deleteComment(found.comment.remoteId, found.token),
+  );
+  if (outcome === 'gone') return 'gone';
+
   await prisma.postComment.delete({ where: { id: options.commentId } });
 
   // The one moderation action nothing can undo, on a page belonging to
