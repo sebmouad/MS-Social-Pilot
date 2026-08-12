@@ -719,6 +719,65 @@ export async function syncTargetEdges(options: {
   return result;
 }
 
+export interface WorkspaceEdgeSync {
+  results: EdgeSyncResult[];
+  /** True when the workspace has no enabled Page matching the request. */
+  empty: boolean;
+}
+
+/**
+ * Refresh every enabled Page in one workspace, or a single named one.
+ *
+ * The isolation is the point. `syncTargetEdges` already records a failure per
+ * *edge* so that a Page whose token cannot read the inbox still reports the
+ * comments it did fetch — but a Page that disappears mid-pass, or whose row
+ * cannot be read at all, throws before it reaches that code. Called in a bare
+ * loop, one such Page discards everything the pass had already gathered and
+ * answers a 500 to somebody who pressed Refresh. The worker's own edge job has
+ * always isolated per Page, through `forEachEnabledPage`; this is the same
+ * promise for the manual button, in the shape the response already has.
+ */
+export async function syncWorkspaceEdges(options: {
+  workspaceId: string;
+  targetId?: string;
+  since?: Date;
+}): Promise<WorkspaceEdgeSync> {
+  const targets = await prisma.target.findMany({
+    where: {
+      workspaceId: options.workspaceId,
+      type: TargetType.page,
+      enabled: true,
+      ...(options.targetId ? { id: options.targetId } : {}),
+    },
+    select: { id: true, name: true },
+    orderBy: { id: 'asc' },
+  });
+
+  if (targets.length === 0) return { results: [], empty: true };
+
+  const results: EdgeSyncResult[] = [];
+  for (const target of targets) {
+    try {
+      results.push(await syncTargetEdges({ targetId: target.id, since: options.since }));
+    } catch (error) {
+      // Same shape as a token failure, so the screen has nothing new to learn:
+      // a named Page with a reason beside it, and the rest of the pass intact.
+      results.push({
+        targetId: target.id,
+        targetName: target.name,
+        comments: 0,
+        reviews: 0,
+        conversations: 0,
+        externalPosts: 0,
+        videos: 0,
+        errors: [{ edge: 'all', message: asGraphError(error).displayMessage }],
+      });
+    }
+  }
+
+  return { results, empty: false };
+}
+
 // ---------------------------------------------------------------------------
 // Reading back
 // ---------------------------------------------------------------------------

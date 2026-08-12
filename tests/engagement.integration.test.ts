@@ -2236,3 +2236,101 @@ describe('writing inbox messages in batches', () => {
     expect(thread.unreadCount).toBe(7);
   });
 });
+
+/**
+ * One broken Page in a workspace full of working ones.
+ *
+ * `syncTargetEdges` catches per edge, so a Page that cannot read its inbox
+ * still reports its comments. But a Page that fails *before* the edges — an
+ * unreadable stored token, a row deleted while the pass was running — throws
+ * past all of that. In a bare loop it took every result already gathered with
+ * it and answered a 500 to somebody who had pressed Refresh, which is exactly
+ * what the per-edge catching exists to prevent, one level up.
+ */
+describe('refreshing a workspace with a broken Page in it', () => {
+  it('keeps the results from the Pages that worked', async () => {
+    const { workspace, target } = await seedWorkspace();
+    stubEverything();
+
+    // A token this installation cannot read: the shape left behind by an
+    // ENCRYPTION_KEY that was rotated without re-encrypting.
+    const broken = await prisma.target.create({
+      data: {
+        workspaceId: workspace.id,
+        type: 'page',
+        providerId: 'page-broken',
+        name: 'Broken Page',
+        accessToken: 'not-a-v1-envelope',
+      },
+    });
+
+    const { results, empty } = await engagement.syncWorkspaceEdges({
+      workspaceId: workspace.id,
+    });
+
+    expect(empty).toBe(false);
+    expect(results).toHaveLength(2);
+
+    const good = results.find((row) => row.targetId === target.id)!;
+    expect(good.comments).toBe(1);
+    expect(good.reviews).toBe(2);
+    expect(good.errors).toEqual([]);
+
+    const bad = results.find((row) => row.targetId === broken.id)!;
+    // Named, so the screen can say which Page rather than just failing.
+    expect(bad.targetName).toBe('Broken Page');
+    expect(bad.errors.map((error) => error.edge)).toEqual(['all']);
+    expect(bad.comments).toBe(0);
+
+    // Not merely reported: the working Page's comments actually landed.
+    expect(await prisma.postComment.count()).toBe(1);
+  });
+
+  it('refreshes only the Page it was given', async () => {
+    const { workspace, target } = await seedWorkspace();
+    stubEverything();
+    await prisma.target.create({
+      data: {
+        workspaceId: workspace.id,
+        type: 'page',
+        providerId: 'page-other',
+        name: 'Other Page',
+        accessToken: 'not-a-v1-envelope',
+      },
+    });
+
+    const { results } = await engagement.syncWorkspaceEdges({
+      workspaceId: workspace.id,
+      targetId: target.id,
+    });
+
+    expect(results.map((row) => row.targetId)).toEqual([target.id]);
+  });
+
+  it('says a workspace with no enabled Page has nothing to refresh', async () => {
+    const { workspace, target } = await seedWorkspace();
+    await prisma.target.update({ where: { id: target.id }, data: { enabled: false } });
+
+    const { results, empty } = await engagement.syncWorkspaceEdges({
+      workspaceId: workspace.id,
+    });
+
+    // Distinct from "refreshed nothing successfully": the route turns this into
+    // a 404 with a sentence, not an empty success.
+    expect(empty).toBe(true);
+    expect(results).toEqual([]);
+  });
+
+  it('does not reach into another workspace', async () => {
+    const mine = await seedWorkspace('mine');
+    const theirs = await seedWorkspace('theirs');
+    stubEverything();
+
+    const { results } = await engagement.syncWorkspaceEdges({
+      workspaceId: mine.workspace.id,
+      targetId: theirs.target.id,
+    });
+
+    expect(results).toEqual([]);
+  });
+});

@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { fail, ok, readJson, route } from '@/lib/api';
-import { syncTargetEdges } from '@/lib/engagement';
+import { syncWorkspaceEdges } from '@/lib/engagement';
 
 const schema = z.object({
   /** Omit to refresh every enabled Page in the workspace. */
@@ -15,33 +14,21 @@ const schema = z.object({
  * Refresh comments, reviews, inbox threads, videos and unscheduled posts.
  *
  * Returns the per-edge error list rather than a single failure: a Page whose
- * token cannot read the inbox should still report the comments it did fetch.
+ * token cannot read the inbox should still report the comments it did fetch,
+ * and a Page that fails outright should not take the rest of the pass with it.
+ * Both are `syncWorkspaceEdges`' job, so the two cannot come apart here.
  */
 export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
   const input = schema.parse((await readJson(request).catch(() => ({}))) ?? {});
 
-  const targets = await prisma.target.findMany({
-    where: {
-      workspaceId: auth.workspace.id,
-      type: 'page',
-      enabled: true,
-      ...(input.targetId ? { id: input.targetId } : {}),
-    },
-    select: { id: true },
+  const { results, empty } = await syncWorkspaceEdges({
+    workspaceId: auth.workspace.id,
+    targetId: input.targetId,
+    since: input.since ? new Date(input.since) : undefined,
   });
 
-  if (targets.length === 0) return fail('No Facebook Page to refresh.', 404);
-
-  const results = [];
-  for (const target of targets) {
-    results.push(
-      await syncTargetEdges({
-        targetId: target.id,
-        since: input.since ? new Date(input.since) : undefined,
-      }),
-    );
-  }
+  if (empty) return fail('No Facebook Page to refresh.', 404);
 
   return ok({ results });
 });

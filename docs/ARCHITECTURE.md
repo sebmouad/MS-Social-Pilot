@@ -1935,6 +1935,17 @@ forever — and every sync **catches per edge**, so a Page whose token cannot re
 the inbox still gets its comments. A refused edge is reported in the result, not
 swallowed.
 
+That promise has to hold one level up as well. A Page can fail *before* its
+edges are reached — a stored token this installation can no longer read after a
+key rotation, a row deleted while the pass was running — and that throws past
+every per-edge catch. The worker's job has always isolated per Page through
+`forEachEnabledPage`; the manual Refresh button looped bare, so one such Page
+discarded every result the pass had already gathered and answered a 500 to the
+person waiting. `syncWorkspaceEdges` now owns both the loop and the catch, and
+records a failed Page in the same shape as a refused edge — named, with a
+reason, and the rest of the pass intact — so the route cannot hold one half of
+the promise without the other.
+
 `published_posts` is the reconciliation edge. Posts made from the Facebook app,
 by another tool, or by a colleague who never opened this product are invisible
 otherwise, and every Page-level report that ignores them understates the Page.
