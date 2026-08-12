@@ -18,7 +18,10 @@ const IGNORED =
  *
  * Returns a live array — read it *after* the navigation, not before.
  */
-export function collectFailures(page: Page): string[] {
+export function collectFailures(
+  page: Page,
+  options: { expect404?: boolean } = {},
+): string[] {
   const failures: string[] = [];
 
   page.on('pageerror', (error) => failures.push(`uncaught: ${error.message}`));
@@ -26,6 +29,11 @@ export function collectFailures(page: Page): string[] {
     if (message.type() !== 'error') return;
     const text = `${message.text()} (${message.location().url})`;
     if (IGNORED.test(text)) return;
+
+    // A page visited to check its 404 reports its own status as a failed
+    // resource load. That is the browser being right, not the app being wrong.
+    if (options.expect404 && /status of 404/.test(text)) return;
+
     failures.push(`console: ${text}`);
   });
 

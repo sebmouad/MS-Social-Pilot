@@ -139,3 +139,45 @@ test('focus is visible when it lands somewhere', async ({ page }) => {
 
   expect(ringed, `focused element has no visible ring: ${JSON.stringify(outline)}`).toBe(true);
 });
+
+/**
+ * The controls somebody touches before they have an account.
+ *
+ * The sweep above runs signed in, which skips the two forms most people use
+ * most: signing in, and accepting an invitation. A field with no label there is
+ * not a degraded experience, it is a door that will not open.
+ */
+test.describe('before signing in', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  for (const path of ['/login', '/register', '/data-deletion', '/invite/not-a-real-token']) {
+    test(`${path} announces every control it shows`, async ({ page }) => {
+      await open(page, path);
+      await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+
+      expect(await unnamedControls(page), `${path} has controls a screen reader cannot name`)
+        .toEqual([]);
+    });
+  }
+
+  test('the sign-in form can be completed with a keyboard alone', async ({ page }) => {
+    await open(page, '/login');
+
+    const reached: string[] = [];
+    for (let step = 0; step < 12; step += 1) {
+      await page.keyboard.press('Tab');
+      const marker = await page.evaluate(() => {
+        const active = document.activeElement;
+        if (!active || active === document.body) return null;
+        return `${active.tagName.toLowerCase()}#${active.id}`;
+      });
+      if (marker) reached.push(marker);
+    }
+
+    // Both fields and the button, in an order that makes sense to somebody who
+    // never sees the page.
+    expect(reached.join(' ')).toContain('input#email');
+    expect(reached.join(' ')).toContain('input#password');
+    expect(reached.indexOf('input#email')).toBeLessThan(reached.indexOf('input#password'));
+  });
+});

@@ -278,3 +278,35 @@ test('comments can be searched and paged rather than only skimmed', async ({ pag
 
   expect(failures).toEqual([]);
 });
+
+test('a link that leads nowhere gets a page, not a bare 404', async ({ page }) => {
+  const failures = collectFailures(page, { expect404: true });
+
+  // The realistic route to this: somebody bookmarked the edit link for a post
+  // that has since been published, or followed a colleague's link to a post
+  // that was deleted. Next's own 404 is a line of text with no way back.
+  const response = await page.goto('/compose?post=does-not-exist');
+  expect(response?.status()).toBe(404);
+
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/not here/i);
+
+  // Signed in, so it offers the dashboard rather than the sign-in screen.
+  await page.getByRole('link', { name: /dashboard/i }).click();
+  await page.waitForURL(/\/dashboard/);
+
+  expect(failures).toEqual([]);
+});
+
+test('a page that throws offers a way out rather than a blank apology', async ({ page }) => {
+  // Next's default is "Application error: a server-side exception has occurred"
+  // with no navigation and a suggestion to check the server logs — addressed to
+  // somebody who does not have them.
+  await page.goto('/e2e-throw');
+
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/went wrong/i);
+  await expect(page.getByRole('button', { name: /try again/i })).toBeVisible();
+
+  // And a way back that does not depend on the broken segment recovering.
+  await page.getByRole('link', { name: /dashboard/i }).click();
+  await page.waitForURL(/\/dashboard/);
+});

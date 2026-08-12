@@ -74,6 +74,9 @@ export default defineConfig({
       ENCRYPTION_KEY: 'c3aCfAcoo9L+9hMqSB+2x2mSjeyLwAyhNamW5DsCikc=',
       FACEBOOK_APP_ID: '000000000000000',
       FACEBOOK_APP_SECRET: 'e2e-placeholder',
+      // Unlocks the one route that throws on purpose, so the error boundary is
+      // exercised rather than assumed. Set nowhere else.
+      E2E_ALLOW_THROW: 'true',
     },
   },
 });

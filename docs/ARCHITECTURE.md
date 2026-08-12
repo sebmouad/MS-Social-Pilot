@@ -795,6 +795,40 @@ Uploading is deliberately **not** a privileged action. Contributors draft posts,
 so they upload; a role check there would stop people doing their job. What bounds
 the disk is a per-workspace quota, checked before the bytes are written.
 
+## When something goes wrong
+
+Three pages exist for the moments the app cannot do what was asked, because
+Next's defaults for all three are addressed to a developer rather than to
+whoever is holding the screen.
+
+**`not-found.tsx`** answers a link that leads nowhere. Two screens call
+`notFound()` on purpose — an edit link for a post published since it was
+bookmarked, an analytics row that has been deleted — so this is a page real
+people reach by following a link that worked yesterday, not only by mistyping.
+It says explicitly that nothing has happened to their account, because a bare
+404 inside an app you are signed into reads as though something might have. It
+offers the dashboard to somebody signed in and the sign-in screen to everybody
+else: a dashboard link for a stranger would bounce them back to sign-in with
+nothing explaining why.
+
+**`error.tsx`** catches a page that throws. It shows the digest deliberately.
+Next replaces the real message in production on purpose, because an exception
+can carry a token or a connection string — the digest is the one string tying
+what somebody saw to the line in the log that explains it, and without it "it
+broke" is the whole bug report. `reset()` re-renders only the segment that
+failed, which clears a dropped connection or a Graph timeout without a reload.
+
+**`global-error.tsx`** is the last resort: the root layout itself failed, so it
+replaces the entire document and none of the app's scaffolding is available.
+Deliberately plain, and deliberately English — a page that tried to translate
+itself there would throw inside the handler for a throw.
+
+All three are walked by the browser, including a route that throws on demand
+behind an environment flag the walk sets and nothing else does. Error handling
+nobody has exercised is the kind that fails when it is finally needed.
+
+---
+
 ## Paging a list somebody is reading
 
 The worker pages with a cursor, deliberately: it walks whole tables, and `skip`

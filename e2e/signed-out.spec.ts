@@ -50,3 +50,17 @@ test('an invitation link nobody issued says so rather than breaking', async ({ p
 
   expect(failures).toEqual([]);
 });
+
+test('a stranger following a dead link is pointed at sign-in, not at nothing', async ({ page }) => {
+  const failures = collectFailures(page, { expect404: true });
+
+  const response = await page.goto('/nothing-here-at-all');
+  expect(response?.status()).toBe(404);
+
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  // No dashboard link for somebody with no session: it would bounce them
+  // straight back to sign-in with nothing explaining why.
+  await expect(page.getByRole('link', { name: /sign in|connexion/i })).toBeVisible();
+
+  expect(failures).toEqual([]);
+});

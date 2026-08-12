@@ -91,6 +91,14 @@ have rows to render; nothing in the walk ever calls the Graph API.
   look like a label; the other sat between a label and the textarea that label
   actually named.
 
+## The route that throws on purpose
+
+`src/app/(app)/e2e-throw` exists only to prove the error boundary works. It is
+a 404 unless `E2E_ALLOW_THROW=true`, which this config sets and nothing else
+does. It is not named with a leading underscore, tempting as that was: Next
+treats such a folder as private and drops it from routing altogether, so the
+route would not exist even with the flag on.
+
 ## What it is not for
 
 It asserts that pages render, that the journeys work, and that a stranger is

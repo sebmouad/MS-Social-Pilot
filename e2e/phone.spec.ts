@@ -171,6 +171,10 @@ test('the navigation is reachable behind the menu', async ({ page }) => {
   const posts = page.getByRole('link', { name: /^posts$/i });
   await expect(posts).toBeVisible();
 
+  // The button that opens it says what it is and what it did, for somebody who
+  // cannot see that a panel appeared.
+  await expect(menu).toHaveAttribute('aria-controls', 'main-menu');
+
   await posts.click();
   await page.waitForURL(/\/posts/);
 
