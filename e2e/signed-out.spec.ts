@@ -64,3 +64,34 @@ test('a stranger following a dead link is pointed at sign-in, not at nothing', a
 
   expect(failures).toEqual([]);
 });
+
+test('the app has a mark of its own, and enough to pin to a home screen', async ({ page }) => {
+  // Without these, three client windows are three identical generic icons —
+  // the other half of the problem the per-screen titles solve — and a phone
+  // that adds the app to its home screen names it after the domain.
+  const icon = await page.request.get('/icon.svg');
+  expect(icon.status()).toBe(200);
+  expect(icon.headers()['content-type']).toContain('svg');
+
+  const manifest = await page.request.get('/manifest.webmanifest');
+  expect(manifest.status()).toBe(200);
+
+  const body = (await manifest.json()) as {
+    name?: string;
+    start_url?: string;
+    display?: string;
+    icons?: Array<{ src: string }>;
+  };
+
+  expect(body.name).toBeTruthy();
+  // Straight to the dashboard: somebody who pinned the app did not pin the
+  // marketing page they never see.
+  expect(body.start_url).toBe('/dashboard');
+  expect(body.display).toBe('standalone');
+  expect(body.icons?.[0]?.src).toBe('/icon.svg');
+
+  // And the document points at both, or none of it is used.
+  await open(page, '/login');
+  await expect(page.locator('link[rel="manifest"]')).toHaveCount(1);
+  await expect(page.locator('link[rel="icon"]')).not.toHaveCount(0);
+});

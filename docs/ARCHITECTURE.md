@@ -845,6 +845,12 @@ notice, the invitation page shown before the invitee belongs to anything, the
 single-post analytics screen whose subject is not known until it is fetched,
 and the two routes that exist only for the browser walk.
 
+The mark itself is `src/app/icon.svg` — SVG rather than a set of PNGs, because
+one file stays crisp at every size a browser asks for and can be read in a diff.
+`manifest.ts` is what a phone needs to pin the app: without it, a home-screen
+shortcut is named after the domain and illustrated with a screenshot. It starts
+at the dashboard, since nobody pins a redirect.
+
 ### And while a page is still coming
 
 Every screen behind the sign-in wall is `force-dynamic`, so a navigation waits
