@@ -878,6 +878,16 @@ whatever URL appears in a post to build its preview card, so an interstitial
 would publish the post with a blank card. Facebook's scraper is excluded from
 click counts for the same reason: it hits every shortened link at publish time.
 
+**A click is one visitor arriving, not one page load.** Recording one first asks
+whether this visitor already followed this link within `CLICK_DEDUPE_MS` (30
+minutes), so a refresh, or tapping back and forward, does not read as a
+campaign that worked in the report a client sees. Two limits are accepted
+rather than papered over: a visitor whose address we cannot see is counted
+every time, because there is nothing to recognise them by, and two requests
+arriving together can both find no earlier click and both count. Folding all
+anonymous visitors into one would be worse than counting them twice, and the
+race costs a single click.
+
 A visitor's IP is stored only as a keyed digest, so a repeat visitor can be
 recognised without the address being recoverable. Keyed, not a bare hash: an
 IPv4 address has about four billion possible values, so a plain SHA-256 of one

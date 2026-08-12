@@ -543,6 +543,9 @@ model LinkClick {
   shortLink ShortLink @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
 
   @@index([shortLinkId, createdAt])
+  // Answers "has this visitor been here lately", which is what keeps a refresh
+  // from counting as a second click.
+  @@index([shortLinkId, ipHash, createdAt])
   @@map("link_clicks")
 }
 

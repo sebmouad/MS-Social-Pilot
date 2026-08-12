@@ -19,6 +19,7 @@ let database: TestDatabase;
 type Prisma = typeof import('../src/lib/prisma')['prisma'];
 let prisma: Prisma;
 let housekeeping: typeof import('../src/lib/housekeeping');
+let links: typeof import('../src/lib/links');
 let settings: typeof import('../src/lib/settings');
 
 const now = new Date('2026-09-01T10:00:00Z');
@@ -33,6 +34,7 @@ beforeAll(async () => {
 
   ({ prisma } = await import('../src/lib/prisma'));
   housekeeping = await import('../src/lib/housekeeping');
+  links = await import('../src/lib/links');
   settings = await import('../src/lib/settings');
 }, 120_000);
 
@@ -258,5 +260,96 @@ describe('the housekeeping job', () => {
 
     const job = jobs.jobDefinitions().find((entry) => entry.name === 'housekeeping');
     expect(job?.intervalMs).toBe(6 * 60 * 60 * 1000);
+  });
+});
+
+/**
+ * What counts as a click.
+ *
+ * One person arriving at the destination, not one page load. The number ends
+ * up in a report a client reads, so a visitor who refreshes, or taps back and
+ * forward a few times, must not read as a campaign that worked.
+ */
+describe('recording a click', () => {
+  async function seedLink() {
+    const workspace = await prisma.workspace.create({
+      data: { name: 'Clicks', slug: `clicks-${randomBytes(4).toString('hex')}`, timezone: 'UTC' },
+    });
+    return prisma.shortLink.create({
+      data: {
+        workspaceId: workspace.id,
+        slug: randomBytes(4).toString('hex'),
+        targetUrl: 'https://example.com/article',
+      },
+    });
+  }
+
+  const visitor = (link: { id: string }, ip: string | null, at?: Date) =>
+    links.recordClick({ shortLinkId: link.id, ip, userAgent: 'Mozilla/5.0', referer: null, now: at });
+
+  it('counts a visitor arriving', async () => {
+    const link = await seedLink();
+    await visitor(link, '203.0.113.7');
+
+    const after = await prisma.shortLink.findUniqueOrThrow({ where: { id: link.id } });
+    expect(after.clickCount).toBe(1);
+    expect(await prisma.linkClick.count({ where: { shortLinkId: link.id } })).toBe(1);
+  });
+
+  it('does not count the same visitor refreshing', async () => {
+    const link = await seedLink();
+    const at = new Date('2026-09-01T10:00:00Z');
+
+    await visitor(link, '203.0.113.7', at);
+    for (let refresh = 1; refresh <= 5; refresh += 1) {
+      await visitor(link, '203.0.113.7', new Date(at.getTime() + refresh * 60_000));
+    }
+
+    // Six page loads, one person, one click.
+    const after = await prisma.shortLink.findUniqueOrThrow({ where: { id: link.id } });
+    expect(after.clickCount).toBe(1);
+  });
+
+  it('counts two different visitors separately', async () => {
+    const link = await seedLink();
+    await visitor(link, '203.0.113.7');
+    await visitor(link, '203.0.113.8');
+
+    const after = await prisma.shortLink.findUniqueOrThrow({ where: { id: link.id } });
+    expect(after.clickCount).toBe(2);
+  });
+
+  it('counts the same visitor again once the window has passed', async () => {
+    const link = await seedLink();
+    const at = new Date('2026-09-01T10:00:00Z');
+
+    await visitor(link, '203.0.113.7', at);
+    await visitor(link, '203.0.113.7', new Date(at.getTime() + links.CLICK_DEDUPE_MS + 1000));
+
+    // Coming back an hour later is a second visit, not a refresh.
+    const after = await prisma.shortLink.findUniqueOrThrow({ where: { id: link.id } });
+    expect(after.clickCount).toBe(2);
+  });
+
+  it('does not let one link suppress a click on another', async () => {
+    const first = await seedLink();
+    const second = await seedLink();
+
+    await visitor(first, '203.0.113.7');
+    await visitor(second, '203.0.113.7');
+
+    expect((await prisma.shortLink.findUniqueOrThrow({ where: { id: first.id } })).clickCount).toBe(1);
+    expect((await prisma.shortLink.findUniqueOrThrow({ where: { id: second.id } })).clickCount).toBe(1);
+  });
+
+  it('counts every load when there is no address to recognise', async () => {
+    const link = await seedLink();
+    await visitor(link, null);
+    await visitor(link, null);
+
+    // Nothing to tell these apart. Counting both overstates by a little;
+    // folding them together would merge every anonymous visitor into one.
+    const after = await prisma.shortLink.findUniqueOrThrow({ where: { id: link.id } });
+    expect(after.clickCount).toBe(2);
   });
 });

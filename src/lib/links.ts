@@ -188,22 +188,58 @@ export function hashVisitorIp(ip: string, secret: string): string {
 }
 
 /**
- * Record a click. IPs are hashed with the app secret so a repeat visitor can
- * be recognised without the raw address ever being stored.
+ * How long the same visitor following the same link counts as one click.
+ *
+ * A click is one person arriving at the destination, not one page load. The
+ * number reaches a client in a report, so a visitor who refreshes, or taps
+ * back and forward a few times, must not read as a campaign that worked.
+ */
+export const CLICK_DEDUPE_MS = 30 * 60 * 1000;
+
+/**
+ * Record a click, unless this visitor already followed this link a moment ago.
+ *
+ * IPs are hashed with the app secret so a repeat visitor can be recognised
+ * without the raw address ever being stored — this is the thing that hash was
+ * always for, and until now nothing read it.
+ *
+ * Two honest limits. A visitor whose address we cannot see is counted every
+ * time, because there is nothing to recognise them by; and two requests
+ * arriving together can both find no earlier click and both count, since the
+ * check and the write are separate. The first is rare behind a normal proxy
+ * and the second costs one extra click, which is a far smaller error than the
+ * refresh spree this prevents.
  */
 export async function recordClick(options: {
   shortLinkId: string;
   ip: string | null;
   userAgent: string | null;
   referer: string | null;
+  now?: Date;
 }): Promise<void> {
+  const now = options.now ?? new Date();
+  const ipHash = options.ip ? hashVisitorIp(options.ip, env.sessionSecret) : null;
+
+  if (ipHash) {
+    const recent = await prisma.linkClick.findFirst({
+      where: {
+        shortLinkId: options.shortLinkId,
+        ipHash,
+        createdAt: { gt: new Date(now.getTime() - CLICK_DEDUPE_MS) },
+      },
+      select: { id: true },
+    });
+    if (recent) return;
+  }
+
   await prisma.$transaction([
     prisma.linkClick.create({
       data: {
         shortLinkId: options.shortLinkId,
-        ipHash: options.ip ? hashVisitorIp(options.ip, env.sessionSecret) : null,
+        ipHash,
         userAgent: options.userAgent?.slice(0, 500) ?? null,
         referer: options.referer?.slice(0, 500) ?? null,
+        createdAt: now,
       },
     }),
     prisma.shortLink.update({
