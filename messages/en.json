@@ -573,6 +573,7 @@
       },
       "post": {
         "approved": "approved a post",
+        "bulkUploaded": "scheduled posts from a CSV",
         "cancelled": "cancelled a post",
         "created": "created a post",
         "recycleStopped": "stopped a post recycling, having reached its limit",

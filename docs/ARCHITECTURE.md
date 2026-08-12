@@ -1826,6 +1826,14 @@ committed as it is processed: the posts that finished are on the posts list
 where somebody can see them. What a timeout loses is the per-row response —
 which rows were rejected and why — not the work itself.
 
+So the upload logs itself as a whole. Scheduled rows already write
+`post.created` each; a rejected row wrote nothing, and existed only in a
+response the uploader may never see, whether because the request timed out or
+because they closed the tab. A campaign quietly twenty posts short then looks
+exactly like one that worked. `post.bulkUploaded` records the totals and the
+rejected rows with their reasons, capped at twenty-five so a file where every
+row is wrong cannot write a row's worth of JSON per row into the audit trail.
+
 Inbox messages get the same treatment and need less: a Page can hold a hundred
 and fifty threads of twenty-five messages, all re-read every sync, and a
 message on Facebook cannot be edited once sent — so a row that exists is

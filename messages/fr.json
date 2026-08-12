@@ -573,6 +573,7 @@
       },
       "post": {
         "approved": "a validé une publication",
+        "bulkUploaded": "a programmé des publications depuis un CSV",
         "cancelled": "a annulé une publication",
         "created": "a créé une publication",
         "recycleStopped": "a arrêté le recyclage d’une publication, sa limite étant atteinte",

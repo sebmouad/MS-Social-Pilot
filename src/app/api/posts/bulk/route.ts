@@ -4,6 +4,7 @@ import { parseCsvWithHeader } from '@/lib/csv';
 import { bulkUploadSchema, bulkRowSchema } from '@/lib/validation';
 import { asGraphError } from '@/lib/facebook/graph';
 import { ok, readJson, route } from '@/lib/api';
+import { logActivity } from '@/lib/scheduler/runner';
 
 /**
  * Bulk-schedule posts from a CSV.
@@ -85,10 +86,34 @@ export const POST = route(async (request: Request) => {
     }
   }
 
+  const rejected = results.filter((result) => result.status === 'error');
+
+  // The per-row outcome exists only in this response, and a five-hundred-row
+  // file can outlast a request timeout — or the uploader can simply close the
+  // tab. Either way a rejected row leaves no trace, so a campaign quietly
+  // twenty posts short looks exactly like one that worked.
+  //
+  // The scheduled rows each log `post.created` already; this records the
+  // upload as a whole, so the rejections are still findable afterwards.
+  await logActivity(
+    auth.workspace.id,
+    'post.bulkUploaded',
+    {
+      total: results.length,
+      scheduled: results.length - rejected.length,
+      failed: rejected.length,
+      // Bounded: a file where every row is wrong must not write a row's worth
+      // of JSON per row into the audit trail.
+      rejected: rejected.slice(0, 25).map((result) => ({ row: result.row, message: result.message })),
+      rejectedShown: Math.min(rejected.length, 25),
+    },
+    auth.user.id,
+  );
+
   return ok({
     total: results.length,
-    scheduled: results.filter((result) => result.status === 'scheduled').length,
-    failed: results.filter((result) => result.status === 'error').length,
+    scheduled: results.length - rejected.length,
+    failed: rejected.length,
     results,
   });
 });

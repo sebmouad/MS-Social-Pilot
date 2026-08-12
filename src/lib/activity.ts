@@ -20,6 +20,7 @@ export const ACTIVITY_ACTIONS = [
   'conversation.replied',
   'instagram.discovered',
   'post.approved',
+  'post.bulkUploaded',
   'post.cancelled',
   'post.created',
   'post.recycleStopped',

@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+
+import { ACTIVITY_ACTIONS } from '../src/lib/activity';
 
 import { bulkCsvTemplate, csvCell, parseCsv, parseCsvWithHeader, toCsv } from '../src/lib/csv';
 import { bulkRowSchema, bulkUploadSchema } from '../src/lib/validation';
@@ -302,5 +305,42 @@ describe('bulkUploadSchema', () => {
     if (!parsed.success) {
       expect(parsed.error.issues[0]?.message).toMatch(/one at a time|schedule/i);
     }
+  });
+});
+
+/**
+ * What a bulk upload leaves behind for rejected rows.
+ *
+ * The per-row outcome lives only in the response. A large file can outlast a
+ * request timeout, and the uploader can simply close the tab — either way a
+ * campaign quietly twenty posts short looks exactly like one that worked. The
+ * scheduled rows log `post.created` on their own; this is about the ones that
+ * did not.
+ */
+describe('the bulk upload audit entry', () => {
+  const route = readFileSync('src/app/api/posts/bulk/route.ts', 'utf8');
+
+  it('records the upload as a whole', () => {
+    expect(route).toContain("'post.bulkUploaded'");
+  });
+
+  it('names which rows were rejected, not just how many', () => {
+    // A count alone tells somebody their file was short without telling them
+    // where to look.
+    const entry = route.slice(route.indexOf("'post.bulkUploaded'"), route.indexOf('return ok('));
+    expect(entry).toMatch(/rejected:/);
+    expect(entry).toMatch(/row: result\.row/);
+    expect(entry).toMatch(/message: result\.message/);
+  });
+
+  it('bounds what it writes', () => {
+    // A file where every row is wrong must not put a row's worth of JSON per
+    // row into the audit trail.
+    const entry = route.slice(route.indexOf("'post.bulkUploaded'"), route.indexOf('return ok('));
+    expect(entry).toMatch(/slice\(0, \d+\)/);
+  });
+
+  it('is a known action, so the history screen has words for it', () => {
+    expect(ACTIVITY_ACTIONS).toContain('post.bulkUploaded');
   });
 });
