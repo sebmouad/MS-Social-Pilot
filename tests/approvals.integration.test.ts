@@ -1936,3 +1936,55 @@ describe('retrying a post that is still ahead of its time', () => {
     expect(after.scheduledAt?.getTime()).toBeLessThanOrEqual(Date.now());
   });
 });
+
+/**
+ * What survives a bulk upload that does not finish.
+ *
+ * A CSV of five hundred rows is processed one at a time inside one request,
+ * and each row can scrape a link or, in native mode, hand a post to Facebook —
+ * so a large file can outlast a deployment's request timeout. What matters
+ * then is whether the work done so far is still there: a run that buffered
+ * everything until the end would lose all of it, and the uploader would have
+ * no way to tell which rows had already reached Facebook.
+ */
+describe('a bulk run that stops partway', () => {
+  it('keeps every row it finished before the failure', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Bulk', ownerId: owner.id });
+
+    const context = {
+      workspaceId: workspace.id,
+      userId: owner.id,
+      role: WorkspaceRole.owner,
+      requiresApproval: false,
+    };
+    const row = (message: string, targetIds: string[]) => ({
+      message,
+      media: [],
+      targetIds,
+      publishMode: 'worker' as const,
+      scheduledAtLocal: null,
+      timezone: 'UTC',
+      useQueue: false,
+      saveAsDraft: true,
+    });
+
+    await posts.createPost(context, row('Row one', [target.id]));
+    await posts.createPost(context, row('Row two', [target.id]));
+
+    // A row naming a destination that is not this workspace's fails on its
+    // own, the way a timeout would end the run partway.
+    await expect(
+      posts.createPost(context, row('Row three', ['not-a-real-target'])),
+    ).rejects.toThrow();
+
+    // Each row is committed as it is processed, so the two that finished are
+    // on the posts list where somebody can see them — which is what makes a
+    // half-finished upload recoverable rather than a mystery.
+    const stored = await prisma.post.findMany({
+      where: { workspaceId: workspace.id },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(stored.map((post) => post.message)).toEqual(['Row one', 'Row two']);
+  });
+});
