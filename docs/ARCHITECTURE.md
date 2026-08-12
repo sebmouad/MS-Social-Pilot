@@ -1242,8 +1242,19 @@ file be swept out from under it, which is the failure the array exists to
 prevent.
 
 That lookup guards deletion in both directions. A manual delete refuses while
-any unpublished post still references the file, because the alternative surfaces
-hours later at publish time as a Graph error nobody can trace back. The `media`
+any post that can still be sent references the file, because the alternative
+surfaces hours later at publish time as a Graph error nobody can trace back.
+That includes a *failed* post and a partly failed one: `retryPost` puts their
+destinations back in the queue, so letting the file go means somebody fixes a
+dead token, presses Retry, and watches the post fail again for a reason that
+has nothing to do with the one they just fixed. `cancelled` is the only
+unpublished state left out, since nothing will ever send it.
+
+The list is named once, in `STATES_NEEDING_MEDIA`. Two callers ask the same
+question — the delete route one file at a time, the library page in a batch —
+and they had their own copies, which is how they came to disagree. The version
+of that nobody notices is a library showing a file as free while the delete
+refuses to remove it. The `media`
 job sweeps the opposite case — uploads nobody ever attached — after 30 days, and
 keeps anything referenced by *any* post whatever its status: deleting one a
 published post still renders turns history into broken images.

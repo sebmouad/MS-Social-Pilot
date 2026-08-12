@@ -196,6 +196,29 @@ export async function openStoredFile(storageKey: string): Promise<StoredStream> 
 }
 
 /**
+ * Post states that still need their attachments.
+ *
+ * Everything unpublished that can still be sent. `cancelled` is the one
+ * unpublished state left out — nothing will ever publish it — and `published`
+ * is out because Facebook holds its own copy by then, so deleting ours changes
+ * nothing.
+ *
+ * Named once because two callers ask the same question: the delete route, one
+ * file at a time, and the library page, in a batch. Two copies of this list
+ * drift, and the version of that mistake nobody notices is a library showing a
+ * file as free while the delete refuses to remove it.
+ */
+const STATES_NEEDING_MEDIA = [
+  'draft',
+  'pending_approval',
+  'rejected',
+  'scheduled',
+  'publishing',
+  'failed',
+  'partially_failed',
+] as const;
+
+/**
  * Posts that would break if this file went away.
  *
  * A post's media is a Json array holding the storage key, not a foreign key, so
@@ -206,6 +229,13 @@ export async function openStoredFile(storageKey: string): Promise<StoredStream> 
  * Only posts that have yet to go out are counted. A published post keeps its
  * media reference for the record, but Facebook holds its own copy by then, so
  * deleting ours changes nothing.
+ *
+ * A *failed* post counts, and so does a partly failed one. Both are retryable
+ * — `retryPost` puts their destinations back in the queue — so they are still
+ * posts that are going to publish, and letting the file go means somebody
+ * fixes a dead token, presses Retry, and watches it fail again for a reason
+ * that has nothing to do with the one they just fixed. Cancelled is the only
+ * unpublished state left out, because nothing will ever send it.
  */
 export async function postsUsingMedia(options: {
   workspaceId: string;
@@ -219,7 +249,7 @@ export async function postsUsingMedia(options: {
   return prisma.post.findMany({
     where: {
       workspaceId: options.workspaceId,
-      status: { in: ['draft', 'pending_approval', 'rejected', 'scheduled', 'publishing'] },
+      status: { in: [...STATES_NEEDING_MEDIA] },
       mediaKeys: { hasSome: keys },
     },
     select: { id: true, message: true },
@@ -492,7 +522,7 @@ export async function readMediaLibrary(workspaceId: string): Promise<MediaLibrar
     ? await prisma.post.findMany({
         where: {
           workspaceId,
-          status: { in: ['draft', 'pending_approval', 'rejected', 'scheduled', 'publishing'] },
+          status: { in: [...STATES_NEEDING_MEDIA] },
           mediaKeys: { hasSome: keys },
         },
         select: { id: true, message: true, mediaKeys: true },

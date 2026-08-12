@@ -84,7 +84,7 @@ async function seed(label = 'client') {
 async function postWith(
   workspaceId: string,
   userId: string,
-  status: 'draft' | 'scheduled' | 'published' | 'cancelled' | 'pending_approval',
+  status: 'draft' | 'scheduled' | 'published' | 'cancelled' | 'pending_approval' | 'failed' | 'partially_failed',
   item: { id: string; storageKey?: string },
 ) {
   const { mediaColumns } = await import('../src/lib/json');
@@ -843,5 +843,67 @@ describe('publishing a post whose file has gone', () => {
     const error = await media.resolveMediaForInstagram(missing).catch((caught) => caught);
     expect(error.message).not.toMatch(/ENOENT/);
     expect(error.kind).toBe('invalid_request');
+  });
+});
+
+/**
+ * A post that failed is a post that can still go out.
+ *
+ * The guard exists so a delete cannot strand something that is going to
+ * publish — its own comment says the alternative "surfaces at publish time,
+ * hours later, as a Graph error nobody can connect to a deletion". A failed
+ * post is exactly that: `retryPost` puts its destinations back in the queue,
+ * so somebody fixes the token, presses Retry, and the post fails again for a
+ * reason that has nothing to do with the one they just fixed.
+ */
+describe('a file a failed post would still need', () => {
+  const checkedStates = ['failed', 'partially_failed'] as const;
+
+  it.each(checkedStates)('is held by a %s post', async (status) => {
+    const { workspace, user, file } = await seed();
+    const post = await postWith(workspace.id, user.id, status, {
+      id: file.id,
+      storageKey: file.storageKey!,
+    });
+
+    const inUse = await media.postsUsingMedia({
+      workspaceId: workspace.id,
+      mediaId: file.id,
+      storageKey: file.storageKey,
+    });
+
+    expect(inUse.map((entry) => entry.id)).toEqual([post.id]);
+  });
+
+  it('is not held by a cancelled post, which will never go out', async () => {
+    const { workspace, user, file } = await seed();
+    await postWith(workspace.id, user.id, 'cancelled', {
+      id: file.id,
+      storageKey: file.storageKey!,
+    });
+
+    expect(
+      await media.postsUsingMedia({
+        workspaceId: workspace.id,
+        mediaId: file.id,
+        storageKey: file.storageKey,
+      }),
+    ).toEqual([]);
+  });
+
+  it('is not held by a published post, whose copy Facebook already has', async () => {
+    const { workspace, user, file } = await seed();
+    await postWith(workspace.id, user.id, 'published', {
+      id: file.id,
+      storageKey: file.storageKey!,
+    });
+
+    expect(
+      await media.postsUsingMedia({
+        workspaceId: workspace.id,
+        mediaId: file.id,
+        storageKey: file.storageKey,
+      }),
+    ).toEqual([]);
   });
 });
