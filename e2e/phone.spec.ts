@@ -177,3 +177,57 @@ test('the navigation is reachable behind the menu', async ({ page }) => {
   // And it closes on the way, rather than covering the screen it navigated to.
   await expect(page.getByRole('link', { name: /^calendar$/i })).toHaveCount(0);
 });
+
+/**
+ * The screens somebody meets before they have an account.
+ *
+ * These are the ones most likely to be opened on a phone in the first place —
+ * an invitation arrives by email, and the email is read on a phone — and the
+ * ones where a layout that does not fit costs the most, because nobody has any
+ * reason yet to persevere with it.
+ */
+test.describe('before signing in', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  const PUBLIC_SCREENS = ['/login', '/register', '/data-deletion', '/invite/not-a-real-token'];
+
+  for (const path of PUBLIC_SCREENS) {
+    test(`${path} fits on a phone`, async ({ page }) => {
+      const failures = collectFailures(page);
+
+      await open(page, path);
+      await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+
+      expect(await overflowingElements(page), `${path} has elements past the edge`).toEqual([]);
+
+      const scrollable = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(scrollable, `${path} scrolls ${scrollable}px sideways`).toBeLessThanOrEqual(SLACK);
+
+      expect(failures, `${path} reported browser errors`).toEqual([]);
+    });
+  }
+
+  test('the sign-in form can be filled in with a thumb', async ({ page }) => {
+    await open(page, '/login');
+
+    // Every field reachable without pinching, and the button not underneath
+    // the fold or half off the edge.
+    for (const field of [/e-?mail/i, /^password$/i]) {
+      const input = page.getByLabel(field);
+      await expect(input).toBeVisible();
+
+      const box = await input.boundingBox();
+      expect(box, 'no box for a visible field').not.toBeNull();
+      expect(box!.width, 'a field narrower than a thumb').toBeGreaterThan(200);
+    }
+
+    const submit = page.getByRole('button', { name: /sign in/i });
+    await expect(submit).toBeVisible();
+
+    const box = await submit.boundingBox();
+    // Apple and Google both put the minimum comfortable tap target at 44px.
+    expect(box!.height, 'the button is too short to tap reliably').toBeGreaterThanOrEqual(40);
+  });
+});

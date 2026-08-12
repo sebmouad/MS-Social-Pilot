@@ -935,6 +935,14 @@ missing translation, or a form that submits before React attaches to it — all
 three of which it found the first time it ran. Playwright is deliberately not a
 declared dependency; see [`e2e/README.md`](../e2e/README.md).
 
+It also sweeps for accessibility, in the narrow sense a machine can check: an
+interactive element with no accessible name, an image with no `alt` attribute,
+a composer that cannot be reached by tab, a focus ring that has been styled
+away. None of that says the app is usable — it says where it certainly is not,
+which is the half worth automating. `alt=""` passes deliberately: it is a
+statement that an image is decorative, and a missing attribute is a statement
+about nothing.
+
 ### Confirming a test can fail
 
 A test written after a fix usually passes. Whether it passes *because of* the

@@ -53,7 +53,8 @@ PLAYWRIGHT_CHROMIUM_PATH=/path/to/chromium npx playwright test
 | `compose.spec.ts` | Writing a post, scheduling it, finding it on the list, the calendar and the dashboard, correcting it in place, and cancelling it. |
 | `invite.spec.ts` | Inviting a colleague, accepting the invitation, and walking every screen again **in French**. |
 | `signed-out.spec.ts` | That none of it is served to a stranger, and that the public pages still are. |
-| `phone.spec.ts` | Every screen at phone width: nothing slides sideways, and the navigation is reachable behind the menu. Its own Playwright project. |
+| `phone.spec.ts` | Every screen at phone width, signed in and signed out: nothing slides sideways, and the navigation is reachable behind the menu. Its own Playwright project. |
+| `accessible.spec.ts` | That every control has something for a screen reader to announce, that the composer can be reached by tab, and that focus is visible when it lands. |
 
 `compose.spec.ts` also covers correcting a scheduled post in place, and that a
 published one offers no way to rewrite it — the Edit button is absent and the
@@ -85,6 +86,10 @@ have rows to render; nothing in the walk ever calls the Graph API.
 - **The settings screen showed contributors four sections they could not save.**
   Every button answered 403, which reads as a broken product rather than as a
   permission. They are hidden now, with the reason in their place.
+- **Two file inputs had no label**, so a screen reader announced "file upload
+  button" and nothing about what the file was for. One was a `<span>` styled to
+  look like a label; the other sat between a label and the textarea that label
+  actually named.
 
 ## What it is not for
 

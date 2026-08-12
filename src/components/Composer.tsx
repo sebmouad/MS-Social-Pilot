@@ -344,8 +344,11 @@ export function Composer({
           </div>
 
           <div className="mt-5">
-            <span className="label">{t('media')}</span>
+            <label className="label" htmlFor="media">
+              {t('media')}
+            </label>
             <input
+              id="media"
               ref={fileInput}
               type="file"
               multiple

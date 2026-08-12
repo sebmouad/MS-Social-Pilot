@@ -461,10 +461,11 @@ function BulkUpload({
       </details>
 
       <div className="mt-4">
-        <label className="label" htmlFor="csvInput">
-          {t('pasteOrUpload')}
+        <label className="label" htmlFor="csvFile">
+          {t('uploadCsvFile')}
         </label>
         <input
+          id="csvFile"
           type="file"
           accept=".csv,text/csv"
           className="mb-2 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-slate-200"
@@ -473,6 +474,9 @@ function BulkUpload({
             if (file) setCsv(await file.text());
           }}
         />
+        <label className="label" htmlFor="csvInput">
+          {t('pasteOrUpload')}
+        </label>
         <textarea
           id="csvInput"
           className="input min-h-[120px] font-mono text-xs"
