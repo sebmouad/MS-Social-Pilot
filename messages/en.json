@@ -701,7 +701,13 @@
     "attempts": "({count, plural, one {# attempt} other {# attempts}})",
     "retryFailed": "Retry failed",
     "cancelConfirm": "Cancel this post? Anything already scheduled inside Facebook will be deleted there too.",
-    "actionFailed": "That action failed."
+    "actionFailed": "That action failed.",
+    "failure": {
+      "account_disconnected": "Cancelled because the Facebook account was disconnected.",
+      "deleted_on_facebook": "This post is no longer on Facebook. It was most likely deleted there, so it never went out.",
+      "destination_off": "This destination was turned off when the post was due, so it was not published there.",
+      "worker_lost": "Publishing was interrupted and did not recover within the attempt limit. Check the destination and try again."
+    }
   },
   "reports": {
     "title": "Reports",

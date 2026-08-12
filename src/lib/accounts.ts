@@ -327,6 +327,7 @@ export async function disconnectAccount(
       data: {
         status: 'cancelled',
         nextAttemptAt: null,
+        errorCode: 'account_disconnected',
         errorMessage: 'Cancelled because the Facebook account was disconnected.',
       },
     }),
@@ -337,6 +338,7 @@ export async function disconnectAccount(
       data: {
         status: 'cancelled',
         nextAttemptAt: null,
+        errorCode: 'account_disconnected',
         errorMessage: 'Cancelled because the Facebook account was disconnected.',
       },
     }),

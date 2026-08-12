@@ -701,7 +701,13 @@
     "attempts": "({count, plural, one {# tentative} other {# tentatives}})",
     "retryFailed": "Réessayer les échecs",
     "cancelConfirm": "Annuler cette publication ? Ce qui est déjà planifié dans Facebook y sera également supprimé.",
-    "actionFailed": "Cette action a échoué."
+    "actionFailed": "Cette action a échoué.",
+    "failure": {
+      "account_disconnected": "Annulé car le compte Facebook a été déconnecté.",
+      "deleted_on_facebook": "Cette publication n’est plus sur Facebook. Elle y a probablement été supprimée, elle n’a donc jamais paru.",
+      "destination_off": "Cette destination était désactivée à l’heure prévue, la publication n’y a donc pas été faite.",
+      "worker_lost": "La publication a été interrompue et n’a pas repris dans la limite des tentatives. Vérifiez la destination puis réessayez."
+    }
   },
   "reports": {
     "title": "Rapports",

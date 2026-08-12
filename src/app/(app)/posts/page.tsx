@@ -114,6 +114,7 @@ export default async function PostsPage({
             status: postTarget.status,
             url: postTarget.remoteUrl,
             error: postTarget.errorMessage,
+            errorCode: postTarget.errorCode,
             attempts: postTarget.attempts,
           })),
         }))}

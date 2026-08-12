@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { TARGET_BLOCK_REASONS } from '../src/lib/constants';
+import { OWN_TARGET_ERRORS, TARGET_BLOCK_REASONS } from '../src/lib/constants';
 import { blockerMessage } from '../src/components/blockerMessage';
 import en from '../messages/en.json';
 import fr from '../messages/fr.json';
@@ -74,6 +74,78 @@ describe('the block reasons', () => {
       const sentences = (source.match(/^\s*publishBlocker:/gm) ?? []).length;
       const codes = (source.match(/^\s*publishBlockerCode:/gm) ?? []).length;
       expect(codes, `${path} stores a reason it cannot translate`).toBe(sentences);
+    }
+  });
+});
+
+/**
+ * Why a destination failed, in the reader's language where we wrote the words.
+ *
+ * `PostTarget.errorCode` carries Facebook's codes alongside ours. Facebook's
+ * stay in Facebook's wording — it wrote the useful part, and a translated
+ * paraphrase of "Unsupported get request" helps nobody. The four this app
+ * composed itself can be said in French to a French reader.
+ */
+describe('the failures this app writes itself', () => {
+  it('each have words in both languages', () => {
+    for (const [language, messages] of [['en', en], ['fr', fr]] as const) {
+      const failure = (messages.posts as { failure: Record<string, string> }).failure;
+      for (const code of OWN_TARGET_ERRORS) {
+        expect(failure[code], `${language} is missing ${code}`).toBeTruthy();
+      }
+    }
+  });
+
+  it('are all set as a code, not only as a sentence', () => {
+    // `accounts.ts` wrote the sentence without a code while its three siblings
+    // wrote both, so that one failure was stuck in English on its own.
+    const sources = [
+      'src/lib/accounts.ts',
+      'src/lib/scheduler/runner.ts',
+      'src/lib/scheduler/jobs.ts',
+    ]
+      .map((path) => readFileSync(path, 'utf8'))
+      .join('\n');
+
+    const written = new Set(
+      [...sources.matchAll(/errorCode: '([a-z_]+)'/g)].map((match) => match[1]!),
+    );
+    for (const code of OWN_TARGET_ERRORS) {
+      expect(written, `nothing writes ${code}`).toContain(code);
+    }
+  });
+
+  it('are set at every site that writes the sentence, not just one of them', () => {
+    // Two places cancel work when an account is disconnected. Giving a code to
+    // one of them leaves the other stuck in English, and the union test above
+    // still passes because the code exists somewhere.
+    const accounts = readFileSync('src/lib/accounts.ts', 'utf8');
+    const sentences = (
+      accounts.match(/errorMessage: 'Cancelled because the Facebook account was disconnected\.'/g) ??
+      []
+    ).length;
+    const codes = (accounts.match(/errorCode: 'account_disconnected'/g) ?? []).length;
+
+    expect(sentences, 'the disconnect cancellation moved or was reworded').toBeGreaterThan(0);
+    expect(codes, 'a cancellation writes a sentence it cannot translate').toBe(sentences);
+  });
+
+  it('leaves Facebook to explain its own refusals', () => {
+    const list = readFileSync('src/components/PostList.tsx', 'utf8');
+    const helper = list.slice(list.indexOf('function failureText'), list.indexOf('return (', list.indexOf('function failureText')));
+
+    // A Graph code has no copy here, so the stored message — Facebook's own
+    // words — has to come through unchanged.
+    expect(helper).toContain('t.has(key)');
+    expect(helper).toContain('return target.error;');
+  });
+
+  it('does not paraphrase a code nobody wrote copy for', () => {
+    const failure = (en.posts as { failure: Record<string, string> }).failure;
+    // Graph codes are numbers, and kinds like `auth` or `rate_limit`. None of
+    // them should have been given copy here by accident.
+    for (const key of Object.keys(failure)) {
+      expect(OWN_TARGET_ERRORS as readonly string[], `${key} is not ours`).toContain(key);
     }
   });
 });

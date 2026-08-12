@@ -140,6 +140,20 @@ somebody's afternoon. A test pins that every writer of the sentence also writes
 the code, because forgetting one puts a reader back where they started and
 nothing would look wrong.
 
+**A failed destination gets the same treatment, with one deliberate
+exception.** `PostTarget.errorCode` already carried a code, but it carries two
+kinds: Facebook's own codes and error kinds, and four reasons this app composed
+itself. Ours are translated; Facebook's keep their stored wording, because
+Facebook wrote the informative part and a translated paraphrase of "Unsupported
+get request" helps nobody. The posts list falls back to the stored message
+whenever the code has no copy, which is exactly what a Graph code should hit.
+
+One of ours was writing the sentence with no code at all — the cancellation
+after a disconnect, while its three siblings wrote both — so that failure alone
+was stuck in English. A test now pins every site that writes the sentence,
+rather than merely checking the code exists somewhere, because giving one of
+two sites a code leaves the other broken and looks correct from a distance.
+
 Both counts travel all the way to the screen. Working them out and returning
 them into a route that drops them would put the silence one layer further out,
 so the routes pass them on and the connections page shows them — as a warning

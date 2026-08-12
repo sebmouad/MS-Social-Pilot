@@ -301,3 +301,20 @@ export const TARGET_BLOCK_REASONS = [
 
 export type TargetBlockReason = (typeof TARGET_BLOCK_REASONS)[number];
 
+/**
+ * The reasons a destination failed that are ours rather than Facebook's.
+ *
+ * `PostTarget.errorCode` also carries Facebook's own codes and error kinds.
+ * Those keep their stored wording, because Facebook wrote it and it is the
+ * informative part. These five are sentences this app composed, so they can be
+ * said in the reader's language instead.
+ */
+export const OWN_TARGET_ERRORS = [
+  'account_disconnected',
+  'deleted_on_facebook',
+  'destination_off',
+  'worker_lost',
+] as const;
+
+export type OwnTargetError = (typeof OWN_TARGET_ERRORS)[number];
+

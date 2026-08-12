@@ -25,12 +25,30 @@ export interface PostView {
     status: string;
     url: string | null;
     error: string | null;
+    /** Ours or Facebook's; only ours can be said in another language. */
+    errorCode: string | null;
     attempts: number;
   }>;
 }
 
 export function PostList({ posts }: { posts: PostView[] }) {
   const t = useTranslations('posts');
+
+  /**
+   * What went wrong, in the reader's language when we are the ones who said it.
+   *
+   * `errorCode` carries Facebook's codes as well as ours. Facebook's stay in
+   * Facebook's words: it wrote the useful part, and a translated paraphrase of
+   * "Unsupported get request" helps nobody. Ours are sentences this app
+   * composed, so they can be said in French to a French reader.
+   */
+  function failureText(target: { error: string | null; errorCode: string | null }): string | null {
+    if (target.errorCode) {
+      const key = `failure.${target.errorCode}` as Parameters<typeof t>[0];
+      if (t.has(key)) return t(key);
+    }
+    return target.error;
+  }
   const tCommon = useTranslations('common');
   const tCompose = useTranslations('compose');
   const router = useRouter();
@@ -113,9 +131,9 @@ export function PostList({ posts }: { posts: PostView[] }) {
                       {t('viewOnFacebook')}
                     </ExternalLink>
                   )}
-                  {target.error && (
+                  {failureText(target) && (
                     <span className="text-red-600">
-                      {target.error}
+                      {failureText(target)}
                       {target.attempts > 1 && ` ${t('attempts', { count: target.attempts })}`}
                     </span>
                   )}
