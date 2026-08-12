@@ -93,6 +93,18 @@ return count === 1;                         // exactly one worker wins
 
 Atomic, so multiple workers are safe.
 
+That safety has to be earned by each job separately, though — it is a property
+of the claim, not of the worker. The loop deciding which jobs are due keeps its
+state in process memory, so every worker runs every job. Recycling had no claim
+at all: each worker found the same due post and created its own copy, which is
+a second post on a client's Page. It now claims a cycle with a compare-and-set
+on `recycleNextAt` before creating anything, so only the worker that still sees
+the date it read gets to act. Advancing before the copy exists means a failure
+costs one missed repeat, which nobody notices, rather than a duplicate, which
+everybody does. RSS polling was already safe by a different route: the
+`@@unique([feedSourceId, guid])` on `feed_items` rejects the second worker's
+insert before it can create a post.
+
 **The one accepted risk:** a worker that dies *after* Facebook accepts a post but
 *before* the row is updated leaves a lock that is reclaimed and retried — which
 can double-post. Facebook's own duplicate detection (error 506) catches

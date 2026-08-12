@@ -209,6 +209,58 @@ describe('evergreen recycling', () => {
     expect(original.recycleCount).toBe(1);
   });
 
+  it('recycles a post once even when several workers run the cycle together', async () => {
+    const { post } = await seedEvergreen();
+
+    // Nothing claims a due post, and the loop that decides which jobs to run
+    // keeps its state in process memory — so every worker process finds this
+    // one due. The docs say running more than one worker is safe, which is
+    // true of publishing because the claim is atomic; recycling had no claim
+    // at all, and a second copy is a second post on a client's Page.
+    //
+    // The overlap is forced rather than hoped for: a row lock on the original
+    // holds every cycle at the moment it tries to write, so they have all
+    // read the same due post before any of them acts on it. Left to chance
+    // the cycles often just miss each other and the test proves nothing.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+
+    const holding = prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM posts WHERE id = ${post.id} FOR UPDATE`;
+        locked();
+        await held;
+      },
+      { timeout: 30_000 },
+    );
+    await ready;
+
+    const cycles = Array.from({ length: 4 }, () => evergreen.runEvergreenCycle({ now, logger }));
+    // Long enough for every cycle to have read the post and queued behind the
+    // lock; they cannot get past it until the transaction above commits.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    release();
+    await holding;
+    const results = await Promise.all(cycles);
+
+    const copies = await prisma.post.findMany({ where: { originPostId: post.id } });
+    expect(copies).toHaveLength(1);
+    expect(results.reduce((total, result) => total + result.created, 0)).toBe(1);
+
+    // And the run counter advanced once. Every worker computing `count + 1`
+    // from the same starting value would leave it at 1 with four copies out,
+    // so `recycleLimit` would let it repeat far more times than was asked for.
+    const original = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(original.recycleCount).toBe(1);
+  });
+
   it('uses the next variant, so Facebook does not reject it as a duplicate', async () => {
     const { post } = await seedEvergreen();
 

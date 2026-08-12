@@ -105,6 +105,33 @@ export async function runEvergreenCycle(options: {
       continue;
     }
 
+    const next = nextRecycleAt({
+      everyDays: post.recycleEveryDays,
+      limit: post.recycleLimit,
+      count,
+      from: post.recycleNextAt ?? now,
+    });
+
+    // Claim this cycle before creating anything. Nothing else marks a due post
+    // as taken, and the loop deciding which jobs to run keeps its state in
+    // process memory, so a second worker finds the same post due and would
+    // create a second copy — a second post on a client's Page, which is the
+    // one outcome nobody can undo from here.
+    //
+    // The compare-and-set is on `recycleNextAt`: only the worker that still
+    // sees the date it read gets to move it on. Advancing before the copy
+    // exists means a failure here costs one missed repeat, which nobody
+    // notices, rather than a duplicate, which everybody does.
+    const { count: won } = await prisma.post.updateMany({
+      where: { id: post.id, recycleNextAt: post.recycleNextAt },
+      data: {
+        recycleCount: count,
+        recycleNextAt: next,
+        recycleEnabled: next !== null,
+      },
+    });
+    if (won === 0) continue;
+
     const copy = await prisma.post.create({
       data: {
         workspaceId: post.workspaceId,
@@ -122,22 +149,6 @@ export async function runEvergreenCycle(options: {
         timezone: post.timezone,
         originPostId: post.id,
         targets: { create: live.map((row) => ({ targetId: row.targetId })) },
-      },
-    });
-
-    const next = nextRecycleAt({
-      everyDays: post.recycleEveryDays,
-      limit: post.recycleLimit,
-      count,
-      from: post.recycleNextAt ?? now,
-    });
-
-    await prisma.post.update({
-      where: { id: post.id },
-      data: {
-        recycleCount: count,
-        recycleNextAt: next,
-        recycleEnabled: next !== null,
       },
     });
 
