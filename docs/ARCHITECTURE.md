@@ -405,6 +405,15 @@ Retrying an expired token forever is the failure mode this table exists to
 prevent: an `auth` error fails the destination immediately *and* flags the whole
 connection, so the UI can ask for a reconnect once instead of per post.
 
+**A manual retry keeps a scheduled time that is still ahead.** `retryPost`
+makes the post due immediately when its moment has passed — the usual case, and
+without it the retry would wait for a slot already behind us and never run. But
+a destination can fail long *before* the post is due: native scheduling hands
+the post to Facebook at creation time, so a Page that refuses it is `failed`
+while the rest of the post sits queued for Friday. Moving that post to "now"
+publishes the retried destination days early while the others stay queued — the
+post goes out twice, at two times, neither of which anybody chose.
+
 ---
 
 ## Publishing: choosing the Graph edge

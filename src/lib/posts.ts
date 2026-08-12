@@ -731,12 +731,23 @@ export async function retryPost(
     // errors; it just says where the post really stands.
     const publishable = PUBLISHABLE_APPROVAL_STATUSES.includes(post.approvalStatus);
 
+    // Due immediately when the moment has passed — waiting for a slot already
+    // behind us would mean the retry never runs, which is the usual case and
+    // the reason this moves the time at all.
+    //
+    // A post still ahead of its time keeps it. A destination can fail long
+    // before the post is due — native scheduling hands it to Facebook at
+    // creation time, so a Page that refuses it is `failed` while the rest sits
+    // queued for Friday — and dragging that one destination forward publishes
+    // the post twice, at two times, neither of which anybody chose.
+    const now = new Date();
+    const stillAhead = post.scheduledAt !== null && post.scheduledAt.getTime() > now.getTime();
+
     await prisma.post.update({
       where: { id: postId },
       data: {
         status: publishable ? PostStatus.scheduled : PostStatus.pending_approval,
-        // Due immediately: a manual retry should not wait for the original slot.
-        scheduledAt: new Date(),
+        scheduledAt: stillAhead ? post.scheduledAt : now,
       },
     });
   }

@@ -1816,3 +1816,96 @@ describe('changing publish mode on an edit', () => {
     expect(targets.map((row) => row.status)).toEqual(['pending']);
   });
 });
+
+/**
+ * Retrying one destination of a post that has not gone out yet.
+ *
+ * A destination can fail long before the scheduled moment: native scheduling
+ * hands the post to Facebook at creation time, so a Page that refuses it is
+ * `failed` while the rest of the post sits queued for next Friday. Retrying
+ * that one destination must not drag it out of the schedule the author chose.
+ */
+describe('retrying a post that is still ahead of its time', () => {
+  async function seedPartiallyHandedOff() {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Split', ownerId: owner.id });
+    const second = await prisma.target.create({
+      data: { workspaceId: workspace.id, type: 'page', providerId: '2000', name: 'Second Page' },
+    });
+
+    const scheduledAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        message: 'Friday campaign',
+        status: PostStatus.scheduled,
+        publishMode: 'native',
+        scheduledAt,
+        targets: {
+          create: [
+            {
+              targetId: target.id,
+              status: 'scheduled_remote',
+              remotePostId: '1000_9999',
+              nativeScheduledFor: scheduledAt,
+            },
+            { targetId: second.id, status: 'failed', errorMessage: 'Page refused it' },
+          ],
+        },
+      },
+    });
+
+    return { owner, workspace, post, scheduledAt };
+  }
+
+  it('keeps the time the author chose', async () => {
+    const seed = await seedPartiallyHandedOff();
+
+    await posts.retryPost(
+      { workspaceId: seed.workspace.id, userId: seed.owner.id, role: WorkspaceRole.owner },
+      seed.post.id,
+    );
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: seed.post.id } });
+
+    // Moving it to "now" publishes this destination days early while the other
+    // stays queued for Friday — the post goes out twice, at two times, neither
+    // of which is the one anybody asked for.
+    expect(after.scheduledAt?.toISOString()).toBe(seed.scheduledAt.toISOString());
+    expect(after.status).toBe(PostStatus.scheduled);
+
+    const retried = await prisma.postTarget.findFirstOrThrow({
+      where: { postId: seed.post.id, status: 'pending' },
+    });
+    expect(retried.errorMessage).toBeNull();
+  });
+
+  it('still makes a post whose moment has passed due immediately', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Overdue', ownerId: owner.id });
+    const scheduledAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        message: 'Should have gone out',
+        status: PostStatus.failed,
+        scheduledAt,
+        targets: { create: { targetId: target.id, status: 'failed' } },
+      },
+    });
+
+    await posts.retryPost(
+      { workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner },
+      post.id,
+    );
+
+    // The usual case, and the reason retry moves the time at all: waiting for
+    // a slot that is already behind us would mean the retry never runs.
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.scheduledAt?.getTime()).toBeGreaterThan(scheduledAt.getTime());
+    expect(after.scheduledAt?.getTime()).toBeLessThanOrEqual(Date.now());
+  });
+});
