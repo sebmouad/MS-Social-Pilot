@@ -112,3 +112,30 @@ describe('naming a destination', () => {
     expect(targetTypeKey('something-new')).toBe('page');
   });
 });
+
+describe('a post with a destination in flight', () => {
+  it('cannot be edited, even while the post itself still reads scheduled', () => {
+    // The window this exists for: a worker has claimed one destination and no
+    // outcome has come back, so the post row is still `scheduled` and nothing
+    // at the post level says anything is happening.
+    expect(
+      postEditBlocker({
+        status: 'scheduled',
+        targets: [{ status: 'processing' }, { status: 'pending' }],
+      }),
+    ).toBe('publishing');
+  });
+
+  it('is editable again once the claim has resolved', () => {
+    // Only the states that legitimately sit under a `scheduled` post. A
+    // published destination puts the post itself into `publishing`, which the
+    // check above already refuses — asserting anything about that combination
+    // here would be describing a state the app cannot produce.
+    for (const status of ['pending', 'failed', 'cancelled']) {
+      expect(
+        postIsEditable({ status: 'scheduled', targets: [{ status }] }),
+        status,
+      ).toBe(true);
+    }
+  });
+});

@@ -218,6 +218,9 @@ export function postStatusFilter(value: string | undefined): PostStatus[] | unde
  */
 export type EditBlocker = 'publishing' | 'published' | 'scheduled_remote' | null;
 
+/** A destination a worker is holding open right now. */
+const IN_FLIGHT = 'processing';
+
 export function postEditBlocker(post: {
   status: string;
   targets: Array<{ status: string }>;
@@ -226,6 +229,14 @@ export function postEditBlocker(post: {
   if (post.status === PostStatus.published || post.status === PostStatus.partially_failed) {
     return 'published';
   }
+
+  // A destination a worker has claimed, on a post that is still `scheduled`.
+  // The post row does not turn `publishing` until an outcome comes back, so
+  // this window is invisible at the post level and is exactly when an edit
+  // does the most damage: replacing the destinations deletes the row the
+  // worker is holding, and the post goes out on Facebook with nothing left to
+  // record it — so the recreated row publishes it again.
+  if (post.targets.some((target) => target.status === IN_FLIGHT)) return 'publishing';
   // Facebook is holding this one. Changing our copy would change nothing about
   // what goes out, which is the worst kind of edit: it looks like it worked.
   if (post.targets.some((target) => target.status === 'scheduled_remote')) {

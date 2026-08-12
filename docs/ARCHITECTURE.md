@@ -99,6 +99,29 @@ can double-post. Facebook's own duplicate detection (error 506) catches
 identical content. The alternative, never reclaiming, silently drops posts,
 which is worse for a scheduling product.
 
+### Editing a post the worker has already started
+
+The claim above moves a *destination* to `processing`, but the *post* stays
+`scheduled` until `refreshPostStatus` runs. There is a real window, then, where
+a post reads "scheduled" in the UI while a worker is already talking to
+Facebook about one of its destinations — and an edit landing in that window
+used to delete the row the worker was holding, erasing the only record that the
+post was on its way out. The recreated `pending` row published it a second time.
+
+Two things close it, and they are deliberately belt *and* braces:
+
+1. **The refusal reads the destinations, not just the post.** An edit is turned
+   away when any destination is `processing`, even while the post itself still
+   says `scheduled`.
+2. **The write can't delete a claimed row anyway.** Replacing a post's
+   destinations only deletes rows nothing is holding (`pending`, `failed`,
+   `cancelled`) and recreates with `skipDuplicates`.
+
+The second exists because the check and the write are two statements and a
+worker can claim between them. With the narrowed delete, the worst a lost race
+can do is leave a stale destination behind — recoverable, and visible. Deleting
+the claimed row is neither.
+
 ### Reclaiming abandoned locks
 
 How long a destination may stay in `processing` before another worker takes it

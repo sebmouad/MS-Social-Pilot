@@ -17,6 +17,11 @@ import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/data
 let server: Server;
 let database: TestDatabase;
 let published: string[] = [];
+/**
+ * Runs before the fake Graph server answers, so a test can make something
+ * happen while the code under test is waiting on a network call.
+ */
+let duringGraphRequest: (() => Promise<void>) | null = null;
 
 type Prisma = typeof import('../src/lib/prisma')['prisma'];
 let prisma: Prisma;
@@ -31,8 +36,12 @@ beforeAll(async () => {
     request.on('data', (chunk: Buffer) => chunks.push(chunk));
     request.on('end', () => {
       published.push(request.url ?? '');
-      response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ id: '1000_5000' }));
+      const hook = duringGraphRequest;
+      duringGraphRequest = null;
+      void Promise.resolve(hook?.()).then(() => {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ id: '1000_5000' }));
+      });
     });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -57,6 +66,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   published = [];
+  duringGraphRequest = null;
   await prisma.postTarget.deleteMany();
   await prisma.post.deleteMany();
   await prisma.target.deleteMany();
@@ -1439,5 +1449,104 @@ describe('editing a post from before the workspace changed timezone', () => {
     const savedInWorkspaceZone = localInputToUtc(shownInOldZone, 'Asia/Tokyo');
 
     expect(savedInWorkspaceZone.getTime()).not.toBe(instant.getTime());
+  });
+})
+
+/**
+ * Editing a post while a worker is publishing it.
+ *
+ * The dangerous window is narrow and invisible from the post row: a worker
+ * claims one destination, which becomes `processing`, and the post itself
+ * stays `scheduled` until an outcome comes back. Replacing the destinations
+ * in that window used to delete every row including the claimed one — so the
+ * post went out on Facebook with nothing left to record it, and the recreated
+ * row published it a second time.
+ */
+describe('editing a post whose destination a worker has claimed', () => {
+  async function seedClaimed() {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Racing', ownerId: owner.id });
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        message: 'Going out now',
+        status: 'scheduled',
+        scheduledAt: new Date(Date.now() - 60_000),
+        targets: { create: { targetId: target.id, status: 'processing', lockedAt: new Date() } },
+      },
+      include: { targets: true },
+    });
+
+    return { owner, workspace, target, post };
+  }
+
+  it('is refused rather than allowed to race', async () => {
+    const seed = await seedClaimed();
+
+    await expect(
+      posts.updatePost(
+        {
+          workspaceId: seed.workspace.id,
+          userId: seed.owner.id,
+          role: WorkspaceRole.owner,
+          requiresApproval: false,
+        },
+        seed.post.id,
+        { message: 'Changed my mind' },
+      ),
+    ).rejects.toThrow(/being published/i);
+  });
+
+  it('never deletes the row the worker is holding, even if the check is outrun', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Racing', ownerId: owner.id });
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        message: 'Going out now',
+        status: 'scheduled',
+        scheduledAt: new Date(Date.now() + 3_600_000),
+        targets: { create: { targetId: target.id, status: 'pending' } },
+      },
+    });
+    const second = await prisma.target.create({
+      data: {
+        workspaceId: workspace.id,
+        type: 'page',
+        providerId: '2000',
+        name: 'Second Page',
+      },
+    });
+
+    // The refusal reads the post, then the write replaces the destinations —
+    // two statements, with a window between them. A worker claims inside that
+    // window here, while the edit is out fetching the link preview, so the
+    // check passes on a state that is no longer true by the time we write.
+    duringGraphRequest = async () => {
+      await prisma.postTarget.updateMany({
+        where: { postId: post.id, targetId: target.id, status: 'pending' },
+        data: { status: 'processing', lockedAt: new Date() },
+      });
+    };
+
+    await posts.updatePost(
+      { workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner, requiresApproval: false },
+      post.id,
+      { link: `${process.env.FACEBOOK_GRAPH_BASE_URL}/preview`, targetIds: [second.id] },
+    );
+
+    const after = await prisma.postTarget.findMany({ where: { postId: post.id } });
+
+    // The claimed row survived: it is the only record that this post is
+    // already on its way to Facebook, and without it the recreated `pending`
+    // row would publish the same post a second time. Losing the race costs a
+    // stale destination, which is recoverable; losing the row is not.
+    expect(after.filter((row) => row.status === 'processing').map((row) => row.targetId)).toEqual([
+      target.id,
+    ]);
+    expect(after.map((row) => row.targetId).sort()).toEqual([target.id, second.id].sort());
   });
 })

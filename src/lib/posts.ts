@@ -554,11 +554,20 @@ export async function updatePost(
       });
       if (valid.length !== input.targetIds.length) throw errors.targetsUnavailable();
 
-      // Replace the fan-out wholesale; nothing has been published yet, so no
-      // per-destination history is lost.
-      await tx.postTarget.deleteMany({ where: { postId } });
+      // Only rows nothing is holding. `postEditBlocker` has already refused an
+      // edit while a worker has one claimed, but that check and this write are
+      // two statements: a worker can claim in between. Narrowing the delete
+      // means the worst a lost race can do is leave a destination behind,
+      // rather than delete the row that is the only record of a post already
+      // on its way to Facebook.
+      await tx.postTarget.deleteMany({
+        where: { postId, status: { in: ['pending', 'failed', 'cancelled'] } },
+      });
+      // `skipDuplicates` for the same reason: a destination whose row survived
+      // the narrowed delete must not gain a second one.
       await tx.postTarget.createMany({
         data: valid.map((target) => ({ postId, targetId: target.id, status: 'pending' })),
+        skipDuplicates: true,
       });
     }
 

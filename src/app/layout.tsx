@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 
@@ -16,10 +16,18 @@ export async function generateMetadata(): Promise<Metadata> {
     // servers and a relative URL means nothing to either.
     metadataBase: new URL(env.appUrl),
     manifest: '/manifest.webmanifest',
-    // Matches the mark, so a phone's chrome tints to the same blue.
-    themeColor: '#3563e9',
   };
 }
+
+/**
+ * Matches the mark, so a phone's chrome tints to the same blue as the icon.
+ *
+ * This belongs in `viewport`, not `metadata`: Next drops `themeColor` from a
+ * metadata export with a warning, which means the tint quietly never happened.
+ */
+export const viewport: Viewport = {
+  themeColor: '#3563e9',
+};
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale();

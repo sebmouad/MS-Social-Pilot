@@ -88,3 +88,34 @@ describe('browser tab titles', () => {
     }
   });
 });
+
+/**
+ * The phone tint. Next moved `themeColor` out of `metadata` and into
+ * `viewport`; a metadata export still type-checks, but Next drops the value
+ * and logs a warning, so the address bar keeps the browser's default grey.
+ * Nothing in a screenshot test notices — the page looks the same, only the
+ * chrome above it is wrong.
+ */
+describe('the theme colour', () => {
+  const layout = readFileSync('src/app/layout.tsx', 'utf8');
+  const manifest = readFileSync('src/app/manifest.ts', 'utf8');
+
+  it('is declared where Next will actually read it', () => {
+    expect(layout).toMatch(/export const viewport: Viewport = \{[^}]*themeColor:/);
+    // And not in the export Next silently discards. Bounded to the body of
+    // `generateMetadata` so the comment explaining all this doesn't count.
+    const start = layout.indexOf('export async function generateMetadata');
+    const body = layout.slice(start, layout.indexOf('\n}\n', start));
+    expect(body).not.toContain('themeColor');
+  });
+
+  it('agrees with the colour a home-screen install gets', () => {
+    const tint = layout.match(/themeColor: '(#[0-9a-f]{6})'/i)?.[1];
+    const splash = manifest.match(/theme_color: '(#[0-9a-f]{6})'/i)?.[1];
+
+    // Two tints for one app reads as a rendering bug to the person holding
+    // the phone: the bar is one blue in the browser and another once pinned.
+    expect(tint).toBeTruthy();
+    expect(splash).toBe(tint);
+  });
+});
