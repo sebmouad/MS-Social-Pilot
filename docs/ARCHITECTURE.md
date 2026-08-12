@@ -118,6 +118,15 @@ either way — refusing would leave a customer unable to disconnect at all — b
 the count that could not be stopped is returned to the caller, because nobody
 will get another chance.
 
+**Turning a destination off is the same question with a different answer.** It
+also leaves Facebook holding posts, but it is a reversible switch and the
+tokens survive — deleting scheduled posts because somebody flipped a toggle
+would be a surprising thing for a toggle to do, and flipping it back could not
+put them back. They are left alone, and the person switching it off is told how
+many will still publish, because those can each be cancelled while the account
+is connected. `removeLinkedAccount` needs none of this: it only covers
+Instagram and ad accounts, and native scheduling is refused for Instagram.
+
 **When that deletion fails, the destination is not marked cancelled.** The copy
 that matters lives on Facebook, so a post reading "Cancelled" here while
 Facebook publishes it on schedule is the worst outcome available: the client

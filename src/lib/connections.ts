@@ -28,10 +28,16 @@ export interface ConnectionResult {
   /** Set when the outcome is `blocked`: why Facebook will not accept this. */
   reason?: string;
   /**
-   * Set by `disconnect`: posts Facebook is still holding that we could not
-   * delete on the way out. They will publish on schedule and nobody has the
-   * credentials to stop them any more, so this has to reach the person who
-   * pressed the button.
+   * Posts Facebook will publish regardless of what was just done here.
+   *
+   * Set by `disconnect` for the ones it could not delete on the way out —
+   * nobody has the credentials to try again after that, so it is a loss. Set
+   * by `setTargetEnabled` when a destination is switched off with posts still
+   * queued inside Facebook — there it is a warning, because those posts can
+   * still be cancelled one at a time while the account is connected.
+   *
+   * Either way it answers the question the screen would otherwise leave open:
+   * why did something appear on a Page I had turned off.
    */
   stillScheduledOnFacebook?: number;
 }
@@ -65,6 +71,17 @@ export async function setTargetEnabled(options: {
     where: { id: target.id },
     data: { enabled: options.enabled },
   });
+
+  // Turning it off stops the queue reaching this destination, but not Facebook
+  // publishing what it already holds. Deleting those is deliberately not done
+  // here — this is a reversible switch, and flipping it back could not put them
+  // back — so the person doing it is told instead.
+  if (!options.enabled) {
+    const waiting = await prisma.postTarget.count({
+      where: { targetId: target.id, status: 'scheduled_remote' },
+    });
+    if (waiting > 0) return { outcome: 'ok', stillScheduledOnFacebook: waiting };
+  }
 
   return OK;
 }

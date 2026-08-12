@@ -651,3 +651,134 @@ describe('disconnecting while Facebook holds scheduled posts', () => {
     expect(after.status).toBe('cancelled');
   });
 });
+
+/**
+ * Turning off a destination Facebook is holding posts for.
+ *
+ * Unlike disconnecting, this is a reversible switch and the tokens survive, so
+ * deleting the posts on Facebook would be a surprising thing for a toggle to
+ * do — and turning it back on could not undo it. Leaving them to publish is
+ * right. Saying nothing about it is not: a queued post appears on a Page the
+ * owner has just turned off, and nothing on the screen suggested that could
+ * happen.
+ */
+describe('turning off a destination with posts inside Facebook', () => {
+  async function seedHandedOff() {
+    const seeded = await seed();
+    await prisma.post.create({
+      data: {
+        workspaceId: seeded.workspace.id,
+        authorId: seeded.user.id,
+        message: 'Facebook has this one',
+        status: 'scheduled',
+        publishMode: 'native',
+        scheduledAt: new Date(Date.now() + 3 * 60 * 60 * 1000),
+        targets: {
+          create: {
+            targetId: seeded.page.id,
+            status: 'scheduled_remote',
+            remotePostId: '1000_4242',
+            nativeScheduledFor: new Date(Date.now() + 3 * 60 * 60 * 1000),
+          },
+        },
+      },
+    });
+    return seeded;
+  }
+
+  it('says how many will still publish', async () => {
+    const seeded = await seedHandedOff();
+
+    const result = await connections.setTargetEnabled({
+      workspaceId: seeded.workspace.id,
+      role: WorkspaceRole.owner,
+      targetId: seeded.page.id,
+      enabled: false,
+    });
+
+    expect(result.outcome).toBe('ok');
+    expect(result.stillScheduledOnFacebook).toBe(1);
+  });
+
+  it('leaves them alone, because the switch can be flipped back', async () => {
+    const seeded = await seedHandedOff();
+
+    await connections.setTargetEnabled({
+      workspaceId: seeded.workspace.id,
+      role: WorkspaceRole.owner,
+      targetId: seeded.page.id,
+      enabled: false,
+    });
+
+    // Nothing asked of Facebook: deleting a scheduled post is not something a
+    // reversible toggle should do, and the post is still cancellable on its
+    // own while the account is connected.
+    expect(received.some((call) => call.method === 'DELETE')).toBe(false);
+    const row = await prisma.postTarget.findFirstOrThrow({ where: { targetId: seeded.page.id } });
+    expect(row.status).toBe('scheduled_remote');
+  });
+
+  it('counts only what is still waiting, not the whole history', async () => {
+    const seeded = await seedHandedOff();
+
+    // A published post and a cancelled one on the same destination. Counting
+    // rows rather than queued ones would report a Page's whole history as
+    // about to publish.
+    const second = await prisma.post.create({
+      data: {
+        workspaceId: seeded.workspace.id,
+        authorId: seeded.user.id,
+        message: 'Already out',
+        status: 'published',
+        targets: { create: { targetId: seeded.page.id, status: 'published' } },
+      },
+    });
+    await prisma.post.create({
+      data: {
+        workspaceId: seeded.workspace.id,
+        authorId: seeded.user.id,
+        message: 'Called off',
+        status: 'cancelled',
+        targets: { create: { targetId: seeded.page.id, status: 'cancelled' } },
+      },
+    });
+    expect(second.id).toBeTruthy();
+
+    const result = await connections.setTargetEnabled({
+      workspaceId: seeded.workspace.id,
+      role: WorkspaceRole.owner,
+      targetId: seeded.page.id,
+      enabled: false,
+    });
+
+    expect(result.stillScheduledOnFacebook).toBe(1);
+  });
+
+  it('says nothing when there is nothing waiting', async () => {
+    const seeded = await seed();
+
+    const result = await connections.setTargetEnabled({
+      workspaceId: seeded.workspace.id,
+      role: WorkspaceRole.owner,
+      targetId: seeded.page.id,
+      enabled: false,
+    });
+
+    expect(result.stillScheduledOnFacebook).toBeUndefined();
+  });
+
+  it('does not warn when turning one back on', async () => {
+    const seeded = await seedHandedOff();
+    await prisma.target.update({ where: { id: seeded.page.id }, data: { enabled: false } });
+
+    const result = await connections.setTargetEnabled({
+      workspaceId: seeded.workspace.id,
+      role: WorkspaceRole.owner,
+      targetId: seeded.page.id,
+      enabled: true,
+    });
+
+    // Switching it on is not a moment anyone needs warning about.
+    expect(result.stillScheduledOnFacebook).toBeUndefined();
+  });
+});
