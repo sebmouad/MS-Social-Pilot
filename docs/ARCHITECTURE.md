@@ -872,6 +872,27 @@ asserted 404 for years started seeing 200.
 
 ---
 
+## A total that is actually a total
+
+The dashboard's reach and engagement figures sit under a heading reading
+"totals across published posts". They were computed by fetching five hundred
+rows of insights JSON and adding them up in JavaScript, which was wrong in two
+ways, the second worse than the first.
+
+Past five hundred published destinations the number was a partial sum presented
+as a total, with nothing on screen suggesting it. And the query had no
+ordering, so *which* five hundred was the database's choice: the figure could
+change between two refreshes with no data having changed, which is how somebody
+stops trusting every other number on the page.
+
+`publishedTotals` sums in Postgres over every row instead. `->>` yields text so
+each value is cast, and `COALESCE` makes a destination whose insights have not
+been fetched yet contribute zero rather than removing the row or turning the
+whole sum null — a post that went out a minute ago is in exactly that state.
+Four integers come back instead of five hundred JSON documents.
+
+---
+
 ## Paging a list somebody is reading
 
 The worker pages with a cursor, deliberately: it walks whole tables, and `skip`

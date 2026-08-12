@@ -998,3 +998,66 @@ export async function readAudience(options: {
     net: adds - removes,
   };
 }
+
+export interface PublishedTotals {
+  impressions: number;
+  reach: number;
+  reactions: number;
+  comments: number;
+  /** How many published destinations went into the figures. */
+  posts: number;
+}
+
+/**
+ * The headline figures on the dashboard, summed over everything.
+ *
+ * This used to fetch five hundred rows of insights JSON and add them up in
+ * JavaScript, under a heading that says "totals across published posts". Two
+ * things were wrong with that, and the second is worse than the first.
+ *
+ * Past five hundred published destinations the figure was a partial sum
+ * presented as a total — an agency's dashboard quietly understating a client's
+ * reach, with nothing on screen suggesting it. And the query had no ordering,
+ * so *which* five hundred was up to the database: the number could change
+ * between two refreshes with no data having changed at all, which is the kind
+ * of thing that makes somebody stop trusting every other number on the page.
+ *
+ * Summing in Postgres fixes both and moves less: four integers back instead of
+ * five hundred JSON documents. `->>` yields text, so each value is cast, and a
+ * row whose insights have not been fetched yet contributes nothing rather than
+ * poisoning the sum with a null.
+ */
+export async function publishedTotals(workspaceId: string): Promise<PublishedTotals> {
+  const [row] = await prisma.$queryRaw<
+    Array<{
+      impressions: bigint | null;
+      reach: bigint | null;
+      reactions: bigint | null;
+      comments: bigint | null;
+      posts: bigint | null;
+    }>
+  >`
+    SELECT
+      SUM(COALESCE((pt.insights->>'impressions')::bigint, 0)) AS impressions,
+      SUM(COALESCE((pt.insights->>'reach')::bigint, 0))       AS reach,
+      SUM(COALESCE((pt.insights->>'reactions')::bigint, 0))   AS reactions,
+      SUM(COALESCE((pt.insights->>'comments')::bigint, 0))    AS comments,
+      COUNT(*)                                                 AS posts
+    FROM post_targets pt
+    JOIN posts p ON p.id = pt."postId"
+    WHERE p."workspaceId" = ${workspaceId}
+      AND pt.status = 'published'
+  `;
+
+  // bigint because SUM over bigint is bigint in Postgres; the values here are
+  // impression counts, which stay far inside what a Number holds exactly.
+  const asNumber = (value: bigint | null): number => (value === null ? 0 : Number(value));
+
+  return {
+    impressions: asNumber(row?.impressions ?? null),
+    reach: asNumber(row?.reach ?? null),
+    reactions: asNumber(row?.reactions ?? null),
+    comments: asNumber(row?.comments ?? null),
+    posts: asNumber(row?.posts ?? null),
+  };
+}

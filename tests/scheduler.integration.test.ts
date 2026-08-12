@@ -793,3 +793,105 @@ describe('publishing to Instagram', () => {
     expect(received).toEqual([]);
   });
 });
+
+/**
+ * The dashboard's headline figures.
+ *
+ * They sit under a heading that says "totals across published posts", which is
+ * a promise: a number that is a partial sum presented as a total is worse than
+ * no number, because nothing on screen says to distrust it.
+ */
+describe('publishedTotals', () => {
+  async function seedPublished(count: number, insights: Record<string, number>) {
+    const seeded = await seedDuePost();
+
+    await prisma.postTarget.updateMany({
+      where: { postId: seeded.post.id },
+      data: { status: 'published', insights },
+    });
+
+    for (let index = 1; index < count; index += 1) {
+      const post = await prisma.post.create({
+        data: {
+          workspaceId: seeded.workspace.id,
+          authorId: seeded.user.id,
+          message: `Published ${index}`,
+          status: 'published',
+          targets: { create: { targetId: seeded.target.id, status: 'published', insights } },
+        },
+      });
+      void post;
+    }
+
+    return seeded;
+  }
+
+  it('adds up every published destination, not the first few hundred', async () => {
+    const analytics = await import('../src/lib/analytics');
+    // Past the five hundred the old query fetched. A workspace this size is an
+    // agency a year in, which is exactly who reads the dashboard.
+    const seeded = await seedPublished(520, { impressions: 10, reach: 4, reactions: 2, comments: 1 });
+
+    const totals = await analytics.publishedTotals(seeded.workspace.id);
+
+    expect(totals.posts).toBe(520);
+    expect(totals.impressions).toBe(5_200);
+    expect(totals.reach).toBe(2_080);
+  }, 120_000);
+
+  it('counts a destination whose insights have never been fetched as zero, not as nothing', async () => {
+    const analytics = await import('../src/lib/analytics');
+    const seeded = await seedPublished(1, { impressions: 7, reach: 3, reactions: 1, comments: 0 });
+
+    // A post published a minute ago has no insights yet. It must not remove
+    // the whole row from the sum, and must not turn the total into null.
+    await prisma.post.create({
+      data: {
+        workspaceId: seeded.workspace.id,
+        authorId: seeded.user.id,
+        message: 'Just went out',
+        status: 'published',
+        targets: { create: { targetId: seeded.target.id, status: 'published' } },
+      },
+    });
+
+    const totals = await analytics.publishedTotals(seeded.workspace.id);
+
+    expect(totals.impressions).toBe(7);
+    expect(totals.posts).toBe(2);
+  });
+
+  it('ignores destinations that have not gone out', async () => {
+    const analytics = await import('../src/lib/analytics');
+    const seeded = await seedPublished(1, { impressions: 9, reach: 5, reactions: 0, comments: 0 });
+
+    await prisma.post.create({
+      data: {
+        workspaceId: seeded.workspace.id,
+        authorId: seeded.user.id,
+        message: 'Still waiting',
+        status: 'scheduled',
+        targets: { create: { targetId: seeded.target.id, status: 'pending', insights: { impressions: 999 } } },
+      },
+    });
+
+    expect((await analytics.publishedTotals(seeded.workspace.id)).impressions).toBe(9);
+  });
+
+  it('cannot see another client’s figures', async () => {
+    const analytics = await import('../src/lib/analytics');
+    const mine = await seedPublished(1, { impressions: 11, reach: 6, reactions: 0, comments: 0 });
+    await seedPublished(3, { impressions: 100, reach: 50, reactions: 0, comments: 0 });
+
+    expect((await analytics.publishedTotals(mine.workspace.id)).impressions).toBe(11);
+  });
+
+  it('is zero rather than empty for a workspace that has published nothing', async () => {
+    const analytics = await import('../src/lib/analytics');
+    const seeded = await seedDuePost();
+
+    const totals = await analytics.publishedTotals(seeded.workspace.id);
+
+    expect(totals).toMatchObject({ impressions: 0, reach: 0, reactions: 0, comments: 0, posts: 0 });
+  });
+})

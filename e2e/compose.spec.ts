@@ -331,3 +331,39 @@ test('a slow page shows a skeleton rather than nothing at all', async ({ page })
   await expect(arrived).toBeVisible({ timeout: 15_000 });
   await expect(page.locator('.animate-pulse')).toHaveCount(0);
 });
+
+test('the dashboard totals every published post, not a sample of them', async ({ page }) => {
+  const workspace = await prisma.workspace.findFirstOrThrow({ where: { name: OWNER.workspace } });
+  const author = await prisma.user.findFirstOrThrow({ where: { email: OWNER.email } });
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+
+  // Enough to have passed the five hundred the old query fetched.
+  for (let batch = 0; batch < 6; batch += 1) {
+    await prisma.post.createMany({
+      data: Array.from({ length: 100 }, (_, index) => ({
+        workspaceId: workspace.id,
+        authorId: author.id,
+        message: `Totals ${batch}-${index}`,
+        status: 'published' as const,
+      })),
+    });
+  }
+  const posts = await prisma.post.findMany({
+    where: { workspaceId: workspace.id, message: { startsWith: 'Totals ' } },
+    select: { id: true },
+  });
+  await prisma.postTarget.createMany({
+    data: posts.map((post) => ({
+      postId: post.id,
+      targetId: target.id,
+      status: 'published' as const,
+      insights: { impressions: 10, reach: 4, reactions: 1, comments: 0 },
+    })),
+  });
+
+  await open(page, '/dashboard');
+
+  // 600 × 10 impressions. A partial sum would read 5,000 and look plausible,
+  // which is what made the old cap worth fixing rather than documenting.
+  await expect(page.getByText('6,000')).toBeVisible();
+});

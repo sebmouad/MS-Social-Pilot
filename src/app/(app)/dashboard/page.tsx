@@ -8,9 +8,8 @@ import { screenMetadata } from '@/lib/metadata';
 import { summariseConnections } from '@/lib/connections';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
-import { parseInsights } from '@/lib/json';
-import { sumInsights } from '@/lib/facebook/insights';
 import { formatInZone, relativeTime } from '@/lib/time';
+import { publishedTotals } from '@/lib/analytics';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +26,7 @@ export default async function DashboardPage() {
   const workspaceId = auth.workspace.id;
   const now = new Date();
 
-  const [upcoming, recent, counts, targetCount, staleAccounts, failures, insightRows, health] =
+  const [upcoming, recent, counts, targetCount, staleAccounts, failures, totals, health] =
     await Promise.all([
     prisma.post.findMany({
       where: { workspaceId, status: { in: ['scheduled', 'publishing'] }, scheduledAt: { gte: now } },
@@ -48,16 +47,11 @@ export default async function DashboardPage() {
       select: { id: true, name: true, invalidReason: true },
     }),
     prisma.postTarget.count({ where: { status: 'failed', post: { workspaceId } } }),
-      prisma.postTarget.findMany({
-        where: { status: 'published', post: { workspaceId } },
-        select: { insights: true },
-        take: 500,
-      }),
+      publishedTotals(workspaceId),
       summariseConnections(workspaceId, { now, warnWithinDays: env.tokenWarningDays }),
     ]);
 
   const countFor = (status: string) => counts.find((entry) => entry.status === status)?._count ?? 0;
-  const totals = sumInsights(insightRows.map((row) => parseInsights(row.insights)));
 
   const stats: Array<{ label: string; value: number; icon: IconName; href: string }> = [
     {
@@ -150,7 +144,7 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {(totals.impressions ?? 0) + (totals.reactions ?? 0) > 0 && (
+      {totals.impressions + totals.reactions > 0 && (
         <div className="card p-5">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Icon name="analytics" className="text-slate-400" /> {t('reachAndEngagement')}
