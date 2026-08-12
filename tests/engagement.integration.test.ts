@@ -28,7 +28,7 @@ let instagram: typeof import('../src/lib/instagram');
 let ads: typeof import('../src/lib/ads');
 
 /** Path suffix to handler. A missing route answers like Graph does: error 100. */
-let routes: Record<string, () => unknown> = {};
+let routes: Record<string, (url: URL) => unknown> = {};
 /** Path suffixes that should answer with a permission error instead. */
 let denied: string[] = [];
 /** Paths Graph says are not there any more, as it does for a deleted comment. */
@@ -87,7 +87,9 @@ beforeAll(async () => {
     }
 
     response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify(routes[match]!()));
+    // The request URL is handed over so a route can answer differently for a
+    // follow-up page, or check what was asked of it.
+    response.end(JSON.stringify(routes[match]!(url)));
   });
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -1826,5 +1828,71 @@ describe('keeping up with a busy post', () => {
     // nothing.
     const comments = await engagement.readComments({ workspaceId: seed.workspace.id });
     expect(comments).toHaveLength(1);
+  });
+});
+
+/**
+ * A backlog bigger than one fetch can carry.
+ *
+ * The ceiling is five pages of a hundred, so a Page that has been left alone
+ * for a while can have more waiting than a single sync can read. That is fine
+ * as long as each sync starts after the last one finished — the backlog drains
+ * over several passes. It is not fine if the anchor tracks the oldest comment
+ * read, which would move forward one comment at a time.
+ */
+describe('draining a backlog across several syncs', () => {
+  const commentsSince = () =>
+    asked.filter((call) => call.path.endsWith('/comments')).at(-1)?.params.get('since');
+
+  function batch(comments: Array<{ id: string; at: string }>) {
+    routes['/comments'] = () => ({
+      data: comments.map((comment) => ({
+        id: comment.id,
+        message: `Comment ${comment.id}`,
+        created_time: comment.at,
+        like_count: 0,
+        from: { id: 'u1', name: 'Ada' },
+      })),
+    });
+  }
+
+  it('anchors on the newest of a batch, not the oldest', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    batch([
+      { id: 'b1', at: '2026-08-01T09:00:00+0000' },
+      { id: 'b2', at: '2026-08-01T10:00:00+0000' },
+      { id: 'b3', at: '2026-08-01T11:00:00+0000' },
+    ]);
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    asked = [];
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    // Anchored on the oldest, a Page with a real backlog would advance one
+    // comment per sync and never catch up.
+    const since = Number(commentsSince()) * 1000;
+    const newest = new Date('2026-08-01T11:00:00Z').getTime();
+    expect(since).toBe(newest - 24 * 60 * 60 * 1000);
+  });
+
+  it('keeps moving forward as later comments arrive', async () => {
+    const seed = await seedWorkspace();
+    stubEverything();
+    batch([{ id: 'b1', at: '2026-08-01T09:00:00+0000' }]);
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+
+    // The next pass finds newer ones, as a drained backlog would.
+    batch([{ id: 'b2', at: '2026-08-05T09:00:00+0000' }]);
+    asked = [];
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+    const first = Number(commentsSince());
+
+    asked = [];
+    await engagement.syncTargetEdges({ targetId: seed.target.id });
+    const second = Number(commentsSince());
+
+    expect(second).toBeGreaterThan(first);
+    expect(await prisma.postComment.count()).toBe(2);
   });
 });

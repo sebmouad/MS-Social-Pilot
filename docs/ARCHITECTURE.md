@@ -1775,6 +1775,17 @@ exactly would mean never re-reading one, and a comment being hidden or argued
 over is the one worth another look. A first sync has nothing to anchor to and
 reads the history it can.
 
+Hitting the ceiling is therefore no longer a dead end, it is a slower
+catch-up: a Page left alone long enough to have more waiting than one fetch can
+carry drains over several passes, because each sync starts after the last one
+finished. That only holds while the anchor tracks the *newest* comment stored —
+anchoring on the oldest would advance one comment per sync and never catch up,
+which is why a test pins it.
+
+The other paged readers do not ask for chronological order, so their ceilings
+truncate the far end of a Page's history rather than its newest activity;
+`published_posts` is anchored with `since` as well.
+
 This is also why there is no bulk reconciliation of deleted comments. Rows
 absent from a fetch are not necessarily gone — on a busy post they are simply
 past the ceiling — so deleting them would destroy live comments. Removal stays
