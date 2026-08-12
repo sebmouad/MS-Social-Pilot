@@ -1558,3 +1558,91 @@ describe('searching and paging comments', () => {
     expect(found).toEqual([]);
   });
 })
+
+/**
+ * The rating summary an agency reports to its client.
+ *
+ * Four tiles: how many ratings, the average, how many recommend, how many do
+ * not. They were computed from the five hundred most recent reviews and
+ * labelled as the Page's, so a busy Page was described by its recent half.
+ */
+describe('the review summary', () => {
+  async function seedReviews(
+    targetId: string,
+    ratings: Array<number | null>,
+    recommendation: string | null = null,
+  ) {
+    await prisma.pageReview.createMany({
+      data: ratings.map((rating, index) => ({
+        targetId,
+        remoteId: `r_${recommendation ?? 'x'}_${index}_${Math.random().toString(36).slice(2)}`,
+        rating,
+        recommendationType: recommendation,
+        createdTime: new Date(2026, 0, 1 + (index % 300)),
+      })),
+    });
+  }
+
+  it('counts and averages every review, not the recent few hundred', async () => {
+    const seed = await seedWorkspace();
+
+    // Six hundred ratings, deliberately lopsided: the older four hundred are
+    // fives and the newer two hundred are ones, so a summary of "the most
+    // recent five hundred" gives a visibly different average from the truth.
+    await seedReviews(seed.target.id, Array.from({ length: 400 }, () => 5));
+    await seedReviews(seed.target.id, Array.from({ length: 200 }, () => 1));
+
+    const summary = await engagement.readReviews({ workspaceId: seed.workspace.id });
+
+    expect(summary.count).toBe(600);
+    // (400×5 + 200×1) / 600 = 3.7
+    expect(summary.averageRating).toBe(3.7);
+    expect(summary.byRating['5']).toBe(400);
+    expect(summary.byRating['1']).toBe(200);
+  }, 120_000);
+
+  it('counts a recommendation with no stars as a review, but not in the average', async () => {
+    const seed = await seedWorkspace();
+    await seedReviews(seed.target.id, [4, 4]);
+    await seedReviews(seed.target.id, [null], 'positive');
+
+    const summary = await engagement.readReviews({ workspaceId: seed.workspace.id });
+
+    expect(summary.count).toBe(3);
+    expect(summary.averageRating).toBe(4);
+    expect(summary.recommends).toBe(1);
+  });
+
+  it('tallies recommendations across everything', async () => {
+    const seed = await seedWorkspace();
+    await seedReviews(seed.target.id, Array.from({ length: 3 }, () => null), 'positive');
+    await seedReviews(seed.target.id, Array.from({ length: 2 }, () => null), 'negative');
+
+    const summary = await engagement.readReviews({ workspaceId: seed.workspace.id });
+
+    expect(summary.recommends).toBe(3);
+    expect(summary.doesNotRecommend).toBe(2);
+  });
+
+  it('shows a handful of recent reviews rather than all of them', async () => {
+    const seed = await seedWorkspace();
+    await seedReviews(seed.target.id, Array.from({ length: 40 }, () => 5));
+
+    const summary = await engagement.readReviews({ workspaceId: seed.workspace.id });
+
+    expect(summary.count).toBe(40);
+    expect(summary.recent).toHaveLength(20);
+  });
+
+  it('cannot see another client’s reviews', async () => {
+    const mine = await seedWorkspace('mine');
+    const theirs = await seedWorkspace('theirs');
+    await seedReviews(mine.target.id, [5]);
+    await seedReviews(theirs.target.id, [1, 1, 1]);
+
+    const summary = await engagement.readReviews({ workspaceId: mine.workspace.id });
+
+    expect(summary.count).toBe(1);
+    expect(summary.averageRating).toBe(5);
+  });
+})

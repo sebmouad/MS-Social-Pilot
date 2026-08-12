@@ -874,6 +874,13 @@ asserted 404 for years started seeing 200.
 
 ## A total that is actually a total
 
+Two figures on two screens were computed from a slice and labelled as though
+they covered everything. They are worth describing together, because the shape
+recurs: fetch a capped page of rows, add them up in JavaScript, present the
+result under a heading that promises the whole.
+
+### The dashboard totals
+
 The dashboard's reach and engagement figures sit under a heading reading
 "totals across published posts". They were computed by fetching five hundred
 rows of insights JSON and adding them up in JavaScript, which was wrong in two
@@ -890,6 +897,21 @@ each value is cast, and `COALESCE` makes a destination whose insights have not
 been fetched yet contribute zero rather than removing the row or turning the
 whole sum null — a post that went out a minute ago is in exactly that state.
 Four integers come back instead of five hundred JSON documents.
+
+### The review summary
+
+`readReviews` had the same shape with a sharper edge. It summarised the five
+hundred most recent reviews into four tiles — how many, the average, how many
+recommend, how many do not — and an agency reports that average to the business
+it belongs to. A partial sum can only understate, and somebody may notice; a
+partial average is wrong in either direction with nothing to signal which. It
+groups in the database now, over everything, and a recommendation left without
+a star still counts as a review while contributing nothing to the average.
+
+The rest of the capped reads were checked and left alone. `readVideos`,
+`readExternalPosts`, `readInstagramMedia` and `readPostAnalytics` all feed
+lists where each row carries its own numbers, so a cap shortens the list
+without corrupting a figure — a different problem, and one the pager solves.
 
 ---
 

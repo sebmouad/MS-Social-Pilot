@@ -582,29 +582,62 @@ export async function readReviews(options: {
   targetId?: string;
   limit?: number;
 }): Promise<ReviewSummary> {
-  const rows = await prisma.pageReview.findMany({
-    where: {
-      target: { workspaceId: options.workspaceId },
-      ...(options.targetId ? { targetId: options.targetId } : {}),
-    },
-    orderBy: { createdTime: 'desc' },
-    take: rowCount(options.limit, 500),
-  });
+  const where = {
+    target: { workspaceId: options.workspaceId },
+    ...(options.targetId ? { targetId: options.targetId } : {}),
+  };
 
-  const rated = rows.map((row) => row.rating).filter((value): value is number => value !== null);
+  // Grouped in the database rather than counted in JavaScript over whatever
+  // rows happened to be fetched. This used to take the five hundred most
+  // recent reviews and describe them as the Page's ratings: a client with nine
+  // hundred was told it had five hundred, and — worse — shown an average of
+  // only the recent ones.
+  //
+  // A partial sum can only understate, and somebody may notice. A partial
+  // average is wrong in either direction with nothing to signal which, and an
+  // agency reports that number to the business it belongs to.
+  const [byRatingRows, byRecommendation, recent] = await Promise.all([
+    prisma.pageReview.groupBy({ by: ['rating'], where, _count: { _all: true } }),
+    prisma.pageReview.groupBy({
+      by: ['recommendationType'],
+      where,
+      _count: { _all: true },
+    }),
+    prisma.pageReview.findMany({
+      where,
+      orderBy: [{ createdTime: 'desc' }, { id: 'desc' }],
+      take: rowCount(options.limit, 20),
+    }),
+  ]);
+
   const byRating: Record<string, number> = {};
-  for (const rating of rated) byRating[String(rating)] = (byRating[String(rating)] ?? 0) + 1;
+  let ratedCount = 0;
+  let ratingSum = 0;
+  let count = 0;
+
+  for (const group of byRatingRows) {
+    const rows = group._count._all;
+    count += rows;
+
+    // A recommendation with no star rating is still a review, and counts
+    // towards the total — it just cannot contribute to an average.
+    if (group.rating === null) continue;
+
+    byRating[String(group.rating)] = rows;
+    ratedCount += rows;
+    ratingSum += group.rating * rows;
+  }
+
+  const tally = (type: string): number =>
+    byRecommendation.find((group) => group.recommendationType === type)?._count._all ?? 0;
 
   return {
-    count: rows.length,
-    averageRating:
-      rated.length > 0
-        ? Math.round((rated.reduce((sum, value) => sum + value, 0) / rated.length) * 10) / 10
-        : null,
-    recommends: rows.filter((row) => row.recommendationType === 'positive').length,
-    doesNotRecommend: rows.filter((row) => row.recommendationType === 'negative').length,
+    count,
+    averageRating: ratedCount > 0 ? Math.round((ratingSum / ratedCount) * 10) / 10 : null,
+    recommends: tally('positive'),
+    doesNotRecommend: tally('negative'),
     byRating,
-    recent: rows.slice(0, 20).map((row) => ({
+    recent: recent.map((row) => ({
       id: row.id,
       reviewer: row.reviewerName ?? 'Facebook user',
       rating: row.rating,
