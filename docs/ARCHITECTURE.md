@@ -172,6 +172,27 @@ The test finds the next transition rather than naming a date, for the same
 reason the scheduling tests compute a future timestamp: a literal date is a
 test that passes until one morning it does not, and this one would need
 rewriting every year besides.
+
+A one-off scheduled time is refused when it falls in the gap; a recurring queue
+slot is moved. The difference is what the two things are: a typed-in time is a
+statement about one post, and silently changing it is a lie, while a weekly slot
+is a standing instruction that must not break one Sunday a year.
+
+### One zone per screen
+
+A post carries the zone it was created in, and every screen renders in the
+*workspace's* zone and says so. Both are right, and the two must not be mixed
+in one place. The edit screen mixed them: it rendered the time in the post's own
+zone while the composer sent back the workspace's, so opening a post written
+before a timezone change and pressing Save without touching anything moved it by
+the difference between the two — and, with review switched on, sent it back to a
+reviewer for a change nobody made. The field is rendered in the workspace's zone
+now, which is also the number the person just saw on the list they clicked from.
+
+Changing a workspace's timezone deliberately does not touch any scheduled post.
+A post is an instant; the zone is how it is displayed. Nine o'clock in London
+becomes ten in Paris on every screen, and goes out at the same moment it always
+would have.
 outs
 
 Sending a file is not a request that answers in a moment, and one timeout used
@@ -592,6 +613,27 @@ The test finds the next transition rather than naming a date, for the same
 reason the scheduling tests compute a future timestamp: a literal date is a
 test that passes until one morning it does not, and this one would need
 rewriting every year besides.
+
+A one-off scheduled time is refused when it falls in the gap; a recurring queue
+slot is moved. The difference is what the two things are: a typed-in time is a
+statement about one post, and silently changing it is a lie, while a weekly slot
+is a standing instruction that must not break one Sunday a year.
+
+### One zone per screen
+
+A post carries the zone it was created in, and every screen renders in the
+*workspace's* zone and says so. Both are right, and the two must not be mixed
+in one place. The edit screen mixed them: it rendered the time in the post's own
+zone while the composer sent back the workspace's, so opening a post written
+before a timezone change and pressing Save without touching anything moved it by
+the difference between the two — and, with review switched on, sent it back to a
+reviewer for a change nobody made. The field is rendered in the workspace's zone
+now, which is also the number the person just saw on the list they clicked from.
+
+Changing a workspace's timezone deliberately does not touch any scheduled post.
+A post is an instant; the zone is how it is displayed. Nine o'clock in London
+becomes ten in Paris on every screen, and goes out at the same moment it always
+would have.
 
 
 Every stored `Date` is UTC. Timezones are applied only when interpreting what a

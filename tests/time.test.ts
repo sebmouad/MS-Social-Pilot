@@ -163,3 +163,50 @@ describe('the clocks changing', () => {
     expect(utcToLocalInput(localInputToUtc(shown, 'Europe/London'), 'Europe/London')).toBe(shown);
   });
 });
+
+describe('a recurring slot on the morning the clocks change', () => {
+  /** The next date in this zone where the given wall clock does not exist. */
+  function nextGapDate(time: string, timeZone: string, from = new Date()): string {
+    for (let day = 1; day < 400; day += 1) {
+      const date = new Date(from.getTime() + day * 24 * 60 * 60 * 1000);
+      const stamp = date.toISOString().slice(0, 10);
+      if (!wallClockExists(`${stamp}T${time}`, timeZone)) return stamp;
+    }
+    throw new Error('no clock change found');
+  }
+
+  it('publishes when the clocks land, not an hour early', () => {
+    // A standing weekly instruction, not a time somebody typed — so it moves
+    // rather than being refused, which is the opposite of what a one-off
+    // scheduled post should do.
+    const stamp = nextGapDate('01:30', 'Europe/London');
+    const day = new Date(`${stamp}T12:00:00Z`).getUTCDay();
+
+    const slot = nextAvailableSlot({
+      slots: [{ dayOfWeek: day, hour: 1, minute: 30 }],
+      timeZone: 'Europe/London',
+      takenUtc: [],
+      now: new Date(`${stamp}T00:00:00Z`),
+      horizonDays: 1,
+    });
+
+    expect(slot).not.toBeNull();
+
+    // The hour it was meant to be in starts at 02:00; an hour early would be
+    // 00:30, which is what converting the wall clock directly returns.
+    const shown = utcToLocalInput(slot!, 'Europe/London');
+    expect(shown).toBe(`${stamp}T02:00`);
+  });
+
+  it('leaves an ordinary week exactly where it was', () => {
+    const slot = nextAvailableSlot({
+      slots: [{ dayOfWeek: 3, hour: 9, minute: 0 }],
+      timeZone: 'Europe/London',
+      takenUtc: [],
+      now: new Date('2026-06-15T00:00:00Z'),
+      horizonDays: 7,
+    });
+
+    expect(utcToLocalInput(slot!, 'Europe/London')).toBe('2026-06-17T09:00');
+  });
+});

@@ -1365,3 +1365,79 @@ describe('scheduling into an hour that does not exist', () => {
     expect(created.postId).toBeTruthy();
   });
 })
+
+/**
+ * Opening a post written before the workspace moved, and saving it unchanged.
+ *
+ * An agency onboards a client in another country, or corrects a timezone that
+ * was wrong from the start. Posts scheduled before that carry the old zone on
+ * their own row; every screen shows workspace time; and the composer sends
+ * back whichever zone it was handed. If the field is rendered in one zone and
+ * saved in another, pressing Save without touching anything moves the post by
+ * the difference — and, in a workspace with review on, sends it back to the
+ * reviewer for a change nobody made.
+ */
+describe('editing a post from before the workspace changed timezone', () => {
+  it('leaves the instant alone when nothing was edited', async () => {
+    const { utcToLocalInput } = await import('../src/lib/time');
+
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Moved', ownerId: owner.id });
+
+    const scheduledAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        message: 'Written when the workspace was in London',
+        status: 'scheduled',
+        scheduledAt,
+        // The zone it was created in, kept on the row.
+        timezone: 'Europe/London',
+        targets: { create: { targetId: target.id, status: 'pending' } },
+      },
+    });
+
+    // The workspace has since moved.
+    const workspaceZone = 'Asia/Tokyo';
+    await prisma.workspace.update({
+      where: { id: workspace.id },
+      data: { timezone: workspaceZone },
+    });
+
+    // What the edit screen puts in the field, and what the composer sends back
+    // with it. These have to be the same zone or the post moves.
+    const shown = utcToLocalInput(scheduledAt, workspaceZone);
+
+    await posts.updatePost(
+      {
+        workspaceId: workspace.id,
+        userId: owner.id,
+        role: WorkspaceRole.owner,
+        requiresApproval: false,
+      },
+      post.id,
+      { scheduledAtLocal: shown, timezone: workspaceZone },
+    );
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+
+    // To the minute: `datetime-local` has no seconds, so the stored instant is
+    // compared at the resolution the field actually carries.
+    expect(Math.floor(after.scheduledAt!.getTime() / 60_000)).toBe(
+      Math.floor(scheduledAt.getTime() / 60_000),
+    );
+  });
+
+  it('would have moved it, had the field been rendered in the post’s old zone', async () => {
+    const { utcToLocalInput, localInputToUtc } = await import('../src/lib/time');
+
+    // The bug, stated as arithmetic rather than left implicit: London and
+    // Tokyo are hours apart, so the same wall clock is a different instant.
+    const instant = new Date('2027-01-15T09:00:00Z');
+    const shownInOldZone = utcToLocalInput(instant, 'Europe/London');
+    const savedInWorkspaceZone = localInputToUtc(shownInOldZone, 'Asia/Tokyo');
+
+    expect(savedInWorkspaceZone.getTime()).not.toBe(instant.getTime());
+  });
+})

@@ -167,7 +167,13 @@ export function nextAvailableSlot(options: {
       ].join('-');
       const wallClock = `${stamp}T${String(slot.hour).padStart(2, '0')}:${String(slot.minute).padStart(2, '0')}:00`;
 
-      const utc = fromZonedTime(wallClock, timeZone);
+      // `firstRealInstant`, not `fromZonedTime`: one Sunday a year the slot's
+      // wall clock is inside the hour the clocks skip, and converting it
+      // directly returns the instant an hour *before* the gap. The queue would
+      // publish an hour early, once, silently. A recurring slot must not be
+      // refused for that — it is a standing instruction, not a typed-in time —
+      // so it moves to the moment the clocks land instead.
+      const utc = firstRealInstant(wallClock, timeZone);
       if (utc.getTime() <= now.getTime()) continue;
       if (taken.has(utc.getTime())) continue;
       return utc;

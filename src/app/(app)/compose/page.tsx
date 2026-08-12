@@ -121,8 +121,15 @@ async function loadForEditing(postId: string, auth: Auth): Promise<EditingPost |
     link: post.link,
     media: parseMedia(post.media),
     targetIds: post.targets.map((target) => target.targetId),
+    // The workspace's zone, not the post's own. The composer sends back
+    // whatever zone it was given, and it is given the workspace's — so
+    // rendering the field in a different one meant that opening a post from
+    // before a timezone change and pressing Save, without touching anything,
+    // moved it by the difference between the two. Every other screen shows
+    // workspace time as well, so this is also the number the person just saw
+    // on the list they clicked from.
     scheduledAtLocal: post.scheduledAt
-      ? utcToLocalInput(post.scheduledAt, post.timezone || auth.workspace.timezone)
+      ? utcToLocalInput(post.scheduledAt, auth.workspace.timezone)
       : null,
     publishMode: post.publishMode,
   };
