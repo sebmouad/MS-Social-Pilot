@@ -490,6 +490,7 @@
     "backToSignIn": "Back to sign in",
     "bulkTooManyRows": "That file has {rows} rows and the limit is {limit}. Split it into smaller uploads.",
     "cannotApproveOwn": "You cannot approve your own post.",
+    "clocksGoForward": "The clocks go forward that night, so {when} does not happen in this workspace’s timezone. Choose a time before or after the missing hour.",
     "connectionNeedsRenewal": "The Facebook connection for this destination needs to be renewed.",
     "correctFields": "Please correct the highlighted fields.",
     "csvUnterminatedQuote": "A quoted field starting on line {line} is never closed, so everything after it was read as one value. Add the missing quote and upload again.",

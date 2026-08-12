@@ -490,6 +490,7 @@
     "backToSignIn": "Retour à la connexion",
     "bulkTooManyRows": "Ce fichier contient {rows} lignes alors que la limite est de {limit}. Divisez-le en plusieurs imports.",
     "cannotApproveOwn": "Vous ne pouvez pas valider votre propre publication.",
+    "clocksGoForward": "Les horloges avancent cette nuit-là : {when} n’existe pas dans le fuseau de cet espace de travail. Choisissez une heure avant ou après l’heure manquante.",
     "connectionNeedsRenewal": "La connexion Facebook de cette destination doit être renouvelée.",
     "correctFields": "Veuillez corriger les champs signalés.",
     "csvUnterminatedQuote": "Un champ entre guillemets commençant à la ligne {line} n’est jamais fermé : tout ce qui suit a été lu comme une seule valeur. Ajoutez le guillemet manquant et réimportez le fichier.",

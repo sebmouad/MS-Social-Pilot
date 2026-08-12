@@ -103,6 +103,14 @@ export const errors = {
       status: 422,
     }),
 
+  clocksGoForward: (when: string) =>
+    new AppError({
+      key: 'errors.clocksGoForward',
+      fallback: `The clocks go forward that night, so ${when} does not happen in this workspace's timezone. Choose a time before or after the missing hour.`,
+      params: { when },
+      status: 422,
+    }),
+
   alreadyPublishing: () =>
     new AppError({
       key: 'errors.alreadyPublishing',

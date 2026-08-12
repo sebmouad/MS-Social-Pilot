@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  isValidTimeZone,
-  localInputToUtc,
-  nextAvailableSlot,
-  utcToLocalInput,
-  type QueueSlotDefinition,
-} from '../src/lib/time';
+import { firstRealInstant, isValidTimeZone, localInputToUtc, nextAvailableSlot, type QueueSlotDefinition, utcToLocalInput, wallClockExists } from '../src/lib/time';
 
 describe('timezone conversion', () => {
   it('interprets wall-clock input in the given zone', () => {
@@ -103,5 +97,69 @@ describe('nextAvailableSlot', () => {
       horizonDays: 8,
     });
     expect(slot).toBeNull();
+  });
+});
+
+/**
+ * The hour that does not happen, and the hour that happens twice.
+ *
+ * A scheduler is exactly the product where these matter, and they are the two
+ * cases nobody writes by hand because they only occur on two mornings a year.
+ */
+describe('the clocks changing', () => {
+  // London, 2026: forward on 29 March, back on 25 October.
+  const FORWARD = '2026-03-29';
+  const BACK = '2026-10-25';
+
+  it('knows an ordinary time exists', () => {
+    expect(wallClockExists('2026-06-15T01:30', 'Europe/London')).toBe(true);
+  });
+
+  it('knows the spring-forward hour does not', () => {
+    // The clocks read 00:59 and then 02:00, so the whole hour from 01:00 up
+    // to 02:00 is missing — 01:00 itself included, which is easy to get wrong.
+    expect(wallClockExists(`${FORWARD}T00:59`, 'Europe/London')).toBe(true);
+    expect(wallClockExists(`${FORWARD}T01:00`, 'Europe/London')).toBe(false);
+    expect(wallClockExists(`${FORWARD}T01:30`, 'Europe/London')).toBe(false);
+    expect(wallClockExists(`${FORWARD}T01:59`, 'Europe/London')).toBe(false);
+    expect(wallClockExists(`${FORWARD}T02:00`, 'Europe/London')).toBe(true);
+  });
+
+  it('does not mistake the repeated autumn hour for a missing one', () => {
+    // 01:30 happens twice on this date. Both are real; only one is chosen.
+    expect(wallClockExists(`${BACK}T01:30`, 'Europe/London')).toBe(true);
+  });
+
+  it('treats the gap as local to the zone', () => {
+    // The same wall clock is perfectly ordinary in a zone whose clocks move on
+    // a different date, which is why this cannot be a calendar-wide rule.
+    expect(wallClockExists(`${FORWARD}T01:30`, 'America/New_York')).toBe(true);
+    expect(wallClockExists('2026-03-08T02:30', 'America/New_York')).toBe(false);
+  });
+
+  it('rolls a missing time forward to the moment the clocks land', () => {
+    const instant = firstRealInstant(`${FORWARD}T01:30`, 'Europe/London');
+
+    // 02:00 BST is 01:00 UTC — the first moment that exists after the gap.
+    expect(instant.toISOString()).toBe('2026-03-29T01:00:00.000Z');
+    expect(utcToLocalInput(instant, 'Europe/London')).toBe(`${FORWARD}T02:00`);
+  });
+
+  it('leaves a time that exists exactly where it is', () => {
+    const asked = '2026-06-15T09:30';
+    const instant = firstRealInstant(asked, 'Europe/London');
+
+    expect(utcToLocalInput(instant, 'Europe/London')).toBe(asked);
+  });
+
+  it('picks one of the two repeated hours and stays with it', () => {
+    // Ambiguity cannot be resolved from the input alone, so the requirement is
+    // only that it is stable: a post shown at 01:30 must not become 00:30 on
+    // the next render.
+    const instant = firstRealInstant(`${BACK}T01:30`, 'Europe/London');
+    const shown = utcToLocalInput(instant, 'Europe/London');
+
+    expect(shown).toBe(`${BACK}T01:30`);
+    expect(utcToLocalInput(localInputToUtc(shown, 'Europe/London'), 'Europe/London')).toBe(shown);
   });
 });

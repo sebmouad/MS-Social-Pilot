@@ -10,7 +10,7 @@ import {
   type PostMedia,
   type LinkPreview,
 } from './json';
-import { localInputToUtc, nextAvailableSlot } from './time';
+import { localInputToUtc, nextAvailableSlot, wallClockExists } from './time';
 import { resolveMediaForPublish } from './media';
 import { resolveLinkPreview } from './facebook/opengraph';
 import { publishPost } from './facebook/publish';
@@ -105,6 +105,13 @@ export async function resolveSchedule(
   }
 
   if (!input.scheduledAtLocal) throw errors.pickDateTime();
+
+  // Once a year an hour does not happen, and the conversion does not object:
+  // it quietly returns an instant an hour before the one that was asked for.
+  // Silently moving somebody's post is worse than refusing to schedule it.
+  if (!wallClockExists(input.scheduledAtLocal, input.timezone)) {
+    throw errors.clocksGoForward(input.scheduledAtLocal.slice(11, 16));
+  }
 
   const scheduledAt = localInputToUtc(input.scheduledAtLocal, input.timezone);
   if (scheduledAt.getTime() <= now.getTime()) throw errors.timePassed();
@@ -495,6 +502,10 @@ export async function updatePost(
       nextScheduledAt = null;
     } else {
       const timezone = input.timezone ?? post.timezone;
+      if (!wallClockExists(input.scheduledAtLocal, timezone)) {
+        throw errors.clocksGoForward(input.scheduledAtLocal.slice(11, 16));
+      }
+
       const scheduledAt = localInputToUtc(input.scheduledAtLocal, timezone);
       if (scheduledAt.getTime() <= Date.now()) {
         throw new GraphError({

@@ -140,7 +140,39 @@ another copy an interval later, indefinitely. Recycling therefore copies only
 live destinations, and stops altogether when none are left — the same thing it
 already did when the destinations had been deleted outright.
 
-### Timeouts
+### Time
+
+### The hour that does not happen
+
+Once a year an hour is skipped. In London the clocks read 00:59 and then 02:00,
+so every wall-clock time from 01:00 up to 02:00 — 01:00 itself included — is not
+a time that morning. `fromZonedTime` does not object to being handed one: it
+returns the instant an hour *before* the gap, so 01:30 becomes 00:30 and 01:59
+becomes 00:59.
+
+Nothing about that is visible afterwards. The post goes out an hour early, and
+the calendar agrees with itself, showing the time it moved to rather than the
+time somebody set. So scheduling into the gap is refused, with a message that
+says which hour is missing and why.
+
+`wallClockExists` is a round trip: convert to an instant and back, and if the
+wall clock that returns is not the one that went in, the one that went in never
+existed. `firstRealInstant` finds the moment the clocks land, for callers that
+should move rather than refuse — a weekly queue slot at 01:30 on a Sunday must
+not break one Sunday a year. It searches rather than adding an hour, for two
+reasons: adding an hour lands an hour after the *requested* time rather than at
+the start of the hour that replaced it, and not every shift is an hour — Lord
+Howe Island moves by thirty minutes.
+
+The autumn transition needs no rule. That hour happens twice, so both readings
+are real; the conversion picks the second and the round trip is stable, which
+is all that is required of it.
+
+The test finds the next transition rather than naming a date, for the same
+reason the scheduling tests compute a future timestamp: a literal date is a
+test that passes until one morning it does not, and this one would need
+rewriting every year besides.
+outs
 
 Sending a file is not a request that answers in a moment, and one timeout used
 to cover both: a minute, which is generous for a JSON call and short for a
@@ -529,6 +561,38 @@ itself stays open to everyone, because that text has been read.
 ---
 
 ## Time
+
+### The hour that does not happen
+
+Once a year an hour is skipped. In London the clocks read 00:59 and then 02:00,
+so every wall-clock time from 01:00 up to 02:00 — 01:00 itself included — is not
+a time that morning. `fromZonedTime` does not object to being handed one: it
+returns the instant an hour *before* the gap, so 01:30 becomes 00:30 and 01:59
+becomes 00:59.
+
+Nothing about that is visible afterwards. The post goes out an hour early, and
+the calendar agrees with itself, showing the time it moved to rather than the
+time somebody set. So scheduling into the gap is refused, with a message that
+says which hour is missing and why.
+
+`wallClockExists` is a round trip: convert to an instant and back, and if the
+wall clock that returns is not the one that went in, the one that went in never
+existed. `firstRealInstant` finds the moment the clocks land, for callers that
+should move rather than refuse — a weekly queue slot at 01:30 on a Sunday must
+not break one Sunday a year. It searches rather than adding an hour, for two
+reasons: adding an hour lands an hour after the *requested* time rather than at
+the start of the hour that replaced it, and not every shift is an hour — Lord
+Howe Island moves by thirty minutes.
+
+The autumn transition needs no rule. That hour happens twice, so both readings
+are real; the conversion picks the second and the round trip is stable, which
+is all that is required of it.
+
+The test finds the next transition rather than naming a date, for the same
+reason the scheduling tests compute a future timestamp: a literal date is a
+test that passes until one morning it does not, and this one would need
+rewriting every year besides.
+
 
 Every stored `Date` is UTC. Timezones are applied only when interpreting what a
 human typed, or when rendering back to them.

@@ -1272,3 +1272,96 @@ describe('invitations', () => {
     ).rejects.toThrow(/at least one owner/i);
   });
 });
+
+/**
+ * The morning the clocks go forward.
+ *
+ * A scheduler is the product where this matters, and it is the case nobody
+ * writes by hand because it happens on one morning a year. Left alone, the
+ * conversion returns an instant an hour before the one that was asked for and
+ * says nothing: the post goes out early, and the calendar afterwards agrees
+ * with itself, showing the time it moved to rather than the time that was set.
+ */
+describe('scheduling into an hour that does not exist', () => {
+  /**
+   * The next wall-clock time in this zone that no clock will ever read.
+   *
+   * Found rather than written down, for the reason `futureLocalInput` gives:
+   * a literal date is a test that passes until one morning it does not. This
+   * one would also have to be rewritten every year.
+   */
+  async function nextMissingHour(timeZone: string): Promise<string> {
+    const { wallClockExists } = await import('../src/lib/time');
+    const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    for (let day = 0; day < 400; day += 1) {
+      const date = new Date(start.getTime() + day * 24 * 60 * 60 * 1000);
+      const stamp = date.toISOString().slice(0, 10);
+
+      for (const time of ['00:30', '01:00', '01:30', '02:00', '02:30', '03:00']) {
+        const local = `${stamp}T${time}`;
+        if (!wallClockExists(local, timeZone)) return local;
+      }
+    }
+
+    throw new Error(`no clock change found in ${timeZone} within a year`);
+  }
+
+  it('is refused rather than quietly moved', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Clocks', ownerId: owner.id });
+    const missing = await nextMissingHour('Europe/London');
+
+    await expect(
+      posts.createPost(
+        {
+          workspaceId: workspace.id,
+          userId: owner.id,
+          role: WorkspaceRole.owner,
+          requiresApproval: false,
+        },
+        {
+          message: 'On the morning that hour does not exist',
+          targetIds: [target.id],
+          publishMode: 'worker',
+          scheduledAtLocal: missing,
+          timezone: 'Europe/London',
+          media: [],
+          link: null,
+          useQueue: false,
+          saveAsDraft: false,
+        } as never,
+      ),
+    ).rejects.toThrow(/does not happen/i);
+  });
+
+  it('accepts the same wall clock in a zone whose clocks move on another date', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Elsewhere', ownerId: owner.id });
+    const missing = await nextMissingHour('Europe/London');
+
+    // The rule belongs to the zone, not to the calendar: the same wall clock
+    // is perfectly ordinary somewhere whose clocks moved on a different date.
+    const created = await posts.createPost(
+      {
+        workspaceId: workspace.id,
+        userId: owner.id,
+        role: WorkspaceRole.owner,
+        requiresApproval: false,
+      },
+      {
+        message: 'Ordinary elsewhere',
+        targetIds: [target.id],
+        publishMode: 'worker',
+        scheduledAtLocal: missing,
+        timezone: 'Asia/Dubai',
+        media: [],
+        link: null,
+        useQueue: false,
+        saveAsDraft: false,
+      } as never,
+    );
+
+    expect(created.postId).toBeTruthy();
+  });
+})

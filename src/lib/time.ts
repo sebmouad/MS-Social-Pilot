@@ -34,6 +34,71 @@ export function localInputToUtc(localInput: string, timeZone: string): Date {
   return instant;
 }
 
+/**
+ * Whether a wall-clock time exists at all in a zone.
+ *
+ * Once a year an hour does not happen. In London the clocks go from 01:00
+ * straight to 02:00 on the last Sunday in March, so 01:30 that morning is not
+ * a time — and `fromZonedTime` does not refuse it, it quietly returns the
+ * instant half an hour *before* the gap. Somebody asks for 01:30, the app
+ * stores 00:30, and the calendar afterwards shows 00:30: their post goes out
+ * early on the one morning of the year nobody is watching for it.
+ *
+ * The round trip is the test. Convert to an instant and back, and if the wall
+ * clock that comes out is not the one that went in, the one that went in never
+ * existed.
+ */
+export function wallClockExists(localInput: string, timeZone: string): boolean {
+  const normalized = localInput.length === 16 ? localInput : localInput.slice(0, 16);
+
+  try {
+    return utcToLocalInput(localInputToUtc(normalized, timeZone), timeZone) === normalized;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The first real instant at or after a wall-clock time.
+ *
+ * For a time that exists this is simply that time. For one inside the
+ * spring-forward gap it is the moment the clocks land — 02:00 where 01:30 was
+ * asked for. Recurring queue slots use this rather than refusing: a weekly slot
+ * at 01:30 on a Sunday must not break one Sunday a year, and going out at the
+ * start of the hour it was meant to be in is the closest thing to what was
+ * asked.
+ */
+export function firstRealInstant(localInput: string, timeZone: string): Date {
+  const instant = localInputToUtc(localInput, timeZone);
+  if (wallClockExists(localInput, timeZone)) return instant;
+
+  const wanted = localInput.length === 16 ? localInput : localInput.slice(0, 16);
+
+  // The smallest instant whose wall clock has reached the one that was asked
+  // for. Adding a fixed hour would be wrong twice over: it lands an hour after
+  // the *requested* time rather than at the start of the hour that replaced
+  // it — 02:30 for a 01:30 request — and not every shift is an hour, since
+  // Lord Howe Island moves by thirty minutes.
+  //
+  // Searched rather than derived, because the offset either side of a
+  // transition is the only thing that decides it and both are the zone's own
+  // business. Minute resolution, which is all a scheduler has anyway.
+  const MINUTE = 60_000;
+  let low = instant.getTime();
+  let high = low + 3 * 60 * MINUTE;
+
+  while (low < high) {
+    const middle = low + Math.floor((high - low) / 2 / MINUTE) * MINUTE;
+    if (middle === low) break;
+
+    // Lexicographic on `yyyy-MM-ddTHH:mm` is chronological.
+    if (utcToLocalInput(new Date(middle), timeZone) < wanted) low = middle;
+    else high = middle;
+  }
+
+  return new Date(high);
+}
+
 /** Render a UTC instant as a `datetime-local` input value in the given zone. */
 export function utcToLocalInput(date: Date, timeZone: string): string {
   return formatInTimeZone(date, timeZone, "yyyy-MM-dd'T'HH:mm");
