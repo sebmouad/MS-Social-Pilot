@@ -2334,3 +2334,96 @@ describe('refreshing a workspace with a broken Page in it', () => {
     expect(results).toEqual([]);
   });
 });
+
+/**
+ * The two functions whose return type *is* their error channel.
+ *
+ * `syncPostInsights` and `syncExternalPostInsights` both return
+ * `{ ok, metrics, error }`, and every caller is a loop over rows that reports
+ * failures one at a time. A second exit past that channel is not a stricter
+ * version of the same promise — it ends the batch, so one post nobody can read
+ * discards every post already refreshed ahead of it and answers a 500 to
+ * whoever pressed Refresh.
+ */
+describe('a post the installation cannot read', () => {
+  /** The shape an ENCRYPTION_KEY rotation leaves behind on a stored token. */
+  async function withUnreadableToken() {
+    const seeded = await seedWorkspace();
+    await prisma.target.update({
+      where: { id: seeded.target.id },
+      data: { accessToken: 'not-a-v1-envelope' },
+    });
+    await prisma.socialAccount.update({
+      where: { id: seeded.account.id },
+      data: { accessToken: 'not-a-v1-envelope' },
+    });
+    return seeded;
+  }
+
+  it('reports the failure rather than throwing it', async () => {
+    const { postTarget } = await withUnreadableToken();
+    const { syncPostInsights } = await import('../src/lib/analytics');
+
+    const result = await syncPostInsights(postTarget.id);
+
+    expect(result.ok).toBe(false);
+    expect(result.metrics).toBe(0);
+    expect(result.error).toMatch(/envelope|encrypted/i);
+  });
+
+  it('reports a row that vanished while the batch was running', async () => {
+    const { syncPostInsights } = await import('../src/lib/analytics');
+
+    // The other way a caller arrives with something unusable: the id was read
+    // into the batch, and the post was deleted before its turn came round.
+    const result = await syncPostInsights('deleted-before-its-turn');
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBeTruthy();
+  });
+
+  it('lets a batch finish when one post in it cannot be read', async () => {
+    const broken = await withUnreadableToken();
+    const working = await seedWorkspace('working');
+    stubEverything();
+    routes['/insights'] = () => ({
+      data: [{ name: 'post_impressions', period: 'lifetime', values: [{ value: 700 }] }],
+    });
+    routes[`/${working.postTarget.remotePostId}`] = () => ({ shares: { count: 1 } });
+
+    const { syncPostInsights } = await import('../src/lib/analytics');
+
+    // The order that used to matter: the unreadable one first, so a throw would
+    // take the second with it.
+    const results = [];
+    for (const id of [broken.postTarget.id, working.postTarget.id]) {
+      results.push(await syncPostInsights(id));
+    }
+
+    expect(results.map((result) => result.ok)).toEqual([false, true]);
+
+    // Not merely reported: the working post's numbers actually landed.
+    const stored = await prisma.postTarget.findUniqueOrThrow({
+      where: { id: working.postTarget.id },
+    });
+    expect(stored.insightsSyncedAt).not.toBeNull();
+  });
+
+  it('reports an external post the same way', async () => {
+    const seeded = await withUnreadableToken();
+    const external = await prisma.externalPost.create({
+      data: {
+        targetId: seeded.target.id,
+        remoteId: 'external-1',
+        message: 'Posted from the Facebook app',
+        createdTime: new Date('2026-08-01T09:00:00Z'),
+      },
+    });
+
+    const { syncExternalPostInsights } = await import('../src/lib/analytics');
+    const result = await syncExternalPostInsights(external.id);
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/envelope|encrypted/i);
+  });
+});

@@ -1946,6 +1946,19 @@ records a failed Page in the same shape as a refused edge — named, with a
 reason, and the rest of the pass intact — so the route cannot hold one half of
 the promise without the other.
 
+The per-post readers answer the same question at the row level, and the rule
+there is simpler: **a function whose return type is its error channel must not
+also throw.** `syncPostInsights` and `syncExternalPostInsights` both return
+`{ ok, metrics, error }`, and every caller is a loop — the worker's analytics
+job, the Refresh button, the edge sync's external-post pass. A second exit past
+that channel is not a stricter version of the same promise; it ends the batch.
+Both had their row lookup and their token decryption outside the guard, which
+are precisely the two steps that fail for reasons the row itself cannot
+express: a post deleted after its id was read into the batch, and a token this
+installation can no longer decrypt after a key rotation. One such row discarded
+every post already refreshed ahead of it. The guard now covers the whole body,
+so the contract is total and no call site needs to know.
+
 `published_posts` is the reconciliation edge. Posts made from the Facebook app,
 by another tool, or by a colleague who never opened this product are invisible
 otherwise, and every Page-level report that ignores them understates the Page.

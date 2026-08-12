@@ -618,23 +618,33 @@ function buildPostInsights(
  * The named fields on PostInsights stay populated for lists and reports; the
  * complete response goes into `metrics` so the explorer can show the rest
  * without a second round trip.
+ *
+ * **This never throws.** The return type is the error channel, and every caller
+ * is a loop over rows that reports failures one at a time: the worker's
+ * analytics job, the Refresh button, the per-post explorer. A second exit past
+ * that channel is not a stricter version of the same thing — it takes the whole
+ * batch with it, so one post with an unreadable token discards every post
+ * already refreshed ahead of it. The lookup and the token are inside the guard
+ * for exactly that reason: a row deleted while the batch was running, or a
+ * token this installation can no longer decrypt after a key rotation, are the
+ * two ways a caller reaches this function with something it cannot use.
  */
 export async function syncPostInsights(postTargetId: string): Promise<{
   ok: boolean;
   metrics: number;
   error?: string;
 }> {
-  const row = await prisma.postTarget.findUniqueOrThrow({
-    where: { id: postTargetId },
-    include: { target: { include: { socialAccount: true } } },
-  });
-
-  if (!row.remotePostId) return { ok: false, metrics: 0, error: 'Post has no Facebook id.' };
-
-  const token = tokenFor(row.target);
-  if (!token) return { ok: false, metrics: 0, error: 'No access token stored.' };
-
   try {
+    const row = await prisma.postTarget.findUniqueOrThrow({
+      where: { id: postTargetId },
+      include: { target: { include: { socialAccount: true } } },
+    });
+
+    if (!row.remotePostId) return { ok: false, metrics: 0, error: 'Post has no Facebook id.' };
+
+    const token = tokenFor(row.target);
+    if (!token) return { ok: false, metrics: 0, error: 'No access token stored.' };
+
     const result = await readPostCatalogue({
       remotePostId: row.remotePostId,
       accessToken: token,
@@ -668,15 +678,17 @@ export async function syncExternalPostInsights(externalPostId: string): Promise<
   metrics: number;
   error?: string;
 }> {
-  const row = await prisma.externalPost.findUniqueOrThrow({
-    where: { id: externalPostId },
-    include: { target: { include: { socialAccount: true } } },
-  });
-
-  const token = tokenFor(row.target);
-  if (!token) return { ok: false, metrics: 0, error: 'No access token stored.' };
-
+  // Total for the same reason as `syncPostInsights`: the caller is a loop, and
+  // it is inside an edge sync whose whole job is to keep going.
   try {
+    const row = await prisma.externalPost.findUniqueOrThrow({
+      where: { id: externalPostId },
+      include: { target: { include: { socialAccount: true } } },
+    });
+
+    const token = tokenFor(row.target);
+    if (!token) return { ok: false, metrics: 0, error: 'No access token stored.' };
+
     const result = await readPostCatalogue({
       remotePostId: row.remoteId,
       accessToken: token,
