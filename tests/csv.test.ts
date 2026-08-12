@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { bulkCsvTemplate, csvCell, parseCsv, parseCsvWithHeader, toCsv } from '../src/lib/csv';
-import { bulkRowSchema } from '../src/lib/validation';
+import { bulkRowSchema, bulkUploadSchema } from '../src/lib/validation';
 import { localInputToUtc } from '../src/lib/time';
 
 describe('parseCsv', () => {
@@ -264,5 +264,43 @@ describe('csvCell', () => {
 
   it('assembles a document', () => {
     expect(toCsv([['name', 'posts'], ['Acme', 3]])).toBe('name,posts\nAcme,3\n');
+  });
+});
+
+/**
+ * What a CSV upload is allowed to ask for.
+ *
+ * The endpoint schedules; every row without a time goes into the queue. A
+ * whole file published the instant it is uploaded is a different gesture
+ * altogether, and an unrecoverable one: the rows go to Facebook one after
+ * another inside a single request, so the connection times out long before the
+ * last one, and the uploader is left with no record of which of five hundred
+ * posts went out.
+ */
+describe('bulkUploadSchema', () => {
+  const upload = (publishMode?: string) =>
+    bulkUploadSchema.safeParse({
+      csv: 'message\nHello',
+      targetIds: ['t1'],
+      ...(publishMode ? { publishMode } : {}),
+    });
+
+  it('schedules through the worker unless told otherwise', () => {
+    const parsed = upload();
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.publishMode).toBe('worker');
+  });
+
+  it('allows handing the schedule to Facebook', () => {
+    // Legitimate for a bulk file: the posts survive our worker being down.
+    expect(upload('native').success).toBe(true);
+  });
+
+  it('refuses to publish a whole file on the spot', () => {
+    const parsed = upload('immediate');
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.message).toMatch(/one at a time|schedule/i);
+    }
   });
 });

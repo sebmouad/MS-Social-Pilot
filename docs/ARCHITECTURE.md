@@ -1810,6 +1810,15 @@ otherwise fail the insert and lose the whole batch rather than the duplicate.
 last had this from Facebook" rather than quietly becoming "when it last
 changed".
 
+**A CSV upload can be scheduled, not fired.** The bulk endpoint accepted any
+publish mode, including `immediate` — which would have sent every row to
+Facebook one after another inside a single request. The connection times out
+long before the last of five hundred, and the uploader is left with no record
+of which ones went out, on an action nothing can undo. The UI only ever sent
+`worker`, but the API is the boundary, so the schema now allows only the two
+scheduling modes. `native` stays: handing a bulk file to Facebook so it
+survives our downtime is a real use, and it is bounded by the same row limit.
+
 Inbox messages get the same treatment and need less: a Page can hold a hundred
 and fifty threads of twenty-five messages, all re-read every sync, and a
 message on Facebook cannot be edited once sent — so a row that exists is

@@ -188,7 +188,19 @@ export const bulkUploadSchema = z.object({
     .max(LIMITS.bulkCsvBytes, 'That file is too large to process in one upload. Split it up.'),
   targetIds: z.array(z.string().min(1)).min(1, 'Choose at least one destination.'),
   timezone: timezone.default('UTC'),
-  publishMode: z.nativeEnum(PublishMode).default(PublishMode.worker),
+  // Scheduling modes only. This endpoint's whole shape is scheduling — a row
+  // with no time goes into the queue — and publishing a file on the spot is a
+  // different, unrecoverable gesture: the rows go to Facebook one after
+  // another inside a single request, so the connection times out long before
+  // the last one and the uploader is left with no record of which of five
+  // hundred posts went out. Posting now stays on the endpoint that does one
+  // post per request, where each has its own answer.
+  publishMode: z
+    .enum([PublishMode.worker, PublishMode.native], {
+      message:
+        'A CSV can be scheduled or handed to Facebook, but not published on the spot. Post those one at a time.',
+    })
+    .default(PublishMode.worker),
 });
 
 export type CreatePostInput = z.infer<typeof createPostSchema>;
