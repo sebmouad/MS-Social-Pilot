@@ -3,7 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { cancelPost, updatePost } from '@/lib/posts';
 import { updatePostSchema } from '@/lib/validation';
 import { parseInsights, parseLinkPreview, parseMedia } from '@/lib/json';
-import { fail, ok, readJson, route } from '@/lib/api';
+import { ok, readJson, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -15,7 +16,7 @@ export const GET = route(async (_request: Request, context: Context) => {
     where: { id, workspaceId: auth.workspace.id },
     include: { targets: { include: { target: true } } },
   });
-  if (!post) return fail('Post not found.', 404);
+  if (!post) throw errors.postNotFound();
 
   return ok({
     id: post.id,

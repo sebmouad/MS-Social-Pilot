@@ -3,12 +3,13 @@ import { releaseHeldPosts } from '@/lib/approvals';
 import { canManageSettings } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { workspaceSettingsSchema } from '@/lib/validation';
-import { fail, ok, readJson, route } from '@/lib/api';
+import { ok, readJson, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 export const PATCH = route(async (request: Request) => {
   const auth = await requireAuth();
   if (!canManageSettings(auth.role)) {
-    return fail('Only workspace owners and admins can change these settings.', 403);
+    throw errors.adminsOnlySettings();
   }
 
   const input = workspaceSettingsSchema.parse(await readJson(request));

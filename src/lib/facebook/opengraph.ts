@@ -1,6 +1,7 @@
 import type { LinkPreview } from '../json';
 import { env } from '../env';
 import { GraphError, graphRequest } from './graph';
+import { errors } from '../errors';
 
 /**
  * Open Graph link previews.
@@ -288,11 +289,11 @@ export function assertSafePreviewUrl(raw: string): URL {
   try {
     url = new URL(raw);
   } catch {
-    throw new Error('Enter a valid URL, including http:// or https://.');
+    throw errors.previewUrlInvalid();
   }
 
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('Only http and https URLs can be previewed.');
+    throw errors.previewSchemeUnsupported();
   }
 
   // `URL` strips the brackets from an IPv6 host, so these compare bare.
@@ -316,7 +317,7 @@ export function assertSafePreviewUrl(raw: string): URL {
     host.startsWith('::ffff:');
 
   if (blocked) {
-    throw new Error('That host is not reachable for link previews.');
+    throw errors.previewHostBlocked();
   }
   return url;
 }

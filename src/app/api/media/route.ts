@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
 import { MediaError, storageUsage, storeFile } from '@/lib/media';
 import { fail, ok, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 /** Upload a file into the workspace media library. */
 export const POST = route(async (request: Request) => {
@@ -11,10 +12,10 @@ export const POST = route(async (request: Request) => {
   const form = await request.formData();
   const file = form.get('file');
   if (!(file instanceof File)) {
-    return fail('Attach a file to upload.', 400);
+    throw errors.attachFile();
   }
   if (file.size > env.maxUploadBytes) {
-    return fail(`That file is larger than the ${Math.round(env.maxUploadBytes / (1024 * 1024))} MB limit.`, 413);
+    throw errors.fileTooLarge(Math.round(env.maxUploadBytes / (1024 * 1024)));
   }
 
   // Uploading is not a privileged action — contributors draft posts, so they
@@ -22,11 +23,9 @@ export const POST = route(async (request: Request) => {
   // would stop people doing their job.
   const usage = await storageUsage(auth.workspace.id);
   if (usage.bytes + file.size > usage.quotaBytes) {
-    return fail(
-      `This client has used ${Math.round(usage.bytes / (1024 * 1024))} MB of its ` +
-        `${Math.round(usage.quotaBytes / (1024 * 1024))} MB media allowance. ` +
-        'Delete some files, or raise the limit in Configuration.',
-      413,
+    throw errors.quotaFull(
+      Math.round(usage.bytes / (1024 * 1024)),
+      Math.round(usage.quotaBytes / (1024 * 1024)),
     );
   }
 

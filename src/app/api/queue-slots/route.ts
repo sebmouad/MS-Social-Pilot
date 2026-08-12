@@ -2,7 +2,8 @@ import { requireAuth } from '@/lib/auth';
 import { canManageSettings } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { queueSlotsSchema } from '@/lib/validation';
-import { fail, ok, readJson, route } from '@/lib/api';
+import { ok, readJson, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 export const GET = route(async () => {
   const auth = await requireAuth();
@@ -28,7 +29,7 @@ export const GET = route(async () => {
 export const PUT = route(async (request: Request) => {
   const auth = await requireAuth();
   if (!canManageSettings(auth.role)) {
-    return fail('Only workspace owners and admins can change the publishing schedule.', 403);
+    throw errors.adminsOnlySchedule();
   }
 
   const { slots } = queueSlotsSchema.parse(await readJson(request));

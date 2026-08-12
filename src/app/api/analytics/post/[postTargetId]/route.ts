@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth';
 import { fail, ok, route } from '@/lib/api';
 import { readPostMetrics, syncExternalPostInsights, syncPostInsights } from '@/lib/analytics';
+import { errors } from '@/lib/errors';
 
 type Context = { params: Promise<{ postTargetId: string }> };
 
@@ -22,7 +23,8 @@ export const GET = route(async (request: Request, context: Context) => {
     ...(external ? { externalPostId: postTargetId } : { postTargetId }),
   });
 
-  return result ? ok(result) : fail('Post not found.', 404);
+  if (!result) throw errors.postNotFound();
+  return ok(result);
 });
 
 /** Re-read this one post's catalogue from Graph. */
@@ -36,7 +38,7 @@ export const POST = route(async (request: Request, context: Context) => {
     workspaceId: auth.workspace.id,
     ...(external ? { externalPostId: postTargetId } : { postTargetId }),
   });
-  if (!owned) return fail('Post not found.', 404);
+  if (!owned) throw errors.postNotFound();
 
   const result = external
     ? await syncExternalPostInsights(postTargetId)

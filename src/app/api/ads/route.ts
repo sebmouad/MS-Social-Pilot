@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { canManageAccounts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
-import { fail, ok, readJson, route } from '@/lib/api';
+import { ok, readJson, route } from '@/lib/api';
 import {
   discoverAdAccounts,
   listAdAccounts,
@@ -11,6 +11,7 @@ import {
   readCampaigns,
   syncAdAccount,
 } from '@/lib/ads';
+import { errors } from '@/lib/errors';
 
 /** Ad accounts, plus spend totals and campaign rows for the window. */
 export const GET = route(async (request: Request) => {
@@ -23,7 +24,7 @@ export const GET = route(async (request: Request) => {
     : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-    return fail('Enter a valid date range.', 400);
+    throw errors.dateRange();
   }
 
   const adAccountId = url.searchParams.get('adAccountId') ?? undefined;
@@ -55,7 +56,7 @@ export const POST = route(async (request: Request) => {
   // Discovery creates connection rows and a sync spends the app's rate limit,
   // so both sit behind the same permission as every other connection change.
   if (!canManageAccounts(auth.role)) {
-    return fail('Only workspace owners and admins can change connections.', 403);
+    throw errors.adminsOnlyConnections();
   }
 
   if (input.action === 'discover') {
@@ -71,7 +72,7 @@ export const POST = route(async (request: Request) => {
     select: { id: true },
   });
 
-  if (accounts.length === 0) return fail('No ad account connected.', 404);
+  if (accounts.length === 0) throw errors.noAdAccount();
 
   const results = [];
   for (const account of accounts) {

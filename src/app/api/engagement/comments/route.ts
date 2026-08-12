@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
-import { fail, ok, readJson, route } from '@/lib/api';
+import { ok, readJson, route } from '@/lib/api';
 import {
   moderateComment,
   readComments,
@@ -9,6 +9,7 @@ import {
   replyToCommentAs,
   type ModerationOutcome,
 } from '@/lib/engagement';
+import { errors } from '@/lib/errors';
 
 /** The workspace comment stream, optionally filtered. */
 export const GET = route(async (request: Request) => {
@@ -57,24 +58,17 @@ export const POST = route(async (request: Request) => {
   /** One mapping for all four actions, so no branch can forget a case. */
   const respond = (outcome: ModerationOutcome, body: Record<string, unknown>) => {
     if (outcome === 'forbidden') {
-      return fail(
-        input.action === 'delete'
-          ? 'Only workspace owners and admins can delete comments on Facebook.'
-          : 'You do not have permission to moderate comments.',
-        403,
-      );
+      throw input.action === 'delete'
+        ? errors.adminsOnlyDeleteComments()
+        : errors.moderateNoPermission();
     }
-    if (outcome === 'not_found') return fail('Comment not found.', 404);
+    if (outcome === 'not_found') throw errors.commentNotFound();
     if (outcome === 'gone') {
       // Deleting something already deleted is the outcome that was wanted, so
       // it is not an error — the row has gone from our copy too, and the list
       // will agree with Facebook once it refreshes.
-      return input.action === 'delete'
-        ? ok({ deleted: true, alreadyGone: true })
-        : fail(
-            'That comment is no longer on Facebook — somebody deleted it there. It has been removed from this list.',
-            410,
-          );
+      if (input.action !== 'delete') throw errors.commentGone();
+      return ok({ deleted: true, alreadyGone: true });
     }
     return ok(body);
   };

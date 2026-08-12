@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { canManageAccounts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
-import { fail, ok, readJson, route } from '@/lib/api';
+import { ok, readJson, route } from '@/lib/api';
 import {
   discoverInstagramAccounts,
   listInstagramAccounts,
@@ -11,6 +11,7 @@ import {
   readInstagramMedia,
   syncInstagramAccount,
 } from '@/lib/instagram';
+import { errors } from '@/lib/errors';
 
 /** Accounts, and optionally one account's stored insights and media. */
 export const GET = route(async (request: Request) => {
@@ -26,7 +27,7 @@ export const GET = route(async (request: Request) => {
     where: { id: accountId, workspaceId: auth.workspace.id },
     select: { id: true },
   });
-  if (!owned) return fail('Instagram account not found.', 404);
+  if (!owned) throw errors.instagramNotFound();
 
   const to = url.searchParams.get('to') ? new Date(url.searchParams.get('to')!) : new Date();
   const from = url.searchParams.get('from')
@@ -34,7 +35,7 @@ export const GET = route(async (request: Request) => {
     : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-    return fail('Enter a valid date range.', 400);
+    throw errors.dateRange();
   }
 
   const [series, media] = await Promise.all([
@@ -60,7 +61,7 @@ export const POST = route(async (request: Request) => {
   // Discovery creates connection rows and a sync spends the app's rate limit,
   // so both sit behind the same permission as every other connection change.
   if (!canManageAccounts(auth.role)) {
-    return fail('Only workspace owners and admins can change connections.', 403);
+    throw errors.adminsOnlyConnections();
   }
 
   if (input.action === 'discover') {
@@ -76,7 +77,7 @@ export const POST = route(async (request: Request) => {
     select: { id: true },
   });
 
-  if (accounts.length === 0) return fail('No Instagram account connected.', 404);
+  if (accounts.length === 0) throw errors.noInstagramConnected();
 
   const results = [];
   for (const account of accounts) {

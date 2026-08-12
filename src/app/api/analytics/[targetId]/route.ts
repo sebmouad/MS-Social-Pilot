@@ -10,7 +10,8 @@ import {
   readStoredAnalytics,
   syncTargetAnalytics,
 } from '@/lib/analytics';
-import { fail, ok, readJson, route } from '@/lib/api';
+import { ok, readJson, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 type Context = { params: Promise<{ targetId: string }> };
 
@@ -31,7 +32,7 @@ export const GET = route(async (request: Request, context: Context) => {
   const url = new URL(request.url);
 
   const target = await loadTarget(targetId, auth.workspace.id);
-  if (!target) return fail('Destination not found.', 404);
+  if (!target) throw errors.destinationNotFound();
 
   const to = url.searchParams.get('to') ? new Date(url.searchParams.get('to')!) : new Date();
   const from = url.searchParams.get('from')
@@ -39,7 +40,7 @@ export const GET = route(async (request: Request, context: Context) => {
     : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-    return fail('Enter a valid date range.', 400);
+    throw errors.dateRange();
   }
 
   const [series, availability, coverage] = await Promise.all([
@@ -83,7 +84,7 @@ export const POST = route(async (request: Request, context: Context) => {
   const { targetId } = await context.params;
 
   const target = await loadTarget(targetId, auth.workspace.id);
-  if (!target) return fail('Destination not found.', 404);
+  if (!target) throw errors.destinationNotFound();
 
   const body = await readJson(request).catch(() => ({}));
   const input = postSchema.parse(body ?? {});

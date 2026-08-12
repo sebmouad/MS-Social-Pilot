@@ -5,7 +5,8 @@ import { requireAuth } from '@/lib/auth';
 import { canManageAccounts } from '@/lib/constants';
 import { authorizationUrl, createOAuthState, OAUTH_NONCE_COOKIE } from '@/lib/facebook/oauth';
 import { env } from '@/lib/env';
-import { fail, route } from '@/lib/api';
+import { route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 /**
  * Start Facebook Login.
@@ -18,7 +19,7 @@ import { fail, route } from '@/lib/api';
 export const GET = route(async () => {
   const auth = await requireAuth();
   if (!canManageAccounts(auth.role)) {
-    return fail('Only workspace owners and admins can connect accounts.', 403);
+    throw errors.adminsOnlyConnect();
   }
 
   const { state, nonce } = createOAuthState();

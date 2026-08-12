@@ -7,7 +7,7 @@ import { pollSource } from '@/lib/rss/poll';
 import { toJson } from '@/lib/json';
 import { errors } from '@/lib/errors';
 import { assertFeedDestinations } from '@/lib/feeds';
-import { fail, ok, readJson, route } from '@/lib/api';
+import { ok, readJson, route } from '@/lib/api';
 
 const patchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
@@ -27,7 +27,7 @@ export const PATCH = route(async (request: Request, context: Context) => {
   const source = await prisma.feedSource.findFirst({
     where: { id, workspaceId: auth.workspace.id },
   });
-  if (!source) return fail('Feed not found.', 404);
+  if (!source) throw errors.feedNotFound();
 
   let targetIds: string[] | undefined;
   if (input.targetIds) {
@@ -69,7 +69,7 @@ export const POST = route(async (_request: Request, context: Context) => {
   const source = await prisma.feedSource.findFirst({
     where: { id, workspaceId: auth.workspace.id },
   });
-  if (!source) return fail('Feed not found.', 404);
+  if (!source) throw errors.feedNotFound();
 
   return ok(await pollSource(source));
 });

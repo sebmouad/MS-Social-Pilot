@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth';
 import { setTargetEnabled } from '@/lib/connections';
 import { targetUpdateSchema } from '@/lib/validation';
 import { fail, ok, readJson, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 /**
  * Enable or disable a destination in the composer.
@@ -23,9 +24,9 @@ export const PATCH = route(async (request: Request, context: { params: Promise<{
   });
 
   if (result.outcome === 'forbidden') {
-    return fail('Only workspace owners and admins can change destinations.', 403);
+    throw errors.adminsOnlyDestinations();
   }
-  if (result.outcome === 'not_found') return fail('Destination not found.', 404);
+  if (result.outcome === 'not_found') throw errors.destinationNotFound();
   if (result.outcome === 'blocked') return fail(result.reason ?? 'Cannot enable this destination.', 409);
 
   // Passed on rather than dropped: turning a destination off does not stop

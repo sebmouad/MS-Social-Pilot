@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
 import { syncPostInsights } from '@/lib/analytics';
 import { ok, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 /**
  * Pull fresh engagement numbers for recently published posts.

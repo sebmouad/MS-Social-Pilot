@@ -745,6 +745,24 @@ to grant, or to withdraw, a role above it — the second half mattering just as
 much, since demoting the sitting owner arrives at the same place as promoting
 yourself. The team screen filters its dropdowns by the same rank, so nobody is
 offered a control that would come back a 403.
+### What the API says when it refuses
+
+Every sentence the API sends back carries a **translation key**, not a finished
+string. `AppError` holds `key`, an English `fallback`, ICU `params` and an HTTP
+status; `handleApiError` translates it against the request's locale, and falls
+back to the English if the catalogue lookup fails for any reason — an error
+response must never itself throw. Facebook's own wording is the exception,
+passed through untranslated, because it arrives in one language and there is
+nothing to translate it against.
+
+A route that builds its own sentence puts English on the wire that no catalogue
+can reach, which a French customer reads at the one moment something has already
+gone wrong. Two sweeps hold the line: one walks every file under `src/app/api`
+and fails on a quoted sentence inside `fail(`, so a new route is covered the
+moment it exists; the other calls every shorthand in `errors` and checks both
+catalogues answer for its key. Anything passing a value straight through — a
+validator's message, a setting name — is named in a short allow-list.
+
 `getAuthContext` resolves the requested workspace and **re-checks membership** —
 an id from a cookie or URL is a request, not a permission. Workspace scoping is
 therefore a security boundary, with tests that a member of one workspace cannot

@@ -4,6 +4,7 @@ import { getAuthContext } from '@/lib/auth';
 import { isFirstRun, maySetUp, readSetupState } from '@/lib/setup';
 import { SettingError, writeSetting } from '@/lib/settings';
 import { fail, ok, readJson, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 /**
  * Setup: what is left to do, and the one thing that cannot be done without it.
@@ -22,7 +23,7 @@ const schema = z.object({
 export const GET = route(async () => {
   const auth = await getAuthContext();
   const firstRun = await isFirstRun();
-  if (!maySetUp(auth, firstRun)) return fail('Only an owner can view setup.', 403);
+  if (!maySetUp(auth, firstRun)) throw errors.ownerOnlyViewSetup();
 
   return ok(await readSetupState(auth?.workspace.id ?? null));
 });
@@ -30,7 +31,7 @@ export const GET = route(async () => {
 export const POST = route(async (request: Request) => {
   const auth = await getAuthContext();
   const firstRun = await isFirstRun();
-  if (!maySetUp(auth, firstRun)) return fail('Only an owner can change setup.', 403);
+  if (!maySetUp(auth, firstRun)) throw errors.ownerOnlyChangeSetup();
 
   const input = schema.parse(await readJson(request));
 

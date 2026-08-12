@@ -58,7 +58,9 @@ export async function handleApiError(error: unknown): Promise<NextResponse> {
     });
   }
   if (error instanceof AppError) {
-    return fail(await translate(error.key, error.params, error.message), error.status);
+    return fail(await translate(error.key, error.params, error.message), error.status, {
+      ...(error.fields ? { fields: error.fields } : {}),
+    });
   }
   if (error instanceof AuthError) {
     return fail(await translate('errors.notSignedIn', {}, error.message), 401);

@@ -11,6 +11,7 @@ import {
   describeSettings,
   writeSetting,
 } from '@/lib/settings';
+import { errors } from '@/lib/errors';
 
 /**
  * Instance configuration.
@@ -21,7 +22,7 @@ import {
  */
 export const GET = route(async () => {
   const auth = await requireAuth();
-  if (!canManageInstance(auth.role)) return fail('Only an owner can view configuration.', 403);
+  if (!canManageInstance(auth.role)) throw errors.ownerOnlyViewConfig();
 
   return ok({ settings: await describeSettings() });
 });
@@ -33,7 +34,7 @@ const schema = z.object({
 
 export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
-  if (!canManageInstance(auth.role)) return fail('Only an owner can change configuration.', 403);
+  if (!canManageInstance(auth.role)) throw errors.ownerOnlyChangeConfig();
 
   const input = schema.parse(await readJson(request));
 

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
-import { fail, ok, readJson, route } from '@/lib/api';
+import { ok, readJson, route } from '@/lib/api';
 import { syncWorkspaceEdges } from '@/lib/engagement';
+import { errors } from '@/lib/errors';
 
 const schema = z.object({
   /** Omit to refresh every enabled Page in the workspace. */
@@ -28,7 +29,7 @@ export const POST = route(async (request: Request) => {
     since: input.since ? new Date(input.since) : undefined,
   });
 
-  if (empty) return fail('No Facebook Page to refresh.', 404);
+  if (empty) throw errors.noPageToRefresh();
 
   return ok({ results });
 });

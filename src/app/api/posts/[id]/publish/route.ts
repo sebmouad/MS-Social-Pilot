@@ -2,7 +2,8 @@ import { requireAuth } from '@/lib/auth';
 import { canManageOthersPosts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { publishNow } from '@/lib/scheduler/runner';
-import { fail, ok, route } from '@/lib/api';
+import { ok, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 /** "Post now" — publish a draft or scheduled post immediately. */
 export const POST = route(async (_request: Request, context: { params: Promise<{ id: string }> }) => {
@@ -13,18 +14,15 @@ export const POST = route(async (_request: Request, context: { params: Promise<{
     where: { id, workspaceId: auth.workspace.id },
     include: { targets: true },
   });
-  if (!post) return fail('Post not found.', 404);
+  if (!post) throw errors.postNotFound();
   if (post.authorId !== auth.user.id && !canManageOthersPosts(auth.role)) {
-    return fail('You can only publish your own posts.', 403);
+    throw errors.publishOwnOnly();
   }
 
-  if (post.status === 'published') return fail('This post has already been published.', 409);
-  if (post.status === 'publishing') return fail('This post is being published right now.', 409);
+  if (post.status === 'published') throw errors.alreadyPublished();
+  if (post.status === 'publishing') throw errors.alreadyPublishing();
   if (post.targets.some((target) => target.status === 'scheduled_remote')) {
-    return fail(
-      'Facebook is already holding this post for its scheduled time. Cancel it first to publish now.',
-      409,
-    );
+    throw errors.heldByFacebook();
   }
 
   const result = await publishNow(post.id);

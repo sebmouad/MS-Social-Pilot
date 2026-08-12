@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { fail, route } from '@/lib/api';
 import { EXPORT_KINDS, buildExport, type ExportKind } from '@/lib/analytics-export';
 import { csvFilename, parseReportRange } from '@/lib/reports';
+import { errors } from '@/lib/errors';
 
 /**
  * CSV export of any part of the analytics catalogue.
@@ -18,7 +19,7 @@ export const GET = route(async (request: Request) => {
 
   const kind = (url.searchParams.get('kind') ?? 'posts') as ExportKind;
   if (!EXPORT_KINDS.includes(kind)) {
-    return fail(`Unknown export. Choose one of: ${EXPORT_KINDS.join(', ')}.`, 400);
+    throw errors.unknownExport(EXPORT_KINDS.join(', '));
   }
 
   const range = parseReportRange({
@@ -37,7 +38,7 @@ export const GET = route(async (request: Request) => {
       where: { id: requestedTarget, workspaceId: auth.workspace.id },
       select: { id: true },
     });
-    if (!owned) return fail('Destination not found.', 404);
+    if (!owned) throw errors.destinationNotFound();
   }
 
   const csv = await buildExport(kind, {

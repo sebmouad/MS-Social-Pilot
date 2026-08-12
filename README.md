@@ -224,7 +224,7 @@ how to drive it from a serverless cron instead of a long-running worker.
 npm test
 ```
 
-1039 tests, in three layers.
+1041 tests, in three layers.
 
 **Unit tests** cover the pure decision-making: which Graph edge a post takes,
 whether a retry is worth attempting, token encryption, timezone and queue-slot
@@ -348,6 +348,9 @@ based, and Facebook's own scraper is excluded so previews do not inflate counts.
   publish and never stored.
 - Every API endpoint is swept by a test that calls it with no session and fails
   unless it refuses; anything public has to be listed with a written reason.
+- Every error the API returns carries a translation key rather than a finished
+  English sentence, swept the same way, so a French customer reads French at the
+  moment something has gone wrong.
 - Link preview fetches refuse loopback and private address ranges (SSRF).
 - `signed_request` verified on Facebook's deauthorize and data-deletion
   callbacks.

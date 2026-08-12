@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
 import { removeLinkedAccount, setLinkedAccountEnabled } from '@/lib/connections';
-import { fail, ok, readJson, route } from '@/lib/api';
+import { ok, readJson, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -22,8 +23,8 @@ export const PATCH = route(async (request: Request, context: Context) => {
     enabled: input.enabled,
   });
 
-  if (result.outcome === 'forbidden') return fail('You cannot change connections.', 403);
-  if (result.outcome === 'not_found') return fail('Account not found.', 404);
+  if (result.outcome === 'forbidden') throw errors.cannotChangeConnections();
+  if (result.outcome === 'not_found') throw errors.accountNotFound();
 
   return ok({ enabled: input.enabled });
 });
@@ -40,8 +41,8 @@ export const DELETE = route(async (_request: Request, context: Context) => {
     id,
   });
 
-  if (result.outcome === 'forbidden') return fail('You cannot change connections.', 403);
-  if (result.outcome === 'not_found') return fail('Account not found.', 404);
+  if (result.outcome === 'forbidden') throw errors.cannotChangeConnections();
+  if (result.outcome === 'not_found') throw errors.accountNotFound();
 
   return ok({ removed: true });
 });

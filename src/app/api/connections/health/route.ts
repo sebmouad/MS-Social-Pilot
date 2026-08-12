@@ -1,7 +1,8 @@
 import { requireAuth } from '@/lib/auth';
 import { canManageAccounts } from '@/lib/constants';
 import { checkWorkspace } from '@/lib/health';
-import { fail, ok, route } from '@/lib/api';
+import { ok, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 /**
  * Run the live connection checks and report what Facebook says.
@@ -17,7 +18,7 @@ import { fail, ok, route } from '@/lib/api';
 export const POST = route(async () => {
   const auth = await requireAuth();
   if (!canManageAccounts(auth.role)) {
-    return fail('Only workspace owners and admins can run connection checks.', 403);
+    throw errors.adminsOnlyHealthCheck();
   }
 
   return ok(await checkWorkspace(auth.workspace.id));

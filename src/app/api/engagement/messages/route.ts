@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
-import { fail, ok, readJson, route } from '@/lib/api';
+import { ok, readJson, route } from '@/lib/api';
 import { replyToConversationAs, type ReplyOutcome } from '@/lib/engagement';
+import { errors } from '@/lib/errors';
 
 const replySchema = z.object({
   conversationId: z.string().min(1),
@@ -37,22 +38,16 @@ function respond(outcome: ReplyOutcome, body: Record<string, unknown>) {
     case 'ok':
       return ok(body);
     case 'forbidden':
-      return fail('You do not have permission to reply to messages.', 403);
+      throw errors.replyNoPermission();
     case 'not_found':
-      return fail('Conversation not found.', 404);
+      throw errors.conversationNotFound();
     case 'gone':
       // Only reachable through the shared outcome type: a conversation is not
       // something Facebook reports as deleted mid-reply.
-      return fail('This conversation is no longer on Facebook.', 410);
+      throw errors.conversationGone();
     case 'no_recipient':
-      return fail(
-        'Nobody to reply to: the last message in this thread is the Page’s own.',
-        409,
-      );
+      throw errors.noRecipient();
     case 'outside_window':
-      return fail(
-        'Facebook only allows a reply within 24 hours of the last message from the person. This thread has gone quiet for longer, so a reply would be refused.',
-        409,
-      );
+      throw errors.replyWindowClosed();
   }
 }

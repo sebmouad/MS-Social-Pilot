@@ -4,7 +4,8 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { openStoredFile } from '@/lib/media';
 import { verifyMediaUrl } from '@/lib/media-links';
-import { fail, route } from '@/lib/api';
+import { route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 
 /**
  * Serve an uploaded file.
@@ -31,7 +32,7 @@ export const GET = route(async (request: Request, context: { params: Promise<{ i
     : await prisma.media.findFirst({
         where: { id, workspaceId: (await requireAuth()).workspace.id },
       });
-  if (!media?.storageKey) return fail('File not found.', 404);
+  if (!media?.storageKey) throw errors.fileNotFound();
 
   // Streamed rather than read into memory: uploads run to tens of megabytes,
   // and a few people opening the media library at once should not each cost a
