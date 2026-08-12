@@ -7,8 +7,8 @@ Everything here assumes the Meta app already exists. If it does not, start with
 
 **Secrets and identity**
 
-- [ ] `SESSION_SECRET` and `ENCRYPTION_KEY` generated fresh
-      (`openssl rand -base64 48` and `-base64 32`)
+- [ ] `SESSION_SECRET` and `ENCRYPTION_KEY` generated fresh — `npm run setup`
+      does both, or `openssl rand -base64 48` and `-base64 32` by hand
 - [ ] `ENCRYPTION_KEY` stored somewhere you can recover it. Lose it and every
       stored Facebook token is unreadable — see [Key rotation](#key-rotation)
 - [ ] `APP_URL` uses https and matches the Meta app's OAuth redirect URI

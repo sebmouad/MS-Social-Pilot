@@ -1,4 +1,4 @@
-# MS Social Pilot
+# MS Social Pilot 1.0.0
 
 A SocialPilot-style scheduler for Facebook Pages, Groups and Instagram. Compose
 once, publish to many destinations, with an approval workflow, RSS auto-posting,
@@ -107,22 +107,28 @@ deleted, because Facebook keeps none.
 
 ## Quick start
 
-Node 20.11+ (22 recommended) and PostgreSQL 14+.
+Requires **Docker**, or **Node 20.11+** (22 recommended) with **PostgreSQL 14+**.
 
 ```bash
 npm install
-cp .env.example .env
+npm run setup
 ```
 
-Generate the two secrets:
+`npm run setup` writes `.env` from `.env.example` and generates the two secrets
+that must be unique to your installation — the session signing key and the token
+encryption key. It never overwrites values you have already set, so it is safe to
+run again.
+
+Then, with Docker:
 
 ```bash
-openssl rand -base64 48   # → SESSION_SECRET
-openssl rand -base64 32   # → ENCRYPTION_KEY (must decode to exactly 32 bytes)
+docker compose up -d
 ```
 
-`FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET` come from your Meta app — see
-[docs/META_APP_SETUP.md](docs/META_APP_SETUP.md), the fiddly part.
+That is Postgres, the web app and the scheduler worker. The app applies its own
+migrations on first boot.
+
+Or without Docker, using a Postgres you already have:
 
 ```bash
 docker compose up -d postgres   # or point DATABASE_URL at your own
@@ -132,28 +138,36 @@ npm run dev                     # http://localhost:3000
 npm run dev:worker              # second terminal
 ```
 
-Both processes are needed: the web app schedules, the worker publishes.
-Serverless alternative: `POST /api/cron/tick` — see
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Both processes are needed: the web app schedules, the worker publishes. A
+serverless alternative to the long-running worker is `POST /api/cron/tick` —
+see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-Everything optional degrades cleanly. No `RESEND_API_KEY` means email is logged
-as skipped rather than failing; no `ANTHROPIC_API_KEY` means the composer hides
-the AI tools.
+### Then, in the browser
 
-### Docker
+Open <http://localhost:3000>.
 
-```bash
-docker compose up --build
-```
+1. **Create the first account.** It becomes the owner. Sign-up is closed to
+   everyone else until you open it or send an invitation, because this app has
+   to be reachable from the internet for Facebook to call back.
+2. **The Setup screen** opens by itself and asks for your Meta app ID and
+   secret. It lists what is done and what is left, and it is the one screen that
+   works before an owner exists — after that it is owner-only.
+3. **Connect a Facebook account** from Connections. Each account shows which
+   permissions were granted and whether publishing actually works, so a missing
+   permission is visible here rather than at publish time.
 
-Three services from one image: `web`, `worker`, `postgres`.
+Getting the Meta app itself right is the part that blocks people:
+[docs/META_APP_SETUP.md](docs/META_APP_SETUP.md).
+
+Everything optional degrades cleanly. No `RESEND_API_KEY` and email is logged as
+skipped rather than failing; no `ANTHROPIC_API_KEY` and the composer hides the AI
+tools.
 
 ---
 
 ## Terminology
 
-The original request asked for the "Facebook Open Graph API". Two different
-things, both used here:
+Two similarly named things, both used here:
 
 - **Graph API** — the REST API that creates posts (`POST /{page-id}/feed`).
 - **Open Graph** — the `og:` metadata protocol describing a web page. Graph's
@@ -194,6 +208,7 @@ how to drive it from a serverless cron instead of a long-running worker.
 
 | Command | What it does |
 |---|---|
+| `npm run setup` | Write `.env` and generate the per-installation secrets |
 | `npm run dev` / `npm run dev:worker` | Dev server / worker |
 | `npm run build` / `npm start` | Production build and server |
 | `npm run worker` | Worker (production) |
@@ -209,14 +224,14 @@ how to drive it from a serverless cron instead of a long-running worker.
 npm test
 ```
 
-1011 tests, in three layers.
+1039 tests, in three layers.
 
 **Unit tests** cover the pure decision-making: which Graph edge a post takes,
 whether a retry is worth attempting, token encryption, timezone and queue-slot
 arithmetic, Open Graph and RSS parsing, CSV in and out, link tagging, and the
 rules for what Instagram will accept.
 
-**Sixteen integration suites** run against a real Postgres schema and a stub
+**Seventeen integration suites** run against a real Postgres schema and a stub
 Graph API. They exist for the failures that cost customers rather than the ones
 that annoy developers:
 

@@ -328,9 +328,9 @@ points at it, so the log line is the only way anyone finds it.
 The claim above moves a *destination* to `processing`, but the *post* stays
 `scheduled` until `refreshPostStatus` runs. There is a real window, then, where
 a post reads "scheduled" in the UI while a worker is already talking to
-Facebook about one of its destinations — and an edit landing in that window
-used to delete the row the worker was holding, erasing the only record that the
-post was on its way out. The recreated `pending` row published it a second time.
+Facebook about one of its destinations. An edit landing in that window must not
+delete the row the worker is holding: that erases the only record that the post
+is on its way out, and the recreated `pending` row publishes it a second time.
 
 Two things close it, and they are deliberately belt *and* braces:
 
@@ -1165,12 +1165,12 @@ documented fix for a stale one — but the fallback fetches the page ourselves,
 and that is the path that needs guarding.
 
 `assertSafePreviewUrl` lives in `scrapeWithFetch`, the one place the fetch
-happens, rather than on a route. It used to sit on the preview endpoint alone,
-which left the two paths that matter more — creating and editing a post, either
-of which can arrive a few hundred rows at a time from a CSV — fetching whatever
-they were given. The parsed `<title>` is stored on the post and rendered back,
-so an unguarded fetch is not only a request to an internal address but a way to
-read the answer.
+happens, rather than on a route. On the preview endpoint alone it would leave
+the two paths that matter more — creating and editing a post, either of which
+can arrive a few hundred rows at a time from a CSV — fetching whatever they were
+given. The parsed `<title>` is stored on the post and rendered back, so an
+unguarded fetch is not only a request to an internal address but a way to read
+the answer.
 
 Redirects are followed manually, three hops at most, checking each one. A guard
 that inspects only the URL it was handed is walked straight past by a public
@@ -1277,9 +1277,8 @@ unpublished state left out, since nothing will ever send it.
 
 The list is named once, in `STATES_NEEDING_MEDIA`. Two callers ask the same
 question — the delete route one file at a time, the library page in a batch —
-and they had their own copies, which is how they came to disagree. The version
-of that nobody notices is a library showing a file as free while the delete
-refuses to remove it. The `media`
+and a copy each is how they drift apart. The version of that nobody notices is a
+library showing a file as free while the delete refuses to remove it. The `media`
 job sweeps the opposite case — uploads nobody ever attached — after 30 days, and
 keeps anything referenced by *any* post whatever its status: deleting one a
 published post still renders turns history into broken images.
@@ -1657,9 +1656,9 @@ process regardless of traffic.
 
 ## First run
 
-A fresh deployment used to answer the browser with a sign-in form for an account
-that does not exist. `/` and `/login` now send whoever just deployed it to
-`/setup` while the database holds no accounts.
+A fresh deployment has no account to sign in to, so a sign-in form is the wrong
+first screen. `/` and `/login` send whoever just deployed it to `/setup` while
+the database holds no accounts.
 
 The checklist is **derived, never stored**. A wizard that remembers which step
 you reached is wrong the moment anything changes underneath it — the last
@@ -1887,12 +1886,12 @@ happened, ten across three rounds to three each and loses one. `spreadClicks`
 hands the remainder out a click at a time instead — arbitrary in which
 destination gets the extra, exact in the total.
 
-The summary card and the per-destination table also count different things,
-and used to say so with the same words. The card counts *posts*; the column
-counts the times each destination was posted to, so one post to three Pages is
-1 in the card and 1+1+1 in the column. Both figures are worth having — the
-label was the bug, and a client reading "Posts published" twice with different
-arithmetic under each has no way to know that.
+The summary card and the per-destination table count different things and are
+labelled differently for it. The card counts *posts*; the column counts the
+times each destination was posted to, so one post to three Pages is 1 in the
+card and 1+1+1 in the column. Both figures are worth having, but a client
+reading "Posts published" twice with different arithmetic under each has no way
+to tell them apart.
 
 Both CSV downloads name the file after the whole period rather than its last
 day. Stamping only the end date gave the same name to every range ending
@@ -1943,25 +1942,21 @@ are all of that shape, and every caller of every one of them is a loop over
 rows. A second exit past the channel is not a stricter version of the same
 promise; it ends the batch.
 
-All four had the same two steps outside their guard — the row lookup and the
-token decryption — and those are precisely the steps that fail for reasons the
-row itself cannot express: a record deleted after its id was read into the
-batch, and a token this installation can no longer decrypt after an
-`ENCRYPTION_KEY` rotation. One such row discarded everything already gathered
-ahead of it; for the manual Refresh button that meant a 500 in place of a
-partial result, and for the worker jobs the rest of that tenant's pass.
-`forEachWorkspace` and `forEachEnabledPage` isolate the *worker* per tenant and
-per Page, which is why the jobs degraded rather than died and the manual routes
-did not.
+Two steps in each are the ones that fail for reasons the row itself cannot
+express: the row lookup and the token decryption. A record can be deleted after
+its id is read into the batch, and a token can be left undecryptable by an
+`ENCRYPTION_KEY` rotation. Either one, thrown, discards everything gathered
+ahead of it — a 500 in place of a partial result for the manual Refresh button,
+and the rest of that tenant's pass for the worker jobs.
 
-The guard now covers the whole body of each, so the contract is total and no
-call site has to know — `syncWorkspaceEdges` and `syncWorkspaceAnalytics` are
-plain loops again. Putting the catch in the callers instead would work exactly
-once: it is a guarantee each new caller has to remember, and the manual refresh
-lacking what the worker job already had is what that looks like. The one thing
-lost by moving it inward is the name of a destination whose row cannot be read
-at all, which is honest — the row that held the name is gone, and the result
-says so rather than inventing one.
+The guard therefore covers the whole body of each, so the contract is total and
+no call site has to know: `syncWorkspaceEdges` and `syncWorkspaceAnalytics` are
+plain loops. Catching in the callers instead would work exactly once — it is a
+guarantee every new caller has to remember, and the ones that forget are the
+ones nobody notices. The single cost of guarding inward is the name of a
+destination whose row cannot be read at all: the result says "Unknown
+destination" rather than inventing one, because the row that held the name is
+gone.
 
 `published_posts` is the reconciliation edge. Posts made from the Facebook app,
 by another tool, or by a colleague who never opened this product are invisible

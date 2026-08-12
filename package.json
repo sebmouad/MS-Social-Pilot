@@ -1,9 +1,10 @@
 {
   "name": "ms-social-pilot",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Schedule and publish Facebook Page and Group posts via the Graph API.",
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "dev": "next dev",
     "dev:worker": "node --env-file-if-exists=.env --import tsx --watch scripts/worker.ts",
     "build": "prisma generate && next build",
