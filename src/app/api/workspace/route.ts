@@ -36,9 +36,19 @@ export const PATCH = route(async (request: Request) => {
 
   // Turning review off has to free whatever it was holding, or those posts sit
   // in `pending` for ever with the screen that would clear them now hidden.
-  if (input.requiresApproval === false) {
-    await releaseHeldPosts({ workspaceId: auth.workspace.id, userId: auth.user.id });
-  }
+  // Passed back rather than dropped: flipping this frees everything review was
+  // holding, and the ones whose moment has gone are on Facebook within the next
+  // tick. The person who flipped it should hear that from the switch, not from
+  // a client.
+  const released =
+    input.requiresApproval === false
+      ? await releaseHeldPosts({ workspaceId: auth.workspace.id, userId: auth.user.id })
+      : null;
 
-  return ok({ id: workspace.id, name: workspace.name, timezone: workspace.timezone });
+  return ok({
+    id: workspace.id,
+    name: workspace.name,
+    timezone: workspace.timezone,
+    ...(released && released.released > 0 ? { released } : {}),
+  });
 });

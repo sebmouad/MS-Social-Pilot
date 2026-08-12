@@ -78,10 +78,22 @@ export function SettingsClient({
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name, timezone: zone, ...settings }),
     });
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      released?: { released: number; publishingNow: number };
+    };
+
+    // Turning review off frees everything it was holding, and anything whose
+    // moment has gone publishes within the next tick. "Saved" alone lets
+    // somebody find that out from a client.
+    const publishingNow = body.released?.publishingNow ?? 0;
+
     setStatus(
       response.ok
-        ? { kind: 'ok', text: t('saved') }
+        ? {
+            kind: 'ok',
+            text: publishingNow > 0 ? t('savedReleased', { count: publishingNow }) : t('saved'),
+          }
         : { kind: 'error', text: body.error ?? t('couldNotSave') },
     );
     setPending(false);

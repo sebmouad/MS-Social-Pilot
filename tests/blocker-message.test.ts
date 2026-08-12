@@ -180,3 +180,43 @@ describe('the approvals screen', () => {
     }
   });
 });
+
+/**
+ * Turning review off, reported to the person who did it.
+ *
+ * The breakdown is worked out in the service layer; a route that drops it or a
+ * screen that ignores it puts the silence one layer further out, which is the
+ * shape this has taken every previous time.
+ */
+describe('the release report', () => {
+  const route = readFileSync('src/app/api/workspace/route.ts', 'utf8');
+  const client = readFileSync('src/components/SettingsClient.tsx', 'utf8');
+
+  it('is in what the route actually answers with', () => {
+    // Computing it into a local and returning without it is the version of
+    // this mistake that reads as done from a distance.
+    const start = route.indexOf('return ok({');
+    const payload = route.slice(start, route.indexOf('});', start));
+
+    expect(start, 'the route no longer answers with an object').toBeGreaterThan(-1);
+    expect(payload).toContain('released');
+  });
+
+  it('is shown when something is actually going out', () => {
+    expect(client).toContain('publishingNow');
+    expect(client).toContain("t('savedReleased'");
+  });
+
+  it('still says the ordinary thing when nothing was waiting', () => {
+    const handler = client.slice(client.indexOf('async function saveWorkspace'), client.indexOf('async function saveSlots'));
+    expect(handler).toContain("t('saved')");
+    expect(handler).toMatch(/publishingNow > 0/);
+  });
+
+  it('counts properly in both languages', () => {
+    for (const [language, messages] of [['en', en], ['fr', fr]] as const) {
+      const settings = messages.settings as unknown as Record<string, string>;
+      expect(settings.savedReleased, language).toContain('{count, plural,');
+    }
+  });
+});

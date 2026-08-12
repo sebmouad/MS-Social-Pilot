@@ -360,7 +360,7 @@ describe('turning the workflow off', () => {
       workspaceId: workspace.id,
       userId: owner.id,
     });
-    expect(released).toBe(1);
+    expect(released.released).toBe(1);
 
     const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
     expect(after.approvalStatus).toBe(ApprovalStatus.not_required);
@@ -391,7 +391,9 @@ describe('turning the workflow off', () => {
       note: 'Off-brand.',
     });
 
-    expect(await approvals.releaseHeldPosts({ workspaceId: workspace.id, userId: owner.id })).toBe(0);
+    expect(
+      (await approvals.releaseHeldPosts({ workspaceId: workspace.id, userId: owner.id })).released,
+    ).toBe(0);
 
     const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
     expect(after.approvalStatus).toBe(ApprovalStatus.rejected);
@@ -1986,5 +1988,91 @@ describe('a bulk run that stops partway', () => {
       orderBy: { createdAt: 'asc' },
     });
     expect(stored.map((post) => post.message)).toEqual(['Row one', 'Row two']);
+  });
+});
+
+/**
+ * Turning review off, when things were waiting behind it.
+ *
+ * This is the batch case in its strongest form: one setting is flipped and
+ * every held post is freed at once. The ones whose moment has already gone
+ * publish on the next tick — the same thing approving them would have done,
+ * and deliberate — but the admin flipping the switch has no idea how many that
+ * is. Everything they might have wanted to check first is already on Facebook
+ * thirty seconds later.
+ */
+describe('releasing everything review was holding', () => {
+  async function seedHeld(times: Array<Date | null>) {
+    const owner = await makeUser('Owner');
+    const contributor = await makeUser('Contributor');
+    const { workspace, target } = await makeWorkspace({
+      name: 'Client',
+      ownerId: owner.id,
+      requiresApproval: true,
+    });
+    await prisma.membership.create({
+      data: { userId: contributor.id, workspaceId: workspace.id, role: WorkspaceRole.contributor },
+    });
+
+    for (const [index, scheduledAt] of times.entries()) {
+      await prisma.post.create({
+        data: {
+          workspaceId: workspace.id,
+          authorId: contributor.id,
+          submittedById: contributor.id,
+          submittedAt: new Date(),
+          message: `Held ${index}`,
+          status: PostStatus.pending_approval,
+          approvalStatus: ApprovalStatus.pending,
+          scheduledAt,
+          targets: { create: { targetId: target.id } },
+        },
+      });
+    }
+
+    return { workspace, owner };
+  }
+
+  const hourAgo = () => new Date(Date.now() - 60 * 60 * 1000);
+  const nextWeek = () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  it('says how many are going out immediately', async () => {
+    const { workspace, owner } = await seedHeld([hourAgo(), hourAgo(), nextWeek(), null]);
+
+    const result = await approvals.releaseHeldPosts({
+      workspaceId: workspace.id,
+      userId: owner.id,
+    });
+
+    expect(result.released).toBe(4);
+    // The two that matter: these are on Facebook within the next tick.
+    expect(result.publishingNow).toBe(2);
+    expect(result.scheduled).toBe(1);
+    expect(result.drafts).toBe(1);
+  });
+
+  it('counts nothing as immediate when everything is still ahead', async () => {
+    const { workspace, owner } = await seedHeld([nextWeek(), nextWeek()]);
+
+    const result = await approvals.releaseHeldPosts({
+      workspaceId: workspace.id,
+      userId: owner.id,
+    });
+
+    expect(result.released).toBe(2);
+    expect(result.publishingNow).toBe(0);
+  });
+
+  it('records the breakdown, not just a total', async () => {
+    const { workspace, owner } = await seedHeld([hourAgo(), nextWeek()]);
+
+    await approvals.releaseHeldPosts({ workspaceId: workspace.id, userId: owner.id });
+
+    // The audit entry is the only durable record — no email is sent, on
+    // purpose. A bare total cannot answer "what went out when we did that".
+    const entry = await prisma.activityLog.findFirstOrThrow({
+      where: { workspaceId: workspace.id, action: 'approvals.disabled' },
+    });
+    expect(entry.detail).toMatchObject({ released: 2, publishingNow: 1 });
   });
 });

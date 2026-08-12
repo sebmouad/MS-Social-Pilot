@@ -215,17 +215,33 @@ export async function rejectPost(options: {
  * transition, so a workspace already carrying stranded posts is healed the next
  * time an admin saves that page.
  */
+export interface ReleaseResult {
+  released: number;
+  /** Their moment has gone, so the next tick publishes them. */
+  publishingNow: number;
+  /** Still ahead of their time, and will wait for it. */
+  scheduled: number;
+  /** No time set, so they went back to being drafts. */
+  drafts: number;
+}
+
 export async function releaseHeldPosts(options: {
   workspaceId: string;
   userId: string;
-}): Promise<number> {
+  now?: Date;
+}): Promise<ReleaseResult> {
+  const now = options.now ?? new Date();
   const held = { workspaceId: options.workspaceId, ...IN_APPROVAL_QUEUE };
 
   // Same landing place as an approval: a post with no time set has nothing for
   // the scheduler to act on, so it returns to draft rather than to a scheduled
   // state it cannot honour. One whose time has already passed goes out on the
   // next tick, which is also what approving it would have done.
-  const [scheduled, drafts] = await prisma.$transaction([
+  const [overdue, scheduled, drafts] = await prisma.$transaction([
+    // Counted before the updates, and first in the array so it reads the state
+    // the switch is being flipped on. This is the number worth knowing: those
+    // posts are on Facebook within the next tick.
+    prisma.post.count({ where: { ...held, scheduledAt: { not: null, lte: now } } }),
     prisma.post.updateMany({
       where: { ...held, scheduledAt: { not: null } },
       data: { approvalStatus: ApprovalStatus.not_required, status: PostStatus.scheduled },
@@ -236,20 +252,23 @@ export async function releaseHeldPosts(options: {
     }),
   ]);
 
-  const released = scheduled.count + drafts.count;
-  if (released > 0) {
+  const result: ReleaseResult = {
+    released: scheduled.count + drafts.count,
+    publishingNow: overdue,
+    scheduled: scheduled.count - overdue,
+    drafts: drafts.count,
+  };
+
+  if (result.released > 0) {
     // One audit entry rather than an email per author: this is a deliberate
     // administrative change, and a burst of "your post was approved" messages
-    // nobody approved would be worse than none.
-    await logActivity(
-      options.workspaceId,
-      'approvals.disabled',
-      { released },
-      options.userId,
-    );
+    // nobody approved would be worse than none. Which makes this entry the only
+    // durable record of what went out, so it carries the breakdown rather than
+    // a total that cannot answer the question.
+    await logActivity(options.workspaceId, 'approvals.disabled', result, options.userId);
   }
 
-  return released;
+  return result;
 }
 
 /**

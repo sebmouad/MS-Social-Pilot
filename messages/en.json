@@ -761,6 +761,7 @@
     "rowsScheduled": "{scheduled} of {total} rows scheduled",
     "saveWorkspace": "Save workspace",
     "saved": "Workspace settings saved.",
+    "savedReleased": "{count, plural, =1 {Saved. One post was waiting for review and is publishing now.} other {Saved. # posts were waiting for review and are publishing now.}}",
     "scheduleAllRows": "Schedule all rows",
     "scheduling": "Scheduling…",
     "shortenHint": "Replaces links with short ones you control, so clicks can be counted.",

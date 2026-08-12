@@ -140,6 +140,18 @@ somebody's afternoon. A test pins that every writer of the sentence also writes
 the code, because forgetting one puts a reader back where they started and
 nothing would look wrong.
 
+**Turning review off is the same situation at its largest.** One switch frees
+everything the queue was holding, and the posts whose moment has gone publish
+on the next tick — deliberate, and the same thing approving them would have
+done. What was missing is that nobody said so: the route called
+`releaseHeldPosts` and discarded its answer, so the admin got "Saved" and found
+out from a client. It now returns a breakdown — how many are publishing now,
+how many are still ahead, how many went back to draft — the route answers with
+it, and the settings screen says how many are going out. No email is sent, on
+purpose: a burst of "your post was approved" from an approval nobody made would
+be worse than none. That makes the activity entry the only durable record, so
+it carries the breakdown rather than a total that cannot answer what went out.
+
 **The approvals screen marks an overdue post too**, because that is where the
 decision is usually made rather than from the email. A reviewer working
 through a queue after a week away has no way to tell a post due next Tuesday
