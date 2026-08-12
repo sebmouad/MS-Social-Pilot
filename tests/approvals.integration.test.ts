@@ -1667,3 +1667,152 @@ describe('cancelling a post Facebook is holding', () => {
     expect(after.status).toBe(PostStatus.cancelled);
   });
 });
+
+/**
+ * Switching a post to native scheduling while editing it.
+ *
+ * The composer offers the same "let Facebook hold it" choice when editing as
+ * when creating, so the edit path has to mean the same thing by it. Creating
+ * refuses the combinations Facebook cannot honour and hands the post over when
+ * it can; editing did neither, so the setting was recorded and then ignored.
+ */
+describe('changing publish mode on an edit', () => {
+  async function seedScheduled(targetType: 'page' | 'group' | 'instagram' = 'page') {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Modes', ownerId: owner.id });
+
+    if (targetType !== 'page') {
+      await prisma.target.update({ where: { id: target.id }, data: { type: targetType } });
+    }
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        message: 'Going out later',
+        status: PostStatus.scheduled,
+        publishMode: 'worker',
+        scheduledAt: new Date(Date.now() + 3 * 60 * 60 * 1000),
+        targets: { create: { targetId: target.id, status: 'pending' } },
+      },
+    });
+
+    return { owner, workspace, target, post };
+  }
+
+  const context = (workspaceId: string, userId: string) => ({
+    workspaceId,
+    userId,
+    role: WorkspaceRole.owner,
+    requiresApproval: false,
+  });
+
+  it('refuses native scheduling for a Group, the same as creating one would', async () => {
+    const seed = await seedScheduled('group');
+
+    await expect(
+      posts.updatePost(context(seed.workspace.id, seed.owner.id), seed.post.id, {
+        publishMode: 'native',
+        targetIds: [seed.target.id],
+      }),
+    ).rejects.toThrow(/group/i);
+  });
+
+  it('refuses native scheduling for Instagram, the same as creating one would', async () => {
+    const seed = await seedScheduled('instagram');
+
+    await expect(
+      posts.updatePost(context(seed.workspace.id, seed.owner.id), seed.post.id, {
+        publishMode: 'native',
+        targetIds: [seed.target.id],
+      }),
+    ).rejects.toThrow(/instagram/i);
+  });
+
+  it('actually hands the post to Facebook when the mode changes to native', async () => {
+    const seed = await seedScheduled();
+
+    await posts.updatePost(context(seed.workspace.id, seed.owner.id), seed.post.id, {
+      publishMode: 'native',
+      targetIds: [seed.target.id],
+    });
+
+    // Recording the choice and leaving the post for the worker is the worst
+    // reading of it: the whole reason to pick native is that the post survives
+    // our worker being down, and the UI would say Facebook had it when nobody
+    // had asked Facebook anything.
+    const targets = await prisma.postTarget.findMany({ where: { postId: seed.post.id } });
+    expect(targets.map((row) => row.status)).toEqual(['scheduled_remote']);
+    expect(targets[0]?.remotePostId).toBeTruthy();
+  });
+
+  it('does not hand it over when the edit sends it back for review', async () => {
+    const owner = await makeUser('Owner');
+    const contributor = await makeUser('Contributor');
+    const { workspace, target } = await makeWorkspace({
+      name: 'Reviewed',
+      ownerId: owner.id,
+      requiresApproval: true,
+    });
+    await prisma.membership.create({
+      data: { userId: contributor.id, workspaceId: workspace.id, role: WorkspaceRole.contributor },
+    });
+
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: contributor.id,
+        message: 'Approved once',
+        status: PostStatus.scheduled,
+        publishMode: 'worker',
+        approvalStatus: ApprovalStatus.approved,
+        scheduledAt: new Date(Date.now() + 3 * 60 * 60 * 1000),
+        targets: { create: { targetId: target.id, status: 'pending' } },
+      },
+    });
+
+    await posts.updatePost(
+      {
+        workspaceId: workspace.id,
+        userId: contributor.id,
+        role: WorkspaceRole.contributor,
+        requiresApproval: true,
+      },
+      post.id,
+      { message: 'Changed after approval', publishMode: 'native', targetIds: [target.id] },
+    );
+
+    // Handing it to Facebook would publish, on a schedule, something a
+    // reviewer has not seen — which is the entire thing the queue prevents.
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.pending_approval);
+
+    const targets = await prisma.postTarget.findMany({ where: { postId: post.id } });
+    expect(targets.map((row) => row.status)).toEqual(['pending']);
+  });
+
+  it('does not hand it over when the edit turns it into a draft', async () => {
+    const seed = await seedScheduled();
+
+    await posts.updatePost(context(seed.workspace.id, seed.owner.id), seed.post.id, {
+      publishMode: 'native',
+      targetIds: [seed.target.id],
+      scheduledAtLocal: null,
+    });
+
+    // A draft has no time for Facebook to hold it until.
+    const targets = await prisma.postTarget.findMany({ where: { postId: seed.post.id } });
+    expect(targets.map((row) => row.status)).toEqual(['pending']);
+  });
+
+  it('leaves a worker post alone when the mode is not what changed', async () => {
+    const seed = await seedScheduled();
+
+    await posts.updatePost(context(seed.workspace.id, seed.owner.id), seed.post.id, {
+      message: 'Reworded, same plan',
+    });
+
+    const targets = await prisma.postTarget.findMany({ where: { postId: seed.post.id } });
+    expect(targets.map((row) => row.status)).toEqual(['pending']);
+  });
+});

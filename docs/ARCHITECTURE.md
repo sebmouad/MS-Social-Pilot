@@ -77,6 +77,18 @@ and editing means deleting it on Facebook and recreating it. Destinations in
 this state get the `scheduled_remote` status so our scheduler leaves them alone,
 and cancelling deletes the remote post rather than silently letting it publish.
 
+**The same rules apply when the mode is changed on an edit.** The composer
+offers "let Facebook hold it" while editing as well as while creating, so both
+paths share `assertNativeSupported` — a rule enforced on only one of them is
+not a rule, it is a detour. And switching to native actually hands the post
+over, rather than recording the choice and leaving it for our own worker: the
+whole reason to pick native is that the post survives our worker being down,
+and the screen would otherwise say Facebook had it while nobody had asked
+Facebook anything. Two cases are deliberately excluded — an edit that sends the
+post back for review, because handing it over would publish something no
+reviewer has seen, and an edit that turns it into a draft, which has no time for
+Facebook to hold it until.
+
 **Facebook never tells us when it publishes one.** A natively scheduled post
 exists on Facebook from the moment it is created and flips to published on its
 own, so without asking, a `scheduled_remote` destination stays that way for

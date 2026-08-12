@@ -174,21 +174,7 @@ export async function createPost(
   });
   const needsApproval = approvalStatus === ApprovalStatus.pending;
 
-  // Native scheduling is a Pages-only Graph feature; fall back cleanly rather
-  // than letting Graph reject the whole batch.
-  if (input.publishMode === 'native') {
-    const groups = targets.filter((target) => target.type === 'group');
-    if (groups.length > 0) {
-      throw errors.nativeGroupsUnsupported(groups.map((group) => group.name).join(', '));
-    }
-
-    // Instagram has no equivalent at all: its API publishes immediately, so
-    // "let Instagram hold it" would silently become "publish it now".
-    const instagram = targets.filter((target) => target.type === 'instagram');
-    if (instagram.length > 0) {
-      throw errors.nativeInstagramUnsupported(instagram.map((item) => item.name).join(', '));
-    }
-  }
+  if (input.publishMode === 'native') assertNativeSupported(targets);
 
   // Cache the link's Open Graph card so the composer preview and the post list
   // do not have to re-scrape on every render.
@@ -433,6 +419,29 @@ function changesWhatWasReviewed(
 }
 
 /**
+ * Refuse the destinations Facebook cannot hold a post for.
+ *
+ * Shared by creating and editing, because the composer offers the same choice
+ * in both and a rule enforced on only one of them is not a rule — it is a
+ * detour. Native scheduling is a Pages-only Graph feature; letting Graph
+ * reject the whole batch instead would fail every destination, including the
+ * Pages that were fine.
+ */
+function assertNativeSupported(targets: Array<{ type: string; name: string }>): void {
+  const groups = targets.filter((target) => target.type === 'group');
+  if (groups.length > 0) {
+    throw errors.nativeGroupsUnsupported(groups.map((group) => group.name).join(', '));
+  }
+
+  // Instagram has no equivalent at all: its API publishes immediately, so
+  // "let Instagram hold it" would silently become "publish it now".
+  const instagram = targets.filter((target) => target.type === 'instagram');
+  if (instagram.length > 0) {
+    throw errors.nativeInstagramUnsupported(instagram.map((item) => item.name).join(', '));
+  }
+}
+
+/**
  * Edit a post.
  *
  * The subtle part is approval. A contributor whose post has been approved can
@@ -458,7 +467,9 @@ export async function updatePost(
 ): Promise<void> {
   const post = await prisma.post.findFirst({
     where: { id: postId, workspaceId: context.workspaceId },
-    include: { targets: true },
+    // The destinations' own rows too: an edit that changes only the mode has
+    // to be checked against the destinations the post already has.
+    include: { targets: { include: { target: { select: { type: true, name: true } } } } },
   });
   if (!post) throw errors.postNotFound();
 
@@ -544,15 +555,31 @@ export async function updatePost(
     data.reviewNote = null;
   }
 
+  // Resolved before the write, because the native check needs to know what
+  // kind of destination each one is, not just that it exists.
+  const valid = input.targetIds
+    ? await prisma.target.findMany({
+        where: { id: { in: input.targetIds }, workspaceId: context.workspaceId },
+        select: { id: true, type: true, name: true },
+      })
+    : [];
+  if (input.targetIds && valid.length !== input.targetIds.length) {
+    throw errors.targetsUnavailable();
+  }
+
+  // The mode the post will have once this edit lands, against the destinations
+  // it will have. Both halves can change in the same request.
+  const nextMode = input.publishMode ?? post.publishMode;
+  if (nextMode === 'native') {
+    assertNativeSupported(
+      input.targetIds ? valid : post.targets.map((row) => row.target),
+    );
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.post.update({ where: { id: postId }, data });
 
     if (input.targetIds) {
-      const valid = await tx.target.findMany({
-        where: { id: { in: input.targetIds }, workspaceId: context.workspaceId },
-        select: { id: true },
-      });
-      if (valid.length !== input.targetIds.length) throw errors.targetsUnavailable();
 
       // Only rows nothing is holding. `postEditBlocker` has already refused an
       // edit while a worker has one claimed, but that check and this write are
@@ -581,6 +608,25 @@ export async function updatePost(
   });
 
   await logActivity(context.workspaceId, 'post.updated', { postId }, context.userId);
+
+  // Switching to native means Facebook is supposed to be holding the post, so
+  // ask it to. Recording the choice and leaving the post for our own worker is
+  // the worst reading of it: the whole reason to pick native is that the post
+  // survives our worker being down, and the screen would say Facebook had it
+  // while nobody had asked Facebook anything.
+  //
+  // Only from a mode that is not already native — a post Facebook is holding
+  // cannot be edited at all, so there is nothing here to hand over twice.
+  const handOverAt = (data.scheduledAt as Date | null | undefined) ?? post.scheduledAt;
+  if (
+    input.publishMode === 'native' &&
+    post.publishMode !== 'native' &&
+    !needsReReview &&
+    data.status !== PostStatus.draft &&
+    handOverAt
+  ) {
+    await handOffToFacebook(postId, handOverAt);
+  }
 
   if (needsReReview) {
     const author = await prisma.user.findUniqueOrThrow({ where: { id: context.userId } });
