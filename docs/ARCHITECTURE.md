@@ -140,6 +140,17 @@ somebody's afternoon. A test pins that every writer of the sentence also writes
 the code, because forgetting one puts a reader back where they started and
 nothing would look wrong.
 
+**An approval email says what is about to happen, not what was planned.** A
+post held for review keeps the time its author chose, and approving it after
+that moment has passed leaves the scheduler to publish on the next tick — which
+is intended, and is the same thing releasing held posts does when approvals are
+switched off. What was not intended was the email: "it is scheduled for Tuesday
+9am", about a time that has gone, for a post going out in thirty seconds. The
+author plans around the sentence they were sent, so it now says the time has
+passed and it will publish shortly. A post with no time at all is returned to
+draft rather than to a schedule that cannot be honoured, and the email said so
+with an em dash where the time should be; it now says that too.
+
 **Emails already pick the recipient's language; they now pick the workspace's
 clock too.** Three of the five templates passed a timezone for a post's
 scheduled time. The two that carry a *deadline* — an invitation expiry and a

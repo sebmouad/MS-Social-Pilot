@@ -427,6 +427,8 @@
       "headingApproved": "Votre publication a été validée",
       "headingRejected": "Votre publication vous est renvoyée",
       "bodyApproved": "{reviewer} a validé votre publication dans {workspace}. Elle est planifiée pour {when}.",
+      "bodyApprovedNow": "{reviewer} a validé votre publication dans {workspace}. L’heure prévue est passée, elle paraîtra donc sous peu.",
+      "bodyApprovedDraft": "{reviewer} a validé votre publication dans {workspace}. Aucune heure n’est définie, elle reste donc en brouillon jusqu’à ce que vous en choisissiez une.",
       "bodyRejected": "{reviewer} vous renvoie votre publication avec cette note :",
       "cta": "Ouvrir la publication"
     },

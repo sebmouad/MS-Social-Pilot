@@ -279,20 +279,44 @@ export function approvalDecisionEmail(options: {
   const t = (key: string, params?: Record<string, string | number>) =>
     translate(options.locale, key, params);
 
-  const when = options.scheduledAt
-    ? formatDate(options.scheduledAt, options.locale, options.timezone)
-    : '—';
+  /**
+   * A post held for review keeps the time its author chose, so approving one
+   * late leaves a moment that has already gone. The scheduler publishes it on
+   * the next tick, which makes "it is scheduled for Tuesday 9am" a sentence
+   * about a time that has passed, for a post going out in the next thirty
+   * seconds. Say what is actually about to happen instead.
+   *
+   * A post with no time is returned to draft rather than to a schedule that
+   * cannot be honoured, and the email used to render that as an em dash.
+   */
+  const approvedBody = () => {
+    if (!options.scheduledAt) {
+      return t('email.approvalDecision.bodyApprovedDraft', {
+        reviewer: options.reviewer,
+        workspace: options.workspace,
+      });
+    }
+
+    if (options.scheduledAt.getTime() <= Date.now()) {
+      return t('email.approvalDecision.bodyApprovedNow', {
+        reviewer: options.reviewer,
+        workspace: options.workspace,
+      });
+    }
+
+    return t('email.approvalDecision.bodyApproved', {
+      reviewer: options.reviewer,
+      workspace: options.workspace,
+      when: formatDate(options.scheduledAt, options.locale, options.timezone),
+    });
+  };
 
   const block = layout({
     heading: options.approved
       ? t('email.approvalDecision.headingApproved')
       : t('email.approvalDecision.headingRejected'),
     body: options.approved
-      ? t('email.approvalDecision.bodyApproved', {
-          reviewer: options.reviewer,
-          workspace: options.workspace,
-          when,
-        })
+      ? approvedBody()
       : t('email.approvalDecision.bodyRejected', { reviewer: options.reviewer }),
     details: !options.approved && options.note ? [`“${options.note}”`] : [],
     cta: { label: t('email.approvalDecision.cta'), url: `${env.appUrl}/posts` },

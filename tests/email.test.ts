@@ -238,3 +238,55 @@ describe('the deadlines in emails', () => {
     expect(email.html).toContain('Sep 3, 2026');
   });
 });
+
+/**
+ * What an author is told when their post was approved late.
+ *
+ * A post held for review keeps the time its author chose. Approve it after
+ * that moment has passed and the scheduler publishes it on the next tick — so
+ * the email saying "it is scheduled for Tuesday 9am" is describing a time that
+ * has gone, about a post going out in the next thirty seconds. The author
+ * plans around the sentence they were sent.
+ */
+describe('an approval that arrives after the scheduled time', () => {
+  const base = {
+    locale: Locale.en,
+    workspace: 'Acme',
+    reviewer: 'Sam',
+    approved: true,
+    timezone: 'Europe/Paris',
+  };
+
+  it('says it is going out now, not that it is scheduled for a past time', () => {
+    const email = approvalDecisionEmail({
+      ...base,
+      scheduledAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+
+    expect(email.html).not.toMatch(/scheduled for/i);
+    expect(email.html).toMatch(/shortly|now/i);
+  });
+
+  it('still names the time when it is genuinely ahead', () => {
+    const scheduledAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    const email = approvalDecisionEmail({ ...base, scheduledAt });
+
+    expect(email.html).toMatch(/scheduled for/i);
+    expect(email.html).toContain(
+      new Intl.DateTimeFormat('en', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Europe/Paris',
+      }).format(scheduledAt),
+    );
+  });
+
+  it('says it is waiting as a draft when there is no time at all', () => {
+    // Approving a post with no time returns it to draft rather than to a
+    // schedule it cannot honour, so the email must not imply either.
+    const email = approvalDecisionEmail({ ...base, scheduledAt: null });
+
+    expect(email.html).not.toMatch(/scheduled for/i);
+    expect(email.html).not.toContain('—');
+  });
+});

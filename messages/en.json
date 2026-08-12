@@ -427,6 +427,8 @@
       "headingApproved": "Your post was approved",
       "headingRejected": "Your post was sent back",
       "bodyApproved": "{reviewer} approved your post in {workspace}. It is scheduled for {when}.",
+      "bodyApprovedNow": "{reviewer} approved your post in {workspace}. Its scheduled time has passed, so it will publish shortly.",
+      "bodyApprovedDraft": "{reviewer} approved your post in {workspace}. It has no time set, so it is waiting as a draft until you pick one.",
       "bodyRejected": "{reviewer} sent your post back with a note:",
       "cta": "Open the post"
     },
