@@ -4,6 +4,7 @@ import { errors } from '@/lib/errors';
 import { clear, hit } from '@/lib/rate-limit';
 import { loginSchema } from '@/lib/validation';
 import { ok, readJson, route } from '@/lib/api';
+import { clientIp } from '@/lib/client-ip';
 
 /**
  * Sign in.
@@ -23,10 +24,7 @@ export const POST = route(async (request: Request) => {
 
   const limit = { limit: env.loginAttempts, windowMs: env.loginWindowMs };
   const address = email.trim().toLowerCase();
-  const client =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    request.headers.get('x-real-ip') ??
-    'unknown';
+  const client = clientIp(request) ?? 'unknown';
 
   const addressKey = `login:address:${address}`;
   const clientKey = `login:client:${client}`;

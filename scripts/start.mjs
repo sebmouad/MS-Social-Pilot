@@ -34,12 +34,14 @@ function fromEnvFile(name) {
   return match?.[1]?.trim().replace(/^["']|["']$/g, '') || undefined;
 }
 
-const port = fromEnvFile('PORT') ?? '3000';
+const port = fromEnvFile('PORT') ?? '80';
 const host = fromEnvFile('HOST') ?? '0.0.0.0';
 
 if (Number(port) < 1024) {
-  // Not a failure — root and CAP_NET_BIND_SERVICE both make it work — but the
-  // error Node gives for this is EACCES with no explanation attached.
+  // The default, not an unusual choice: HTTPS is terminated by Cloudflare or
+  // another proxy, and this app serves plain HTTP on 80. Root and
+  // CAP_NET_BIND_SERVICE both make it work — but the error Node gives when
+  // neither is in place is a bare EACCES with nothing attached saying why.
   console.log(
     `Binding privileged port ${port}. If this fails with EACCES, either run as ` +
       `root or grant the capability once:\n` +

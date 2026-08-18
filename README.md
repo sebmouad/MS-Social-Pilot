@@ -130,8 +130,12 @@ Then, with Docker:
 docker compose up -d
 ```
 
-That is Postgres, the web app and the scheduler worker. The app applies its own
-migrations on first boot.
+That is Postgres, the web app and the scheduler worker, on
+<http://localhost>. The app applies its own migrations on first boot.
+
+Port 80 is the default because a real deployment sits behind Cloudflare or
+another terminator. On a laptop where 80 is taken, or where publishing it needs
+root, set `APP_PORT=8080` in `.env` and use <http://localhost:8080>.
 
 Or without Docker, using a Postgres you already have:
 
@@ -147,14 +151,17 @@ Both processes are needed: the web app schedules, the worker publishes. A
 serverless alternative to the long-running worker is `POST /api/cron/tick` —
 see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-The app listens on `PORT` (3000 by default) and speaks plain HTTP, so 443
-belongs to a TLS terminator in front of it. `PORT=80` serves directly; that is a
-privileged port, and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) says how to bind
-it without running as root.
+The app listens on `PORT` — **80 by default** — and speaks plain HTTP: HTTPS is
+terminated in front of it, by Cloudflare or another proxy, so 443 is never this
+process's port. Port 80 is privileged; the systemd unit written by the Debian
+installer can bind it without running as root, and
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) covers the Cloudflare setup and the
+alternatives.
 
 ### Then, in the browser
 
-Open <http://localhost:3000>.
+Open the app — <http://localhost> under Docker, <http://localhost:3000> from
+`npm run dev`, which stays on 3000 so a development server never needs root.
 
 1. **Create the first account.** It becomes the owner. Sign-up is closed to
    everyone else until you open it or send an invitation, because this app has
@@ -238,7 +245,7 @@ how to drive it from a serverless cron instead of a long-running worker.
 npm test
 ```
 
-1050 tests, in three layers.
+1057 tests, in three layers.
 
 **Unit tests** cover the pure decision-making: which Graph edge a post takes,
 whether a retry is worth attempting, token encryption, timezone and queue-slot

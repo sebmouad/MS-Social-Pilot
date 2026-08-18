@@ -188,7 +188,7 @@ fi
 say "Done"
 cat <<SUMMARY
 
-    Open http://$(hostname -I 2>/dev/null | awk '{print $1}'):3000
+    Open http://$(hostname -I 2>/dev/null | awk '{print $1}')
 
     1. Create the first account. It becomes the owner.
     2. The Setup screen asks for your Meta app ID and secret.
@@ -198,9 +198,9 @@ cat <<SUMMARY
     including https://, before connecting Facebook — the OAuth redirect has to
     match it exactly.
 
-    The app listens on PORT (3000 by default) and serves plain HTTP. For a
-    public server put a TLS terminator in front of it on 443 — the app has no
-    certificate handling of its own. To serve directly without one, set PORT=80
-    in .env; the unit installed here already carries the capability to bind it.
+    The app listens on PORT (80 by default) and serves plain HTTP. HTTPS is
+    terminated in front of it — Cloudflare, or another proxy — because the app
+    has no certificate handling of its own. The unit installed here carries the
+    capability to bind port 80 without running as root.
 
 SUMMARY

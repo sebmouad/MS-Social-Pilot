@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
 import { isProbablyBot, recordClick } from '@/lib/links';
+import { clientIp } from '@/lib/client-ip';
 
 /**
  * Short link redirect.
@@ -35,9 +36,7 @@ export async function GET(
     try {
       await recordClick({
         shortLinkId: link.id,
-        ip:
-          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-          request.headers.get('x-real-ip'),
+        ip: clientIp(request),
         userAgent,
         referer: request.headers.get('referer'),
       });

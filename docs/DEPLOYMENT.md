@@ -210,32 +210,72 @@ instead, and skip `signMediaUrl` entirely.
 
 ## Ports
 
-The app listens on **`PORT`, 3000 by default**, on the interface named by
+The app listens on **`PORT`, 80 by default**, on the interface named by
 **`HOST`**, and it speaks **plain HTTP**. There is no certificate handling in
-it, so **443 is a proxy's job** — see the next section. Under Docker, `PORT`
-inside the container is fixed at 3000 and `APP_PORT` chooses the host port the
-mapping publishes.
+it, so **443 is never this process's port** — HTTPS is terminated in front of
+it, by Cloudflare or another proxy.
 
-`APP_URL` is a separate question and is the *public* address. Behind a
-terminator the two differ on purpose: the app listens on 3000 and the world
-sees `https://your.domain`. Nothing is derived from the request, so `APP_URL`
-has to be right on its own.
-
-To serve directly with no proxy, set `PORT=80`. Ports below 1024 are
-privileged, and the honest choices are:
+Port 80 is privileged. The systemd unit written by `scripts/install-debian.sh`
+carries `AmbientCapabilities=CAP_NET_BIND_SERVICE`, which lets that one unit
+bind it while still running as an ordinary user. Outside systemd, grant the
+capability once:
 
 ```bash
-# Grant the capability once, and keep running as an ordinary user.
 sudo setcap 'cap_net_bind_service=+ep' "$(command -v node)"
 ```
 
-The systemd unit written by `scripts/install-debian.sh` already carries
-`AmbientCapabilities=CAP_NET_BIND_SERVICE`, which does the same thing for that
-unit alone and is narrower than the `setcap` above. Running the whole app as
-root to reach port 80 is the option to avoid.
+Running the whole app as root to reach port 80 is the option to avoid.
 
-`HOST=127.0.0.1` binds loopback only, which is what you want when a proxy on
-the same machine is the only thing that should reach it.
+Set `PORT=3000` when something else on the machine already owns 80 — a local
+nginx, or another site. `HOST=127.0.0.1` binds loopback only, which is right
+when a proxy or a Cloudflare Tunnel on the same machine is the only thing that
+should reach the app.
+
+Under Docker the container port is fixed at 3000 and **`APP_PORT`** chooses the
+host port the mapping publishes, so the healthcheck and the worker never depend
+on what was chosen outside.
+
+`APP_URL` is a separate question and is the **public** address. Behind a
+terminator the two differ on purpose: the app listens on 80 and the world sees
+`https://your.domain`. Nothing is derived from the incoming request, so
+`APP_URL` has to be right on its own.
+
+## Cloudflare
+
+The arrangement Cloudflare is used for here: DNS record proxied (orange cloud),
+Cloudflare answers 443 with its own certificate, and forwards to this server.
+
+```
+APP_URL="https://your.domain"
+PORT="80"
+```
+
+**Set the SSL/TLS mode to Full, not Flexible.** Flexible makes the hop from
+Cloudflare to your server plain HTTP across the open internet, which is where
+session cookies and Facebook tokens travel. Two ways to avoid it:
+
+- **Cloudflare Tunnel** (`cloudflared`) — the server opens an outbound
+  connection and needs no inbound port at all. Set `HOST=127.0.0.1` so nothing
+  else can reach the app, and point the tunnel at `http://127.0.0.1:80`. This is
+  the option to prefer: the origin is not exposed, so there is no origin address
+  to find and connect to directly.
+- **An origin certificate** — issue one in Cloudflare, install it on the server
+  behind a small terminator, and set the mode to Full (strict).
+
+**Do not enable Cloudflare's caching or minification for this app.** Every page
+is dynamic and behind a session; a cached response served to a second visitor is
+another workspace's calendar. Leave the default "bypass cache on cookie"
+behaviour alone, and if you add a Cache Rule, exclude `/api/*` explicitly.
+
+**Facebook's OAuth redirect goes through Cloudflare like everything else.** The
+redirect URI registered in the Meta app must be the `https://` address on your
+domain, matching `APP_URL` exactly.
+
+**`cf-connecting-ip` is read in preference to `x-forwarded-for`.** Cloudflare
+overwrites its own header on every request, while `x-forwarded-for` arrives as
+a list beginning with whatever the visitor sent — so behind Cloudflare the
+first is the one a visitor cannot choose for themselves. The next section says
+what the app does with an address.
 
 ## Behind a reverse proxy
 
@@ -256,6 +296,11 @@ session cookie in exactly that deployment. The Docker image sets `NODE_ENV`, and
 
 **`X-Forwarded-For` is read in two places**, and it is worth knowing what each
 one does with it:
+
+Both read it through `clientIp` in `src/lib/client-ip.ts`, which takes
+`cf-connecting-ip` first, then the left-most entry of `x-forwarded-for`, then
+`x-real-ip`. One function rather than a copy each, because a header added for
+one of them would otherwise not reach the other.
 
 - The **short-link redirect** hashes it for click counts. Forwarding it makes
   those counts more accurate; forging it skews an estimate and nothing else.
