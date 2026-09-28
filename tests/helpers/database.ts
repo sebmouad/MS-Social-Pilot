@@ -66,7 +66,7 @@ export function setupTestDatabase(label: string): TestDatabase {
  */
 export function setTestEnv(overrides: Record<string, string> = {}): void {
   process.env.ENCRYPTION_KEY ??= randomBytes(32).toString('base64');
-  process.env.SESSION_SECRET ??= 'integration-test-secret';
+  process.env.SESSION_SECRET ??= 'integration-test-secret-at-least-32-characters';
   process.env.FACEBOOK_APP_ID ??= '111';
   process.env.FACEBOOK_APP_SECRET ??= 'integration-app-secret';
   for (const [key, value] of Object.entries(overrides)) {
