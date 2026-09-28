@@ -216,6 +216,13 @@ export const errors = {
       status: 422,
     }),
 
+  feedUrlBlocked: () =>
+    new AppError({
+      key: 'errors.feedUrlBlocked',
+      fallback: 'That feed address points at a private network, which this server does not fetch. Use the feed’s public address.',
+      status: 422,
+    }),
+
   clocksGoForward: (when: string) =>
     new AppError({
       key: 'errors.clocksGoForward',
@@ -284,6 +291,31 @@ export const errors = {
       params: { minutes },
       status: 429,
     }),
+
+  // Sign-in and sign-up refusals have their own keys. They used to be thrown as
+  // `AuthError`, which the API renders as "You must be signed in." — so a
+  // mistyped password, on the sign-in form, told the person to sign in.
+  invalidCredentials: () =>
+    new AppError({ key: 'errors.invalidCredentials', fallback: 'Incorrect email or password.', status: 401 }),
+  emailTaken: () =>
+    new AppError({
+      key: 'errors.emailTaken',
+      fallback: 'An account with that email already exists. Sign in instead.',
+      status: 409,
+    }),
+
+  tooManySignups: (minutes: number) =>
+    new AppError({
+      key: 'errors.tooManySignups',
+      fallback: `Too many accounts created from here. Try again in ${minutes} minute(s).`,
+      params: { minutes },
+      status: 429,
+    }),
+
+  currentPasswordWrong: () =>
+    new AppError({ key: 'errors.currentPasswordWrong', fallback: 'Your current password is not correct.', status: 422 }),
+  passwordUnchanged: () =>
+    new AppError({ key: 'errors.passwordUnchanged', fallback: 'Choose a password different from the current one.', status: 422 }),
 
   registrationClosed: () =>
     new AppError({

@@ -174,17 +174,27 @@ export async function registerUser(input: {
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    throw new AuthError('An account with that email already exists.');
+    throw errors.emailTaken();
   }
 
-  const user = await prisma.user.create({
-    data: {
-      email,
-      name: input.name.trim(),
-      passwordHash: hashPassword(input.password),
-      locale: input.locale ?? Locale.en,
-    },
-  });
+  // The check above is advisory: two sign-ups for one address at the same
+  // moment both pass it, and the unique index decides. The loser gets the same
+  // answer as if it had come second, not a 500.
+  const user = await prisma.user
+    .create({
+      data: {
+        email,
+        name: input.name.trim(),
+        passwordHash: hashPassword(input.password),
+        locale: input.locale ?? Locale.en,
+      },
+    })
+    .catch((error: unknown) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw errors.emailTaken();
+      }
+      throw error;
+    });
 
   if (!input.skipWorkspace) {
     const workspace = await createWorkspace({
@@ -201,17 +211,28 @@ export async function registerUser(input: {
   return { userId: user.id, token: await createSession(user.id) };
 }
 
+let dummy: string | null = null;
+
+/** A real hash of nothing in particular, made on first use and then kept. */
+function dummyHash(): string {
+  dummy ??= hashPassword(randomToken(16));
+  return dummy;
+}
+
 export async function authenticate(email: string, password: string): Promise<string> {
   const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
 
   // Hash regardless of whether the user exists, so response timing does not
-  // reveal which email addresses are registered.
+  // reveal which email addresses are registered. Against a stored hash made
+  // once, not one made here: hashing a placeholder and then verifying against
+  // it cost two scrypt runs for an unknown address and one for a known one,
+  // which told anybody with a stopwatch exactly which addresses had accounts.
   const valid = user
     ? verifyPassword(password, user.passwordHash)
-    : verifyPassword(password, hashPassword('placeholder'));
+    : verifyPassword(password, dummyHash());
 
   if (!user || !valid) {
-    throw new AuthError('Incorrect email or password.');
+    throw errors.invalidCredentials();
   }
   return createSession(user.id);
 }
@@ -248,6 +269,15 @@ export async function destroySession(): Promise<void> {
   }
   store.delete(SESSION_COOKIE);
   store.delete(WORKSPACE_COOKIE);
+}
+
+/**
+ * The stored hash of this request's session token, or null when there is none.
+ * For telling "this browser" apart from the others when signing them out.
+ */
+export async function currentSessionTokenHash(): Promise<string | null> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  return token ? hashToken(token) : null;
 }
 
 /** Remember the active workspace across requests. */

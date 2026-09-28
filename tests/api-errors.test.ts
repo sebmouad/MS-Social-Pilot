@@ -62,6 +62,18 @@ describe('errors the app raises on purpose', () => {
     expect(body.error).toMatch(/does not accept new accounts/i);
   });
 
+  it('tells somebody who mistyped a password that, not to sign in', async () => {
+    // Sign-in failures used to be an AuthError, rendered as "You must be
+    // signed in." — on the sign-in form itself.
+    const wrong = await handle(errors.invalidCredentials());
+    expect(wrong.status).toBe(401);
+    expect(wrong.body.error).toMatch(/incorrect email or password/i);
+
+    const taken = await handle(errors.emailTaken());
+    expect(taken.status).toBe(409);
+    expect(taken.body.error).toMatch(/already exists/i);
+  });
+
   it('fills in the numbers an error carries', async () => {
     const { body } = await handle(errors.bulkTooManyRows(900, 500));
     expect(body.error).toContain('900');
