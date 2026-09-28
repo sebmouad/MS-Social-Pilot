@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 export interface PostMetricView {
   metric: string;
@@ -32,6 +32,7 @@ export function PostMetricExplorer({
   metrics: PostMetricView[];
 }) {
   const t = useTranslations('analytics');
+  const locale = useLocale();
   const tCommon = useTranslations('common');
   const router = useRouter();
 
@@ -120,7 +121,7 @@ export function PostMetricExplorer({
                     <span className="text-xs text-slate-400">{t('breakdownBelow')}</span>
                   ) : (
                     <span className="text-lg font-semibold text-slate-900">
-                      {(metric.value as number).toLocaleString()}
+                      {(metric.value as number).toLocaleString(locale)}
                     </span>
                   )}
                 </div>
@@ -141,7 +142,7 @@ export function PostMetricExplorer({
                         <li key={key} className="flex justify-between gap-3 text-xs">
                           <span className="truncate text-slate-600">{key}</span>
                           <span className="font-medium text-slate-700">
-                            {value.toLocaleString()}
+                            {value.toLocaleString(locale)}
                           </span>
                         </li>
                       ))}

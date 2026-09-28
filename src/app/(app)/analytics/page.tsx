@@ -37,7 +37,7 @@ import {
   readVideos,
 } from '@/lib/engagement';
 import { listInstagramAccounts, readInstagramInsights, readInstagramMedia } from '@/lib/instagram';
-import { formatInZone } from '@/lib/time';
+import { formatInZone, appLocale } from '@/lib/time';
 import { env } from '@/lib/env';
 import { pageRatingsAvailable } from '@/lib/facebook/graph';
 import { ExternalLink } from '@/components/ExternalLink';
@@ -398,7 +398,7 @@ async function VideosView({
   }
 
   const seconds = (milliseconds: number | null) =>
-    milliseconds === null ? '—' : `${Math.round(milliseconds / 1000).toLocaleString()}s`;
+    milliseconds === null ? '—' : `${Math.round(milliseconds / 1000).toLocaleString(appLocale())}s`;
 
   return (
     <div className="space-y-4">
@@ -437,9 +437,9 @@ async function VideosView({
                     {video.targetName} · {formatInZone(video.createdTime, timezone)}
                   </p>
                 </td>
-                <td className="px-4 py-3 text-right">{video.views?.toLocaleString() ?? '—'}</td>
-                <td className="px-4 py-3 text-right">{video.uniqueViews?.toLocaleString() ?? '—'}</td>
-                <td className="px-4 py-3 text-right">{video.completeViews?.toLocaleString() ?? '—'}</td>
+                <td className="px-4 py-3 text-right">{video.views?.toLocaleString(appLocale()) ?? '—'}</td>
+                <td className="px-4 py-3 text-right">{video.uniqueViews?.toLocaleString(appLocale()) ?? '—'}</td>
+                <td className="px-4 py-3 text-right">{video.completeViews?.toLocaleString(appLocale()) ?? '—'}</td>
                 <td className="px-4 py-3 text-right">{seconds(video.avgTimeWatchedMs)}</td>
                 <td className="px-4 py-3 text-right">{seconds(video.totalWatchTimeMs)}</td>
                 <td className="px-4 py-3 text-right text-slate-500">
@@ -576,10 +576,10 @@ async function ReviewsView({
   }
 
   const cards = [
-    { label: t('reviewCount'), value: summary.count.toLocaleString() },
+    { label: t('reviewCount'), value: summary.count.toLocaleString(appLocale()) },
     { label: t('averageRating'), value: summary.averageRating?.toFixed(1) ?? '—' },
-    { label: t('recommends'), value: summary.recommends.toLocaleString() },
-    { label: t('doesNotRecommend'), value: summary.doesNotRecommend.toLocaleString() },
+    { label: t('recommends'), value: summary.recommends.toLocaleString(appLocale()) },
+    { label: t('doesNotRecommend'), value: summary.doesNotRecommend.toLocaleString(appLocale()) },
   ];
 
   return (
@@ -737,7 +737,7 @@ async function ExternalView({
                         {figure.label}
                       </dt>
                       <dd className="text-sm font-medium text-slate-900">
-                        {figure.value === null ? '—' : figure.value.toLocaleString()}
+                        {figure.value === null ? '—' : figure.value.toLocaleString(appLocale())}
                       </dd>
                     </div>
                   ))}
@@ -905,7 +905,7 @@ async function InstagramView({
                   </td>
                   <td className="px-4 py-2.5 text-slate-500">{entry.period}</td>
                   <td className="px-4 py-2.5 text-right">
-                    {entry.total === null ? t('breakdown') : entry.total.toLocaleString()}
+                    {entry.total === null ? t('breakdown') : entry.total.toLocaleString(appLocale())}
                   </td>
                   <td className="px-4 py-2.5 text-right text-slate-500">{entry.points.length}</td>
                 </tr>
@@ -945,11 +945,11 @@ async function InstagramView({
                       {item.mediaType ?? '—'} · {formatInZone(item.timestamp, timezone)}
                     </p>
                   </td>
-                  <td className="px-4 py-3 text-right">{item.reach?.toLocaleString() ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">{item.impressions?.toLocaleString() ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">{item.likeCount?.toLocaleString() ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">{item.commentsCount?.toLocaleString() ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">{item.saved?.toLocaleString() ?? '—'}</td>
+                  <td className="px-4 py-3 text-right">{item.reach?.toLocaleString(appLocale()) ?? '—'}</td>
+                  <td className="px-4 py-3 text-right">{item.impressions?.toLocaleString(appLocale()) ?? '—'}</td>
+                  <td className="px-4 py-3 text-right">{item.likeCount?.toLocaleString(appLocale()) ?? '—'}</td>
+                  <td className="px-4 py-3 text-right">{item.commentsCount?.toLocaleString(appLocale()) ?? '—'}</td>
+                  <td className="px-4 py-3 text-right">{item.saved?.toLocaleString(appLocale()) ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

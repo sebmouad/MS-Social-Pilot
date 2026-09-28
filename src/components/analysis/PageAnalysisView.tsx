@@ -18,7 +18,7 @@ import {
   type Health,
   type KpiKey,
 } from '@/lib/page-analysis';
-import { formatInZone } from '@/lib/time';
+import { appLocale, formatInZone } from '@/lib/time';
 import { VIZ, compact, seriesColor } from '@/lib/viz';
 
 /** Localised weekday names, 0 = Sunday, from a known Sunday. */
@@ -187,12 +187,12 @@ async function PostTable({
                   </p>
                 </td>
                 <td className="nums px-4 py-2.5 text-right font-medium text-slate-900 sm:px-3">
-                  {post.interactions.toLocaleString()}
+                  {post.interactions.toLocaleString(appLocale())}
                   <span className="block text-[11px] font-normal text-slate-500">
-                    {post.reactions.toLocaleString()} · {post.comments.toLocaleString()} · {post.shares.toLocaleString()}
+                    {post.reactions.toLocaleString(appLocale())} · {post.comments.toLocaleString(appLocale())} · {post.shares.toLocaleString(appLocale())}
                   </span>
                 </td>
-                <td className="nums hidden px-3 py-2.5 text-right text-slate-700 sm:table-cell">{post.reach?.toLocaleString() ?? '—'}</td>
+                <td className="nums hidden px-3 py-2.5 text-right text-slate-700 sm:table-cell">{post.reach?.toLocaleString(appLocale()) ?? '—'}</td>
                 <td className="nums hidden px-4 py-2.5 text-right text-slate-700 sm:table-cell">{post.rate !== null ? `${post.rate}%` : '—'}</td>
               </tr>
             ))}
@@ -400,7 +400,7 @@ export async function ComparePagesView({
 
   if (rows.length === 0) return <div className="card p-8 text-center text-sm text-slate-600">{t('compare.none')}</div>;
 
-  const signed = (value: number | null) => (value === null ? '—' : `${value > 0 ? '+' : ''}${value.toLocaleString()}`);
+  const signed = (value: number | null) => (value === null ? '—' : `${value > 0 ? '+' : ''}${value.toLocaleString(appLocale())}`);
 
   return (
     <section className="card overflow-hidden">
@@ -447,10 +447,10 @@ export async function ComparePagesView({
                       </span>
                     )}
                   </td>
-                  <td className="nums px-3 py-3 text-right text-slate-700">{row.followers?.toLocaleString() ?? '—'}</td>
+                  <td className="nums px-3 py-3 text-right text-slate-700">{row.followers?.toLocaleString(appLocale()) ?? '—'}</td>
                   <td className="nums px-3 py-3 text-right text-slate-700">{row.perWeek}</td>
                   <td className="nums px-3 py-3 text-right text-slate-700">
-                    {row.avgInteractions?.toLocaleString() ?? '—'}
+                    {row.avgInteractions?.toLocaleString(appLocale()) ?? '—'}
                     {row.avgInteractionsChange !== null && (
                       <span
                         className="ml-1 text-xs"

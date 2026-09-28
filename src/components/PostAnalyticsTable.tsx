@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { VIZ, seriesColor } from '@/lib/viz';
 import { ExternalLink } from './ExternalLink';
@@ -46,6 +46,7 @@ type SortKey =
  */
 export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
   const t = useTranslations('analytics');
+  const locale = useLocale();
   const [sort, setSort] = useState<SortKey>('impressions');
   const [descending, setDescending] = useState(true);
 
@@ -171,7 +172,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
                         ? '—'
                         : column.key === 'engagementRate'
                           ? `${value}%`
-                          : Number(value).toLocaleString()}
+                          : Number(value).toLocaleString(locale)}
                     </dd>
                   </div>
                 );
@@ -235,7 +236,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
                         ? '—'
                         : column.key === 'engagementRate'
                           ? `${value}%`
-                          : Number(value).toLocaleString()}
+                          : Number(value).toLocaleString(locale)}
                     </td>
                   );
                 })}

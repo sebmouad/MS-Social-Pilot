@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { buildReport, parseReportRange } from '@/lib/reports';
-import { formatInZone, utcToLocalInput } from '@/lib/time';
+import { formatInZone, utcToLocalInput, appLocale } from '@/lib/time';
 import { ReportControls } from '@/components/ReportControls';
 import { ExternalLink } from '@/components/ExternalLink';
 
@@ -77,7 +77,7 @@ export default async function ReportsPage({
         {cards.map((card) => (
           <div key={card.label} className="card p-4">
             <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900">{card.value.toLocaleString()}</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">{card.value.toLocaleString(appLocale())}</p>
           </div>
         ))}
       </div>
@@ -113,13 +113,13 @@ export default async function ReportsPage({
                       <td className="py-2 pr-3 font-medium text-slate-800">{row.name}</td>
                       <td className="py-2 pr-3 text-right text-slate-600">{row.posts}</td>
                       <td className="py-2 pr-3 text-right text-slate-600">
-                        {row.impressions.toLocaleString()}
+                        {row.impressions.toLocaleString(appLocale())}
                       </td>
-                      <td className="py-2 pr-3 text-right text-slate-600">{row.reach.toLocaleString()}</td>
+                      <td className="py-2 pr-3 text-right text-slate-600">{row.reach.toLocaleString(appLocale())}</td>
                       <td className="py-2 pr-3 text-right text-slate-600">
-                        {(row.reactions + row.comments + row.shares).toLocaleString()}
+                        {(row.reactions + row.comments + row.shares).toLocaleString(appLocale())}
                       </td>
-                      <td className="py-2 text-right text-slate-600">{row.clicks.toLocaleString()}</td>
+                      <td className="py-2 text-right text-slate-600">{row.clicks.toLocaleString(appLocale())}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -136,8 +136,8 @@ export default async function ReportsPage({
                   <p className="mt-1 text-xs text-slate-500">
                     {post.targetName}
                     {post.publishedLabel ? ` · ${post.publishedLabel}` : ''} ·{' '}
-                    {post.engagement.toLocaleString()} {t('totalEngagement').toLowerCase()}
-                    {post.impressions > 0 && ` · ${post.impressions.toLocaleString()} impressions`}
+                    {post.engagement.toLocaleString(appLocale())} {t('totalEngagement').toLowerCase()}
+                    {post.impressions > 0 && ` · ${post.impressions.toLocaleString(appLocale())} impressions`}
                     {post.url && (
                       <>
                         {' · '}

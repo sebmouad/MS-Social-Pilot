@@ -1,3 +1,5 @@
+import { useLocale } from 'next-intl';
+
 import { VIZ, compact } from '@/lib/viz';
 import { Sparkline } from '@/components/Sparkline';
 
@@ -31,8 +33,11 @@ export function StatTile({
   trend?: number[];
   hero?: boolean;
 }) {
+  // Rendered both from server components and inside client ones; useLocale
+  // answers the same in both, where the request's language slot does not.
+  const locale = useLocale();
   const display =
-    value === null ? '—' : typeof value === 'number' ? compact(value) : value;
+    value === null ? '—' : typeof value === 'number' ? compact(value, locale) : value;
 
   const good =
     delta !== null && delta !== undefined && upIsGood !== null ? (delta >= 0) === upIsGood : null;
@@ -43,7 +48,7 @@ export function StatTile({
 
       <p
         className={`mt-1 font-semibold text-slate-900 ${hero ? 'text-4xl sm:text-5xl' : 'text-xl sm:text-2xl'}`}
-        title={typeof value === 'number' ? value.toLocaleString() : undefined}
+        title={typeof value === 'number' ? value.toLocaleString(locale) : undefined}
       >
         {display}
       </p>

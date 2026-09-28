@@ -8,7 +8,7 @@ import { screenMetadata } from '@/lib/metadata';
 import { summariseConnections } from '@/lib/connections';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
-import { formatInZone, relativeTime } from '@/lib/time';
+import { formatInZone, relativeTime, appLocale } from '@/lib/time';
 import { publishedTotals } from '@/lib/analytics';
 
 export const dynamic = 'force-dynamic';
@@ -162,7 +162,7 @@ export default async function DashboardPage() {
               <div key={String(label)}>
                 <dt className="text-xs text-slate-500">{label}</dt>
                 <dd className="text-lg font-semibold text-slate-900">
-                  {typeof value === 'number' ? value.toLocaleString() : '—'}
+                  {typeof value === 'number' ? value.toLocaleString(appLocale()) : '—'}
                 </dd>
               </div>
             ))}

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { BarList } from './charts/BarList';
 import { ChartFrame } from './charts/ChartFrame';
@@ -94,6 +94,7 @@ export function AnalyticsClient({
   profile,
 }: Props) {
   const t = useTranslations('analytics');
+  const locale = useLocale();
   const tCommon = useTranslations('common');
   const router = useRouter();
 
@@ -246,7 +247,7 @@ export function AnalyticsClient({
             rows: featuredSeries.points
               .filter((point) => typeof point.value === 'number')
               .map((point) => [
-                new Date(point.endTime).toLocaleDateString(),
+                new Date(point.endTime).toLocaleDateString(locale),
                 point.value as number,
               ]),
           }}
@@ -262,7 +263,7 @@ export function AnalyticsClient({
               },
             ]}
             formatX={(iso) =>
-              new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+              new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' })
             }
           />
         </ChartFrame>
@@ -376,7 +377,7 @@ export function AnalyticsClient({
                         </span>
                         <span className="text-right">
                           <span className="block text-lg font-semibold text-slate-900">
-                            {entry.total !== null ? compact(entry.total) : '—'}
+                            {entry.total !== null ? compact(entry.total, locale) : '—'}
                           </span>
                           {entry.trend !== null && (
                             <span

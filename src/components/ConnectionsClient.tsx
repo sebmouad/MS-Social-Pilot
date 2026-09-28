@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { Icon, type IconName } from './Icon';
 import { blockerMessage } from './blockerMessage';
@@ -68,6 +68,7 @@ export function ConnectionsClient({
   canManage: boolean;
 }) {
   const t = useTranslations('connections');
+  const locale = useLocale();
   const tCommon = useTranslations('common');
   const router = useRouter();
 
@@ -148,7 +149,7 @@ export function ConnectionsClient({
         body.health.message ??
           (body.health.expiresAt
             ? t('tokenValidUntil', {
-                when: new Date(body.health.expiresAt).toLocaleDateString(),
+                when: new Date(body.health.expiresAt).toLocaleDateString(locale),
               })
             : t('tokenValid')),
       );

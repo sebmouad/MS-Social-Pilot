@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { VIZ, seriesColor } from '@/lib/viz';
 
@@ -39,6 +39,7 @@ export function BarList({
   formatValue?: (value: number) => string;
 }) {
   const t = useTranslations('analytics');
+  const locale = useLocale();
   const [expanded, setExpanded] = useState(false);
 
   const rows: BarDatum[] = Object.entries(data)
@@ -52,7 +53,7 @@ export function BarList({
 
   const largest = rows[0]!.value;
   const shown = expanded ? rows : rows.slice(0, limit);
-  const format = formatValue ?? ((value: number) => value.toLocaleString());
+  const format = formatValue ?? ((value: number) => value.toLocaleString(locale));
 
   return (
     <div>

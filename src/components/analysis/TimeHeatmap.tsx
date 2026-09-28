@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { ChartFrame } from '@/components/charts/ChartFrame';
 
@@ -61,6 +61,7 @@ export function TimeHeatmap({
   timeZone: string;
 }) {
   const t = useTranslations('pageAnalysis');
+  const locale = useLocale();
   const [active, setActive] = useState<HeatCell | null>(null);
 
   // Monday first: the working week reads left to right, top to bottom.
@@ -146,7 +147,7 @@ export function TimeHeatmap({
               <p className="nums font-semibold text-slate-900">{t('times.cellDetail', { posts: active.posts })}</p>
               {active.avgInteractions !== null && active.lift !== null && (
                 <p className="nums text-slate-600">
-                  {t('times.cellLift', { avg: active.avgInteractions.toLocaleString(), lift: active.lift })}
+                  {t('times.cellLift', { avg: active.avgInteractions.toLocaleString(locale), lift: active.lift })}
                 </p>
               )}
             </div>

@@ -11,7 +11,7 @@ import { requirePage } from '@/lib/auth';
 import { listAdAccounts, readAdSummary, readCampaigns } from '@/lib/ads';
 import { adFindings, adKpis, type AdFinding, type AdKpiKey } from '@/lib/ads-analysis';
 import { screenMetadata } from '@/lib/metadata';
-import { formatInZone } from '@/lib/time';
+import { formatInZone, appLocale } from '@/lib/time';
 import { VIZ, seriesColor } from '@/lib/viz';
 
 export const dynamic = 'force-dynamic';
@@ -278,8 +278,8 @@ export default async function AdsPage({
                           <span className="nums w-9 text-right text-xs text-slate-600">{share}%</span>
                         </span>
                       </td>
-                      <td className="nums px-3 py-2.5 text-right text-slate-700">{row.impressions.toLocaleString()}</td>
-                      <td className="nums px-3 py-2.5 text-right text-slate-700">{row.clicks.toLocaleString()}</td>
+                      <td className="nums px-3 py-2.5 text-right text-slate-700">{row.impressions.toLocaleString(appLocale())}</td>
+                      <td className="nums px-3 py-2.5 text-right text-slate-700">{row.clicks.toLocaleString(appLocale())}</td>
                       <td className="nums px-3 py-2.5 text-right text-slate-700">{row.ctr === null ? '—' : `${row.ctr}%`}</td>
                       <td className="nums px-3 py-2.5 text-right text-slate-700">{money(row.cpc)}</td>
                       <td className="nums px-4 py-2.5 text-right text-slate-700">{money(row.cpm)}</td>

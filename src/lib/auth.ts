@@ -9,7 +9,7 @@ import { ensureSettings } from './settings';
 import { env } from './env';
 import { hashPassword, hashToken, randomToken, verifyPassword } from './crypto';
 import { uniqueSlug } from './slug';
-import { DEFAULT_QUEUE_SLOTS } from './time';
+import { DEFAULT_QUEUE_SLOTS, setDateLocale } from './time';
 
 /**
  * Sessions, and resolving which workspace the request is acting on.
@@ -331,6 +331,9 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
 
   const { user } = session;
   if (user.memberships.length === 0) return null;
+
+  // Dates on every screen this request renders are written in this language.
+  setDateLocale(user.locale);
 
   const cookieWorkspaceId = store.get(WORKSPACE_COOKIE)?.value;
   const candidates = [requestedWorkspaceId, cookieWorkspaceId, user.lastActiveWorkspaceId];

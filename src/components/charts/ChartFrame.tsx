@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { seriesColor } from '@/lib/viz';
 
@@ -40,6 +40,7 @@ export function ChartFrame({
   children: React.ReactNode;
 }) {
   const t = useTranslations('analytics');
+  const locale = useLocale();
   const [showTable, setShowTable] = useState(false);
   const tableId = useId();
 
@@ -113,7 +114,7 @@ export function ChartFrame({
                           cellIndex === 0 ? 'text-slate-700' : 'nums text-right text-slate-600'
                         }`}
                       >
-                        {typeof cell === 'number' ? cell.toLocaleString() : cell}
+                        {typeof cell === 'number' ? cell.toLocaleString(locale) : cell}
                       </td>
                     ))}
                   </tr>

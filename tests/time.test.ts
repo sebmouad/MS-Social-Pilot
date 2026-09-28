@@ -291,3 +291,25 @@ describe('monthGrid', () => {
     }
   });
 });
+
+describe('dates in the reader’s language', () => {
+  it('writes French month and day names for a French reader', async () => {
+    const { formatInZone } = await import('../src/lib/time');
+    const when = new Date('2026-09-29T18:30:00Z');
+    expect(formatInZone(when, 'Europe/Paris', 'EEEE d MMMM yyyy, HH:mm', 'fr')).toBe('mardi 29 septembre 2026, 20:30');
+    expect(formatInZone(when, 'Europe/Paris', 'EEEE d MMMM yyyy, HH:mm', 'en')).toBe('Tuesday 29 September 2026, 20:30');
+  });
+
+  it('keeps English, unchanged, outside a signed-in request', async () => {
+    // The worker and email have no request: dates there must not move.
+    const { formatInZone } = await import('../src/lib/time');
+    expect(formatInZone(new Date('2026-09-29T18:30:00Z'), 'UTC', 'd MMM yyyy')).toBe('29 Sep 2026');
+  });
+
+  it('says "in 2 hours" in the reader’s language too', async () => {
+    const { relativeTime } = await import('../src/lib/time');
+    const now = new Date('2026-09-29T10:00:00Z');
+    expect(relativeTime(new Date('2026-09-29T12:00:00Z'), now, 'fr')).toBe('dans 2 heures');
+    expect(relativeTime(new Date('2026-09-29T12:00:00Z'), now)).toBe('in 2 hours');
+  });
+});

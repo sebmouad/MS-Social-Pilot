@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { TargetPicker, type TargetOption } from './TargetPicker';
 import { ExternalLink } from './ExternalLink';
@@ -61,6 +61,9 @@ export function Composer({
   editing,
 }: Props) {
   const t = useTranslations('compose');
+  // Passed explicitly: this runs in the browser, outside the server request
+  // that sets the date language for everything else.
+  const locale = useLocale();
   const tCommon = useTranslations('common');
   const tAuth = useTranslations('auth');
   const router = useRouter();
@@ -267,7 +270,7 @@ export function Composer({
 
     const queuedFor =
       timing === 'queue' && body.scheduledAt
-        ? formatInZone(new Date(body.scheduledAt), timezone)
+        ? formatInZone(new Date(body.scheduledAt), timezone, undefined, locale)
         : null;
 
     setResult(
