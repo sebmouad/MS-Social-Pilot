@@ -66,6 +66,7 @@ export const SIGNED_IN_SCREENS = [
   '/analytics?view=interactions',
   '/analytics?view=audience',
   '/reports',
+  '/ads',
   '/settings',
   '/settings/team',
   '/settings/config',

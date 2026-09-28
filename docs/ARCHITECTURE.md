@@ -1400,6 +1400,28 @@ asserted 404 for years started seeing 200.
 
 ---
 
+## Three modules
+
+The top bar is three modules — **Analytics**, **Ads**, **Schedule** — rather
+than ten equal links. `src/lib/modules.ts` is the one map of which screen
+belongs to which; the nav, its sub-navigation and a test that every linked
+route exists all read it. Shared screens (home, connections, settings) belong
+to no module and sit beside them.
+
+The three tabs are never behind a menu, on any width: where you are is the one
+thing that must always be visible. A module's own screens appear as a second
+row under the bar, and only inside that module. Phones use shorter module
+names where a language needs them (French "Planification" becomes "Planning").
+
+Ads was a tab inside Analytics and is its own module now; `/analytics?view=ads`
+redirects there so old bookmarks keep working. It reads **one ad account at a
+time**: two accounts can bill in two currencies, and a total of euros and
+dollars is wrong under either symbol. Its findings follow the page analysis
+rules — the account against its own previous period, with floors (1,000
+impressions before a click-through rate is judged, 30 clicks before a cost per
+click) — and spend changes are shown uncoloured, because spending more is the
+plan as often as it is the problem.
+
 ## Page analysis
 
 The analytics screen opens on an analysis of the selected Page rather than on

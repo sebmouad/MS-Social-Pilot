@@ -29,6 +29,19 @@ nobody started.
 
 ## What it does
 
+The app is three modules, one tab each in the top bar:
+
+| Module | What it answers | Screens |
+|---|---|---|
+| **Analytics** | How are my Pages doing, and why? | Page analysis, compare pages, every insights view, reports |
+| **Ads** | What did the paid side cost, and what did it buy? | Spend and delivery against the previous period, daily trends, campaign / ad set / ad breakdown |
+| **Schedule** | What is going out, and when? | Calendar, posts, composer, approvals, RSS feeds |
+
+Connections, settings and the home overview serve all three and sit beside
+them rather than in any one.
+
+![The Ads module: findings, spend and delivery against the previous period, daily trends and where the budget went](docs/images/ads.png)
+
 ![The composer: message, link card, media, destinations and the three scheduling modes](docs/images/compose.png)
 
 **Publishing**
@@ -323,8 +336,9 @@ src/lib/settings/     The configuration registry every tunable comes from
 src/lib/              Auth, posts, approvals, team, links, AI, reports, media,
                       engagement, connection health, first-run setup
 src/app/api/          REST endpoints
-src/app/(app)/        Dashboard, composer, calendar, posts, approvals,
-                      connections, accounts, feeds, analytics, reports, settings
+src/app/(app)/        Analytics (analytics, reports), Ads (ads), Schedule (calendar,
+                      posts, compose, approvals, feeds); shared: dashboard,
+                      connections, accounts, settings. src/lib/modules.ts maps them
 src/app/setup/        First-run setup screen
 messages/             en.json, fr.json
 scripts/worker.ts     The background worker
