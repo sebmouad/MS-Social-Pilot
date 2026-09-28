@@ -17,6 +17,7 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "node --env-file-if-exists=.env --import tsx prisma/seed.ts",
+    "db:demo": "node --env-file-if-exists=.env --import tsx prisma/demo.ts",
     "postinstall": "prisma generate",
     "screenshots": "playwright test screenshots.spec.ts --project=chromium"
   },

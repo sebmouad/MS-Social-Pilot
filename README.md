@@ -98,6 +98,18 @@ threads outside that window say so instead of offering a box that would refuse.
 (`POST /?id=<url>&scrape=true`), so you see exactly the card Facebook will
 render and its cache is refreshed. Falls back to parsing `og:` tags directly.
 
+**Page analysis** — the first thing Analytics shows for a connected Page is
+what its numbers *mean*: a health score out of 100 built from four stated
+parts, this period against the one before, posts per week against a target,
+which formats earn the most interactions, a day-by-time grid of when posts do
+best, the strongest and weakest posts, and a short list of findings in plain
+sentences. It reads every post on the Page, not only those published from here,
+and compares the Page with itself rather than with benchmarks nobody can check.
+**Compare pages** puts every Page in a workspace side by side on the same
+figures. **Analyse now** re-reads the Page from Facebook on demand.
+
+![Page analysis: health score, findings, period comparison, cadence, formats and the best-time grid](docs/images/analysis.png)
+
 **Reporting** — impressions, reach, engagement and link clicks per destination
 and per post, with CSV export and a print-styled page for PDF.
 
@@ -146,6 +158,7 @@ Or without Docker, using a Postgres you already have:
 docker compose up -d postgres   # or point DATABASE_URL at your own
 npm run db:migrate
 npm run db:seed                 # optional: demo login, two workspaces
+npm run db:demo                 # optional: two invented Pages with six months of analytics
 npm run dev                     # http://localhost:3000
 npm run dev:worker              # second terminal
 ```
@@ -239,6 +252,7 @@ how to drive it from a serverless cron instead of a long-running worker.
 | `npm test` | Vitest suite |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run db:migrate` / `db:push` / `db:studio` / `db:seed` | Prisma |
+| `npm run db:demo` | Invented Pages with analytics history, to see the analytics screens without Facebook |
 
 ---
 
