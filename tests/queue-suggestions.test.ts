@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { rateOf, type AnalysedPost } from '../src/lib/page-analysis';
-import { suggestSlots, upcomingOccurrences } from '../src/lib/queue-suggestions';
+import { nextGoodTimes, suggestSlots, upcomingOccurrences, type SlotSuggestion } from '../src/lib/queue-suggestions';
 import { localInputToUtc } from '../src/lib/time';
 
 /**
@@ -107,5 +107,44 @@ describe('upcomingOccurrences', () => {
       '2026-06-03T09:30:00.000Z',
       '2026-06-08T09:00:00.000Z',
     ]);
+  });
+});
+
+describe('nextGoodTimes', () => {
+  const suggestion = (dayOfWeek: number, hour: number, lift: number): SlotSuggestion => ({
+    dayOfWeek,
+    hour,
+    minute: 0,
+    lift,
+    posts: 4,
+    pages: ['Bakery'],
+  });
+
+  it('keeps the strongest suggestions, then lists them soonest first', () => {
+    // Monday 1 June 2026, 08:00 UTC.
+    const times = nextGoodTimes({
+      suggestions: [suggestion(5, 18, 2.4), suggestion(2, 9, 1.9), suggestion(3, 12, 1.2)],
+      timeZone: 'UTC',
+      earliest: new Date('2026-06-01T08:00:00Z'),
+      days: 7,
+      toUtc: localInputToUtc,
+      limit: 2,
+    });
+
+    expect(times.map((time) => time.at.toISOString())).toEqual([
+      '2026-06-02T09:00:00.000Z',
+      '2026-06-05T18:00:00.000Z',
+    ]);
+  });
+
+  it('skips a time that has already passed today, offering next week instead', () => {
+    const [time] = nextGoodTimes({
+      suggestions: [suggestion(1, 9, 2)],
+      timeZone: 'UTC',
+      earliest: new Date('2026-06-01T09:30:00Z'),
+      days: 7,
+      toUtc: localInputToUtc,
+    });
+    expect(time!.at.toISOString()).toBe('2026-06-08T09:00:00.000Z');
   });
 });

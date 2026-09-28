@@ -402,3 +402,48 @@ test('a caption too long for Instagram is flagged while it is being written', as
   // to another, and a failure in the second is then nobody's obvious fault.
   await prisma.target.delete({ where: { id: instagram.id } });
 });
+
+test('picking a time offers the times the Page has done best at', async ({ page }) => {
+  const failures = collectFailures(page);
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: target.workspaceId } });
+  expect(workspace.timezone).toBe('UTC');
+
+  // Six weeks of posts: the Wednesday-morning ones did well, the rest did not.
+  const week = 7 * 24 * 60 * 60 * 1000;
+  const lastWednesday = new Date();
+  lastWednesday.setUTCDate(lastWednesday.getUTCDate() - ((lastWednesday.getUTCDay() - 3 + 7) % 7 || 7));
+  lastWednesday.setUTCHours(10, 0, 0, 0);
+  const insights = (reactions: number) => ({ impressions: null, reach: 1000, engagedUsers: null, reactions, comments: 0, shares: 0, clicks: 0 });
+  const rows = Array.from({ length: 6 }, (_, index) => [
+    { at: new Date(lastWednesday.getTime() - index * week), reactions: 90 },
+    { at: new Date(lastWednesday.getTime() - index * week - 2 * 24 * 60 * 60 * 1000 + 6 * 60 * 60 * 1000), reactions: 10 },
+  ]).flat();
+  await prisma.externalPost.createMany({
+    data: rows.map((row, index) => ({
+      targetId: target.id,
+      remoteId: `good-time-${index}`,
+      createdTime: row.at,
+      insights: insights(row.reactions),
+    })),
+  });
+
+  try {
+    await open(page, '/compose');
+    const chips = page.getByRole('group', { name: /good times this week/i }).getByRole('button');
+    await expect(chips).toHaveCount(1);
+    await expect(chips.first()).toHaveText(/Wed.*10:00/);
+
+    // One tap fills the time in.
+    const time = page.getByLabel(/date and time/i);
+    await expect(async () => {
+      await chips.first().click();
+      await expect(time).toHaveValue(/T10:00$/, { timeout: 1_500 });
+    }).toPass({ timeout: 30_000 });
+    await expect(chips.first()).toHaveAttribute('aria-pressed', 'true');
+  } finally {
+    await prisma.externalPost.deleteMany({ where: { remoteId: { startsWith: 'good-time-' } } });
+  }
+
+  expect(failures).toEqual([]);
+});

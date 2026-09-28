@@ -148,3 +148,36 @@ export function upcomingOccurrences(options: {
     .filter((entry) => (seen.has(entry.at.getTime()) ? false : (seen.add(entry.at.getTime()), true)))
     .sort((a, b) => a.at.getTime() - b.at.getTime());
 }
+
+/**
+ * The next time each suggestion comes round, for the composer's "good times"
+ * chips: one instant per suggestion, soonest first.
+ *
+ * `earliest` keeps out a time too close to be useful — a chip for four
+ * minutes from now would be gone before the post is written, and would fall
+ * under Facebook's ten-minute floor for posts it holds itself.
+ */
+export function nextGoodTimes(options: {
+  suggestions: SlotSuggestion[];
+  timeZone: string;
+  earliest: Date;
+  days: number;
+  toUtc: (localInput: string, timeZone: string) => Date;
+  limit?: number;
+}): Array<{ at: Date; suggestion: SlotSuggestion }> {
+  const limit = options.limit ?? 3;
+  return options.suggestions
+    .map((suggestion) => {
+      const [next] = upcomingOccurrences({
+        slots: [suggestion],
+        timeZone: options.timeZone,
+        from: options.earliest,
+        days: options.days,
+        toUtc: options.toUtc,
+      });
+      return next ? { at: next.at, suggestion } : null;
+    })
+    .filter((entry): entry is { at: Date; suggestion: SlotSuggestion } => entry !== null)
+    .slice(0, limit)
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
+}

@@ -19,6 +19,8 @@ interface Props {
   hasQueueSlots: boolean;
   /** Local `datetime-local` value one hour from now, computed on the server. */
   defaultScheduledAt: string;
+  /** This week's times the workspace's Pages have done best at, soonest first. */
+  goodTimes?: GoodTime[];
   /** Hidden entirely when the server has no API key or the client opted out. */
   aiEnabled: boolean;
   /** True when this workspace holds posts for review. */
@@ -47,6 +49,15 @@ export interface EditingPost {
   publishMode: string;
 }
 
+export interface GoodTime {
+  /** `datetime-local` value in the workspace's zone. */
+  value: string;
+  label: string;
+  /** Average interactions against each Page's typical post: 1 is typical. */
+  lift: number;
+  posts: number;
+}
+
 type Timing = 'now' | 'schedule' | 'queue';
 type Handler = 'worker' | 'native';
 
@@ -55,6 +66,7 @@ export function Composer({
   timezone,
   hasQueueSlots,
   defaultScheduledAt,
+  goodTimes = [],
   aiEnabled,
   requiresApproval,
   canPublishDirectly,
@@ -483,6 +495,33 @@ export function Composer({
                 onChange={(event) => setScheduledAt(event.target.value)}
               />
               <p className="hint">{t('timezoneHint', { timezone })}</p>
+
+              {goodTimes.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-slate-700" id="good-times-label">
+                    {t('goodTimes')}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap gap-2" role="group" aria-labelledby="good-times-label">
+                    {goodTimes.map((time) => (
+                      <button
+                        key={time.value}
+                        type="button"
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                          scheduledAt === time.value
+                            ? 'border-brand-500 bg-brand-50 text-brand-700'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-brand-300'
+                        }`}
+                        aria-pressed={scheduledAt === time.value}
+                        title={t('goodTimeTitle', { lift: time.lift.toLocaleString(locale), posts: time.posts })}
+                        onClick={() => setScheduledAt(time.value)}
+                      >
+                        {time.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="hint">{t('goodTimesHint')}</p>
+                </div>
+              )}
 
               <div className="mt-4 space-y-2 rounded-lg bg-slate-50 p-3">
                 <p className="text-xs font-medium text-slate-700">{t('whoHolds')}</p>
