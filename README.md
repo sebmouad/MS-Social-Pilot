@@ -66,6 +66,9 @@ nobody started.
 - **Approval workflow**: contributors submit, admins approve or send back with a
   note. Enforced in the scheduler, not just the UI. Contributors upload media —
   they draft posts — but deleting from the shared library is editor and above.
+- **Your own account** under Settings → Account: change your name, language and
+  password, and sign out every other device. Changing the password signs the
+  other devices out as well.
 
 **Automation**
 - **RSS auto-posting** with conditional polling, guid de-duplication, and a
@@ -372,7 +375,14 @@ based, and Facebook's own scraper is excluded so previews do not inflate counts.
 - Every error the API returns carries a translation key rather than a finished
   English sentence, swept the same way, so a French customer reads French at the
   moment something has gone wrong.
-- Link preview fetches refuse loopback and private address ranges (SSRF).
+- Server-side fetches of user-supplied URLs — link previews and RSS feeds —
+  refuse loopback and private ranges as written, as resolved by DNS, and on
+  every redirect hop (SSRF).
+- Sign-in and sign-up are rate limited; changing a password needs the current
+  one, is rate limited per user, and signs out every other session.
+- API writes started by another site, including a sibling subdomain, are refused
+  on the browser's `Sec-Fetch-Site`. Every response is sent with
+  `X-Frame-Options: DENY`, `nosniff` and a strict referrer policy.
 - `signed_request` verified on Facebook's deauthorize and data-deletion
   callbacks.
 - AI output never publishes on its own — it lands in the composer for a human.

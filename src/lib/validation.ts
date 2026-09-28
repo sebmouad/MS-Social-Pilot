@@ -21,14 +21,31 @@ const httpUrl = z
     message: 'Links must start with http:// or https://.',
   });
 
+/** One rule for a new password, wherever one is chosen. */
+const newPassword = z
+  .string()
+  .min(10, 'Use at least 10 characters.')
+  .max(200, 'That password is too long.');
+
 export const registerSchema = z.object({
   name: z.string().trim().min(1, 'Enter your name.').max(120),
   email: z.string().trim().toLowerCase().email('Enter a valid email address.'),
-  password: z
-    .string()
-    .min(10, 'Use at least 10 characters.')
-    .max(200, 'That password is too long.'),
+  password: newPassword,
   workspaceName: z.string().trim().max(120).optional(),
+});
+
+export const profileSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Enter your name.').max(120).optional(),
+    locale: z.nativeEnum(Locale).optional(),
+  })
+  .refine((value) => value.name !== undefined || value.locale !== undefined, {
+    message: 'Nothing to change.',
+  });
+
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1, 'Enter your current password.'),
+  newPassword,
 });
 
 export const loginSchema = z.object({
