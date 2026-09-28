@@ -48,7 +48,7 @@
     "groupsDisabled": "Group publishing is turned off. Meta restricted the Groups API in April 2024, so it needs a separately approved permission and the app must be installed in each group."
   },
   "ads": {
-    "none": "No ad account is connected. Finding them needs the ads read permission.",
+    "none": "No ad account is connected yet. Finding them needs the ads read permission on the Facebook connection.",
     "discover": "Find ad accounts",
     "sync": "Pull from Facebook",
     "hint": "Spend next to organic reach, so a jump in reach can be told apart from a jump in budget.",
@@ -67,7 +67,31 @@
     "level": "Break down by",
     "level_campaign": "Campaign",
     "level_adset": "Ad set",
-    "level_ad": "Ad"
+    "level_ad": "Ad",
+    "title": "Ads",
+    "subtitle": "What your paid campaigns cost, what they delivered, and where the budget went",
+    "account": "Ad account",
+    "lastDays": "{count, plural, one {# day} other {# days}}",
+    "lastSynced": "read from Facebook {when}",
+    "neverSynced": "not read from Facebook yet",
+    "vsPrevious": "vs previous",
+    "dailySpend": "Spend per day",
+    "dailyClicks": "Clicks per day",
+    "date": "Date",
+    "breakdownTitle": "Where the budget went",
+    "share": "Share of spend",
+    "findings": {
+      "bestCtr": "“{name}” is clicked {ratio}× as often as the account average.",
+      "concentrated": "“{name}” took {share}% of the spend.",
+      "costlyClicks": "Clicks on “{name}” cost {ratio}× the account average.",
+      "cpcDown": "Clicks cost {percent}% less than in the previous period.",
+      "cpcUp": "Clicks cost {percent}% more than in the previous period.",
+      "ctrDown": "People clicked {percent}% less often than in the previous period.",
+      "ctrUp": "People clicked {percent}% more often than in the previous period.",
+      "noSpend": "This account spent nothing in this period. Pull from Facebook if you expected delivery.",
+      "none": "Nothing unusual in this period.",
+      "title": "What stands out"
+    }
   },
   "analytics": {
     "title": "Analytics",
@@ -752,14 +776,29 @@
     "posts": "Posts",
     "approvals": "Approvals",
     "accounts": "Accounts",
-    "feeds": "Feeds",
+    "feeds": "RSS feeds",
     "reports": "Reports",
     "settings": "Settings",
     "signOut": "Sign out",
     "switchWorkspace": "Switch client",
     "analytics": "Analytics",
     "menu": "Menu",
-    "connections": "Connections"
+    "connections": "Connections",
+    "module": {
+      "ads": "Ads",
+      "analytics": "Analytics",
+      "schedule": "Schedule"
+    },
+    "moduleShort": {
+      "ads": "Ads",
+      "analytics": "Analytics",
+      "schedule": "Schedule"
+    },
+    "home": "Home",
+    "modules": "Modules",
+    "shared": "Workspace",
+    "pages": "Pages",
+    "adsPerformance": "Performance"
   },
   "notifications": {
     "title": "Notifications",

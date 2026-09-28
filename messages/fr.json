@@ -48,7 +48,7 @@
     "groupsDisabled": "La publication dans les groupes est désactivée. Meta a restreint l'API Groupes en avril 2024 : une autorisation distincte est nécessaire et l'application doit être installée dans chaque groupe."
   },
   "ads": {
-    "none": "Aucun compte publicitaire connecté. La recherche nécessite l’autorisation de lecture des publicités.",
+    "none": "Aucun compte publicitaire n’est connecté. Pour les trouver, la connexion Facebook doit avoir l’autorisation de lecture des publicités.",
     "discover": "Rechercher les comptes publicitaires",
     "sync": "Récupérer depuis Facebook",
     "hint": "Les dépenses à côté de la portée organique, pour distinguer une hausse de portée d’une hausse de budget.",
@@ -67,7 +67,31 @@
     "level": "Détailler par",
     "level_campaign": "Campagne",
     "level_adset": "Ensemble de publicités",
-    "level_ad": "Publicité"
+    "level_ad": "Publicité",
+    "title": "Publicités",
+    "subtitle": "Ce que coûtent vos campagnes payantes, ce qu’elles ont apporté et où est allé le budget",
+    "account": "Compte publicitaire",
+    "lastDays": "{count, plural, one {# jour} other {# jours}}",
+    "lastSynced": "lu sur Facebook {when}",
+    "neverSynced": "pas encore lu sur Facebook",
+    "vsPrevious": "vs précédente",
+    "dailySpend": "Dépenses par jour",
+    "dailyClicks": "Clics par jour",
+    "date": "Date",
+    "breakdownTitle": "Où est allé le budget",
+    "share": "Part des dépenses",
+    "findings": {
+      "bestCtr": "« {name} » est cliquée {ratio}× plus souvent que la moyenne du compte.",
+      "concentrated": "« {name} » a absorbé {share} % des dépenses.",
+      "costlyClicks": "Les clics sur « {name} » coûtent {ratio}× la moyenne du compte.",
+      "cpcDown": "Les clics ont coûté {percent} % de moins que sur la période précédente.",
+      "cpcUp": "Les clics ont coûté {percent} % de plus que sur la période précédente.",
+      "ctrDown": "Les gens ont cliqué {percent} % moins souvent que sur la période précédente.",
+      "ctrUp": "Les gens ont cliqué {percent} % plus souvent que sur la période précédente.",
+      "noSpend": "Ce compte n’a rien dépensé sur cette période. Actualisez depuis Facebook si vous attendiez de la diffusion.",
+      "none": "Rien d’inhabituel sur cette période.",
+      "title": "Ce qui ressort"
+    }
   },
   "analytics": {
     "title": "Statistiques",
@@ -759,7 +783,22 @@
     "switchWorkspace": "Changer de client",
     "analytics": "Statistiques",
     "menu": "Menu",
-    "connections": "Connexions"
+    "connections": "Connexions",
+    "module": {
+      "ads": "Publicités",
+      "analytics": "Statistiques",
+      "schedule": "Planification"
+    },
+    "moduleShort": {
+      "ads": "Pubs",
+      "analytics": "Stats",
+      "schedule": "Planning"
+    },
+    "home": "Accueil",
+    "modules": "Modules",
+    "shared": "Espace de travail",
+    "pages": "Pages",
+    "adsPerformance": "Performances"
   },
   "notifications": {
     "title": "Notifications",
