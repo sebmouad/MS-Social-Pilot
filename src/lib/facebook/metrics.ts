@@ -226,7 +226,7 @@ export const PAGE_METRICS: MetricDefinition[] = [
   ]),
   ...group({ level: 'page', category: 'audience', periods: DAY_ONLY }, [
     ['page_fans_online_per_day', 'Followers online at any point that day.'],
-    ['page_follows', 'New followers.'],
+    ['page_follows', 'Total followers of the Page, as of that day.'],
     ['page_daily_follows', 'Follows recorded that day.'],
     ['page_daily_follows_unique', 'People who followed the Page.'],
     ['page_daily_unfollows_unique', 'People who unfollowed the Page.'],

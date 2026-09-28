@@ -243,6 +243,15 @@ export interface StoredSeries {
   trend: number | null;
 }
 
+/**
+ * Metrics that report a standing total rather than a day's activity.
+ *
+ * Adding up a month of "followers today" does not give anything; it gave a
+ * figure thirty times the audience, labelled as new followers. For these the
+ * headline is the latest value.
+ */
+const STOCK_METRICS = new Set(['page_follows', 'page_fans', 'page_fans_online_per_day']);
+
 function humanise(metric: string): string {
   return metric
     .replace(/^page_|^post_/, '')
@@ -316,7 +325,11 @@ export async function readStoredAnalytics(options: {
       categoryLabel: CATEGORY_LABELS[definition?.category ?? 'engagement'],
       breakdown: isBreakdown,
       points,
-      total: isBreakdown ? null : numeric.reduce((sum, value) => sum + value, 0),
+      total: isBreakdown
+        ? null
+        : STOCK_METRICS.has(metricName)
+          ? (numeric[numeric.length - 1] ?? null)
+          : numeric.reduce((sum, value) => sum + value, 0),
       latest: points.length > 0 ? points[points.length - 1]!.value : null,
       trend: isBreakdown ? null : trendOf(numeric),
     });
@@ -926,8 +939,39 @@ export async function readInteractions(options: {
   to: Date;
   targetId?: string;
 }): Promise<InteractionSummary> {
-  const posts = await readPostAnalytics({ ...options, limit: 1000 });
+  const ours = await readPostAnalytics({ ...options, limit: 1000 });
   const { mergeBreakdowns } = await import('./facebook/insights');
+
+  // Posts made on the Page in Facebook itself count too. Reading only what
+  // went out through this app showed zero on every figure for a Page run from
+  // the Facebook app, which is most of them.
+  const found = await prisma.externalPost.findMany({
+    where: {
+      target: { workspaceId: options.workspaceId },
+      ...(options.targetId ? { targetId: options.targetId } : {}),
+      createdTime: { gte: options.from, lte: options.to },
+    },
+    select: { insights: true },
+    take: 2000,
+  });
+
+  const numberIn = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+  const posts = [
+    ...ours,
+    ...found.map((row) => {
+      const insights = parseInsights(row.insights);
+      return {
+        reactions: numberIn(insights?.reactions),
+        comments: numberIn(insights?.comments),
+        shares: numberIn(insights?.shares),
+        clicks: numberIn(insights?.clicks),
+        negativeFeedback: numberIn(insights?.negativeFeedback),
+        engagedUsers: numberIn(insights?.engagedUsers),
+        reactionsByType: insights?.reactionsByType ?? {},
+        clicksByType: insights?.clicksByType ?? {},
+      };
+    }),
+  ];
 
   return {
     reactionsByType: mergeBreakdowns(posts.map((post) => post.reactionsByType)),
@@ -983,16 +1027,22 @@ export async function readAudience(options: {
       : {};
   };
 
-  const sumOf = async (metric: string): Promise<number> => {
-    const result = await prisma.pageInsight.aggregate({
-      where: {
+  // The first of several names that has any daily figures stored. Meta
+  // withdrew `page_fan_adds` and `page_fan_removes` in favour of the follow
+  // metrics, so a Page connected since then holds only the newer names, and
+  // asking for the old ones alone read zero gained and zero lost for ever.
+  const sumOf = async (...metrics: string[]): Promise<number> => {
+    for (const metric of metrics) {
+      const where = {
         targetId: options.targetId,
         metric,
+        period: 'day',
         endTime: { gte: options.from, lte: options.to },
-      },
-      _sum: { numeric: true },
-    });
-    return Math.round(result._sum.numeric ?? 0);
+      };
+      const result = await prisma.pageInsight.aggregate({ where, _sum: { numeric: true }, _count: true });
+      if (result._count > 0) return Math.round(result._sum.numeric ?? 0);
+    }
+    return 0;
   };
 
   const [byCountry, byCity, byLocale, byGenderAge, adds, removes] = await Promise.all([
@@ -1000,8 +1050,8 @@ export async function readAudience(options: {
     latestOf('page_fans_city'),
     latestOf('page_fans_locale'),
     latestOf('page_fans_gender_age'),
-    sumOf('page_fan_adds'),
-    sumOf('page_fan_removes'),
+    sumOf('page_daily_follows_unique', 'page_fan_adds_unique', 'page_fan_adds'),
+    sumOf('page_daily_unfollows_unique', 'page_fan_removes_unique', 'page_fan_removes'),
   ]);
 
   return {
