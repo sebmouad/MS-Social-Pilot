@@ -48,8 +48,19 @@ Everything here assumes the Meta app already exists. If it does not, start with
 - [ ] The scheduler runs — either `npm run worker` or a cron hitting
       `/api/cron/tick`. Without it, nothing scheduled is ever published
 - [ ] "Require app secret proof" enabled in the Meta app
-- [ ] Deauthorize and data-deletion callback URLs set, and reachable from
-      outside your network
+- [ ] Every value in the **Meta app settings** panel (on Setup, and on
+      Connections for an admin) entered in the Meta app: app domain, site URL,
+      OAuth redirect URI, deauthorize and data-deletion callbacks. The panel
+      builds them from `APP_URL` and warns if it is not https or is localhost
+- [ ] Deauthorize and data-deletion callback URLs reachable from outside your
+      network — Meta calls them from its own servers
+- [ ] The Meta app's API version at least the one the app pins
+      (`FACEBOOK_GRAPH_VERSION`, **v25.0** by default, supported until
+      29 July 2028). An old `.env` pinning `v21.0` stops working on
+      21 January 2027 — see
+      [what Meta has retired](META_APP_SETUP.md#what-meta-has-retired)
+- [ ] A Privacy Policy URL in the Meta app (Settings → Basic) — required
+      before the app can go Live, and not something this app publishes for you
 - [ ] If you publish to Instagram: `APP_URL` reachable from the public
       internet, because Facebook fetches your media itself
       ([why](#instagram-needs-app_url-to-be-publicly-reachable))

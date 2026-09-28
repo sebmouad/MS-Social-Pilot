@@ -17,7 +17,10 @@ RUN npm ci
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx prisma generate && npm run build
+# `public/` is optional in a Next app and this one has no static files, so the
+# folder is not in the repository — and the runtime stage copies it, which
+# failed the whole build with "not found". Created here so it always exists.
+RUN mkdir -p public && npx prisma generate && npm run build
 
 FROM base AS runtime
 ENV NODE_ENV=production
