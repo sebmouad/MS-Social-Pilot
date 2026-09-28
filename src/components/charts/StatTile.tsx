@@ -14,7 +14,10 @@ export function StatTile({
   value,
   delta,
   deltaLabel,
-  /** False when down is the good direction (unfollows, negative feedback). */
+  /**
+   * False when down is the good direction (unfollows, negative feedback); null
+   * when neither is, as for ad spend — the change is shown, uncoloured.
+   */
   upIsGood = true,
   trend,
   hero = false,
@@ -24,14 +27,15 @@ export function StatTile({
   /** Percentage change against a named period. */
   delta?: number | null;
   deltaLabel?: string;
-  upIsGood?: boolean;
+  upIsGood?: boolean | null;
   trend?: number[];
   hero?: boolean;
 }) {
   const display =
     value === null ? '—' : typeof value === 'number' ? compact(value) : value;
 
-  const good = delta !== null && delta !== undefined ? (delta >= 0) === upIsGood : null;
+  const good =
+    delta !== null && delta !== undefined && upIsGood !== null ? (delta >= 0) === upIsGood : null;
 
   return (
     <div className="card p-4">
@@ -48,7 +52,7 @@ export function StatTile({
         {delta !== null && delta !== undefined ? (
           <p
             className="text-xs font-medium"
-            style={{ color: good ? VIZ.goodText : VIZ.critical }}
+            style={{ color: good === null ? VIZ.inkSecondary : good ? VIZ.goodText : VIZ.critical }}
           >
             {/* The arrow is the second channel: the direction never rests on
                 colour alone. */}

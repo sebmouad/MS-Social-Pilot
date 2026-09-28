@@ -211,6 +211,8 @@ export async function syncWorkspaceAds(options: {
 
 export interface AdSpendSummary {
   currency: string | null;
+  /** The rows came from accounts billed in different currencies. */
+  mixedCurrencies: boolean;
   spend: number;
   impressions: number;
   clicks: number;
@@ -222,6 +224,29 @@ export interface AdSpendSummary {
   /** Every action type the window produced, summed. */
   actions: Record<string, number>;
   daily: Array<{ date: string; spend: number; impressions: number; clicks: number; reach: number }>;
+}
+
+/**
+ * One point per date, whichever accounts contributed to it.
+ *
+ * Read across several ad accounts the rows arrive one per account per day, and
+ * mapping them straight through drew each date twice — a saw-tooth curve with
+ * every point on it wrong.
+ */
+function dailyTotals(
+  rows: Array<{ date: Date; spend: number; impressions: number; clicks: number; reach: number }>,
+): Array<{ date: string; spend: number; impressions: number; clicks: number; reach: number }> {
+  const byDate = new Map<string, { date: string; spend: number; impressions: number; clicks: number; reach: number }>();
+  for (const row of rows) {
+    const date = row.date.toISOString().slice(0, 10);
+    const day = byDate.get(date) ?? { date, spend: 0, impressions: 0, clicks: 0, reach: 0 };
+    day.spend += row.spend;
+    day.impressions += row.impressions;
+    day.clicks += row.clicks;
+    day.reach += row.reach;
+    byDate.set(date, day);
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** Account-level totals and the daily curve. */
@@ -259,8 +284,14 @@ export async function readAdSummary(options: {
 
   const round = (value: number): number => Math.round(value * 100) / 100;
 
+  // Two accounts in two currencies cannot be added up into one figure with one
+  // symbol on it. Say so with a null rather than label a sum of euros and
+  // dollars as either; the screen asks for one account in that case.
+  const currencies = new Set(rows.map((row) => row.adAccount.currency ?? ''));
+
   return {
-    currency: rows[0]?.adAccount.currency ?? null,
+    currency: currencies.size === 1 ? (rows[0]?.adAccount.currency ?? null) : null,
+    mixedCurrencies: currencies.size > 1,
     spend: round(spend),
     impressions,
     clicks,
@@ -271,13 +302,7 @@ export async function readAdSummary(options: {
     cpm: impressions > 0 ? round((spend / impressions) * 1000) : null,
     ctr: impressions > 0 ? Math.round((clicks / impressions) * 10000) / 100 : null,
     actions,
-    daily: rows.map((row) => ({
-      date: row.date.toISOString().slice(0, 10),
-      spend: round(row.spend),
-      impressions: row.impressions,
-      clicks: row.clicks,
-      reach: row.reach,
-    })),
+    daily: dailyTotals(rows).map((day) => ({ ...day, spend: round(day.spend) })),
   };
 }
 

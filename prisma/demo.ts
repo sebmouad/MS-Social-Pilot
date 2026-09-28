@@ -1,7 +1,7 @@
 /**
  * Demo analytics: two invented Pages with six months of history.
  *
- * Every analytics screen is a view over data that only a real Facebook Page can
+ * Every analytics and ads screen is a view over data that only a real Facebook Page can
  * produce, so on a fresh installation — or a developer's laptop — they are all
  * empty states. This fills one workspace with enough invented history to see
  * them working: daily Page figures, posts of every format with their insights,
@@ -267,6 +267,124 @@ async function seedPage(workspaceId: string, accountId: string, spec: PageSpec, 
   return { name: spec.name, posts: posts.length, days: DAYS };
 }
 
+/**
+ * One ad account with three campaigns, each with ad sets and ads, delivering
+ * daily for the whole period — at every level, the way a sync stores them.
+ *
+ * Also with a story: the spring campaign takes most of the budget, the video
+ * ads are clicked far more often, and one retargeting ad set pays a lot per
+ * click.
+ */
+async function seedAds(workspaceId: string, accountId: string, now: Date) {
+  const random = generator(23);
+  const actId = 'act_demo_100000000000001';
+
+  await prisma.adAccount.deleteMany({ where: { workspaceId, actId } });
+  const adAccount = await prisma.adAccount.create({
+    data: {
+      workspaceId,
+      socialAccountId: accountId,
+      actId,
+      name: 'Halloway Bakery — Ads',
+      currency: 'EUR',
+      accountStatus: 1,
+      lastSyncedAt: now,
+    },
+  });
+
+  const campaigns = [
+    { id: 'c1', name: 'Spring menu launch', budget: 38, ctr: 1.4, cpc: 0.42 },
+    { id: 'c2', name: 'Weekend brunch — video', budget: 12, ctr: 3.1, cpc: 0.21 },
+    { id: 'c3', name: 'Retargeting — website visitors', budget: 9, ctr: 0.8, cpc: 1.05 },
+  ];
+
+  const rows: Prisma.AdInsightCreateManyInput[] = [];
+  const start = now.getTime() - 120 * DAY_MS;
+
+  for (let day = 0; day < 120; day += 1) {
+    const date = new Date(start + day * DAY_MS);
+    date.setUTCHours(0, 0, 0, 0);
+    // Costs drift down over the period as the campaigns learn.
+    const learning = 1.15 - (day / 120) * 0.3;
+    const account = { spend: 0, impressions: 0, clicks: 0, reach: 0 };
+
+    for (const campaign of campaigns) {
+      const spend = Math.round(campaign.budget * (0.75 + random() * 0.5) * 100) / 100;
+      const clicks = Math.max(1, Math.round(spend / (campaign.cpc * learning)));
+      const impressions = Math.round((clicks / campaign.ctr) * 100);
+      const reach = Math.round(impressions / (1.3 + random() * 0.4));
+
+      const figures = (share: number) => {
+        const s = Math.round(spend * share * 100) / 100;
+        const c = Math.round(clicks * share);
+        const i = Math.round(impressions * share);
+        return {
+          spend: s,
+          clicks: c,
+          impressions: i,
+          reach: Math.round(reach * share),
+          cpc: c > 0 ? Math.round((s / c) * 100) / 100 : null,
+          cpm: i > 0 ? Math.round((s / i) * 100000) / 100 : null,
+          ctr: i > 0 ? Math.round((c / i) * 10000) / 100 : null,
+          actions: {
+            actions: [
+              { action_type: 'link_click', value: String(Math.round(c * 0.8)) },
+              { action_type: 'post_engagement', value: String(Math.round(c * 2.4)) },
+              { action_type: 'landing_page_view', value: String(Math.round(c * 0.55)) },
+            ],
+          },
+        };
+      };
+
+      rows.push({ adAccountId: adAccount.id, level: 'campaign', objectId: campaign.id, objectName: campaign.name, date, ...figures(1) });
+      for (const [index, share] of [0.6, 0.4].entries()) {
+        const adset = `${campaign.id}-s${index + 1}`;
+        rows.push({ adAccountId: adAccount.id, level: 'adset', objectId: adset, objectName: `${campaign.name} · ${index === 0 ? 'Paris 25–44' : 'Lyon 25–44'}`, date, ...figures(share) });
+        for (const [adIndex, adShare] of [0.7, 0.3].entries()) {
+          rows.push({
+            adAccountId: adAccount.id,
+            level: 'ad',
+            objectId: `${adset}-a${adIndex + 1}`,
+            objectName: `${campaign.name} · ${adIndex === 0 ? 'Image' : 'Carousel'} ${index + 1}`,
+            date,
+            ...figures(share * adShare),
+          });
+        }
+      }
+
+      account.spend += spend;
+      account.clicks += clicks;
+      account.impressions += impressions;
+      account.reach += reach;
+    }
+
+    rows.push({
+      adAccountId: adAccount.id,
+      level: 'account',
+      objectId: actId,
+      objectName: adAccount.name,
+      date,
+      spend: Math.round(account.spend * 100) / 100,
+      impressions: account.impressions,
+      clicks: account.clicks,
+      reach: Math.round(account.reach * 0.8),
+      cpc: Math.round((account.spend / account.clicks) * 100) / 100,
+      cpm: Math.round((account.spend / account.impressions) * 100000) / 100,
+      ctr: Math.round((account.clicks / account.impressions) * 10000) / 100,
+      actions: {
+        actions: [
+          { action_type: 'link_click', value: String(Math.round(account.clicks * 0.8)) },
+          { action_type: 'post_engagement', value: String(Math.round(account.clicks * 2.4)) },
+          { action_type: 'landing_page_view', value: String(Math.round(account.clicks * 0.55)) },
+        ],
+      },
+    });
+  }
+
+  await prisma.adInsight.createMany({ data: rows });
+  return { name: adAccount.name, days: 120 };
+}
+
 async function main(): Promise<void> {
   const requested = process.argv[2];
 
@@ -308,6 +426,9 @@ async function main(): Promise<void> {
     const result = await seedPage(workspace.id, account.id, spec, now);
     console.log(`  ${result.name}: ${result.posts} posts over ${result.days} days`);
   }
+
+  const ads = await seedAds(workspace.id, account.id, now);
+  console.log(`  ${ads.name}: ${ads.days} days of ad delivery`);
 
   console.log(`Demo analytics added to "${workspace.name}". Open Analytics to see them.`);
 }

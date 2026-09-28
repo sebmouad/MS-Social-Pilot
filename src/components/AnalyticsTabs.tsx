@@ -17,7 +17,6 @@ const VIEWS = [
   'inbox',
   'external',
   'instagram',
-  'ads',
 ] as const;
 
 /**

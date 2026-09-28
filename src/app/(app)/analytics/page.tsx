@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { TargetType } from '@prisma/client';
 
@@ -36,7 +37,6 @@ import {
   readVideos,
 } from '@/lib/engagement';
 import { listInstagramAccounts, readInstagramInsights, readInstagramMedia } from '@/lib/instagram';
-import { listAdAccounts, readAdSummary, readCampaigns } from '@/lib/ads';
 import { formatInZone } from '@/lib/time';
 import { ExternalLink } from '@/components/ExternalLink';
 
@@ -92,6 +92,12 @@ export default async function AnalyticsPage({
   const window = Number.isFinite(days) && days > 0 && days <= 365 ? days : 30;
   const to = new Date();
   const from = new Date(to.getTime() - window * 24 * 60 * 60 * 1000);
+
+  // Ads is its own module now; an old bookmark to the tab lands there.
+  if (first(params.view) === 'ads') {
+    const level = first(params.adLevel);
+    redirect(level ? `/ads?level=${encodeURIComponent(level)}` : '/ads');
+  }
 
   // The analysis is the answer to "how is this Page doing"; the raw views
   // behind it are one tab away for anyone who wants the figures themselves.
@@ -240,15 +246,6 @@ export default async function AnalyticsPage({
         />
       )}
 
-      {view === 'ads' && (
-        <AdsView
-          workspaceId={auth.workspace.id}
-          level={first(params.adLevel)}
-          from={from}
-          to={to}
-          timezone={timezone}
-        />
-      )}
 
       {view === 'overview' && (
         <AnalyticsClient
@@ -932,145 +929,6 @@ async function InstagramView({
           </table>
         </div>
       )}
-    </div>
-  );
-}
-
-async function AdsView({
-  workspaceId,
-  level,
-  from,
-  to,
-  timezone,
-}: {
-  workspaceId: string;
-  level?: string;
-  from: Date;
-  to: Date;
-  timezone: string;
-}) {
-  const t = await getTranslations('ads');
-  const accounts = await listAdAccounts(workspaceId);
-
-  const breakdown: 'campaign' | 'adset' | 'ad' =
-    level === 'adset' || level === 'ad' ? level : 'campaign';
-
-  if (accounts.length === 0) {
-    return (
-      <div className="card flex flex-col items-center gap-3 p-8 text-center">
-        <p className="text-sm text-slate-600">{t('none')}</p>
-        <SyncButton
-          endpoint="/api/ads"
-          body={{ action: 'discover' }}
-          label={t('discover')}
-          variant="primary"
-        />
-      </div>
-    );
-  }
-
-  const [summary, campaigns] = await Promise.all([
-    readAdSummary({ workspaceId, from, to }),
-    readCampaigns({ workspaceId, from, to, level: breakdown }),
-  ]);
-
-  const money = (value: number | null) =>
-    value === null ? '—' : `${value.toLocaleString()} ${summary.currency ?? ''}`.trim();
-
-  const cards = [
-    { label: t('spend'), value: money(summary.spend) },
-    { label: t('impressions'), value: summary.impressions.toLocaleString() },
-    { label: t('reach'), value: summary.reach.toLocaleString() },
-    { label: t('clicks'), value: summary.clicks.toLocaleString() },
-    { label: t('cpc'), value: money(summary.cpc) },
-    { label: t('cpm'), value: money(summary.cpm) },
-    { label: t('ctr'), value: summary.ctr === null ? '—' : `${summary.ctr}%` },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm text-slate-600">{t('hint')}</p>
-          <p className="text-xs text-slate-500">
-            {accounts.map((account) => account.name).join(', ')}
-            {accounts[0]?.lastSyncedAt && ` · ${formatInZone(accounts[0].lastSyncedAt, timezone)}`}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <SyncButton endpoint="/api/ads" body={{ action: 'discover' }} label={t('discover')} />
-          <SyncButton
-            endpoint="/api/ads"
-            body={{ action: 'sync' }}
-            label={t('sync')}
-            variant="primary"
-          />
-        </div>
-      </div>
-
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-7">
-        {cards.map((card) => (
-          <StatTile key={card.label} label={card.label} value={card.value} />
-        ))}
-      </section>
-
-      {Object.keys(summary.actions).length > 0 && (
-        <BreakdownBars title={t('actions')} description={t('actionsHint')} data={summary.actions} />
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs uppercase tracking-wide text-slate-500">{t('level')}</span>
-        {(['campaign', 'adset', 'ad'] as const).map((option) => (
-          <Link
-            key={option}
-            href={`/analytics?view=ads&adLevel=${option}`}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-              option === breakdown ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            {t(`level_${option}`)}
-          </Link>
-        ))}
-      </div>
-
-      {campaigns.length === 0 ? (
-        <p className="card p-6 text-center text-sm text-slate-600">{t('noCampaigns')}</p>
-      ) : (
-        <div className="card overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">{t(`level_${breakdown}`)}</th>
-                <th className="px-4 py-3 text-right">{t('spend')}</th>
-                <th className="px-4 py-3 text-right">{t('impressions')}</th>
-                <th className="px-4 py-3 text-right">{t('reach')}</th>
-                <th className="px-4 py-3 text-right">{t('clicks')}</th>
-                <th className="px-4 py-3 text-right">{t('cpc')}</th>
-                <th className="px-4 py-3 text-right">{t('ctr')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {campaigns.map((campaign) => (
-                <tr key={campaign.objectId}>
-                  <td className="max-w-xs truncate px-4 py-3 font-medium text-slate-900" title={campaign.name}>
-                    {campaign.name}
-                  </td>
-                  <td className="px-4 py-3 text-right">{money(campaign.spend)}</td>
-                  <td className="px-4 py-3 text-right">{campaign.impressions.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right">{campaign.reach.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right">{campaign.clicks.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right">{money(campaign.cpc)}</td>
-                  <td className="px-4 py-3 text-right">
-                    {campaign.ctr === null ? '—' : `${campaign.ctr}%`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <p className="text-xs text-slate-500">{t('reachNote')}</p>
     </div>
   );
 }
