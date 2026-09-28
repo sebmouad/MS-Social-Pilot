@@ -33,6 +33,9 @@ function required(name: string): string {
   return value;
 }
 
+/** Permissions Meta has removed outright; asking for one fails the login. */
+const RETIRED_SCOPES = new Set(['publish_to_groups', 'groups_access_member_info']);
+
 export const env = {
   get appUrl(): string {
     // Trailing slashes break OAuth redirect matching, so normalise once here.
@@ -70,13 +73,12 @@ export const env = {
     return settingNumber('facebook.uploadTimeoutSeconds') * 1000;
   },
   get facebookScopes(): string[] {
-    const base = [...settingList('facebook.scopes')];
-
-    if (env.groupsEnabled) {
-      for (const scope of ['publish_to_groups', 'groups_access_member_info']) {
-        if (!base.includes(scope)) base.push(scope);
-      }
-    }
+    // Never the Groups scopes, whatever the Groups switch says. Meta removed
+    // `publish_to_groups` and `groups_access_member_info` from every API version
+    // on 22 April 2024, and a scope that does not exist fails the whole consent
+    // dialog: turning the switch on used to stop anybody connecting at all. A
+    // stray one in a hand-written scope list is dropped for the same reason.
+    const base = settingList('facebook.scopes').filter((scope) => !RETIRED_SCOPES.has(scope));
 
     // Analytics-only extras. Each is opt-in because Meta reviews them
     // separately, and requesting one the app has not been approved for makes

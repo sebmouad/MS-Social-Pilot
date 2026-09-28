@@ -5,7 +5,7 @@ import { env } from './env';
 import { canDeleteComments, canModerateComments } from './constants';
 import { decryptSecret } from './crypto';
 import { parseInsights, toJson, toJsonOrNull } from './json';
-import { asGraphError } from './facebook/graph';
+import { asGraphError, pageRatingsAvailable } from './facebook/graph';
 import { fetchInsights } from './facebook/analytics';
 import { logActivity } from './scheduler/runner';
 import { syncExternalPostInsights } from './analytics';
@@ -509,6 +509,10 @@ export async function syncTargetEdges(options: {
   });
 
   await attempt('reviews', async () => {
+    // Retired by Meta from v22.0: asking would only record the same error on
+    // every pass. What was stored before stays readable.
+    if (!pageRatingsAvailable(env.graphVersion)) return 0;
+
     /**
      * Store a batch in a handful of statements rather than one per review.
      *

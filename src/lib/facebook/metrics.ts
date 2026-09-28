@@ -56,6 +56,13 @@ export interface MetricDefinition {
   breakdown?: boolean;
   /** Graph version that announced removal, if any. */
   deprecatedFrom?: string;
+  /**
+   * The date Meta stopped serving it on every API version, after which asking
+   * for it is an error rather than an empty answer. Set from {@link REMOVED}.
+   */
+  removedOn?: string;
+  /** What Meta names as the replacement, when it names one. */
+  replacedBy?: string;
 }
 
 /** A row in a group: the metric name and what it means. */
@@ -92,6 +99,19 @@ const LIFETIME: MetricPeriod[] = ['lifetime'];
 // ---------------------------------------------------------------------------
 
 export const PAGE_METRICS: MetricDefinition[] = [
+  // --- Views: Meta's replacement for impressions and reach -------------------
+  // Impressions went on 15 November 2025 and reach (the `_unique` impressions)
+  // when v26.0 shipped on 29 July 2026, both on every API version. These are
+  // what Meta names in their place, and what everything here reads first.
+  ...group({ level: 'page', category: 'reach', periods: DAILY }, [
+    ['page_media_view', 'Times the Page’s content was played or displayed (views).'],
+    ['page_total_media_view_unique', 'People who viewed the Page’s content (viewers — Meta’s replacement for reach).'],
+  ]),
+  ...group({ level: 'page', category: 'demographics', periods: LIFETIME, breakdown: true }, [
+    ['page_follows_country', 'Followers by country.'],
+    ['page_follows_city', 'Followers by city.'],
+    ['page_follows_locale', 'Followers by language.'],
+  ]),
   // --- Impressions and reach -------------------------------------------------
   ...group({ level: 'page', category: 'reach', periods: DAILY }, [
     ['page_impressions', 'Times any content from the Page entered a screen.'],
@@ -372,6 +392,11 @@ export const PAGE_METRICS: MetricDefinition[] = [
 // ---------------------------------------------------------------------------
 
 export const POST_METRICS: MetricDefinition[] = [
+  // --- Views: the replacements for post impressions and reach ----------------
+  ...group({ level: 'post', category: 'reach', periods: LIFETIME }, [
+    ['post_media_view', 'Times the post’s content was played or displayed (views).'],
+    ['post_total_media_view_unique', 'People who viewed the post (viewers — Meta’s replacement for reach).'],
+  ]),
   // --- Impressions and reach -------------------------------------------------
   ...group({ level: 'post', category: 'reach', periods: LIFETIME }, [
     ['post_impressions', 'Times the post entered a screen.'],
@@ -924,6 +949,105 @@ export const IG_MEDIA_FIELDS = [
 // Lookups
 // ---------------------------------------------------------------------------
 
+/**
+ * Metrics Meta has stopped serving on every API version, and when.
+ *
+ * Taken from Meta's own announcements, not inferred: the Pages API changelog
+ * for 15 November 2025 (impressions and fans), the v25.0 changelog for the
+ * reach metrics removed when v26.0 shipped on 29 July 2026, and the v22.0
+ * changelog for the Instagram metrics removed on 21 April 2025.
+ *
+ * Asking for a removed name is an error that costs the whole request, so they
+ * are left out of every sync. They stay in the catalogue — stored history under
+ * those names is still real data, and the coverage screen should be able to
+ * say "Meta retired this" rather than lose it.
+ */
+const NOV_2025 = '2025-11-15';
+const JUL_2026 = '2026-07-29';
+const APR_2025 = '2025-04-21';
+
+export const REMOVED: Record<string, { on: string; replacedBy?: string; level?: MetricLevel }> = {
+  // Fans became follows.
+  page_fans: { on: NOV_2025, replacedBy: 'page_follows' },
+  page_fans_locale: { on: NOV_2025, replacedBy: 'page_follows_locale' },
+  page_fans_city: { on: NOV_2025, replacedBy: 'page_follows_city' },
+  page_fans_country: { on: NOV_2025, replacedBy: 'page_follows_country' },
+  page_fan_adds: { on: NOV_2025, replacedBy: 'page_daily_follows_unique' },
+  page_fan_adds_unique: { on: NOV_2025, replacedBy: 'page_daily_follows_unique' },
+  page_fan_removes: { on: NOV_2025, replacedBy: 'page_daily_unfollows_unique' },
+  page_fan_removes_unique: { on: NOV_2025, replacedBy: 'page_daily_unfollows_unique' },
+  // Impressions became views.
+  page_impressions: { on: NOV_2025, replacedBy: 'page_media_view' },
+  page_impressions_paid: { on: NOV_2025, replacedBy: 'page_media_view' },
+  page_impressions_viral: { on: NOV_2025 },
+  page_impressions_nonviral: { on: NOV_2025 },
+  post_impressions: { on: NOV_2025, replacedBy: 'post_media_view' },
+  post_impressions_paid: { on: NOV_2025, replacedBy: 'post_media_view' },
+  post_impressions_fan: { on: NOV_2025, replacedBy: 'post_media_view' },
+  post_impressions_organic: { on: NOV_2025, replacedBy: 'post_media_view' },
+  post_impressions_viral: { on: NOV_2025 },
+  post_impressions_nonviral: { on: NOV_2025 },
+  // Reach became viewers.
+  page_impressions_unique: { on: JUL_2026, replacedBy: 'page_total_media_view_unique' },
+  page_impressions_paid_unique: { on: JUL_2026, replacedBy: 'page_media_view' },
+  page_impressions_viral_unique: { on: JUL_2026 },
+  page_impressions_nonviral_unique: { on: JUL_2026 },
+  page_posts_impressions: { on: JUL_2026, replacedBy: 'page_media_view' },
+  page_posts_impressions_unique: { on: JUL_2026, replacedBy: 'page_total_media_view_unique' },
+  page_posts_impressions_paid: { on: JUL_2026 },
+  page_posts_impressions_paid_unique: { on: JUL_2026 },
+  page_posts_impressions_organic: { on: JUL_2026 },
+  page_posts_impressions_organic_unique: { on: JUL_2026 },
+  page_posts_impressions_viral: { on: JUL_2026 },
+  page_posts_impressions_viral_unique: { on: JUL_2026 },
+  page_posts_impressions_nonviral: { on: JUL_2026 },
+  page_posts_impressions_nonviral_unique: { on: JUL_2026 },
+  page_video_views_unique: { on: JUL_2026 },
+  post_impressions_unique: { on: JUL_2026, replacedBy: 'post_total_media_view_unique' },
+  post_impressions_paid_unique: { on: JUL_2026, replacedBy: 'post_media_view' },
+  post_impressions_fan_unique: { on: JUL_2026, replacedBy: 'post_media_view' },
+  post_impressions_organic_unique: { on: JUL_2026, replacedBy: 'post_media_view' },
+  post_impressions_viral_unique: { on: JUL_2026 },
+  post_impressions_nonviral_unique: { on: JUL_2026 },
+  total_video_impressions_unique: { on: JUL_2026 },
+  // Instagram impressions and plays became views.
+  impressions: { on: APR_2025, replacedBy: 'views', level: 'ig_media' },
+  plays: { on: APR_2025, replacedBy: 'views', level: 'ig_media' },
+  clips_replays_count: { on: APR_2025, replacedBy: 'views', level: 'ig_media' },
+  ig_reels_aggregated_all_plays_count: { on: APR_2025, replacedBy: 'views', level: 'ig_media' },
+};
+
+/** Instagram's account-level `impressions` went with the media-level one. */
+const REMOVED_IG_ACCOUNT = new Set(['impressions']);
+
+/** "All `post_video_views_*_unique` metrics" went in the same v26 removal. */
+const REMOVED_PATTERN = /^post_video_views.*_unique$/;
+
+function removalOf(metric: MetricDefinition): { on: string; replacedBy?: string } | null {
+  if (metric.level === 'ig_account') {
+    return REMOVED_IG_ACCOUNT.has(metric.name) ? { on: APR_2025, replacedBy: 'views' } : null;
+  }
+  const entry = REMOVED[metric.name];
+  if (entry && (!entry.level || entry.level === metric.level)) return entry;
+  if (metric.level === 'post' && REMOVED_PATTERN.test(metric.name)) return { on: JUL_2026 };
+  return null;
+}
+
+for (const list of [PAGE_METRICS, POST_METRICS, VIDEO_METRICS, IG_ACCOUNT_METRICS, IG_MEDIA_METRICS]) {
+  for (const metric of list) {
+    const removal = removalOf(metric);
+    if (removal) {
+      metric.removedOn = removal.on;
+      if (removal.replacedBy) metric.replacedBy = removal.replacedBy;
+    }
+  }
+}
+
+/** Whether Meta still serves this metric, as of `now`. */
+export function isServed(metric: MetricDefinition, now: Date = new Date()): boolean {
+  return !metric.removedOn || now.getTime() < Date.parse(`${metric.removedOn}T00:00:00Z`);
+}
+
 export const ALL_METRICS = [
   ...PAGE_METRICS,
   ...POST_METRICS,
@@ -940,8 +1064,16 @@ const BY_LEVEL: Record<MetricLevel, MetricDefinition[]> = {
   ig_media: IG_MEDIA_METRICS,
 };
 
-export function metricsFor(level: MetricLevel): MetricDefinition[] {
-  return BY_LEVEL[level];
+/**
+ * The metrics worth asking for at a level: everything Meta still serves.
+ * `includeRemoved` is for the catalogue screens, which list retired names.
+ */
+export function metricsFor(
+  level: MetricLevel,
+  options: { includeRemoved?: boolean; now?: Date } = {},
+): MetricDefinition[] {
+  const all = BY_LEVEL[level];
+  return options.includeRemoved ? all : all.filter((metric) => isServed(metric, options.now));
 }
 
 /**
@@ -986,12 +1118,13 @@ export const CATEGORY_LABELS: Record<MetricCategory, string> = {
 
 /** How many metric names the catalogue covers, per level. Used by the UI. */
 export function catalogueSize(): Record<MetricLevel | 'ads', number> {
+  // What Meta still serves: a retired metric is not a gap in anybody's coverage.
   return {
-    page: PAGE_METRICS.length,
-    post: POST_METRICS.length,
-    video: VIDEO_METRICS.length,
-    ig_account: IG_ACCOUNT_METRICS.length,
-    ig_media: IG_MEDIA_METRICS.length,
+    page: metricsFor('page').length,
+    post: metricsFor('post').length,
+    video: metricsFor('video').length,
+    ig_account: metricsFor('ig_account').length,
+    ig_media: metricsFor('ig_media').length,
     ads: AD_INSIGHT_FIELDS.length,
   };
 }

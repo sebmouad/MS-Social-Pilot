@@ -109,7 +109,7 @@ export function planPublish(request: PublishRequest): PublishPlan {
 /**
  * Validate a native (Facebook-held) schedule.
  *
- * Graph enforces a 10-minute floor and a 6-month ceiling, and returns an
+ * Graph enforces a 10-minute floor and a 30-day ceiling, and returns an
  * opaque code 100 when violated — checking first produces a message the user
  * can act on.
  */
@@ -124,7 +124,7 @@ export function toScheduledPublishTime(when: Date, now: Date = new Date()): numb
   }
   if (deltaSeconds > NATIVE_SCHEDULE_MAX_SECONDS) {
     throw new GraphError({
-      message: 'Facebook cannot schedule a post more than 6 months ahead.',
+      message: 'Facebook cannot hold a post more than 30 days ahead. Let this app schedule it instead.',
       kind: 'invalid_request',
     });
   }

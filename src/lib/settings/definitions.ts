@@ -155,9 +155,12 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'string',
     label: 'Graph API version',
     description: 'The pinned version every request is made against.',
-    default: 'v21.0',
+    // v21.0 expires on 21 January 2027. v25.0 is supported until 29 July 2028,
+    // and nothing this app calls changed incompatibly between the two except
+    // Page ratings, which Meta retired in v22.0 (see pageRatingsAvailable).
+    default: 'v25.0',
     env: 'FACEBOOK_GRAPH_VERSION',
-    hint: 'Pin it deliberately. Meta ships breaking changes between versions and supports each for about two years.',
+    hint: 'Pin it deliberately. Meta ships breaking changes between versions and supports each for about two years; v25.0 is supported until 29 July 2028. Metric retirements apply to every version at once, whichever is pinned.',
   },
   {
     key: 'facebook.graphBaseUrl',
@@ -216,10 +219,10 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     group: 'features',
     type: 'boolean',
     label: 'Group publishing',
-    description: 'Adds publish_to_groups and groups_access_member_info, and shows Groups in the UI.',
+    description: 'Shows Groups in the UI. Meta removed the Groups API on 22 April 2024, so no Group can be published to; leave this off.',
     default: false,
     env: 'FACEBOOK_ENABLE_GROUPS',
-    hint: 'Meta restricted the Groups API in April 2024: this needs separate approval and the app installed in each group.',
+    hint: 'publish_to_groups no longer exists on any API version and is never requested, whatever this says: asking for it would fail every login.',
   },
   {
     key: 'features.messaging',

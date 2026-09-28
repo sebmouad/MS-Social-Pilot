@@ -15,6 +15,7 @@ import {
   CATEGORY_LABELS,
   catalogueSize,
   findMetric,
+  isServed,
   type MetricLevel,
   type MetricPeriod,
 } from './facebook/metrics';
@@ -388,7 +389,12 @@ export async function readCoverage(targetId: string): Promise<CoverageRow[]> {
   const levels: MetricLevel[] = ['page', 'post', 'video', 'ig_account', 'ig_media'];
 
   return levels.map((level) => {
-    const forLevel = rows.filter((row) => findMetric(row.metric)?.level === level);
+    // Against the served catalogue only, so an old answer about a metric Meta
+    // has since retired cannot push "checked" past the size of the catalogue.
+    const forLevel = rows.filter((row) => {
+      const definition = findMetric(row.metric, level);
+      return definition !== undefined && isServed(definition);
+    });
     return {
       level,
       catalogue: sizes[level],
@@ -608,8 +614,11 @@ function buildPostInsights(
   }
 
   return {
-    impressions: numberOf(series, 'post_impressions'),
-    reach: numberOf(series, 'post_impressions_unique'),
+    // Views and viewers first: Meta retired post impressions in November 2025
+    // and post reach when v26.0 shipped in July 2026, on every API version.
+    // The older names are still read, for a Page synced before either date.
+    impressions: numberOf(series, 'post_media_view') ?? numberOf(series, 'post_impressions'),
+    reach: numberOf(series, 'post_total_media_view_unique') ?? numberOf(series, 'post_impressions_unique'),
     engagedUsers: numberOf(series, 'post_engaged_users'),
     reactions: engagement?.reactions ?? null,
     comments: engagement?.comments ?? null,
@@ -1016,15 +1025,19 @@ export async function readAudience(options: {
 }): Promise<AudienceSummary> {
   const target = await prisma.target.findUniqueOrThrow({ where: { id: options.targetId } });
 
-  const latestOf = async (metric: string): Promise<Record<string, number>> => {
-    const row = await prisma.pageInsight.findFirst({
-      where: { targetId: options.targetId, metric },
-      orderBy: { endTime: 'desc' },
-    });
-    const value = row?.value;
-    return value && typeof value === 'object' && !Array.isArray(value)
-      ? (value as Record<string, number>)
-      : {};
+  // Newest name first: Meta replaced the `page_fans_*` breakdowns with
+  // `page_follows_*` on 15 November 2025, and a Page synced since then holds
+  // only the new ones.
+  const latestOf = async (...metrics: string[]): Promise<Record<string, number>> => {
+    for (const metric of metrics) {
+      const row = await prisma.pageInsight.findFirst({
+        where: { targetId: options.targetId, metric },
+        orderBy: { endTime: 'desc' },
+      });
+      const value = row?.value;
+      if (value && typeof value === 'object' && !Array.isArray(value)) return value as Record<string, number>;
+    }
+    return {};
   };
 
   // The first of several names that has any daily figures stored. Meta
@@ -1046,9 +1059,9 @@ export async function readAudience(options: {
   };
 
   const [byCountry, byCity, byLocale, byGenderAge, adds, removes] = await Promise.all([
-    latestOf('page_fans_country'),
-    latestOf('page_fans_city'),
-    latestOf('page_fans_locale'),
+    latestOf('page_follows_country', 'page_fans_country'),
+    latestOf('page_follows_city', 'page_fans_city'),
+    latestOf('page_follows_locale', 'page_fans_locale'),
     latestOf('page_fans_gender_age'),
     sumOf('page_daily_follows_unique', 'page_fan_adds_unique', 'page_fan_adds'),
     sumOf('page_daily_unfollows_unique', 'page_fan_removes_unique', 'page_fan_removes'),

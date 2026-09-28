@@ -188,7 +188,9 @@ describe('fetchInsights', () => {
   });
 
   it('isolates several removed metrics at once', async () => {
-    removed = new Set(['page_impressions_viral', 'page_consumptions']);
+    // Two names this fake Graph refuses; neither is one Meta has retired, since
+    // retired names are not asked for in the first place.
+    removed = new Set(['page_negative_feedback', 'page_consumptions']);
 
     const result = await fetchInsights({
       objectId: '1000',
@@ -199,7 +201,7 @@ describe('fetchInsights', () => {
 
     expect(result.unavailable.map((entry) => entry.name).sort()).toEqual([
       'page_consumptions',
-      'page_impressions_viral',
+      'page_negative_feedback',
     ]);
     expect(result.series.length).toBeGreaterThan(5);
   });
@@ -271,7 +273,9 @@ describe('fetchInsights', () => {
       period: 'lifetime',
     });
 
-    expect(result.series.some((entry) => entry.name === 'post_impressions')).toBe(true);
+    expect(result.series.some((entry) => entry.name === 'post_media_view')).toBe(true);
+    // Retired on every version in November 2025: not asked for, so not read.
+    expect(result.series.some((entry) => entry.name === 'post_impressions')).toBe(false);
   });
 });
 
@@ -314,12 +318,13 @@ describe('metric catalogue', () => {
   });
 
   it('covers every level and the ad fields', () => {
+    // What Meta still serves, after the 2025 and 2026 retirements.
     const sizes = catalogueSize();
-    expect(sizes.page).toBeGreaterThan(150);
-    expect(sizes.post).toBeGreaterThan(70);
+    expect(sizes.page).toBeGreaterThan(130);
+    expect(sizes.post).toBeGreaterThan(55);
     expect(sizes.video).toBeGreaterThan(50);
-    expect(sizes.ig_account).toBeGreaterThan(20);
-    expect(sizes.ig_media).toBeGreaterThan(20);
+    expect(sizes.ig_account).toBeGreaterThan(15);
+    expect(sizes.ig_media).toBeGreaterThan(15);
     expect(sizes.ads).toBeGreaterThan(100);
   });
 

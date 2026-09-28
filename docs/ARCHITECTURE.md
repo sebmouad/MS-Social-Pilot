@@ -72,7 +72,7 @@ cost: if the worker is not running, nothing is published.
 
 **`native`** — create the post on Facebook immediately with
 `scheduled_publish_time`, and let Facebook hold it. Survives our downtime
-entirely. The costs: Pages only, minimum 10 minutes and maximum 6 months ahead,
+entirely. The costs: Pages only, minimum 10 minutes and maximum 30 days ahead,
 and editing means deleting it on Facebook and recreating it. Destinations in
 this state get the `scheduled_remote` status so our scheduler leaves them alone,
 and cancelling deletes the remote post rather than silently letting it publish.

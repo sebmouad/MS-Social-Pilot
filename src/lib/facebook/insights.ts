@@ -20,9 +20,12 @@ import { GraphError, graphRequest } from './graph';
  * re-read from the insights store each render.
  */
 const INSIGHT_METRICS = [
-  'post_impressions',
-  'post_impressions_unique',
-  'post_engaged_users',
+  // Views and viewers are Meta's replacements for impressions (retired
+  // 15 November 2025) and reach (retired 29 July 2026), on every version.
+  // The old names were requested here in one call, and one retired name makes
+  // Graph refuse the whole request — so every post read no reach at all.
+  'post_media_view',
+  'post_total_media_view_unique',
   'post_clicks',
 ] as const;
 
@@ -72,33 +75,45 @@ export async function fetchPostInsights(
 
   if (options.includeInsights === false) return result;
 
-  try {
-    const { data } = await graphRequest<InsightsResponse>(`${remotePostId}/insights`, {
-      accessToken,
-      params: { metric: INSIGHT_METRICS.join(',') },
-    });
-
+  const apply = (data: InsightsResponse) => {
     for (const metric of data.data ?? []) {
       const value = metric.values?.[0]?.value ?? null;
       switch (metric.name) {
-        case 'post_impressions':
+        case 'post_media_view':
           result.impressions = value;
           break;
-        case 'post_impressions_unique':
+        case 'post_total_media_view_unique':
           result.reach = value;
-          break;
-        case 'post_engaged_users':
-          result.engagedUsers = value;
           break;
         case 'post_clicks':
           result.clicks = value;
           break;
       }
     }
+  };
+
+  try {
+    const { data } = await graphRequest<InsightsResponse>(`${remotePostId}/insights`, {
+      accessToken,
+      params: { metric: INSIGHT_METRICS.join(',') },
+    });
+    apply(data);
   } catch (error) {
     if (error instanceof GraphError && error.kind === 'auth') throw error;
-    // Groups have no insights edge, and metric names drift between versions —
-    // engagement numbers alone are still worth showing.
+    // One name Meta has since retired fails the whole request. Ask for each on
+    // its own, so the next retirement costs one figure rather than all three.
+    // Groups have no insights edge at all, and fail each of these too.
+    for (const metric of INSIGHT_METRICS) {
+      try {
+        const { data } = await graphRequest<InsightsResponse>(`${remotePostId}/insights`, {
+          accessToken,
+          params: { metric },
+        });
+        apply(data);
+      } catch (inner) {
+        if (inner instanceof GraphError && inner.kind === 'auth') throw inner;
+      }
+    }
   }
 
   return result;

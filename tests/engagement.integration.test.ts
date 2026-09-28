@@ -39,7 +39,9 @@ let received: Array<{ path: string; body: string }> = [];
 let asked: Array<{ path: string; params: URLSearchParams }> = [];
 
 beforeAll(async () => {
-  setTestEnv();
+  // Pinned to a version that still serves Page ratings, so the ratings sync
+  // below is exercised; from v22.0 Meta withdrew the edge and the sync skips it.
+  setTestEnv({ FACEBOOK_GRAPH_VERSION: 'v21.0' });
 
   server = createServer((request, response) => {
     const url = new URL(request.url ?? '', 'http://localhost');
@@ -490,16 +492,19 @@ describe('probing every level', () => {
 
   it('records post-level availability against the destination', async () => {
     const { target } = await seedWorkspace();
+    // A metric Meta still serves: retired names are not probed at all.
     routes['/insights'] = () => ({
-      data: [{ name: 'post_impressions', period: 'lifetime', values: [{ value: 1 }] }],
+      data: [{ name: 'post_media_view', period: 'lifetime', values: [{ value: 1 }] }],
     });
 
     const { probeTarget, readAvailability, readCoverage } = await import('../src/lib/analytics');
     await probeTarget(target.id, 'lifetime', 'post');
 
     const availability = await readAvailability(target.id);
-    const impressions = availability.find((row) => row.metric === 'post_impressions');
-    expect(impressions!.available).toBe(true);
+    const views = availability.find((row) => row.metric === 'post_media_view');
+    expect(views!.available).toBe(true);
+    // Retired in November 2025 on every version, so never asked about.
+    expect(availability.find((row) => row.metric === 'post_impressions')).toBeUndefined();
 
     // Everything else in the post catalogue was asked for and did not come
     // back, which is a different fact from never having been asked.

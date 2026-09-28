@@ -234,8 +234,8 @@ async function seedPage(workspaceId: string, accountId: string, spec: PageSpec, 
     const daily = (metric: string, value: number) =>
       insights.push({ targetId: target.id, metric, period: 'day', endTime, value, numeric: value });
 
-    daily('page_impressions_unique', reach);
-    daily('page_impressions', Math.round(reach * 1.5));
+    daily('page_total_media_view_unique', reach);
+    daily('page_media_view', Math.round(reach * 1.5));
     daily('page_post_engagements', Math.round(reach * 0.06 * (0.7 + random() * 0.6)));
     daily('page_views_total', Math.round(reach * 0.03 * (0.7 + random() * 0.6)));
     daily('page_daily_follows_unique', follows);
@@ -252,13 +252,13 @@ async function seedPage(workspaceId: string, accountId: string, spec: PageSpec, 
       value,
       numeric: null,
     });
-  lifetime('page_fans_country', { FR: Math.round(spec.fans * 0.62), BE: Math.round(spec.fans * 0.12), CH: Math.round(spec.fans * 0.08), GB: Math.round(spec.fans * 0.05), MA: Math.round(spec.fans * 0.04) });
-  lifetime('page_fans_city', { 'Paris, France': Math.round(spec.fans * 0.31), 'Lyon, France': Math.round(spec.fans * 0.11), 'Brussels, Belgium': Math.round(spec.fans * 0.08) });
+  lifetime('page_follows_country', { FR: Math.round(spec.fans * 0.62), BE: Math.round(spec.fans * 0.12), CH: Math.round(spec.fans * 0.08), GB: Math.round(spec.fans * 0.05), MA: Math.round(spec.fans * 0.04) });
+  lifetime('page_follows_city', { 'Paris, France': Math.round(spec.fans * 0.31), 'Lyon, France': Math.round(spec.fans * 0.11), 'Brussels, Belgium': Math.round(spec.fans * 0.08) });
   lifetime('page_fans_gender_age', { 'F.25-34': Math.round(spec.fans * 0.21), 'F.35-44': Math.round(spec.fans * 0.17), 'M.25-34': Math.round(spec.fans * 0.15), 'M.35-44': Math.round(spec.fans * 0.12), 'F.18-24': Math.round(spec.fans * 0.08) });
 
   await prisma.pageInsight.createMany({ data: insights });
 
-  for (const metric of ['page_impressions_unique', 'page_impressions', 'page_post_engagements', 'page_views_total', 'page_daily_follows_unique', 'page_daily_unfollows_unique', 'page_follows']) {
+  for (const metric of ['page_total_media_view_unique', 'page_media_view', 'page_post_engagements', 'page_views_total', 'page_daily_follows_unique', 'page_daily_unfollows_unique', 'page_follows']) {
     await prisma.metricAvailability.create({
       data: { targetId: target.id, metric, period: 'day', available: true },
     });

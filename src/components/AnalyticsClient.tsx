@@ -76,10 +76,13 @@ const DOWN_IS_GOOD = /unlike|negative_feedback|fan_removes|unfollows|blocked|rep
 
 /** The metric a page's overview should lead with, in order of preference. */
 const HEADLINE = [
+  // Viewers and views, Meta's replacements for reach and impressions; the
+  // retired names after them, for a Page whose stored history predates them.
+  'page_total_media_view_unique',
+  'page_media_view',
   'page_impressions_unique',
   'page_impressions',
   'page_post_engagements',
-  'page_engaged_users',
 ];
 
 export function AnalyticsClient({

@@ -42,7 +42,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const TIMING_LOOKBACK_DAYS = 90;
 
 const PAGE_METRICS: Record<keyof PageTotals, string[]> = {
-  reach: ['page_impressions_unique', 'page_posts_impressions_unique'],
+  // Viewers is Meta's replacement for reach, which it retired on 29 July 2026.
+  reach: ['page_total_media_view_unique', 'page_impressions_unique', 'page_posts_impressions_unique'],
   engagements: ['page_post_engagements'],
   profileViews: ['page_views_total'],
   follows: ['page_daily_follows_unique', 'page_fan_adds_unique', 'page_fan_adds'],
@@ -137,12 +138,13 @@ export async function loadPagePosts(targetId: string, from: Date, to: Date): Pro
 }
 
 /**
- * Page-level sums over a window, each from the first metric in its fallback
- * list that has any daily figures stored for this Page.
+ * Page-level sums over each window.
  *
- * The metric is chosen once for both windows being compared, by the caller
- * passing the whole span: a comparison of `page_fan_adds` last month with
- * `page_daily_follows_unique` this month would be two different measures.
+ * Each day counts once, from the first metric in its fallback list that has a
+ * figure for that day. Per day rather than per window, because Meta renames
+ * these mid-history: a Page synced across 29 July 2026 holds reach before it
+ * and viewers after it, and choosing one name for the whole span would drop
+ * the other half. A day is never counted twice under two names.
  */
 export async function loadPageTotals(
   targetId: string,
@@ -151,40 +153,39 @@ export async function loadPageTotals(
   const spanFrom = new Date(Math.min(...windows.map((window) => window.from.getTime())));
   const spanTo = new Date(Math.max(...windows.map((window) => window.to.getTime())));
 
-  const allNames = Object.values(PAGE_METRICS).flat();
-  const present = await prisma.pageInsight.groupBy({
-    by: ['metric'],
+  // A daily value's endTime is the end of the day it covers, so a window takes
+  // the days that *end* inside it.
+  const rows = await prisma.pageInsight.findMany({
     where: {
       targetId,
       period: 'day',
-      metric: { in: allNames },
+      metric: { in: Object.values(PAGE_METRICS).flat() },
       endTime: { gt: spanFrom, lte: spanTo },
     },
+    select: { metric: true, endTime: true, numeric: true },
   });
-  const available = new Set(present.map((row) => row.metric));
 
-  const chosen = Object.fromEntries(
-    Object.entries(PAGE_METRICS).map(([key, names]) => [key, names.find((name) => available.has(name)) ?? null]),
-  ) as Record<keyof PageTotals, string | null>;
+  return windows.map((window) => {
+    const inside = rows.filter(
+      (row) => row.endTime.getTime() > window.from.getTime() && row.endTime.getTime() <= window.to.getTime(),
+    );
 
-  return Promise.all(
-    windows.map(async (window) => {
-      const entries = await Promise.all(
-        (Object.keys(PAGE_METRICS) as Array<keyof PageTotals>).map(async (key) => {
-          const metric = chosen[key];
-          if (!metric) return [key, null] as const;
-          // A daily value's endTime is the end of the day it covers, so a
-          // window takes the days that *end* inside it.
-          const result = await prisma.pageInsight.aggregate({
-            where: { targetId, metric, period: 'day', endTime: { gt: window.from, lte: window.to } },
-            _sum: { numeric: true },
-          });
-          return [key, Math.round(result._sum.numeric ?? 0)] as const;
-        }),
-      );
-      return Object.fromEntries(entries) as unknown as PageTotals;
-    }),
-  );
+    const totals = {} as PageTotals;
+    for (const key of Object.keys(PAGE_METRICS) as Array<keyof PageTotals>) {
+      const names = PAGE_METRICS[key];
+      const byDay = new Map<string, { rank: number; value: number }>();
+      for (const row of inside) {
+        const rank = names.indexOf(row.metric);
+        if (rank === -1 || row.numeric === null) continue;
+        const day = row.endTime.toISOString().slice(0, 10);
+        const held = byDay.get(day);
+        if (!held || rank < held.rank) byDay.set(day, { rank, value: row.numeric });
+      }
+      totals[key] =
+        byDay.size === 0 ? null : Math.round([...byDay.values()].reduce((sum, day) => sum + day.value, 0));
+    }
+    return totals;
+  });
 }
 
 async function findPage(workspaceId: string, targetId: string) {

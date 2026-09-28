@@ -38,6 +38,8 @@ import {
 } from '@/lib/engagement';
 import { listInstagramAccounts, readInstagramInsights, readInstagramMedia } from '@/lib/instagram';
 import { formatInZone } from '@/lib/time';
+import { env } from '@/lib/env';
+import { pageRatingsAvailable } from '@/lib/facebook/graph';
 import { ExternalLink } from '@/components/ExternalLink';
 
 export const dynamic = 'force-dynamic';
@@ -551,8 +553,21 @@ async function ReviewsView({
   const t = await getTranslations('engagement');
   const summary = await readReviews({ workspaceId, targetId });
 
+  // Meta withdrew Page ratings from the API in v22.0. Say so, rather than offer
+  // a refresh button that can only ever fail; what was stored before stays.
+  const retired = !pageRatingsAvailable(env.graphVersion);
+  const retiredNotice = (
+    <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+      {t('reviewsRetired', { version: env.graphVersion })}
+    </p>
+  );
+
   if (summary.count === 0) {
-    return <EmptyEdge message={t('noReviews')} targetId={targetId} label={t('refresh')} />;
+    return retired ? (
+      retiredNotice
+    ) : (
+      <EmptyEdge message={t('noReviews')} targetId={targetId} label={t('refresh')} />
+    );
   }
 
   const cards = [
@@ -564,9 +579,10 @@ async function ReviewsView({
 
   return (
     <div className="space-y-6">
+      {retired && retiredNotice}
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('reviewsHint')}</p>
-        <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />
+        {!retired && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
       </div>
 
       <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">

@@ -134,6 +134,35 @@ describe('loadPageTotals', () => {
     expect(totals).toMatchObject({ follows: 12, unfollows: 2, reach: null });
   });
 
+  it('reads reach across the July 2026 switch to viewers, counting each day once', async () => {
+    const { page } = await seed();
+    const day = (offset: number) => new Date(NOW.getTime() - offset * DAY);
+    const row = (metric: string, offset: number, value: number) => ({
+      targetId: page.id,
+      metric,
+      period: 'day',
+      endTime: day(offset),
+      value,
+      numeric: value,
+    });
+
+    await prisma.pageInsight.createMany({
+      data: [
+        // Before the switch: reach only.
+        row('page_impressions_unique', 5, 100),
+        row('page_impressions_unique', 4, 100),
+        // A day synced under both names is counted once, from the new one.
+        row('page_impressions_unique', 3, 999),
+        row('page_total_media_view_unique', 3, 300),
+        // After the switch: viewers only.
+        row('page_total_media_view_unique', 2, 300),
+      ],
+    });
+
+    const [totals] = await data.loadPageTotals(page.id, [{ from: FROM, to: NOW }]);
+    expect(totals!.reach).toBe(100 + 100 + 300 + 300);
+  });
+
   it('ignores anything that is not a daily figure', async () => {
     const { page } = await seed();
     await prisma.pageInsight.create({

@@ -403,3 +403,21 @@ export function asGraphError(error: unknown): GraphError {
     kind: 'transient',
   });
 }
+
+/** The major number of a Graph version string: "v25.0" is 25. NaN if unreadable. */
+export function graphMajor(version: string): number {
+  const match = /^v?(\d+)\./.exec(version.trim());
+  return match ? Number(match[1]) : Number.NaN;
+}
+
+/**
+ * Whether Page ratings can still be read on this version.
+ *
+ * Meta deprecated `GET /{page-id}/ratings` in v22.0 ("Page recommendations
+ * have been deprecated for v22.0 and future versions"). Asking for it on a
+ * later version is an error on every sync, so the edge is not asked at all.
+ */
+export function pageRatingsAvailable(version: string): boolean {
+  const major = graphMajor(version);
+  return Number.isFinite(major) && major < 22;
+}

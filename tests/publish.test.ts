@@ -114,10 +114,12 @@ describe('toScheduledPublishTime', () => {
     );
   });
 
-  it('rejects a time beyond the 6-month ceiling', () => {
-    expect(() => toScheduledPublishTime(new Date('2027-03-01T10:00:00Z'), now)).toThrow(
-      /more than 6 months/i,
+  it('rejects a time beyond the 30-day ceiling', () => {
+    // Meta's limit is 30 days; it used to say six months here.
+    expect(() => toScheduledPublishTime(new Date('2026-04-15T10:00:00Z'), now)).toThrow(
+      /more than 30 days/i,
     );
+    expect(() => toScheduledPublishTime(new Date('2026-03-30T10:00:00Z'), now)).not.toThrow();
   });
 
   it('throws a GraphError so route handlers map it to a 400', () => {

@@ -1,6 +1,6 @@
 # MS Social Pilot 1.0.0
 
-A SocialPilot-style scheduler for Facebook Pages, Groups and Instagram. Compose
+A SocialPilot-style scheduler for Facebook Pages and Instagram. Compose
 once, publish to many destinations, with an approval workflow, RSS auto-posting,
 AI writing help, link tracking and client reporting.
 
@@ -45,7 +45,7 @@ them rather than in any one.
 ![The composer: message, link card, media, destinations and the three scheduling modes](docs/images/compose.png)
 
 **Publishing**
-- Many Facebook Pages and Groups from one composer: text, links, photo
+- Many Facebook Pages from one composer: text, links, photo
   galleries, video.
 - **Instagram Business accounts** as destinations alongside them — single
   photo, reel, or carousel. Instagram's API takes a URL rather than an upload,
@@ -56,11 +56,11 @@ them rather than in any one.
 
 **Scheduling** — three modes, because they fail differently:
 
-| Mode | Who holds the post | Editable after saving | Works for Groups | Survives your server being down |
+| Mode | Who holds the post | Editable after saving | How far ahead | Survives your server being down |
 |---|---|---|---|---|
-| Publish now | — | n/a | Yes | n/a |
-| Scheduled (default) | This app | Yes | Yes | No — the worker must be running |
-| Scheduled (native) | Facebook | No, cancel and recreate | No | Yes |
+| Publish now | — | n/a | — | n/a |
+| Scheduled (default) | This app | Yes | Any time | No — the worker must be running |
+| Scheduled (native) | Facebook | No, cancel and recreate | 10 minutes to 30 days | Yes |
 
 - A recurring **queue** ("post at my next free slot"), defined in workspace-local
   time and stable across daylight saving changes.
@@ -352,11 +352,14 @@ More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Important limitations
 
-**Groups.** Meta restricted the Groups API in April 2024. `publish_to_groups`
-needs separate approval, and a Group only appears if an admin has added your app
-to it. Off by default (`FACEBOOK_ENABLE_GROUPS=false`). The code paths are
-complete and work once you have the access — but do not plan a product around
-Group publishing before confirming you can get it.
+**Groups.** Meta removed the Groups API from every version on 22 April 2024, so
+no app can publish to a Facebook Group. `publish_to_groups` is never requested:
+asking for a permission that no longer exists fails the whole login.
+
+**Metrics Meta retired.** Impressions and fans went on 15 November 2025 and
+reach on 29 July 2026, on every API version. The app reads Meta's replacements
+(views, viewers, follows) and keeps stored history under the old names; see
+[docs/META_APP_SETUP.md](docs/META_APP_SETUP.md#what-meta-has-retired).
 
 **App Review.** Publishing to Pages you do not own needs `pages_manage_posts`
 approved by Meta. Until then the app works only for people with a role on it.

@@ -3,6 +3,16 @@
 This is the part that blocks people, so it is written as a checklist. Budget an
 hour for the setup and several days for App Review.
 
+**You do not have to copy URLs from this page.** Once the app is running, the
+**Setup** screen (and **Connections**, for an admin) shows a *Meta app settings*
+panel with every value below already built from your `APP_URL` — redirect URI,
+callbacks, Graph version and the exact permissions requested — each with a copy
+button and the place it goes in Meta's dashboard. It also warns when `APP_URL`
+is not https or is still localhost.
+
+Checked against Meta's changelogs as of September 2026; see
+[What Meta has retired](#what-meta-has-retired) for the changes that shaped it.
+
 ---
 
 ## 1. Create the app
@@ -76,7 +86,6 @@ so a switch turned on too early stops anybody connecting at all.
 
 | Switch | Adds | Gives you |
 |---|---|---|
-| Group publishing | `publish_to_groups`, `groups_access_member_info` | Posting to Groups. Read §6 first. |
 | Page inbox | `pages_messaging`, `pages_manage_metadata` | Reading and answering Messenger threads. |
 | Instagram | `instagram_basic`, `instagram_manage_insights`, `instagram_content_publish` | Instagram analytics, and posting to Instagram. |
 | Ad spend | `ads_read` | Campaign spend and results. |
@@ -134,28 +143,16 @@ Both must be publicly reachable — Facebook calls them from its own servers.
 
 ---
 
-## 6. Groups (optional, read this first)
+## 6. Groups — not possible any more
 
-Meta restricted the Groups API in **April 2024**. Today:
+Meta removed the Groups API from **every** API version on **22 April 2024**.
+`publish_to_groups` and `groups_access_member_info` no longer exist, and no
+third-party app can publish to a Group.
 
-- `/me/groups` returns only Groups where **your specific app is installed**.
-- A Group admin installs it via Group Settings → Advanced settings → Apps.
-- Publishing needs `publish_to_groups`, which requires separate approval, and
-  Meta grants it narrowly.
-
-If, and only if, you have that access:
-
-```env
-FACEBOOK_ENABLE_GROUPS="true"
-```
-
-That adds `publish_to_groups` and `groups_access_member_info` to the login
-request and shows Groups in the UI. Two behavioural differences to expect:
-
-- Group posts use the **user** access token, not a Page token.
-- Facebook does **not** support `scheduled_publish_time` for Groups, so native
-  scheduling is unavailable — the built-in scheduler handles them instead. The
-  composer enforces this rather than letting Graph reject the post.
+The `FACEBOOK_ENABLE_GROUPS` switch is kept so an old configuration still loads,
+but it no longer adds those scopes: a permission that does not exist makes the
+whole login dialog fail, so turning it on used to stop anybody connecting.
+Leave it off.
 
 ---
 
@@ -220,8 +217,8 @@ posted twice in quick succession. Not retryable, and the app does not retry it.
 **Link preview shows stale content** — press "Refresh card" in the composer. That
 calls the scrape endpoint, which is the documented way to bust Facebook's cache.
 
-**Groups list is empty** — expected unless a Group admin has installed your app
-in that Group. See section 6.
+**Groups list is empty** — expected. Meta removed the Groups API in April 2024;
+see section 6.
 
 **No Instagram accounts found** — the account must be Business or Creator (not
 personal) and linked to a Page you have connected here. Check it on Facebook
@@ -248,3 +245,33 @@ dialog in that case, not just the one permission. Turn the switch back off.
 - The app's own **Setup** screen walks a fresh installation through the first
   few steps, and **Connections** tells you which permissions are actually
   granted for each connected account.
+
+---
+
+## What Meta has retired
+
+Meta retires metrics and edges on its own schedule, often **on every API version
+at once**, so pinning an old version does not protect you. What this app does
+about each, from Meta's own changelogs:
+
+| When | What | What this app does |
+|---|---|---|
+| 22 Apr 2024 | Groups API (`publish_to_groups`) removed | Never requested; see §6. |
+| 21 Apr 2025 | Instagram `impressions`, `plays` and reel play counts | Not requested; `views` is read instead. |
+| v22.0 | Page ratings (`/{page}/ratings`) deprecated | Read up to v21 only; the Reviews view keeps what was stored and says why nothing new arrives. |
+| 15 Nov 2025 | Page and post **impressions** and **fans** (`page_impressions`, `post_impressions`, `page_fans*`, `page_fan_adds/removes`) | Not requested; `page_media_view` / `post_media_view` (views), `page_follows*` and `page_daily_follows_unique` / `page_daily_unfollows_unique` are read instead. |
+| 29 Jul 2026 (v26.0 release) | Page and post **reach** (`page_impressions_unique`, `post_impressions_unique` and every `*_unique` impressions metric) | Not requested; `page_total_media_view_unique` / `post_total_media_view_unique` (viewers) are read instead. Stored history under the old names still counts — each day is read once, from whichever name it holds. |
+
+The retired names stay listed in the metric catalogue, marked with the date,
+so the coverage screen can say "Meta retired this" rather than show a gap.
+
+**Graph API version.** The default is **v25.0**, supported until 29 July 2028.
+v21.0, the previous default, expires on 21 January 2027 — if your `.env` pins
+`FACEBOOK_GRAPH_VERSION="v21.0"`, change it (and set the app's API version in
+Meta's dashboard to match). Between v21 and v25 the only change that touches
+this app is Page ratings, above.
+
+**Scheduling on Facebook.** A post Facebook holds (native scheduling) must be
+between **10 minutes and 30 days** ahead. Anything later is scheduled by this
+app's worker instead; the composer says so rather than letting Graph refuse it.
+

@@ -533,6 +533,7 @@
     "replyWindowOpen": "Facebook accepts a reply on this thread until {until}.",
     "reviewCount": "Ratings",
     "reviewsHint": "Star ratings and recommendations left on the page.",
+    "reviewsRetired": "Meta removed Page ratings from the Graph API from v22.0, and this installation uses {version}, so no new reviews can be read. Anything read before is still shown.",
     "searchComments": "Search comments",
     "searchPlaceholder": "Words in a comment",
     "sendReply": "Send reply",
@@ -768,6 +769,49 @@
     "usageNearlyFull": "Nearly full. Delete what is no longer needed, or raise the allowance in Configuration.",
     "usageOf": "{used} of {total}",
     "usageTitle": "Storage used"
+  },
+  "metaApp": {
+    "copied": "Copied",
+    "copy": "Copy",
+    "copyNamed": "Copy {name}",
+    "fields": {
+      "appDomain": {
+        "label": "App domain",
+        "where": "App settings → Basic → App domains."
+      },
+      "dataDeletion": {
+        "label": "Data deletion request URL",
+        "where": "App settings → Basic → Data deletion → Data deletion callback URL. Required for app review."
+      },
+      "deauthorize": {
+        "label": "Deauthorize callback URL",
+        "where": "Facebook Login → Settings → Deauthorize callback URL. Meta calls it when somebody removes the app from their account."
+      },
+      "graphVersion": {
+        "label": "Graph API version",
+        "where": "App settings → Advanced → Upgrade API version: the app must be on this version or later. Every request is made against it."
+      },
+      "permissions": {
+        "label": "Permissions requested",
+        "where": "App Review → Permissions and features: each needs Advanced Access before people outside your business can connect."
+      },
+      "redirectUri": {
+        "label": "Valid OAuth redirect URI",
+        "where": "Facebook Login → Settings → Valid OAuth Redirect URIs. It must match character for character, including https and without a trailing slash."
+      },
+      "siteUrl": {
+        "label": "Site URL",
+        "where": "App settings → Basic → Add platform → Website → Site URL."
+      }
+    },
+    "privacyNote": "Meta also requires a Privacy Policy URL (App settings → Basic) before the app can go Live. This installation does not publish one for you: use your organisation's.",
+    "subtitle": "The exact values to enter in your app at developers.facebook.com, built from this installation's address.",
+    "title": "Meta app settings",
+    "warnings": {
+      "loopback": "This address is localhost. Facebook cannot call the deauthorize and data-deletion URLs here, and real users cannot sign in through it. Use it for development only.",
+      "notAUrl": "APP_URL is not a valid URL, so none of these values can be right. Fix it in the environment or on the Configuration screen.",
+      "notHttps": "This installation's address is not https. Facebook only accepts an http redirect URI for localhost in development mode: set APP_URL to the public https address before connecting real Pages."
+    }
   },
   "nav": {
     "dashboard": "Dashboard",

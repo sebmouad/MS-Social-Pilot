@@ -533,6 +533,7 @@
     "replyWindowOpen": "Facebook accepte une réponse sur cette conversation jusqu’à {until}.",
     "reviewCount": "Notes",
     "reviewsHint": "Notes et recommandations laissées sur la page.",
+    "reviewsRetired": "Meta a retiré les avis de Page de l’API Graph à partir de la v22.0, et cette installation utilise {version} : aucun nouvel avis ne peut être lu. Ceux lus auparavant restent affichés.",
     "searchComments": "Rechercher dans les commentaires",
     "searchPlaceholder": "Mots d’un commentaire",
     "sendReply": "Envoyer la réponse",
@@ -768,6 +769,49 @@
     "usageNearlyFull": "Presque plein. Supprimez ce qui n’est plus utile, ou augmentez l’allocation dans la configuration.",
     "usageOf": "{used} sur {total}",
     "usageTitle": "Stockage utilisé"
+  },
+  "metaApp": {
+    "copied": "Copié",
+    "copy": "Copier",
+    "copyNamed": "Copier {name}",
+    "fields": {
+      "appDomain": {
+        "label": "Domaine de l’application",
+        "where": "Paramètres de l’app → Général → Domaines de l’app."
+      },
+      "dataDeletion": {
+        "label": "URL de demande de suppression des données",
+        "where": "Paramètres de l’app → Général → Suppression des données → URL de rappel. Obligatoire pour l’examen de l’application."
+      },
+      "deauthorize": {
+        "label": "URL de rappel de désautorisation",
+        "where": "Facebook Login → Paramètres → URL de rappel de désautorisation. Meta l’appelle quand quelqu’un retire l’application de son compte."
+      },
+      "graphVersion": {
+        "label": "Version de l’API Graph",
+        "where": "Paramètres de l’app → Avancé → Mettre à niveau la version de l’API : l’application doit être au moins sur cette version. Toutes les requêtes l’utilisent."
+      },
+      "permissions": {
+        "label": "Autorisations demandées",
+        "where": "Examen de l’app → Autorisations et fonctionnalités : chacune nécessite l’accès avancé pour que des personnes extérieures à votre entreprise puissent se connecter."
+      },
+      "redirectUri": {
+        "label": "URI de redirection OAuth valide",
+        "where": "Facebook Login → Paramètres → URI de redirection OAuth valides. Elle doit correspondre caractère pour caractère, https compris et sans barre oblique finale."
+      },
+      "siteUrl": {
+        "label": "URL du site",
+        "where": "Paramètres de l’app → Général → Ajouter une plateforme → Site web → URL du site."
+      }
+    },
+    "privacyNote": "Meta exige aussi une URL de politique de confidentialité (Paramètres → Général) avant de passer l’application en mode Live. Cette installation n’en publie pas pour vous : utilisez celle de votre organisation.",
+    "subtitle": "Les valeurs exactes à saisir dans votre application sur developers.facebook.com, calculées à partir de l’adresse de cette installation.",
+    "title": "Réglages de l’application Meta",
+    "warnings": {
+      "loopback": "Cette adresse est localhost. Facebook ne peut pas appeler les URL de désautorisation et de suppression des données, et de vrais utilisateurs ne peuvent pas s’y connecter. À réserver au développement.",
+      "notAUrl": "APP_URL n’est pas une URL valide : aucune de ces valeurs ne peut être juste. Corrigez-la dans l’environnement ou dans l’écran Configuration.",
+      "notHttps": "L’adresse de cette installation n’est pas en https. Facebook n’accepte une URI de redirection http que pour localhost en mode développement : réglez APP_URL sur l’adresse https publique avant de connecter de vraies Pages."
+    }
   },
   "nav": {
     "dashboard": "Tableau de bord",
