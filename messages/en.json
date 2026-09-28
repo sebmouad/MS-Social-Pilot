@@ -30,7 +30,7 @@
   },
   "accounts": {
     "title": "Connected accounts",
-    "subtitle": "Facebook pages and groups this workspace can publish to.",
+    "subtitle": "Facebook pages this workspace can publish to.",
     "connect": "Connect Facebook",
     "noneTitle": "No accounts connected yet",
     "noneBody": "Connect the Facebook account that manages your pages. We ask for permission to list your pages and publish posts on their behalf, and store the resulting tokens encrypted.",
@@ -42,7 +42,7 @@
     "syncedAt": "synced {when}",
     "tokenExpires": "token expires {when}",
     "reconnectPrompt": "Reconnect this account to resume scheduled posts.",
-    "disconnectConfirm": "Disconnect {name}? Scheduled posts to its pages and groups will be cancelled. Published history is kept.",
+    "disconnectConfirm": "Disconnect {name}? Scheduled posts to its pages will be cancelled. Published history is kept.",
     "syncedResult": "Synced {pages} page(s) and {groups} group(s).",
     "healthy": "Connection is healthy",
     "groupsDisabled": "Groups cannot be published to. Meta removed the Groups API from every version on 22 April 2024."
@@ -199,7 +199,7 @@
   },
   "app": {
     "name": "MS Social Pilot",
-    "tagline": "Schedule Facebook Page and Group posts from one place."
+    "tagline": "Schedule Facebook Page and Instagram posts from one place."
   },
   "approvals": {
     "title": "Approvals",
@@ -308,10 +308,10 @@
     "viewOn": "View on {destination}",
     "submitForApproval": "Submit for approval",
     "submittedOk": "Submitted for approval.",
-    "subtitle": "Write once, publish to any number of Facebook pages and groups.",
+    "subtitle": "Write once, publish to any number of Facebook pages.",
     "targetPaused": "Turned off for this workspace.",
     "thisApp": "This app.",
-    "thisAppHint": "Editable until it goes out, and works for groups.",
+    "thisAppHint": "Editable until it goes out, and any distance ahead.",
     "timezoneHint": "Times are in {timezone}, your workspace timezone.",
     "title": "Compose",
     "viaGraph": "the Facebook scraper",
@@ -371,7 +371,7 @@
       "checkedAt": "Checked at {when}",
       "appTitle": "Facebook app",
       "permissions": "Permissions",
-      "destinations": "Pages and Groups",
+      "destinations": "Pages",
       "declined": "Refused on Facebook. {consequence}",
       "notRequested": "Not granted. {consequence}",
       "noAccounts": "No Facebook account is connected yet.",
@@ -388,7 +388,7 @@
     "noLinkedPage": "No linked page",
     "noPages": "No pages found. Refresh, or check that this account manages any.",
     "noScopes": "None recorded — reconnect to refresh this.",
-    "noneBody": "Connect a Facebook account to bring in the pages and groups you manage. Publishing, analytics and comment moderation all run through that connection.",
+    "noneBody": "Connect a Facebook account to bring in the pages you manage. Publishing, analytics and comment moderation all run through that connection.",
     "noneFound": "None found yet.",
     "noneTitle": "Nothing is connected yet",
     "ownToken": "Has its own page token",
@@ -397,7 +397,7 @@
     "permissions": "Permissions granted",
     "reconnect": "Reconnect",
     "reconnectRequired": "Reconnect required.",
-    "subtitle": "Connected Facebook users, the pages and groups behind them, and the tokens that reach them.",
+    "subtitle": "Connected Facebook users, the pages behind them, and the tokens that reach them.",
     "syncTargets": "Refresh pages",
     "synced": "synced {when}",
     "syncedResult": "Found {pages} pages and {groups} groups.",
@@ -462,7 +462,7 @@
     "connectionExpired": {
       "subject": "Reconnect {account} to keep posting",
       "heading": "A Facebook connection stopped working",
-      "body": "{account} can no longer publish. Scheduled posts to its pages and groups will fail until it is reconnected.",
+      "body": "{account} can no longer publish. Scheduled posts to its pages will fail until it is reconnected.",
       "cta": "Reconnect now"
     },
     "tokenExpiring": {
@@ -1138,13 +1138,13 @@
       },
       "connect": {
         "title": "Connect a Facebook account",
-        "body": "Sign in with Facebook so this app can see the Pages and Groups you manage.",
+        "body": "Sign in with Facebook so this app can see the Pages you manage.",
         "done": "A Facebook account is connected.",
         "action": "Connect Facebook"
       },
       "destination": {
-        "title": "Turn on a Page or Group",
-        "body": "Choose which of your Pages and Groups this workspace may publish to. Nothing goes out until at least one is on.",
+        "title": "Turn on a Page",
+        "body": "Choose which of your Pages this workspace may publish to. Nothing goes out until at least one is on.",
         "done": "At least one destination is ready to publish.",
         "action": "Choose destinations"
       },
@@ -1211,7 +1211,7 @@
     "connectAnAccount": "Connect an account",
     "group": "Group",
     "instagram": "Instagram",
-    "noneConnected": "No Facebook pages or groups are connected yet.",
+    "noneConnected": "No Facebook pages are connected yet.",
     "page": "Page",
     "selectAll": "Select all",
     "selectedOf": "{selected} of {total} selected",

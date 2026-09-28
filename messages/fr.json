@@ -30,7 +30,7 @@
   },
   "accounts": {
     "title": "Comptes connectés",
-    "subtitle": "Pages et groupes Facebook sur lesquels cet espace de travail peut publier.",
+    "subtitle": "Pages Facebook sur lesquelles cet espace de travail peut publier.",
     "connect": "Connecter Facebook",
     "noneTitle": "Aucun compte connecté",
     "noneBody": "Connectez le compte Facebook qui gère vos pages. Nous demandons l'autorisation de lister vos pages et de publier en leur nom, et les jetons obtenus sont chiffrés.",
@@ -42,7 +42,7 @@
     "syncedAt": "synchronisé {when}",
     "tokenExpires": "jeton expirant le {when}",
     "reconnectPrompt": "Reconnectez ce compte pour reprendre les publications planifiées.",
-    "disconnectConfirm": "Déconnecter {name} ? Les publications planifiées vers ses pages et groupes seront annulées. L'historique est conservé.",
+    "disconnectConfirm": "Déconnecter {name} ? Les publications planifiées vers ses pages seront annulées. L'historique est conservé.",
     "syncedResult": "{pages} page(s) et {groups} groupe(s) synchronisés.",
     "healthy": "La connexion fonctionne",
     "groupsDisabled": "Impossible de publier dans les groupes. Meta a retiré l’API Groupes de toutes les versions le 22 avril 2024."
@@ -199,7 +199,7 @@
   },
   "app": {
     "name": "MS Social Pilot",
-    "tagline": "Planifiez vos publications Facebook, pages et groupes, depuis un seul endroit."
+    "tagline": "Planifiez vos publications Facebook et Instagram depuis un seul endroit."
   },
   "approvals": {
     "title": "Validations",
@@ -308,10 +308,10 @@
     "viewOn": "Voir sur {destination}",
     "submitForApproval": "Soumettre à validation",
     "submittedOk": "Soumise à validation.",
-    "subtitle": "Rédigez une fois, publiez sur autant de pages et de groupes Facebook que vous voulez.",
+    "subtitle": "Rédigez une fois, publiez sur autant de pages Facebook que vous voulez.",
     "targetPaused": "Désactivée pour cet espace de travail.",
     "thisApp": "Cette application.",
-    "thisAppHint": "Modifiable jusqu'à la parution, et compatible avec les groupes.",
+    "thisAppHint": "Modifiable jusqu'à la parution, et sans limite de date.",
     "timezoneHint": "Les heures sont exprimées en {timezone}, le fuseau de votre espace de travail.",
     "title": "Rédiger",
     "viaGraph": "l'analyseur Facebook",
@@ -371,7 +371,7 @@
       "checkedAt": "Vérifié à {when}",
       "appTitle": "Application Facebook",
       "permissions": "Autorisations",
-      "destinations": "Pages et groupes",
+      "destinations": "Pages",
       "declined": "Refusée sur Facebook. {consequence}",
       "notRequested": "Non accordée. {consequence}",
       "noAccounts": "Aucun compte Facebook connecté pour le moment.",
@@ -388,7 +388,7 @@
     "noLinkedPage": "Aucune page reliée",
     "noPages": "Aucune page trouvée. Actualisez, ou vérifiez que ce compte en gère.",
     "noScopes": "Aucune enregistrée — reconnectez pour actualiser.",
-    "noneBody": "Connectez un compte Facebook pour récupérer les pages et groupes que vous gérez. La publication, les statistiques et la modération passent toutes par cette connexion.",
+    "noneBody": "Connectez un compte Facebook pour récupérer les pages que vous gérez. La publication, les statistiques et la modération passent toutes par cette connexion.",
     "noneFound": "Aucun trouvé pour le moment.",
     "noneTitle": "Aucune connexion pour le moment",
     "ownToken": "Possède son propre jeton de page",
@@ -397,7 +397,7 @@
     "permissions": "Autorisations accordées",
     "reconnect": "Reconnecter",
     "reconnectRequired": "Reconnexion nécessaire.",
-    "subtitle": "Comptes Facebook connectés, pages et groupes associés, et les jetons qui y donnent accès.",
+    "subtitle": "Comptes Facebook connectés, pages associées, et les jetons qui y donnent accès.",
     "syncTargets": "Actualiser les pages",
     "synced": "synchronisé {when}",
     "syncedResult": "{pages} pages et {groups} groupes trouvés.",
@@ -462,7 +462,7 @@
     "connectionExpired": {
       "subject": "Reconnectez {account} pour continuer à publier",
       "heading": "Une connexion Facebook ne fonctionne plus",
-      "body": "{account} ne peut plus publier. Les publications planifiées vers ses pages et groupes échoueront tant que le compte n'est pas reconnecté.",
+      "body": "{account} ne peut plus publier. Les publications planifiées vers ses pages échoueront tant que le compte n'est pas reconnecté.",
       "cta": "Reconnecter maintenant"
     },
     "tokenExpiring": {
@@ -1138,13 +1138,13 @@
       },
       "connect": {
         "title": "Connecter un compte Facebook",
-        "body": "Connectez-vous avec Facebook pour que l’application voie les Pages et groupes que vous gérez.",
+        "body": "Connectez-vous avec Facebook pour que l’application voie les Pages que vous gérez.",
         "done": "Un compte Facebook est connecté.",
         "action": "Connecter Facebook"
       },
       "destination": {
-        "title": "Activer une Page ou un groupe",
-        "body": "Choisissez les Pages et groupes sur lesquels cet espace peut publier. Rien ne part tant qu’aucun n’est activé.",
+        "title": "Activer une Page",
+        "body": "Choisissez les Pages sur lesquelles cet espace peut publier. Rien ne part tant qu’aucune n’est activée.",
         "done": "Au moins une destination est prête à publier.",
         "action": "Choisir les destinations"
       },
@@ -1211,7 +1211,7 @@
     "connectAnAccount": "Connecter un compte",
     "group": "Groupe",
     "instagram": "Instagram",
-    "noneConnected": "Aucune page ni groupe Facebook n'est encore connecté.",
+    "noneConnected": "Aucune page Facebook n'est encore connectée.",
     "page": "Page",
     "selectAll": "Tout sélectionner",
     "selectedOf": "{selected} sur {total} sélectionnées",
