@@ -302,7 +302,12 @@ async function InteractionsView({
     { label: t('comments'), value: summary.totals.comments },
     { label: t('shares'), value: summary.totals.shares },
     { label: t('clicks'), value: summary.totals.clicks },
-    { label: t('engaged'), value: summary.totals.engagedUsers },
+    // Interactions rather than "engaged people": Meta retired the engaged-users
+    // metrics, so that tile read zero on every Page.
+    {
+      label: t('interactionsTotal'),
+      value: summary.totals.reactions + summary.totals.comments + summary.totals.shares,
+    },
     { label: t('negativeFeedback'), value: summary.totals.negativeFeedback },
   ];
 
@@ -699,7 +704,13 @@ async function ExternalView({
           const figures = [
             { label: t('impressions'), value: post.impressions },
             { label: t('reach'), value: post.reach },
-            { label: t('engaged'), value: post.engagedUsers },
+            {
+              label: t('interactions'),
+              value:
+                post.reactions === null && post.comments === null && post.shares === null
+                  ? null
+                  : (post.reactions ?? 0) + (post.comments ?? 0) + (post.shares ?? 0),
+            },
             { label: t('reactions'), value: post.reactions },
             { label: t('comments'), value: post.comments },
             { label: t('shares'), value: post.shares },

@@ -80,7 +80,6 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
   const columns: Array<{ key: SortKey; label: string; numeric: boolean }> = [
     { key: 'impressions', label: t('impressions'), numeric: true },
     { key: 'reach', label: t('reach'), numeric: true },
-    { key: 'engagedUsers', label: t('engaged'), numeric: true },
     { key: 'engagementRate', label: t('engagementRate'), numeric: true },
     { key: 'reactions', label: t('reactions'), numeric: true },
     { key: 'comments', label: t('comments'), numeric: true },

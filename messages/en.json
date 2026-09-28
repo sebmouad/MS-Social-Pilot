@@ -195,7 +195,8 @@
     "coverageKey": "Darker is served by Facebook; lighter was asked for and refused. The remainder has not been tested yet.",
     "chooseView": "Choose a view",
     "sortBy": "Sort by",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "interactionsTotal": "Interactions"
   },
   "app": {
     "name": "MS Social Pilot",
@@ -510,6 +511,7 @@
     "hide": "Hide",
     "impressions": "Impressions",
     "inboxHint": "Recent page inbox threads. Reading these needs the messaging permission, and replying needs it too.",
+    "interactions": "Interactions",
     "likes": "{count, plural, one {# like} other {# likes}}",
     "messageCount": "{count, plural, one {# message} other {# messages}}",
     "metricsCount": "Metrics",

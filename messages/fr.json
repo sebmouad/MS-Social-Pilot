@@ -195,7 +195,8 @@
     "coverageKey": "Le foncé est fourni par Facebook ; le clair a été demandé et refusé. Le reste n’a pas encore été testé.",
     "chooseView": "Choisir une vue",
     "sortBy": "Trier par",
-    "showLess": "Afficher moins"
+    "showLess": "Afficher moins",
+    "interactionsTotal": "Interactions"
   },
   "app": {
     "name": "MS Social Pilot",
@@ -510,6 +511,7 @@
     "hide": "Masquer",
     "impressions": "Impressions",
     "inboxHint": "Conversations récentes de la boîte de réception. Les lire demande l’autorisation de messagerie, y répondre aussi.",
+    "interactions": "Interactions",
     "likes": "{count, plural, one {# j’aime} other {# j’aime}}",
     "messageCount": "{count, plural, one {# message} other {# messages}}",
     "metricsCount": "Indicateurs",

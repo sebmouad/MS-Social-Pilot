@@ -236,6 +236,30 @@ describe('the older views, corrected', () => {
     expect(summary.reactionsByType).toMatchObject({ like: 20, love: 10 });
   });
 
+  it('gives each post an engagement rate from interactions, not the retired engaged-users metric', async () => {
+    const { user, workspace, page } = await seed();
+    await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: user.id,
+        message: 'Hello',
+        status: 'published',
+        targets: {
+          create: {
+            targetId: page.id,
+            status: 'published',
+            publishedAt: new Date(NOW.getTime() - DAY),
+            // Reach 1,000; 40 reactions, 8 comments, 2 shares; no engaged users.
+            insights: { impressions: null, reach: 1000, engagedUsers: null, reactions: 40, comments: 8, shares: 2, clicks: 5 },
+          },
+        },
+      },
+    });
+
+    const [row] = await analytics.readPostAnalytics({ workspaceId: workspace.id, targetId: page.id, from: FROM, to: NOW });
+    expect(row!.engagementRate).toBe(5);
+  });
+
   it('reads gained and lost followers from the metrics Meta still serves', async () => {
     const { page } = await seed();
     await prisma.pageInsight.createMany({

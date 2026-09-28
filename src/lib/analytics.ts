@@ -920,9 +920,15 @@ export async function readPostAnalytics(options: {
       paid: value('impressionsPaid'),
       reactionsByType: insights?.reactionsByType ?? {},
       clicksByType: insights?.clicksByType ?? {},
-      // Rate against reach, not impressions: the same person seeing a post
-      // three times is one opportunity to engage, not three.
-      engagementRate: reach > 0 ? Math.round((engaged / reach) * 1000) / 10 : null,
+      // Reactions, comments and shares per hundred people reached — the same
+      // definition as the page analysis. It was engaged users over reach, and
+      // Meta retired `post_engaged_users`, so every post read 0% or nothing.
+      // Against reach, not impressions: the same person seeing a post three
+      // times is one opportunity to engage, not three.
+      engagementRate:
+        reach > 0
+          ? Math.round(((value('reactions') + value('comments') + value('shares')) / reach) * 1000) / 10
+          : null,
       syncedAt: row.insightsSyncedAt,
     };
   });
