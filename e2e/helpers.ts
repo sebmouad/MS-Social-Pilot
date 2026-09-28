@@ -52,6 +52,7 @@ export const SIGNED_IN_SCREENS = [
   '/dashboard',
   '/compose',
   '/calendar',
+  '/queue',
   '/posts',
   '/approvals',
   '/connections',

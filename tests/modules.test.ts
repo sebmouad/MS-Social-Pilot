@@ -19,7 +19,7 @@ describe('the modules', () => {
     expect(moduleFor('/analytics/post/abc')?.key).toBe('analytics');
     expect(moduleFor('/reports')?.key).toBe('analytics');
     expect(moduleFor('/ads')?.key).toBe('ads');
-    for (const path of ['/calendar', '/posts', '/compose', '/approvals', '/feeds']) {
+    for (const path of ['/calendar', '/queue', '/posts', '/compose', '/approvals', '/feeds']) {
       expect(moduleFor(path)?.key, path).toBe('schedule');
     }
   });

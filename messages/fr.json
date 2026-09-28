@@ -45,7 +45,7 @@
     "disconnectConfirm": "Déconnecter {name} ? Les publications planifiées vers ses pages et groupes seront annulées. L'historique est conservé.",
     "syncedResult": "{pages} page(s) et {groups} groupe(s) synchronisés.",
     "healthy": "La connexion fonctionne",
-    "groupsDisabled": "La publication dans les groupes est désactivée. Meta a restreint l'API Groupes en avril 2024 : une autorisation distincte est nécessaire et l'application doit être installée dans chaque groupe."
+    "groupsDisabled": "Impossible de publier dans les groupes. Meta a retiré l’API Groupes de toutes les versions le 22 avril 2024."
   },
   "ads": {
     "none": "Aucun compte publicitaire n’est connecté. Pour les trouver, la connexion Facebook doit avoir l’autorisation de lecture des publicités.",
@@ -360,7 +360,7 @@
     "featureOff": "Désactivé dans la Configuration. Meta examine cette autorisation séparément, et la demander avant approbation fait échouer toute la connexion.",
     "followers": "{count, plural, one {# abonné} other {# abonnés}}",
     "groups": "Groupes",
-    "groupsOff": "La publication dans les groupes est désactivée. Meta a restreint l’API Groups en avril 2024 : elle nécessite une autorisation approuvée séparément et l’installation de l’application dans chaque groupe. Activez-la dans la Configuration une fois l’approbation obtenue.",
+    "groupsOff": "Impossible de publier dans les groupes. Meta a retiré l’API Groupes de toutes les versions le 22 avril 2024, et plus aucune application ne peut publier dans un groupe.",
     "health": {
       "title": "Vérification des connexions",
       "subtitle": "Demandez à Facebook ce qui fonctionne, autorisation par autorisation et Page par Page.",
@@ -384,7 +384,7 @@
     "instagramDestinations": "Comptes Instagram où publier",
     "instagramHint": "Comptes professionnels accessibles via une page connectée. Utilisables comme destinations une fois instagram_content_publish approuvé ; jusque-là, ils apparaissent désactivés.",
     "instagramTitle": "Comptes Instagram",
-    "noGroups": "Aucun groupe. La publication dans les groupes nécessite une autorisation approuvée séparément.",
+    "noGroups": "Aucun groupe. Meta a retiré l’API Groupes en avril 2024.",
     "noLinkedPage": "Aucune page reliée",
     "noPages": "Aucune page trouvée. Actualisez, ou vérifiez que ce compte en gère.",
     "noScopes": "Aucune enregistrée — reconnectez pour actualiser.",
@@ -842,7 +842,8 @@
     "modules": "Modules",
     "shared": "Espace de travail",
     "pages": "Pages",
-    "adsPerformance": "Performances"
+    "adsPerformance": "Performances",
+    "queue": "File d’attente"
   },
   "notifications": {
     "title": "Notifications",
@@ -977,7 +978,8 @@
       "hint": "Interactions moyennes selon le jour et l’heure de publication ({timezone}), rapportées à la publication type de la page. Plus c’est foncé, mieux c’est.",
       "low": "Sous la normale",
       "none": "Pas encore assez de publications pour dégager les bons horaires.",
-      "title": "Quand les publications fonctionnent le mieux"
+      "title": "Quand les publications fonctionnent le mieux",
+      "toQueue": "Ajouter les meilleurs horaires à la file de publication"
     },
     "top": {
       "hint": "Selon les interactions sur cette période.",
@@ -1007,6 +1009,37 @@
       "destination_off": "Cette destination était désactivée à l’heure prévue, la publication n’y a donc pas été faite.",
       "worker_lost": "La publication a été interrompue et n’a pas repris dans la limite des tentatives. Vérifiez la destination puis réessayez."
     }
+  },
+  "queue": {
+    "addSlot": "Ajouter un créneau",
+    "addToQueue": "Ajouter à la file",
+    "added": "{day} à {time} ajouté.",
+    "alreadyThere": "Cet horaire est déjà dans la file.",
+    "awaitingApproval": "En attente de validation",
+    "day": "Jour",
+    "free": "Libre",
+    "noSlots": "Aucun créneau",
+    "noText": "(sans texte)",
+    "readOnly": "Seuls les propriétaires et administrateurs peuvent modifier la file.",
+    "removeSlot": "Retirer {day} {time}",
+    "removed": "{day} à {time} retiré.",
+    "saveFailed": "La file n’a pas pu être enregistrée. Veuillez réessayer.",
+    "seeAnalysis": "Voir l’analyse des pages",
+    "slotCount": "{count, plural, =0 {Aucun créneau} one {# créneau par semaine} other {# créneaux par semaine}}",
+    "subtitle": "Quand partent les publications « ajoutées à la file », ce qui occupe la semaine à venir, et quels horaires ajouter. Heures en {timezone}.",
+    "suggestionDetail": "{lift}× la publication type · {posts} publications · {pages}",
+    "suggestionsHint": "{posts, plural, =0 {Aucune publication} one {Une publication} other {# publications}} de {pages, plural, =0 {aucune page} one {une page} other {# pages}} sur les 90 derniers jours, chacune comparée à la publication type de sa propre page, pour qu’une grande page ne l’emporte pas sur une petite.",
+    "suggestionsNoHistory": "Pas encore d’historique. Après quelques semaines de publications, les horaires qui fonctionnent apparaîtront ici.",
+    "suggestionsNone": "Rien ne ressort en dehors des horaires déjà dans la file.",
+    "suggestionsTitle": "Suggéré d’après vos résultats",
+    "time": "Heure",
+    "title": "File de publication",
+    "upcomingFree": "{free, plural, =0 {Tout est occupé} one {Un créneau libre} other {# créneaux libres}} sur {total}",
+    "upcomingNone": "La file n’a aucun créneau : rien n’est prévu. Ajoutez un créneau ci-dessus.",
+    "upcomingTitle": "Dans les 7 prochains jours",
+    "weeklyHint": "Toutes les pages de cet espace partagent ces horaires. Une publication ajoutée à la file prend le prochain créneau libre.",
+    "weeklyTitle": "Créneaux hebdomadaires",
+    "writePost": "Rédiger une publication"
   },
   "reports": {
     "title": "Rapports",
@@ -1042,8 +1075,10 @@
     "linkTagging": "Marquage des liens",
     "name": "Nom",
     "noTimes": "Aucun créneau défini.",
+    "openQueue": "Ouvrir la file",
     "pasteOrUpload": "Ou collez les lignes",
     "queue": "File de publication",
+    "queueMoved": "La file de publication se trouve désormais dans Planification → File d’attente, avec des horaires suggérés d’après les résultats de vos pages.",
     "queueSubtitle": "Créneaux récurrents pour « ajouter au prochain créneau ». Chaque publication prend le premier créneau libre.",
     "queueUpdated": "Créneaux mis à jour.",
     "readOnly": "Seuls les propriétaires et les administrateurs de l’espace peuvent modifier ces réglages. Vous pouvez toujours importer des publications ci-dessous.",

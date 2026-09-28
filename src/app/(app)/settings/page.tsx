@@ -54,11 +54,7 @@ export default async function SettingsPage() {
   const auth = await requirePage();
   const t = await getTranslations('settings');
 
-  const [slots, targets, workspace] = await Promise.all([
-    prisma.queueSlot.findMany({
-      where: { workspaceId: auth.workspace.id },
-      orderBy: [{ dayOfWeek: 'asc' }, { hour: 'asc' }, { minute: 'asc' }],
-    }),
+  const [targets, workspace] = await Promise.all([
     prisma.target.findMany({
       where: { workspaceId: auth.workspace.id },
       include: { socialAccount: { select: { name: true } } },
@@ -94,11 +90,6 @@ export default async function SettingsPage() {
           aiTone: workspace.aiTone ?? '',
           aiBrandVoice: workspace.aiBrandVoice ?? '',
         }}
-        slots={slots.map((slot) => ({
-          dayOfWeek: slot.dayOfWeek,
-          hour: slot.hour,
-          minute: slot.minute,
-        }))}
         targets={targets.map((target) => ({
           id: target.id,
           name: target.name,

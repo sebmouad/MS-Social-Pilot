@@ -45,7 +45,7 @@
     "disconnectConfirm": "Disconnect {name}? Scheduled posts to its pages and groups will be cancelled. Published history is kept.",
     "syncedResult": "Synced {pages} page(s) and {groups} group(s).",
     "healthy": "Connection is healthy",
-    "groupsDisabled": "Group publishing is turned off. Meta restricted the Groups API in April 2024, so it needs a separately approved permission and the app must be installed in each group."
+    "groupsDisabled": "Groups cannot be published to. Meta removed the Groups API from every version on 22 April 2024."
   },
   "ads": {
     "none": "No ad account is connected yet. Finding them needs the ads read permission on the Facebook connection.",
@@ -360,7 +360,7 @@
     "featureOff": "Turned off in Configuration. Meta reviews this permission separately, and requesting it before approval fails the whole login.",
     "followers": "{count, plural, one {# follower} other {# followers}}",
     "groups": "Groups",
-    "groupsOff": "Group publishing is turned off. Meta restricted the Groups API in April 2024, so it needs a separately approved permission and the app installed in each group. Turn it on in Configuration once you have that approval.",
+    "groupsOff": "Groups cannot be published to. Meta removed the Groups API from every version on 22 April 2024, and no app can post to a Group any more.",
     "health": {
       "title": "Connection check",
       "subtitle": "Ask Facebook what is working right now, permission by permission and Page by Page.",
@@ -384,7 +384,7 @@
     "instagramDestinations": "Instagram accounts you can post to",
     "instagramHint": "Business accounts reachable through a connected page. Usable as destinations once instagram_content_publish is approved; until then they appear turned off.",
     "instagramTitle": "Instagram accounts",
-    "noGroups": "No groups. Group publishing needs a separately approved permission.",
+    "noGroups": "No groups. Meta removed the Groups API in April 2024.",
     "noLinkedPage": "No linked page",
     "noPages": "No pages found. Refresh, or check that this account manages any.",
     "noScopes": "None recorded — reconnect to refresh this.",
@@ -842,7 +842,8 @@
     "modules": "Modules",
     "shared": "Workspace",
     "pages": "Pages",
-    "adsPerformance": "Performance"
+    "adsPerformance": "Performance",
+    "queue": "Queue"
   },
   "notifications": {
     "title": "Notifications",
@@ -977,7 +978,8 @@
       "hint": "Average interactions by the day and time a post went out ({timezone}), against the page’s typical post. Darker is better.",
       "low": "Below typical",
       "none": "Not enough posts yet to tell which times work.",
-      "title": "When posts do best"
+      "title": "When posts do best",
+      "toQueue": "Add the best times to the posting queue"
     },
     "top": {
       "hint": "By interactions in this period.",
@@ -1007,6 +1009,37 @@
       "destination_off": "This destination was turned off when the post was due, so it was not published there.",
       "worker_lost": "Publishing was interrupted and did not recover within the attempt limit. Check the destination and try again."
     }
+  },
+  "queue": {
+    "addSlot": "Add slot",
+    "addToQueue": "Add to queue",
+    "added": "Added {day} at {time}.",
+    "alreadyThere": "That time is already in the queue.",
+    "awaitingApproval": "Awaiting approval",
+    "day": "Day",
+    "free": "Free",
+    "noSlots": "No slots",
+    "noText": "(no text)",
+    "readOnly": "Only owners and admins can change the queue.",
+    "removeSlot": "Remove {day} {time}",
+    "removed": "Removed {day} at {time}.",
+    "saveFailed": "The queue could not be saved. Please try again.",
+    "seeAnalysis": "See the page analysis",
+    "slotCount": "{count, plural, =0 {No slots} one {# slot a week} other {# slots a week}}",
+    "subtitle": "When “add to queue” posts go out, what is filling the next week, and when else is worth adding. Times are in {timezone}.",
+    "suggestionDetail": "{lift}× the typical post · {posts} posts · {pages}",
+    "suggestionsHint": "{posts, plural, =0 {No posts} one {One post} other {# posts}} from {pages, plural, =0 {no pages} one {one page} other {# pages}} over the last 90 days, each scored against its own page’s typical post, so a big page cannot outvote a small one.",
+    "suggestionsNoHistory": "No post history yet. Once your pages have a few weeks of posts, the times that work will show here.",
+    "suggestionsNone": "Nothing stands out beyond the times already in the queue.",
+    "suggestionsTitle": "Suggested from your results",
+    "time": "Time",
+    "title": "Posting queue",
+    "upcomingFree": "{free, plural, =0 {All filled} one {One free slot} other {# free slots}} of {total}",
+    "upcomingNone": "The queue has no slots, so nothing is coming up. Add a slot above.",
+    "upcomingTitle": "Coming up in the next 7 days",
+    "weeklyHint": "Every page in this workspace shares these times. A post added to the queue takes the next free one.",
+    "weeklyTitle": "Weekly slots",
+    "writePost": "Write a post"
   },
   "reports": {
     "title": "Reports",
@@ -1042,8 +1075,10 @@
     "linkTagging": "Link tagging",
     "name": "Name",
     "noTimes": "No times set yet.",
+    "openQueue": "Open the queue",
     "pasteOrUpload": "Or paste the rows",
     "queue": "Publishing queue",
+    "queueMoved": "The posting queue now lives in Schedule → Queue, with suggested times from your pages’ results.",
     "queueSubtitle": "Recurring times for \"add to the next queue slot\". Each new post takes the earliest free slot.",
     "queueUpdated": "Publishing times updated.",
     "readOnly": "Only workspace owners and admins can change these settings. You can still upload posts below.",

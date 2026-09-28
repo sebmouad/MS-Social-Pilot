@@ -349,14 +349,23 @@ export async function PageAnalysisView({
             </ChartFrame>
           </div>
 
-          <TimeHeatmap
-            cells={analysis.times.cells}
-            best={analysis.times.best}
-            weekdays={shortDays}
-            blockHours={BLOCK_HOURS}
-            minPosts={MIN_POSTS_PER_SLOT}
-            timeZone={timeZone}
-          />
+          <div className="space-y-2">
+            <TimeHeatmap
+              cells={analysis.times.cells}
+              best={analysis.times.best}
+              weekdays={shortDays}
+              blockHours={BLOCK_HOURS}
+              minPosts={MIN_POSTS_PER_SLOT}
+              timeZone={timeZone}
+            />
+            {/* Where the finding is acted on: the queue suggests these times. */}
+            {analysis.times.best.length > 0 && (
+              <Link href="/queue" className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline">
+                <Icon name="clock" size={15} />
+                {t('times.toQueue')}
+              </Link>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <PostTable title={t('top.title')} hint={t('top.hint')} posts={analysis.top} timeZone={timeZone} />

@@ -55,6 +55,7 @@ export const MODULES: AppModule[] = [
     icon: 'calendar',
     pages: [
       { href: '/calendar', label: 'calendar', icon: 'calendar' },
+      { href: '/queue', label: 'queue', icon: 'clock' },
       { href: '/posts', label: 'posts', icon: 'posts' },
       { href: '/compose', label: 'compose', icon: 'compose' },
       { href: '/approvals', label: 'approvals', icon: 'approvals' },
