@@ -5,6 +5,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 const VIEWS = [
+  'analysis',
+  'compare',
   'overview',
   'posts',
   'interactions',

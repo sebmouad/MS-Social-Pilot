@@ -4,6 +4,7 @@ import { TargetType } from '@prisma/client';
 
 import { AnalyticsClient } from '@/components/AnalyticsClient';
 import { AnalyticsTabs } from '@/components/AnalyticsTabs';
+import { ComparePagesView, PageAnalysisView } from '@/components/analysis/PageAnalysisView';
 import { BreakdownBars } from '@/components/BreakdownBars';
 import { CommentsPanel } from '@/components/CommentsPanel';
 import { InboxPanel } from '@/components/InboxPanel';
@@ -92,7 +93,9 @@ export default async function AnalyticsPage({
   const to = new Date();
   const from = new Date(to.getTime() - window * 24 * 60 * 60 * 1000);
 
-  const view = first(params.view) ?? 'overview';
+  // The analysis is the answer to "how is this Page doing"; the raw views
+  // behind it are one tab away for anyone who wants the figures themselves.
+  const view = first(params.view) ?? 'analysis';
 
   return (
     <div className="space-y-6">
@@ -133,6 +136,21 @@ export default async function AnalyticsPage({
       </div>
 
       <AnalyticsTabs current={view} />
+
+      {view === 'analysis' && (
+        <PageAnalysisView
+          workspaceId={auth.workspace.id}
+          targetId={selected.id}
+          from={from}
+          to={to}
+          days={window}
+          timeZone={timezone}
+        />
+      )}
+
+      {view === 'compare' && (
+        <ComparePagesView workspaceId={auth.workspace.id} from={from} to={to} days={window} timeZone={timezone} />
+      )}
 
       {view === 'posts' && (
         <PostAnalyticsTable

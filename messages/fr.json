@@ -71,7 +71,7 @@
   },
   "analytics": {
     "title": "Statistiques",
-    "subtitle": "Toutes les données que l'API Graph de Facebook fournit pour cette page",
+    "subtitle": "Comment se portent vos pages connectées, et tous les chiffres qui le montrent",
     "noPages": "Aucune page Facebook n'est encore connectée.",
     "connect": "Connecter une page",
     "choosePage": "Choisir une page",
@@ -100,7 +100,9 @@
       "inbox": "Messages",
       "external": "Autres publications",
       "instagram": "Instagram",
-      "ads": "Publicités"
+      "ads": "Publicités",
+      "analysis": "Analyse",
+      "compare": "Comparer les pages"
     },
     "byPost": "Impressions et interactions par publication",
     "byPostHint": "Une ligne par publication et par destination : une même publication peut réagir très différemment sur deux pages, et faire la moyenne masquerait l'information utile.",
@@ -769,6 +771,136 @@
     "saved": "Préférences enregistrées.",
     "noEmailProvider": "Aucun fournisseur d’e-mail n’est configuré sur ce serveur : rien ne sera réellement envoyé. Un propriétaire peut ajouter une clé API Resend dans l’écran Configuration.",
     "saveFailed": "Vos préférences de notification n’ont pas pu être enregistrées. Veuillez réessayer."
+  },
+  "pageAnalysis": {
+    "analyseNow": "Analyser maintenant",
+    "analysed": "{count, plural, =0 {À jour.} one {À jour. Une publication récente a été actualisée.} other {À jour. # publications récentes ont été actualisées.}}",
+    "analysing": "Lecture de Facebook…",
+    "bottom": {
+      "hint": "À regarder avant de publier quelque chose de semblable.",
+      "title": "Publications les plus faibles"
+    },
+    "cadence": {
+      "hint": "{perWeek} par semaine en moyenne. La ligne pointillée correspond à {target} par semaine.",
+      "posts": "{count, plural, =0 {Aucune publication} one {# publication} other {# publications}}",
+      "target": "Objectif",
+      "title": "Publications par semaine",
+      "week": "Semaine du {date}"
+    },
+    "compare": {
+      "avg": "Par publication",
+      "followers": "Abonnés",
+      "health": "Santé",
+      "hint": "Les mêmes chiffres pour chaque page de cet espace, sur les mêmes {days} jours, pour repérer celles qui demandent de l’attention.",
+      "net": "Abonnés nets",
+      "none": "Aucune page n’est connectée.",
+      "open": "Analyser",
+      "page": "Page",
+      "perWeek": "Publications / sem.",
+      "rate": "Taux médian",
+      "reach": "Touchées",
+      "title": "Toutes les pages côte à côte"
+    },
+    "empty": "Aucune publication ni aucun chiffre pour cette page pour l’instant. Lancez l’analyse pour lire son historique sur Facebook.",
+    "failed": "L’analyse n’a pas pu être actualisée. Veuillez réessayer.",
+    "findings": {
+      "bestFormat": "Ici, les publications de type {best} obtiennent {ratio}× les interactions des publications de type {worst}.",
+      "bestTime": "Les publications du {weekday} entre {start} et {end} obtiennent {lift}× la publication type ({posts} publications).",
+      "goneQuiet": "Rien n’a été publié depuis {days} jours.",
+      "interactionsDown": "Chaque publication obtient {percent} % d’interactions de moins que sur la période précédente.",
+      "interactionsUp": "Chaque publication obtient {percent} % d’interactions de plus que sur la période précédente.",
+      "longGap": "La plus longue période sans publication a duré {days} jours.",
+      "losingFollowers": "{count, plural, one {La page a perdu un abonné de plus qu’elle n’en a gagné.} other {La page a perdu # abonnés de plus qu’elle n’en a gagné.}}",
+      "mostPostedUnderperforms": "Le type {format} représente {share} % des publications mais fait moins bien que la moyenne ; le type {best} fait le mieux.",
+      "neverSynced": "Rien n’a encore été lu sur Facebook pour cette page : l’analyse est vide.",
+      "noPosts": "Aucune publication sur cette période. Une page qui se tait est montrée à moins d’abonnés quand elle reprend.",
+      "none": "Rien d’inhabituel sur cette période. Continuez à publier et revenez plus tard.",
+      "reachDown": "La page a touché {percent} % de personnes de moins que sur la période précédente.",
+      "reachUp": "La page a touché {percent} % de personnes de plus que sur la période précédente.",
+      "stale": "Ces chiffres ont été lus sur Facebook il y a {days} jours. Lancez l’analyse pour les mettre à jour.",
+      "standoutPost": "La meilleure publication a obtenu {ratio}× la publication type. Elle est en tête de la liste ci-dessous.",
+      "title": "Ce qui ressort"
+    },
+    "format": {
+      "link": "Lien",
+      "other": "Autre",
+      "photo": "Photo",
+      "text": "Texte",
+      "video": "Vidéo"
+    },
+    "formats": {
+      "avg": "Interactions moy.",
+      "format": "Type",
+      "hint": "Interactions moyennes par publication, selon le type.",
+      "lift": "vs moyenne",
+      "none": "Aucune publication à comparer sur cette période.",
+      "posts": "Publications",
+      "rate": "Taux médian",
+      "reach": "Portée moy.",
+      "title": "Quel type de publication fonctionne"
+    },
+    "heading": "Comment se porte {page}",
+    "health": {
+      "band": {
+        "attention": "À surveiller",
+        "steady": "Stable",
+        "strong": "Solide"
+      },
+      "component": {
+        "consistency": "Régularité",
+        "growth": "Croissance des abonnés",
+        "momentum": "Interactions par publication",
+        "reach": "Portée"
+      },
+      "componentHint": {
+        "consistency": "Publier environ {target} fois par semaine, sans semaine vide.",
+        "growth": "Nouveaux abonnés nets, rapportés à l’audience.",
+        "momentum": "Par rapport à la période précédente. La stabilité vaut 50.",
+        "reach": "Personnes touchées, par rapport à la période précédente. La stabilité vaut 50."
+      },
+      "hint": "Une note sur 100 calculée à partir des quatre éléments ci-dessous. Ce que Facebook ne fournit pas est ignoré plutôt que compté comme zéro.",
+      "none": "Pas encore assez de données.",
+      "title": "Santé de la page"
+    },
+    "kpi": {
+      "avgInteractions": "Par publication",
+      "interactions": "Interactions",
+      "medianRate": "Taux médian",
+      "netFollows": "Abonnés nets",
+      "posts": "Publications",
+      "reach": "Personnes touchées"
+    },
+    "kpiHint": "Les interactions sont les réactions, commentaires et partages. Le taux est le nombre d’interactions pour cent personnes touchées, valeur médiane des publications.",
+    "lastRefreshed": "Chiffres lus sur Facebook {when}.",
+    "neverRefreshed": "Rien n’a encore été lu sur Facebook pour cette page.",
+    "partial": "Certains chiffres n’ont pas pu être lus : {detail}",
+    "period": "{days} derniers jours, comparés aux {days} jours précédents",
+    "post": {
+      "fromApp": "Publiée ici",
+      "fromPage": "Publiée sur Facebook",
+      "noText": "(sans texte)",
+      "open": "Ouvrir sur Facebook",
+      "rate": "Taux"
+    },
+    "sample": "{current, plural, =0 {Aucune publication} one {Établie à partir d’une publication} other {Établie à partir de # publications}} sur cette période ; la grille des meilleurs horaires utilise {timing, plural, one {une publication} other {# publications}} des 90 derniers jours ou plus.",
+    "times": {
+      "best": "Meilleurs horaires",
+      "cell": "{weekday} {start}–{end}",
+      "cellDetail": "{posts, plural, =0 {Aucune publication} one {Une publication} other {# publications}}",
+      "cellLift": "{avg} interactions en moyenne · {lift}× la normale",
+      "day": "Jour",
+      "faded": "Les cases estompées reposent sur une seule publication.",
+      "high": "1,5× ou plus",
+      "hint": "Interactions moyennes selon le jour et l’heure de publication ({timezone}), rapportées à la publication type de la page. Plus c’est foncé, mieux c’est.",
+      "low": "Sous la normale",
+      "none": "Pas encore assez de publications pour dégager les bons horaires.",
+      "title": "Quand les publications fonctionnent le mieux"
+    },
+    "top": {
+      "hint": "Selon les interactions sur cette période.",
+      "title": "Meilleures publications"
+    },
+    "vsPrevious": "vs précédente"
   },
   "posts": {
     "title": "Publications",

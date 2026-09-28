@@ -71,7 +71,7 @@
   },
   "analytics": {
     "title": "Analytics",
-    "subtitle": "Everything the Facebook Graph API will give us for this page",
+    "subtitle": "How your connected pages are doing, and every figure behind it",
     "noPages": "No Facebook pages are connected yet.",
     "connect": "Connect a page",
     "choosePage": "Choose a page",
@@ -100,7 +100,9 @@
       "inbox": "Inbox",
       "external": "Other posts",
       "instagram": "Instagram",
-      "ads": "Ads"
+      "ads": "Ads",
+      "analysis": "Analysis",
+      "compare": "Compare pages"
     },
     "byPost": "Impressions and interaction per post",
     "byPostHint": "One row per post per destination — the same post can perform very differently on two pages, and averaging that away hides the signal.",
@@ -769,6 +771,136 @@
     "saved": "Notification settings saved.",
     "noEmailProvider": "No email provider is configured on this server, so nothing will actually be sent. An owner can add a Resend API key on the Configuration screen.",
     "saveFailed": "Your notification settings could not be saved. Please try again."
+  },
+  "pageAnalysis": {
+    "analyseNow": "Analyse now",
+    "analysed": "{count, plural, =0 {Up to date.} one {Up to date. One recent post was refreshed.} other {Up to date. # recent posts were refreshed.}}",
+    "analysing": "Reading Facebook…",
+    "bottom": {
+      "hint": "Worth a look before posting something similar.",
+      "title": "Weakest posts"
+    },
+    "cadence": {
+      "hint": "{perWeek} a week on average. The dashed line is {target} a week.",
+      "posts": "{count, plural, =0 {No posts} one {# post} other {# posts}}",
+      "target": "Target",
+      "title": "Posts per week",
+      "week": "Week of {date}"
+    },
+    "compare": {
+      "avg": "Per post",
+      "followers": "Followers",
+      "health": "Health",
+      "hint": "The same figures for every page in this workspace, over the same {days} days, so the ones that need attention stand out.",
+      "net": "Net followers",
+      "none": "No pages are connected.",
+      "open": "Analyse",
+      "page": "Page",
+      "perWeek": "Posts / week",
+      "rate": "Median rate",
+      "reach": "Reached",
+      "title": "All pages side by side"
+    },
+    "empty": "There are no posts or figures for this page yet. Analyse now to read its history from Facebook.",
+    "failed": "The analysis could not be refreshed. Please try again.",
+    "findings": {
+      "bestFormat": "{best} posts earn {ratio}× the interactions of {worst} posts here.",
+      "bestTime": "Posts on {weekday} between {start} and {end} earn {lift}× the typical post ({posts} posts).",
+      "goneQuiet": "Nothing has been posted for {days} days.",
+      "interactionsDown": "Each post earns {percent}% fewer interactions than in the previous period.",
+      "interactionsUp": "Each post earns {percent}% more interactions than in the previous period.",
+      "longGap": "The longest stretch without a post was {days} days.",
+      "losingFollowers": "{count, plural, one {The page lost one more follower than it gained.} other {The page lost # more followers than it gained.}}",
+      "mostPostedUnderperforms": "{format} makes up {share}% of posts but does below average; {best} does best.",
+      "neverSynced": "Nothing has been read from Facebook for this page yet, so this analysis is empty.",
+      "noPosts": "No posts in this period. A page that goes quiet is shown to fewer of its followers when it comes back.",
+      "none": "Nothing unusual in this period. Keep posting and check back.",
+      "reachDown": "The page reached {percent}% fewer people than in the previous period.",
+      "reachUp": "The page reached {percent}% more people than in the previous period.",
+      "stale": "These figures were last read from Facebook {days} days ago. Analyse now to bring them up to date.",
+      "standoutPost": "The best post earned {ratio}× the typical post. It is at the top of the list below.",
+      "title": "What stands out"
+    },
+    "format": {
+      "link": "Link",
+      "other": "Other",
+      "photo": "Photo",
+      "text": "Text",
+      "video": "Video"
+    },
+    "formats": {
+      "avg": "Avg. interactions",
+      "format": "Format",
+      "hint": "Average interactions per post, by format.",
+      "lift": "vs average",
+      "none": "No posts to compare in this period.",
+      "posts": "Posts",
+      "rate": "Median rate",
+      "reach": "Avg. reach",
+      "title": "What kind of post works"
+    },
+    "heading": "How {page} is doing",
+    "health": {
+      "band": {
+        "attention": "Needs attention",
+        "steady": "Steady",
+        "strong": "Strong"
+      },
+      "component": {
+        "consistency": "Posting consistency",
+        "growth": "Follower growth",
+        "momentum": "Interactions per post",
+        "reach": "Reach"
+      },
+      "componentHint": {
+        "consistency": "Posting about {target} times a week, without empty weeks.",
+        "growth": "Net new followers as a share of the audience.",
+        "momentum": "Against the previous period. Level is 50.",
+        "reach": "People reached, against the previous period. Level is 50."
+      },
+      "hint": "A score out of 100 from the four things below. Anything Facebook does not report is left out rather than counted as zero.",
+      "none": "Not enough to go on yet.",
+      "title": "Page health"
+    },
+    "kpi": {
+      "avgInteractions": "Per post",
+      "interactions": "Interactions",
+      "medianRate": "Median rate",
+      "netFollows": "Net followers",
+      "posts": "Posts",
+      "reach": "People reached"
+    },
+    "kpiHint": "Interactions are reactions, comments and shares. The rate is interactions per hundred people reached, the middle value across posts.",
+    "lastRefreshed": "Figures last read from Facebook {when}.",
+    "neverRefreshed": "Nothing has been read from Facebook for this page yet.",
+    "partial": "Some figures could not be read: {detail}",
+    "period": "Last {days} days, compared with the {days} days before",
+    "post": {
+      "fromApp": "Published here",
+      "fromPage": "Posted on Facebook",
+      "noText": "(no text)",
+      "open": "Open on Facebook",
+      "rate": "Rate"
+    },
+    "sample": "{current, plural, =0 {No posts} one {Built from one post} other {Built from # posts}} in this period; the best-time grid uses {timing, plural, one {one post} other {# posts}} from the last 90 days or more.",
+    "times": {
+      "best": "Best times",
+      "cell": "{weekday} {start}–{end}",
+      "cellDetail": "{posts, plural, =0 {No posts} one {One post} other {# posts}}",
+      "cellLift": "{avg} interactions on average · {lift}× typical",
+      "day": "Day",
+      "faded": "Faded cells rest on a single post.",
+      "high": "1.5× or more",
+      "hint": "Average interactions by the day and time a post went out ({timezone}), against the page’s typical post. Darker is better.",
+      "low": "Below typical",
+      "none": "Not enough posts yet to tell which times work.",
+      "title": "When posts do best"
+    },
+    "top": {
+      "hint": "By interactions in this period.",
+      "title": "Best posts"
+    },
+    "vsPrevious": "vs previous"
   },
   "posts": {
     "title": "Posts",
