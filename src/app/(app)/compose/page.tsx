@@ -115,10 +115,9 @@ export default async function ComposePage({
 
   // One hour out is a friendlier default than "now", and clears Facebook's
   // 10-minute floor for natively scheduled posts.
-  const defaultScheduledAt = utcToLocalInput(
-    new Date(Date.now() + 60 * 60 * 1000),
-    auth.workspace.timezone,
-  );
+  const defaultScheduledAt =
+    requestedTime(params.at, auth.workspace.timezone) ??
+    utcToLocalInput(new Date(Date.now() + 60 * 60 * 1000), auth.workspace.timezone);
 
   return (
     <div className="space-y-6">
@@ -167,6 +166,20 @@ type Auth = Awaited<ReturnType<typeof requirePage>>;
  * published post cannot be rewritten. The API applies all three again on save
  * — this only decides whether to put the form on screen.
  */
+/**
+ * `?at=YYYY-MM-DDTHH:mm`, from the calendar's "new post on this day", when it
+ * names a time far enough ahead to schedule — otherwise the usual default. A
+ * stale link to a day that has gone by opens the composer as normal rather
+ * than on a time it would refuse.
+ */
+function requestedTime(raw: string | string[] | undefined, timeZone: string): string | null {
+  const at = Array.isArray(raw) ? raw[0] : raw;
+  if (!at || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at)) return null;
+  const instant = localInputToUtc(at, timeZone);
+  if (Number.isNaN(instant.getTime())) return null;
+  return instant.getTime() > Date.now() + EARLIEST_MINUTES * 60 * 1000 ? at : null;
+}
+
 async function loadForEditing(postId: string, auth: Auth): Promise<EditingPost | null> {
   const post = await prisma.post.findFirst({
     where: { id: postId, workspaceId: auth.workspace.id },

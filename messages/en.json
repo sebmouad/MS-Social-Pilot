@@ -237,6 +237,7 @@
   "calendar": {
     "title": "Calendar",
     "timesShownIn": "Times shown in {timezone}.",
+    "newPostOn": "New post on {date}",
     "more": "+{count} more"
   },
   "common": {

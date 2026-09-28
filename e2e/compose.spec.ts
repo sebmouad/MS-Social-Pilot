@@ -100,6 +100,27 @@ test('a scheduled post can be corrected without being recreated', async ({ page 
   expect(failures).toEqual([]);
 });
 
+test('the calendar opens a post for editing, and starts a new one on a chosen day', async ({ page }) => {
+  const failures = collectFailures(page);
+
+  await open(page, '/calendar');
+  await page.getByRole('link', { name: new RegExp(CORRECTED.slice(0, 20)) }).first().click();
+  await page.waitForURL(/\/compose\?post=/);
+  await expect(page.getByLabel(/what do you want to say/i)).toHaveValue(CORRECTED);
+
+  // Next month, where every day is ahead whatever today's date.
+  await open(page, '/calendar');
+  await page.getByRole('link', { name: '→' }).click();
+  await page.waitForURL(/\/calendar\?month=/);
+  const plus = page.getByRole('link', { name: /^new post on/i });
+  await plus.nth(10).click();
+  await page.waitForURL(/\/compose\?at=\d{4}-\d{2}-\d{2}T09:00/);
+  const at = new URL(page.url()).searchParams.get('at');
+  await expect(page.getByLabel(/date and time/i)).toHaveValue(at!);
+
+  expect(failures).toEqual([]);
+});
+
 test('a published post offers no way to rewrite it', async ({ page }) => {
   // The Edit button and the API agree on this: the copy on Facebook cannot be
   // changed, so an edit here would only create a second version of the truth.
