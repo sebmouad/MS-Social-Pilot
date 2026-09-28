@@ -5,6 +5,7 @@ import { parseTargetIds } from '../json';
 import { nextAvailableSlot } from '../time';
 import { QUEUE_OCCUPYING_STATUSES } from '../constants';
 import { parseFeed, renderTemplate, type FeedEntry } from './parse';
+import { fetchPublic, readCapped } from '../safe-fetch';
 
 /**
  * RSS ingestion.
@@ -48,13 +49,15 @@ async function fetchFeed(source: FeedSource): Promise<
     if (source.lastEtag) headers['if-none-match'] = source.lastEtag;
     if (source.lastModified) headers['if-modified-since'] = source.lastModified;
 
-    const response = await fetch(source.url, { headers, signal: controller.signal, redirect: 'follow' });
+    // Guarded: the address is whatever somebody typed into the feeds screen,
+    // and this runs inside the server's network. See `safe-fetch.ts`.
+    const response = await fetchPublic(source.url, { headers, signal: controller.signal });
 
     // Nothing new since last time — the cheap, common case.
     if (response.status === 304) return { status: 'not-modified' };
     if (!response.ok) throw new Error(`Feed responded ${response.status}.`);
 
-    const body = (await response.text()).slice(0, MAX_FEED_BYTES);
+    const body = await readCapped(response, MAX_FEED_BYTES);
     return {
       status: 'ok',
       body,

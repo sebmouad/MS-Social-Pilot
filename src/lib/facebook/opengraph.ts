@@ -2,6 +2,7 @@ import type { LinkPreview } from '../json';
 import { env } from '../env';
 import { GraphError, graphRequest } from './graph';
 import { errors } from '../errors';
+import { fetchPublic, isBlockedHost, readCapped } from '../safe-fetch';
 
 /**
  * Open Graph link previews.
@@ -153,24 +154,27 @@ function absolutize(candidate: string, base: string): string {
 
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_HTML_BYTES = 512 * 1024;
-const MAX_REDIRECTS = 3;
 
 /**
- * Fetch a URL, checking every hop rather than only the one we were handed.
+ * Fetch and parse a URL ourselves. Never throws for ordinary HTTP failures.
  *
- * `redirect: 'follow'` would let a perfectly public URL bounce us to
- * 169.254.169.254 — checking the first address and then handing the rest to
- * fetch is a guard that any redirect walks straight past. Following manually
- * costs a loop and closes that.
+ * The address checks live in `fetchPublic` rather than at the callers because
+ * this is one of only two places the server itself fetches a user-supplied URL.
+ * They used to sit on the preview endpoint alone, which left the two paths that
+ * matter more — creating and editing a post, either of which can arrive a few
+ * hundred rows at a time from a CSV — fetching whatever they were given.
  */
-async function fetchChecked(raw: string, signal: AbortSignal): Promise<Response | null> {
-  let current = raw;
+export async function scrapeWithFetch(url: string): Promise<LinkPreview> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-    const url = assertSafePreviewUrl(current);
-    const response = await fetch(url, {
-      redirect: 'manual',
-      signal,
+  try {
+    // The translated refusal, for a caller that wants to say why; the fetch
+    // below checks again, hop by hop and by resolved address.
+    assertSafePreviewUrl(url);
+
+    const response = await fetchPublic(url, {
+      signal: controller.signal,
       headers: {
         // Sites commonly serve og: tags only to recognised crawlers.
         'user-agent': 'facebookexternalhit/1.1 (+MS-Social-Pilot link preview)',
@@ -178,69 +182,20 @@ async function fetchChecked(raw: string, signal: AbortSignal): Promise<Response 
       },
     });
 
-    if (response.status < 300 || response.status >= 400) return response;
-
-    const location = response.headers.get('location');
-    if (!location) return null;
-    current = new URL(location, url).toString();
-  }
-
-  return null;
-}
-
-/**
- * Fetch and parse a URL ourselves. Never throws for ordinary HTTP failures.
- *
- * The address check lives here rather than at the callers because this is the
- * only place the server itself fetches a user-supplied URL. It used to sit on
- * the preview endpoint alone, which left the two paths that matter more —
- * creating and editing a post, either of which can arrive a few hundred rows at
- * a time from a CSV — fetching whatever they were given.
- */
-export async function scrapeWithFetch(url: string): Promise<LinkPreview> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-  try {
-    const response = await fetchChecked(url, controller.signal);
-
-    if (!response || !response.ok || !response.body) return emptyPreview(url);
+    if (!response.ok || !response.body) return emptyPreview(url);
 
     const contentType = response.headers.get('content-type') ?? '';
     if (!contentType.includes('html')) return emptyPreview(url);
 
-    // Read at most MAX_HTML_BYTES: the <head> is at the top, and a malicious
-    // or misconfigured URL should not be able to stream gigabytes at us.
-    const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    while (total < MAX_HTML_BYTES) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) {
-        chunks.push(value);
-        total += value.length;
-      }
-    }
-    await reader.cancel().catch(() => undefined);
-
-    const html = new TextDecoder('utf-8').decode(concat(chunks, total));
+    // The <head> is at the top, and a malicious or misconfigured URL should
+    // not be able to stream gigabytes at us.
+    const html = await readCapped(response, MAX_HTML_BYTES);
     return parseOpenGraphHtml(html, response.url || url);
   } catch {
     return emptyPreview(url);
   } finally {
     clearTimeout(timer);
   }
-}
-
-function concat(chunks: Uint8Array[], total: number): Uint8Array {
-  const merged = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return merged;
 }
 
 function emptyPreview(url: string): LinkPreview {
@@ -279,10 +234,9 @@ export async function resolveLinkPreview(url: string): Promise<LinkPreview> {
  * Reject anything that is not a public http(s) URL.
  *
  * This is an SSRF guard: the preview endpoint fetches a user-supplied URL from
- * our server, so loopback, link-local and private ranges must be refused.
- * Hostname-based checks cannot catch a domain that resolves to a private
- * address, which is why the deployment notes recommend an egress proxy for
- * hostile input.
+ * our server, so loopback, link-local and private ranges must be refused. This
+ * is the check on the address as written, with translated errors for the
+ * screen; `fetchPublic` repeats it on every hop and on the resolved address.
  */
 export function assertSafePreviewUrl(raw: string): URL {
   let url: URL;
@@ -296,25 +250,7 @@ export function assertSafePreviewUrl(raw: string): URL {
     throw errors.previewSchemeUnsupported();
   }
 
-  // `URL` strips the brackets from an IPv6 host, so these compare bare.
-  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
-  const blocked =
-    host === 'localhost' ||
-    host === '::1' ||
-    host === '::' ||
-    host === '0.0.0.0' ||
-    host.endsWith('.local') ||
-    host.endsWith('.internal') ||
-    /^127\./.test(host) ||
-    /^10\./.test(host) ||
-    /^192\.168\./.test(host) ||
-    /^169\.254\./.test(host) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-    // IPv6: unique-local (fc00::/7), link-local (fe80::/10), and the
-    // IPv4-mapped form that smuggles 127.0.0.1 past a v4-only check.
-    /^f[cd]/.test(host) ||
-    /^fe[89ab]/.test(host) ||
-    host.startsWith('::ffff:');
+  const blocked = isBlockedHost(url.hostname);
 
   if (blocked) {
     throw errors.previewHostBlocked();

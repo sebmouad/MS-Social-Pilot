@@ -6,12 +6,16 @@ import { canManageSettings } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { parseTargetIds, toJson } from '@/lib/json';
 import { errors } from '@/lib/errors';
-import { assertFeedDestinations } from '@/lib/feeds';
+import { assertFeedDestinations, assertFeedUrl } from '@/lib/feeds';
 import { ok, readJson, route } from '@/lib/api';
 
 const createSchema = z.object({
   name: z.string().trim().min(1, 'Give this feed a name.').max(120),
-  url: z.string().trim().url('Enter the feed URL.'),
+  url: z
+    .string()
+    .trim()
+    .url('Enter the feed URL.')
+    .refine((value) => /^https?:\/\//i.test(value), 'Enter an http or https address.'),
   messageTemplate: z.string().trim().min(1).max(2000).default('{{title}}\n\n{{link}}'),
   targetIds: z.array(z.string().min(1)).min(1, 'Choose at least one destination.'),
   publishMode: z.nativeEnum(PublishMode).default(PublishMode.worker),
@@ -47,6 +51,7 @@ export const GET = route(async () => {
 export const POST = route(async (request: Request) => {
   const auth = await requireCapability(canManageSettings);
   const input = createSchema.parse(await readJson(request));
+  assertFeedUrl(input.url);
 
   // Destination ids come from the client, so confirm they belong here.
   const valid = await prisma.target.findMany({

@@ -1,4 +1,5 @@
 import { errors } from './errors';
+import { isBlockedHost } from './safe-fetch';
 
 /**
  * RSS auto-posting is Facebook-only, and has to be.
@@ -17,4 +18,22 @@ export function assertFeedDestinations(targets: Array<{ name: string; type: stri
   if (instagram.length > 0) {
     throw errors.feedInstagramUnsupported(instagram.map((target) => target.name).join(', '));
   }
+}
+
+/**
+ * Refuse a feed address that names the server's own network.
+ *
+ * The poller checks every fetch anyway, including where the name resolves and
+ * where it redirects; this is the part that can be said while the person is
+ * still on the form, rather than as an error on the feed an hour later.
+ */
+export function assertFeedUrl(raw: string): void {
+  let host: string;
+  try {
+    host = new URL(raw).hostname;
+  } catch {
+    // Not a URL at all is the schema's message to give, not this one.
+    return;
+  }
+  if (isBlockedHost(host)) throw errors.feedUrlBlocked();
 }

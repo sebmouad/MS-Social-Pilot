@@ -1192,10 +1192,17 @@ the answer.
 
 Redirects are followed manually, three hops at most, checking each one. A guard
 that inspects only the URL it was handed is walked straight past by a public
-address that 302s to `169.254.169.254`. Hostname checks still cannot catch a
-domain that *resolves* to a private address, so an egress proxy remains the
-right answer for genuinely hostile input; this closes what can be closed in
-process.
+address that 302s to `169.254.169.254`.
+
+The hop-by-hop fetch is `fetchPublic` in `src/lib/safe-fetch.ts`, shared with
+the RSS poller — which used to fetch a feed address with no check at all and
+`redirect: 'follow'`, then show the status code on the feeds screen: a port
+scanner with a friendly interface. Each hop is also checked *as resolved*: the
+name is looked up and every answer tested, so `metadata.example.com` pointing at
+169.254.169.254 is refused too. A name that answers publicly to the check and
+privately to the connection (DNS rebinding) still gets through, so an egress
+proxy remains the right answer for genuinely hostile input; this closes what can
+be closed in process.
 
 ## Media
 
