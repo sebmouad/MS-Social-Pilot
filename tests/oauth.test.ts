@@ -18,6 +18,8 @@ let routes: Record<string, () => { status?: number; body: unknown }> = {};
 
 let oauth: typeof import('../src/lib/facebook/oauth');
 
+const BINDING = { workspaceId: 'cworkspace0001', userId: 'cuser0001' };
+
 beforeAll(async () => {
   process.env.ENCRYPTION_KEY = randomBytes(32).toString('base64');
   process.env.SESSION_SECRET = 'the-session-secret';
@@ -48,62 +50,74 @@ afterAll(async () => {
 
 describe('the state that ties a callback to the browser that started it', () => {
   it('accepts what it issued', () => {
-    const { state, nonce } = oauth.createOAuthState();
-    expect(oauth.verifyOAuthState(state, nonce)).toBe(true);
+    const { state, nonce } = oauth.createOAuthState(BINDING);
+    expect(oauth.verifyOAuthState(state, nonce)).toEqual(BINDING);
   });
 
   it('refuses a state that belongs to a different browser', () => {
     // The attack: a signed-in victim follows a link carrying the attacker's
     // state. Their cookie holds a different nonce, so the connection stops
     // here rather than landing the attacker's Page in the victim's workspace.
-    const attacker = oauth.createOAuthState();
-    const victim = oauth.createOAuthState();
+    const attacker = oauth.createOAuthState(BINDING);
+    const victim = oauth.createOAuthState(BINDING);
 
-    expect(oauth.verifyOAuthState(attacker.state, victim.nonce)).toBe(false);
+    expect(oauth.verifyOAuthState(attacker.state, victim.nonce)).toBeNull();
   });
 
   it('refuses a nonce with no signature at all', () => {
-    const { nonce } = oauth.createOAuthState();
-    expect(oauth.verifyOAuthState(nonce, nonce)).toBe(false);
+    const { nonce } = oauth.createOAuthState(BINDING);
+    expect(oauth.verifyOAuthState(nonce, nonce)).toBeNull();
   });
 
   it('refuses a tampered signature', () => {
-    const { state, nonce } = oauth.createOAuthState();
+    const { state, nonce } = oauth.createOAuthState(BINDING);
     const forged = `${state.slice(0, state.lastIndexOf('.'))}.${'0'.repeat(64)}`;
 
-    expect(oauth.verifyOAuthState(forged, nonce)).toBe(false);
+    expect(oauth.verifyOAuthState(forged, nonce)).toBeNull();
   });
 
   it('refuses a state signed with a different secret', () => {
     // What binds the state to this installation: an attacker who knows the
     // format still cannot produce one without the session secret.
-    const { state, nonce } = oauth.createOAuthState();
+    const { state, nonce } = oauth.createOAuthState(BINDING);
     const previous = process.env.SESSION_SECRET;
     process.env.SESSION_SECRET = 'a-different-secret';
 
     try {
-      expect(oauth.verifyOAuthState(state, nonce)).toBe(false);
+      expect(oauth.verifyOAuthState(state, nonce)).toBeNull();
     } finally {
       process.env.SESSION_SECRET = previous;
     }
   });
 
   it('refuses empty and malformed values', () => {
-    const { nonce } = oauth.createOAuthState();
+    const { nonce } = oauth.createOAuthState(BINDING);
     for (const state of ['', '.', '.signature', 'no-separator']) {
-      expect(oauth.verifyOAuthState(state, nonce)).toBe(false);
+      expect(oauth.verifyOAuthState(state, nonce)).toBeNull();
     }
   });
 
+  it('refuses a state whose workspace or user was swapped', () => {
+    // The binding is what stops a connection started in one workspace landing
+    // in another. Rewriting it without the secret has to break the signature.
+    const { state, nonce } = oauth.createOAuthState(BINDING);
+    const [n, , user, signature] = state.split('.');
+
+    expect(oauth.verifyOAuthState(`${n}.other-workspace.${user}.${signature}`, nonce)).toBeNull();
+    expect(
+      oauth.verifyOAuthState(`${n}.${BINDING.workspaceId}.other-user.${signature}`, nonce),
+    ).toBeNull();
+  });
+
   it('issues a different nonce every time', () => {
-    const nonces = new Set(Array.from({ length: 20 }, () => oauth.createOAuthState().nonce));
+    const nonces = new Set(Array.from({ length: 20 }, () => oauth.createOAuthState(BINDING).nonce));
     expect(nonces.size).toBe(20);
   });
 });
 
 describe('the dialog people are sent to', () => {
   it('carries everything Facebook needs, and the state', () => {
-    const { state } = oauth.createOAuthState();
+    const { state } = oauth.createOAuthState(BINDING);
     const url = new URL(oauth.authorizationUrl(state));
 
     expect(url.searchParams.get('client_id')).toBe('123');
@@ -118,7 +132,7 @@ describe('the dialog people are sent to', () => {
   it('re-prompts rather than silently reusing an old answer', () => {
     // Without this, someone reconnecting to fix a missing permission is sent
     // straight back with the same permissions they already refused.
-    const url = new URL(oauth.authorizationUrl(oauth.createOAuthState().state));
+    const url = new URL(oauth.authorizationUrl(oauth.createOAuthState(BINDING).state));
     expect(url.searchParams.get('auth_type')).toBe('rerequest');
   });
 

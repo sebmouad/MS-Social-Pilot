@@ -468,3 +468,110 @@ test('picking a time offers the times the Page has done best at', async ({ page 
 
   expect(failures).toEqual([]);
 });
+
+test('Instagram without a picture is stopped before it is sent, and Facebook cannot hold it', async ({ page }) => {
+  // Instagram has no text-only post and no scheduling of its own; both used to
+  // be learnt from the server's refusal after pressing the button.
+  const failures = collectFailures(page);
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const instagram = await prisma.target.upsert({
+    where: { workspaceId_providerId: { workspaceId: target.workspaceId, providerId: 'ig-walk' } },
+    create: {
+      workspaceId: target.workspaceId,
+      socialAccountId: target.socialAccountId,
+      type: 'instagram',
+      providerId: 'ig-walk',
+      name: '@walkbakery',
+      accessToken: target.accessToken,
+      canPublish: true,
+    },
+    update: { canPublish: true, enabled: true },
+  });
+
+  try {
+    await open(page, '/compose');
+    await page.getByLabel(/what do you want to say/i).fill('Fresh loaves at seven.');
+
+    const box = page.getByRole('checkbox', { name: /@walkbakery/ });
+    await expect(async () => {
+      if (!(await box.isChecked())) await box.click();
+      await expect(page.getByText(/instagram only takes posts with a photo/i)).toBeVisible({ timeout: 1_500 });
+    }).toPass({ timeout: 30_000 });
+
+    await expect(page.getByRole('button', { name: /^schedule$/i })).toBeDisabled();
+    await expect(page.getByRole('radio', { name: /facebook\./i })).toBeDisabled();
+    await expect(page.getByText(/unavailable while an instagram account is selected/i)).toBeVisible();
+  } finally {
+    await prisma.target.delete({ where: { id: instagram.id } });
+  }
+
+  expect(failures).toEqual([]);
+});
+
+test('leaving a half-written post asks first', async ({ page }) => {
+  // Asked of the page directly: whether the browser then shows its prompt
+  // depends on its own rules about user gestures, which a headless run blurs.
+  const wouldAsk = () =>
+    page.evaluate(() => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+
+  await open(page, '/compose');
+  const box = page.getByLabel(/what do you want to say/i);
+  await expect(box).toBeEditable();
+  expect(await wouldAsk()).toBe(false);
+
+  await expect(async () => {
+    await box.fill('Half a thought');
+    expect(await wouldAsk()).toBe(true);
+  }).toPass({ timeout: 30_000 });
+
+  // Nothing left to lose once the box is empty again.
+  await box.fill('');
+  await expect.poll(wouldAsk).toBe(false);
+});
+
+test('an undated draft is listed under the calendar, and a switched-off destination can be unticked', async ({
+  page,
+}) => {
+  const failures = collectFailures(page);
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const author = await prisma.user.findFirstOrThrow({ where: { email: OWNER.email } });
+  const draft = await prisma.post.create({
+    data: {
+      workspaceId: target.workspaceId,
+      authorId: author.id,
+      message: 'Undated draft about rye',
+      status: 'draft',
+      targets: { create: [{ targetId: target.id, status: 'pending' }] },
+    },
+  });
+  // Switched off after the draft was written: it stays ticked in the editor.
+  await prisma.target.update({ where: { id: target.id }, data: { enabled: false } });
+
+  try {
+    await open(page, '/calendar');
+    const drafts = page.getByRole('region', { name: /unscheduled drafts/i });
+    await expect(drafts).toBeVisible();
+    await drafts.getByRole('link', { name: /undated draft about rye/i }).click();
+    await page.waitForURL(new RegExp(`/compose\\?post=${draft.id}`));
+
+    const box = page.getByRole('checkbox', { name: new RegExp(PAGE_NAME) });
+    await expect(box).toBeChecked();
+    await expect(box).toBeEnabled();
+    await expect(page.getByText(/switched off since this post was written/i)).toBeVisible();
+    await expect(async () => {
+      if (await box.isChecked()) await box.click();
+      await expect(box).not.toBeChecked({ timeout: 1_500 });
+    }).toPass({ timeout: 30_000 });
+    // Unticked for good: it cannot be ticked again while switched off.
+    await expect(box).toBeDisabled();
+  } finally {
+    await prisma.target.update({ where: { id: target.id }, data: { enabled: true } });
+    await prisma.post.delete({ where: { id: draft.id } });
+  }
+
+  expect(failures).toEqual([]);
+});

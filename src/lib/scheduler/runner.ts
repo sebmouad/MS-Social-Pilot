@@ -195,6 +195,14 @@ async function findDue(now: Date, limit: number): Promise<string[]> {
   return rows.map((row) => row.id);
 }
 
+/** How a destination that was off at publish time is settled, by both paths. */
+const SKIPPED_DESTINATION_OFF = {
+  status: 'skipped',
+  nextAttemptAt: null,
+  errorCode: 'destination_off',
+  errorMessage: 'This destination was turned off when the post was due, so it was not published there.',
+} as const;
+
 /**
  * Settle destinations that are due but point at a Page nobody turned back on.
  *
@@ -233,12 +241,7 @@ async function skipDisabledDestinations(now: Date, logger: TickOptions['logger']
 
   await prisma.postTarget.updateMany({
     where: { id: { in: stranded.map((row) => row.id) } },
-    data: {
-      status: 'skipped',
-      nextAttemptAt: null,
-      errorCode: 'destination_off',
-      errorMessage: 'This destination was turned off when the post was due, so it was not published there.',
-    },
+    data: SKIPPED_DESTINATION_OFF,
   });
 
   for (const postId of new Set(stranded.map((row) => row.postId))) {
@@ -660,14 +663,34 @@ export async function publishNow(postId: string, logger?: TickOptions['logger'])
     where: { id: postId },
     data: { status: 'publishing', scheduledAt: now },
   });
-  // Clear any pending backoff so every destination is due right now.
+  // Clear any pending backoff so every destination is due right now. Attempts
+  // go back to zero too: this is a person asking for a fresh try, and a row that
+  // failed on its last allowed attempt would otherwise be failed again by the
+  // very first transient error, with no retry at all.
+  //
+  // A Facebook-held post that was never confirmed is left alone: it most
+  // likely did go out, and publishing it again would put it on the Page twice.
+  // (The OR is spelled out because `not` alone also excludes NULL.)
   await prisma.postTarget.updateMany({
-    where: { postId, status: { in: ['pending', 'failed'] } },
-    data: { status: 'pending', nextAttemptAt: null },
+    where: {
+      postId,
+      status: { in: ['pending', 'failed'] },
+      OR: [{ errorCode: null }, { errorCode: { not: 'unconfirmed_on_facebook' } }],
+    },
+    data: { status: 'pending', nextAttemptAt: null, attempts: 0 },
   });
 
+  // A destination that is turned off is settled the way the scheduler settles
+  // it (see skipDisabledDestinations) rather than published to: "Post now" must
+  // not be the one path that ignores the switch.
+  const { count: skipped } = await prisma.postTarget.updateMany({
+    where: { postId, status: 'pending', target: { enabled: false } },
+    data: SKIPPED_DESTINATION_OFF,
+  });
+  if (skipped > 0) logger?.(`Skipped ${skipped} destination(s) that were turned off.`);
+
   const rows = await prisma.postTarget.findMany({
-    where: { postId, status: 'pending' },
+    where: { postId, status: 'pending', target: { enabled: true } },
     select: { id: true },
   });
 
@@ -690,7 +713,7 @@ export async function publishNow(postId: string, logger?: TickOptions['logger'])
     retrying: outcomes.filter((outcome) => outcome === 'retrying').length,
     reclaimedStale: 0,
     abandonedStale: 0,
-    skipped: 0,
+    skipped,
   };
 }
 

@@ -107,6 +107,14 @@ export async function runTokenExpiryCheck(context: JobContext): Promise<string |
 }
 
 /**
+ * How long after its scheduled moment a Facebook-held post may stay
+ * unconfirmed. A week of checks is long enough to outlast an expired token
+ * being renewed or a Graph outage; past that, "Scheduled" is no longer a
+ * plausible state and saying so beats saying nothing.
+ */
+const NATIVE_CONFIRM_GIVE_UP_DAYS = 7;
+
+/**
  * Find out whether the posts Facebook is holding have gone out yet.
  *
  * Native scheduling hands the post to Facebook at creation time and Facebook
@@ -119,6 +127,14 @@ export async function runTokenExpiryCheck(context: JobContext): Promise<string |
  *
  * Only destinations whose scheduled moment has passed are worth asking about,
  * which keeps this to one Graph call per post, once.
+ *
+ * The batch rotates: rows are taken least-recently-checked first, and a row
+ * that could not be confirmed is stamped (`updatedAt`) so the next pass starts
+ * with the others. Ordering by scheduled time alone meant a hundred rows that
+ * never confirm — no token, a post Facebook will not describe — were the whole
+ * batch every pass, and everything scheduled after them was never asked about.
+ * A row still unconfirmed {@link NATIVE_CONFIRM_GIVE_UP_DAYS} days after its
+ * moment is settled as failed with an explanation instead of waiting for ever.
  */
 export async function runNativeReconcile(context: JobContext): Promise<string | null> {
   const rows = await prisma.postTarget.findMany({
@@ -128,24 +144,59 @@ export async function runNativeReconcile(context: JobContext): Promise<string | 
       nativeScheduledFor: { lte: context.now },
     },
     include: { target: { include: { socialAccount: true } } },
-    orderBy: { nativeScheduledFor: 'asc' },
+    orderBy: [{ updatedAt: 'asc' }, { nativeScheduledFor: 'asc' }],
     take: 100,
   });
 
+  const giveUpBefore = new Date(context.now.getTime() - NATIVE_CONFIRM_GIVE_UP_DAYS * 24 * 60 * 60 * 1000);
+
   let published = 0;
   let missing = 0;
+  let unconfirmed = 0;
   const touched = new Set<string>();
+
+  /** Nothing definite this pass: give up if it has been long enough, else rotate. */
+  async function leaveUnconfirmed(row: (typeof rows)[number]): Promise<void> {
+    if (row.nativeScheduledFor && row.nativeScheduledFor < giveUpBefore) {
+      const { count } = await prisma.postTarget.updateMany({
+        where: { id: row.id, status: 'scheduled_remote' },
+        data: {
+          status: 'failed',
+          errorCode: 'unconfirmed_on_facebook',
+          errorMessage:
+            'Facebook never confirmed that this post went out. Check the Page to see whether it was published.',
+        },
+      });
+      if (count > 0) {
+        unconfirmed += 1;
+        touched.add(row.postId);
+      }
+      return;
+    }
+    // Wall-clock rather than `context.now`: the stamp orders rows against
+    // other writes to them, which Prisma stamps with the real time.
+    await prisma.postTarget.updateMany({
+      where: { id: row.id, status: 'scheduled_remote' },
+      data: { updatedAt: new Date() },
+    });
+  }
 
   for (const row of rows) {
     const encrypted = row.target.accessToken ?? row.target.socialAccount?.accessToken ?? null;
-    if (!encrypted || !row.remotePostId) continue;
+    if (!encrypted || !row.remotePostId) {
+      await leaveUnconfirmed(row);
+      continue;
+    }
 
     try {
       const state = await fetchRemotePostState(row.remotePostId, decryptSecret(encrypted));
       // `null` means Facebook did not tell us, which is not the same as "no".
       // Leaving the row alone costs one more check next pass; guessing costs a
       // post marked published that never went out.
-      if (state.isPublished !== true) continue;
+      if (state.isPublished !== true) {
+        await leaveUnconfirmed(row);
+        continue;
+      }
 
       const { count } = await prisma.postTarget.updateMany({
         where: { id: row.id, status: 'scheduled_remote' },
@@ -185,13 +236,14 @@ export async function runNativeReconcile(context: JobContext): Promise<string | 
       context.logger(
         `Could not check ${row.target.name} on Facebook: ${graphError.displayMessage}`,
       );
+      await leaveUnconfirmed(row);
     }
   }
 
   for (const postId of touched) await refreshPostStatus(postId, context.now);
 
-  if (published === 0 && missing === 0) return null;
-  return `native: ${published} published, ${missing} gone from Facebook`;
+  if (published === 0 && missing === 0 && unconfirmed === 0) return null;
+  return `native: ${published} published, ${missing} gone from Facebook, ${unconfirmed} never confirmed`;
 }
 
 /**

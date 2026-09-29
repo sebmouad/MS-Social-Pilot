@@ -211,7 +211,7 @@ describe('the confirmation for a post that has published', () => {
     // A permalink is data from Graph, so it goes through the same check as
     // every other external href rather than straight into an anchor.
     expect(source).toContain("import { ExternalLink } from './ExternalLink'");
-    const bannerStart = source.indexOf('{result && (');
+    const bannerStart = source.indexOf('{(result || partial) && (');
     const banner = source.slice(bannerStart, source.indexOf('<div className="flex gap-2">', bannerStart));
     expect(banner).toContain('<ExternalLink');
     expect(banner).not.toMatch(/<a\s+href=\{/);

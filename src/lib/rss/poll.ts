@@ -1,9 +1,11 @@
-import { ApprovalStatus, PostStatus, type FeedSource } from '@prisma/client';
+import { ApprovalStatus, PostStatus, Prisma, type FeedSource } from '@prisma/client';
 
 import { prisma } from './../prisma';
 import { parseTargetIds } from '../json';
-import { nextAvailableSlot } from '../time';
 import { QUEUE_OCCUPYING_STATUSES } from '../constants';
+import { AppError } from '../errors';
+import { allocateQueueSlot } from '../posts';
+import { notifyApprovalRequest } from '../email/notify';
 import { parseFeed, renderTemplate, type FeedEntry } from './parse';
 import { fetchPublic, readCapped } from '../safe-fetch';
 
@@ -85,6 +87,62 @@ export function selectNewEntries(options: {
     .slice(0, options.max ?? MAX_ITEMS_PER_POLL);
 }
 
+/** How far out a post goes when there is no free queue slot to put it in. */
+const FALLBACK_DELAY_MS = 60 * 60 * 1000;
+/** And how far apart consecutive fallbacks are kept. */
+const FALLBACK_SPACING_MS = 30 * 60 * 1000;
+
+/**
+ * When a feed post goes out if the queue cannot place it.
+ *
+ * An hour out clears Facebook's native scheduling floor and gives a human time
+ * to intervene. But a fixed "now + 1h" handed every item of a poll — and every
+ * item of the next poll, if it ran within the hour — the same instant, so ten
+ * posts landed on the Page at once. Stepping past anything already booked near
+ * that time spreads them out instead.
+ */
+export function fallbackTime(now: Date, taken: Date[]): Date {
+  const booked = taken.map((date) => date.getTime());
+  let candidate = now.getTime() + FALLBACK_DELAY_MS;
+  // Terminates: each step moves past at least one booked time, and there are
+  // finitely many of them.
+  while (booked.some((time) => Math.abs(time - candidate) < FALLBACK_SPACING_MS)) {
+    candidate += FALLBACK_SPACING_MS;
+  }
+  return new Date(candidate);
+}
+
+/** A post created from a feed entry. */
+interface ScheduledEntry {
+  postId: string;
+  scheduledAt: Date;
+  needsApproval: boolean;
+}
+
+/** The queue has no slots, or none free in its horizon. */
+function isQueueUnavailable(error: unknown): boolean {
+  return (
+    error instanceof AppError && (error.key === 'errors.queueEmpty' || error.key === 'errors.queueFull')
+  );
+}
+
+/** Another poll of the same feed recorded this entry first. */
+function isAlreadyIngested(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
+/**
+ * Record one entry as seen and create its post — together, or not at all.
+ *
+ * Apart, a post that failed to be written (a database hiccup, a destination
+ * deleted mid-poll) left its entry marked as seen, and the article was never
+ * posted and never retried. In one transaction a failure rolls both back and
+ * the next poll picks the entry up again.
+ *
+ * The slot comes from `allocateQueueSlot`, inside the same transaction, which
+ * holds the per-workspace lock the composer takes — so a feed post and a
+ * composer post cannot both be handed the same free slot.
+ */
 async function scheduleEntry(options: {
   source: FeedSource;
   entry: FeedEntry;
@@ -92,63 +150,73 @@ async function scheduleEntry(options: {
   authorId: string;
   timezone: string;
   now: Date;
-}): Promise<string | null> {
+}): Promise<ScheduledEntry | null> {
   const { source, entry } = options;
-
   const message = renderTemplate(source.messageTemplate, entry);
-  if (!message && !entry.link) return null;
 
-  const slots = await prisma.queueSlot.findMany({ where: { workspaceId: source.workspaceId } });
-  const taken = await prisma.post.findMany({
-    where: {
-      workspaceId: source.workspaceId,
-      status: { in: [...QUEUE_OCCUPYING_STATUSES] },
-      scheduledAt: { gte: options.now },
-    },
-    select: { scheduledAt: true },
-  });
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const item = await tx.feedItem.create({
+        data: {
+          feedSourceId: source.id,
+          guid: entry.guid,
+          url: entry.link,
+          title: entry.title,
+          publishedAt: entry.publishedAt,
+        },
+      });
 
-  const slot =
-    slots.length > 0
-      ? nextAvailableSlot({
-          slots,
-          timeZone: options.timezone,
-          takenUtc: taken.map((post) => post.scheduledAt).filter((date): date is Date => Boolean(date)),
-          now: options.now,
-        })
-      : null;
+      // Nothing to post. Still recorded as seen: otherwise it is reconsidered
+      // on every poll and takes one of the per-poll places each time.
+      if (!message && !entry.link) return null;
 
-  // No queue configured: an hour out, which clears Facebook's native
-  // scheduling floor and gives a human time to intervene.
-  const scheduledAt = slot ?? new Date(options.now.getTime() + 60 * 60 * 1000);
+      let scheduledAt: Date;
+      try {
+        scheduledAt = await allocateQueueSlot(tx, source.workspaceId, options.timezone, options.now);
+      } catch (error) {
+        // No queue, or none free: a feed still posts, just not into a slot.
+        if (!isQueueUnavailable(error)) throw error;
+        const taken = await tx.post.findMany({
+          where: {
+            workspaceId: source.workspaceId,
+            status: { in: [...QUEUE_OCCUPYING_STATUSES] },
+            scheduledAt: { gte: options.now },
+          },
+          select: { scheduledAt: true },
+        });
+        scheduledAt = fallbackTime(
+          options.now,
+          taken.map((post) => post.scheduledAt).filter((date): date is Date => Boolean(date)),
+        );
+      }
 
-  const item = await prisma.feedItem.create({
-    data: {
-      feedSourceId: source.id,
-      guid: entry.guid,
-      url: entry.link,
-      title: entry.title,
-      publishedAt: entry.publishedAt,
-    },
-  });
+      const needsApproval = !source.autoApprove;
+      const post = await tx.post.create({
+        data: {
+          workspaceId: source.workspaceId,
+          authorId: options.authorId,
+          message,
+          link: entry.link,
+          status: needsApproval ? PostStatus.pending_approval : PostStatus.scheduled,
+          approvalStatus: needsApproval ? ApprovalStatus.pending : ApprovalStatus.not_required,
+          // Reviewers see how long something has waited by this; a feed post
+          // is submitted the moment it is imported.
+          submittedAt: needsApproval ? options.now : null,
+          publishMode: source.publishMode,
+          scheduledAt,
+          timezone: options.timezone,
+          sourceFeedItemId: item.id,
+          targets: { create: options.targetIds.map((targetId) => ({ targetId })) },
+        },
+      });
 
-  const post = await prisma.post.create({
-    data: {
-      workspaceId: source.workspaceId,
-      authorId: options.authorId,
-      message,
-      link: entry.link,
-      status: source.autoApprove ? PostStatus.scheduled : PostStatus.pending_approval,
-      approvalStatus: source.autoApprove ? ApprovalStatus.not_required : ApprovalStatus.pending,
-      publishMode: source.publishMode,
-      scheduledAt,
-      timezone: options.timezone,
-      sourceFeedItemId: item.id,
-      targets: { create: options.targetIds.map((targetId) => ({ targetId })) },
-    },
-  });
-
-  return post.id;
+      return { postId: post.id, scheduledAt, needsApproval };
+    });
+  } catch (error) {
+    // "Poll now" racing the worker: the other poll recorded it, and posted it.
+    if (isAlreadyIngested(error)) return null;
+    throw error;
+  }
 }
 
 /** Poll one source. Never throws — failures are recorded on the row. */
@@ -207,15 +275,19 @@ export async function pollSource(
       select: { guid: true },
     });
 
-    const fresh = selectNewEntries({
+    const candidates = selectNewEntries({
       entries: feed.entries,
       seenGuids: new Set(seen.map((item) => item.guid)),
       ingestFrom: source.ingestFrom,
+      max: Number.POSITIVE_INFINITY,
     });
+    const fresh = candidates.slice(0, MAX_ITEMS_PER_POLL);
+    const backlog = candidates.length > fresh.length;
 
     let created = 0;
+    let firstForReview: Date | null = null;
     for (const entry of fresh) {
-      const postId = await scheduleEntry({
+      const scheduled = await scheduleEntry({
         source,
         entry,
         targetIds: validTargets.map((target) => target.id),
@@ -223,19 +295,35 @@ export async function pollSource(
         timezone: workspace.timezone,
         now,
       });
-      if (postId) created += 1;
+      if (!scheduled) continue;
+      created += 1;
+      if (scheduled.needsApproval && (!firstForReview || scheduled.scheduledAt < firstForReview)) {
+        firstForReview = scheduled.scheduledAt;
+      }
     }
 
     await prisma.feedSource.update({
       where: { id: source.id },
       data: {
         lastPolledAt: now,
-        lastEtag: fetched.etag,
-        lastModified: fetched.lastModified,
+        // Only once everything in this copy of the feed has been taken. Stored
+        // with a backlog left, the next poll is answered "304 Not Modified" and
+        // the rest wait until the publisher next posts — possibly for weeks.
+        ...(backlog ? {} : { lastEtag: fetched.etag, lastModified: fetched.lastModified }),
         pollErrorCount: 0,
         lastError: null,
       },
     });
+
+    // The same email the composer sends on submission, once per poll rather
+    // than per item: ten imported articles should not be ten emails.
+    if (firstForReview) {
+      await notifyApprovalRequest({
+        workspaceId: source.workspaceId,
+        authorName: source.name,
+        scheduledAt: firstForReview,
+      });
+    }
 
     if (created > 0) options.logger?.(`Feed "${source.name}" queued ${created} new item(s).`);
     return { sourceId: source.id, status: 'ingested', created };

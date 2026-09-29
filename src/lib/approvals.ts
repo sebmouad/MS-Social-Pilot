@@ -5,6 +5,7 @@ import { AppError, errors } from './errors';
 import { canApprove, canManageOthersPosts, canPublishWithoutApproval } from './constants';
 import { notifyApprovalDecision, notifyApprovalRequest } from './email/notify';
 import { logActivity } from './scheduler/runner';
+import type { NativeFallback } from './posts';
 
 /**
  * The approval workflow.
@@ -111,12 +112,20 @@ export async function submitForApproval(options: {
   void workspace;
 }
 
+export interface ApproveResult {
+  /**
+   * Set when the post was meant for Facebook to hold, but its time had
+   * drifted outside the window Facebook accepts, so our worker publishes it.
+   */
+  nativeFallback: NativeFallback | null;
+}
+
 export async function approvePost(options: {
   workspaceId: string;
   postId: string;
   reviewerId: string;
   reviewerRole: WorkspaceRole;
-}): Promise<void> {
+}): Promise<ApproveResult> {
   if (!canApprove(options.reviewerRole)) throw errors.noPermission();
 
   const post = await prisma.post.findFirst({
@@ -154,6 +163,19 @@ export async function approvePost(options: {
     },
   });
 
+  // A native post is one the author asked Facebook to hold. Only setting it
+  // `scheduled` left it to our worker, which is the one thing native was
+  // chosen to avoid — and the screen went on saying Facebook had it. Handed
+  // over now, the moment it is cleared, and never before: Facebook publishes
+  // whatever it is given, reviewed or not.
+  let nativeFallback: NativeFallback | null = null;
+  if (nextStatus === PostStatus.scheduled && post.publishMode === 'native' && post.scheduledAt) {
+    // Imported here rather than at the top: `posts` already imports this
+    // module for `initialApprovalStatus`.
+    const { handOffOrKeep } = await import('./posts');
+    nativeFallback = await handOffOrKeep(post.id, post.scheduledAt);
+  }
+
   if (post.submittedById) {
     await notifyApprovalDecision({
       workspaceId: options.workspaceId,
@@ -167,9 +189,11 @@ export async function approvePost(options: {
   await logActivity(
     options.workspaceId,
     'post.approved',
-    { postId: options.postId },
+    nativeFallback ? { postId: options.postId, nativeFallback } : { postId: options.postId },
     options.reviewerId,
   );
+
+  return { nativeFallback };
 }
 
 export async function rejectPost(options: {
