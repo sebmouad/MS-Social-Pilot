@@ -34,6 +34,7 @@ import {
   countComments,
   readComments,
   readConversations,
+  countConversations,
   readExternalPosts,
   readReviews,
   readVideos,
@@ -219,7 +220,12 @@ export default async function AnalyticsPage({
       {view === 'audience' && <AudienceView targetId={selected.id} from={from} to={to} />}
 
       {view === 'videos' && (
-        <VideosView workspaceId={auth.workspace.id} targetId={selected.id} timezone={timezone} />
+        <VideosView
+          workspaceId={auth.workspace.id}
+          targetId={selected.id}
+          timezone={timezone}
+          canSync={canModerateComments(auth.role)}
+        />
       )}
 
       {view === 'comments' && (
@@ -234,7 +240,12 @@ export default async function AnalyticsPage({
       )}
 
       {view === 'reviews' && (
-        <ReviewsView workspaceId={auth.workspace.id} targetId={selected.id} timezone={timezone} />
+        <ReviewsView
+          workspaceId={auth.workspace.id}
+          targetId={selected.id}
+          timezone={timezone}
+          canSync={canModerateComments(auth.role)}
+        />
       )}
 
       {view === 'inbox' && (
@@ -243,11 +254,13 @@ export default async function AnalyticsPage({
           targetId={selected.id}
           timezone={timezone}
           canReply={canModerateComments(auth.role)}
+          params={params}
         />
       )}
 
       {view === 'external' && (
         <ExternalView
+          canSync={canModerateComments(auth.role)}
           workspaceId={auth.workspace.id}
           targetId={selected.id}
           from={from}
@@ -405,16 +418,18 @@ async function VideosView({
   workspaceId,
   targetId,
   timezone,
+  canSync,
 }: {
   workspaceId: string;
   targetId: string;
   timezone: string;
+  canSync: boolean;
 }) {
   const t = await getTranslations('engagement');
   const videos = await readVideos({ workspaceId, targetId });
 
   if (videos.length === 0) {
-    return <EmptyEdge message={t('noVideos')} targetId={targetId} label={t('refresh')} />;
+    return <EmptyEdge message={t('noVideos')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
   }
 
   const seconds = (milliseconds: number | null) =>
@@ -424,7 +439,7 @@ async function VideosView({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('videosHint')}</p>
-        <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />
+        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
       </div>
 
       <div className="card overflow-x-auto">
@@ -495,11 +510,18 @@ async function CommentsView({
   const search = (first(params.q) ?? '').trim();
   const shown = first(params.shown);
   const hidden = shown === 'hidden' ? true : shown === 'visible' ? false : undefined;
+  const unanswered = shown === 'unanswered';
 
   // The three go together. Two hundred comments with no way to search them and
   // no way to reach the two hundred and first is not a moderation screen, and a
   // busy Page passes that in a week.
-  const filter = { workspaceId, targetId, ...(hidden === undefined ? {} : { hidden }), ...(search ? { search } : {}) };
+  const filter = {
+    workspaceId,
+    targetId,
+    ...(hidden === undefined ? {} : { hidden }),
+    ...(unanswered ? { unanswered: true } : {}),
+    ...(search ? { search } : {}),
+  };
   const page = paginate({
     total: await countComments(filter),
     requested: pageNumber(params.page),
@@ -536,6 +558,7 @@ async function CommentsView({
             <option value="all">{t('showAll')}</option>
             <option value="visible">{t('showVisible')}</option>
             <option value="hidden">{t('showHidden')}</option>
+            <option value="unanswered">{t('showUnanswered')}</option>
           </select>
         </div>
 
@@ -572,10 +595,12 @@ async function ReviewsView({
   workspaceId,
   targetId,
   timezone,
+  canSync,
 }: {
   workspaceId: string;
   targetId: string;
   timezone: string;
+  canSync: boolean;
 }) {
   const t = await getTranslations('engagement');
   const summary = await readReviews({ workspaceId, targetId });
@@ -593,7 +618,7 @@ async function ReviewsView({
     return retired ? (
       retiredNotice
     ) : (
-      <EmptyEdge message={t('noReviews')} targetId={targetId} label={t('refresh')} />
+      <EmptyEdge message={t('noReviews')} targetId={targetId} label={t('refresh')} canSync={canSync} />
     );
   }
 
@@ -609,7 +634,7 @@ async function ReviewsView({
       {retired && retiredNotice}
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('reviewsHint')}</p>
-        {!retired && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
+        {!retired && canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
       </div>
 
       <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -650,24 +675,38 @@ async function InboxView({
   targetId,
   timezone,
   canReply,
+  params,
 }: {
   workspaceId: string;
   targetId: string;
   timezone: string;
   canReply: boolean;
+  params: Record<string, string | string[] | undefined>;
 }) {
   const t = await getTranslations('engagement');
-  const conversations = await readConversations({ workspaceId, targetId });
+  // Replying and pulling are the same permission: both act on the Page's
+  // conversations on the workspace's behalf.
+  const canSync = canReply;
 
-  if (conversations.length === 0) {
-    return <EmptyEdge message={t('noConversations')} targetId={targetId} label={t('refresh')} />;
+  // Paged like the comments, so a busy inbox is not cut off at its fiftieth thread.
+  const page = paginate({
+    total: await countConversations({ workspaceId, targetId }),
+    requested: pageNumber(params.page),
+    size: 50,
+  });
+  const conversations = await readConversations({ workspaceId, targetId, skip: page.skip, limit: page.take });
+
+  if (page.total === 0) {
+    return <EmptyEdge message={t('noConversations')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
   }
+
+  const href = (next: number) => pageHref('/analytics', { ...params, view: 'inbox' }, next);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('inboxHint')}</p>
-        <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />
+        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
       </div>
 
       <InboxPanel
@@ -689,6 +728,8 @@ async function InboxView({
               : { state: thread.reply.state },
         }))}
       />
+
+      <Pagination page={page} href={href} />
     </div>
   );
 }
@@ -700,25 +741,27 @@ async function ExternalView({
   from,
   to,
   timezone,
+  canSync,
 }: {
   workspaceId: string;
   targetId: string;
   from: Date;
   to: Date;
   timezone: string;
+  canSync: boolean;
 }) {
   const t = await getTranslations('engagement');
   const posts = await readExternalPosts({ workspaceId, targetId, from, to });
 
   if (posts.length === 0) {
-    return <EmptyEdge message={t('noExternal')} targetId={targetId} label={t('refresh')} />;
+    return <EmptyEdge message={t('noExternal')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('externalHint')}</p>
-        <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />
+        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
       </div>
 
       <ul className="space-y-3">
@@ -794,20 +837,25 @@ async function EmptyEdge({
   message,
   targetId,
   label,
+  canSync,
 }: {
   message: string;
   targetId: string;
   label: string;
+  /** The sync route refuses anyone who cannot moderate comments; so does the button. */
+  canSync: boolean;
 }) {
   return (
     <div className="card flex flex-col items-center gap-3 p-8 text-center">
       <p className="text-sm text-slate-600">{message}</p>
-      <SyncButton
-        endpoint="/api/engagement/sync"
-        body={{ targetId }}
-        label={label}
-        variant="primary"
-      />
+      {canSync && (
+        <SyncButton
+          endpoint="/api/engagement/sync"
+          body={{ targetId }}
+          label={label}
+          variant="primary"
+        />
+      )}
     </div>
   );
 }
