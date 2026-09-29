@@ -91,7 +91,11 @@
       "noSpend": "Ce compte n’a rien dépensé sur cette période. Actualisez depuis Facebook si vous attendiez de la diffusion.",
       "none": "Rien d’inhabituel sur cette période.",
       "title": "Ce qui ressort"
-    }
+    },
+    "askAdmin": "Demandez à un propriétaire ou administrateur de l’espace de rechercher les comptes publicitaires accessibles.",
+    "exportCsv": "Télécharger le CSV",
+    "coverage": "données depuis le {date}",
+    "noComparison": "Pas de comparaison avec la période précédente : les données sont récupérées de Facebook jusqu’au {date}, et la période précédente commence avant."
   },
   "analytics": {
     "title": "Statistiques",
@@ -647,7 +651,9 @@
     "tooManySignups": "{minutes, plural, one {Trop de comptes créés depuis cet endroit. Réessayez dans une minute.} other {Trop de comptes créés depuis cet endroit. Réessayez dans # minutes.}}",
     "tryAgain": "Réessayer",
     "unknownExport": "Export inconnu. Choisissez parmi : {kinds}.",
-    "variantsNeedApproval": "Les formulations alternatives sont publiées sans validation : seuls les éditeurs et rôles supérieurs peuvent les définir lorsque la validation est activée."
+    "variantsNeedApproval": "Les formulations alternatives sont publiées sans validation : seuls les éditeurs et rôles supérieurs peuvent les définir lorsque la validation est activée.",
+    "dateRangeInverted": "Le début de la période est après sa fin. Inversez les dates.",
+    "adAccountNotFound": "Compte publicitaire introuvable."
   },
   "feeds": {
     "title": "Flux RSS",
@@ -1063,7 +1069,12 @@
     "byDestination": "Par destination",
     "destination": "Destination",
     "topPosts": "Meilleures publications",
-    "noData": "Aucune publication parue sur cette période."
+    "noData": "Aucune publication parue sur cette période.",
+    "impressions": "Impressions",
+    "linkClicksLifetime": "Clics sur les liens (depuis toujours)",
+    "engagementCount": "{count, plural, one {# interaction} other {# interactions}}",
+    "impressionCount": "{count, plural, one {# impression} other {# impressions}}",
+    "sourceNote": "Les impressions, la portée et l’engagement viennent de Facebook. Les clics sur les liens sont comptés par les liens courts de l’application, sur toute leur durée de vie et pas seulement sur cette période. Ils mesurent des choses différentes et ne sont jamais additionnés."
   },
   "settings": {
     "addTime": "Ajouter un créneau",

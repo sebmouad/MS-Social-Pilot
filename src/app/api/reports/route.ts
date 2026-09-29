@@ -14,7 +14,8 @@ export const GET = route(async (request: Request) => {
     to: url.searchParams.get('to'),
     timeZone: auth.workspace.timezone,
   });
-  if (!range.ok) return NextResponse.json({ error: range.message }, { status: 400 });
+  // Thrown rather than returned, so it reaches the reader in their language.
+  if (!range.ok) throw range.error;
   const { from, to } = range;
 
   const report = await buildReport({
@@ -28,7 +29,7 @@ export const GET = route(async (request: Request) => {
     return new NextResponse(reportToCsv(report), {
       headers: {
         'content-type': 'text/csv; charset=utf-8',
-        'content-disposition': `attachment; filename="${csvFilename('report', auth.workspace.slug, range)}"`,
+        'content-disposition': `attachment; filename="${csvFilename('report', auth.workspace.slug, range, auth.workspace.timezone)}"`,
       },
     });
   }

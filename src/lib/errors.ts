@@ -337,4 +337,14 @@ export const errors = {
       fallback: 'AI assistance is not configured on this server.',
       status: 503,
     }),
+
+  dateRangeInverted: () =>
+    new AppError({
+      key: 'errors.dateRangeInverted',
+      fallback: 'The start of the range comes after its end. Swap the dates.',
+      status: 400,
+    }),
+
+  adAccountNotFound: () =>
+    new AppError({ key: 'errors.adAccountNotFound', fallback: 'Ad account not found.', status: 404 }),
 };
