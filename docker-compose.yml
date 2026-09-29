@@ -11,13 +11,19 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # Required, with no default: a stack that starts with a well-known
+      # password is one misplaced port mapping away from an open database.
+      # `npm run setup` generates one into .env.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (npm run setup generates one)}
       POSTGRES_DB: ${POSTGRES_DB:-social_pilot}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
-      # Exposed for local tooling (psql, Prisma Studio). Remove in production.
-      - '5432:5432'
+      # Loopback only, for local tooling (psql, Prisma Studio, `npm run dev`
+      # against this database). Never 0.0.0.0: that publishes Postgres to every
+      # network the host is on. Delete the mapping entirely in production — web
+      # and worker reach it over the compose network, not through this port.
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432'
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
       interval: 5s
@@ -29,7 +35,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-social_pilot}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-social_pilot}?schema=public
       # Fixed inside the container whatever .env says, so the mapping above and
       # the healthcheck below stay true.
       PORT: '3000'
@@ -69,7 +75,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-social_pilot}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-social_pilot}?schema=public
     volumes:
       # The same media volume: the worker reads uploaded files to publish them.
       - media:/app/media
@@ -84,6 +90,11 @@ services:
       web:
         condition: service_healthy
     command: npm run worker
+    # The image's HEALTHCHECK probes the web server, which this container does
+    # not run. Whether the worker is alive is reported by web's /api/health
+    # (`worker.status`), from the heartbeat it writes.
+    healthcheck:
+      disable: true
 
 volumes:
   postgres-data:

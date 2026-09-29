@@ -147,10 +147,11 @@ npm install
 npm run setup
 ```
 
-`npm run setup` writes `.env` from `.env.example` and generates the two secrets
-that must be unique to your installation — the session signing key and the token
-encryption key. It never overwrites values you have already set, so it is safe to
-run again.
+`npm run setup` writes `.env` from `.env.example` and generates the secrets that
+must be unique to your installation — the session signing key, the token
+encryption key and the password of the bundled Postgres, which Docker Compose
+refuses to start without. It never overwrites values you have already set, so it
+is safe to run again.
 
 Then, with Docker:
 
@@ -166,6 +167,9 @@ another terminator. On a laptop where 80 is taken, or where publishing it needs
 root, set `APP_PORT=8080` in `.env` and use <http://localhost:8080>.
 
 Or without Docker, using a Postgres you already have:
+
+The Compose Postgres is published on `127.0.0.1:5432` only, and the
+`DATABASE_URL` that `npm run setup` writes already carries its password:
 
 ```bash
 docker compose up -d postgres   # or point DATABASE_URL at your own

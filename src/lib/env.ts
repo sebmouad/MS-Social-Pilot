@@ -20,7 +20,10 @@ import {
  * Deliberately not validated eagerly at import time: `next build` imports
  * modules without a populated .env, and failing the build because a runtime
  * secret is absent is unhelpful. Instead each accessor throws a precise,
- * actionable error the first time something genuinely needs the value.
+ * actionable error the first time something genuinely needs the value — and
+ * `validateEnv` below runs the same checks once at server start, from
+ * `src/instrumentation.ts`, so a production server with a bad secret refuses
+ * to boot instead of failing the first visitor.
  */
 
 function required(name: string): string {
@@ -36,13 +39,48 @@ function required(name: string): string {
 /** Permissions Meta has removed outright; asking for one fails the login. */
 const RETIRED_SCOPES = new Set(['publish_to_groups', 'groups_access_member_info']);
 
+/**
+ * The shortest session secret accepted in production.
+ *
+ * It signs every session cookie, so it has to be long enough that a signature
+ * cannot be brute-forced. Development and the test suites keep short
+ * throwaway values, which is why this is enforced only in production.
+ */
+export const MIN_SESSION_SECRET_LENGTH = 32;
+
+function sessionSecret(): string {
+  const value = required('SESSION_SECRET');
+  if (process.env.NODE_ENV === 'production' && value.trim().length < MIN_SESSION_SECRET_LENGTH) {
+    // Length only, never the value: this message ends up in container logs.
+    throw new Error(
+      `SESSION_SECRET is ${value.trim().length} characters; production needs at least ` +
+        `${MIN_SESSION_SECRET_LENGTH}. Generate one with: openssl rand -base64 32`,
+    );
+  }
+  return value;
+}
+
+/**
+ * Check the environment-only values once, at startup.
+ *
+ * Only the three that cannot come from the settings store: everything else has
+ * a default or is set on the configuration screen, so its absence is not a
+ * reason to refuse to start. Throws on the first problem, with a message that
+ * names the variable and how to fix it.
+ */
+export function validateEnv(): void {
+  required('DATABASE_URL');
+  sessionSecret();
+  required('ENCRYPTION_KEY');
+}
+
 export const env = {
   get appUrl(): string {
     // Trailing slashes break OAuth redirect matching, so normalise once here.
     return settingString('app.url').replace(/\/+$/, '');
   },
   get sessionSecret(): string {
-    return required('SESSION_SECRET');
+    return sessionSecret();
   },
   get encryptionKey(): string {
     return required('ENCRYPTION_KEY');

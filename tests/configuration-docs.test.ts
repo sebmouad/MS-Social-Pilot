@@ -39,6 +39,7 @@ const PROCESS_ONLY = new Map([
   ['PORT', 'scripts/start.mjs'],
   ['HOST', 'scripts/start.mjs'],
   ['APP_PORT', 'docker-compose.yml'],
+  ['POSTGRES_PASSWORD', 'docker-compose.yml'],
 ]);
 
 const registryEnvNames = SETTING_DEFINITIONS.flatMap((definition) =>
