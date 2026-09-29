@@ -55,6 +55,29 @@ describe('nextRecycleAt', () => {
     expect(nextRecycleAt({ everyDays: 7, limit: null, count: 500, from })).not.toBeNull();
   });
 
+  it('skips ahead past now after downtime, keeping the original cadence', () => {
+    // A daily post and a worker that was down for a week: one interval from the
+    // stored date is still in the past, so every cycle made another copy.
+    const now = new Date('2026-09-08T12:00:00Z');
+    expect(
+      nextRecycleAt({ everyDays: 1, limit: null, count: 1, from, now })?.toISOString(),
+    ).toBe('2026-09-09T09:00:00.000Z');
+  });
+
+  it('is strictly after now when now lands exactly on the cadence', () => {
+    const now = new Date('2026-09-03T09:00:00Z');
+    expect(
+      nextRecycleAt({ everyDays: 1, limit: null, count: 1, from, now })?.toISOString(),
+    ).toBe('2026-09-04T09:00:00.000Z');
+  });
+
+  it('adds one interval when the worker is on time', () => {
+    const now = new Date('2026-09-01T09:05:00Z');
+    expect(
+      nextRecycleAt({ everyDays: 30, limit: null, count: 1, from, now })?.toISOString(),
+    ).toBe('2026-10-01T09:00:00.000Z');
+  });
+
   it('returns null for a missing or nonsensical interval', () => {
     expect(nextRecycleAt({ everyDays: null, limit: null, count: 0, from })).toBeNull();
     expect(nextRecycleAt({ everyDays: 0, limit: null, count: 0, from })).toBeNull();

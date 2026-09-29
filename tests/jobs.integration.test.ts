@@ -346,6 +346,27 @@ describe('evergreen recycling', () => {
     expect(original.recycleNextAt?.toISOString()).toBe('2026-09-30T10:00:00.000Z');
   });
 
+  it('creates one copy, not a burst, after the worker was down for several intervals', async () => {
+    const { post } = await seedEvergreen({ limit: null });
+    // Weekly, and last due six weeks ago.
+    await prisma.post.update({
+      where: { id: post.id },
+      data: { recycleEveryDays: 7, recycleNextAt: new Date('2026-07-21T10:00:00Z') },
+    });
+
+    await evergreen.runEvergreenCycle({ now, logger });
+    await evergreen.runEvergreenCycle({ now, logger });
+    await evergreen.runEvergreenCycle({ now, logger });
+
+    expect(await prisma.post.count({ where: { originPostId: post.id } })).toBe(1);
+    const original = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    // Still on its Tuesday-10:00 cadence, and in the future.
+    expect(original.recycleNextAt?.toISOString()).toBe('2026-09-08T10:00:00.000Z');
+
+    const copy = await prisma.post.findFirstOrThrow({ where: { originPostId: post.id } });
+    expect(copy.scheduledAt?.toISOString()).toBe(now.toISOString());
+  });
+
   it('leaves a post that is not due yet alone', async () => {
     const { post } = await seedEvergreen();
     await prisma.post.update({
