@@ -594,6 +594,7 @@
     "destinationNotFound": "Destination introuvable.",
     "editorsOnlyDeleteMedia": "Seuls les éditeurs et les rôles supérieurs peuvent supprimer des fichiers de la médiathèque.",
     "emailTaken": "Un compte existe déjà avec cette adresse e-mail. Connectez-vous plutôt.",
+    "emptyPost": "Écrivez quelque chose, ajoutez un lien ou joignez un média.",
     "errorBody": "La page n’a pas pu être chargée. Réessayer en vaut la peine — si cela persiste, la référence ci-dessous indiquera par où commencer.",
     "errorTitle": "Une erreur est survenue",
     "feedInstagramUnsupported": "Un élément de flux est un titre et un lien, et Instagram n’accepte ni l’un ni l’autre sans image ({names}). Choisissez des destinations Facebook pour ce flux.",
@@ -621,6 +622,7 @@
     "notFoundTitle": "Cette page n’est pas ici",
     "notPending": "Cette publication n'est pas en attente de validation.",
     "notSignedIn": "Vous devez être connecté.",
+    "notSubmittable": "Cette publication ne peut pas être envoyée en validation.",
     "ownerOnlyChangeConfig": "Seul un propriétaire peut modifier la configuration.",
     "ownerOnlyChangeSetup": "Seul un propriétaire peut modifier la configuration initiale.",
     "ownerOnlyViewConfig": "Seul un propriétaire peut consulter la configuration.",
@@ -631,6 +633,7 @@
     "previewHostBlocked": "Cet hôte n’est pas accessible pour les aperçus de liens.",
     "previewSchemeUnsupported": "Seules les URL http et https peuvent être prévisualisées.",
     "previewUrlInvalid": "Saisissez une URL valide, avec http:// ou https://.",
+    "publishNeedsReview": "Les publications de cet espace sont validées avant de partir, elles ne peuvent donc pas être publiées immédiatement. Planifiez-la et elle rejoindra la file de validation.",
     "publishOwnOnly": "Vous ne pouvez publier que vos propres publications.",
     "queueEmpty": "Votre file de publication est vide. Ajoutez des créneaux dans les Paramètres.",
     "queueFull": "Tous les créneaux des 90 prochains jours sont pris. Ajoutez des créneaux ou choisissez une date.",
@@ -1014,7 +1017,10 @@
       "deleted_on_facebook": "Cette publication n’est plus sur Facebook. Elle y a probablement été supprimée, elle n’a donc jamais paru.",
       "destination_off": "Cette destination était désactivée à l’heure prévue, la publication n’y a donc pas été faite.",
       "worker_lost": "La publication a été interrompue et n’a pas repris dans la limite des tentatives. Vérifiez la destination puis réessayez."
-    }
+    },
+    "nativeTooSoon": "Facebook ne conserve que les publications prévues au moins 10 minutes à l’avance : celle-ci reste donc avec notre propre planificateur et partira à l’heure prévue.",
+    "nativeTooFar": "Facebook ne peut pas conserver une publication prévue aussi loin : celle-ci reste donc avec notre propre planificateur et partira à l’heure prévue.",
+    "nativeUnavailable": "Cette publication n’a pas pu être confiée à Facebook pour le moment : elle reste donc avec notre propre planificateur et partira à l’heure prévue."
   },
   "queue": {
     "addSlot": "Ajouter un créneau",

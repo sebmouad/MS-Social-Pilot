@@ -1,8 +1,10 @@
 import { z } from 'zod';
+import { getTranslations } from 'next-intl/server';
 
 import { requireAuth } from '@/lib/auth';
 import { approvePost, rejectPost, submitForApproval } from '@/lib/approvals';
 import { ok, readJson, route } from '@/lib/api';
+import { nativeFallbackKey } from '@/lib/posts';
 
 const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('submit') }),
@@ -19,6 +21,10 @@ export const POST = route(async (request: Request, context: { params: Promise<{ 
   const { id } = await context.params;
   const input = schema.parse(await readJson(request));
 
+  // Set when approving had something to say beyond "done": a post meant for
+  // Facebook to hold that our worker will publish instead.
+  let notice: string | undefined;
+
   switch (input.action) {
     case 'submit':
       await submitForApproval({
@@ -29,14 +35,19 @@ export const POST = route(async (request: Request, context: { params: Promise<{ 
       });
       break;
 
-    case 'approve':
-      await approvePost({
+    case 'approve': {
+      const approved = await approvePost({
         workspaceId: auth.workspace.id,
         postId: id,
         reviewerId: auth.user.id,
         reviewerRole: auth.role,
       });
+      if (approved.nativeFallback) {
+        const t = await getTranslations('posts');
+        notice = t(nativeFallbackKey(approved.nativeFallback));
+      }
       break;
+    }
 
     case 'reject':
       await rejectPost({
@@ -49,5 +60,5 @@ export const POST = route(async (request: Request, context: { params: Promise<{ 
       break;
   }
 
-  return ok({ ok: true });
+  return ok({ ok: true, ...(notice ? { notice } : {}) });
 });
