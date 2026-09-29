@@ -15,7 +15,6 @@ const MEMBER = {
   name: 'Pat Quill',
   email: 'pat.quill@example.test',
   password: 'a-long-enough-password',
-  workspace: 'Quill Consulting',
 };
 const MEMBER_STATE = 'e2e/.auth/member.json';
 
@@ -44,6 +43,8 @@ test('a colleague with a workspace of their own joins the owner’s', async ({ p
 test('changing a role asks first, and a refusal changes nothing', async ({ page }) => {
   const failures = collectFailures(page);
   await open(page, '/settings/team');
+  // A pick made before hydration never reaches the handler; nothing to test.
+  await page.waitForLoadState('networkidle');
 
   const select = page.getByRole('combobox', { name: `Role for ${MEMBER.name}` });
   await expect(select).toHaveValue('contributor');
@@ -72,27 +73,24 @@ test('changing a role asks first, and a refusal changes nothing', async ({ page 
   await expect(select).toHaveValue('editor');
   await expect(select).toBeEnabled();
   expect(patches).toBe(1);
-  await page.screenshot({ path: '/tmp/u10-team.png', fullPage: true }); // TEMP
 
   expect(failures).toEqual([]);
 });
 
 test('an invitation that never reaches the server gives the button back', async ({ page }) => {
   await open(page, '/settings/team');
+  await page.waitForLoadState('networkidle');
+
+  const send = page.getByRole('button', { name: 'Send invitation' });
+  await page.getByLabel('Email address').fill('nobody@example.test');
+  await expect(send).toBeEnabled();
+
   await page.route('**/api/team', (route) =>
     route.request().method() === 'POST' ? route.abort('internetdisconnected') : route.continue(),
   );
-
-  const send = page.getByRole('button', { name: 'Send invitation' });
-  // Typed until it sticks: a value filled in before hydration is wiped when
-  // React takes over the controlled input, leaving the button disabled.
-  await expect(async () => {
-    await page.getByLabel('Email address').fill('nobody@example.test');
-    await expect(send).toBeEnabled({ timeout: 1_000 });
-  }).toPass();
   await send.click();
 
-  await expect(page.getByRole('alert')).toContainText(/could not reach the server/i);
+  await expect(page.getByRole('alert').filter({ hasText: /could not reach the server/i })).toBeVisible();
   await expect(send).toBeEnabled();
 });
 
@@ -108,10 +106,9 @@ test.describe('signed out', () => {
     const submit = page.getByRole('button', { name: /sign in/i });
     await submit.click();
 
-    await expect(page.getByRole('alert')).toContainText(/could not reach the server/i);
+    await expect(page.getByRole('alert').filter({ hasText: /could not reach the server/i })).toBeVisible();
     await expect(submit).toBeEnabled();
     await expect(submit).toHaveText(/sign in/i);
-    await page.screenshot({ path: '/tmp/u10-login.png', fullPage: true }); // TEMP
   });
 });
 
@@ -119,15 +116,19 @@ test.describe('as the colleague', () => {
   test.use({ storageState: MEMBER_STATE });
 
   const switcher = (page: Page) => page.getByRole('combobox', { name: /switch client/i });
+  /** Whichever client is not the current one: the colleague has exactly two. */
+  const otherClient = async (page: Page) =>
+    (await switcher(page).locator('option:not(:checked)').first().getAttribute('value')) ?? '';
 
   test('a failed switch says so and stays put', async ({ page }) => {
     await open(page, '/settings/notifications');
+    await page.waitForLoadState('networkidle');
     const before = await switcher(page).inputValue();
     await page.route('**/api/workspace/switch', (route) => route.abort('internetdisconnected'));
 
-    await switcher(page).selectOption({ label: MEMBER.workspace });
+    await switcher(page).selectOption(await otherClient(page));
 
-    await expect(page.getByRole('alert')).toContainText(/could not switch client/i);
+    await expect(page.getByRole('alert').filter({ hasText: /could not switch client/i })).toBeVisible();
     await expect(page).toHaveURL(/\/settings\/notifications$/);
     await expect(switcher(page)).toHaveValue(before);
     await expect(switcher(page)).toBeEnabled();
@@ -139,14 +140,14 @@ test.describe('as the colleague', () => {
     // Deep inside the owner's workspace, where the URL would mean nothing to
     // the other one.
     await open(page, '/settings/notifications');
+    await page.waitForLoadState('networkidle');
     const before = await switcher(page).inputValue();
 
-    await switcher(page).selectOption({ label: MEMBER.workspace });
+    await switcher(page).selectOption(await otherClient(page));
 
     await page.waitForURL(/\/dashboard$/, { timeout: 30_000 });
     await expect(switcher(page)).not.toHaveValue(before);
     await expect(switcher(page)).toBeEnabled();
-    await page.setViewportSize({ width: 375, height: 800 }); await open(page, '/settings/team'); await page.screenshot({ path: '/tmp/u10-team-375.png', fullPage: true }); // TEMP
 
     expect(failures).toEqual([]);
   });
