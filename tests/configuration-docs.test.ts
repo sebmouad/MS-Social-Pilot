@@ -43,6 +43,7 @@ const PROCESS_ONLY = new Map([
   ['PORT', 'scripts/start.mjs'],
   ['HOST', 'scripts/start.mjs'],
   ['APP_PORT', 'docker-compose.yml'],
+  ['POSTGRES_PASSWORD', 'docker-compose.yml'],
   ['TRUST_PROXY', 'src/lib/client-ip.ts'],
 ]);
 

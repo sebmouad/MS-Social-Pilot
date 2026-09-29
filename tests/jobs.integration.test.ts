@@ -684,15 +684,16 @@ describe('GET /api/health', () => {
     const response = await health.GET();
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: 'ok' });
+    expect((await response.json()).status).toBe('ok');
   });
 
-  it('says nothing beyond the status', async () => {
+  it('says nothing beyond the status and the worker heartbeat age', async () => {
     // Reachable by anyone who can reach the port, so it must not hand out a
     // version, a hostname, or the text of a database error.
     const body = (await (await health.GET()).json()) as Record<string, unknown>;
 
-    expect(Object.keys(body)).toEqual(['status']);
+    expect(Object.keys(body).sort()).toEqual(['status', 'worker']);
+    expect(Object.keys(body.worker as object).sort()).toEqual(['lastBeatSeconds', 'status']);
   });
 });
 
