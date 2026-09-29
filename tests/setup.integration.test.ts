@@ -242,11 +242,24 @@ describe('who may set up the installation', () => {
     expect(setup.maySetUp(null, false)).toBe(false);
   });
 
-  it('is owner-only once it is shut', () => {
-    expect(setup.maySetUp({ role: WorkspaceRole.owner }, false)).toBe(true);
-    expect(setup.maySetUp({ role: WorkspaceRole.admin }, false)).toBe(false);
-    expect(setup.maySetUp({ role: WorkspaceRole.editor }, false)).toBe(false);
-    expect(setup.maySetUp({ role: WorkspaceRole.contributor }, false)).toBe(false);
+  it('is the installation owner\'s alone once it is shut, whatever their workspace role', () => {
+    // Every sign-up owns a workspace of its own, so a workspace role cannot be
+    // what admits someone here.
+    for (const role of Object.values(WorkspaceRole)) {
+      const installer = { role, isInstanceOwner: true };
+      const everyoneElse = { role, isInstanceOwner: false };
+      expect(setup.maySetUp(installer, false), role).toBe(true);
+      expect(setup.maySetUp(everyoneElse, false), role).toBe(false);
+    }
+  });
+
+  it('never lets anybody but the installation owner write, not even on first run', () => {
+    // Nobody legitimate writes the app credentials before the first account
+    // exists — the form comes after it — so an open write only served whoever
+    // found a fresh installation first.
+    expect(setup.mayChangeSetup(null)).toBe(false);
+    expect(setup.mayChangeSetup({ isInstanceOwner: false })).toBe(false);
+    expect(setup.mayChangeSetup({ isInstanceOwner: true })).toBe(true);
   });
 
   it('reports first run from the database, not from a setting somebody could flip', () => {

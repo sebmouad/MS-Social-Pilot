@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { clientIp } from '../src/lib/client-ip';
 
@@ -14,7 +14,14 @@ import { clientIp } from '../src/lib/client-ip';
 const withHeaders = (headers: Record<string, string>) =>
   new Request('http://localhost/l/abc', { headers });
 
-describe('the address a request came from', () => {
+describe('the address a request came from, behind a proxy', () => {
+  beforeEach(() => {
+    process.env.TRUST_PROXY = 'true';
+  });
+  afterEach(() => {
+    delete process.env.TRUST_PROXY;
+  });
+
   it('prefers what Cloudflare says over what the client claimed', () => {
     // Cloudflare overwrites its own header on every request and appends to
     // x-forwarded-for, so behind it the list still begins with whatever the
@@ -63,5 +70,42 @@ describe('the address a request came from', () => {
     expect(clientIp(withHeaders({ 'x-forwarded-for': '   ', 'x-real-ip': '198.51.100.5' }))).toBe(
       '198.51.100.5',
     );
+  });
+});
+
+/**
+ * With nothing in front of the app, every one of those headers is whatever the
+ * visitor typed. Believing them let one machine give each sign-in attempt a
+ * new address and never meet the per-client limit.
+ */
+describe('the address a request came from, with no proxy declared', () => {
+  afterEach(() => {
+    delete process.env.TRUST_PROXY;
+  });
+
+  it('believes none of the forwarding headers', () => {
+    const request = withHeaders({
+      'cf-connecting-ip': '203.0.113.7',
+      'x-forwarded-for': '198.51.100.4',
+      'x-real-ip': '198.51.100.9',
+    });
+
+    expect(clientIp(request)).toBeNull();
+  });
+
+  it('is not switched on by a value that only looks like one', () => {
+    for (const value of ['', '0', 'false', 'no']) {
+      process.env.TRUST_PROXY = value;
+      expect(clientIp(withHeaders({ 'x-forwarded-for': '198.51.100.4' })), value).toBeNull();
+    }
+  });
+
+  it('reads them once the operator says a proxy is there', () => {
+    for (const value of ['1', 'true', 'TRUE', 'yes']) {
+      process.env.TRUST_PROXY = value;
+      expect(clientIp(withHeaders({ 'x-forwarded-for': '198.51.100.4' })), value).toBe(
+        '198.51.100.4',
+      );
+    }
   });
 });
