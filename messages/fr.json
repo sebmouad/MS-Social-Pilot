@@ -222,7 +222,10 @@
     "rejectedBadge": "Refusée",
     "reviewNote": "Note du relecteur",
     "resubmit": "Soumettre à nouveau",
-    "overdue": "Heure dépassée — la valider la publie maintenant"
+    "overdue": "Heure dépassée — la valider la publie maintenant",
+    "overdueConfirm": "Son heure prévue est passée : la valider la publie immédiatement sur toutes ses destinations. Valider et publier ?",
+    "approvedNow": "Validée. Son heure est passée, elle part donc tout de suite.",
+    "moreMedia": "+{count}"
   },
   "auth": {
     "signIn": "Se connecter",
@@ -245,7 +248,11 @@
     "title": "Calendrier",
     "timesShownIn": "Heures affichées en {timezone}.",
     "newPostOn": "Nouvelle publication le {date}",
-    "more": "+{count} de plus"
+    "more": "+{count} de plus",
+    "unscheduledDrafts": "Brouillons sans date",
+    "unscheduledDraftsHint": "Les brouillons sans date n'apparaissent pas dans la grille. {count, plural, one {Le plus récent} other {Les # plus récents}} :",
+    "allDrafts": "Tous les brouillons",
+    "draftCreated": "Commencé le {date}"
   },
   "common": {
     "all": "Tout",
@@ -332,7 +339,17 @@
     "whatToSay": "Que voulez-vous dire ?",
     "whenToPost": "Quand publier",
     "whereToPost": "Où publier",
-    "whoHolds": "Qui conserve la publication jusque-là ?"
+    "whoHolds": "Qui conserve la publication jusque-là ?",
+    "uploadFailed": "l'envoi n'a pas abouti. Veuillez réessayer.",
+    "uploading": "Envoi en cours…",
+    "altText": "Décrivez l'image",
+    "altTextFor": "Description de l'image {number}, pour les lecteurs d'écran",
+    "untickSwitchedOff": "Désactivées depuis la rédaction de cette publication : {names}. Décochez-les pour enregistrer.",
+    "instagramNeedsMedia": "Instagram n'accepte que les publications avec une photo ou une vidéo. Ajoutez-en une, ou décochez les destinations Instagram. Vous pouvez toujours enregistrer un brouillon.",
+    "facebookInstagramWarning": ", et indisponible si un compte Instagram est sélectionné",
+    "retryFromList": "La publication est enregistrée et les destinations qui ont fonctionné l’ont reçue. Pour réessayer les autres, utilisez « Réessayer les échecs » dans la liste des publications — publier à nouveau d’ici en enverrait une seconde copie.",
+    "openPostList": "Ouvrir la liste des publications",
+    "retryAllFromList": "Aucune destination ne l’a acceptée, mais la publication est enregistrée. Utilisez « Réessayer les échecs » dans la liste des publications pour réessayer — publier à nouveau d’ici en créerait une seconde copie."
   },
   "config": {
     "title": "Configuration",
@@ -1035,6 +1052,15 @@
     "retryFailed": "Réessayer les échecs",
     "cancelConfirm": "Annuler cette publication ? Ce qui est déjà planifié dans Facebook y sera également supprimé.",
     "actionFailed": "Cette action a échoué.",
+    "statusFilter": "Filtrer par statut",
+    "searchLabel": "Rechercher des publications",
+    "searchPlaceholder": "Mots de la publication",
+    "destinationFilter": "Destination",
+    "allDestinations": "Toutes les destinations",
+    "clearFilters": "Effacer",
+    "noMatches": "Aucune publication ne correspond à ces filtres.",
+    "submitForReview": "Soumettre pour validation",
+    "publishNowConfirm": "Publier maintenant sur {count, plural, one {sa destination} other {ses # destinations}} ? Elle part immédiatement.",
     "failure": {
       "account_disconnected": "Annulé car le compte Facebook a été déconnecté.",
       "deleted_on_facebook": "Cette publication n’est plus sur Facebook. Elle y a probablement été supprimée, elle n’a donc jamais paru.",
