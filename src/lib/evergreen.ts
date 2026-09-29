@@ -28,17 +28,32 @@ export function variantForRun(original: string, variants: string[], runIndex: nu
   return pool[runIndex % pool.length]!;
 }
 
-/** When the next repeat is due, or null when the post has finished its run. */
+/**
+ * When the next repeat is due, or null when the post has finished its run.
+ *
+ * With `now`, the result is always after it: whole intervals are added to
+ * `from` until the date is in the future. One interval from a stored date is
+ * right while the worker keeps up, but after downtime longer than an interval
+ * it lands in the past again — so each cycle created another copy at once, and
+ * a week-long outage on a daily post came back as seven posts in a burst.
+ * Skipping ahead in whole intervals, rather than restarting from `now`, keeps
+ * the post on its original cadence (same weekday, same time of day).
+ */
 export function nextRecycleAt(options: {
   everyDays: number | null;
   limit: number | null;
   count: number;
   from: Date;
+  now?: Date;
 }): Date | null {
   if (!options.everyDays || options.everyDays < 1) return null;
   if (options.limit !== null && options.count >= options.limit) return null;
 
-  return new Date(options.from.getTime() + options.everyDays * 24 * 60 * 60 * 1000);
+  const interval = options.everyDays * 24 * 60 * 60 * 1000;
+  const behind = options.now ? options.now.getTime() - options.from.getTime() : -1;
+  const steps = behind < 0 ? 1 : Math.floor(behind / interval) + 1;
+
+  return new Date(options.from.getTime() + steps * interval);
 }
 
 export interface RecycleResult {
@@ -110,6 +125,7 @@ export async function runEvergreenCycle(options: {
       limit: post.recycleLimit,
       count,
       from: post.recycleNextAt ?? now,
+      now,
     });
 
     // Claim this cycle before creating anything. Nothing else marks a due post
@@ -145,7 +161,9 @@ export async function runEvergreenCycle(options: {
         // editorial decision.
         approvalStatus: ApprovalStatus.not_required,
         publishMode: post.publishMode,
-        scheduledAt: post.recycleNextAt ?? now,
+        // The repeat goes out now if the worker fell behind, and the calendar
+        // should show when it actually went rather than when it was meant to.
+        scheduledAt: post.recycleNextAt && post.recycleNextAt > now ? post.recycleNextAt : now,
         timezone: post.timezone,
         originPostId: post.id,
         targets: { create: live.map((row) => ({ targetId: row.targetId })) },
