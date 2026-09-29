@@ -28,8 +28,12 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
   // reasons are acted on; this screen only repeats them.
   const tBlocked = useTranslations('connections');
 
-  function toggle(id: string) {
-    onChange(selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id]);
+  function toggle(target: TargetOption) {
+    if (selected.includes(target.id)) {
+      onChange(selected.filter((value) => value !== target.id));
+    } else if (target.canPublish) {
+      onChange([...selected, target.id]);
+    }
   }
 
   const selectable = targets.filter((target) => target.canPublish);
@@ -51,7 +55,10 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs text-slate-500">
-          {t('selectedOf', { selected: selected.length, total: selectable.length })}
+          {t('selectedOf', {
+            selected: selectable.filter((target) => selected.includes(target.id)).length,
+            total: selectable.length,
+          })}
         </span>
         <button
           type="button"
@@ -65,6 +72,11 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
       <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-lg border border-slate-200 p-2">
         {targets.map((target) => {
           const disabled = !target.canPublish;
+          const checked = selected.includes(target.id);
+          // A post being edited can still name a destination switched off
+          // since it was written. It stays ticked so that is visible, and it
+          // can be unticked — only never ticked again.
+          const locked = disabled && !checked;
           const blocked = blockerMessage(
             target.publishBlockerCode,
             target.publishBlocker,
@@ -76,15 +88,19 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
               key={target.id}
               title={blocked ?? undefined}
               className={`flex items-center gap-3 rounded-lg px-2 py-2 ${
-                disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-slate-50'
+                locked
+                  ? 'cursor-not-allowed opacity-60'
+                  : disabled
+                    ? 'cursor-pointer bg-amber-50/60 hover:bg-amber-50'
+                    : 'cursor-pointer hover:bg-slate-50'
               }`}
             >
               <input
                 type="checkbox"
                 className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-                checked={selected.includes(target.id)}
-                disabled={disabled}
-                onChange={() => toggle(target.id)}
+                checked={checked}
+                disabled={locked}
+                onChange={() => toggle(target)}
               />
               {target.pictureUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
