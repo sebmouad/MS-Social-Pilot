@@ -2,8 +2,9 @@ import { ApprovalStatus, PostStatus, Prisma, type FeedSource } from '@prisma/cli
 
 import { prisma } from './../prisma';
 import { parseTargetIds } from '../json';
-import { nextAvailableSlot } from '../time';
 import { QUEUE_OCCUPYING_STATUSES } from '../constants';
+import { AppError } from '../errors';
+import { allocateQueueSlot } from '../posts';
 import { notifyApprovalRequest } from '../email/notify';
 import { parseFeed, renderTemplate, type FeedEntry } from './parse';
 import { fetchPublic, readCapped } from '../safe-fetch';
@@ -118,6 +119,13 @@ interface ScheduledEntry {
   needsApproval: boolean;
 }
 
+/** The queue has no slots, or none free in its horizon. */
+function isQueueUnavailable(error: unknown): boolean {
+  return (
+    error instanceof AppError && (error.key === 'errors.queueEmpty' || error.key === 'errors.queueFull')
+  );
+}
+
 /** Another poll of the same feed recorded this entry first. */
 function isAlreadyIngested(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
@@ -131,9 +139,9 @@ function isAlreadyIngested(error: unknown): boolean {
  * posted and never retried. In one transaction a failure rolls both back and
  * the next poll picks the entry up again.
  *
- * The transaction also takes the same per-workspace lock the composer takes
- * around queue allocation (see `createPost`), so a feed post and a composer post
- * cannot both be handed the same free slot.
+ * The slot comes from `allocateQueueSlot`, inside the same transaction, which
+ * holds the per-workspace lock the composer takes — so a feed post and a
+ * composer post cannot both be handed the same free slot.
  */
 async function scheduleEntry(options: {
   source: FeedSource;
@@ -148,8 +156,6 @@ async function scheduleEntry(options: {
 
   try {
     return await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${source.workspaceId}))`;
-
       const item = await tx.feedItem.create({
         data: {
           feedSourceId: source.id,
@@ -164,23 +170,25 @@ async function scheduleEntry(options: {
       // on every poll and takes one of the per-poll places each time.
       if (!message && !entry.link) return null;
 
-      const [slots, taken] = await Promise.all([
-        tx.queueSlot.findMany({ where: { workspaceId: source.workspaceId } }),
-        tx.post.findMany({
+      let scheduledAt: Date;
+      try {
+        scheduledAt = await allocateQueueSlot(tx, source.workspaceId, options.timezone, options.now);
+      } catch (error) {
+        // No queue, or none free: a feed still posts, just not into a slot.
+        if (!isQueueUnavailable(error)) throw error;
+        const taken = await tx.post.findMany({
           where: {
             workspaceId: source.workspaceId,
             status: { in: [...QUEUE_OCCUPYING_STATUSES] },
             scheduledAt: { gte: options.now },
           },
           select: { scheduledAt: true },
-        }),
-      ]);
-      const takenUtc = taken.map((post) => post.scheduledAt).filter((date): date is Date => Boolean(date));
-
-      const scheduledAt =
-        (slots.length > 0
-          ? nextAvailableSlot({ slots, timeZone: options.timezone, takenUtc, now: options.now })
-          : null) ?? fallbackTime(options.now, takenUtc);
+        });
+        scheduledAt = fallbackTime(
+          options.now,
+          taken.map((post) => post.scheduledAt).filter((date): date is Date => Boolean(date)),
+        );
+      }
 
       const needsApproval = !source.autoApprove;
       const post = await tx.post.create({
