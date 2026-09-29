@@ -656,7 +656,7 @@
     "name": "Name",
     "url": "Feed URL",
     "template": "Post template",
-    "templateHint": "Use {'{{'}title{'}}'}, {'{{'}link{'}}'} and {'{{'}description{'}}'}.",
+    "templateHint": "Use '{{title}}', '{{link}}' and '{{description}}'.",
     "destinations": "Destinations",
     "autoApprove": "Schedule new items automatically",
     "autoApproveHint": "When off, new items go to the approval queue instead.",
@@ -667,7 +667,21 @@
     "itemsImported": "{count, plural, one {# item imported} other {# items imported}}",
     "pollNow": "Check now",
     "deleteConfirm": "Remove this feed? Posts already created from it are kept.",
-    "errorCount": "{count, plural, one {# consecutive error} other {# consecutive errors}}"
+    "errorCount": "{count, plural, one {# consecutive error} other {# consecutive errors}}",
+    "saved": "Feed saved.",
+    "pollFailed": "The feed could not be checked. The reason is shown on the feed below.",
+    "autoApproveOn": "Schedules automatically",
+    "autoApproveOff": "Needs approval",
+    "recent": "Recently imported",
+    "untitled": "Untitled item",
+    "importedAt": "Imported {when}",
+    "viewPost": "View post",
+    "noPost": "Nothing to post",
+    "preview": "Preview",
+    "previewEmpty": "This template produces an empty post.",
+    "sampleTitle": "An example headline",
+    "sampleDescription": "The first lines of the article appear here.",
+    "noDestinations": "Connect a Facebook Page or Group first: feeds post to those."
   },
   "history": {
     "actions": {
