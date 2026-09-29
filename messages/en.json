@@ -215,7 +215,10 @@
     "rejectedBadge": "Rejected",
     "reviewNote": "Reviewer note",
     "resubmit": "Resubmit",
-    "overdue": "Time has passed — approving publishes it now"
+    "overdue": "Time has passed — approving publishes it now",
+    "overdueConfirm": "Its scheduled time has passed, so approving it publishes it to every destination right now. Approve and publish?",
+    "approvedNow": "Approved. Its time has passed, so it goes out right away.",
+    "moreMedia": "+{count}"
   },
   "auth": {
     "signIn": "Sign in",
@@ -1026,6 +1029,15 @@
     "retryFailed": "Retry failed",
     "cancelConfirm": "Cancel this post? Anything already scheduled inside Facebook will be deleted there too.",
     "actionFailed": "That action failed.",
+    "statusFilter": "Filter by status",
+    "searchLabel": "Search posts",
+    "searchPlaceholder": "Words in the post",
+    "destinationFilter": "Destination",
+    "allDestinations": "All destinations",
+    "clearFilters": "Clear",
+    "noMatches": "No posts match these filters.",
+    "submitForReview": "Submit for review",
+    "publishNowConfirm": "Publish this now to {count, plural, one {its destination} other {all # destinations}}? It goes out immediately.",
     "failure": {
       "account_disconnected": "Cancelled because the Facebook account was disconnected.",
       "deleted_on_facebook": "This post is no longer on Facebook. It was most likely deleted there, so it never went out.",
