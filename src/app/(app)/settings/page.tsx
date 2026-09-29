@@ -70,7 +70,7 @@ export default async function SettingsPage() {
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
 
-      <SettingsNav showConfig={canManageInstance(auth.role)} />
+      <SettingsNav showConfig={canManageInstance(auth)} />
 
       <SettingsClient
         canManage={canManageSettings(auth.role)}

@@ -52,6 +52,9 @@ async function main(): Promise<void> {
       email: DEMO_EMAIL,
       name: 'Demo User',
       passwordHash: hashPassword(DEMO_PASSWORD),
+      // On an empty database the demo user is the first account, and the first
+      // account owns the installation — as it would after signing up.
+      isInstanceOwner: (await prisma.user.count()) === 0,
     },
   });
 

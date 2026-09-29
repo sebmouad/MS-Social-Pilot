@@ -23,7 +23,13 @@ interface Upcoming {
   iso: string;
   label: string;
   weekday: number;
-  post: { id: string; message: string; pending: boolean } | null;
+  post: {
+    id: string;
+    message: string;
+    pending: boolean;
+    /** Whether this person may change it now; otherwise it opens the post list. */
+    editable: boolean;
+  } | null;
 }
 
 const time = (slot: Slot) => `${String(slot.hour).padStart(2, '0')}:${String(slot.minute).padStart(2, '0')}`;
@@ -266,7 +272,7 @@ export function QueueClient({
                 <span className="nums w-40 shrink-0 text-sm text-slate-700 sm:w-48">{entry.label}</span>
                 {entry.post ? (
                   <Link
-                    href={`/compose?post=${entry.post.id}`}
+                    href={entry.post.editable ? `/compose?post=${entry.post.id}` : '/posts'}
                     className="min-w-0 flex-1 truncate text-sm text-slate-900 hover:underline"
                   >
                     {entry.post.message || t('noText')}

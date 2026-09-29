@@ -5,7 +5,7 @@ import { ApprovalsClient } from '@/components/ApprovalsClient';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
-import { canApprove } from '@/lib/constants';
+import { canApprove, canManageOthersPosts, postIsEditable } from '@/lib/constants';
 import { IN_APPROVAL_QUEUE } from '@/lib/approvals';
 import { parseMedia } from '@/lib/json';
 import { formatInZone } from '@/lib/time';
@@ -57,7 +57,18 @@ export default async function ApprovalsPage() {
           submittedBy: post.submitter?.name ?? post.author.name,
           submittedLabel: post.submittedAt ? formatInZone(post.submittedAt, timezone) : null,
           targets: post.targets.map((postTarget) => postTarget.target.name),
-          mediaCount: parseMedia(post.media).length,
+          // What is actually going out, not a count of it: a reviewer
+          // signing off on a caption has to see the picture it sits under.
+          media: parseMedia(post.media).map((item) => ({
+            id: item.id,
+            kind: item.kind,
+            url: item.url,
+            altText: item.altText ?? null,
+          })),
+          // Reviewers may fix a typo themselves rather than bounce the whole
+          // post back. With review on, an edit to a waiting post keeps it
+          // waiting (`reviewAfterEdit` in lib/posts), so it comes back here.
+          editable: canManageOthersPosts(auth.role) && postIsEditable(post),
         }))}
       />
     </div>

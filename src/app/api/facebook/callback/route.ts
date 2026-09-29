@@ -3,7 +3,9 @@ import { cookies } from 'next/headers';
 
 import { requireAuth } from '@/lib/auth';
 import { connectAccount } from '@/lib/accounts';
+import { canManageAccounts } from '@/lib/constants';
 import { env } from '@/lib/env';
+import { errors } from '@/lib/errors';
 import {
   exchangeCodeForToken,
   exchangeForLongLivedToken,
@@ -37,16 +39,25 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const auth = await requireAuth();
-
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
     if (!code || !state) {
       throw new Error('Facebook did not return an authorization code.');
     }
-    if (!nonce || !verifyOAuthState(state, nonce)) {
+    const binding = nonce ? verifyOAuthState(state, nonce) : null;
+    if (!binding) {
       throw new Error('This connection request expired or could not be verified. Please try again.');
     }
+
+    // Resolve the workspace the connection was started in, not whichever one
+    // is active now, and then insist it is still the same person with the
+    // same right to connect. A membership removed or demoted while the dialog
+    // was open must not finish the connection it could no longer start.
+    const auth = await requireAuth(binding.workspaceId);
+    if (auth.user.id !== binding.userId || auth.workspace.id !== binding.workspaceId) {
+      throw new Error('This connection request expired or could not be verified. Please try again.');
+    }
+    if (!canManageAccounts(auth.role)) throw errors.adminsOnlyConnect();
 
     // Short-lived token first, then immediately upgrade: page tokens derived
     // from a short-lived user token expire in about an hour, which would break

@@ -3,7 +3,12 @@ import { TargetType } from '@prisma/client';
 
 import { QueueClient } from '@/components/QueueClient';
 import { requirePage } from '@/lib/auth';
-import { QUEUE_OCCUPYING_STATUSES, canManageSettings } from '@/lib/constants';
+import {
+  QUEUE_OCCUPYING_STATUSES,
+  canManageOthersPosts,
+  canManageSettings,
+  postIsEditable,
+} from '@/lib/constants';
 import { screenMetadata } from '@/lib/metadata';
 import { loadPagePosts } from '@/lib/page-analysis-data';
 import { prisma } from '@/lib/prisma';
@@ -55,7 +60,14 @@ export default async function QueuePage() {
         status: { in: [...QUEUE_OCCUPYING_STATUSES] },
         scheduledAt: { gte: now, lte: new Date(now.getTime() + (UPCOMING_DAYS + 1) * DAY_MS) },
       },
-      select: { id: true, message: true, scheduledAt: true, status: true },
+      select: {
+        id: true,
+        message: true,
+        scheduledAt: true,
+        status: true,
+        authorId: true,
+        targets: { select: { status: true } },
+      },
     }),
   ]);
 
@@ -84,6 +96,11 @@ export default async function QueuePage() {
   });
 
   const byTime = new Map(taken.map((post) => [post.scheduledAt!.getTime(), post]));
+  // The calendar's rule: a post this person can still change opens in the
+  // composer, anything else opens the list, which says why it cannot be.
+  const manageOthers = canManageOthersPosts(auth.role);
+  const editable = (post: (typeof taken)[number]) =>
+    postIsEditable(post) && (manageOthers || post.authorId === auth.user.id);
   const upcoming = upcomingOccurrences({ slots, timeZone, from: now, days: UPCOMING_DAYS, toUtc: localInputToUtc })
     .filter((entry) => entry.at.getTime() <= now.getTime() + UPCOMING_DAYS * DAY_MS)
     .map((entry) => {
@@ -92,7 +109,14 @@ export default async function QueuePage() {
         iso: entry.at.toISOString(),
         label: when.format(entry.at),
         weekday: entry.slot.dayOfWeek,
-        post: post ? { id: post.id, message: post.message, pending: post.status === 'pending_approval' } : null,
+        post: post
+          ? {
+              id: post.id,
+              message: post.message,
+              pending: post.status === 'pending_approval',
+              editable: editable(post),
+            }
+          : null,
       };
     });
 

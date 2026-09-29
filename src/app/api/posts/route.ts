@@ -1,10 +1,20 @@
+import { z } from 'zod';
+
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createPost } from '@/lib/posts';
 import { createPostSchema } from '@/lib/validation';
 import { parseLinkPreview, parseMedia } from '@/lib/json';
 import { ok, readJson, route } from '@/lib/api';
+import { errors } from '@/lib/errors';
 import { postStatusFilter } from '@/lib/constants';
+
+const rangeSchema = z
+  .object({
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
+  })
+  .refine((range) => !range.from || !range.to || range.from.getTime() <= range.to.getTime());
 
 /** List posts, newest scheduled first. Supports status and date filtering. */
 export const GET = route(async (request: Request) => {
@@ -12,13 +22,19 @@ export const GET = route(async (request: Request) => {
   const url = new URL(request.url);
 
   const statuses = postStatusFilter(url.searchParams.get('status') ?? undefined);
-  const from = url.searchParams.get('from');
-  const to = url.searchParams.get('to');
+  const range = rangeSchema.safeParse({
+    from: url.searchParams.get('from') || undefined,
+    to: url.searchParams.get('to') || undefined,
+  });
+  // A malformed date used to become `Invalid Date`, which Prisma rejects deep
+  // in the query — so a typo in a URL was a 500 and a logged "unhandled error".
+  if (!range.success) throw errors.dateRange();
+  const { from, to } = range.data;
   const limit = Math.min(Number.parseInt(url.searchParams.get('limit') ?? '50', 10) || 50, 200);
 
   const scheduledAt: { gte?: Date; lte?: Date } = {};
-  if (from) scheduledAt.gte = new Date(from);
-  if (to) scheduledAt.lte = new Date(to);
+  if (from) scheduledAt.gte = from;
+  if (to) scheduledAt.lte = to;
 
   const posts = await prisma.post.findMany({
     where: {

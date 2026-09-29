@@ -26,7 +26,7 @@ export default async function ConfigPage() {
   const auth = await requirePage();
   const t = await getTranslations('config');
 
-  if (!canManageInstance(auth.role)) {
+  if (!canManageInstance(auth)) {
     // Still a titled page. Someone who followed a colleague's link here lands
     // on a card with no heading otherwise: nothing names the screen they are
     // looking at, and a screen reader announces a document with no title.
@@ -36,7 +36,7 @@ export default async function ConfigPage() {
           <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
         </header>
 
-        <SettingsNav showConfig={canManageInstance(auth.role)} />
+        <SettingsNav showConfig={canManageInstance(auth)} />
 
         <div className="card p-8 text-center text-sm text-slate-600">{t('ownerOnly')}</div>
       </div>
@@ -52,7 +52,7 @@ export default async function ConfigPage() {
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
 
-      <SettingsNav showConfig={canManageInstance(auth.role)} />
+      <SettingsNav showConfig={canManageInstance(auth)} />
 
       <ConfigClient settings={settings} groupLabels={GROUP_LABELS} groupOrder={GROUP_ORDER} />
 

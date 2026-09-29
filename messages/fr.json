@@ -215,7 +215,10 @@
     "rejectedBadge": "Refusée",
     "reviewNote": "Note du relecteur",
     "resubmit": "Soumettre à nouveau",
-    "overdue": "Heure dépassée — la valider la publie maintenant"
+    "overdue": "Heure dépassée — la valider la publie maintenant",
+    "overdueConfirm": "Son heure prévue est passée : la valider la publie immédiatement sur toutes ses destinations. Valider et publier ?",
+    "approvedNow": "Validée. Son heure est passée, elle part donc tout de suite.",
+    "moreMedia": "+{count}"
   },
   "auth": {
     "signIn": "Se connecter",
@@ -239,7 +242,11 @@
     "title": "Calendrier",
     "timesShownIn": "Heures affichées en {timezone}.",
     "newPostOn": "Nouvelle publication le {date}",
-    "more": "+{count} de plus"
+    "more": "+{count} de plus",
+    "unscheduledDrafts": "Brouillons sans date",
+    "unscheduledDraftsHint": "Les brouillons sans date n'apparaissent pas dans la grille. {count, plural, one {Le plus récent} other {Les # plus récents}} :",
+    "allDrafts": "Tous les brouillons",
+    "draftCreated": "Commencé le {date}"
   },
   "common": {
     "all": "Tout",
@@ -326,12 +333,22 @@
     "whatToSay": "Que voulez-vous dire ?",
     "whenToPost": "Quand publier",
     "whereToPost": "Où publier",
-    "whoHolds": "Qui conserve la publication jusque-là ?"
+    "whoHolds": "Qui conserve la publication jusque-là ?",
+    "uploadFailed": "l'envoi n'a pas abouti. Veuillez réessayer.",
+    "uploading": "Envoi en cours…",
+    "altText": "Décrivez l'image",
+    "altTextFor": "Description de l'image {number}, pour les lecteurs d'écran",
+    "untickSwitchedOff": "Désactivées depuis la rédaction de cette publication : {names}. Décochez-les pour enregistrer.",
+    "instagramNeedsMedia": "Instagram n'accepte que les publications avec une photo ou une vidéo. Ajoutez-en une, ou décochez les destinations Instagram. Vous pouvez toujours enregistrer un brouillon.",
+    "facebookInstagramWarning": ", et indisponible si un compte Instagram est sélectionné",
+    "retryFromList": "La publication est enregistrée et les destinations qui ont fonctionné l’ont reçue. Pour réessayer les autres, utilisez « Réessayer les échecs » dans la liste des publications — publier à nouveau d’ici en enverrait une seconde copie.",
+    "openPostList": "Ouvrir la liste des publications",
+    "retryAllFromList": "Aucune destination ne l’a acceptée, mais la publication est enregistrée. Utilisez « Réessayer les échecs » dans la liste des publications pour réessayer — publier à nouveau d’ici en créerait une seconde copie."
   },
   "config": {
     "title": "Configuration",
     "subtitle": "Tous les réglages de cette installation, sans modifier de fichier sur le serveur.",
-    "ownerOnly": "Seul un propriétaire d’espace peut modifier les réglages de l’installation.",
+    "ownerOnly": "Seul le propriétaire de cette installation — la personne qui a créé son premier compte — peut modifier ses réglages.",
     "footnote": "Les valeurs définies ici priment sur l’environnement. Réinitialiser une valeur rend la main à la variable d’environnement, ou à la valeur par défaut s’il n’y en a pas.",
     "saved": "{count, plural, one {# réglage enregistré} other {# réglages enregistrés}}.",
     "unsaved": "{count, plural, one {# modification non enregistrée} other {# modifications non enregistrées}}",
@@ -606,6 +623,7 @@
     "destinationBlocked": "Impossible de publier sur cette destination pour le moment : elle ne peut donc pas être activée.",
     "editorsOnlyDeleteMedia": "Seuls les éditeurs et les rôles supérieurs peuvent supprimer des fichiers de la médiathèque.",
     "emailTaken": "Un compte existe déjà avec cette adresse e-mail. Connectez-vous plutôt.",
+    "emptyPost": "Écrivez quelque chose, ajoutez un lien ou joignez un média.",
     "errorBody": "La page n’a pas pu être chargée. Réessayer en vaut la peine — si cela persiste, la référence ci-dessous indiquera par où commencer.",
     "errorTitle": "Une erreur est survenue",
     "feedInstagramUnsupported": "Un élément de flux est un titre et un lien, et Instagram n’accepte ni l’un ni l’autre sans image ({names}). Choisissez des destinations Facebook pour ce flux.",
@@ -633,6 +651,7 @@
     "notFoundTitle": "Cette page n’est pas ici",
     "notPending": "Cette publication n'est pas en attente de validation.",
     "notSignedIn": "Vous devez être connecté.",
+    "notSubmittable": "Cette publication ne peut pas être envoyée en validation.",
     "ownerOnlyChangeConfig": "Seul un propriétaire peut modifier la configuration.",
     "ownerOnlyChangeSetup": "Seul un propriétaire peut modifier la configuration initiale.",
     "ownerOnlyViewConfig": "Seul un propriétaire peut consulter la configuration.",
@@ -643,6 +662,7 @@
     "previewHostBlocked": "Cet hôte n’est pas accessible pour les aperçus de liens.",
     "previewSchemeUnsupported": "Seules les URL http et https peuvent être prévisualisées.",
     "previewUrlInvalid": "Saisissez une URL valide, avec http:// ou https://.",
+    "publishNeedsReview": "Les publications de cet espace sont validées avant de partir, elles ne peuvent donc pas être publiées immédiatement. Planifiez-la et elle rejoindra la file de validation.",
     "publishOwnOnly": "Vous ne pouvez publier que vos propres publications.",
     "queueEmpty": "Votre file de publication est vide. Ajoutez des créneaux dans les Paramètres.",
     "queueFull": "Tous les créneaux des 90 prochains jours sont pris. Ajoutez des créneaux ou choisissez une date.",
@@ -668,7 +688,7 @@
     "name": "Nom",
     "url": "URL du flux",
     "template": "Modèle de publication",
-    "templateHint": "Utilisez {'{{'}title{'}}'}, {'{{'}link{'}}'} et {'{{'}description{'}}'}.",
+    "templateHint": "Utilisez '{{title}}', '{{link}}' et '{{description}}'.",
     "destinations": "Destinations",
     "autoApprove": "Planifier automatiquement les nouveaux articles",
     "autoApproveHint": "Si désactivé, les nouveaux articles passent par la file de validation.",
@@ -679,7 +699,21 @@
     "itemsImported": "{count, plural, one {# article importé} other {# articles importés}}",
     "pollNow": "Vérifier maintenant",
     "deleteConfirm": "Supprimer ce flux ? Les publications déjà créées sont conservées.",
-    "errorCount": "{count, plural, one {# erreur consécutive} other {# erreurs consécutives}}"
+    "errorCount": "{count, plural, one {# erreur consécutive} other {# erreurs consécutives}}",
+    "saved": "Flux enregistré.",
+    "pollFailed": "Le flux n’a pas pu être vérifié. La raison est indiquée sur le flux ci-dessous.",
+    "autoApproveOn": "Planification automatique",
+    "autoApproveOff": "Validation requise",
+    "recent": "Importés récemment",
+    "untitled": "Article sans titre",
+    "importedAt": "Importé {when}",
+    "viewPost": "Voir la publication",
+    "noPost": "Rien à publier",
+    "preview": "Aperçu",
+    "previewEmpty": "Ce modèle produit une publication vide.",
+    "sampleTitle": "Un exemple de titre",
+    "sampleDescription": "Les premières lignes de l’article apparaissent ici.",
+    "noDestinations": "Connectez d’abord une Page ou un Groupe Facebook : les flux y publient."
   },
   "history": {
     "actions": {
@@ -1025,12 +1059,24 @@
     "retryFailed": "Réessayer les échecs",
     "cancelConfirm": "Annuler cette publication ? Ce qui est déjà planifié dans Facebook y sera également supprimé.",
     "actionFailed": "Cette action a échoué.",
+    "statusFilter": "Filtrer par statut",
+    "searchLabel": "Rechercher des publications",
+    "searchPlaceholder": "Mots de la publication",
+    "destinationFilter": "Destination",
+    "allDestinations": "Toutes les destinations",
+    "clearFilters": "Effacer",
+    "noMatches": "Aucune publication ne correspond à ces filtres.",
+    "submitForReview": "Soumettre pour validation",
+    "publishNowConfirm": "Publier maintenant sur {count, plural, one {sa destination} other {ses # destinations}} ? Elle part immédiatement.",
     "failure": {
       "account_disconnected": "Annulé car le compte Facebook a été déconnecté.",
       "deleted_on_facebook": "Cette publication n’est plus sur Facebook. Elle y a probablement été supprimée, elle n’a donc jamais paru.",
       "destination_off": "Cette destination était désactivée à l’heure prévue, la publication n’y a donc pas été faite.",
       "worker_lost": "La publication a été interrompue et n’a pas repris dans la limite des tentatives. Vérifiez la destination puis réessayez."
-    }
+    },
+    "nativeTooSoon": "Facebook ne conserve que les publications prévues au moins 10 minutes à l’avance : celle-ci reste donc avec notre propre planificateur et partira à l’heure prévue.",
+    "nativeTooFar": "Facebook ne peut pas conserver une publication prévue aussi loin : celle-ci reste donc avec notre propre planificateur et partira à l’heure prévue.",
+    "nativeUnavailable": "Cette publication n’a pas pu être confiée à Facebook pour le moment : elle reste donc avec notre propre planificateur et partira à l’heure prévue."
   },
   "queue": {
     "addSlot": "Ajouter un créneau",
