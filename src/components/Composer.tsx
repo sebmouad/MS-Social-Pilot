@@ -59,6 +59,9 @@ export interface GoodTime {
   posts: number;
 }
 
+/** The parts of an attachment list an author can change, for spotting edits. */
+const mediaKey = (media: PostMedia[]) => media.map((item) => `${item.id}:${item.altText ?? ''}`).join('|');
+
 type Timing = 'now' | 'schedule' | 'queue';
 type Handler = 'worker' | 'native';
 
@@ -103,7 +106,7 @@ export function Composer({
   /** Permalinks for a post that has just gone out, so it can be checked. */
   const [published, setPublished] = useState<Array<{ name: string; url: string }>>([]);
   /** A post that was made but reached only some of its destinations. */
-  const [partial, setPartial] = useState<string | null>(null);
+  const [partial, setPartial] = useState<{ text: string; allFailed: boolean } | null>(null);
   const [uploading, setUploading] = useState(false);
 
   /**
@@ -175,7 +178,7 @@ export function Composer({
   const dirty = editing
     ? message !== editing.message ||
       link !== (editing.link ?? '') ||
-      JSON.stringify(media) !== JSON.stringify(editing.media) ||
+      mediaKey(media) !== mediaKey(editing.media) ||
       [...selected].sort().join() !== [...editing.targetIds].sort().join() ||
       scheduledAt !== (editing.scheduledAtLocal ?? defaultScheduledAt)
     : message.trim().length > 0 || link.trim().length > 0 || media.length > 0;
@@ -300,6 +303,7 @@ export function Composer({
         fields?: Record<string, string>;
         postId?: string;
         scheduledAt?: string | null;
+        notice?: string;
         results?: Array<{ targetName: string; status: string; url?: string; error?: string }>;
       };
 
@@ -312,6 +316,17 @@ export function Composer({
       // Editing ends by going back to the list the Edit button came from, where
       // the changed row is on screen. Emptying the form and staying put would
       // look like the post had been thrown away.
+      //
+      // Unless the save came back with something to say — Facebook would have
+      // refused the time, so this app holds the post instead. The list would
+      // not repeat that, so it is said here, with the way on to the list.
+      if (editing && body.notice) {
+        setResult(body.notice);
+        // What the server did, so saving again does not ask for it once more.
+        setHandler('worker');
+        router.refresh();
+        return;
+      }
       if (editing) {
         router.push('/posts');
         router.refresh();
@@ -335,13 +350,14 @@ export function Composer({
 
       const failures = (body.results ?? []).filter((item) => item.status === 'failed');
       if (failures.length > 0) {
-        setPartial(
-          t('publishedWithProblems', {
+        setPartial({
+          text: t('publishedWithProblems', {
             details: failures
               .map((failure) => `${failure.targetName} — ${failure.error ?? ''}`.trim())
               .join('; '),
           }),
-        );
+          allFailed: failures.length === (body.results ?? []).length,
+        });
         return;
       }
 
@@ -480,6 +496,9 @@ export function Composer({
               ref={fileInput}
               type="file"
               multiple
+              // One batch at a time: a second pick mid-upload would count
+              // against a stale total and could run past the per-post limit.
+              disabled={uploading}
               accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime"
               className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-slate-200"
               onChange={(event) => event.target.files && uploadFiles(event.target.files)}
@@ -677,12 +696,19 @@ export function Composer({
                 : 'border-emerald-200 bg-emerald-50 text-emerald-700'
             }`}
           >
-            <p>{partial ?? result}</p>
-            {/* Where to go from a partial failure: the post exists, and the
-                list's "Retry failed" sends it to the missing destinations only. */}
+            <p>{partial?.text ?? result}</p>
+            {editing && result && (
+              <p className="mt-1">
+                <Link href="/posts" className="font-medium underline underline-offset-2">
+                  {t('openPostList')}
+                </Link>
+              </p>
+            )}
+            {/* Where to go from a failure: the post exists, and the list's
+                "Retry failed" sends it to the missing destinations only. */}
             {partial && (
               <p className="mt-1">
-                {t('retryFromList')}{' '}
+                {partial.allFailed ? t('retryAllFromList') : t('retryFromList')}{' '}
                 <Link href="/posts" className="font-medium underline underline-offset-2">
                   {t('openPostList')}
                 </Link>
