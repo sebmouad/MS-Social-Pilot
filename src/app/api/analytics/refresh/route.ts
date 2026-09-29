@@ -1,7 +1,7 @@
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
-import { syncPostInsights } from '@/lib/analytics';
+import { canRefreshAnalytics, syncPostInsights, throttleAnalyticsRefresh } from '@/lib/analytics';
 import { ok, route } from '@/lib/api';
 import { errors } from '@/lib/errors';
 
@@ -16,9 +16,14 @@ import { errors } from '@/lib/errors';
  * pressing refresh here *overwrote* the full catalogue the job had stored and
  * silently emptied the per-post metric explorer until the next scheduled pass.
  * One reader, one shape.
+ *
+ * Editor and above, and throttled per workspace, for the same reason as the
+ * per-Page sync: each press is a Graph call per post in the batch.
  */
 export const POST = route(async () => {
   const auth = await requireAuth();
+  if (!canRefreshAnalytics(auth.role)) throw errors.noPermission();
+  throttleAnalyticsRefresh(auth.workspace.id);
 
   const rows = await prisma.postTarget.findMany({
     where: {
@@ -34,7 +39,7 @@ export const POST = route(async () => {
 
   let refreshed = 0;
   let metrics = 0;
-  const errors: string[] = [];
+  const failures: string[] = [];
 
   for (const row of rows) {
     const result = await syncPostInsights(row.id);
@@ -42,9 +47,9 @@ export const POST = route(async () => {
       refreshed += 1;
       metrics += result.metrics;
     } else if (result.error) {
-      errors.push(`${row.target.name}: ${result.error}`);
+      failures.push(`${row.target.name}: ${result.error}`);
     }
   }
 
-  return ok({ refreshed, checked: rows.length, metrics, errors });
+  return ok({ refreshed, checked: rows.length, metrics, errors: failures });
 });

@@ -196,7 +196,12 @@
     "chooseView": "Choisir une vue",
     "sortBy": "Trier par",
     "showLess": "Afficher moins",
-    "interactionsTotal": "Interactions"
+    "interactionsTotal": "Interactions",
+    "filterLabel": "Filtrer les indicateurs",
+    "sortAscending": "Tri croissant — inverser",
+    "sortDescending": "Tri décroissant — inverser",
+    "trendFromTo": "Tendance de {from} à {to}",
+    "refreshThrottled": "Les statistiques viennent d’être actualisées plusieurs fois. Réessayez dans {minutes, plural, one {# minute} other {# minutes}}."
   },
   "app": {
     "name": "MS Social Pilot",
@@ -464,7 +469,9 @@
     "destinationsFailed": "{count, plural, one {# destination n'a pas pu recevoir la publication} other {# destinations n'ont pas pu recevoir la publication}}.",
     "reviewAndRetry": "Vérifier et réessayer",
     "tokensExpiring": "{count, plural, one {# connexion Facebook expire} other {# connexions Facebook expirent}} sous {days} jours. Les publications programmées s’arrêtent dès qu’une expire.",
-    "reviewConnections": "Vérifier les connexions"
+    "reviewConnections": "Vérifier les connexions",
+    "reconnectRequired": "Reconnexion nécessaire.",
+    "noTimeSet": "Aucune heure définie"
   },
   "email": {
     "invitation": {
