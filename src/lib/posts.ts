@@ -237,6 +237,7 @@ export async function createPost(
   const needsApproval = approvalStatus === ApprovalStatus.pending;
 
   if (input.publishMode === 'native') assertNativeSupported(targets);
+  if (!input.saveAsDraft) assertInstagramHasMedia(targets, input.media?.length ?? 0);
 
   // Cache the link's Open Graph card so the composer preview and the post list
   // do not have to re-scrape on every render.
@@ -587,6 +588,22 @@ function assertNativeSupported(targets: Array<{ type: string; name: string }>): 
 }
 
 /**
+ * Refuse a post with nothing to show going to Instagram.
+ *
+ * Instagram publishes a picture or a video with a caption, never text alone,
+ * so such a post would only fail at its scheduled time — long after anyone
+ * could fix it. Drafts may still be saved without media: they are unfinished
+ * by definition.
+ */
+function assertInstagramHasMedia(targets: Array<{ type: string; name: string }>, mediaCount: number): void {
+  if (mediaCount > 0) return;
+  const instagram = targets.filter((target) => target.type === 'instagram');
+  if (instagram.length > 0) {
+    throw errors.instagramNeedsMedia(instagram.map((item) => item.name).join(', '));
+  }
+}
+
+/**
  * Where review leaves a post after an edit.
  *
  *   submit — it goes (back) into the review queue.
@@ -875,10 +892,12 @@ export async function updatePost(
   // The mode the post will have once this edit lands, against the destinations
   // it will have. Both halves can change in the same request.
   const nextMode = input.publishMode ?? post.publishMode;
-  if (nextMode === 'native') {
-    assertNativeSupported(
-      input.targetIds ? valid : post.targets.map((row) => row.target),
-    );
+  const nextTargets = input.targetIds ? valid : post.targets.map((row) => row.target);
+  if (nextMode === 'native') assertNativeSupported(nextTargets);
+
+  const nextStatus = (data.status as PostStatus | undefined) ?? post.status;
+  if (nextStatus !== PostStatus.draft && nextStatus !== PostStatus.cancelled) {
+    assertInstagramHasMedia(nextTargets, nextMediaCount);
   }
 
   await prisma.$transaction(async (tx) => {

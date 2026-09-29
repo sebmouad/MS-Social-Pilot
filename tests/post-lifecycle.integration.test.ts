@@ -543,6 +543,57 @@ describe('handing a post to Facebook', () => {
   });
 });
 
+describe('Instagram without media', () => {
+  async function instagram(s: Seed) {
+    const { encryptSecret } = await import('../src/lib/crypto');
+    return prisma.target.create({
+      data: {
+        workspaceId: s.workspace.id,
+        type: 'instagram',
+        providerId: 'ig-1',
+        name: '@client',
+        accessToken: encryptSecret('ig-token'),
+      },
+    });
+  }
+
+  const textOnly = (targetIds: string[], saveAsDraft: boolean) => ({
+    message: 'Words only',
+    link: null,
+    media: [],
+    targetIds,
+    publishMode: 'worker' as const,
+    scheduledAtLocal: localInput(new Date(Date.now() + 3 * HOUR)),
+    timezone: 'UTC',
+    useQueue: false,
+    saveAsDraft,
+  });
+
+  it('is refused when scheduled, naming the account', async () => {
+    const s = await seed({ requiresApproval: false });
+    const ig = await instagram(s);
+
+    await expect(
+      posts.createPost(s.as(s.owner, WorkspaceRole.owner), textOnly([s.target.id, ig.id], false)),
+    ).rejects.toMatchObject({ key: 'errors.instagramNeedsMedia', params: { names: '@client' } });
+  });
+
+  it('may still be saved as a draft, but not scheduled from one', async () => {
+    const s = await seed({ requiresApproval: false });
+    const ig = await instagram(s);
+
+    const { postId } = await posts.createPost(s.as(s.owner, WorkspaceRole.owner), textOnly([ig.id], true));
+
+    await expect(
+      posts.updatePost(s.as(s.owner, WorkspaceRole.owner), postId, {
+        scheduledAtLocal: localInput(new Date(Date.now() + 3 * HOUR)),
+        timezone: 'UTC',
+        status: 'scheduled',
+      }),
+    ).rejects.toMatchObject({ key: 'errors.instagramNeedsMedia' });
+  });
+});
+
 describe('listing posts', () => {
   it('answers a malformed date range with a 400, not a 500', async () => {
     const s = await seed();

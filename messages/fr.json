@@ -643,6 +643,7 @@
     "mediaInUse": "Ce fichier est encore utilisé par {count, plural, one {# publication non encore parue} other {# publications non encore parues}}. Retirez-le d’abord de celles-ci.",
     "moderateNoPermission": "Vous n’avez pas l’autorisation de modérer les commentaires.",
     "nativeGroupsUnsupported": "Facebook ne peut pas planifier nativement les publications de groupe ({names}). Utilisez le planificateur intégré.",
+    "instagramNeedsMedia": "Instagram publie une photo ou une vidéo, jamais du texte seul ({names}). Ajoutez un média ou retirez Instagram.",
     "nativeInstagramUnsupported": "Instagram ne propose pas de programmation ({names}). Utilisez le planificateur intégré pour celles-ci.",
     "noAdAccount": "Aucun compte publicitaire connecté.",
     "noInstagramConnected": "Aucun compte Instagram connecté.",

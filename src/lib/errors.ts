@@ -208,6 +208,14 @@ export const errors = {
       params: { names },
     }),
 
+  instagramNeedsMedia: (names: string) =>
+    new AppError({
+      key: 'errors.instagramNeedsMedia',
+      fallback: `Instagram publishes a photo or a video, never text alone (${names}). Add media, or leave Instagram out.`,
+      params: { names },
+      status: 422,
+    }),
+
   feedInstagramUnsupported: (names: string) =>
     new AppError({
       key: 'errors.feedInstagramUnsupported',

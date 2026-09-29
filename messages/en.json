@@ -643,6 +643,7 @@
     "mediaInUse": "This file is still used by {count, plural, one {# post that has not gone out yet} other {# posts that have not gone out yet}}. Remove it from them first.",
     "moderateNoPermission": "You do not have permission to moderate comments.",
     "nativeGroupsUnsupported": "Facebook cannot natively schedule Group posts ({names}). Use the built-in scheduler for these.",
+    "instagramNeedsMedia": "Instagram publishes a photo or a video, never text alone ({names}). Add media, or leave Instagram out.",
     "nativeInstagramUnsupported": "Instagram has no scheduling of its own ({names}). Use the built-in scheduler for these.",
     "noAdAccount": "No ad account connected.",
     "noInstagramConnected": "No Instagram account connected.",
