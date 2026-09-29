@@ -27,24 +27,45 @@ export function redirectUri(): string {
   return `${env.appUrl}${OAUTH_REDIRECT_PATH}`;
 }
 
-/**
- * Build an opaque, tamper-evident state value: `<nonce>.<signature>`.
- * The nonce is also stored in a short-lived cookie and compared on return, so
- * a forged callback cannot complete a connection into someone else's account.
- */
-export function createOAuthState(): { state: string; nonce: string } {
-  const nonce = randomToken(24);
-  return { state: `${nonce}.${hmacHex(env.sessionSecret, nonce)}`, nonce };
+/** Who started a connection, and into which workspace. */
+export interface OAuthBinding {
+  workspaceId: string;
+  userId: string;
 }
 
-export function verifyOAuthState(state: string, expectedNonce: string): boolean {
-  const separator = state.lastIndexOf('.');
-  if (separator <= 0) return false;
+/**
+ * Build a tamper-evident state value:
+ * `<nonce>.<workspaceId>.<userId>.<signature>`.
+ *
+ * The nonce is also stored in a short-lived cookie and compared on return, so
+ * a forged callback cannot complete a connection into someone else's account.
+ *
+ * The workspace and the user are signed in with it because the cookie alone
+ * only proves *this browser* started a connection — not that it is still the
+ * same person acting on the same workspace when Facebook sends it back.
+ * Switching workspace in another tab mid-dialog used to land the Pages in
+ * whichever workspace happened to be active by then.
+ */
+export function createOAuthState(binding: OAuthBinding): { state: string; nonce: string } {
+  const nonce = randomToken(24);
+  const payload = [nonce, binding.workspaceId, binding.userId].join('.');
+  return { state: `${payload}.${hmacHex(env.sessionSecret, payload)}`, nonce };
+}
 
-  const nonce = state.slice(0, separator);
-  const signature = state.slice(separator + 1);
-  if (!safeEqual(nonce, expectedNonce)) return false;
-  return safeEqual(signature, hmacHex(env.sessionSecret, nonce));
+/**
+ * The binding a state carries, or null when it is not one this installation
+ * issued to this browser. The caller still has to hold the binding up against
+ * whoever is signed in now.
+ */
+export function verifyOAuthState(state: string, expectedNonce: string): OAuthBinding | null {
+  const parts = state.split('.');
+  if (parts.length !== 4 || parts.some((part) => part === '')) return null;
+
+  const [nonce, workspaceId, userId, signature] = parts as [string, string, string, string];
+  if (!safeEqual(nonce, expectedNonce)) return null;
+  if (!safeEqual(signature, hmacHex(env.sessionSecret, parts.slice(0, 3).join('.')))) return null;
+
+  return { workspaceId, userId };
 }
 
 export function authorizationUrl(state: string): string {

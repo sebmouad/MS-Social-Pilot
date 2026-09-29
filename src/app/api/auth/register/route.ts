@@ -21,8 +21,12 @@ const SIGNUP_LIMIT = { limit: 10, windowMs: 60 * 60 * 1000 };
 export const POST = route(async (request: Request) => {
   const input = registerSchema.parse(await readJson(request));
 
-  const attempt = hit(`register:client:${clientIp(request) ?? 'unknown'}`, SIGNUP_LIMIT);
-  if (!attempt.allowed) {
+  // No client key without a trusted proxy to name the client (see `clientIp`):
+  // one shared "unknown" key would let a single visitor's ten sign-ups shut
+  // registration for everybody — invited colleagues included — for the hour.
+  const client = clientIp(request);
+  const attempt = client ? hit(`register:client:${client}`, SIGNUP_LIMIT) : null;
+  if (attempt && !attempt.allowed) {
     throw errors.tooManySignups(Math.max(1, Math.ceil((attempt.resetAt - Date.now()) / 60_000)));
   }
 

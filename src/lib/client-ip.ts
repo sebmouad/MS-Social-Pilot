@@ -8,9 +8,12 @@
  *
  * **None of this is trustworthy on its own.** Every header below is set by
  * whatever is in front of the app, and a client talking to the app directly
- * can send any of them. That is why neither caller treats the result as an
- * identity: the click count is an estimate, and the load-bearing half of the
- * sign-in limit is the email address, which cannot be forged.
+ * can send any of them. So they are read only when the operator says a proxy
+ * is in front (`TRUST_PROXY`); otherwise a visitor could pick a fresh address
+ * for every sign-in attempt and never meet the per-client limit. Even then
+ * neither caller treats the result as an identity: the click count is an
+ * estimate, and the load-bearing half of the sign-in limit is the email
+ * address, which cannot be forged.
  */
 
 /**
@@ -24,7 +27,28 @@
  */
 const CLOUDFLARE = 'cf-connecting-ip';
 
+/**
+ * Whether a proxy in front of the app sets the headers above.
+ *
+ * Read from `process.env` directly rather than through `env`: it describes how
+ * the machine is wired, which only whoever deployed it knows, so it is not a
+ * setting anybody should be able to flip from the configuration screen.
+ */
+export function trustProxy(): boolean {
+  const value = process.env.TRUST_PROXY?.trim().toLowerCase();
+  return value === '1' || value === 'true' || value === 'yes';
+}
+
+/**
+ * The client's address, or null when it cannot be known.
+ *
+ * Next's route handlers are not handed the socket, so with no trusted proxy
+ * there is nothing honest to return — and null, rather than a placeholder,
+ * lets each caller decide what an unknown address means.
+ */
 export function clientIp(request: Request): string | null {
+  if (!trustProxy()) return null;
+
   const cloudflare = request.headers.get(CLOUDFLARE)?.trim();
   if (cloudflare) return cloudflare;
 

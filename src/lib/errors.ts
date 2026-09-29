@@ -338,6 +338,21 @@ export const errors = {
       status: 503,
     }),
 
+  publishNeedsReview: () =>
+    new AppError({
+      key: 'errors.publishNeedsReview',
+      fallback:
+        'Posts in this workspace are reviewed before they go out, so they cannot be published on the spot. Schedule it and it will go to the approval queue.',
+      status: 403,
+    }),
+
+  emptyPost: () =>
+    new AppError({
+      key: 'errors.emptyPost',
+      fallback: 'Write something, add a link, or attach media.',
+      status: 422,
+    }),
+
   dateRangeInverted: () =>
     new AppError({
       key: 'errors.dateRangeInverted',

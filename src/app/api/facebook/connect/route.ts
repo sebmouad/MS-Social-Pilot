@@ -22,7 +22,7 @@ export const GET = route(async () => {
     throw errors.adminsOnlyConnect();
   }
 
-  const { state, nonce } = createOAuthState();
+  const { state, nonce } = createOAuthState({ workspaceId: auth.workspace.id, userId: auth.user.id });
 
   const store = await cookies();
   store.set(OAUTH_NONCE_COOKIE, nonce, {

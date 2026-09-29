@@ -1,7 +1,7 @@
 import { authenticate, setSessionCookie } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { errors } from '@/lib/errors';
-import { clear, hit } from '@/lib/rate-limit';
+import { clear, forgive, hit } from '@/lib/rate-limit';
 import { loginSchema } from '@/lib/validation';
 import { ok, readJson, route } from '@/lib/api';
 import { clientIp } from '@/lib/client-ip';
@@ -15,21 +15,31 @@ import { clientIp } from '@/lib/client-ip';
  * and bounds the load: checking a password is deliberately slow, so an
  * unlimited form is also a cheap way to keep every core busy.
  *
- * The client key is whatever the proxy says, which can be forged — but forging
- * it does not get past the address key, and a client honest enough to be
- * identified is the one worth slowing down.
+ * The client key is whatever a trusted proxy says (see `clientIp`), which a
+ * visitor can still forge in some deployments — but forging it does not get
+ * past the address key, and a client honest enough to be identified is the one
+ * worth slowing down. With no trusted proxy there is no client key at all:
+ * one shared "unknown" key would let a single visitor's wrong guesses lock
+ * every other visitor out.
  */
 export const POST = route(async (request: Request) => {
   const { email, password } = loginSchema.parse(await readJson(request));
 
   const limit = { limit: env.loginAttempts, windowMs: env.loginWindowMs };
   const address = email.trim().toLowerCase();
-  const client = clientIp(request) ?? 'unknown';
+  const client = clientIp(request);
 
   const addressKey = `login:address:${address}`;
-  const clientKey = `login:client:${client}`;
+  const clientKey = client ? `login:client:${client}` : null;
+  // What this client has spent on this one address, never refused on its own:
+  // it only measures how much of the client's count a success may give back.
+  const pairKey = client ? `login:pair:${client}:${address}` : null;
 
-  const attempts = [hit(addressKey, limit), hit(clientKey, limit)];
+  const attempts = [hit(addressKey, limit)];
+  if (clientKey) attempts.push(hit(clientKey, limit));
+  const pair = pairKey
+    ? hit(pairKey, { limit: Number.MAX_SAFE_INTEGER, windowMs: limit.windowMs })
+    : null;
   const blocked = attempts.find((attempt) => !attempt.allowed);
   if (blocked) {
     throw errors.tooManyAttempts(Math.max(1, Math.ceil((blocked.resetAt - Date.now()) / 60_000)));
@@ -37,14 +47,20 @@ export const POST = route(async (request: Request) => {
 
   const token = await authenticate(email, password);
 
-  // A success clears both counts. For the address it means a person who
-  // mistypes their password twice and then gets it right starts from zero. For
-  // the client it matters more than it looks: a whole office behind one
-  // address would otherwise spend its allowance on people signing in
-  // successfully, and the tenth colleague of the morning would be turned away.
-  // Somebody who can sign in is not who the limit is for.
+  // A success clears the address's count, so a person who mistypes their
+  // password twice and then gets it right starts from zero.
+  //
+  // The client's gives back only what *this client* spent on *this* address:
+  // its mistakes and the success itself. Clearing it outright let anybody
+  // holding one working account reset their allowance at will — a few guesses
+  // at other people's addresses, one good sign-in, a few more, for ever. Those
+  // guesses stay counted; a whole office behind one address still does not
+  // spend its allowance on colleagues signing in, or on their typos.
   clear(addressKey);
-  clear(clientKey);
+  if (clientKey && pairKey && pair) {
+    forgive(clientKey, Number.MAX_SAFE_INTEGER - pair.remaining);
+    clear(pairKey);
+  }
 
   await setSessionCookie(token);
   return ok({ ok: true });

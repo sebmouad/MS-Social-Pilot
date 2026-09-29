@@ -112,6 +112,12 @@ model User {
   /// Which workspace to open on sign-in. Not a security boundary — membership
   /// is always re-checked — just a convenience.
   lastActiveWorkspaceId String?
+  /// The person who installed this server, and the only one who may change its
+  /// instance-wide configuration (Graph credentials, feature switches, setup).
+  /// Deliberately not derived from workspace roles: anyone who registers gets
+  /// a workspace of their own to own, so "owner somewhere" admits everybody.
+  /// Set for the first account only, under a lock — see `registerUser`.
+  isInstanceOwner Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -225,6 +231,7 @@ model Invitation {
   // One live invitation per address per workspace; re-inviting updates this row.
   @@unique([workspaceId, email])
   @@index([workspaceId])
+  @@index([email])
   @@map("invitations")
 }
 
@@ -379,6 +386,10 @@ model Post {
   @@index([scheduledAt])
   @@index([workspaceId, approvalStatus])
   @@index([recycleEnabled, recycleNextAt])
+  @@index([workspaceId, scheduledAt])
+  @@index([authorId])
+  @@index([originPostId])
+  @@index([sourceFeedItemId])
   @@map("posts")
 }
 
@@ -417,6 +428,7 @@ model PostTarget {
   @@unique([postId, targetId])
   @@index([status, nextAttemptAt])
   @@index([targetId])
+  @@index([status, insightsSyncedAt])
   @@map("post_targets")
 }
 
@@ -439,6 +451,7 @@ model Media {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
+  @@index([workspaceId, createdAt])
   @@map("media")
 }
 
