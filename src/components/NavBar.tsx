@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Icon } from './Icon';
@@ -39,9 +39,21 @@ export function NavBar({
   const router = useRouter();
   const [switching, setSwitching] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => setSwitching(false), [workspaceId]);
 
   async function signOut() {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    setError(null);
+    try {
+      const response = await fetch('/api/auth/logout', { method: 'POST' });
+      if (!response.ok) throw new Error(`logout answered ${response.status}`);
+    } catch {
+      // Carrying on to /login would be worse than stopping: the session cookie
+      // is still set, so the login page would bounce straight back in and the
+      // person would believe they had signed out of a shared machine.
+      setError(t('signOutFailed'));
+      return;
+    }
     router.refresh();
     router.push('/login');
   }
@@ -49,15 +61,36 @@ export function NavBar({
   async function switchTo(id: string) {
     if (id === workspaceId) return;
     setSwitching(true);
-    await fetch('/api/workspace/switch', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ workspaceId: id }),
-    });
-    // A full refresh: every server component on the page is scoped to the
-    // workspace, so all of them need to re-render against the new one.
+    setError(null);
+    try {
+      const response = await fetch('/api/workspace/switch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId: id }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? t('switchFailed'));
+        setSwitching(false);
+        return;
+      }
+    } catch {
+      setError(t('switchFailed'));
+      setSwitching(false);
+      return;
+    }
+    // On success `switching` stays on until the new workspace's props arrive
+    // (the effect above): re-enabling the select sooner would show the old
+    // workspace's name in it, inviting a second switch mid-flight.
+
+    // To the dashboard rather than staying put: the current URL may name
+    // something that only exists in the old workspace — /compose?post=…, a
+    // report's date range, a feed — and would answer the new one with a 404.
+    // The refresh drops the router cache, whose pages were rendered against
+    // the old workspace too.
+    setMenuOpen(false);
+    router.push('/dashboard');
     router.refresh();
-    setSwitching(false);
   }
 
   const current = moduleFor(pathname);
@@ -229,6 +262,23 @@ export function NavBar({
         </div>
       )}
 
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-3 border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 sm:px-6"
+        >
+          <p className="min-w-0">{error}</p>
+          <button
+            type="button"
+            className="shrink-0 text-red-500 hover:text-red-700"
+            onClick={() => setError(null)}
+          >
+            <span className="sr-only">{t('dismiss')}</span>
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      )}
+
       {menuOpen && (
         <div id="main-menu" className="border-t border-slate-200 px-4 py-3 lg:hidden">
           {workspaces.length > 1 && (
@@ -248,7 +298,7 @@ export function NavBar({
               </select>
             </label>
           )}
-          <nav className="grid grid-cols-2 gap-1">
+          <nav aria-label={t('menu')} className="grid grid-cols-2 gap-1">
             <Link
               href="/dashboard"
               onClick={() => setMenuOpen(false)}

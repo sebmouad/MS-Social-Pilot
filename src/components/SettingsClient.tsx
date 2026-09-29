@@ -64,37 +64,43 @@ export function SettingsClient({
   async function saveWorkspace() {
     setPending(true);
     setStatus(null);
-    const response = await fetch('/api/workspace', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, timezone: zone, ...settings }),
-    });
-    const body = (await response.json().catch(() => ({}))) as {
-      error?: string;
-      released?: { released: number; publishingNow: number };
-    };
+    try {
+      const response = await fetch('/api/workspace', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name, timezone: zone, ...settings }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        released?: { released: number; publishingNow: number };
+      };
 
-    // Turning review off frees everything it was holding, and anything whose
-    // moment has gone publishes within the next tick. "Saved" alone lets
-    // somebody find that out from a client.
-    const publishingNow = body.released?.publishingNow ?? 0;
+      // Turning review off frees everything it was holding, and anything whose
+      // moment has gone publishes within the next tick. "Saved" alone lets
+      // somebody find that out from a client.
+      const publishingNow = body.released?.publishingNow ?? 0;
 
-    setStatus(
-      response.ok
-        ? {
-            kind: 'ok',
-            text: publishingNow > 0 ? t('savedReleased', { count: publishingNow }) : t('saved'),
-          }
-        : { kind: 'error', text: body.error ?? t('couldNotSave') },
-    );
-    setPending(false);
-    if (response.ok) router.refresh();
+      setStatus(
+        response.ok
+          ? {
+              kind: 'ok',
+              text: publishingNow > 0 ? t('savedReleased', { count: publishingNow }) : t('saved'),
+            }
+          : { kind: 'error', text: body.error ?? t('couldNotSave') },
+      );
+      if (response.ok) router.refresh();
+    } catch {
+      setStatus({ kind: 'error', text: t('networkError') });
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
     <div className="space-y-6">
       {status && (
         <div
+          role={status.kind === 'ok' ? 'status' : 'alert'}
           className={`rounded-lg border px-3 py-2 text-sm ${
             status.kind === 'ok'
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
@@ -236,7 +242,7 @@ export function SettingsClient({
         <h2 className="text-sm font-semibold text-slate-900">{t('ai')}</h2>
         {!aiConfigured && (
           <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            No ANTHROPIC_API_KEY is set on this server, so the composer hides these tools.
+            {t('aiNotConfigured')}
           </p>
         )}
 
@@ -262,9 +268,9 @@ export function SettingsClient({
               onChange={(event) => setSettings({ ...settings, aiTone: event.target.value })}
             >
               <option value="">{tCommon('none')}</option>
-              {['friendly', 'professional', 'playful', 'urgent', 'informative'].map((tone) => (
+              {(['friendly', 'professional', 'playful', 'urgent', 'informative'] as const).map((tone) => (
                 <option key={tone} value={tone}>
-                  {tone}
+                  {t(`tones.${tone}`)}
                 </option>
               ))}
             </select>
@@ -337,20 +343,27 @@ function BulkUpload({
     setError(null);
     setSummary(null);
 
-    const response = await fetch('/api/posts/bulk', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ csv, targetIds: selected, timezone, publishMode: 'worker' }),
-    });
-    const body = (await response.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
+    try {
+      const response = await fetch('/api/posts/bulk', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ csv, targetIds: selected, timezone, publishMode: 'worker' }),
+      });
+      const body = (await response.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
 
-    if (!response.ok) {
-      setError(body.error ?? t('uploadFailed'));
-    } else {
-      setSummary(body as never);
-      router.refresh();
+      if (!response.ok) {
+        setError(body.error ?? t('uploadFailed'));
+      } else {
+        setSummary(body as never);
+        router.refresh();
+      }
+    } catch {
+      // Some rows may have been scheduled before the connection dropped; the
+      // posts list is where to check, and the message does not claim otherwise.
+      setError(t('networkError'));
+    } finally {
+      setPending(false);
     }
-    setPending(false);
   }
 
   return (
@@ -420,7 +433,7 @@ function BulkUpload({
       </div>
 
       {error && (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </div>
       )}

@@ -385,4 +385,11 @@ export const errors = {
 
   adAccountNotFound: () =>
     new AppError({ key: 'errors.adAccountNotFound', fallback: 'Ad account not found.', status: 404 }),
+
+  destinationBlocked: () =>
+    new AppError({
+      key: 'errors.destinationBlocked',
+      fallback: 'This destination cannot be published to right now, so it cannot be turned on.',
+      status: 409,
+    }),
 };

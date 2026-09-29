@@ -71,6 +71,10 @@ export function SetupClient({ state, signedIn }: { state: SetupState; signedIn: 
         return;
       }
       router.refresh();
+    } catch {
+      // Rejected rather than answered — the server is unreachable. Said
+      // anyway, so the form does not look as if it silently accepted.
+      setError(t('saveFailed'));
     } finally {
       setBusy(false);
     }

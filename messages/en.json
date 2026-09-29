@@ -247,7 +247,8 @@
     "createOne": "Create one",
     "somethingWrong": "Something went wrong.",
     "registrationClosedTitle": "Registration is closed",
-    "registrationClosedBody": "This server only accepts people who have been invited. Ask an administrator to send you an invitation."
+    "registrationClosedBody": "This server only accepts people who have been invited. Ask an administrator to send you an invitation.",
+    "networkError": "Could not reach the server. Check your connection and try again."
   },
   "calendar": {
     "title": "Calendar",
@@ -451,6 +452,16 @@
       "inaccessible": "This destination is no longer reachable with the connected Facebook account.",
       "disconnected": "The Facebook account for this destination was disconnected.",
       "instagram_permission": "Publishing to Instagram needs Meta to grant instagram_content_publish. Turn this destination on once it is approved."
+    },
+    "networkError": "Could not reach the server. Check your connection and try again.",
+    "toggleDestination": "Publish to {name}",
+    "toggleAccount": "Use {name}",
+    "dataDeletion": {
+      "title": "Data deletion request",
+      "completed": "Your request has been completed. The Facebook connection and its stored access tokens have been deleted, and any posts still queued for its pages and groups were cancelled.",
+      "code": "Confirmation code:",
+      "noCode": "No confirmation code was supplied. Open this page using the link Facebook gave you when you requested deletion.",
+      "retained": "Records of posts already published to your pages are kept as the workspace owner’s business records. Contact the workspace owner if you need those removed as well."
     }
   },
   "dashboard": {
@@ -625,6 +636,7 @@
     "currentPasswordWrong": "Your current password is not correct.",
     "dateRange": "Enter a valid date range.",
     "destinationNotFound": "Destination not found.",
+    "destinationBlocked": "This destination cannot be published to right now, so it cannot be turned on.",
     "editorsOnlyDeleteMedia": "Only editors and above can delete files from the library.",
     "emailTaken": "An account with that email already exists. Sign in instead.",
     "emptyPost": "Write something, add a link, or attach media.",
@@ -905,7 +917,10 @@
     "shared": "Workspace",
     "pages": "Pages",
     "adsPerformance": "Performance",
-    "queue": "Queue"
+    "queue": "Queue",
+    "switchFailed": "Could not switch client. Please try again.",
+    "signOutFailed": "Could not sign out. Check your connection and try again.",
+    "dismiss": "Dismiss"
   },
   "notifications": {
     "title": "Notifications",
@@ -916,7 +931,8 @@
     "onApprovalDecision": "My post is approved or rejected",
     "saved": "Notification settings saved.",
     "noEmailProvider": "No email provider is configured on this server, so nothing will actually be sent. An owner can add a Resend API key on the Configuration screen.",
-    "saveFailed": "Your notification settings could not be saved. Please try again."
+    "saveFailed": "Your notification settings could not be saved. Please try again.",
+    "networkError": "Could not reach the server. Check your connection and try again."
   },
   "pageAnalysis": {
     "analyseNow": "Analyse now",
@@ -1187,7 +1203,16 @@
     "utmHint": "Appended to links in your posts so you can attribute traffic. Leave blank to post links untouched.",
     "utmMedium": "UTM medium",
     "utmSource": "UTM source",
-    "workspace": "Workspace"
+    "workspace": "Workspace",
+    "networkError": "Could not reach the server. Check your connection and try again.",
+    "aiNotConfigured": "No ANTHROPIC_API_KEY is set on this server, so the composer hides these tools.",
+    "tones": {
+      "friendly": "Friendly",
+      "professional": "Professional",
+      "playful": "Playful",
+      "urgent": "Urgent",
+      "informative": "Informative"
+    }
   },
   "setup": {
     "title": "Set up MS Social Pilot",
@@ -1330,6 +1355,18 @@
     "accept": "Accept invitation",
     "acceptExpired": "This invitation has expired. Ask for a new one.",
     "acceptInvalid": "This invitation link is not valid.",
-    "acceptWrongEmail": "This invitation was sent to {email}. Sign in with that address to accept it."
+    "acceptWrongEmail": "This invitation was sent to {email}. Sign in with that address to accept it.",
+    "networkError": "Could not reach the server. Check your connection and try again.",
+    "inviteFailed": "Could not send that invitation.",
+    "actionFailed": "That did not work. Please try again.",
+    "invalidEmail": "Enter a valid email address.",
+    "emailNotConfigured": "Email is not configured on this server, so invitations are not emailed. Once you send one, copy the link shown here and pass it on yourself.",
+    "shareLink": "Share this link with them:",
+    "memberRole": "Role for {name}",
+    "removeMemberNamed": "Remove {name}",
+    "revokeNamed": "Revoke the invitation for {email}",
+    "roleChangeConfirm": "Change {name} from {from} to {to}?",
+    "roleToOwnerWarning": "Owners have full control, including instance configuration and deleting the workspace, and only another owner can take that back.",
+    "roleFromOwnerWarning": "They will lose owner access to this workspace straight away."
   }
 }

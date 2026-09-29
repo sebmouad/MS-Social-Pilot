@@ -247,7 +247,8 @@
     "createOne": "En créer un",
     "somethingWrong": "Une erreur est survenue.",
     "registrationClosedTitle": "Les inscriptions sont fermées",
-    "registrationClosedBody": "Ce serveur n’accepte que les personnes invitées. Demandez à un administrateur de vous envoyer une invitation."
+    "registrationClosedBody": "Ce serveur n’accepte que les personnes invitées. Demandez à un administrateur de vous envoyer une invitation.",
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez."
   },
   "calendar": {
     "title": "Calendrier",
@@ -451,6 +452,16 @@
       "inaccessible": "Cette destination n’est plus accessible avec le compte Facebook connecté.",
       "disconnected": "Le compte Facebook de cette destination a été déconnecté.",
       "instagram_permission": "Publier sur Instagram nécessite l’autorisation instagram_content_publish de Meta. Réactivez cette destination une fois qu’elle est accordée."
+    },
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+    "toggleDestination": "Publier sur {name}",
+    "toggleAccount": "Utiliser {name}",
+    "dataDeletion": {
+      "title": "Demande de suppression des données",
+      "completed": "Votre demande a été traitée. La connexion Facebook et ses jetons d’accès enregistrés ont été supprimés, et les publications encore en attente pour ses pages et groupes ont été annulées.",
+      "code": "Code de confirmation :",
+      "noCode": "Aucun code de confirmation n’a été fourni. Ouvrez cette page avec le lien que Facebook vous a donné lors de votre demande de suppression.",
+      "retained": "Les traces des publications déjà parues sur vos pages sont conservées dans les archives professionnelles du propriétaire de l’espace de travail. Contactez-le si vous souhaitez aussi les faire supprimer."
     }
   },
   "dashboard": {
@@ -625,6 +636,7 @@
     "currentPasswordWrong": "Votre mot de passe actuel est incorrect.",
     "dateRange": "Saisissez une plage de dates valide.",
     "destinationNotFound": "Destination introuvable.",
+    "destinationBlocked": "Impossible de publier sur cette destination pour le moment : elle ne peut donc pas être activée.",
     "editorsOnlyDeleteMedia": "Seuls les éditeurs et les rôles supérieurs peuvent supprimer des fichiers de la médiathèque.",
     "emailTaken": "Un compte existe déjà avec cette adresse e-mail. Connectez-vous plutôt.",
     "emptyPost": "Écrivez quelque chose, ajoutez un lien ou joignez un média.",
@@ -905,7 +917,10 @@
     "shared": "Espace de travail",
     "pages": "Pages",
     "adsPerformance": "Performances",
-    "queue": "File d’attente"
+    "queue": "File d’attente",
+    "switchFailed": "Impossible de changer de client. Veuillez réessayer.",
+    "signOutFailed": "Déconnexion impossible. Vérifiez votre connexion et réessayez.",
+    "dismiss": "Fermer"
   },
   "notifications": {
     "title": "Notifications",
@@ -916,7 +931,8 @@
     "onApprovalDecision": "Ma publication est validée ou refusée",
     "saved": "Préférences enregistrées.",
     "noEmailProvider": "Aucun fournisseur d’e-mail n’est configuré sur ce serveur : rien ne sera réellement envoyé. Un propriétaire peut ajouter une clé API Resend dans l’écran Configuration.",
-    "saveFailed": "Vos préférences de notification n’ont pas pu être enregistrées. Veuillez réessayer."
+    "saveFailed": "Vos préférences de notification n’ont pas pu être enregistrées. Veuillez réessayer.",
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez."
   },
   "pageAnalysis": {
     "analyseNow": "Analyser maintenant",
@@ -1187,7 +1203,16 @@
     "utmHint": "Ajouté aux liens de vos publications pour attribuer le trafic. Laissez vide pour publier les liens tels quels.",
     "utmMedium": "Support UTM",
     "utmSource": "Source UTM",
-    "workspace": "Espace de travail"
+    "workspace": "Espace de travail",
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+    "aiNotConfigured": "Aucune clé ANTHROPIC_API_KEY n’est définie sur ce serveur : l’éditeur masque donc ces outils.",
+    "tones": {
+      "friendly": "Amical",
+      "professional": "Professionnel",
+      "playful": "Enjoué",
+      "urgent": "Urgent",
+      "informative": "Informatif"
+    }
   },
   "setup": {
     "title": "Configurer MS Social Pilot",
@@ -1330,6 +1355,18 @@
     "accept": "Accepter l'invitation",
     "acceptExpired": "Cette invitation a expiré. Demandez-en une nouvelle.",
     "acceptInvalid": "Ce lien d'invitation n'est pas valide.",
-    "acceptWrongEmail": "Cette invitation a été envoyée à {email}. Connectez-vous avec cette adresse pour l'accepter."
+    "acceptWrongEmail": "Cette invitation a été envoyée à {email}. Connectez-vous avec cette adresse pour l'accepter.",
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+    "inviteFailed": "Impossible d’envoyer cette invitation.",
+    "actionFailed": "Cela n’a pas fonctionné. Veuillez réessayer.",
+    "invalidEmail": "Saisissez une adresse e-mail valide.",
+    "emailNotConfigured": "L’e-mail n’est pas configuré sur ce serveur : les invitations ne sont pas envoyées. Une fois l’invitation créée, copiez le lien affiché ici et transmettez-le vous-même.",
+    "shareLink": "Transmettez-lui ce lien :",
+    "memberRole": "Rôle de {name}",
+    "removeMemberNamed": "Retirer {name}",
+    "revokeNamed": "Révoquer l’invitation de {email}",
+    "roleChangeConfirm": "Faire passer {name} de {from} à {to} ?",
+    "roleToOwnerWarning": "Les propriétaires ont un contrôle total, y compris la configuration du serveur et la suppression de l’espace de travail, et seul un autre propriétaire peut le leur retirer.",
+    "roleFromOwnerWarning": "Cette personne perdra immédiatement ses droits de propriétaire sur cet espace de travail."
   }
 }
