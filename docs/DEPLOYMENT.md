@@ -41,6 +41,12 @@ Everything here assumes the Meta app already exists. If it does not, start with
       stored Facebook token is unreadable — see [Key rotation](#key-rotation)
 - [ ] `APP_URL` uses https and matches the Meta app's OAuth redirect URI
       **exactly**, trailing slash and all
+- [ ] Behind Cloudflare, a tunnel or a reverse proxy: `TRUST_PROXY="true"` in
+      `.env` — Docker included, it is read from there — and the proxy is the
+      only way in. Unset, every visitor looks like the proxy
+      ([why](#behind-a-reverse-proxy))
+- [ ] Docker: `POSTGRES_PASSWORD` set (`npm run setup` does it), and the
+      Postgres port mapping removed ([Docker](#docker))
 
 **The things that publish**
 
@@ -260,6 +266,7 @@ Cloudflare answers 443 with its own certificate, and forwards to this server.
 ```
 APP_URL="https://your.domain"
 PORT="80"
+TRUST_PROXY="true"
 ```
 
 **Set the SSL/TLS mode to Full, not Flexible.** Flexible makes the hop from
@@ -305,6 +312,16 @@ happens to arrive over TLS. Behind a terminator the app itself sees plain http,
 and deriving the flag from the request would quietly drop `secure` on every
 session cookie in exactly that deployment. The Docker image sets `NODE_ENV`, and
 `next start` sets it too.
+
+**`TRUST_PROXY` must be set for any forwarding header to be read.** Unset (the
+default), `cf-connecting-ip`, `x-forwarded-for` and `x-real-ip` are all
+ignored: anyone who can reach the app directly can write them, and believing
+them let one machine claim a fresh address for every sign-in attempt. Set
+`TRUST_PROXY="true"` behind Cloudflare, a tunnel or a reverse proxy — and then
+make sure the proxy is the *only* way in (`HOST=127.0.0.1`, or a firewall that
+admits only the proxy), or the headers are no more trustworthy than before.
+Without it the sign-in limit keys on the email address alone, and short-link
+clicks are counted without an address.
 
 **`X-Forwarded-For` is read in two places**, and it is worth knowing what each
 one does with it:
@@ -455,6 +472,13 @@ never bound to every interface: a database on `0.0.0.0` is reachable by
 anything that can reach the host. For production, delete the mapping entirely —
 `web` and `worker` reach Postgres over the compose network — and put a TLS
 terminator in front of `web`.
+
+**Behind a proxy, set `TRUST_PROXY="true"` in `.env`.** The compose file does
+not set it, because it publishes `web` on every interface and anyone reaching
+that port directly could forge the forwarding headers. When the proxy is on the
+same host, also change the `web` mapping to `'127.0.0.1:${APP_PORT:-80}:3000'`
+so the proxy really is the only way in. See
+[Behind a reverse proxy](#behind-a-reverse-proxy).
 
 The image carries its own `HEALTHCHECK` against `/api/health`, so a plain
 `docker run` or another orchestrator gets the same probe Compose runs. The

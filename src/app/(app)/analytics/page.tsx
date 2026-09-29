@@ -17,10 +17,12 @@ import { SyncButton } from '@/components/SyncButton';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { canDeleteComments, canModerateComments } from '@/lib/constants';
+import { UNWINDOWED_VIEWS, parseAnalyticsView } from '@/lib/analytics-views';
 import { Pagination } from '@/components/Pagination';
 import { pageHref, pageNumber, paginate } from '@/lib/paging';
 import { prisma } from '@/lib/prisma';
 import {
+  canRefreshAnalytics,
   readAudience,
   readAvailability,
   readCoverage,
@@ -103,15 +105,22 @@ export default async function AnalyticsPage({
 
   // The analysis is the answer to "how is this Page doing"; the raw views
   // behind it are one tab away for anyone who wants the figures themselves.
-  const view = first(params.view) ?? 'analysis';
+  // An unknown view — a typo, a retired tab — lands there too rather than on
+  // a screen with a tab strip and nothing under it.
+  const view = parseAnalyticsView(first(params.view));
 
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-600">
-          {t('subtitle')} · {formatInZone(from, timezone, 'd MMM')} –{' '}
-          {formatInZone(to, timezone, 'd MMM yyyy')}
+          {t('subtitle')}
+          {!UNWINDOWED_VIEWS.has(view) && (
+            <>
+              {' · '}
+              {formatInZone(from, timezone, 'd MMM')} – {formatInZone(to, timezone, 'd MMM yyyy')}
+            </>
+          )}
         </p>
       </header>
 
@@ -157,7 +166,16 @@ export default async function AnalyticsPage({
       )}
 
       {view === 'compare' && (
-        <ComparePagesView workspaceId={auth.workspace.id} from={from} to={to} days={window} timeZone={timezone} />
+        <ComparePagesView
+          workspaceId={auth.workspace.id}
+          from={from}
+          to={to}
+          days={window}
+          timeZone={timezone}
+          sort={first(params.sort)}
+          order={first(params.order)}
+          targetId={selected.id}
+        />
       )}
 
       {view === 'posts' && (
@@ -253,6 +271,8 @@ export default async function AnalyticsPage({
         <AnalyticsClient
           targetId={selected.id}
           targetName={selected.name}
+          timeZone={timezone}
+          canSync={canRefreshAnalytics(auth.role)}
           series={await readStoredAnalytics({ targetId: selected.id, from, to })}
           availability={(await readAvailability(selected.id)).map((entry) => ({
             metric: entry.metric,
@@ -498,6 +518,8 @@ async function CommentsView({
         {typeof params.target === 'string' && (
           <input type="hidden" name="target" value={params.target} />
         )}
+        {/* Otherwise applying the filter quietly resets the window to 30 days. */}
+        {typeof params.days === 'string' && <input type="hidden" name="days" value={params.days} />}
 
         <div className="min-w-[12rem] flex-1">
           <label className="label" htmlFor="q">

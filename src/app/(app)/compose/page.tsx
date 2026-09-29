@@ -159,14 +159,6 @@ export default async function ComposePage({
 type Auth = Awaited<ReturnType<typeof requirePage>>;
 
 /**
- * The post behind `?post=`, or null if this person may not edit it.
- *
- * Every reason to refuse is folded into one null: the workspace scope, the
- * contributor rule about other people's work, and the lifecycle rule that a
- * published post cannot be rewritten. The API applies all three again on save
- * — this only decides whether to put the form on screen.
- */
-/**
  * `?at=YYYY-MM-DDTHH:mm`, from the calendar's "new post on this day", when it
  * names a time far enough ahead to schedule — otherwise the usual default. A
  * stale link to a day that has gone by opens the composer as normal rather
@@ -180,6 +172,14 @@ function requestedTime(raw: string | string[] | undefined, timeZone: string): st
   return instant.getTime() > Date.now() + EARLIEST_MINUTES * 60 * 1000 ? at : null;
 }
 
+/**
+ * The post behind `?post=`, or null if this person may not edit it.
+ *
+ * Every reason to refuse is folded into one null: the workspace scope, the
+ * contributor rule about other people's work, and the lifecycle rule that a
+ * published post cannot be rewritten. The API applies all three again on save
+ * — this only decides whether to put the form on screen.
+ */
 async function loadForEditing(postId: string, auth: Auth): Promise<EditingPost | null> {
   const post = await prisma.post.findFirst({
     where: { id: postId, workspaceId: auth.workspace.id },

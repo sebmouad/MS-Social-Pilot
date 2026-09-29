@@ -8,7 +8,7 @@ import { ChartFrame } from '@/components/charts/ChartFrame';
 import { StatTile } from '@/components/charts/StatTile';
 import { ExternalLink } from '@/components/ExternalLink';
 import { Icon, type IconName } from '@/components/Icon';
-import { analysePage, comparePages } from '@/lib/page-analysis-data';
+import { analysePage, comparePages, type PageComparisonRow } from '@/lib/page-analysis-data';
 import {
   BLOCK_HOURS,
   MIN_POSTS_PER_SLOT,
@@ -381,26 +381,88 @@ export async function PageAnalysisView({
   );
 }
 
-/** Every Page in the workspace, one row each, on the same window. */
+/** The comparison's sortable columns, each with the figure it sorts by. */
+const COMPARE_SORTS = {
+  health: (row: PageComparisonRow) => row.health.score,
+  followers: (row: PageComparisonRow) => row.followers,
+  perWeek: (row: PageComparisonRow) => row.perWeek,
+  avg: (row: PageComparisonRow) => row.avgInteractions,
+  rate: (row: PageComparisonRow) => row.medianRate,
+  reach: (row: PageComparisonRow) => row.reach,
+  net: (row: PageComparisonRow) => row.netFollows,
+} as const;
+
+type CompareSort = keyof typeof COMPARE_SORTS;
+
+/**
+ * Every Page in the workspace, one row each, on the same window.
+ *
+ * Sortable by any figure through the URL rather than client state, so the
+ * table stays a server render and a sorted view can be shared. Pages with no
+ * figure for the column go last whichever way it runs: "no data" is neither
+ * the best nor the worst.
+ */
 export async function ComparePagesView({
   workspaceId,
   from,
   to,
   days,
   timeZone,
+  sort,
+  order,
+  targetId,
 }: {
   workspaceId: string;
   from: Date;
   to: Date;
   days: number;
   timeZone: string;
+  sort?: string;
+  order?: string;
+  /** The Page picked elsewhere on the screen, kept so sorting here does not reset it. */
+  targetId?: string;
 }) {
   const t = await getTranslations('pageAnalysis');
-  const rows = await comparePages({ workspaceId, from, to, timeZone });
+  const locale = appLocale();
+  const unsorted = await comparePages({ workspaceId, from, to, timeZone });
+
+  // Own keys only: `in` would also accept `__proto__` and `toString`.
+  const sortKey = sort && Object.hasOwn(COMPARE_SORTS, sort) ? (sort as CompareSort) : null;
+  const ascending = order === 'asc';
+  const rows = sortKey
+    ? [...unsorted].sort((a, b) => {
+        const left = COMPARE_SORTS[sortKey](a);
+        const right = COMPARE_SORTS[sortKey](b);
+        if (left === null || right === null) return left === right ? 0 : left === null ? 1 : -1;
+        return ascending ? left - right : right - left;
+      })
+    : unsorted;
+
+  /** A header that sorts by its column: descending first, then flips. */
+  const header = (key: CompareSort, label: string, align: 'left' | 'right' = 'right') => {
+    const active = sortKey === key;
+    const nextOrder = active && !ascending ? 'asc' : 'desc';
+    return (
+      <th
+        scope="col"
+        className={`px-3 py-2 ${align === 'right' ? 'text-right' : ''}`}
+        aria-sort={active ? (ascending ? 'ascending' : 'descending') : undefined}
+      >
+        <Link
+          href={`/analytics?view=compare${targetId ? `&target=${targetId}` : ''}&days=${days}&sort=${key}&order=${nextOrder}`}
+          className={`hover:text-slate-800 ${active ? 'text-brand-700' : ''}`}
+          scroll={false}
+        >
+          {label}
+          {active && <span aria-hidden>{ascending ? ' ↑' : ' ↓'}</span>}
+        </Link>
+      </th>
+    );
+  };
 
   if (rows.length === 0) return <div className="card p-8 text-center text-sm text-slate-600">{t('compare.none')}</div>;
 
-  const signed = (value: number | null) => (value === null ? '—' : `${value > 0 ? '+' : ''}${value.toLocaleString(appLocale())}`);
+  const signed = (value: number | null) => (value === null ? '—' : `${value > 0 ? '+' : ''}${value.toLocaleString(locale)}`);
 
   return (
     <section className="card overflow-hidden">
@@ -413,13 +475,13 @@ export async function ComparePagesView({
           <thead className="border-y border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th scope="col" className="px-4 py-2">{t('compare.page')}</th>
-              <th scope="col" className="px-3 py-2">{t('compare.health')}</th>
-              <th scope="col" className="px-3 py-2 text-right">{t('compare.followers')}</th>
-              <th scope="col" className="px-3 py-2 text-right">{t('compare.perWeek')}</th>
-              <th scope="col" className="px-3 py-2 text-right">{t('compare.avg')}</th>
-              <th scope="col" className="px-3 py-2 text-right">{t('compare.rate')}</th>
-              <th scope="col" className="px-3 py-2 text-right">{t('compare.reach')}</th>
-              <th scope="col" className="px-3 py-2 text-right">{t('compare.net')}</th>
+              {header('health', t('compare.health'), 'left')}
+              {header('followers', t('compare.followers'))}
+              {header('perWeek', t('compare.perWeek'))}
+              {header('avg', t('compare.avg'))}
+              {header('rate', t('compare.rate'))}
+              {header('reach', t('compare.reach'))}
+              {header('net', t('compare.net'))}
               {/* `relative`, so the hidden label is positioned inside the scrolling
                   table rather than against the page, where it pushed the whole
                   screen sideways on a phone. */}
@@ -447,10 +509,10 @@ export async function ComparePagesView({
                       </span>
                     )}
                   </td>
-                  <td className="nums px-3 py-3 text-right text-slate-700">{row.followers?.toLocaleString(appLocale()) ?? '—'}</td>
+                  <td className="nums px-3 py-3 text-right text-slate-700">{row.followers?.toLocaleString(locale) ?? '—'}</td>
                   <td className="nums px-3 py-3 text-right text-slate-700">{row.perWeek}</td>
                   <td className="nums px-3 py-3 text-right text-slate-700">
-                    {row.avgInteractions?.toLocaleString(appLocale()) ?? '—'}
+                    {row.avgInteractions?.toLocaleString(locale) ?? '—'}
                     {row.avgInteractionsChange !== null && (
                       <span
                         className="ml-1 text-xs"
@@ -462,7 +524,7 @@ export async function ComparePagesView({
                     )}
                   </td>
                   <td className="nums px-3 py-3 text-right text-slate-700">{row.medianRate !== null ? `${row.medianRate}%` : '—'}</td>
-                  <td className="nums px-3 py-3 text-right text-slate-700">{row.reach !== null ? compact(row.reach) : '—'}</td>
+                  <td className="nums px-3 py-3 text-right text-slate-700">{row.reach !== null ? compact(row.reach, locale) : '—'}</td>
                   <td className="nums px-3 py-3 text-right text-slate-700">{signed(row.netFollows)}</td>
                   <td className="px-4 py-3 text-right">
                     <Link

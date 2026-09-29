@@ -1,5 +1,9 @@
 import { requireAuth } from '@/lib/auth';
-import { canManageOthersPosts } from '@/lib/constants';
+import {
+  canManageOthersPosts,
+  canPublishWithoutApproval,
+  PUBLISHABLE_APPROVAL_STATUSES,
+} from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { publishNow } from '@/lib/scheduler/runner';
 import { ok, route } from '@/lib/api';
@@ -17,6 +21,20 @@ export const POST = route(async (_request: Request, context: { params: Promise<{
   if (!post) throw errors.postNotFound();
   if (post.authorId !== auth.user.id && !canManageOthersPosts(auth.role)) {
     throw errors.publishOwnOnly();
+  }
+
+  // "Post now" skips the approval queue by its nature, so it belongs to the
+  // people review does not apply to. `publishNow` only checks the post's own
+  // approval state, and a contributor's draft is saved `not_required` — nothing
+  // has been submitted yet — so that check alone let the author of an
+  // unreviewed draft put it straight on the client's Page.
+  if (auth.workspace.requiresApproval && !canPublishWithoutApproval(auth.role)) {
+    throw errors.publishNeedsReview();
+  }
+  // Waiting for a decision, or refused one: not going anywhere until a
+  // reviewer says so, whoever presses the button.
+  if (!PUBLISHABLE_APPROVAL_STATUSES.includes(post.approvalStatus)) {
+    throw errors.awaitingApproval();
   }
 
   if (post.status === 'published') throw errors.alreadyPublished();

@@ -1,7 +1,5 @@
 import { access, constants, mkdir } from 'node:fs/promises';
 
-import type { WorkspaceRole } from '@prisma/client';
-
 import { prisma } from './prisma';
 import { canManageInstance } from './constants';
 import { env } from './env';
@@ -242,21 +240,34 @@ export async function readSetupState(workspaceId: string | null): Promise<SetupS
 }
 
 /**
- * Who is allowed to see and change setup.
+ * Who is allowed to see setup.
  *
  * Open while no account exists, because requiring a sign-in to create the first
  * account is a deadlock. That exception closes the moment anybody registers —
- * after that this screen shows what the installation is connected to and can
- * write the Facebook app credentials, which is owner business.
+ * after that this screen shows what the installation is connected to, which is
+ * the installation owner's business.
  *
  * Pure so it can be tested directly: this one rule is the whole security of the
  * setup screen, and it is worth being able to state it in a test rather than
  * infer it from two route handlers.
  */
 export function maySetUp(
-  auth: { role: WorkspaceRole } | null,
+  auth: { isInstanceOwner: boolean } | null,
   firstRun: boolean,
 ): boolean {
   if (firstRun) return true;
-  return auth !== null && canManageInstance(auth.role);
+  return auth !== null && canManageInstance(auth);
+}
+
+/**
+ * Who is allowed to *change* setup: the installation owner, first run or not.
+ *
+ * Narrower than seeing it on purpose. The only thing setup writes is the
+ * Facebook app credentials, and the screen offers that form only after the
+ * account step — so nobody legitimate writes them anonymously. Leaving the
+ * write open until the first sign-up let whoever found a fresh installation
+ * first plant their own Meta app in it for its owner to connect through.
+ */
+export function mayChangeSetup(auth: { isInstanceOwner: boolean } | null): boolean {
+  return auth !== null && canManageInstance(auth);
 }

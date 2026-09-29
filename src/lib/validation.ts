@@ -62,15 +62,69 @@ export const postMediaSchema = z.object({
   altText: z.string().max(1000).optional(),
 });
 
+const postMessage = z.string().max(LIMITS.messageLength, 'That message is too long for Facebook.');
+const postMedia = z.array(postMediaSchema).max(LIMITS.mediaPerPost);
+const postTargetIds = z
+  .array(z.string().min(1))
+  .min(1, 'Choose at least one page or group.')
+  .max(LIMITS.targetsPerPost);
+
+/**
+ * The content rules a post has to meet however it arrives.
+ *
+ * Shared by creating and editing because the composer is the same screen for
+ * both, and a rule enforced on only one of them is a detour rather than a rule:
+ * the edit schema used to have none of these, so a video could be combined with
+ * photos by saving once and editing once, and it failed only when Facebook
+ * refused it at publish time.
+ *
+ * An edit may leave fields out, so the emptiness check only runs when all
+ * three content fields are present — `updatePost` repeats it against the
+ * stored row for the ones that are not.
+ */
+function refinePostContent(
+  value: { message?: string; link?: string | null; media?: Array<{ kind: string }> },
+  ctx: z.RefinementCtx,
+): void {
+  const knowsAllContent =
+    value.message !== undefined && value.link !== undefined && value.media !== undefined;
+  if (knowsAllContent && !hasPostContent(value.message ?? '', value.link ?? null, value.media?.length ?? 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['message'],
+      message: 'Write something, add a link, or attach media.',
+    });
+  }
+
+  const media = value.media ?? [];
+  const videos = media.filter((item) => item.kind === 'video');
+  if (videos.length > 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['media'],
+      message: 'A post can include at most one video.',
+    });
+  }
+  if (videos.length > 0 && media.length > videos.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['media'],
+      message: 'Facebook cannot combine a video with photos in one post.',
+    });
+  }
+}
+
+/** Whether a post has anything in it to publish. */
+export function hasPostContent(message: string, link: string | null, mediaCount: number): boolean {
+  return message.trim().length > 0 || Boolean(link) || mediaCount > 0;
+}
+
 export const createPostSchema = z
   .object({
-    message: z.string().max(LIMITS.messageLength, 'That message is too long for Facebook.').default(''),
+    message: postMessage.default(''),
     link: httpUrl.nullish(),
-    media: z.array(postMediaSchema).max(LIMITS.mediaPerPost).default([]),
-    targetIds: z
-      .array(z.string().min(1))
-      .min(1, 'Choose at least one page or group.')
-      .max(LIMITS.targetsPerPost),
+    media: postMedia.default([]),
+    targetIds: postTargetIds,
     publishMode: z.nativeEnum(PublishMode).default(PublishMode.worker),
     /** Wall-clock time as typed by the user, interpreted in `timezone`. */
     scheduledAtLocal: z.string().min(10).nullish(),
@@ -80,14 +134,9 @@ export const createPostSchema = z
     saveAsDraft: z.boolean().default(false),
   })
   .superRefine((value, ctx) => {
-    const hasContent = value.message.trim().length > 0 || Boolean(value.link) || value.media.length > 0;
-    if (!hasContent) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['message'],
-        message: 'Write something, add a link, or attach media.',
-      });
-    }
+    // `link` is optional here and absent means none, so it is normalised for
+    // the shared check, which reads `undefined` as "not sent".
+    refinePostContent({ ...value, link: value.link ?? null }, ctx);
 
     const needsTime = !value.saveAsDraft && value.publishMode !== 'immediate' && !value.useQueue;
     if (needsTime && !value.scheduledAtLocal) {
@@ -97,34 +146,20 @@ export const createPostSchema = z
         message: 'Pick a date and time, or add the post to your queue.',
       });
     }
-
-    const videos = value.media.filter((item) => item.kind === 'video');
-    if (videos.length > 1) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['media'],
-        message: 'A post can include at most one video.',
-      });
-    }
-    if (videos.length > 0 && value.media.length > videos.length) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['media'],
-        message: 'Facebook cannot combine a video with photos in one post.',
-      });
-    }
   });
 
-export const updatePostSchema = z.object({
-  message: z.string().max(LIMITS.messageLength).optional(),
-  link: httpUrl.nullish(),
-  media: z.array(postMediaSchema).max(LIMITS.mediaPerPost).optional(),
-  targetIds: z.array(z.string().min(1)).min(1).max(LIMITS.targetsPerPost).optional(),
-  scheduledAtLocal: z.string().min(10).nullish(),
-  timezone: timezone.optional(),
-  publishMode: z.nativeEnum(PublishMode).optional(),
-  status: z.enum(['draft', 'scheduled', 'cancelled']).optional(),
-});
+export const updatePostSchema = z
+  .object({
+    message: postMessage.optional(),
+    link: httpUrl.nullish(),
+    media: postMedia.optional(),
+    targetIds: postTargetIds.optional(),
+    scheduledAtLocal: z.string().min(10).nullish(),
+    timezone: timezone.optional(),
+    publishMode: z.nativeEnum(PublishMode).optional(),
+    status: z.enum(['draft', 'scheduled', 'cancelled']).optional(),
+  })
+  .superRefine(refinePostContent);
 
 export const linkPreviewSchema = z.object({
   url: httpUrl,

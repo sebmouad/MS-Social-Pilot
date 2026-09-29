@@ -514,6 +514,102 @@ describe('publishNow', () => {
     const result = await runner.publishNow(post.id);
     expect(result.published).toBe(1);
   });
+
+  it('gives a manual retry its full set of attempts', async () => {
+    const { post, postTarget } = await seedDuePost();
+    // Failed on its last allowed attempt (SCHEDULER_MAX_ATTEMPTS is 3 here).
+    await prisma.postTarget.update({
+      where: { id: postTarget.id },
+      data: { status: 'failed', attempts: 3, errorCode: '2', errorMessage: 'Gave up after 3 attempts.' },
+    });
+    responses = [
+      { status: 500, body: { error: { message: 'Service temporarily unavailable', code: 2 } } },
+    ];
+
+    // Keeping the old count would fail it again on this one transient error.
+    const result = await runner.publishNow(post.id);
+    expect(result).toMatchObject({ failed: 0, retrying: 1 });
+
+    const updated = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(updated.status).toBe('pending');
+    expect(updated.attempts).toBe(1);
+  });
+
+  it('skips a destination that is turned off instead of publishing to it', async () => {
+    const { post, target, postTarget } = await seedDuePost();
+    await prisma.target.update({ where: { id: target.id }, data: { enabled: false } });
+
+    const result = await runner.publishNow(post.id);
+    expect(result).toMatchObject({ claimed: 0, published: 0, skipped: 1 });
+    expect(received).toEqual([]);
+
+    const updated = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(updated.status).toBe('skipped');
+    expect(updated.errorCode).toBe('destination_off');
+
+    // Settled honestly rather than left reading "publishing".
+    const parent = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(parent.status).toBe('failed');
+  });
+});
+
+/**
+ * A link on a post with media. The photos and videos edges have no `link`
+ * field and a feed post with attached media ignores it, so unless it goes in
+ * the text, the link — and the UTM tags on it — silently disappears.
+ */
+describe('links on media posts', () => {
+  async function seedWithMedia(media: Array<{ id: string; kind: 'image' | 'video'; url: string }>) {
+    const seeded = await seedDuePost({ message: 'New menu', link: 'https://example.com/menu' });
+    await prisma.post.update({ where: { id: seeded.post.id }, data: { media } });
+    return seeded;
+  }
+
+  it('puts the link in a single photo caption', async () => {
+    await seedWithMedia([{ id: 'm1', kind: 'image', url: 'https://cdn.example.com/a.jpg' }]);
+    responses = [{ status: 200, body: { id: '3000', post_id: '1000_3001' } }];
+
+    await runner.runSchedulerTick();
+
+    const call = received[0]!;
+    expect(call.path).toContain('/1000/photos');
+    expect(call.body.message).toBe('New menu\n\nhttps://example.com/menu');
+  });
+
+  it('puts the link in a multi-photo caption', async () => {
+    await seedWithMedia([
+      { id: 'm1', kind: 'image', url: 'https://cdn.example.com/a.jpg' },
+      { id: 'm2', kind: 'image', url: 'https://cdn.example.com/b.jpg' },
+    ]);
+    responses = [
+      { status: 200, body: { id: '3000' } },
+      { status: 200, body: { id: '3001' } },
+      { status: 200, body: { id: '1000_3002' } },
+    ];
+
+    await runner.runSchedulerTick();
+
+    const feed = received.find((call) => call.path.includes('/1000/feed'))!;
+    expect(feed.body.message).toBe('New menu\n\nhttps://example.com/menu');
+    expect(feed.body).not.toHaveProperty('link');
+  });
+
+  it('puts the link in a video description and records a working permalink', async () => {
+    const { postTarget } = await seedWithMedia([
+      { id: 'm1', kind: 'video', url: 'https://cdn.example.com/clip.mp4' },
+    ]);
+    responses = [{ status: 200, body: { id: '5555' } }];
+
+    await runner.runSchedulerTick();
+
+    const call = received[0]!;
+    expect(call.path).toContain('/1000/videos');
+    expect(call.body.description).toBe('New menu\n\nhttps://example.com/menu');
+
+    const updated = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    // A bare video id at the site root is not a page URL.
+    expect(updated.remoteUrl).toBe('https://www.facebook.com/1000/videos/5555/');
+  });
 });
 
 /**
@@ -1086,7 +1182,8 @@ describe('reconciling posts scheduled inside Facebook', () => {
 
 
   async function seedHandedOff(overrides: { scheduledFor?: Date } = {}) {
-    const { post, postTarget } = await seedDuePost();
+    const seeded = await seedDuePost();
+    const { post, postTarget } = seeded;
     const scheduledFor = overrides.scheduledFor ?? new Date('2026-09-01T11:00:00Z');
 
     await prisma.post.update({
@@ -1102,7 +1199,7 @@ describe('reconciling posts scheduled inside Facebook', () => {
       },
     });
 
-    return { post, postTarget };
+    return seeded;
   }
 
   it('marks a destination published once Facebook says it went out', async () => {
@@ -1183,5 +1280,65 @@ describe('reconciling posts scheduled inside Facebook', () => {
 
     const after = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
     expect(after.status).toBe('scheduled_remote');
+  });
+
+  it('gives up with an explanation once a post has gone unconfirmed for over a week', async () => {
+    const { post, postTarget } = await seedHandedOff({ scheduledFor: new Date('2026-08-20T11:00:00Z') });
+    responses = [{ status: 200, body: { id: '1000_4242' } }];
+
+    const summary = await jobs.runNativeReconcile({ now, logger });
+    expect(summary).toMatch(/1 never confirmed/);
+
+    const after = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(after.status).toBe('failed');
+    expect(after.errorCode).toBe('unconfirmed_on_facebook');
+
+    const parent = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(parent.status).toBe('failed');
+
+    // It most likely went out, so "Post now" must not send a second copy.
+    received = [];
+    expect((await runner.publishNow(post.id)).claimed).toBe(0);
+    expect(received).toEqual([]);
+  });
+
+  it('does not let a full batch of unconfirmable rows starve newer ones', async () => {
+    const { workspace, user } = await seedHandedOff();
+    // A Page with no usable token: none of its rows can ever be checked.
+    const tokenless = await prisma.target.create({
+      data: { workspaceId: workspace.id, type: 'page', providerId: '2000', name: 'Tokenless Page' },
+    });
+    for (let index = 0; index < 100; index += 1) {
+      await prisma.post.create({
+        data: {
+          workspaceId: workspace.id,
+          authorId: user.id,
+          message: `Old ${index}`,
+          status: 'scheduled',
+          publishMode: 'native',
+          scheduledAt: new Date('2026-08-30T11:00:00Z'),
+          targets: {
+            create: {
+              targetId: tokenless.id,
+              status: 'scheduled_remote',
+              remotePostId: `2000_${index}`,
+              nativeScheduledFor: new Date('2026-08-30T11:00:00Z'),
+            },
+          },
+        },
+      });
+    }
+    // The checkable row is the newest, so it was last in line by schedule.
+    const checkable = await prisma.postTarget.findFirstOrThrow({ where: { remotePostId: '1000_4242' } });
+    await prisma.postTarget.update({ where: { id: checkable.id }, data: { updatedAt: new Date() } });
+    responses = [
+      { status: 200, body: { id: '1000_4242', is_published: true, created_time: '2026-09-01T11:00:05+0000' } },
+    ];
+
+    await jobs.runNativeReconcile({ now, logger });
+    await jobs.runNativeReconcile({ now, logger });
+
+    const after = await prisma.postTarget.findUniqueOrThrow({ where: { id: checkable.id } });
+    expect(after.status).toBe('published');
   });
 });

@@ -337,4 +337,34 @@ export const errors = {
       fallback: 'AI assistance is not configured on this server.',
       status: 503,
     }),
+
+  publishNeedsReview: () =>
+    new AppError({
+      key: 'errors.publishNeedsReview',
+      fallback:
+        'Posts in this workspace are reviewed before they go out, so they cannot be published on the spot. Schedule it and it will go to the approval queue.',
+      status: 403,
+    }),
+
+  emptyPost: () =>
+    new AppError({
+      key: 'errors.emptyPost',
+      fallback: 'Write something, add a link, or attach media.',
+      status: 422,
+    }),
+
+  refreshNoPermission: () =>
+    new AppError({
+      key: 'errors.refreshNoPermission',
+      fallback: 'Only editors and above can pull comments and messages from Facebook.',
+      status: 403,
+    }),
+
+  refreshTooSoon: (seconds: number) =>
+    new AppError({
+      key: 'errors.refreshTooSoon',
+      fallback: `This workspace has just pulled from Facebook. Try again in ${seconds} second(s).`,
+      params: { seconds },
+      status: 429,
+    }),
 };

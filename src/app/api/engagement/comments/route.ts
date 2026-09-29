@@ -24,11 +24,13 @@ export const GET = route(async (request: Request) => {
       targetId: url.searchParams.get('targetId') ?? undefined,
       search: url.searchParams.get('q') ?? undefined,
       hidden: hidden === null ? undefined : hidden === 'true',
+      unanswered: url.searchParams.get('unanswered') === 'true',
       // Clamped here because this is where a number from a stranger arrives.
       // Internal callers ask for what they need — the CSV export wants
       // thousands — but a screen cannot use more than this, and an unbounded
       // one is a join across every comment in the workspace for the asking.
       limit: Math.min(Number.parseInt(url.searchParams.get('limit') ?? '100', 10) || 100, 200),
+      skip: Math.max(0, Number.parseInt(url.searchParams.get('skip') ?? '0', 10) || 0),
     }),
   });
 });

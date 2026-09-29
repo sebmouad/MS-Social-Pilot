@@ -22,7 +22,7 @@ beforeEach(() => {
 afterEach(() => {
   for (const key of KEYS) {
     if (saved[key] === undefined) delete process.env[key];
-    else process.env[key] = saved[key];
+    else (process.env as Record<string, string>)[key] = saved[key]!;
   }
 });
 

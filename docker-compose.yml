@@ -40,6 +40,13 @@ services:
       # the healthcheck below stay true.
       PORT: '3000'
       HOST: '0.0.0.0'
+      # Behind Cloudflare, a tunnel or a reverse proxy — the deployment this
+      # stack is shaped for — set TRUST_PROXY="true" in .env (env_file above
+      # passes it through), or every visitor shares the proxy's address and
+      # the per-client sign-in limit keys on nothing. Not set here: the port
+      # below is published on every interface, and a client reaching it
+      # directly can forge the forwarding headers. When the proxy runs on
+      # this host, publish on loopback too: '127.0.0.1:${APP_PORT:-80}:3000'.
     ports:
       # Host side is configurable, container side is not: inside the network the
       # app is always on 3000, so the healthcheck and the worker do not have to

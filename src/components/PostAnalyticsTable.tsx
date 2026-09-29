@@ -56,18 +56,21 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
       const left = a[sort];
       const right = b[sort];
 
+      // Nulls last, whichever direction: a post with no rate is not "best",
+      // and not "worst" either. Compared as text they sorted as "" — first
+      // when ascending, and in among the numbers by string order otherwise.
+      if (left === null || right === null) {
+        return left === right ? 0 : left === null ? 1 : -1;
+      }
       if (typeof left === 'number' && typeof right === 'number') {
         return descending ? right - left : left - right;
       }
-      // Nulls last, whichever direction: a post with no value is not "best".
-      const leftText = left ?? '';
-      const rightText = right ?? '';
       return descending
-        ? String(rightText).localeCompare(String(leftText))
-        : String(leftText).localeCompare(String(rightText));
+        ? String(right).localeCompare(String(left), locale)
+        : String(left).localeCompare(String(right), locale);
     });
     return copy;
-  }, [posts, sort, descending]);
+  }, [posts, sort, descending, locale]);
 
   function toggle(key: SortKey) {
     if (key === sort) {
@@ -101,20 +104,36 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
 
         {/* A ten-column table has no sortable headers on a phone, so the sort
             moves into a control the card layout can use too. */}
-        <label className="sm:hidden">
-          <span className="sr-only">{t('sortBy')}</span>
-          <select
-            className="input"
-            value={sort}
-            onChange={(event) => toggle(event.target.value as SortKey)}
+        <div className="flex items-center gap-1.5 sm:hidden">
+          <label>
+            <span className="sr-only">{t('sortBy')}</span>
+            <select
+              className="input"
+              value={sort}
+              onChange={(event) => {
+                setSort(event.target.value as SortKey);
+                setDescending(true);
+              }}
+            >
+              {columns.map((column) => (
+                <option key={column.key} value={column.key}>
+                  {column.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {/* Re-picking the selected option fires no change event, so the
+              direction needs a control of its own. */}
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setDescending((value) => !value)}
+            aria-label={descending ? t('sortDescending') : t('sortAscending')}
+            title={descending ? t('sortDescending') : t('sortAscending')}
           >
-            {columns.map((column) => (
-              <option key={column.key} value={column.key}>
-                {column.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            <span aria-hidden>{descending ? '↓' : '↑'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Phones get cards. A horizontally scrolling ten-column table on a
@@ -187,16 +206,25 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
         <table className="w-full min-w-[56rem] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-              <th className="py-2 pr-3 font-medium">{t('post')}</th>
+              <th scope="col" className="py-2 pr-3 font-medium">
+                {t('post')}
+              </th>
               {columns.map((column) => (
-                <th key={column.key} className="py-2 pr-3 text-right font-medium">
+                <th
+                  key={column.key}
+                  scope="col"
+                  className="py-2 pr-3 text-right font-medium"
+                  aria-sort={
+                    sort === column.key ? (descending ? 'descending' : 'ascending') : undefined
+                  }
+                >
                   <button
                     type="button"
                     className={`hover:text-slate-800 ${sort === column.key ? 'text-brand-700' : ''}`}
                     onClick={() => toggle(column.key)}
                   >
                     {column.label}
-                    {sort === column.key && (descending ? ' ↓' : ' ↑')}
+                    {sort === column.key && <span aria-hidden>{descending ? ' ↓' : ' ↑'}</span>}
                   </button>
                 </th>
               ))}
@@ -222,7 +250,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
                       <>
                         {' · '}
                         <ExternalLink href={post.url} className="text-brand-600 hover:underline">
-                          Facebook
+                          {t('viewOnFacebook')}
                         </ExternalLink>
                       </>
                     )}

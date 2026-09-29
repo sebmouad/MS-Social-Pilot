@@ -47,6 +47,14 @@ export interface CoverageView {
 interface Props {
   targetId: string;
   targetName: string;
+  /**
+   * The workspace's zone. Dates are formatted in it on both sides of the
+   * render, so the server's zone and the reader's cannot disagree about which
+   * day a data point ends on.
+   */
+  timeZone: string;
+  /** Whether this member may make the server call Graph (editor and up). */
+  canSync: boolean;
   series: SeriesView[];
   availability: AvailabilityView[];
   coverage: CoverageView[];
@@ -88,6 +96,8 @@ const HEADLINE = [
 export function AnalyticsClient({
   targetId,
   targetName,
+  timeZone,
+  canSync,
   series,
   availability,
   coverage,
@@ -142,29 +152,47 @@ export function AnalyticsClient({
   const shown = categories.reduce((sum, [, rows]) => sum + rows.length, 0);
   const unavailable = availability.filter((entry) => !entry.available);
 
-  async function sync() {
-    setSyncing(true);
+  /**
+   * Post one action and settle the busy flag whatever happens.
+   *
+   * The `finally` matters: a dropped connection throws out of `fetch`, and
+   * without it the buttons stayed on "Working…" and the whole screen greyed
+   * out until a reload.
+   */
+  async function run<T>(
+    action: 'sync' | 'probeAll',
+    setBusy: (value: boolean) => void,
+    onSuccess: (body: T) => void,
+  ) {
+    setBusy(true);
     setError(null);
     setMessage(null);
 
-    const response = await fetch(`/api/analytics/${targetId}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ action: 'sync' }),
-    });
-    const body = (await response.json().catch(() => ({}))) as {
-      stored?: number;
-      metrics?: number;
-      error?: string;
-    };
+    try {
+      const response = await fetch(`/api/analytics/${targetId}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const body = (await response.json().catch(() => ({}))) as T & { error?: string };
 
-    if (!response.ok || body.error) {
-      setError(body.error ?? t('syncFailed'));
-    } else {
-      setMessage(t('synced', { stored: body.stored ?? 0, metrics: body.metrics ?? 0 }));
-      router.refresh();
+      if (!response.ok || body.error) {
+        setError(body.error ?? t('syncFailed'));
+      } else {
+        onSuccess(body);
+        router.refresh();
+      }
+    } catch {
+      setError(t('syncFailed'));
+    } finally {
+      setBusy(false);
     }
-    setSyncing(false);
+  }
+
+  function sync() {
+    return run<{ stored?: number; metrics?: number }>('sync', setSyncing, (body) =>
+      setMessage(t('synced', { stored: body.stored ?? 0, metrics: body.metrics ?? 0 })),
+    );
   }
 
   /**
@@ -175,30 +203,16 @@ export function AnalyticsClient({
    * destination at all — against a real Page, a real post, a real video and,
    * when linked, a real Instagram account.
    */
-  async function probeAll() {
-    setProbing(true);
-    setError(null);
-    setMessage(null);
-
-    const response = await fetch(`/api/analytics/${targetId}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ action: 'probeAll' }),
-    });
-    const body = (await response.json().catch(() => ({}))) as {
-      levels?: Array<{ checked: number; available: number }>;
-      error?: string;
-    };
-
-    if (!response.ok || body.error) {
-      setError(body.error ?? t('syncFailed'));
-    } else {
-      const checked = (body.levels ?? []).reduce((sum, level) => sum + level.checked, 0);
-      const available = (body.levels ?? []).reduce((sum, level) => sum + level.available, 0);
-      setMessage(t('probed', { checked, available }));
-      router.refresh();
-    }
-    setProbing(false);
+  function probeAll() {
+    return run<{ levels?: Array<{ checked: number; available: number }> }>(
+      'probeAll',
+      setProbing,
+      (body) => {
+        const checked = (body.levels ?? []).reduce((sum, level) => sum + level.checked, 0);
+        const available = (body.levels ?? []).reduce((sum, level) => sum + level.available, 0);
+        setMessage(t('probed', { checked, available }));
+      },
+    );
   }
 
   const busy = syncing || probing;
@@ -247,7 +261,7 @@ export function AnalyticsClient({
             rows: featuredSeries.points
               .filter((point) => typeof point.value === 'number')
               .map((point) => [
-                new Date(point.endTime).toLocaleDateString(locale),
+                new Date(point.endTime).toLocaleDateString(locale, { timeZone }),
                 point.value as number,
               ]),
           }}
@@ -263,7 +277,7 @@ export function AnalyticsClient({
               },
             ]}
             formatX={(iso) =>
-              new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' })
+              new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone })
             }
           />
         </ChartFrame>
@@ -278,9 +292,11 @@ export function AnalyticsClient({
             <h2 className="text-sm font-semibold text-slate-900">{t('coverageTitle')}</h2>
             <p className="mt-0.5 text-xs text-slate-500">{t('coverageHint')}</p>
           </div>
-          <button type="button" className="btn-secondary" onClick={probeAll} disabled={busy}>
-            {probing ? tCommon('working') : t('probeAll')}
-          </button>
+          {canSync && (
+            <button type="button" className="btn-secondary" onClick={probeAll} disabled={busy}>
+              {probing ? tCommon('working') : t('probeAll')}
+            </button>
+          )}
         </div>
 
         <ul className="mt-4 space-y-3">
@@ -326,25 +342,31 @@ export function AnalyticsClient({
       {/* The browsable catalogue. Filter row above the content it scopes. */}
       <div className="filter-row justify-between">
         <input
+          type="search"
           className="input w-full sm:w-64"
+          aria-label={t('filterLabel')}
           placeholder={t('filterPlaceholder')}
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
         />
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-500">{t('metricsShown', { count: shown })}</span>
-          <button type="button" className="btn-primary" onClick={sync} disabled={busy}>
-            {syncing ? tCommon('working') : t('syncNow')}
-          </button>
+          {canSync && (
+            <button type="button" className="btn-primary" onClick={sync} disabled={busy}>
+              {syncing ? tCommon('working') : t('syncNow')}
+            </button>
+          )}
         </div>
       </div>
 
       {series.length === 0 ? (
         <div className="card p-8 text-center">
           <p className="text-sm text-slate-600">{t('noData')}</p>
-          <button type="button" className="btn-primary mt-4" onClick={sync} disabled={busy}>
-            {syncing ? tCommon('working') : t('syncNow')}
-          </button>
+          {canSync && (
+            <button type="button" className="btn-primary mt-4" onClick={sync} disabled={busy}>
+              {syncing ? tCommon('working') : t('syncNow')}
+            </button>
+          )}
         </div>
       ) : (
         categories.map(([category, metrics]) => (

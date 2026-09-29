@@ -84,6 +84,18 @@ export function clear(key: string): void {
   windows.delete(key);
 }
 
+/**
+ * Take back `attempts` counted against `key`, and no more.
+ *
+ * For attempts that turned out not to be what the limit is for — a correct
+ * password, say — where `clear` would also wipe unrelated failures counted
+ * under the same key.
+ */
+export function forgive(key: string, attempts = 1): void {
+  const window = windows.get(key);
+  if (window) window.count = Math.max(0, window.count - attempts);
+}
+
 /** Test seam: drop everything. */
 export function reset(): void {
   windows.clear();
