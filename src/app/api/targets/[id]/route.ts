@@ -27,7 +27,13 @@ export const PATCH = route(async (request: Request, context: { params: Promise<{
     throw errors.adminsOnlyDestinations();
   }
   if (result.outcome === 'not_found') throw errors.destinationNotFound();
-  if (result.outcome === 'blocked') return fail(result.reason ?? 'Cannot enable this destination.', 409);
+  if (result.outcome === 'blocked') {
+    // The reason is what Facebook said when the destination was last checked,
+    // passed through untranslated like every Graph message; only the fallback
+    // for a blocker with no recorded reason is ours to translate.
+    if (result.reason) return fail(result.reason, 409);
+    throw errors.destinationBlocked();
+  }
 
   // Passed on rather than dropped: turning a destination off does not stop
   // Facebook publishing what it already holds, and this is the moment somebody

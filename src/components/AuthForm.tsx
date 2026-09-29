@@ -51,6 +51,11 @@ export function AuthForm({ mode, inviteToken }: Props) {
   // invitation either — it is the same detour, one click longer.
   const withInvite = (path: string): string => withInviteParam(path, inviteToken);
 
+  // Ties a field's message to the field, so a screen reader announces it on
+  // focus rather than leaving it as loose text further down the form.
+  const fieldState = (name: string) =>
+    fields[name] ? { 'aria-invalid': true, 'aria-describedby': `${name}-error` } : {};
+
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
@@ -60,11 +65,20 @@ export function AuthForm({ mode, inviteToken }: Props) {
     const form = new FormData(event.currentTarget);
     const payload = Object.fromEntries(form.entries());
 
-    const response = await fetch(`/api/auth/${mode}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`/api/auth/${mode}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      // A dropped connection rejects rather than answering; without this the
+      // button would say "Please wait…" for as long as the tab stays open.
+      setError(t('networkError'));
+      setPending(false);
+      return;
+    }
 
     if (!response.ok) {
       const body = (await response.json().catch(() => ({}))) as {
@@ -77,6 +91,8 @@ export function AuthForm({ mode, inviteToken }: Props) {
       return;
     }
 
+    // Pending stays on through the navigation: the session exists now, and a
+    // second click would only register the same account again.
     // Server components read the session cookie, so refresh before navigating.
     router.refresh();
     router.push(afterAuthPath(inviteToken));
@@ -99,8 +115,15 @@ export function AuthForm({ mode, inviteToken }: Props) {
             <label className="label" htmlFor="name">
               {t('name')}
             </label>
-            <input id="name" name="name" className="input" required autoComplete="name" />
-            {fields.name && <p className="error-text">{fields.name}</p>}
+            <input
+              id="name"
+              name="name"
+              className="input"
+              required
+              autoComplete="name"
+              {...fieldState('name')}
+            />
+            {fields.name && <p id="name-error" className="error-text">{fields.name}</p>}
           </div>
         )}
 
@@ -115,8 +138,9 @@ export function AuthForm({ mode, inviteToken }: Props) {
             className="input"
             required
             autoComplete="email"
+            {...fieldState('email')}
           />
-          {fields.email && <p className="error-text">{fields.email}</p>}
+          {fields.email && <p id="email-error" className="error-text">{fields.email}</p>}
         </div>
 
         <div>
@@ -130,9 +154,10 @@ export function AuthForm({ mode, inviteToken }: Props) {
             className="input"
             required
             autoComplete={isRegister ? 'new-password' : 'current-password'}
+            {...fieldState('password')}
           />
           {isRegister && <p className="hint">{t('passwordHint')}</p>}
-          {fields.password && <p className="error-text">{fields.password}</p>}
+          {fields.password && <p id="password-error" className="error-text">{fields.password}</p>}
         </div>
 
         {isRegister && (
@@ -146,7 +171,7 @@ export function AuthForm({ mode, inviteToken }: Props) {
         )}
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </div>
         )}

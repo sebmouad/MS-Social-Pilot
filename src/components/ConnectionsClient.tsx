@@ -101,6 +101,11 @@ export function ConnectionsClient({
       }
       router.refresh();
       return payload;
+    } catch {
+      // Unhandled, a dropped connection would surface as nothing at all — the
+      // button re-enables and the reader assumes it worked.
+      setError(t('networkError'));
+      return null;
     } finally {
       setBusy(null);
     }
@@ -181,12 +186,12 @@ export function ConnectionsClient({
   return (
     <div className="space-y-6">
       {error && (
-        <p className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           <Icon name="error" /> {error}
         </p>
       )}
       {notice && (
-        <p className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+        <p role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           <Icon name="check" /> {notice}
         </p>
       )}
@@ -432,6 +437,7 @@ function TargetList({
                   type="checkbox"
                   className="h-4 w-4 rounded border-slate-300"
                   checked={target.enabled}
+                  aria-label={t('toggleDestination', { name: target.name })}
                   disabled={!canManage || busy === target.id}
                   onChange={(event) => onToggle(target.id, event.target.checked)}
                 />
@@ -518,6 +524,7 @@ function LinkedAccounts({
                   type="checkbox"
                   className="h-4 w-4 rounded border-slate-300"
                   checked={account.enabled}
+                  aria-label={t('toggleAccount', { name: account.label })}
                   disabled={!canManage || busy === account.id}
                   onChange={(event) =>
                     call(account.id, `${togglePath}/${account.id}`, 'PATCH', {

@@ -35,7 +35,9 @@ export function SettingsNav({
   ];
 
   return (
-    <nav className="scroll-x flex gap-1 border-b border-slate-200 pb-3">
+    // Named, because the page already has a main navigation: two unnamed
+    // landmarks read as "navigation, navigation" to a screen reader.
+    <nav aria-label={t('settings.title')} className="scroll-x flex gap-1 border-b border-slate-200 pb-3">
       {tabs.map((tab) => {
         // Exact match for /settings so it does not light up on its children.
         const active = tab.href === '/settings' ? pathname === tab.href : pathname.startsWith(tab.href);

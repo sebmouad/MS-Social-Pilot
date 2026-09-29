@@ -337,4 +337,11 @@ export const errors = {
       fallback: 'AI assistance is not configured on this server.',
       status: 503,
     }),
+
+  destinationBlocked: () =>
+    new AppError({
+      key: 'errors.destinationBlocked',
+      fallback: 'This destination cannot be published to right now, so it cannot be turned on.',
+      status: 409,
+    }),
 };

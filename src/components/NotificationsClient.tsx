@@ -23,7 +23,7 @@ export function NotificationsClient({
   const [preferences, setPreferences] = useState(initial);
   const [pending, setPending] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const rows: Array<{ key: keyof NotificationPreferences; label: string }> = [
     { key: 'onPublishFailure', label: t('onPublishFailure') },
@@ -35,18 +35,26 @@ export function NotificationsClient({
   async function save() {
     setPending(true);
     setSaved(false);
-    setFailed(false);
-    // Said "saved" whatever happened, including a 401 from an expired session
-    // or no network at all — the one outcome a preferences screen must not
-    // claim is one where nothing was saved.
-    const response = await fetch('/api/notifications', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(preferences),
-    }).catch(() => null);
-    setPending(false);
-    if (response?.ok) setSaved(true);
-    else setFailed(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(preferences),
+      });
+      // "Saved" after a refusal is the worst answer here: the person stops
+      // watching for failures on the strength of an email that will never come.
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? t('saveFailed'));
+        return;
+      }
+      setSaved(true);
+    } catch {
+      setError(t('networkError'));
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -75,14 +83,18 @@ export function NotificationsClient({
         ))}
       </ul>
 
-      <div className="mt-5 flex items-center gap-3">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <button type="button" className="btn-primary" onClick={save} disabled={pending}>
           {pending ? tCommon('working') : tCommon('save')}
         </button>
-        {saved && <span className="text-sm text-emerald-600">{t('saved')}</span>}
-        {failed && (
+        {saved && (
+          <span role="status" className="text-sm text-emerald-600">
+            {t('saved')}
+          </span>
+        )}
+        {error && (
           <span role="alert" className="text-sm text-red-600">
-            {t('saveFailed')}
+            {error}
           </span>
         )}
       </div>
