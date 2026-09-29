@@ -135,12 +135,20 @@ export function canManageSettings(role: WorkspaceRole): boolean {
  * Change instance-wide configuration: API credentials, job intervals, feature
  * switches.
  *
- * Owner only. These settings are not scoped to a workspace — an agency admin
- * for one client must not be able to change the Graph version, or read out the
- * fact that an API key is set, for every other client on the installation.
+ * The installation's owner only — the person who created its first account —
+ * and deliberately not a workspace role. These settings are not scoped to a
+ * workspace: an agency admin for one client must not be able to change the
+ * Graph version, or read out the fact that an API key is set, for every other
+ * client on the installation. And owning *a* workspace proves nothing, because
+ * everybody who registers is given one of their own to own; a role check here
+ * let anyone invited as a contributor switch to that workspace and rewrite the
+ * Facebook app credentials for everybody.
+ *
+ * Takes the auth context rather than a role for that reason, so a caller cannot
+ * go back to asking the wrong question by passing `auth.role`.
  */
-export function canManageInstance(role: WorkspaceRole): boolean {
-  return atLeast(role, WorkspaceRole.owner);
+export function canManageInstance(auth: { isInstanceOwner: boolean }): boolean {
+  return auth.isInstanceOwner === true;
 }
 
 /**

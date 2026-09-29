@@ -259,6 +259,7 @@ Cloudflare answers 443 with its own certificate, and forwards to this server.
 ```
 APP_URL="https://your.domain"
 PORT="80"
+TRUST_PROXY="true"
 ```
 
 **Set the SSL/TLS mode to Full, not Flexible.** Flexible makes the hop from
@@ -304,6 +305,16 @@ happens to arrive over TLS. Behind a terminator the app itself sees plain http,
 and deriving the flag from the request would quietly drop `secure` on every
 session cookie in exactly that deployment. The Docker image sets `NODE_ENV`, and
 `next start` sets it too.
+
+**`TRUST_PROXY` must be set for any forwarding header to be read.** Unset (the
+default), `cf-connecting-ip`, `x-forwarded-for` and `x-real-ip` are all
+ignored: anyone who can reach the app directly can write them, and believing
+them let one machine claim a fresh address for every sign-in attempt. Set
+`TRUST_PROXY="true"` behind Cloudflare, a tunnel or a reverse proxy — and then
+make sure the proxy is the *only* way in (`HOST=127.0.0.1`, or a firewall that
+admits only the proxy), or the headers are no more trustworthy than before.
+Without it the sign-in limit keys on the email address alone, and short-link
+clicks are counted without an address.
 
 **`X-Forwarded-For` is read in two places**, and it is worth knowing what each
 one does with it:

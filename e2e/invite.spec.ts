@@ -96,6 +96,29 @@ test.describe('the invited colleague, in French', () => {
     await context.close();
   });
 
+  test('cannot reach the installation settings', async ({ browser }) => {
+    // Registering gave them a workspace of their own to own, which used to be
+    // enough to rewrite the Facebook app credentials for every client here.
+    const context = await browser.newContext({ storageState: 'e2e/.auth/colleague.json' });
+    const page = await context.newPage();
+
+    await open(page, '/settings/config');
+    await expect(page.getByText(/only the owner of this installation|seul le propriétaire de cette installation/i))
+      .toBeVisible();
+
+    expect((await page.request.get('/api/settings/config')).status()).toBe(403);
+    const write = await page.request.post('/api/settings/config', {
+      data: { values: { 'facebook.graphVersion': 'v1.0' } },
+    });
+    expect(write.status()).toBe(403);
+    const setup = await page.request.post('/api/setup', {
+      data: { facebookAppId: 'someone-else', facebookAppSecret: 'x' },
+    });
+    expect(setup.status()).toBe(403);
+
+    await context.close();
+  });
+
   // An editor sees fewer screens than an owner; the ones they do see must be
   // whole. A missing French key throws, so rendering at all is the assertion.
   for (const path of SIGNED_IN_SCREENS) {
