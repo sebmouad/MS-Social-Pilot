@@ -659,7 +659,7 @@
     "name": "Nom",
     "url": "URL du flux",
     "template": "Modèle de publication",
-    "templateHint": "Utilisez {'{{'}title{'}}'}, {'{{'}link{'}}'} et {'{{'}description{'}}'}.",
+    "templateHint": "Utilisez '{{title}}', '{{link}}' et '{{description}}'.",
     "destinations": "Destinations",
     "autoApprove": "Planifier automatiquement les nouveaux articles",
     "autoApproveHint": "Si désactivé, les nouveaux articles passent par la file de validation.",
@@ -670,7 +670,21 @@
     "itemsImported": "{count, plural, one {# article importé} other {# articles importés}}",
     "pollNow": "Vérifier maintenant",
     "deleteConfirm": "Supprimer ce flux ? Les publications déjà créées sont conservées.",
-    "errorCount": "{count, plural, one {# erreur consécutive} other {# erreurs consécutives}}"
+    "errorCount": "{count, plural, one {# erreur consécutive} other {# erreurs consécutives}}",
+    "saved": "Flux enregistré.",
+    "pollFailed": "Le flux n’a pas pu être vérifié. La raison est indiquée sur le flux ci-dessous.",
+    "autoApproveOn": "Planification automatique",
+    "autoApproveOff": "Validation requise",
+    "recent": "Importés récemment",
+    "untitled": "Article sans titre",
+    "importedAt": "Importé {when}",
+    "viewPost": "Voir la publication",
+    "noPost": "Rien à publier",
+    "preview": "Aperçu",
+    "previewEmpty": "Ce modèle produit une publication vide.",
+    "sampleTitle": "Un exemple de titre",
+    "sampleDescription": "Les premières lignes de l’article apparaissent ici.",
+    "noDestinations": "Connectez d’abord une Page ou un Groupe Facebook : les flux y publient."
   },
   "history": {
     "actions": {
