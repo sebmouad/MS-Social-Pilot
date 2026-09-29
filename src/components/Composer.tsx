@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -101,6 +102,9 @@ export function Composer({
   const [result, setResult] = useState<string | null>(null);
   /** Permalinks for a post that has just gone out, so it can be checked. */
   const [published, setPublished] = useState<Array<{ name: string; url: string }>>([]);
+  /** A post that was made but reached only some of its destinations. */
+  const [partial, setPartial] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   /**
    * Keep the two text boxes uncontrolled, and read them once on mount.
@@ -148,6 +152,44 @@ export function Composer({
   const selectedTargets = targets.filter((target) => selected.includes(target.id));
   const hasGroupSelected = selectedTargets.some((target) => target.type === 'group');
   const hasInstagramSelected = selectedTargets.some((target) => target.type === 'instagram');
+  // Facebook's own scheduler holds Page posts only: a Group has no such API
+  // and Instagram's publishes on the spot. Rather than let the choice stand
+  // and have the server refuse it, the app takes over while either is ticked.
+  const nativeBlocked = hasGroupSelected || hasInstagramSelected;
+  const effectiveHandler: Handler = nativeBlocked ? 'worker' : handler;
+  // Instagram has no text-only post; said now rather than at the scheduled
+  // moment. A draft can still be saved while the picture is found.
+  const instagramNeedsMedia = hasInstagramSelected && media.length === 0;
+  // A destination switched off since this post was written stays ticked so
+  // the author sees it, but the server will not accept it; say which to untick.
+  const switchedOff = selectedTargets.filter((target) => !target.canPublish);
+
+  /**
+   * Whether leaving now would lose something.
+   *
+   * A new post counts as unsaved once it has any content; an edit, once it
+   * differs from what was loaded. Destinations and time alone do not count on
+   * a new post — they are two clicks to redo, and warning over them would make
+   * the guard fire on every visit.
+   */
+  const dirty = editing
+    ? message !== editing.message ||
+      link !== (editing.link ?? '') ||
+      JSON.stringify(media) !== JSON.stringify(editing.media) ||
+      [...selected].sort().join() !== [...editing.targetIds].sort().join() ||
+      scheduledAt !== (editing.scheduledAtLocal ?? defaultScheduledAt)
+    : message.trim().length > 0 || link.trim().length > 0 || media.length > 0;
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Older browsers show the prompt only when this is set.
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   const loadPreview = useCallback(
     async (url: string, refresh = false) => {
@@ -175,141 +217,167 @@ export function Composer({
 
   async function uploadFiles(files: FileList) {
     setError(null);
-    for (const file of Array.from(files).slice(0, LIMITS.mediaPerPost - media.length)) {
-      const form = new FormData();
-      form.set('file', file);
+    setUploading(true);
+    // Every refusal names its file. Several can go wrong in one pick, and
+    // "File too large" on its own leaves the author guessing which one.
+    const problems: string[] = [];
+    try {
+      for (const file of Array.from(files).slice(0, LIMITS.mediaPerPost - media.length)) {
+        const form = new FormData();
+        form.set('file', file);
 
-      const response = await fetch('/api/media', { method: 'POST', body: form });
-      const body = (await response.json()) as PostMedia & { error?: string };
-
-      if (!response.ok) {
-        setError(body.error ?? `${file.name}: ${body.error ?? ''}`.trim());
-        continue;
+        try {
+          const response = await fetch('/api/media', { method: 'POST', body: form });
+          const body = (await response.json().catch(() => ({}))) as PostMedia & { error?: string };
+          if (!response.ok) {
+            problems.push(`${file.name}: ${body.error ?? t('uploadFailed')}`);
+            continue;
+          }
+          setMedia((current) => [...current, body]);
+        } catch {
+          problems.push(`${file.name}: ${t('uploadFailed')}`);
+        }
       }
-      setMedia((current) => [...current, body]);
+    } finally {
+      if (problems.length > 0) setError(problems.join(' · '));
+      setUploading(false);
+      if (fileInput.current) fileInput.current.value = '';
     }
-    if (fileInput.current) fileInput.current.value = '';
+  }
+
+  function setAltText(id: string, altText: string) {
+    setMedia((current) =>
+      current.map((item) => (item.id === id ? { ...item, altText: altText || undefined } : item)),
+    );
   }
 
   async function submit(saveAsDraft: boolean) {
     setPending(true);
     setError(null);
     setResult(null);
+    setPartial(null);
     setPublished([]);
 
-    const publishMode = timing === 'now' ? 'immediate' : handler;
+    const publishMode = timing === 'now' ? 'immediate' : effectiveHandler;
 
-    // Editing takes a narrower route on purpose. "Publish now" and the queue
-    // are ways of *starting* a post; a post that already exists has a place in
-    // the calendar, and the thing being changed here is its content and when
-    // it goes out.
-    const response = editing
-      ? await fetch(`/api/posts/${editing.id}`, {
-          method: 'PATCH',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            message,
-            link: link.trim() ? link.trim() : null,
-            media,
-            targetIds: selected,
-            publishMode: handler,
-            scheduledAtLocal: saveAsDraft ? null : scheduledAt,
-            timezone,
-          }),
-        })
-      : await fetch('/api/posts', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            message,
-            link: link.trim() ? link.trim() : null,
-            media,
-            targetIds: selected,
-            publishMode,
-            scheduledAtLocal: timing === 'schedule' ? scheduledAt : null,
-            timezone,
-            useQueue: timing === 'queue',
-            saveAsDraft,
-          }),
-        });
+    try {
+      // Editing takes a narrower route on purpose. "Publish now" and the queue
+      // are ways of *starting* a post; a post that already exists has a place in
+      // the calendar, and the thing being changed here is its content and when
+      // it goes out.
+      const response = editing
+        ? await fetch(`/api/posts/${editing.id}`, {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              message,
+              link: link.trim() ? link.trim() : null,
+              media,
+              targetIds: selected,
+              publishMode: effectiveHandler,
+              scheduledAtLocal: saveAsDraft ? null : scheduledAt,
+              timezone,
+            }),
+          })
+        : await fetch('/api/posts', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              message,
+              link: link.trim() ? link.trim() : null,
+              media,
+              targetIds: selected,
+              publishMode,
+              scheduledAtLocal: timing === 'schedule' ? scheduledAt : null,
+              timezone,
+              useQueue: timing === 'queue',
+              saveAsDraft,
+            }),
+          });
 
-    const body = (await response.json().catch(() => ({}))) as {
-      error?: string;
-      fields?: Record<string, string>;
-      postId?: string;
-      scheduledAt?: string | null;
-      results?: Array<{ targetName: string; status: string; url?: string; error?: string }>;
-    };
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        fields?: Record<string, string>;
+        postId?: string;
+        scheduledAt?: string | null;
+        results?: Array<{ targetName: string; status: string; url?: string; error?: string }>;
+      };
 
-    if (!response.ok) {
-      const fieldError = body.fields ? Object.values(body.fields)[0] : undefined;
-      setError(fieldError ?? body.error ?? t('couldNotSave'));
-      setPending(false);
-      return;
-    }
+      if (!response.ok) {
+        const fieldError = body.fields ? Object.values(body.fields)[0] : undefined;
+        setError(fieldError ?? body.error ?? t('couldNotSave'));
+        return;
+      }
 
-    const failures = (body.results ?? []).filter((item) => item.status === 'failed');
-    if (failures.length > 0) {
-      setError(
-        t('publishedWithProblems', {
-          details: failures
-            .map((failure) => `${failure.targetName} — ${failure.error ?? ''}`.trim())
-            .join('; '),
-        }),
+      // Editing ends by going back to the list the Edit button came from, where
+      // the changed row is on screen. Emptying the form and staying put would
+      // look like the post had been thrown away.
+      if (editing) {
+        router.push('/posts');
+        router.refresh();
+        return;
+      }
+
+      // From here on the post exists, whatever happened to its destinations,
+      // so the form is emptied either way. Leaving it filled after a partial
+      // failure invited pressing the button again — which made a second post
+      // and published it a second time to every Page that had worked.
+      setPublished(
+        (body.results ?? [])
+          .filter((item) => item.status === 'published' && item.url)
+          .map((item) => ({ name: item.targetName, url: item.url! })),
       );
+      writeMessage('');
+      writeLink('');
+      setPreview(null);
+      setMedia([]);
+      router.refresh();
+
+      const failures = (body.results ?? []).filter((item) => item.status === 'failed');
+      if (failures.length > 0) {
+        setPartial(
+          t('publishedWithProblems', {
+            details: failures
+              .map((failure) => `${failure.targetName} — ${failure.error ?? ''}`.trim())
+              .join('; '),
+          }),
+        );
+        return;
+      }
+
+      // The queue picks the time on the server, so this is the only place the
+      // author is told which slot they got. "Scheduled" on its own leaves them
+      // to go and find out.
+      const queuedFor =
+        timing === 'queue' && body.scheduledAt
+          ? formatInZone(new Date(body.scheduledAt), timezone, undefined, locale)
+          : null;
+
+      setResult(
+        saveAsDraft
+          ? t('savedDraft')
+          : needsApproval
+            ? t('submittedOk')
+            : timing === 'now'
+              ? t('publishedOk')
+              : queuedFor
+                ? t('queuedOk', { when: queuedFor })
+                : t('scheduledOk'),
+      );
+    } catch {
+      setError(t('couldNotSave'));
+    } finally {
       setPending(false);
-      router.refresh();
-      return;
     }
-
-    // Editing ends by going back to the list the Edit button came from, where
-    // the changed row is on screen. Emptying the form and staying put would
-    // look like the post had been thrown away.
-    if (editing) {
-      router.push('/posts');
-      router.refresh();
-      return;
-    }
-
-    // The queue picks the time on the server, so this is the only place the
-    // author is told which slot they got. "Scheduled" on its own leaves them
-    // to go and find out.
-    setPublished(
-      (body.results ?? [])
-        .filter((item) => item.status === 'published' && item.url)
-        .map((item) => ({ name: item.targetName, url: item.url! })),
-    );
-
-    const queuedFor =
-      timing === 'queue' && body.scheduledAt
-        ? formatInZone(new Date(body.scheduledAt), timezone, undefined, locale)
-        : null;
-
-    setResult(
-      saveAsDraft
-        ? t('savedDraft')
-        : needsApproval
-          ? t('submittedOk')
-          : timing === 'now'
-            ? t('publishedOk')
-            : queuedFor
-              ? t('queuedOk', { when: queuedFor })
-              : t('scheduledOk'),
-    );
-    writeMessage('');
-    writeLink('');
-    setPreview(null);
-    setMedia([]);
-    setPending(false);
-    router.refresh();
   }
 
   // A contributor in a workspace with approval on is submitting, not
   // scheduling, and the button must say so.
   const needsApproval = requiresApproval && !canPublishDirectly;
 
+  const hasContent = message.trim().length > 0 || link.trim().length > 0 || media.length > 0;
   const canSubmit =
-    !pending && selected.length > 0 && (message.trim().length > 0 || link.trim().length > 0 || media.length > 0);
+    !pending && !uploading && selected.length > 0 && hasContent && !instagramNeedsMedia;
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -416,28 +484,47 @@ export function Composer({
               className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-slate-200"
               onChange={(event) => event.target.files && uploadFiles(event.target.files)}
             />
-            <p className="hint">{t('mediaHint', { max: LIMITS.mediaPerPost })}</p>
+            <p className="hint">{uploading ? t('uploading') : t('mediaHint', { max: LIMITS.mediaPerPost })}</p>
 
             {media.length > 0 && (
-              <ul className="mt-3 flex flex-wrap gap-2">
-                {media.map((item) => (
-                  <li key={item.id} className="relative">
-                    {item.kind === 'image' ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.url} alt="" className="h-20 w-20 rounded-lg border border-slate-200 object-cover" />
-                    ) : (
-                      <span className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-xs text-slate-600">
-                        {t('video')}
-                      </span>
+              <ul className="mt-3 flex flex-wrap gap-3">
+                {media.map((item, index) => (
+                  <li key={item.id} className="w-28">
+                    <div className="relative h-20 w-20">
+                      {item.kind === 'image' ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.url}
+                          alt={item.altText ?? ''}
+                          className="h-20 w-20 rounded-lg border border-slate-200 object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-xs text-slate-600">
+                          {t('video')}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        aria-label={t('removeAttachment')}
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-xs text-white"
+                        onClick={() => setMedia((current) => current.filter((entry) => entry.id !== item.id))}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    {/* A description for people using screen readers, kept
+                        with the picture it describes. Only photos ask for one:
+                        a video carries its own captions. */}
+                    {item.kind === 'image' && (
+                      <input
+                        className="input mt-1.5 px-2 py-1 text-xs"
+                        placeholder={t('altText')}
+                        aria-label={t('altTextFor', { number: index + 1 })}
+                        maxLength={1000}
+                        value={item.altText ?? ''}
+                        onChange={(event) => setAltText(item.id, event.target.value)}
+                      />
                     )}
-                    <button
-                      type="button"
-                      aria-label={t('removeAttachment')}
-                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-xs text-white"
-                      onClick={() => setMedia((current) => current.filter((entry) => entry.id !== item.id))}
-                    >
-                      ×
-                    </button>
                   </li>
                 ))}
               </ul>
@@ -450,6 +537,16 @@ export function Composer({
         <section className="card p-5">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">{t('whereToPost')}</h2>
           <TargetPicker targets={targets} selected={selected} onChange={setSelected} />
+          {switchedOff.length > 0 && (
+            <p className="mt-2 text-xs text-amber-700">
+              {t('untickSwitchedOff', { names: switchedOff.map((target) => target.name).join(', ') })}
+            </p>
+          )}
+          {instagramNeedsMedia && (
+            <p className="mt-2 text-xs text-amber-700" role="status">
+              {t('instagramNeedsMedia')}
+            </p>
+          )}
         </section>
 
         <section className="card p-5">
@@ -530,7 +627,7 @@ export function Composer({
                     type="radio"
                     name="handler"
                     className="mt-0.5 h-3.5 w-3.5 border-slate-300 text-brand-500"
-                    checked={handler === 'worker'}
+                    checked={effectiveHandler === 'worker'}
                     onChange={() => setHandler('worker')}
                   />
                   <span>
@@ -543,14 +640,19 @@ export function Composer({
                     type="radio"
                     name="handler"
                     className="mt-0.5 h-3.5 w-3.5 border-slate-300 text-brand-500"
-                    checked={handler === 'native'}
-                    disabled={hasGroupSelected}
+                    checked={effectiveHandler === 'native'}
+                    disabled={nativeBlocked}
                     onChange={() => setHandler('native')}
                   />
                   <span>
                     <strong className="font-medium text-slate-800">{t('facebook')}</strong>{' '}
                     {t('facebookHint')}
-                    {hasGroupSelected && t('facebookGroupWarning')}.
+                    {hasGroupSelected
+                      ? t('facebookGroupWarning')
+                      : hasInstagramSelected
+                        ? t('facebookInstagramWarning')
+                        : ''}
+                    .
                   </span>
                 </label>
               </div>
@@ -559,11 +661,33 @@ export function Composer({
         </section>
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+          <div
+            role="alert"
+            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 [overflow-wrap:anywhere]"
+          >
+            {error}
+          </div>
         )}
-        {result && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            <p>{result}</p>
+        {(result || partial) && (
+          <div
+            role={partial ? 'alert' : 'status'}
+            className={`rounded-lg border px-3 py-2 text-sm [overflow-wrap:anywhere] ${
+              partial
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            }`}
+          >
+            <p>{partial ?? result}</p>
+            {/* Where to go from a partial failure: the post exists, and the
+                list's "Retry failed" sends it to the missing destinations only. */}
+            {partial && (
+              <p className="mt-1">
+                {t('retryFromList')}{' '}
+                <Link href="/posts" className="font-medium underline underline-offset-2">
+                  {t('openPostList')}
+                </Link>
+              </p>
+            )}
             {/* The permalink comes back with the publish and is thrown away
                 everywhere else. Right after posting is when somebody wants to
                 look at what went out — telling them it worked and making them
@@ -594,7 +718,7 @@ export function Composer({
                     ? t('publishNow')
                     : t('schedule')}
           </button>
-          <button type="button" className="btn-secondary" disabled={pending} onClick={() => submit(true)}>
+          <button type="button" className="btn-secondary" disabled={pending || uploading} onClick={() => submit(true)}>
             {editing ? t('moveToDrafts') : t('saveDraft')}
           </button>
         </div>

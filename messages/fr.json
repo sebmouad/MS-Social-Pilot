@@ -238,7 +238,11 @@
     "title": "Calendrier",
     "timesShownIn": "Heures affichées en {timezone}.",
     "newPostOn": "Nouvelle publication le {date}",
-    "more": "+{count} de plus"
+    "more": "+{count} de plus",
+    "unscheduledDrafts": "Brouillons sans date",
+    "unscheduledDraftsHint": "Les brouillons sans date n'apparaissent pas dans la grille. {count, plural, one {Le plus récent} other {Les # plus récents}} :",
+    "allDrafts": "Tous les brouillons",
+    "draftCreated": "Commencé le {date}"
   },
   "common": {
     "all": "Tout",
@@ -325,7 +329,16 @@
     "whatToSay": "Que voulez-vous dire ?",
     "whenToPost": "Quand publier",
     "whereToPost": "Où publier",
-    "whoHolds": "Qui conserve la publication jusque-là ?"
+    "whoHolds": "Qui conserve la publication jusque-là ?",
+    "uploadFailed": "l'envoi n'a pas abouti. Veuillez réessayer.",
+    "uploading": "Envoi en cours…",
+    "altText": "Décrivez l'image",
+    "altTextFor": "Description de l'image {number}, pour les lecteurs d'écran",
+    "untickSwitchedOff": "Désactivées depuis la rédaction de cette publication : {names}. Décochez-les pour enregistrer.",
+    "instagramNeedsMedia": "Instagram n'accepte que les publications avec une photo ou une vidéo. Ajoutez-en une, ou décochez les destinations Instagram. Vous pouvez toujours enregistrer un brouillon.",
+    "facebookInstagramWarning": ", et indisponible si un compte Instagram est sélectionné",
+    "retryFromList": "La publication est enregistrée et les destinations qui ont fonctionné l’ont reçue. Pour réessayer les autres, utilisez « Réessayer les échecs » dans la liste des publications — publier à nouveau d’ici en enverrait une seconde copie.",
+    "openPostList": "Ouvrir la liste des publications"
   },
   "config": {
     "title": "Configuration",

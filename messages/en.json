@@ -238,7 +238,11 @@
     "title": "Calendar",
     "timesShownIn": "Times shown in {timezone}.",
     "newPostOn": "New post on {date}",
-    "more": "+{count} more"
+    "more": "+{count} more",
+    "unscheduledDrafts": "Unscheduled drafts",
+    "unscheduledDraftsHint": "Drafts with no date do not appear on the grid. The {count, plural, one {latest} other {# latest}}, newest first:",
+    "allDrafts": "All drafts",
+    "draftCreated": "Started {date}"
   },
   "common": {
     "all": "All",
@@ -325,7 +329,16 @@
     "whatToSay": "What do you want to say?",
     "whenToPost": "When to post",
     "whereToPost": "Where to post",
-    "whoHolds": "Who holds the post until then?"
+    "whoHolds": "Who holds the post until then?",
+    "uploadFailed": "the upload did not go through. Please try again.",
+    "uploading": "Uploading…",
+    "altText": "Describe the image",
+    "altTextFor": "Description of image {number}, for screen readers",
+    "untickSwitchedOff": "Switched off since this post was written: {names}. Untick to save.",
+    "instagramNeedsMedia": "Instagram only takes posts with a photo or a video. Add one, or untick the Instagram destinations. You can still save a draft.",
+    "facebookInstagramWarning": ", and unavailable while an Instagram account is selected",
+    "retryFromList": "The post is saved and the destinations that worked have it. To try the others again, use “Retry failed” on the post list — posting again from here would send a second copy.",
+    "openPostList": "Open the post list"
   },
   "config": {
     "title": "Configuration",
