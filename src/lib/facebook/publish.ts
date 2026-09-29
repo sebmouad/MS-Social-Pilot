@@ -40,7 +40,12 @@ export type MediaSource = { type: 'url'; url: string } | BinarySource;
 
 /** Media already resolved to something Graph can consume. */
 export type ResolvedMedia =
-  | { kind: 'image'; source: MediaSource }
+  | {
+      kind: 'image';
+      source: MediaSource;
+      /** What the picture shows, for screen readers. Sent as Facebook's custom alt text. */
+      altText?: string;
+    }
   | { kind: 'video'; source: MediaSource };
 
 export interface PublishRequest {
@@ -212,6 +217,11 @@ async function uploadPhoto(
   item: Extract<ResolvedMedia, { kind: 'image' }>,
   fields: Record<string, string | number | boolean | object | undefined>,
 ): Promise<PhotoResponse> {
+  // Without it Facebook writes its own guess ("May be an image of…"), which is
+  // rarely what the person who chose the picture would say.
+  const altText = item.altText?.trim();
+  if (altText) fields = { ...fields, alt_text_custom: altText };
+
   if (item.source.type === 'url') {
     const { data } = await graphRequest<PhotoResponse>(`${request.targetId}/photos`, {
       method: 'POST',

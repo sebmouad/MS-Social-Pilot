@@ -576,6 +576,23 @@ describe('links on media posts', () => {
     expect(call.body.message).toBe('New menu\n\nhttps://example.com/menu');
   });
 
+  it('sends a photo\'s description as its alt text', async () => {
+    const seeded = await seedDuePost({ message: 'New menu' });
+    await prisma.post.update({
+      where: { id: seeded.post.id },
+      data: {
+        media: [
+          { id: 'm1', kind: 'image', url: 'https://cdn.example.com/a.jpg', altText: ' Three loaves on a rack ' },
+        ],
+      },
+    });
+    responses = [{ status: 200, body: { id: '3000', post_id: '1000_3001' } }];
+
+    await runner.runSchedulerTick();
+
+    expect(received[0]!.body.alt_text_custom).toBe('Three loaves on a rack');
+  });
+
   it('puts the link in a multi-photo caption', async () => {
     await seedWithMedia([
       { id: 'm1', kind: 'image', url: 'https://cdn.example.com/a.jpg' },
