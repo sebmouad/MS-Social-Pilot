@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import {
+  canRefreshAnalytics,
   probeAllLevels,
+  throttleAnalyticsRefresh,
   probeTarget,
   readAvailability,
   readCoverage,
@@ -78,16 +80,24 @@ const postSchema = z.object({
   level: z.enum(['page', 'post', 'video', 'ig_account', 'ig_media']).optional(),
 });
 
-/** Pull fresh data from Graph, or probe which metrics it will serve. */
+/**
+ * Pull fresh data from Graph, or probe which metrics it will serve.
+ *
+ * Editor and above, and throttled per workspace: every action here loops over
+ * the metric catalogue against Graph, which a reader pressing the button over
+ * and over could otherwise turn into the app's whole rate limit.
+ */
 export const POST = route(async (request: Request, context: Context) => {
   const auth = await requireAuth();
   const { targetId } = await context.params;
+  if (!canRefreshAnalytics(auth.role)) throw errors.noPermission();
 
   const target = await loadTarget(targetId, auth.workspace.id);
   if (!target) throw errors.destinationNotFound();
 
   const body = await readJson(request).catch(() => ({}));
   const input = postSchema.parse(body ?? {});
+  throttleAnalyticsRefresh(auth.workspace.id);
 
   // A full probe walks every level against a real Page, post, video and — when
   // linked — a real Instagram account and media item.
