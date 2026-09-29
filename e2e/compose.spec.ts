@@ -224,7 +224,8 @@ test('the history screen says who did what, in words', async ({ page }) => {
   await expect(page.getByText('post.created')).toHaveCount(0);
 
   // The email tab is a click away and renders whether or not anything sent.
-  await page.getByRole('link', { name: /^email$/i }).click();
+  // Named "Email", or "Email, 1 failed" once an earlier spec's invite has failed to send.
+  await page.getByRole('link', { name: /^email\b/i }).click();
   await expect(page).toHaveURL(/view=email/);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 

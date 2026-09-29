@@ -804,6 +804,7 @@
     "statusSkipped": "Not sent",
     "subtitle": "What happened in this workspace, and what was emailed about it.",
     "tabActivity": "Activity",
+    "tabFailures": "{count, plural, one {, # failed} other {, # failed}}",
     "tabEmail": "Email",
     "title": "History",
     "unknownAction": "did something the app no longer has a name for ({action})"

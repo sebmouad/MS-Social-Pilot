@@ -804,6 +804,7 @@
     "statusSkipped": "Non envoyé",
     "subtitle": "Ce qui s’est passé dans cet espace de travail, et ce qui a été envoyé par e-mail.",
     "tabActivity": "Activité",
+    "tabFailures": "{count, plural, one {, # en échec} other {, # en échec}}",
     "tabEmail": "E-mails",
     "title": "Historique",
     "unknownAction": "a fait quelque chose que l’application ne sait plus nommer ({action})"

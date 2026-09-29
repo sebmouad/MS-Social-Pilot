@@ -90,8 +90,11 @@ test('the posts table says which way it is sorted', async ({ page }) => {
   await expect(table.getByText('Walk: busy post')).toBeVisible();
 
   const reach = table.getByRole('columnheader', { name: /^reach/i });
-  await reach.getByRole('button').click();
-  await expect(reach).toHaveAttribute('aria-sort', 'descending');
+  // A click before hydration never reaches the handler; retry until it sorts.
+  await expect(async () => {
+    await reach.getByRole('button').click();
+    await expect(reach).toHaveAttribute('aria-sort', 'descending', { timeout: 1_500 });
+  }).toPass({ timeout: 30_000 });
   await reach.getByRole('button').click();
   await expect(reach).toHaveAttribute('aria-sort', 'ascending');
 

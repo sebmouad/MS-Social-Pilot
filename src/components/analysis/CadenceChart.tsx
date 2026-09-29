@@ -74,7 +74,10 @@ export function CadenceChart({
           width={width}
           height={HEIGHT}
           viewBox={`0 0 ${width} ${HEIGHT}`}
-          className="block touch-pan-y"
+          // Until the card is measured the width is a guess; on a phone the
+          // guess is wider than the screen. Scaled down to fit meanwhile, and a
+          // no-op once the real width is in.
+          className="block h-auto max-w-full touch-pan-y"
           role="img"
           aria-label={t('cadence.hint', { perWeek, target })}
           onPointerLeave={() => setActive(null)}
