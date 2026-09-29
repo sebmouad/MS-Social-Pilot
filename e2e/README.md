@@ -33,7 +33,7 @@ docker compose up -d db          # or a local Postgres on 5432
 npx playwright test
 ```
 
-The config starts `next dev` on port 3100 itself and points it at a schema
+The config starts `next dev` on port 3100 (or `E2E_PORT`) itself and points it at a schema
 called `e2e` inside `social_pilot_test`, which `e2e/prepare.ts` drops and
 recreates on every run. Nothing touches the development database.
 
