@@ -153,7 +153,10 @@ export default async function DashboardPage() {
           <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
             {(
               [
-                [t('impressions'), totals.impressions],
+                // Only where some were recorded: a Page synced since Meta
+                // retired the metric reads a flat zero that means "not
+                // reported", not "nobody saw it".
+                ...(totals.impressions > 0 ? [[t('impressions'), totals.impressions] as const] : []),
                 [t('peopleReached'), totals.reach],
                 [t('reactions'), totals.reactions],
                 [t('comments'), totals.comments],
