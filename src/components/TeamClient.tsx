@@ -45,13 +45,15 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
   const [notice, setNotice] = useState<string | null>(null);
   const [manualLink, setManualLink] = useState<string | null>(null);
   /**
-   * The member or invitation a change is in flight for.
+   * The members and invitations a change is in flight for.
    *
-   * Every control for it is disabled until the answer comes back. Without the
+   * A set rather than one id, because two rows can be changed at once and the
+   * first to finish must not unlock the other. Every control for a row is
+   * disabled until its answer comes back. Without the
    * lock a second pick in the role menu races the first, and whichever request
    * lands last wins — not necessarily the one the admin chose last.
    */
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   /**
    * A confirmed role change, shown until the refreshed member list arrives.
    *
@@ -118,7 +120,7 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
 
   /** Resolves true when the server accepted the change. */
   async function call(id: string, path: string, init: RequestInit): Promise<boolean> {
-    setBusy(id);
+    setBusy((current) => new Set(current).add(id));
     setError(null);
     try {
       const response = await fetch(path, init);
@@ -133,7 +135,11 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
       setError(t('networkError'));
       return false;
     } finally {
-      setBusy(null);
+      setBusy((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
     }
   }
 
@@ -275,7 +281,7 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
                     type="button"
                     className="btn-danger"
                     aria-label={t('revokeNamed', { email: invitation.email })}
-                    disabled={busy === invitation.id}
+                    disabled={busy.has(invitation.id)}
                     onClick={() =>
                       call(invitation.id, `/api/team/${invitation.id}?type=invitation`, { method: 'DELETE' })
                     }
@@ -308,7 +314,7 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
                     className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
                     aria-label={t('memberRole', { name: member.name })}
                     value={requested?.userId === member.userId ? requested.role : member.role}
-                    disabled={busy === member.userId}
+                    disabled={busy.has(member.userId)}
                     onChange={(event) => changeRole(member, event.target.value)}
                   >
                     {grantable.map((option) => (
@@ -321,7 +327,7 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
                     type="button"
                     className="btn-danger"
                     aria-label={t('removeMemberNamed', { name: member.name })}
-                    disabled={busy === member.userId}
+                    disabled={busy.has(member.userId)}
                     onClick={() => {
                       if (window.confirm(t('removeConfirm', { name: member.name }))) {
                         void call(member.userId, `/api/team/${member.userId}`, { method: 'DELETE' });
