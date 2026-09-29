@@ -61,6 +61,10 @@ export function InboxPanel({
       setOpenThread(null);
       setText('');
       router.refresh();
+    } catch {
+      // The request never arrived — offline, or the connection dropped. The
+      // text stays in the box so it can be sent again.
+      setError(tCommon('genericError'));
     } finally {
       setBusy(null);
     }
@@ -69,7 +73,10 @@ export function InboxPanel({
   return (
     <div className="space-y-3">
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
           {error}
         </div>
       )}
@@ -101,15 +108,17 @@ export function InboxPanel({
                     <div className="space-y-2">
                       <textarea
                         className="input min-h-[72px]"
+                        aria-label={t('replyToLabel', { author: thread.participants })}
+                        aria-describedby={`reply-window-${thread.id}`}
                         value={text}
                         onChange={(event) => setText(event.target.value)}
                         placeholder={t('replyPlaceholder')}
                         maxLength={2000}
                       />
-                      <p className="hint">
+                      <p className="hint" id={`reply-window-${thread.id}`}>
                         {t('replyWindowOpen', { until: thread.reply.untilLabel })}
                       </p>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
                           className="btn-primary"

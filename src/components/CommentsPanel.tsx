@@ -49,22 +49,43 @@ export function CommentsPanel({
   const [replyText, setReplyText] = useState('');
   const [syncing, setSyncing] = useState(false);
 
-  async function act(body: Record<string, unknown>, id: string) {
-    setBusy(id);
-    setError(null);
+  /**
+   * POST and report, the one way both actions talk to the server.
+   *
+   * The body is read leniently: a proxy's HTML error page or an empty 502 is
+   * not JSON, and parsing it anyway put "Unexpected token '<'" on screen in
+   * place of a sentence. The server's own message wins when there is one —
+   * it is already translated, and it says which rule was broken. A request
+   * that never arrived (offline, connection reset) gets the generic line
+   * rather than the browser's "Failed to fetch".
+   */
+  async function post(url: string, body: Record<string, unknown>): Promise<boolean> {
     try {
-      const response = await fetch('/api/engagement/comments', {
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? tCommon('genericError'));
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        setError(payload.error ?? tCommon('genericError'));
+        return false;
+      }
+      return true;
+    } catch {
+      setError(tCommon('genericError'));
+      return false;
+    }
+  }
+
+  async function act(body: Record<string, unknown>, id: string) {
+    setBusy(id);
+    setError(null);
+    try {
+      if (!(await post('/api/engagement/comments', body))) return;
       setReplyTo(null);
       setReplyText('');
       router.refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(null);
     }
@@ -74,16 +95,7 @@ export function CommentsPanel({
     setSyncing(true);
     setError(null);
     try {
-      const response = await fetch('/api/engagement/sync', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ targetId }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? tCommon('genericError'));
-      router.refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      if (await post('/api/engagement/sync', { targetId })) router.refresh();
     } finally {
       setSyncing(false);
     }
@@ -91,8 +103,9 @@ export function CommentsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-600">{t('commentsHint')}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="min-w-0 flex-1 text-sm text-slate-600">{t('commentsHint')}</p>
+        {/* Editors and above, the same rule the sync route enforces. */}
         {canModerate && (
           <button type="button" className="btn-secondary" onClick={sync} disabled={syncing}>
             {syncing ? tCommon('working') : t('refresh')}
@@ -100,7 +113,11 @@ export function CommentsPanel({
         )}
       </div>
 
-      {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+      {error && (
+        <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {error}
+        </p>
+      )}
 
       {comments.length === 0 ? (
         <div className="card p-8 text-center text-sm text-slate-600">{t('noComments')}</div>
@@ -109,12 +126,22 @@ export function CommentsPanel({
           {comments.map((comment) => (
             <li
               key={comment.id}
-              className={`card p-4 ${comment.isHidden ? 'opacity-60' : ''} ${
-                comment.isReply ? 'ml-6 border-l-2 border-l-slate-200' : ''
+              // Hidden is said with a badge and a tint, not by fading the
+              // card: faded grey text on white fails contrast, and a hidden
+              // comment is exactly the one a moderator needs to read clearly.
+              className={`card p-4 ${comment.isHidden ? 'border-amber-200 bg-amber-50' : ''} ${
+                comment.isReply ? 'ml-4 border-l-2 border-l-slate-300 sm:ml-8' : ''
               }`}
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm font-medium text-slate-900">{comment.author}</p>
+                <p className="flex flex-wrap items-baseline gap-2 text-sm font-medium text-slate-900">
+                  {comment.author}
+                  {comment.isHidden && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                      {t('hidden')}
+                    </span>
+                  )}
+                </p>
                 <p className="text-xs text-slate-500">
                   {comment.targetName} · {comment.createdLabel}
                 </p>
@@ -122,7 +149,7 @@ export function CommentsPanel({
 
               <p className="mt-1.5 whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-700">{comment.message}</p>
 
-              <p className="mt-2 truncate text-xs text-slate-400" title={comment.postMessage}>
+              <p className="mt-2 truncate text-xs text-slate-500" title={comment.postMessage}>
                 {t('onPost', { post: comment.postMessage })}
               </p>
 
@@ -131,11 +158,6 @@ export function CommentsPanel({
                   {t('likes', { count: comment.likeCount })} ·{' '}
                   {t('replies', { count: comment.replyCount })}
                 </span>
-                {comment.isHidden && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
-                    {t('hidden')}
-                  </span>
-                )}
 
                 {canModerate && (
                   <>
@@ -143,6 +165,7 @@ export function CommentsPanel({
                       type="button"
                       className="font-medium text-brand-600 hover:underline disabled:opacity-50"
                       disabled={busy === comment.id}
+                      aria-expanded={replyTo === comment.id}
                       onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
                     >
                       {t('reply')}
@@ -183,6 +206,7 @@ export function CommentsPanel({
                 <div className="mt-3 space-y-2">
                   <textarea
                     className="input min-h-[72px]"
+                    aria-label={t('replyToLabel', { author: comment.author })}
                     value={replyText}
                     onChange={(event) => setReplyText(event.target.value)}
                     placeholder={t('replyPlaceholder')}
