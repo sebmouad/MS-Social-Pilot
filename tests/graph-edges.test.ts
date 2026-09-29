@@ -397,6 +397,21 @@ describe('Ads insights', () => {
     );
   });
 
+  it('always asks for the level\'s own id, so campaigns stay apart', async () => {
+    routes['/act_1/insights'] = () => ({ data: [] });
+
+    await fetchAdInsights({
+      actId: 'act_1',
+      accessToken: 'token',
+      level: 'campaign',
+      since: new Date('2026-08-01T00:00:00Z'),
+      until: new Date('2026-08-07T00:00:00Z'),
+      fields: ['spend', 'campaign_name'],
+    });
+
+    expect(seen[0]!.params.get('fields')!.split(',')).toEqual(['spend', 'campaign_name', 'campaign_id']);
+  });
+
   it('separates action arrays from scalar fields', async () => {
     routes['/act_1/insights'] = () => ({
       data: [
