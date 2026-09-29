@@ -607,6 +607,7 @@
     "destinationNotFound": "Destination not found.",
     "editorsOnlyDeleteMedia": "Only editors and above can delete files from the library.",
     "emailTaken": "An account with that email already exists. Sign in instead.",
+    "emptyPost": "Write something, add a link, or attach media.",
     "errorBody": "The page could not be loaded. It is worth trying again — if it keeps happening, the reference below will tell whoever looks into it where to start.",
     "errorTitle": "Something went wrong",
     "feedInstagramUnsupported": "A feed item is a headline and a link, and Instagram takes neither without a picture ({names}). Choose Facebook destinations for this feed.",
@@ -634,6 +635,7 @@
     "notFoundTitle": "That page is not here",
     "notPending": "That post is not awaiting approval.",
     "notSignedIn": "You must be signed in.",
+    "notSubmittable": "That post cannot be sent for review.",
     "ownerOnlyChangeConfig": "Only an owner can change configuration.",
     "ownerOnlyChangeSetup": "Only an owner can change setup.",
     "ownerOnlyViewConfig": "Only an owner can view configuration.",
@@ -644,6 +646,7 @@
     "previewHostBlocked": "That host is not reachable for link previews.",
     "previewSchemeUnsupported": "Only http and https URLs can be previewed.",
     "previewUrlInvalid": "Enter a valid URL, including http:// or https://.",
+    "publishNeedsReview": "Posts in this workspace are reviewed before they go out, so they cannot be published on the spot. Schedule it and it will go to the approval queue.",
     "publishOwnOnly": "You can only publish your own posts.",
     "queueEmpty": "Your posting queue is empty. Add publishing times in Settings first.",
     "queueFull": "Every queue slot in the next 90 days is taken. Add more times or pick a date.",
@@ -1027,7 +1030,10 @@
       "deleted_on_facebook": "This post is no longer on Facebook. It was most likely deleted there, so it never went out.",
       "destination_off": "This destination was turned off when the post was due, so it was not published there.",
       "worker_lost": "Publishing was interrupted and did not recover within the attempt limit. Check the destination and try again."
-    }
+    },
+    "nativeTooSoon": "Facebook only holds posts at least 10 minutes ahead, so this one stays with our own scheduler and goes out at its time.",
+    "nativeTooFar": "Facebook cannot hold a post that far ahead, so this one stays with our own scheduler and goes out at its time.",
+    "nativeUnavailable": "Facebook could not be given this post just now, so it stays with our own scheduler and goes out at its time."
   },
   "queue": {
     "addSlot": "Add slot",
