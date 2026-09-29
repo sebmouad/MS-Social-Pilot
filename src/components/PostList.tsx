@@ -158,6 +158,7 @@ export function PostList({
           post.mayAct && post.cleared && !heldByFacebook && PUBLISHABLE_NOW.includes(post.status);
         const canCancel = post.mayAct && CANCELLABLE.includes(post.status);
         const canSubmit = post.mayAct && needsReview && SUBMITTABLE.includes(post.status);
+        const canWithdraw = post.mayAct && post.status === 'pending_approval';
         // The same rule the API enforces, so the button is never a dead end.
         const canEdit = post.mayAct && postIsEditable(post);
         const canRetry = post.mayAct && post.targets.some((target) => target.status === 'failed');
@@ -240,6 +241,22 @@ export function PostList({
                   }
                 >
                   {post.status === 'rejected' ? tApprovals('resubmit') : t('submitForReview')}
+                </button>
+              )}
+              {canWithdraw && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={working}
+                  onClick={() =>
+                    act(post.id, {
+                      path: `/api/posts/${post.id}/approve`,
+                      method: 'POST',
+                      body: { action: 'withdraw' },
+                    })
+                  }
+                >
+                  {t('withdraw')}
                 </button>
               )}
               {canPublishNow && (

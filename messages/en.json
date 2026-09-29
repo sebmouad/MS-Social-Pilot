@@ -760,7 +760,8 @@
         "rejected": "sent a post back for changes",
         "retried": "retried a failed post",
         "submitted": "submitted a post for approval",
-        "updated": "edited a post"
+        "updated": "edited a post",
+        "withdrawn": "took a post back out of review"
       },
       "settings": {
         "changed": "changed the workspace settings"
@@ -1071,6 +1072,7 @@
     "allDestinations": "All destinations",
     "clearFilters": "Clear",
     "noMatches": "No posts match these filters.",
+    "withdraw": "Withdraw from review",
     "submitForReview": "Submit for review",
     "publishNowConfirm": "Publish this now to {count, plural, one {its destination} other {all # destinations}}? It goes out immediately.",
     "failure": {

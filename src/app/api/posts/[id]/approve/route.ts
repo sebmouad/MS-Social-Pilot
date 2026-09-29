@@ -2,12 +2,13 @@ import { z } from 'zod';
 import { getTranslations } from 'next-intl/server';
 
 import { requireAuth } from '@/lib/auth';
-import { approvePost, rejectPost, submitForApproval } from '@/lib/approvals';
+import { approvePost, rejectPost, submitForApproval, withdrawFromReview } from '@/lib/approvals';
 import { ok, readJson, route } from '@/lib/api';
 import { nativeFallbackKey } from '@/lib/posts';
 
 const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('submit') }),
+  z.object({ action: z.literal('withdraw') }),
   z.object({ action: z.literal('approve') }),
   z.object({
     action: z.literal('reject'),
@@ -15,7 +16,7 @@ const schema = z.discriminatedUnion('action', [
   }),
 ]);
 
-/** Submit for review, approve, or send back with a note. */
+/** Submit for review, withdraw from it, approve, or send back with a note. */
 export const POST = route(async (request: Request, context: { params: Promise<{ id: string }> }) => {
   const auth = await requireAuth();
   const { id } = await context.params;
@@ -28,6 +29,15 @@ export const POST = route(async (request: Request, context: { params: Promise<{ 
   switch (input.action) {
     case 'submit':
       await submitForApproval({
+        workspaceId: auth.workspace.id,
+        postId: id,
+        userId: auth.user.id,
+        role: auth.role,
+      });
+      break;
+
+    case 'withdraw':
+      await withdrawFromReview({
         workspaceId: auth.workspace.id,
         postId: id,
         userId: auth.user.id,

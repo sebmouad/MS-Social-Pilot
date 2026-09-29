@@ -543,6 +543,57 @@ describe('handing a post to Facebook', () => {
   });
 });
 
+describe('withdrawing a post from review', () => {
+  it('returns it to the author as a draft, off the approvals screen', async () => {
+    const s = await seed();
+    const post = await makePost(s, {
+      status: PostStatus.pending_approval,
+      approvalStatus: ApprovalStatus.pending,
+      scheduledAt: new Date(Date.now() + 3 * HOUR),
+    });
+
+    await approvals.withdrawFromReview({
+      workspaceId: s.workspace.id,
+      postId: post.id,
+      userId: s.contributor.id,
+      role: WorkspaceRole.contributor,
+    });
+
+    const after = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect(after.status).toBe(PostStatus.draft);
+    expect(after.approvalStatus).toBe(ApprovalStatus.not_required);
+    expect(after.submittedById).toBeNull();
+    expect(await approvals.pendingApprovalCount(s.workspace.id)).toBe(0);
+  });
+
+  it('refuses someone else\'s post, and one no longer waiting', async () => {
+    const s = await seed();
+    const theirs = await makePost(s, {
+      status: PostStatus.pending_approval,
+      approvalStatus: ApprovalStatus.pending,
+      authorId: s.editor.id,
+    });
+    await expect(
+      approvals.withdrawFromReview({
+        workspaceId: s.workspace.id,
+        postId: theirs.id,
+        userId: s.contributor.id,
+        role: WorkspaceRole.contributor,
+      }),
+    ).rejects.toMatchObject({ key: 'errors.noPermission' });
+
+    const approved = await makePost(s, { status: PostStatus.scheduled, approvalStatus: ApprovalStatus.approved });
+    await expect(
+      approvals.withdrawFromReview({
+        workspaceId: s.workspace.id,
+        postId: approved.id,
+        userId: s.contributor.id,
+        role: WorkspaceRole.contributor,
+      }),
+    ).rejects.toMatchObject({ key: 'errors.notPending' });
+  });
+});
+
 describe('Instagram without media', () => {
   async function instagram(s: Seed) {
     const { encryptSecret } = await import('../src/lib/crypto');

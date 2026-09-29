@@ -760,7 +760,8 @@
         "rejected": "a renvoyé une publication pour modification",
         "retried": "a relancé une publication en échec",
         "submitted": "a soumis une publication pour validation",
-        "updated": "a modifié une publication"
+        "updated": "a modifié une publication",
+        "withdrawn": "a retiré une publication de la validation"
       },
       "settings": {
         "changed": "a modifié les réglages de l’espace de travail"
@@ -1071,6 +1072,7 @@
     "allDestinations": "Toutes les destinations",
     "clearFilters": "Effacer",
     "noMatches": "Aucune publication ne correspond à ces filtres.",
+    "withdraw": "Retirer de la validation",
     "submitForReview": "Soumettre pour validation",
     "publishNowConfirm": "Publier maintenant sur {count, plural, one {sa destination} other {ses # destinations}} ? Elle part immédiatement.",
     "failure": {

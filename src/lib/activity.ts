@@ -29,6 +29,7 @@ export const ACTIVITY_ACTIONS = [
   'post.retried',
   'post.submitted',
   'post.updated',
+  'post.withdrawn',
   'settings.changed',
   'team.invitationRevoked',
   'team.invited',
