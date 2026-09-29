@@ -1,6 +1,8 @@
+import { getTranslations } from 'next-intl/server';
+
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { cancelPost, updatePost } from '@/lib/posts';
+import { cancelPost, nativeFallbackKey, updatePost } from '@/lib/posts';
 import { updatePostSchema } from '@/lib/validation';
 import { parseInsights, parseLinkPreview, parseMedia } from '@/lib/json';
 import { ok, readJson, route } from '@/lib/api';
@@ -48,7 +50,7 @@ export const PATCH = route(async (request: Request, context: Context) => {
   const { id } = await context.params;
   const input = updatePostSchema.parse(await readJson(request));
 
-  await updatePost(
+  const result = await updatePost(
     {
       workspaceId: auth.workspace.id,
       userId: auth.user.id,
@@ -58,6 +60,13 @@ export const PATCH = route(async (request: Request, context: Context) => {
     id,
     input,
   );
+
+  // The one outcome of a save the author would not otherwise learn: they chose
+  // "let Facebook hold it" and Facebook would have refused the time.
+  if (result.nativeFallback) {
+    const t = await getTranslations('posts');
+    return ok({ ok: true, notice: t(nativeFallbackKey(result.nativeFallback)) });
+  }
   return ok({ ok: true });
 });
 
