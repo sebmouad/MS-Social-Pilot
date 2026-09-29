@@ -464,8 +464,9 @@ describe('capabilities', () => {
   it('matches the intended matrix', async () => {
     const c = await import('../src/lib/constants');
 
+    // canManageInstance is not on this list on purpose: it answers from the
+    // installation-owner flag, never from a workspace role. See below.
     const expected: Record<string, WorkspaceRole[]> = {
-      canManageInstance: [WorkspaceRole.owner],
       canManageAccounts: [WorkspaceRole.owner, WorkspaceRole.admin],
       canManageTeam: [WorkspaceRole.owner, WorkspaceRole.admin],
       canManageSettings: [WorkspaceRole.owner, WorkspaceRole.admin],
@@ -491,11 +492,26 @@ describe('capabilities', () => {
     for (const [name, check] of checks) {
       // canCompose takes no role; skip anything that ignores its argument.
       if (check.length === 0) continue;
+      // Takes the auth context, not a role; it has its own test below.
+      if (name === 'canManageInstance') continue;
       for (let index = 1; index < ROLES.length; index += 1) {
         const higher = check(ROLES[index - 1]!);
         const lower = check(ROLES[index]!);
         expect(!lower || higher, `${name}: ${ROLES[index]} without ${ROLES[index - 1]}`).toBe(true);
       }
+    }
+  });
+
+  it('keeps instance settings for the installation owner, whatever the workspace role', async () => {
+    // Everybody who registers owns a workspace of their own, so "owner" of the
+    // active workspace admitted anybody an admin had ever invited.
+    const c = await import('../src/lib/constants');
+
+    for (const role of ROLES) {
+      const installer = { role, isInstanceOwner: true };
+      const everyoneElse = { role, isInstanceOwner: false };
+      expect(c.canManageInstance(installer), role).toBe(true);
+      expect(c.canManageInstance(everyoneElse), role).toBe(false);
     }
   });
 });

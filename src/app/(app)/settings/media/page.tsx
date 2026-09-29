@@ -37,7 +37,7 @@ export default async function MediaPage() {
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
 
-      <SettingsNav showConfig={canManageInstance(auth.role)} />
+      <SettingsNav showConfig={canManageInstance(auth)} />
 
       <MediaLibrary
         canDelete={canDeleteMedia(auth.role)}

@@ -330,7 +330,7 @@
   "config": {
     "title": "Configuration",
     "subtitle": "Tous les réglages de cette installation, sans modifier de fichier sur le serveur.",
-    "ownerOnly": "Seul un propriétaire d’espace peut modifier les réglages de l’installation.",
+    "ownerOnly": "Seul le propriétaire de cette installation — la personne qui a créé son premier compte — peut modifier ses réglages.",
     "footnote": "Les valeurs définies ici priment sur l’environnement. Réinitialiser une valeur rend la main à la variable d’environnement, ou à la valeur par défaut s’il n’y en a pas.",
     "saved": "{count, plural, one {# réglage enregistré} other {# réglages enregistrés}}.",
     "unsaved": "{count, plural, one {# modification non enregistrée} other {# modifications non enregistrées}}",

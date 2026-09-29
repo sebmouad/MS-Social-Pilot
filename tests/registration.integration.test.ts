@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * A cookie jar, because signing in sets one and `next/headers` only works
@@ -287,6 +287,13 @@ describe('signing in too often', () => {
 
   beforeEach(() => {
     limiter.reset();
+    // These tests speak for the client through x-forwarded-for, which is only
+    // believed when the operator says a proxy sets it.
+    process.env.TRUST_PROXY = 'true';
+  });
+
+  afterEach(() => {
+    delete process.env.TRUST_PROXY;
   });
 
   function attempt(address: string, password: string, client = '198.51.100.7') {
@@ -384,6 +391,37 @@ describe('signing in too often', () => {
       await attempt(address, 'wrong-password');
       await attempt(address, 'wrong-password');
       expect((await attempt(address, 'a-long-enough-password')).status).toBe(200);
+    });
+  });
+
+  it('does not let one working account reset the allowance for guessing at others', async () => {
+    // The attack: guess at other people's addresses, sign in to your own to
+    // wipe the count, guess again. Only what was spent on your own address may
+    // be given back.
+    const mine = email();
+    await auth.registerUser({ email: mine, password: 'a-long-enough-password', name: 'Mallory' });
+
+    await withLimit(3, async () => {
+      const refused: number[] = [];
+      for (let round = 0; round < 4; round += 1) {
+        refused.push((await attempt(email(), 'guess')).status);
+        await attempt(mine, 'a-long-enough-password');
+      }
+
+      expect(refused.slice(0, 3)).toEqual([401, 401, 401]);
+      expect(refused[3]).toBe(429);
+    });
+  });
+
+  it('keys on the address alone when no proxy says who the client is', async () => {
+    // One shared "unknown" key would let a single visitor's wrong guesses turn
+    // every other visitor away.
+    delete process.env.TRUST_PROXY;
+
+    await withLimit(3, async () => {
+      for (let guess = 0; guess < 5; guess += 1) {
+        expect((await attempt(email(), 'wrong-password')).status).toBe(401);
+      }
     });
   });
 });
@@ -544,5 +582,170 @@ describe('authenticate', () => {
 
   it('rejects an unknown address without revealing that it is unknown', async () => {
     await expect(auth.authenticate('nobody@example.com', 'whatever')).rejects.toThrow(/incorrect/i);
+  });
+});
+
+/**
+ * Who owns the installation, as opposed to who owns a workspace on it.
+ *
+ * Everybody who registers is given a workspace of their own to own, invited or
+ * not. Instance settings used to ask only "owner of the active workspace?", so
+ * someone invited as a contributor could switch to their own workspace and
+ * rewrite the Facebook app credentials every client publishes through.
+ */
+describe('the installation owner', () => {
+  let settings: typeof import('../src/lib/settings');
+  let config: typeof import('../src/app/api/settings/config/route');
+  let setupRoute: typeof import('../src/app/api/setup/route');
+
+  beforeAll(async () => {
+    settings = await import('../src/lib/settings');
+    config = await import('../src/app/api/settings/config/route');
+    setupRoute = await import('../src/app/api/setup/route');
+  });
+
+  beforeEach(() => {
+    cookieJar.clear();
+  });
+
+  async function withRegistrationClosed(body: () => Promise<void>) {
+    await settings.writeSetting('auth.openRegistration', false, null);
+    await settings.ensureSettings();
+    try {
+      await body();
+    } finally {
+      await settings.writeSetting('auth.openRegistration', true, null);
+      await settings.ensureSettings();
+    }
+  }
+
+  /** The first account, and somebody it invited as a contributor. */
+  async function ownerAndInvitee() {
+    const owner = await auth.registerUser({
+      email: email(),
+      password: 'a-long-enough-password',
+      name: 'Owner',
+      workspaceName: 'Agency',
+    });
+    const agency = await prisma.workspace.findFirstOrThrow({ where: { name: 'Agency' } });
+    const invited = email();
+    await prisma.invitation.create({
+      data: {
+        workspaceId: agency.id,
+        email: invited,
+        role: 'contributor',
+        tokenHash: `hash-${invited}`,
+        invitedById: owner.userId,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const invitee = await auth.registerUser({
+      email: invited,
+      password: 'a-long-enough-password',
+      name: 'Invitee',
+    });
+    await prisma.membership.create({
+      data: { userId: invitee.userId, workspaceId: agency.id, role: WorkspaceRole.contributor },
+    });
+    const own = await prisma.membership.findFirstOrThrow({
+      where: { userId: invitee.userId, role: WorkspaceRole.owner },
+    });
+
+    return { owner, invitee, agency, inviteeWorkspaceId: own.workspaceId };
+  }
+
+  function signInAs(token: string, workspaceId?: string) {
+    cookieJar.set('msp_session', token);
+    if (workspaceId) cookieJar.set('msp_workspace', workspaceId);
+  }
+
+  const setupWrite = () =>
+    setupRoute.POST(
+      new Request('http://localhost/api/setup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ facebookAppId: 'attacker-app', facebookAppSecret: 'x' }),
+      }),
+    );
+
+  it('is the first account, and only the first', async () => {
+    await withRegistrationClosed(async () => {
+      const { owner, invitee } = await ownerAndInvitee();
+
+      const users = await prisma.user.findMany({ select: { id: true, isInstanceOwner: true } });
+      expect(users.find((user) => user.id === owner.userId)?.isInstanceOwner).toBe(true);
+      expect(users.find((user) => user.id === invitee.userId)?.isInstanceOwner).toBe(false);
+    });
+  });
+
+  it('keeps an invitee out of instance settings, even from a workspace they own', async () => {
+    await withRegistrationClosed(async () => {
+      const { invitee, inviteeWorkspaceId } = await ownerAndInvitee();
+      signInAs(invitee.token, inviteeWorkspaceId);
+
+      const context = await auth.getAuthContext();
+      // The precondition of the attack: they really do own this one.
+      expect(context?.role).toBe(WorkspaceRole.owner);
+      expect(context?.isInstanceOwner).toBe(false);
+
+      const write = await config.POST(
+        new Request('http://localhost/api/settings/config', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ values: { 'facebook.appId': 'attacker-app' } }),
+        }),
+      );
+      expect(write.status).toBe(403);
+      expect((await config.GET()).status).toBe(403);
+      expect((await setupWrite()).status).toBe(403);
+    });
+  });
+
+  it('lets the installation owner in from any workspace', async () => {
+    await withRegistrationClosed(async () => {
+      const { owner } = await ownerAndInvitee();
+      signInAs(owner.token);
+
+      expect((await config.GET()).status).toBe(200);
+    });
+  });
+
+  it('refuses a setup write before anybody has registered', async () => {
+    // Nobody legitimate writes the app credentials before the first account
+    // exists, so an open door here only served whoever found the server first.
+    expect((await setupWrite()).status).toBe(403);
+  });
+
+  it('crowns exactly one of several people signing up on a fresh installation at once', async () => {
+    // Each used to count zero users and pass as "the first account", so all of
+    // them came out owning the installation — and with registration shut, a
+    // stranger racing the operator got in as well.
+    await withRegistrationClosed(async () => {
+      const results = await Promise.allSettled(
+        [1, 2, 3, 4].map((person) =>
+          auth.registerUser({
+            email: email(),
+            password: 'a-long-enough-password',
+            name: `Racer ${person}`,
+          }),
+        ),
+      );
+
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(await prisma.user.count()).toBe(1);
+      expect(await prisma.user.count({ where: { isInstanceOwner: true } })).toBe(1);
+    });
+  });
+
+  it('crowns one even when registration is open and everyone arrives at once', async () => {
+    const results = await Promise.all(
+      [1, 2, 3, 4].map((person) =>
+        auth.registerUser({ email: email(), password: 'a-long-enough-password', name: `P${person}` }),
+      ),
+    );
+
+    expect(results).toHaveLength(4);
+    expect(await prisma.user.count({ where: { isInstanceOwner: true } })).toBe(1);
   });
 });

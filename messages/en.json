@@ -330,7 +330,7 @@
   "config": {
     "title": "Configuration",
     "subtitle": "Everything this installation can be tuned with, without editing a file on the server.",
-    "ownerOnly": "Only a workspace owner can change installation settings.",
+    "ownerOnly": "Only the owner of this installation — whoever created its first account — can change its settings.",
     "footnote": "Values set here override the environment. Clearing one hands the setting back to the environment variable, or to the built-in default when there is none.",
     "saved": "{count, plural, one {# setting saved} other {# settings saved}}.",
     "unsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",

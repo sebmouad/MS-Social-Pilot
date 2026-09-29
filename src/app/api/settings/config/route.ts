@@ -22,7 +22,7 @@ import { errors } from '@/lib/errors';
  */
 export const GET = route(async () => {
   const auth = await requireAuth();
-  if (!canManageInstance(auth.role)) throw errors.ownerOnlyViewConfig();
+  if (!canManageInstance(auth)) throw errors.ownerOnlyViewConfig();
 
   return ok({ settings: await describeSettings() });
 });
@@ -34,7 +34,7 @@ const schema = z.object({
 
 export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
-  if (!canManageInstance(auth.role)) throw errors.ownerOnlyChangeConfig();
+  if (!canManageInstance(auth)) throw errors.ownerOnlyChangeConfig();
 
   const input = schema.parse(await readJson(request));
 
