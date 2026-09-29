@@ -91,7 +91,14 @@
       "noSpend": "This account spent nothing in this period. Pull from Facebook if you expected delivery.",
       "none": "Nothing unusual in this period.",
       "title": "What stands out"
-    }
+    },
+    "askAdmin": "Ask a workspace owner or admin to find the ad accounts this workspace can read.",
+    "exportCsv": "Download CSV",
+    "coverage": "data from {date}",
+    "noComparison": "No comparison with the previous period: data is pulled from Facebook back to {date}, and the period before this one starts earlier.",
+    "allDisabled": "Every ad account in this workspace is turned off. Turn one back on under Connections to see its spend here.",
+    "openConnections": "Open Connections",
+    "staleComparison": "No comparison with the previous period: the last pull from Facebook was on {when}, so the days since are missing."
   },
   "analytics": {
     "title": "Analytics",
@@ -678,7 +685,9 @@
     "tooManySignups": "{minutes, plural, one {Too many accounts created from here. Try again in a minute.} other {Too many accounts created from here. Try again in # minutes.}}",
     "tryAgain": "Try again",
     "unknownExport": "Unknown export. Choose one of: {kinds}.",
-    "variantsNeedApproval": "Alternate wordings publish without review, so only editors and above can set them while approval is on."
+    "variantsNeedApproval": "Alternate wordings publish without review, so only editors and above can set them while approval is on.",
+    "dateRangeInverted": "The start of the range comes after its end. Swap the dates.",
+    "adAccountNotFound": "Ad account not found."
   },
   "feeds": {
     "title": "RSS feeds",
@@ -1120,7 +1129,12 @@
     "byDestination": "By destination",
     "destination": "Destination",
     "topPosts": "Top posts",
-    "noData": "No published posts in this range."
+    "noData": "No published posts in this range.",
+    "impressions": "Impressions",
+    "linkClicksLifetime": "Link clicks (all time)",
+    "engagementCount": "{count, plural, other {# engagement}}",
+    "impressionCount": "{count, plural, one {# impression} other {# impressions}}",
+    "sourceNote": "Impressions, reach and engagement come from Facebook. Link clicks are counted by this app’s own short links, over each link’s whole life rather than only this range. They measure different things and are never added together."
   },
   "settings": {
     "addTime": "Add time",

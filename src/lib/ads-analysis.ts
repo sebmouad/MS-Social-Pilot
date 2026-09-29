@@ -34,12 +34,20 @@ export interface AdKpi {
   upIsGood: boolean | null;
 }
 
-export function adKpis(current: AdPeriodTotals, previous: AdPeriodTotals): AdKpi[] {
+/**
+ * The headline figures, each against the period before.
+ *
+ * `previous` is null when that period falls outside what was pulled from
+ * Facebook. Its totals would read as zero spend and zero clicks, and every
+ * delta against them as a collapse or a boom that never happened — so there
+ * is no comparison rather than a wrong one.
+ */
+export function adKpis(current: AdPeriodTotals, previous: AdPeriodTotals | null): AdKpi[] {
   const kpi = (key: AdKpiKey, upIsGood: boolean | null): AdKpi => ({
     key,
     current: current[key],
-    previous: previous[key],
-    change: change(current[key], previous[key]),
+    previous: previous ? previous[key] : null,
+    change: previous ? change(current[key], previous[key]) : null,
     upIsGood,
   });
 
@@ -84,7 +92,8 @@ export const MIN_CLICKS = 30;
  */
 export function adFindings(input: {
   current: AdPeriodTotals;
-  previous: AdPeriodTotals;
+  /** Null when the previous period was never synced; see `adKpis`. */
+  previous: AdPeriodTotals | null;
   campaigns: AdCampaignFigures[];
 }): AdFinding[] {
   const out: AdFinding[] = [];
@@ -95,7 +104,7 @@ export function adFindings(input: {
     return out;
   }
 
-  const cpcChange = change(current.cpc, previous.cpc);
+  const cpcChange = previous ? change(current.cpc, previous.cpc) : null;
   if (cpcChange !== null && Math.abs(cpcChange) >= 15) {
     out.push({
       tone: cpcChange < 0 ? 'good' : 'warning',
@@ -104,7 +113,7 @@ export function adFindings(input: {
     });
   }
 
-  const ctrChange = change(current.ctr, previous.ctr);
+  const ctrChange = previous ? change(current.ctr, previous.ctr) : null;
   if (ctrChange !== null && Math.abs(ctrChange) >= 15) {
     out.push({
       tone: ctrChange > 0 ? 'good' : 'warning',

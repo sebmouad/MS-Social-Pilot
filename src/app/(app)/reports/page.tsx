@@ -22,6 +22,8 @@ export default async function ReportsPage({
 }) {
   const auth = await requirePage();
   const t = await getTranslations('reports');
+  // Unscoped, for the `errors.*` key a refused range carries.
+  const tAll = await getTranslations();
   const params = await searchParams;
   const timezone = auth.workspace.timezone;
 
@@ -39,7 +41,7 @@ export default async function ReportsPage({
   // last thirty days under dates nobody asked for is the failure this screen
   // is most able to hide: the numbers look real, and they are — for a period
   // the reader is not looking at.
-  const rangeError = range.ok ? null : range.message;
+  const rangeError = range.ok ? null : tAll(range.error.key, range.error.params);
   const { from, to } = range.ok
     ? range
     : { from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), to: new Date() };
@@ -53,7 +55,7 @@ export default async function ReportsPage({
         { label: t('postsPublished'), value: report.postsPublished },
         { label: t('totalReach'), value: report.totals.reach },
         { label: t('totalEngagement'), value: report.totals.engagement },
-        { label: t('linkClicks'), value: report.totals.linkClicks },
+        { label: t('linkClicksLifetime'), value: report.totals.linkClicks },
       ]
     : [];
 
@@ -63,13 +65,17 @@ export default async function ReportsPage({
         <div>
           <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">
-            {t('subtitle')} · {formatInZone(from, timezone, 'd MMM yyyy')} –{' '}
-            {formatInZone(to, timezone, 'd MMM yyyy')}
+            {t('subtitle')}
+            {/* Not while the range is refused: these would be the fallback
+                dates, naming a period nobody asked for. */}
+            {!rangeError &&
+              ` · ${formatInZone(from, timezone, 'd MMM yyyy')} – ${formatInZone(to, timezone, 'd MMM yyyy')}`}
           </p>
         </div>
         <ReportControls
           from={utcToLocalInput(from, timezone).slice(0, 10)}
           to={utcToLocalInput(to, timezone).slice(0, 10)}
+          downloadable={!rangeError}
         />
       </header>
 
@@ -95,16 +101,16 @@ export default async function ReportsPage({
               <table className="w-full min-w-[42rem] text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-                    <th className="py-2 pr-3 font-medium">{t('destination')}</th>
+                    <th scope="col" className="py-2 pr-3 font-medium">{t('destination')}</th>
                     {/* Not the headline figure: that counts posts, this counts
                         the times each destination was posted to, so one post to
                         three Pages is 1 up there and 1+1+1 here. Sharing a
                         label made the column look like broken arithmetic. */}
-                    <th className="py-2 pr-3 text-right font-medium">{t('postsSent')}</th>
-                    <th className="py-2 pr-3 text-right font-medium">Impressions</th>
-                    <th className="py-2 pr-3 text-right font-medium">{t('totalReach')}</th>
-                    <th className="py-2 pr-3 text-right font-medium">{t('totalEngagement')}</th>
-                    <th className="py-2 text-right font-medium">{t('linkClicks')}</th>
+                    <th scope="col" className="py-2 pr-3 text-right font-medium">{t('postsSent')}</th>
+                    <th scope="col" className="py-2 pr-3 text-right font-medium">{t('impressions')}</th>
+                    <th scope="col" className="py-2 pr-3 text-right font-medium">{t('totalReach')}</th>
+                    <th scope="col" className="py-2 pr-3 text-right font-medium">{t('totalEngagement')}</th>
+                    <th scope="col" className="py-2 text-right font-medium">{t('linkClicksLifetime')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -130,22 +136,27 @@ export default async function ReportsPage({
           <section className="card p-5">
             <h2 className="mb-3 text-sm font-semibold text-slate-900">{t('topPosts')}</h2>
             <ol className="space-y-3">
-              {report.topPosts.map((post, index) => (
-                <li key={`${post.postId}-${index}`} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+              {report.topPosts.map((post) => (
+                <li key={post.postId} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
                   <p className="line-clamp-2 [overflow-wrap:anywhere] text-sm text-slate-800">{post.message || '—'}</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {post.targetName}
+                    {/* Each destination by name, linked to the post there: one
+                        entry per post, however many Pages it went to. */}
+                    {post.destinations.map((destination, index) => (
+                      <span key={`${destination.name}-${index}`}>
+                        {index > 0 && ', '}
+                        {destination.url ? (
+                          <ExternalLink href={destination.url} className="text-brand-600 hover:underline">
+                            {destination.name}
+                          </ExternalLink>
+                        ) : (
+                          destination.name
+                        )}
+                      </span>
+                    ))}
                     {post.publishedLabel ? ` · ${post.publishedLabel}` : ''} ·{' '}
-                    {post.engagement.toLocaleString(appLocale())} {t('totalEngagement').toLowerCase()}
-                    {post.impressions > 0 && ` · ${post.impressions.toLocaleString(appLocale())} impressions`}
-                    {post.url && (
-                      <>
-                        {' · '}
-                        <ExternalLink href={post.url} className="text-brand-600 hover:underline">
-                          Facebook
-                        </ExternalLink>
-                      </>
-                    )}
+                    {t('engagementCount', { count: post.engagement })}
+                    {post.impressions > 0 && ` · ${t('impressionCount', { count: post.impressions })}`}
                   </p>
                 </li>
               ))}
@@ -155,8 +166,7 @@ export default async function ReportsPage({
       )}
 
       <p className="text-xs text-slate-500">
-        Impressions, reach and engagement come from Facebook. Link clicks are counted by this app&apos;s
-        own short links. They measure different things and are never added together.
+        {t('sourceNote')}
       </p>
     </div>
   );

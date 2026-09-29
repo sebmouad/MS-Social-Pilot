@@ -4,6 +4,7 @@ import { prisma } from './prisma';
 import { parseInsights, type PostInsights } from './json';
 import { DEFAULT_TIMEZONE, firstRealInstant, formatInZone, isValidTimeZone } from './time';
 import { toCsv } from './csv';
+import { AppError, errors } from './errors';
 
 /**
  * Reporting.
@@ -27,12 +28,21 @@ export interface DestinationRow {
   clicks: number;
 }
 
+/**
+ * One post, however many destinations it went to.
+ *
+ * Ranked per destination row, a post sent to three Pages took three of the ten
+ * places — and a client with one strong post saw it listed three times over
+ * the posts that came next.
+ */
 export interface TopPost {
   postId: string;
   message: string;
+  /** When it first went out in the range. */
   publishedLabel: string | null;
-  url: string | null;
-  targetName: string;
+  /** Every destination it reached in the range, each with its link there. */
+  destinations: Array<{ name: string; url: string | null }>;
+  /** Summed across those destinations. */
   engagement: number;
   impressions: number;
 }
@@ -45,6 +55,13 @@ export interface Report {
     impressions: number;
     reach: number;
     engagement: number;
+    /**
+     * Every click the range's posts' short links have ever had — not clicks
+     * made in the range. The per-click rows that carry a date are pruned after
+     * `retention.clickDays`, so counting by date would quietly undercount any
+     * range older than that; the running total is the figure that stays true,
+     * and it is labelled as lifetime wherever it is shown.
+     */
     linkClicks: number;
   };
   destinations: DestinationRow[];
@@ -63,7 +80,17 @@ function engagementOf(insights: PostInsights | null): number {
 /** A resolved date range, or the reason it could not be. */
 export type RangeResult =
   | { ok: true; from: Date; to: Date }
-  | { ok: false; message: string };
+  | {
+      ok: false;
+      /** Carries the translation key; routes throw it, the screen translates it. */
+      error: AppError;
+      /** The English fallback, for logs and tests. */
+      message: string;
+    };
+
+function refuse(error: AppError): RangeResult {
+  return { ok: false, error, message: error.message };
+}
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -127,11 +154,11 @@ export function parseReportRange(params: {
     : new Date(to.getTime() - THIRTY_DAYS_MS);
 
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-    return { ok: false, message: 'Enter a valid date range.' };
+    return refuse(errors.dateRange());
   }
 
   if (from.getTime() > to.getTime()) {
-    return { ok: false, message: 'The start of the range comes after its end. Swap the dates.' };
+    return refuse(errors.dateRangeInverted());
   }
 
   return { ok: true, from, to };
@@ -144,9 +171,21 @@ export function parseReportRange(params: {
  * so a client sent last month and last quarter receives two files called the
  * same thing — and the browser quietly renames the second rather than saying
  * so. Nothing inside the file records the range either.
+ *
+ * The days are the workspace's, like the range itself. Taken in UTC, a Los
+ * Angeles report for August — which ends at 23:59 on 31 August local, 06:59
+ * on 1 September UTC — was saved as `…_2026-09-01.csv`, naming a day the
+ * report does not cover.
  */
-export function csvFilename(prefix: string, slug: string, range: { from: Date; to: Date }): string {
-  const day = (date: Date) => date.toISOString().slice(0, 10);
+export function csvFilename(
+  prefix: string,
+  slug: string,
+  range: { from: Date; to: Date },
+  timeZone: string = DEFAULT_TIMEZONE,
+): string {
+  const zone = isValidTimeZone(timeZone) ? timeZone : DEFAULT_TIMEZONE;
+  // No locale: these are digits, and a filename should not change language.
+  const day = (date: Date) => formatInZone(date, zone, 'yyyy-MM-dd', undefined);
   return `${prefix}-${slug}-${day(range.from)}_${day(range.to)}.csv`;
 }
 
@@ -210,7 +249,7 @@ export async function buildReport(options: {
 
   const byDestination = new Map<string, DestinationRow>();
   const totals = { impressions: 0, reach: 0, engagement: 0, linkClicks: 0 };
-  const topPosts: TopPost[] = [];
+  const deliveries: PostDelivery[] = [];
 
   for (const row of published) {
     const insights = parseInsights(row.insights);
@@ -241,12 +280,12 @@ export async function buildReport(options: {
     totals.reach += number(insights?.reach);
     totals.engagement += engagement;
 
-    topPosts.push({
+    deliveries.push({
       postId: row.post.id,
       message: row.post.message,
-      publishedLabel: row.publishedAt ? formatInZone(row.publishedAt, options.timezone) : null,
-      url: row.remoteUrl,
+      publishedAt: row.publishedAt,
       targetName: row.target.name,
+      url: row.remoteUrl,
       engagement,
       impressions: number(insights?.impressions),
     });
@@ -270,14 +309,63 @@ export async function buildReport(options: {
     postsPublished: new Set(published.map((row) => row.post.id)).size,
     totals,
     destinations: [...byDestination.values()].sort((a, b) => b.impressions - a.impressions),
-    topPosts: topPosts.sort((a, b) => b.engagement - a.engagement).slice(0, 10),
+    topPosts: rankTopPosts(deliveries, options.timezone),
   };
+}
+
+/** One published destination row, as `rankTopPosts` reads it. */
+export interface PostDelivery {
+  postId: string;
+  message: string;
+  publishedAt: Date | null;
+  targetName: string;
+  url: string | null;
+  engagement: number;
+  impressions: number;
+}
+
+/**
+ * The best posts of the range, one entry per post rather than per destination.
+ *
+ * Each post's destinations are summed before ranking, so a post that went to
+ * three Pages competes once, on what it earned across all three.
+ */
+export function rankTopPosts(deliveries: PostDelivery[], timezone: string, limit = 10): TopPost[] {
+  const byPost = new Map<string, TopPost & { firstPublished: Date | null }>();
+
+  for (const row of deliveries) {
+    const post = byPost.get(row.postId) ?? {
+      postId: row.postId,
+      message: row.message,
+      publishedLabel: null,
+      firstPublished: null,
+      destinations: [],
+      engagement: 0,
+      impressions: 0,
+    };
+    post.destinations.push({ name: row.targetName, url: row.url });
+    post.engagement += row.engagement;
+    post.impressions += row.impressions;
+    if (row.publishedAt && (!post.firstPublished || row.publishedAt < post.firstPublished)) {
+      post.firstPublished = row.publishedAt;
+    }
+    byPost.set(row.postId, post);
+  }
+
+  return [...byPost.values()]
+    .sort((a, b) => b.engagement - a.engagement)
+    .slice(0, limit)
+    .map(({ firstPublished, ...post }) => ({
+      ...post,
+      publishedLabel: firstPublished ? formatInZone(firstPublished, timezone) : null,
+    }));
 }
 
 /** CSV of the per-destination table, for a spreadsheet or a client deck. */
 export function reportToCsv(report: Report): string {
   const rows = [
-    ['destination', 'type', 'posts', 'impressions', 'reach', 'reactions', 'comments', 'shares', 'link_clicks'],
+    // Lifetime, like the screen says: see `Report.totals.linkClicks`.
+    ['destination', 'type', 'posts', 'impressions', 'reach', 'reactions', 'comments', 'shares', 'link_clicks_lifetime'],
     ...report.destinations.map((row) => [
       row.name,
       row.type,

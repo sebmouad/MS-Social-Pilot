@@ -29,6 +29,27 @@ describe('adKpis', () => {
     expect(kpis.find((kpi) => kpi.key === 'spend')?.change).toBeNull();
     expect(kpis.find((kpi) => kpi.key === 'cpc')?.change).toBeNull();
   });
+
+  it('compares with nothing when the previous period was never synced', () => {
+    // Its totals would read as zero, and every figure as a jump from nothing.
+    const kpis = adKpis(totals(), null);
+    expect(kpis.every((kpi) => kpi.change === null && kpi.previous === null)).toBe(true);
+    expect(kpis.find((kpi) => kpi.key === 'spend')?.current).toBe(100);
+  });
+});
+
+describe('adFindings without a previous period', () => {
+  it('says nothing about change, and still reads the campaigns', () => {
+    const result = adFindings({
+      current: totals({ cpc: 0.2, ctr: 5 }),
+      previous: null,
+      campaigns: [campaign({ name: 'Big', spend: 80 }), campaign({ name: 'Small', spend: 20 })],
+    });
+    const keys = result.map((finding) => finding.key);
+    expect(keys).not.toContain('cpcDown');
+    expect(keys).not.toContain('ctrUp');
+    expect(keys).toContain('concentrated');
+  });
 });
 
 describe('adFindings', () => {

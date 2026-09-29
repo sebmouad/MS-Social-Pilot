@@ -901,7 +901,7 @@ describe('CSV export', () => {
 
     // No ad account connected: a header and nothing else, not a crash.
     const spend = await parse(await buildExport('ads', window(workspace.id)));
-    expect(spend[0]![0]).toBe('date');
+    expect(spend[0]!.slice(0, 3)).toEqual(['ad_account', 'currency', 'date']);
     expect(spend).toHaveLength(1);
   });
 

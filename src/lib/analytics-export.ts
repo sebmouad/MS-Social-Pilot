@@ -43,6 +43,8 @@ interface Window {
   from: Date;
   to: Date;
   targetId?: string;
+  /** Ads only: one ad account, already checked against the workspace. */
+  adAccountId?: string;
 }
 
 /**
@@ -289,59 +291,88 @@ export async function instagramMediaCsv(options: Window): Promise<string> {
   );
 }
 
-/** Spend by day and by campaign, ad set and ad. */
+/**
+ * Spend by day and by campaign, ad set and ad — one ad account at a time.
+ *
+ * Every row names its ad account and that account's own currency, and nothing
+ * is totalled across two accounts. This used to read the whole workspace in
+ * one pass: two accounts billing in euros and dollars were added into one
+ * daily figure, under a currency column left blank because no single one was
+ * true. A spreadsheet sums whatever it is given, so the only safe file is one
+ * where every number already carries the unit it was billed in.
+ *
+ * With `adAccountId` the file covers that account; without it, each enabled
+ * account in turn, in its own block of rows.
+ */
 export async function adsCsv(options: Window): Promise<string> {
-  const summary = await readAdSummary({
-    workspaceId: options.workspaceId,
-    from: options.from,
-    to: options.to,
+  const accounts = await prisma.adAccount.findMany({
+    where: {
+      workspaceId: options.workspaceId,
+      ...(options.adAccountId ? { id: options.adAccountId } : { enabled: true }),
+    },
+    select: { id: true, name: true, currency: true },
+    orderBy: { name: 'asc' },
   });
 
-  const rows: unknown[][] = summary.daily.map((entry) => [
-    entry.date,
-    'account',
-    '',
-    summary.currency,
-    entry.spend,
-    entry.impressions,
-    entry.reach,
-    entry.clicks,
-    '',
-    '',
-    '',
-  ]);
+  const rows: unknown[][] = [];
 
-  for (const level of ['campaign', 'adset', 'ad'] as const) {
-    const breakdown = await readCampaigns({
+  for (const account of accounts) {
+    const scope = {
       workspaceId: options.workspaceId,
+      adAccountId: account.id,
       from: options.from,
       to: options.to,
-      level,
-    });
+    };
+    const summary = await readAdSummary(scope);
+    const currency = account.currency ?? summary.currency ?? '';
 
-    for (const entry of breakdown) {
+    for (const entry of summary.daily) {
       rows.push([
+        account.name,
+        currency,
+        entry.date,
+        'account',
         '',
-        level,
-        entry.name,
-        summary.currency,
+        '',
         entry.spend,
         entry.impressions,
         entry.reach,
         entry.clicks,
-        entry.cpc,
-        entry.cpm,
-        entry.ctr,
+        '',
+        '',
+        '',
       ]);
+    }
+
+    for (const level of ['campaign', 'adset', 'ad'] as const) {
+      for (const entry of await readCampaigns({ ...scope, level })) {
+        rows.push([
+          account.name,
+          currency,
+          '',
+          level,
+          entry.name,
+          entry.campaignName ?? '',
+          entry.spend,
+          entry.impressions,
+          entry.reach,
+          entry.clicks,
+          entry.cpc,
+          entry.cpm,
+          entry.ctr,
+        ]);
+      }
     }
   }
 
   return toCsv(
     [
+      'ad_account',
+      'currency',
       'date',
       'level',
       'name',
-      'currency',
+      'campaign',
       'spend',
       'impressions',
       'reach',

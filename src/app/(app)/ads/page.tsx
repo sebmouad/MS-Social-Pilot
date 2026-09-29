@@ -8,10 +8,12 @@ import { Icon, type IconName } from '@/components/Icon';
 import { QuerySelect } from '@/components/QuerySelect';
 import { SyncButton } from '@/components/SyncButton';
 import { requirePage } from '@/lib/auth';
-import { listAdAccounts, readAdSummary, readCampaigns } from '@/lib/ads';
+import { listAdAccounts, readAdSummary, readCampaigns, syncedSince, type CampaignRow } from '@/lib/ads';
 import { adFindings, adKpis, type AdFinding, type AdKpiKey } from '@/lib/ads-analysis';
+import { canManageAccounts } from '@/lib/constants';
+import { env } from '@/lib/env';
 import { screenMetadata } from '@/lib/metadata';
-import { formatInZone, appLocale } from '@/lib/time';
+import { formatInZone } from '@/lib/time';
 import { VIZ, seriesColor } from '@/lib/viz';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +23,36 @@ export function generateMetadata() {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** A sync older than this leaves recent days unread; see `comparable`. */
+const STALE_AFTER_MS = 2 * DAY_MS;
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+
+/** Breakdown columns a reader can sort by, and which way each starts. */
+const SORTS = {
+  name: 'asc',
+  campaign: 'asc',
+  spend: 'desc',
+  impressions: 'desc',
+  clicks: 'desc',
+  ctr: 'desc',
+  cpc: 'asc',
+  cpm: 'asc',
+} as const satisfies Record<string, 'asc' | 'desc'>;
+type SortKey = keyof typeof SORTS;
+
+/** Missing figures (no clicks, so no cost per click) sort last either way. */
+function sortRows(rows: CampaignRow[], key: SortKey, dir: 'asc' | 'desc', locale: string): CampaignRow[] {
+  const valueOf = (row: CampaignRow): string | number | null =>
+    key === 'name' ? row.name : key === 'campaign' ? row.campaignName : row[key];
+  const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true });
+  return [...rows].sort((a, b) => {
+    const x = valueOf(a);
+    const y = valueOf(b);
+    if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
+    const order = typeof x === 'string' ? collator.compare(x, String(y)) : x - (y as number);
+    return dir === 'asc' ? order : -order;
+  });
+}
 
 const TONE: Record<AdFinding['tone'], { icon: IconName; className: string }> = {
   good: { icon: 'check', className: 'text-emerald-700' },
@@ -43,6 +74,10 @@ export default async function AdsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const auth = await requirePage();
+  // Discovery and syncing are refused to anyone below admin by the API, so
+  // the buttons are not offered to them either: a button that can only fail
+  // is worse than none.
+  const admin = canManageAccounts(auth.role);
   const t = await getTranslations('ads');
   const locale = await getLocale();
   const params = await searchParams;
@@ -58,13 +93,25 @@ export default async function AdsPage({
   );
 
   if (accounts.length === 0) {
+    // Accounts that exist but are all turned off are not "none connected":
+    // discovery would find them again and change nothing, and the permission
+    // it asks about was never the problem.
+    const disabled = (await listAdAccounts(auth.workspace.id, { includeDisabled: true })).length > 0;
     return (
       <div className="space-y-6">
         {header}
         <div className="card flex flex-col items-center gap-3 p-8 text-center">
           <Icon name="megaphone" size={28} className="text-slate-400" />
-          <p className="max-w-md text-sm text-slate-600">{t('none')}</p>
-          <SyncButton endpoint="/api/ads" body={{ action: 'discover' }} label={t('discover')} variant="primary" />
+          <p className="max-w-md text-sm text-slate-600">{t(disabled ? 'allDisabled' : 'none')}</p>
+          {disabled ? (
+            <Link href="/connections" className="btn-secondary">
+              {t('openConnections')}
+            </Link>
+          ) : admin ? (
+            <SyncButton endpoint="/api/ads" body={{ action: 'discover' }} label={t('discover')} variant="primary" />
+          ) : (
+            <p className="max-w-md text-sm text-slate-500">{t('askAdmin')}</p>
+          )}
         </div>
       </div>
     );
@@ -72,11 +119,29 @@ export default async function AdsPage({
 
   const account = accounts.find((entry) => entry.id === first(params.account)) ?? accounts[0]!;
 
+  // A sync pulls `adWindowDays` of history and no more, so a longer range
+  // is offered nowhere: its early part would read as days of no spend rather
+  // than days never asked about.
+  const syncWindow = env.adWindowDays;
+  const rangeOptions = [7, 30, 90].filter((option) => option <= syncWindow);
+  if (syncWindow < 90 && !rangeOptions.includes(syncWindow)) rangeOptions.push(syncWindow);
+
   const days = Number.parseInt(first(params.days) ?? '30', 10);
-  const window = Number.isFinite(days) && days > 0 && days <= 365 ? days : 30;
+  const window = Math.min(Number.isFinite(days) && days > 0 ? days : 30, syncWindow);
   const to = new Date();
   const from = new Date(to.getTime() - window * DAY_MS);
   const previousFrom = new Date(from.getTime() - window * DAY_MS);
+
+  // The previous period is compared against only when it was synced in full.
+  // With a 90-day window, "last 90 days vs the 90 before" set every figure
+  // against zero, and the tiles and findings reported a collapse that was
+  // only the edge of the data.
+  // And only while the sync is recent: days since the last one were never
+  // pulled either, so a stale sync would set an empty current period against
+  // a full previous one — the same false collapse, at the other end.
+  const coverage = syncedSince(account.lastSyncedAt, syncWindow);
+  const stale = account.lastSyncedAt !== null && to.getTime() - account.lastSyncedAt.getTime() > STALE_AFTER_MS;
+  const comparable = coverage !== null && !stale && previousFrom.getTime() >= coverage.getTime();
 
   const requestedLevel = first(params.level);
   const level: 'campaign' | 'adset' | 'ad' =
@@ -85,7 +150,9 @@ export default async function AdsPage({
   const scope = { workspaceId: auth.workspace.id, adAccountId: account.id };
   const [summary, previous, rows, campaigns] = await Promise.all([
     readAdSummary({ ...scope, from, to }),
-    readAdSummary({ ...scope, from: previousFrom, to: new Date(from.getTime() - 1) }),
+    comparable
+      ? readAdSummary({ ...scope, from: previousFrom, to: new Date(from.getTime() - 1) })
+      : Promise.resolve(null),
     readCampaigns({ ...scope, from, to, level }),
     level === 'campaign' ? Promise.resolve(null) : readCampaigns({ ...scope, from, to, level: 'campaign' }),
   ]);
@@ -103,18 +170,62 @@ export default async function AdsPage({
           maximumFractionDigits: value >= 100 ? 0 : 2,
         }).format(value);
 
+  // CTR arrives as a percentage figure (1.25 for 1.25%); the formatter wants
+  // the fraction, and writes the sign and spacing each language expects.
+  const percentFormat = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 2 });
+  const percent = (value: number | null) => (value === null ? '—' : percentFormat.format(value / 100));
+  const count = (value: number) => value.toLocaleString(locale);
+
   const display = (key: AdKpiKey, value: number | null): string | number | null => {
     if (value === null) return null;
     if (key === 'spend' || key === 'cpc' || key === 'cpm') return money(value);
-    if (key === 'ctr') return `${value}%`;
+    if (key === 'ctr') return percent(value);
     return value;
   };
 
+  const requestedSort = first(params.sort);
+  const sort: SortKey =
+    requestedSort && Object.hasOwn(SORTS, requestedSort) && (requestedSort !== 'campaign' || level !== 'campaign')
+      ? (requestedSort as SortKey)
+      : 'spend';
+  const requestedDir = first(params.dir);
+  const dir: 'asc' | 'desc' = requestedDir === 'asc' || requestedDir === 'desc' ? requestedDir : SORTS[sort];
+  const sorted = sortRows(rows, sort, dir, locale);
+
   const hrefWith = (changes: Record<string, string>) => {
-    const next = new URLSearchParams({ account: account.id, days: String(window), level });
+    const next = new URLSearchParams({ account: account.id, days: String(window), level, sort, dir });
     for (const [key, value] of Object.entries(changes)) next.set(key, value);
     return `/ads?${next.toString()}`;
   };
+
+  /** A sortable column header: the active one flips, any other starts its own way. */
+  const sortHeader = (key: SortKey, label: string, className: string) => {
+    const active = key === sort;
+    const nextDir = active ? (dir === 'asc' ? 'desc' : 'asc') : SORTS[key];
+    return (
+      <th
+        scope="col"
+        className={className}
+        aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : undefined}
+      >
+        <Link
+          href={hrefWith({ sort: key, dir: nextDir })}
+          className="inline-flex items-center gap-1 hover:text-slate-900"
+          scroll={false}
+        >
+          {label}
+          {active && <span aria-hidden="true">{dir === 'asc' ? '▲' : '▼'}</span>}
+        </Link>
+      </th>
+    );
+  };
+
+  const exportHref = `/api/analytics/export?${new URLSearchParams({
+    kind: 'ads',
+    adAccountId: account.id,
+    from: from.toISOString(),
+    to: to.toISOString(),
+  }).toString()}`;
 
   return (
     <div className="space-y-6">
@@ -122,7 +233,7 @@ export default async function AdsPage({
 
       <div className="filter-row">
         <div className="segmented">
-          {[7, 30, 90].map((option) => (
+          {rangeOptions.map((option) => (
             <Link
               key={option}
               href={hrefWith({ days: String(option) })}
@@ -146,8 +257,21 @@ export default async function AdsPage({
         )}
 
         <div className="ml-auto flex flex-wrap gap-2">
-          <SyncButton endpoint="/api/ads" body={{ action: 'discover' }} label={t('discover')} />
-          <SyncButton endpoint="/api/ads" body={{ action: 'sync', adAccountId: account.id }} label={t('sync')} variant="primary" />
+          {/* One account's rows in its own currency, over the range on screen. */}
+          <a className="btn-secondary" href={exportHref}>
+            {t('exportCsv')}
+          </a>
+          {admin && (
+            <>
+              <SyncButton endpoint="/api/ads" body={{ action: 'discover' }} label={t('discover')} />
+              <SyncButton
+                endpoint="/api/ads"
+                body={{ action: 'sync', adAccountId: account.id }}
+                label={t('sync')}
+                variant="primary"
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -158,6 +282,7 @@ export default async function AdsPage({
         {account.lastSyncedAt
           ? t('lastSynced', { when: formatInZone(account.lastSyncedAt, timezone, 'd MMM yyyy, HH:mm') })
           : t('neverSynced')}
+        {coverage && ` · ${t('coverage', { date: formatInZone(coverage, timezone, 'd MMM yyyy') })}`}
       </p>
 
       <section className="card-viz">
@@ -191,6 +316,14 @@ export default async function AdsPage({
         ))}
       </section>
 
+      {coverage && !comparable && (
+        <p className="-mt-3 text-xs text-slate-500">
+          {stale
+            ? t('staleComparison', { when: formatInZone(account.lastSyncedAt!, timezone, 'd MMM yyyy') })
+            : t('noComparison', { date: formatInZone(coverage, timezone, 'd MMM yyyy') })}
+        </p>
+      )}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <AdsTrend
           title={t('dailySpend')}
@@ -198,6 +331,7 @@ export default async function AdsPage({
           valueLabel={t('spend')}
           dateLabel={t('date')}
           colorIndex={0}
+          currency={currency || undefined}
           points={summary.daily.map((day) => ({ date: day.date, value: day.spend }))}
         />
         <AdsTrend
@@ -241,24 +375,33 @@ export default async function AdsPage({
             <table className="mt-3 w-full min-w-[760px] text-sm">
               <thead className="border-y border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th scope="col" className="px-4 py-2">{t(`level_${level}`)}</th>
-                  <th scope="col" className="px-3 py-2 text-right">{t('spend')}</th>
+                  {sortHeader('name', t(`level_${level}`), 'px-4 py-2')}
+                  {level !== 'campaign' && sortHeader('campaign', t('level_campaign'), 'px-3 py-2')}
+                  {sortHeader('spend', t('spend'), 'px-3 py-2 text-right')}
                   <th scope="col" className="w-32 px-3 py-2">{t('share')}</th>
-                  <th scope="col" className="px-3 py-2 text-right">{t('impressions')}</th>
-                  <th scope="col" className="px-3 py-2 text-right">{t('clicks')}</th>
-                  <th scope="col" className="px-3 py-2 text-right">{t('ctr')}</th>
-                  <th scope="col" className="px-3 py-2 text-right">{t('cpc')}</th>
-                  <th scope="col" className="px-4 py-2 text-right">{t('cpm')}</th>
+                  {sortHeader('impressions', t('impressions'), 'px-3 py-2 text-right')}
+                  {sortHeader('clicks', t('clicks'), 'px-3 py-2 text-right')}
+                  {sortHeader('ctr', t('ctr'), 'px-3 py-2 text-right')}
+                  {sortHeader('cpc', t('cpc'), 'px-3 py-2 text-right')}
+                  {sortHeader('cpm', t('cpm'), 'px-4 py-2 text-right')}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rows.map((row) => {
+                {sorted.map((row) => {
                   const share = summary.spend > 0 ? Math.round((row.spend / summary.spend) * 100) : 0;
                   return (
                     <tr key={row.objectId}>
                       <td className="max-w-xs truncate px-4 py-2.5 font-medium text-slate-900" title={row.name}>
                         {row.name}
                       </td>
+                      {level !== 'campaign' && (
+                        <td
+                          className="max-w-[12rem] truncate px-3 py-2.5 text-slate-600"
+                          title={row.campaignName ?? undefined}
+                        >
+                          {row.campaignName ?? '—'}
+                        </td>
+                      )}
                       <td className="nums px-3 py-2.5 text-right text-slate-900">{money(row.spend)}</td>
                       <td className="px-3 py-2.5">
                         {/* Share of spend as a bar with its number: which line
@@ -275,12 +418,12 @@ export default async function AdsPage({
                               }}
                             />
                           </span>
-                          <span className="nums w-9 text-right text-xs text-slate-600">{share}%</span>
+                          <span className="nums w-10 text-right text-xs text-slate-600">{percentFormat.format(share / 100)}</span>
                         </span>
                       </td>
-                      <td className="nums px-3 py-2.5 text-right text-slate-700">{row.impressions.toLocaleString(appLocale())}</td>
-                      <td className="nums px-3 py-2.5 text-right text-slate-700">{row.clicks.toLocaleString(appLocale())}</td>
-                      <td className="nums px-3 py-2.5 text-right text-slate-700">{row.ctr === null ? '—' : `${row.ctr}%`}</td>
+                      <td className="nums px-3 py-2.5 text-right text-slate-700">{count(row.impressions)}</td>
+                      <td className="nums px-3 py-2.5 text-right text-slate-700">{count(row.clicks)}</td>
+                      <td className="nums px-3 py-2.5 text-right text-slate-700">{percent(row.ctr)}</td>
                       <td className="nums px-3 py-2.5 text-right text-slate-700">{money(row.cpc)}</td>
                       <td className="nums px-4 py-2.5 text-right text-slate-700">{money(row.cpm)}</td>
                     </tr>

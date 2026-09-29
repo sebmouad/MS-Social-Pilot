@@ -367,4 +367,14 @@ export const errors = {
       params: { seconds },
       status: 429,
     }),
+
+  dateRangeInverted: () =>
+    new AppError({
+      key: 'errors.dateRangeInverted',
+      fallback: 'The start of the range comes after its end. Swap the dates.',
+      status: 400,
+    }),
+
+  adAccountNotFound: () =>
+    new AppError({ key: 'errors.adAccountNotFound', fallback: 'Ad account not found.', status: 404 }),
 };
