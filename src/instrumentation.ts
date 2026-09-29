@@ -7,22 +7,13 @@
  * caused it looked healthy.
  */
 export async function register(): Promise<void> {
-  // Node only: the edge runtime has no use for these secrets, and `next build`
-  // loads this file too — failing a build over a runtime secret is exactly
-  // what `src/lib/env.ts` is careful not to do.
-  if (process.env.NEXT_RUNTIME !== 'nodejs') return;
-  if (process.env.NEXT_PHASE === 'phase-production-build') return;
-
-  const { validateEnv } = await import('./lib/env');
-  try {
-    validateEnv();
-  } catch (error) {
-    // In development a warning is enough: `next dev` is often started before
-    // `.env` is finished, and the accessor throws again at the point of use.
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(`[env] ${error instanceof Error ? error.message : String(error)}`);
-      return;
-    }
-    throw error;
+  // Node only, and written as a condition around the import rather than an
+  // early return: Next replaces `NEXT_RUNTIME` at compile time, so the edge
+  // bundle drops this branch — and with it `env.ts` and the `node:` modules it
+  // pulls in, which the edge compiler cannot resolve. After an early return the
+  // import would still be bundled, and the build fails.
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { checkEnvAtStartup } = await import('./instrumentation-node');
+    await checkEnvAtStartup();
   }
 }
