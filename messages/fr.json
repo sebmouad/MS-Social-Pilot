@@ -196,7 +196,12 @@
     "chooseView": "Choisir une vue",
     "sortBy": "Trier par",
     "showLess": "Afficher moins",
-    "interactionsTotal": "Interactions"
+    "interactionsTotal": "Interactions",
+    "filterLabel": "Filtrer les indicateurs",
+    "sortAscending": "Tri croissant — inverser",
+    "sortDescending": "Tri décroissant — inverser",
+    "trendFromTo": "Tendance de {from} à {to}",
+    "refreshThrottled": "Les statistiques viennent d’être actualisées plusieurs fois. Réessayez dans {minutes, plural, one {# minute} other {# minutes}}."
   },
   "app": {
     "name": "MS Social Pilot",
@@ -475,7 +480,9 @@
     "destinationsFailed": "{count, plural, one {# destination n'a pas pu recevoir la publication} other {# destinations n'ont pas pu recevoir la publication}}.",
     "reviewAndRetry": "Vérifier et réessayer",
     "tokensExpiring": "{count, plural, one {# connexion Facebook expire} other {# connexions Facebook expirent}} sous {days} jours. Les publications programmées s’arrêtent dès qu’une expire.",
-    "reviewConnections": "Vérifier les connexions"
+    "reviewConnections": "Vérifier les connexions",
+    "reconnectRequired": "Reconnexion nécessaire.",
+    "noTimeSet": "Aucune heure définie"
   },
   "email": {
     "invitation": {
@@ -563,6 +570,7 @@
     "replyFailed": "Facebook a refusé d’envoyer cette réponse.",
     "replyNobodyWaiting": "Le dernier message est celui de la page : il n’y a personne à qui répondre.",
     "replyPlaceholder": "Répondre en tant que page…",
+    "replyToLabel": "Répondre à {author}",
     "replyWindowClosed": "Facebook n’autorise une réponse que dans les 24 heures suivant le dernier message de la personne. Cette conversation est silencieuse depuis plus longtemps.",
     "replyWindowOpen": "Facebook accepte une réponse sur cette conversation jusqu’à {until}.",
     "reviewCount": "Notes",
@@ -575,6 +583,7 @@
     "show": "Afficher",
     "showAll": "Tous",
     "showHidden": "Masqués uniquement",
+    "showUnanswered": "Sans réponse uniquement",
     "showVisible": "Visibles uniquement",
     "totalWatch": "Durée totale",
     "unhide": "Afficher",
@@ -668,6 +677,8 @@
     "queueFull": "Tous les créneaux des 90 prochains jours sont pris. Ajoutez des créneaux ou choisissez une date.",
     "quotaFull": "Ce client a utilisé {used} Mo de son quota de {quota} Mo. Supprimez des fichiers ou augmentez la limite dans la Configuration.",
     "reference": "Référence",
+    "refreshNoPermission": "Seuls les éditeurs et au-delà peuvent récupérer les commentaires et messages depuis Facebook.",
+    "refreshTooSoon": "Cet espace de travail vient de récupérer les données de Facebook. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}.",
     "registrationClosed": "Ce serveur n’accepte pas de nouveaux comptes. Demandez à un administrateur de vous inviter.",
     "replyNoPermission": "Vous n’avez pas l’autorisation de répondre aux messages.",
     "replyWindowClosed": "Facebook n’autorise une réponse que dans les 24 heures suivant le dernier message de la personne. Cette conversation est silencieuse depuis plus longtemps, une réponse serait donc refusée.",

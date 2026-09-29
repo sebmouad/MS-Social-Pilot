@@ -1,5 +1,8 @@
-import { TargetType } from '@prisma/client';
+import { Prisma, TargetType, WorkspaceRole } from '@prisma/client';
 
+import { atLeast } from './constants';
+import { AppError } from './errors';
+import { hit } from './rate-limit';
 import { prisma } from './prisma';
 import { decryptSecret } from './crypto';
 import { parseInsights, toJson } from './json';
@@ -162,31 +165,35 @@ export async function syncTargetAnalytics(options: {
       unavailable.push(...result.unavailable);
 
       // Record availability so the UI can distinguish "Meta refused this" from
-      // "this Page had no activity".
-      for (const entry of result.unavailable) {
-        await prisma.metricAvailability.upsert({
-          where: {
-            targetId_metric_period: { targetId: target.id, metric: entry.name, period },
-          },
-          create: {
-            targetId: target.id,
-            metric: entry.name,
-            period,
-            available: false,
-            reason: entry.reason,
-          },
-          update: { available: false, reason: entry.reason, checkedAt: new Date() },
-        });
-      }
-      for (const entry of result.series) {
-        await prisma.metricAvailability.upsert({
-          where: {
-            targetId_metric_period: { targetId: target.id, metric: entry.name, period },
-          },
-          create: { targetId: target.id, metric: entry.name, period, available: true },
-          update: { available: true, reason: null, checkedAt: new Date() },
-        });
-      }
+      // "this Page had no activity". One transaction rather than one round trip
+      // per metric: a full catalogue is well over a hundred names a period.
+      const checkedAt = new Date();
+      await prisma.$transaction([
+        ...result.unavailable.map((entry) =>
+          prisma.metricAvailability.upsert({
+            where: {
+              targetId_metric_period: { targetId: target.id, metric: entry.name, period },
+            },
+            create: {
+              targetId: target.id,
+              metric: entry.name,
+              period,
+              available: false,
+              reason: entry.reason,
+            },
+            update: { available: false, reason: entry.reason, checkedAt },
+          }),
+        ),
+        ...result.series.map((entry) =>
+          prisma.metricAvailability.upsert({
+            where: {
+              targetId_metric_period: { targetId: target.id, metric: entry.name, period },
+            },
+            create: { targetId: target.id, metric: entry.name, period, available: true },
+            update: { available: true, reason: null, checkedAt },
+          }),
+        ),
+      ]);
     }
 
     return { ...base, stored, metrics, unavailable };
@@ -1034,13 +1041,30 @@ export async function readAudience(options: {
   // Newest name first: Meta replaced the `page_fans_*` breakdowns with
   // `page_follows_*` on 15 November 2025, and a Page synced since then holds
   // only the new ones.
-  const latestOf = async (...metrics: string[]): Promise<Record<string, number>> => {
+  //
+  // Every candidate name's newest row in one query — DISTINCT ON walks the
+  // (targetId, metric, endTime) index — rather than a round trip per name.
+  const BREAKDOWNS = {
+    country: ['page_follows_country', 'page_fans_country'],
+    city: ['page_follows_city', 'page_fans_city'],
+    locale: ['page_follows_locale', 'page_fans_locale'],
+    genderAge: ['page_fans_gender_age'],
+  } as const;
+
+  const latestRows = prisma.$queryRaw<Array<{ metric: string; value: unknown }>>`
+    SELECT DISTINCT ON (metric) metric, value
+    FROM page_insights
+    WHERE "targetId" = ${options.targetId}
+      AND metric IN (${Prisma.join(Object.values(BREAKDOWNS).flat())})
+    ORDER BY metric, "endTime" DESC
+  `;
+
+  const latestOf = (
+    rows: Array<{ metric: string; value: unknown }>,
+    metrics: readonly string[],
+  ): Record<string, number> => {
     for (const metric of metrics) {
-      const row = await prisma.pageInsight.findFirst({
-        where: { targetId: options.targetId, metric },
-        orderBy: { endTime: 'desc' },
-      });
-      const value = row?.value;
+      const value = rows.find((row) => row.metric === metric)?.value;
       if (value && typeof value === 'object' && !Array.isArray(value)) return value as Record<string, number>;
     }
     return {};
@@ -1064,14 +1088,15 @@ export async function readAudience(options: {
     return 0;
   };
 
-  const [byCountry, byCity, byLocale, byGenderAge, adds, removes] = await Promise.all([
-    latestOf('page_follows_country', 'page_fans_country'),
-    latestOf('page_follows_city', 'page_fans_city'),
-    latestOf('page_follows_locale', 'page_fans_locale'),
-    latestOf('page_fans_gender_age'),
+  const [latest, adds, removes] = await Promise.all([
+    latestRows,
     sumOf('page_daily_follows_unique', 'page_fan_adds_unique', 'page_fan_adds'),
     sumOf('page_daily_unfollows_unique', 'page_fan_removes_unique', 'page_fan_removes'),
   ]);
+  const byCountry = latestOf(latest, BREAKDOWNS.country);
+  const byCity = latestOf(latest, BREAKDOWNS.city);
+  const byLocale = latestOf(latest, BREAKDOWNS.locale);
+  const byGenderAge = latestOf(latest, BREAKDOWNS.genderAge);
 
   return {
     fans: target.fanCount,
@@ -1085,6 +1110,26 @@ export async function readAudience(options: {
     removes,
     net: adds - removes,
   };
+}
+
+/**
+ * The dashboard's "Recently published": the last few posts that went out, or
+ * tried to.
+ *
+ * Failures are included on purpose — a post that did not go out is exactly
+ * what someone opening the dashboard needs to see. But Postgres sorts NULL
+ * first in a descending order, so a post that failed before anything was
+ * published (no `publishedAt`) used to head the list for ever, above
+ * everything that had actually gone out since. Those now come after, newest
+ * attempt first.
+ */
+export async function recentOutcomes(workspaceId: string, take = 5) {
+  return prisma.post.findMany({
+    where: { workspaceId, status: { in: ['published', 'partially_failed', 'failed'] } },
+    include: { targets: { include: { target: { select: { name: true } } } } },
+    orderBy: [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { updatedAt: 'desc' }],
+    take,
+  });
 }
 
 export interface PublishedTotals {
@@ -1114,8 +1159,20 @@ export interface PublishedTotals {
  * five hundred JSON documents. `->>` yields text, so each value is cast, and a
  * row whose insights have not been fetched yet contributes nothing rather than
  * poisoning the sum with a null.
+ *
+ * The cast is to numeric, behind a shape check, not straight to bigint: one
+ * stored "12.5" — or a breakdown object where a count was expected — made
+ * `::bigint` throw, and the whole dashboard with it. A value that is not a
+ * number now counts as nothing; the sum is rounded back to a whole figure.
  */
 export async function publishedTotals(workspaceId: string): Promise<PublishedTotals> {
+  // The key is one of four literals, never input, so it is inlined rather
+  // than bound as a parameter.
+  const insightNumber = (key: 'impressions' | 'reach' | 'reactions' | 'comments') => {
+    const text = Prisma.raw(`btrim(pt.insights->>'${key}')`);
+    return Prisma.sql`CASE WHEN ${text} ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN ${text}::numeric ELSE 0 END`;
+  };
+
   const [row] = await prisma.$queryRaw<
     Array<{
       impressions: bigint | null;
@@ -1126,10 +1183,10 @@ export async function publishedTotals(workspaceId: string): Promise<PublishedTot
     }>
   >`
     SELECT
-      SUM(COALESCE((pt.insights->>'impressions')::bigint, 0)) AS impressions,
-      SUM(COALESCE((pt.insights->>'reach')::bigint, 0))       AS reach,
-      SUM(COALESCE((pt.insights->>'reactions')::bigint, 0))   AS reactions,
-      SUM(COALESCE((pt.insights->>'comments')::bigint, 0))    AS comments,
+      ROUND(SUM(${insightNumber('impressions')}))::bigint AS impressions,
+      ROUND(SUM(${insightNumber('reach')}))::bigint       AS reach,
+      ROUND(SUM(${insightNumber('reactions')}))::bigint   AS reactions,
+      ROUND(SUM(${insightNumber('comments')}))::bigint    AS comments,
       COUNT(*)                                                 AS posts
     FROM post_targets pt
     JOIN posts p ON p.id = pt."postId"
@@ -1148,4 +1205,36 @@ export async function publishedTotals(workspaceId: string): Promise<PublishedTot
     comments: asNumber(row?.comments ?? null),
     posts: asNumber(row?.posts ?? null),
   };
+}
+
+/**
+ * Make the server walk the Graph catalogue: a sync, a probe, a post refresh.
+ *
+ * Editor and above. Each one is dozens of Graph calls against the app's shared
+ * rate limit, so it is not something every contributor should be able to set
+ * off; reading what has been stored stays open to every member.
+ */
+export function canRefreshAnalytics(role: WorkspaceRole): boolean {
+  return atLeast(role, WorkspaceRole.editor);
+}
+
+/**
+ * The brake on those walks: a handful per workspace per five minutes, shared
+ * by the per-Page sync and probe and the post refresh.
+ *
+ * Per workspace, not per member, because what is being protected — the Graph
+ * quota of the Pages connected to it — is shared by the workspace. Throws a
+ * 429 that says how long to wait.
+ */
+export function throttleAnalyticsRefresh(workspaceId: string, now = Date.now()): void {
+  const attempt = hit(`analytics:refresh:${workspaceId}`, { limit: 6, windowMs: 5 * 60_000, now });
+  if (attempt.allowed) return;
+
+  const minutes = Math.max(1, Math.ceil((attempt.resetAt - now) / 60_000));
+  throw new AppError({
+    key: 'analytics.refreshThrottled',
+    fallback: `Analytics was refreshed several times just now. Try again in ${minutes} minute(s).`,
+    params: { minutes },
+    status: 429,
+  });
 }
