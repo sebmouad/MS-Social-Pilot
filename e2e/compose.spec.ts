@@ -299,6 +299,38 @@ test('comments can be searched and paged rather than only skimmed', async ({ pag
   await expect(page.getByText('The delivery never arrived')).toBeVisible();
   await expect(page.getByText(/Ordinary comment/).first()).toHaveCount(0);
 
+  // A reply sits under the comment it answers, not where its own timestamp
+  // would put it: the Page answered a day later, after a newer comment arrived.
+  await prisma.postComment.createMany({
+    data: [
+      {
+        postTargetId: postTarget.id,
+        remoteId: 'walk_c_7_reply',
+        parentRemoteId: 'walk_c_7',
+        fromId: target.providerId,
+        fromName: PAGE_NAME,
+        message: 'Sorry about the delivery, a replacement is on its way',
+        createdTime: new Date('2026-08-02T09:00:00Z'),
+      },
+      {
+        postTargetId: postTarget.id,
+        remoteId: 'walk_c_newer',
+        fromName: 'Grace Hopper',
+        message: 'My delivery was quick, thanks',
+        createdTime: new Date('2026-08-01T12:00:00Z'),
+      },
+    ],
+  });
+
+  await page.getByLabel(/search comments/i).fill('delivery');
+  await page.getByRole('button', { name: /^filter$/i }).click();
+
+  const messages = page.getByRole('listitem').filter({ hasText: /delivery/i });
+  await expect(messages).toHaveCount(3);
+  await expect(messages.nth(0)).toContainText('My delivery was quick');
+  await expect(messages.nth(1)).toContainText('The delivery never arrived');
+  await expect(messages.nth(2)).toContainText('a replacement is on its way');
+
   expect(failures).toEqual([]);
 });
 

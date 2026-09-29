@@ -352,4 +352,19 @@ export const errors = {
       fallback: 'Write something, add a link, or attach media.',
       status: 422,
     }),
+
+  refreshNoPermission: () =>
+    new AppError({
+      key: 'errors.refreshNoPermission',
+      fallback: 'Only editors and above can pull comments and messages from Facebook.',
+      status: 403,
+    }),
+
+  refreshTooSoon: (seconds: number) =>
+    new AppError({
+      key: 'errors.refreshTooSoon',
+      fallback: `This workspace has just pulled from Facebook. Try again in ${seconds} second(s).`,
+      params: { seconds },
+      status: 429,
+    }),
 };
