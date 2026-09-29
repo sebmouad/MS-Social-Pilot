@@ -65,8 +65,11 @@ export default async function ReportsPage({
         <div>
           <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">
-            {t('subtitle')} · {formatInZone(from, timezone, 'd MMM yyyy')} –{' '}
-            {formatInZone(to, timezone, 'd MMM yyyy')}
+            {t('subtitle')}
+            {/* Not while the range is refused: these would be the fallback
+                dates, naming a period nobody asked for. */}
+            {!rangeError &&
+              ` · ${formatInZone(from, timezone, 'd MMM yyyy')} – ${formatInZone(to, timezone, 'd MMM yyyy')}`}
           </p>
         </div>
         <ReportControls

@@ -23,6 +23,8 @@ export function generateMetadata() {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** A sync older than this leaves recent days unread; see `comparable`. */
+const STALE_AFTER_MS = 2 * DAY_MS;
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
 /** Breakdown columns a reader can sort by, and which way each starts. */
@@ -91,13 +93,21 @@ export default async function AdsPage({
   );
 
   if (accounts.length === 0) {
+    // Accounts that exist but are all turned off are not "none connected":
+    // discovery would find them again and change nothing, and the permission
+    // it asks about was never the problem.
+    const disabled = (await listAdAccounts(auth.workspace.id, { includeDisabled: true })).length > 0;
     return (
       <div className="space-y-6">
         {header}
         <div className="card flex flex-col items-center gap-3 p-8 text-center">
           <Icon name="megaphone" size={28} className="text-slate-400" />
-          <p className="max-w-md text-sm text-slate-600">{t('none')}</p>
-          {admin ? (
+          <p className="max-w-md text-sm text-slate-600">{t(disabled ? 'allDisabled' : 'none')}</p>
+          {disabled ? (
+            <Link href="/connections" className="btn-secondary">
+              {t('openConnections')}
+            </Link>
+          ) : admin ? (
             <SyncButton endpoint="/api/ads" body={{ action: 'discover' }} label={t('discover')} variant="primary" />
           ) : (
             <p className="max-w-md text-sm text-slate-500">{t('askAdmin')}</p>
@@ -126,8 +136,12 @@ export default async function AdsPage({
   // With a 90-day window, "last 90 days vs the 90 before" set every figure
   // against zero, and the tiles and findings reported a collapse that was
   // only the edge of the data.
+  // And only while the sync is recent: days since the last one were never
+  // pulled either, so a stale sync would set an empty current period against
+  // a full previous one — the same false collapse, at the other end.
   const coverage = syncedSince(account.lastSyncedAt, syncWindow);
-  const comparable = coverage !== null && previousFrom.getTime() >= coverage.getTime();
+  const stale = account.lastSyncedAt !== null && to.getTime() - account.lastSyncedAt.getTime() > STALE_AFTER_MS;
+  const comparable = coverage !== null && !stale && previousFrom.getTime() >= coverage.getTime();
 
   const requestedLevel = first(params.level);
   const level: 'campaign' | 'adset' | 'ad' =
@@ -304,7 +318,9 @@ export default async function AdsPage({
 
       {coverage && !comparable && (
         <p className="-mt-3 text-xs text-slate-500">
-          {t('noComparison', { date: formatInZone(coverage, timezone, 'd MMM yyyy') })}
+          {stale
+            ? t('staleComparison', { when: formatInZone(account.lastSyncedAt!, timezone, 'd MMM yyyy') })
+            : t('noComparison', { date: formatInZone(coverage, timezone, 'd MMM yyyy') })}
         </p>
       )}
 

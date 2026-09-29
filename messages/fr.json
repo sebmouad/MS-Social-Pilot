@@ -95,7 +95,10 @@
     "askAdmin": "Demandez à un propriétaire ou administrateur de l’espace de rechercher les comptes publicitaires accessibles.",
     "exportCsv": "Télécharger le CSV",
     "coverage": "données depuis le {date}",
-    "noComparison": "Pas de comparaison avec la période précédente : les données sont récupérées de Facebook jusqu’au {date}, et la période précédente commence avant."
+    "noComparison": "Pas de comparaison avec la période précédente : les données sont récupérées de Facebook jusqu’au {date}, et la période précédente commence avant.",
+    "allDisabled": "Tous les comptes publicitaires de cet espace sont désactivés. Réactivez-en un dans Connexions pour voir ses dépenses ici.",
+    "openConnections": "Ouvrir Connexions",
+    "staleComparison": "Pas de comparaison avec la période précédente : la dernière récupération depuis Facebook date du {when}, les jours suivants manquent."
   },
   "analytics": {
     "title": "Statistiques",

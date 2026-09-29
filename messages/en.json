@@ -95,7 +95,10 @@
     "askAdmin": "Ask a workspace owner or admin to find the ad accounts this workspace can read.",
     "exportCsv": "Download CSV",
     "coverage": "data from {date}",
-    "noComparison": "No comparison with the previous period: data is pulled from Facebook back to {date}, and the period before this one starts earlier."
+    "noComparison": "No comparison with the previous period: data is pulled from Facebook back to {date}, and the period before this one starts earlier.",
+    "allDisabled": "Every ad account in this workspace is turned off. Turn one back on under Connections to see its spend here.",
+    "openConnections": "Open Connections",
+    "staleComparison": "No comparison with the previous period: the last pull from Facebook was on {when}, so the days since are missing."
   },
   "analytics": {
     "title": "Analytics",
