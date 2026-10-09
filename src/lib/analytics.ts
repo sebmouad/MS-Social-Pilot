@@ -23,6 +23,10 @@ import {
   type MetricPeriod,
 } from './facebook/metrics';
 import { logActivity } from './scheduler/runner';
+import { formatInZone } from './time';
+
+/** A day, for placing Facebook's daily values on a calendar. */
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Analytics: pulling Graph data in, storing it, and reading it back.
@@ -1123,6 +1127,55 @@ export async function readAudience(options: {
  * everything that had actually gone out since. Those now come after, newest
  * attempt first.
  */
+/**
+ * Followers gained and lost per day over a window, for the audience chart.
+ *
+ * Reads Meta's follows metrics and, for stored history from before they
+ * replaced Page likes, the retired fan metrics — one source per figure, never
+ * both added together. Facebook stamps a daily value with the end of the day
+ * it covers, so each is placed on the day before its `endTime`, then on the
+ * workspace's calendar.
+ */
+export async function readFollowerTrend(options: {
+  targetId: string;
+  from: Date;
+  to: Date;
+  timeZone: string;
+}): Promise<Array<{ date: string; gained: number; lost: number }>> {
+  const series = async (current: string, retired: string) => {
+    const read = (metric: string) =>
+      prisma.pageInsight.findMany({
+        where: { targetId: options.targetId, metric, endTime: { gt: options.from, lte: new Date(options.to.getTime() + DAY_MS) } },
+        select: { endTime: true, numeric: true },
+      });
+    const rows = await read(current);
+    return rows.length > 0 ? rows : read(retired);
+  };
+
+  const [gained, lost] = await Promise.all([
+    series('page_daily_follows_unique', 'page_fan_adds'),
+    series('page_daily_unfollows_unique', 'page_fan_removes'),
+  ]);
+
+  const byDay = new Map<string, { gained: number; lost: number }>();
+  const dayOf = (endTime: Date) =>
+    formatInZone(new Date(endTime.getTime() - DAY_MS / 2), options.timeZone, 'yyyy-MM-dd');
+  for (const row of gained) {
+    const day = byDay.get(dayOf(row.endTime)) ?? { gained: 0, lost: 0 };
+    day.gained += Math.round(row.numeric ?? 0);
+    byDay.set(dayOf(row.endTime), day);
+  }
+  for (const row of lost) {
+    const day = byDay.get(dayOf(row.endTime)) ?? { gained: 0, lost: 0 };
+    day.lost += Math.round(row.numeric ?? 0);
+    byDay.set(dayOf(row.endTime), day);
+  }
+
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, values]) => ({ date, ...values }));
+}
+
 export async function recentOutcomes(workspaceId: string, take = 5) {
   return prisma.post.findMany({
     where: { workspaceId, status: { in: ['published', 'partially_failed', 'failed'] } },

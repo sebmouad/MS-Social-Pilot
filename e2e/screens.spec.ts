@@ -97,7 +97,8 @@ test('the report download covers the range on screen, not the one being typed', 
   await expect(download).toHaveAttribute('href', /from=2026-08-01&to=2026-08-31/);
 
   // Changed but not applied: the file must still be the report being shown.
-  await page.getByLabel('From').fill('2026-07-01');
+  await page.locator('details summary').first().click();
+  await page.getByRole('textbox', { name: 'From', exact: true }).fill('2026-07-01');
   await expect(download).toHaveAttribute('href', /from=2026-08-01&to=2026-08-31/);
 
   const response = await page.request.get((await download.getAttribute('href'))!);

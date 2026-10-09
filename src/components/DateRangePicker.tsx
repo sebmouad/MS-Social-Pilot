@@ -2,7 +2,20 @@ import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import { Icon } from './Icon';
-import { RANGE_PRESETS, type DateRange } from '@/lib/date-range';
+import { ALL_TIME_DAYS, RANGE_PRESETS, type DateRange, type RangePreset } from '@/lib/date-range';
+
+/** The longest each preset can run, in days, for screens with a limit. */
+const PRESET_SPAN: Record<RangePreset, number> = {
+  today: 1,
+  yesterday: 1,
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+  thisMonth: 31,
+  lastMonth: 31,
+  thisYear: 366,
+  all: ALL_TIME_DAYS,
+};
 
 /**
  * The date range control, as Meta Business Suite draws it: one button naming
@@ -17,12 +30,18 @@ export async function DateRangePicker({
   range,
   path,
   keep,
+  maxDays,
 }: {
   range: DateRange;
   /** The screen the choices lead back to. */
   path: string;
   /** The other parameters a choice must keep: the view, the Page. */
   keep: Record<string, string>;
+  /**
+   * The longest span this screen can show, when it has one: ads are only read
+   * back as far as the last sync went, so a longer preset is not offered.
+   */
+  maxDays?: number;
 }) {
   const t = await getTranslations('dateRange');
   const locale = await getLocale();
@@ -53,7 +72,7 @@ export async function DateRangePicker({
 
       <div className="absolute left-0 z-30 mt-2 w-[19rem] max-w-[calc(100vw-2rem)] rounded-lg bg-white p-2 shadow-lg ring-1 ring-black/5">
         <ul className="grid gap-0.5" aria-label={t('presets')}>
-          {RANGE_PRESETS.map((preset) => {
+          {RANGE_PRESETS.filter((preset) => !maxDays || PRESET_SPAN[preset] <= maxDays).map((preset) => {
             const active = range.key === preset;
             return (
               <li key={preset}>

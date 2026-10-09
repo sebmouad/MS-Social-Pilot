@@ -211,7 +211,11 @@
     "refreshThrottled": "Analytics was refreshed several times just now. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
     "genderWomen": "Women {age}",
     "genderMen": "Men {age}",
-    "genderOther": "Not stated {age}"
+    "genderOther": "Not stated {age}",
+    "followerTrend": "Followers gained and lost",
+    "followerTrendHint": "New and lost followers each day, from Facebook. A rising total can still hide a day that lost more people than it found.",
+    "newFollowers": "New followers",
+    "lostFollowers": "Lost followers"
   },
   "app": {
     "name": "MS Social Pilot",
@@ -1089,7 +1093,28 @@
       "hint": "By interactions in this period.",
       "title": "Best posts"
     },
-    "vsPrevious": "vs previous"
+    "vsPrevious": "vs previous",
+    "hashtags": {
+      "title": "Hashtags that work",
+      "hint": "Average interactions of the posts using each hashtag, against the Page’s typical post. Hashtags on two posts or more.",
+      "none": "No hashtag was used on two posts or more in this period.",
+      "tag": "Hashtag"
+    },
+    "captions": {
+      "title": "What captions work",
+      "hint": "Average interactions by the kind of caption, against the Page’s typical post. Length leaves out links and hashtags.",
+      "none": "Not enough posts in this period to compare captions.",
+      "kind": "Caption",
+      "trait": {
+        "short": "Short (under 80 characters)",
+        "medium": "Medium (80–250)",
+        "long": "Long (over 250)",
+        "question": "Asks a question",
+        "emoji": "Uses emoji",
+        "hashtags": "Has hashtags",
+        "link": "Has a link"
+      }
+    }
   },
   "posts": {
     "title": "Posts",
@@ -1189,7 +1214,13 @@
     "linkClicksLifetime": "Link clicks (all time)",
     "engagementCount": "{count, plural, other {# engagement}}",
     "impressionCount": "{count, plural, one {# impression} other {# impressions}}",
-    "sourceNote": "Impressions, reach and engagement come from Facebook. Link clicks are counted by this app’s own short links, over each link’s whole life rather than only this range. They measure different things and are never added together."
+    "sourceNote": "Impressions, reach and engagement come from Facebook. Link clicks are counted by this app’s own short links, over each link’s whole life rather than only this range. They measure different things and are never added together.",
+    "choosePage": "Choose a Page",
+    "coverTitle": "{page}: performance report",
+    "generatedOn": "Generated {date}",
+    "audienceTitle": "Audience",
+    "publishedHere": "Published from MS Social Pilot",
+    "publishedHereHint": "Posts sent from this app in the period, with the link clicks its short links counted."
   },
   "settings": {
     "addTime": "Add time",

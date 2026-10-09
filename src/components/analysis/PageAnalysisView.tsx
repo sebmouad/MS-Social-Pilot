@@ -367,6 +367,39 @@ export async function PageAnalysisView({
             )}
           </div>
 
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <LiftList
+              title={t('hashtags.title')}
+              description={t('hashtags.hint')}
+              empty={t('hashtags.none')}
+              head={[t('hashtags.tag'), t('formats.posts'), t('formats.avg'), t('formats.reach')]}
+              rows={analysis.hashtags.slice(0, 8).map((row) => ({
+                key: row.tag,
+                label: row.tag,
+                detail: t('cadence.posts', { count: row.posts }),
+                value: row.avgInteractions,
+                lift: row.lift,
+                table: [row.tag, row.posts, Math.round(row.avgInteractions), row.avgReach !== null ? Math.round(row.avgReach) : '—'],
+              }))}
+              liftLabel={t('formats.lift')}
+            />
+            <LiftList
+              title={t('captions.title')}
+              description={t('captions.hint')}
+              empty={t('captions.none')}
+              head={[t('captions.kind'), t('formats.posts'), t('formats.avg')]}
+              rows={analysis.captions.map((row) => ({
+                key: row.trait,
+                label: t(`captions.trait.${row.trait}`),
+                detail: `${t('cadence.posts', { count: row.posts })} · ${row.share}%`,
+                value: row.avgInteractions,
+                lift: row.lift,
+                table: [t(`captions.trait.${row.trait}`), row.posts, Math.round(row.avgInteractions)],
+              }))}
+              liftLabel={t('formats.lift')}
+            />
+          </div>
+
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <PostTable title={t('top.title')} hint={t('top.hint')} posts={analysis.top} timeZone={timeZone} />
             <PostTable title={t('bottom.title')} hint={t('bottom.hint')} posts={analysis.bottom} timeZone={timeZone} />
@@ -544,5 +577,78 @@ export async function ComparePagesView({
         </table>
       </div>
     </section>
+  );
+}
+
+/**
+ * A ranked list of groups against the Page's typical post: hashtags, kinds of
+ * caption. Bars show average interactions; the lift beside them says it in
+ * words, with par drawn as the colour change from blue to grey.
+ */
+function LiftList({
+  title,
+  description,
+  empty,
+  head,
+  rows,
+  liftLabel,
+}: {
+  title: string;
+  description: string;
+  empty: string;
+  head: string[];
+  rows: Array<{
+    key: string;
+    label: string;
+    detail: string;
+    value: number;
+    lift: number | null;
+    table: Array<string | number>;
+  }>;
+  liftLabel: string;
+}) {
+  const largest = Math.max(1, ...rows.map((row) => row.value));
+  return (
+    <ChartFrame
+      title={title}
+      description={description}
+      table={rows.length > 0 ? { head, rows: rows.map((row) => row.table) } : undefined}
+    >
+      {rows.length === 0 ? (
+        <p className="py-6 text-center text-sm text-slate-500">{empty}</p>
+      ) : (
+        <ul className="space-y-3">
+          {rows.map((row) => (
+            <li key={row.key}>
+              <div className="flex items-baseline justify-between gap-3 text-xs">
+                <span className="min-w-0 truncate font-semibold text-slate-800">
+                  {row.label}
+                  <span className="ml-1.5 font-normal text-slate-500">{row.detail}</span>
+                </span>
+                <span className="nums shrink-0 font-semibold text-slate-900">
+                  {compact(Math.round(row.value))}
+                  {row.lift !== null && (
+                    <span className={`ml-1.5 font-normal ${row.lift >= 1 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                      {Math.round(row.lift * 10) / 10}× {liftLabel}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <span className="mt-1 block h-2.5 w-full overflow-hidden rounded-sm" style={{ background: VIZ.grid }}>
+                <span
+                  className="block h-full"
+                  style={{
+                    width: `${Math.max(1.5, (row.value / largest) * 100)}%`,
+                    background: row.lift !== null && row.lift < 1 ? VIZ.muted : seriesColor(0),
+                    borderTopRightRadius: 4,
+                    borderBottomRightRadius: 4,
+                  }}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </ChartFrame>
   );
 }

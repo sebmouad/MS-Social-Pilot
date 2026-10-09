@@ -14,6 +14,8 @@ import { canManageAccounts } from '@/lib/constants';
 import { env } from '@/lib/env';
 import { screenMetadata } from '@/lib/metadata';
 import { formatInZone } from '@/lib/time';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { parseRange, rangeParams } from '@/lib/date-range';
 import { VIZ, seriesColor } from '@/lib/viz';
 
 export const dynamic = 'force-dynamic';
@@ -123,13 +125,16 @@ export default async function AdsPage({
   // is offered nowhere: its early part would read as days of no spend rather
   // than days never asked about.
   const syncWindow = env.adWindowDays;
-  const rangeOptions = [7, 30, 90].filter((option) => option <= syncWindow);
-  if (syncWindow < 90 && !rangeOptions.includes(syncWindow)) rangeOptions.push(syncWindow);
 
-  const days = Number.parseInt(first(params.days) ?? '30', 10);
-  const window = Math.min(Number.isFinite(days) && days > 0 ? days : 30, syncWindow);
-  const to = new Date();
-  const from = new Date(to.getTime() - window * DAY_MS);
+  // The same range control as every other screen, held to what the sync read:
+  // a longer preset is not offered, and a custom range is cut to fit.
+  const range = parseRange(
+    { range: first(params.range), from: first(params.from), to: first(params.to), days: first(params.days) },
+    timezone,
+  );
+  const to = range.to;
+  const from = new Date(Math.max(range.from.getTime(), to.getTime() - syncWindow * DAY_MS));
+  const window = Math.max(1, Math.ceil((to.getTime() - from.getTime()) / DAY_MS));
   const previousFrom = new Date(from.getTime() - window * DAY_MS);
 
   // The previous period is compared against only when it was synced in full.
@@ -193,7 +198,7 @@ export default async function AdsPage({
   const sorted = sortRows(rows, sort, dir, locale);
 
   const hrefWith = (changes: Record<string, string>) => {
-    const next = new URLSearchParams({ account: account.id, days: String(window), level, sort, dir });
+    const next = new URLSearchParams({ account: account.id, ...rangeParams(range), level, sort, dir });
     for (const [key, value] of Object.entries(changes)) next.set(key, value);
     return `/ads?${next.toString()}`;
   };
@@ -232,17 +237,12 @@ export default async function AdsPage({
       {header}
 
       <div className="filter-row">
-        <div className="segmented">
-          {rangeOptions.map((option) => (
-            <Link
-              key={option}
-              href={hrefWith({ days: String(option) })}
-              className={`segmented-item ${option === window ? 'segmented-item-active' : ''}`}
-            >
-              {t('lastDays', { count: option })}
-            </Link>
-          ))}
-        </div>
+        <DateRangePicker
+          range={range}
+          path="/ads"
+          keep={{ account: account.id, level, sort, dir }}
+          maxDays={syncWindow}
+        />
 
         {accounts.length > 1 && (
           <QuerySelect

@@ -50,15 +50,15 @@ const STATUS_TYPE: Record<Format, string> = {
 
 const MESSAGES: Record<Format, string[]> = {
   photo: [
-    'Fresh out of the oven this morning.',
+    'Fresh out of the oven this morning 🥖 #sourdough #bakery',
     'Behind the counter: meet the team.',
-    'This week’s special, photographed before it sold out.',
-    'Saturday market stall is up.',
+    'This week’s special, photographed before it sold out. #weeklyspecial #bakery',
+    'Saturday market stall is up 🧺 #market #shoplocal',
   ],
   video: [
-    'Sixty seconds of how we shape a loaf.',
+    'Sixty seconds of how we shape a loaf 🎥 #sourdough #behindthescenes',
     'Watch the first batch of the day come out.',
-    'A quick tour of the new kitchen.',
+    'A quick tour of the new kitchen. #behindthescenes',
   ],
   link: [
     'Our story in the local paper.',
@@ -67,8 +67,8 @@ const MESSAGES: Record<Format, string[]> = {
   ],
   text: [
     'Closed Monday for a family wedding. Back Tuesday!',
-    'What should next month’s special be? Tell us below.',
-    'Thank you for a record week.',
+    'What should next month’s special be? Tell us below 👇 #weeklyspecial',
+    'Thank you for a record week ❤️ #shoplocal',
   ],
 };
 

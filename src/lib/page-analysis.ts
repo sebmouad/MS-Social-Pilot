@@ -328,6 +328,107 @@ export function formatBreakdown(posts: AnalysedPost[]): FormatRow[] {
 export const BLOCK_HOURS = 3;
 export const BLOCKS_PER_DAY = 24 / BLOCK_HOURS;
 
+export interface HashtagRow {
+  /** Lower-cased, with its #: "#sourdough". */
+  tag: string;
+  posts: number;
+  avgInteractions: number;
+  avgReach: number | null;
+  /** Average interactions against the Page's overall average: 1 is par. */
+  lift: number | null;
+}
+
+/** Hashtags as Facebook links them: letters, digits and underscores after a #. */
+const HASHTAG = /#[\p{L}\p{N}_]+/gu;
+
+/**
+ * How the posts carrying each hashtag did, against the Page's typical post.
+ *
+ * Only hashtags used on at least `minPosts` posts are ranked: one post with a
+ * lucky tag says nothing about the tag. Case is folded, so #Paris and #paris
+ * are one hashtag, as they are on Facebook.
+ */
+export function hashtagBreakdown(posts: AnalysedPost[], minPosts = 2): HashtagRow[] {
+  const overall = mean(posts.map((post) => post.interactions));
+  const byTag = new Map<string, AnalysedPost[]>();
+  for (const post of posts) {
+    const tags = new Set((post.message.match(HASHTAG) ?? []).map((tag) => tag.toLowerCase()));
+    for (const tag of tags) byTag.set(tag, [...(byTag.get(tag) ?? []), post]);
+  }
+
+  return [...byTag.entries()]
+    .filter(([, tagged]) => tagged.length >= minPosts)
+    .map(([tag, tagged]) => {
+      const avgInteractions = mean(tagged.map((post) => post.interactions)) ?? 0;
+      const reaches = tagged.map((post) => post.reach).filter((reach): reach is number => reach !== null);
+      return {
+        tag,
+        posts: tagged.length,
+        avgInteractions,
+        avgReach: mean(reaches),
+        lift: overall ? avgInteractions / overall : null,
+      };
+    })
+    .sort((a, b) => (b.lift ?? 0) - (a.lift ?? 0) || b.posts - a.posts);
+}
+
+export type CaptionTrait = 'short' | 'medium' | 'long' | 'question' | 'emoji' | 'hashtags' | 'link';
+
+export interface CaptionRow {
+  trait: CaptionTrait;
+  posts: number;
+  /** Share of all posts, as a percentage. */
+  share: number;
+  avgInteractions: number;
+  lift: number | null;
+}
+
+/** Any pictographic character: what people mean by "an emoji". */
+const EMOJI = /\p{Extended_Pictographic}/u;
+const URL_IN_TEXT = /https?:\/\/\S+/i;
+/** Not global: `test` on a global pattern carries its position between calls. */
+const HAS_HASHTAG = /#[\p{L}\p{N}_]+/u;
+
+/**
+ * Which kinds of caption do best here: by length, and whether it asks a
+ * question, uses emoji, carries hashtags or a link.
+ *
+ * Length is measured without links and hashtags, which inflate it without
+ * being anything a reader reads. A trait on fewer than two posts is left out.
+ */
+export function captionBreakdown(posts: AnalysedPost[]): CaptionRow[] {
+  const overall = mean(posts.map((post) => post.interactions));
+  const traitsOf = (post: AnalysedPost): CaptionTrait[] => {
+    const text = post.message.replace(new RegExp(URL_IN_TEXT, 'gi'), '').replace(HASHTAG, '').trim();
+    const traits: CaptionTrait[] = [text.length < 80 ? 'short' : text.length <= 250 ? 'medium' : 'long'];
+    if (text.includes('?')) traits.push('question');
+    if (EMOJI.test(post.message)) traits.push('emoji');
+    if (HAS_HASHTAG.test(post.message)) traits.push('hashtags');
+    if (post.format === 'link' || URL_IN_TEXT.test(post.message)) traits.push('link');
+    return traits;
+  };
+
+  const groups = new Map<CaptionTrait, AnalysedPost[]>();
+  for (const post of posts) {
+    for (const trait of traitsOf(post)) groups.set(trait, [...(groups.get(trait) ?? []), post]);
+  }
+
+  const order: CaptionTrait[] = ['short', 'medium', 'long', 'question', 'emoji', 'hashtags', 'link'];
+  return order
+    .filter((trait) => (groups.get(trait)?.length ?? 0) >= 2)
+    .map((trait) => {
+      const group = groups.get(trait)!;
+      const avgInteractions = mean(group.map((post) => post.interactions)) ?? 0;
+      return {
+        trait,
+        posts: group.length,
+        share: posts.length ? Math.round((group.length / posts.length) * 100) : 0,
+        avgInteractions,
+        lift: overall ? avgInteractions / overall : null,
+      };
+    });
+}
+
 export interface TimeCell {
   /** 0 = Sunday, matching `QueueSlot.dayOfWeek`. */
   weekday: number;
@@ -600,6 +701,8 @@ export interface PageAnalysis {
   health: Health;
   cadence: Cadence;
   formats: FormatRow[];
+  hashtags: HashtagRow[];
+  captions: CaptionRow[];
   times: BestTimes;
   top: AnalysedPost[];
   bottom: AnalysedPost[];
@@ -646,6 +749,8 @@ export function analyse(input: {
     health: healthScore({ cadence: rhythm, kpis, followers: input.followers }),
     cadence: rhythm,
     formats,
+    hashtags: hashtagBreakdown(input.current),
+    captions: captionBreakdown(input.current),
     times,
     top,
     bottom,

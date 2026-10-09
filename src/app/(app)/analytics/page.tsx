@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getLocale, getTranslations } from 'next-intl/server';
+import { getTranslations } from 'next-intl/server';
 import { TargetType } from '@prisma/client';
 
 import { AnalyticsClient } from '@/components/AnalyticsClient';
 import { AnalyticsTabs } from '@/components/AnalyticsTabs';
 import { ComparePagesView, PageAnalysisView } from '@/components/analysis/PageAnalysisView';
 import { BreakdownBars } from '@/components/BreakdownBars';
-import { countryLabel, genderAgeLabel, languageLabel } from '@/lib/audience-labels';
+import { AudienceView } from '@/components/AudienceSection';
 import { CommentsPanel } from '@/components/CommentsPanel';
 import { InboxPanel } from '@/components/InboxPanel';
 import { ExportMenu } from '@/components/ExportMenu';
@@ -26,7 +26,6 @@ import { pageHref, pageNumber, paginate } from '@/lib/paging';
 import { prisma } from '@/lib/prisma';
 import {
   canRefreshAnalytics,
-  readAudience,
   readAvailability,
   readCoverage,
   readInteractions,
@@ -212,7 +211,7 @@ export default async function AnalyticsPage({
         to={to}
       />}
 
-      {view === 'audience' && <AudienceView targetId={selected.id} from={from} to={to} />}
+      {view === 'audience' && <AudienceView targetId={selected.id} from={from} to={to} timeZone={timezone} />}
 
       {view === 'videos' && (
         <VideosView
@@ -364,66 +363,6 @@ async function InteractionsView({
   );
 }
 
-/** Who the audience is, and how it changed over the window. */
-async function AudienceView({ targetId, from, to }: { targetId: string; from: Date; to: Date }) {
-  const t = await getTranslations('analytics');
-  const locale = await getLocale();
-  const audience = await readAudience({ targetId, from, to });
-  const words = {
-    women: (age: string) => t('genderWomen', { age }),
-    men: (age: string) => t('genderMen', { age }),
-    other: (age: string) => t('genderOther', { age }),
-  };
-
-  const cards = [
-    { label: t('fans'), value: audience.fans },
-    { label: t('followers'), value: audience.followers },
-    { label: t('talkingAbout'), value: audience.talkingAbout },
-    { label: t('newLikes'), value: audience.adds },
-    { label: t('lostLikes'), value: audience.removes },
-    { label: t('netChange'), value: audience.net },
-  ];
-
-  return (
-    <div className="space-y-6">
-      {/* Losing likes is not an achievement, whichever way the arrow points. */}
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-6">
-        {cards.map((card) => (
-          <StatTile
-            key={card.label}
-            label={card.label}
-            value={card.value}
-            upIsGood={card.label !== t('lostLikes')}
-          />
-        ))}
-      </section>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <BreakdownBars
-          title={t('byCountry')}
-          data={audience.byCountry}
-          formatKey={(code) => countryLabel(code, locale)}
-        />
-        <BreakdownBars title={t('byCity')} data={audience.byCity} />
-        <BreakdownBars
-          title={t('byGenderAge')}
-          data={audience.byGenderAge}
-          formatKey={(key) => genderAgeLabel(key, words)}
-        />
-        <BreakdownBars
-          title={t('byLocale')}
-          data={audience.byLocale}
-          formatKey={(key) => languageLabel(key, locale)}
-        />
-      </div>
-
-      <p className="text-xs text-slate-500">{t('audienceHint')}</p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Graph edges beyond /insights
 // ---------------------------------------------------------------------------
 
 /** Videos with their video-level figures, which aggregate across crossposts. */

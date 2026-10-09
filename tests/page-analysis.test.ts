@@ -16,6 +16,8 @@ import {
   summarise,
   type AnalysedPost,
   type PageTotals,
+  captionBreakdown,
+  hashtagBreakdown,
 } from '../src/lib/page-analysis';
 
 /**
@@ -310,5 +312,64 @@ describe('analyse', () => {
     });
     expect(result.top[0]?.reactions).toBe(50);
     expect(result.bottom).toEqual([]);
+  });
+});
+
+describe('hashtagBreakdown', () => {
+  it('ranks hashtags by how their posts did against the typical post', () => {
+    const rows = hashtagBreakdown([
+      post({ message: 'Fresh bread #Sourdough #bakery', reactions: 60 }),
+      post({ message: 'More #sourdough today', reactions: 40 }),
+      post({ message: 'Quiet day #bakery', reactions: 10 }),
+      post({ message: 'Opening hours #bakery', reactions: 10 }),
+      post({ message: 'No tags at all', reactions: 30 }),
+    ]);
+    // #Sourdough and #sourdough are one hashtag, as on Facebook.
+    expect(rows.map((row) => row.tag)).toEqual(['#sourdough', '#bakery']);
+    expect(rows[0]).toMatchObject({ posts: 2, avgInteractions: 50 });
+    expect(rows[0]!.lift).toBeCloseTo(50 / 30);
+  });
+
+  it('leaves out a hashtag seen on a single post', () => {
+    expect(hashtagBreakdown([post({ message: '#once' }), post({ message: 'plain' })])).toEqual([]);
+  });
+
+  it('counts a hashtag once per post, however often it repeats', () => {
+    const rows = hashtagBreakdown([
+      post({ message: '#a #a #a', reactions: 10 }),
+      post({ message: '#a', reactions: 10 }),
+    ]);
+    expect(rows[0]!.posts).toBe(2);
+  });
+});
+
+describe('captionBreakdown', () => {
+  it('sorts captions by length without counting links and hashtags', () => {
+    const long = 'x'.repeat(300);
+    const rows = captionBreakdown([
+      post({ message: 'Short one' }),
+      post({ message: 'Another short #tag #tag2 https://example.com/a-very-long-link-that-is-not-reading' }),
+      post({ message: long }),
+      post({ message: long }),
+    ]);
+    const traits = Object.fromEntries(rows.map((row) => [row.trait, row.posts]));
+    expect(traits.short).toBe(2);
+    expect(traits.long).toBe(2);
+    expect(traits.medium).toBeUndefined();
+  });
+
+  it('finds questions, emoji, hashtags and links', () => {
+    const rows = captionBreakdown([
+      post({ message: 'Croissant or pain au chocolat? 🥐 #choice', reactions: 50 }),
+      post({ message: 'Which one? 🥖 #choice https://example.com', reactions: 30 }),
+      post({ message: 'Plain announcement', reactions: 10 }),
+    ]);
+    const traits = Object.fromEntries(rows.map((row) => [row.trait, row]));
+    expect(traits.question!.posts).toBe(2);
+    expect(traits.emoji!.posts).toBe(2);
+    expect(traits.hashtags!.posts).toBe(2);
+    expect(traits.question!.lift).toBeCloseTo(40 / 30);
+    // Only one post has a link: too few to say anything.
+    expect(traits.link).toBeUndefined();
   });
 });
