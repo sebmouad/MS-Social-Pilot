@@ -1,6 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-import { collectFailures, open, SIGNED_IN_SCREENS } from './helpers';
+import {
+  collectFailures,
+  DESKTOP_WIDTHS,
+  expectEveryNavLinkShown,
+  open,
+  SIGNED_IN_SCREENS,
+} from './helpers';
 
 /**
  * Open every screen behind the sign-in wall and check that it renders.
@@ -22,6 +28,14 @@ for (const path of SIGNED_IN_SCREENS) {
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
 
     expect(failures, `${path} reported browser errors`).toEqual([]);
+  });
+}
+
+for (const width of DESKTOP_WIDTHS) {
+  test(`every nav link is on screen at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await open(page, '/dashboard');
+    await expectEveryNavLinkShown(page);
   });
 }
 

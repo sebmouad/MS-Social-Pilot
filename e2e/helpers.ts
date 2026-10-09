@@ -76,3 +76,30 @@ export const OWNER = {
 };
 
 export const OWNER_STATE = 'e2e/.auth/owner.json';
+
+/** Desktop widths the link row has to fit: the smallest that shows it, a laptop, a large Mac. */
+export const DESKTOP_WIDTHS = [1024, 1280, 1728];
+
+/**
+ * Every link in the header's link row is on screen, with nothing scrolled out
+ * of sight. The row scrolls rather than wrapping, and a Mac hides the
+ * scrollbar, so a link past the edge simply looks absent — which is how
+ * Reports and Settings went missing on a desktop.
+ */
+export async function expectEveryNavLinkShown(page: Page): Promise<void> {
+  const nav = page.getByRole('banner').getByRole('navigation');
+  const { overflow, offscreen } = await nav.evaluate((element) => {
+    const viewport = document.documentElement.clientWidth;
+    const outside = [...element.querySelectorAll('a')]
+      .filter((link) => {
+        const box = link.getBoundingClientRect();
+        const row = element.getBoundingClientRect();
+        return box.width === 0 || box.left < row.left - 1 || box.right > Math.min(row.right, viewport) + 1;
+      })
+      .map((link) => link.textContent?.trim() ?? '');
+    return { overflow: element.scrollWidth - element.clientWidth, offscreen: outside };
+  });
+
+  expect(offscreen, 'links hidden past the edge of the header').toEqual([]);
+  expect(overflow, 'the link row scrolls').toBeLessThanOrEqual(1);
+}

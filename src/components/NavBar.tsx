@@ -74,7 +74,11 @@ export function NavBar({
     setSwitching(false);
   }
 
-  const navLinks = (
+  /**
+   * The bar shows icons only from `xl`: between `lg` and `xl` the French labels
+   * alone fill the row. The menu below `lg` always has room for them.
+   */
+  const navLinks = (place: 'bar' | 'menu') => (
     <>
       {links.map((link) => {
         const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
@@ -88,7 +92,11 @@ export function NavBar({
               active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            <Icon name={link.icon} size={16} className={active ? '' : 'text-slate-400'} />
+            <Icon
+              name={link.icon}
+              size={16}
+              className={`${place === 'bar' ? 'hidden xl:inline-block' : ''} ${active ? '' : 'text-slate-400'}`}
+            />
             {link.label}
             {typeof link.badge === 'number' && link.badge > 0 && (
               <span className="rounded-full bg-violet-100 px-1.5 text-[10px] font-semibold text-violet-700">
@@ -108,21 +116,8 @@ export function NavBar({
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white">
             SP
           </span>
-          {/* The wordmark is dropped once the link row appears: ten labels
-              plus a workspace switcher already fill the bar, and the product
-              name is on the tab, the login screen and every email. */}
-          <span className="hidden text-sm font-semibold text-slate-900 sm:inline lg:hidden">
-            MS Social Pilot
-          </span>
+          <span className="hidden text-sm font-semibold text-slate-900 sm:inline">MS Social Pilot</span>
         </Link>
-
-        {/* Ten links wrap into three ragged rows on a phone and push the page
-            below the fold. Below `lg` they live behind a menu instead; above
-            it they stay on one line and scroll rather than wrapping, so the
-            header height never changes with the label lengths. */}
-        <nav className="scroll-x hidden min-w-0 flex-1 lg:block">
-          <div className="flex items-center gap-0.5">{navLinks}</div>
-        </nav>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {workspaces.length > 1 ? (
@@ -142,7 +137,12 @@ export function NavBar({
               </select>
             </label>
           ) : (
-            <p className="hidden text-sm font-medium text-slate-900 sm:block">{workspaceName}</p>
+            <p
+              className="hidden max-w-[16rem] truncate text-sm font-medium text-slate-900 sm:block"
+              title={workspaceName}
+            >
+              {workspaceName}
+            </p>
           )}
 
           <p className="hidden text-xs text-slate-500 2xl:block">
@@ -169,9 +169,23 @@ export function NavBar({
         </div>
       </div>
 
+      {/* The links get a row of their own. Sharing one with the workspace name
+          and the account controls left them about 700px, against more than
+          900px of labels in English and over 1,100px in French, so the last
+          links scrolled out of sight under a hidden scrollbar and Reports and
+          Settings could not be found. Below `lg` they live behind the menu,
+          because ten links wrap into ragged rows on a phone. The row never
+          wraps, so the header keeps one height whatever the labels say; scroll
+          remains only as a last resort for a label longer than any today. */}
+      <div className="mx-auto hidden max-w-7xl px-4 pb-2 sm:px-6 lg:block">
+        <nav className="scroll-x min-w-0">
+          <div className="flex items-center gap-0.5">{navLinks('bar')}</div>
+        </nav>
+      </div>
+
       {menuOpen && (
         <div id="main-menu" className="border-t border-slate-200 px-4 py-3 lg:hidden">
-          <nav className="grid grid-cols-2 gap-1">{navLinks}</nav>
+          <nav className="grid grid-cols-2 gap-1">{navLinks('menu')}</nav>
           <button type="button" onClick={signOut} className="btn-secondary mt-3 w-full">
             {t('signOut')}
           </button>

@@ -1,6 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-import { collectFailures, open, SIGNED_IN_SCREENS } from './helpers';
+import {
+  collectFailures,
+  DESKTOP_WIDTHS,
+  expectEveryNavLinkShown,
+  open,
+  SIGNED_IN_SCREENS,
+} from './helpers';
 
 /**
  * A colleague is invited, accepts, and finds the app in their own language.
@@ -95,6 +101,23 @@ test.describe('the invited colleague, in French', () => {
 
     await context.close();
   });
+
+  // French labels run about a third longer than English, so the header row
+  // that fits in English is checked again here.
+  for (const width of DESKTOP_WIDTHS) {
+    test(`every nav link is on screen at ${width}px in French`, async ({ browser }) => {
+      const context = await browser.newContext({
+        storageState: 'e2e/.auth/colleague.json',
+        viewport: { width, height: 900 },
+      });
+      const page = await context.newPage();
+
+      await open(page, '/dashboard');
+      await expect(page.getByRole('link', { name: 'Paramètres' })).toBeAttached();
+      await expectEveryNavLinkShown(page);
+      await context.close();
+    });
+  }
 
   // An editor sees fewer screens than an owner; the ones they do see must be
   // whole. A missing French key throws, so rendering at all is the assertion.
