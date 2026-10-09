@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import { requirePage } from '@/lib/auth';
+import { canManageOthersPosts, postIsEditable } from '@/lib/constants';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { formatInZone, monthGrid } from '@/lib/time';
@@ -14,8 +15,10 @@ export function generateMetadata() {
   return screenMetadata('calendar.title');
 }
 
-
+/** Dot colours, matching the badge colours StatusBadge gives each status. */
 const STATUS_DOT: Record<string, string> = {
+  pending_approval: 'bg-violet-500',
+  rejected: 'bg-rose-500',
   scheduled: 'bg-blue-500',
   publishing: 'bg-amber-500',
   published: 'bg-emerald-500',
@@ -24,6 +27,21 @@ const STATUS_DOT: Record<string, string> = {
   draft: 'bg-slate-400',
   cancelled: 'bg-slate-300',
 };
+
+/** Every status the grid can show; cancelled posts are left off it. */
+const LEGEND = [
+  'pending_approval',
+  'rejected',
+  'scheduled',
+  'publishing',
+  'published',
+  'partially_failed',
+  'failed',
+  'draft',
+];
+
+/** Undated drafts listed under the grid; the post list has the rest. */
+const DRAFT_LIMIT = 10;
 
 export default async function CalendarPage({
   searchParams,
@@ -52,15 +70,25 @@ export default async function CalendarPage({
   const gridStart = days[0]!;
   const gridEnd = new Date(days[days.length - 1]!.getTime() + 24 * 60 * 60 * 1000);
 
-  const posts = await prisma.post.findMany({
-    where: {
-      workspaceId: auth.workspace.id,
-      scheduledAt: { gte: gridStart, lt: gridEnd },
-      status: { not: 'cancelled' },
-    },
-    include: { targets: { include: { target: { select: { name: true } } } } },
-    orderBy: { scheduledAt: 'asc' },
-  });
+  const [posts, drafts] = await Promise.all([
+    prisma.post.findMany({
+      where: {
+        workspaceId: auth.workspace.id,
+        scheduledAt: { gte: gridStart, lt: gridEnd },
+        status: { not: 'cancelled' },
+      },
+      include: { targets: { include: { target: { select: { name: true } } } } },
+      orderBy: { scheduledAt: 'asc' },
+    }),
+    // A draft saved without a time has no square to sit on, so a calendar of
+    // only dated posts hid exactly the work that still needs a date.
+    prisma.post.findMany({
+      where: { workspaceId: auth.workspace.id, status: 'draft', scheduledAt: null },
+      include: { targets: { select: { status: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: DRAFT_LIMIT,
+    }),
+  ]);
 
   // Bucket by the local calendar day so a post at 23:00 UTC+2 lands on the
   // right square rather than the previous day.
@@ -83,9 +111,26 @@ export default async function CalendarPage({
 
   // 2024-01-07 was a Sunday, so this indexes weekdays 0..6 in the active locale.
   const weekdayFormatter = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' });
+  const dayLabel = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: timezone });
   const weekdayName = (day: number) =>
     weekdayFormatter.format(new Date(Date.UTC(2024, 0, 7 + day)));
   const todayKey = formatInZone(today, timezone, 'yyyy-MM-dd');
+  const manageOthers = canManageOthersPosts(auth.role);
+
+  // A post this person can still change opens in the composer; anything else
+  // (published, going out, or someone else's) opens the list, which says why.
+  const postHref = (post: {
+    id: string;
+    authorId: string;
+    status: string;
+    targets: Array<{ status: string }>;
+  }) =>
+    postIsEditable(post) && (manageOthers || post.authorId === auth.user.id)
+      ? `/compose?post=${post.id}`
+      : '/posts';
+  // "New post on this day" starts at nine in the morning; today it keeps the
+  // composer's own default of an hour from now.
+  const newPostHref = (key: string) => (key === todayKey ? '/compose' : `/compose?at=${key}T09:00`);
 
   return (
     <div className="space-y-6">
@@ -149,16 +194,28 @@ export default async function CalendarPage({
                   >
                     {formatInZone(day, timezone, 'd')}
                   </span>
-                  {dayPosts.length > 2 && (
-                    <span className="text-[10px] text-slate-400">{dayPosts.length}</span>
-                  )}
+                  <span className="flex items-center gap-1">
+                    {dayPosts.length > 2 && (
+                      <span className="text-[10px] text-slate-400">{dayPosts.length}</span>
+                    )}
+                    {key >= todayKey && (
+                      <Link
+                        href={newPostHref(key)}
+                        className="flex h-5 w-5 items-center justify-center rounded text-sm leading-none text-slate-400 hover:bg-brand-50 hover:text-brand-600 focus-visible:bg-brand-50"
+                        aria-label={t('newPostOn', { date: dayLabel.format(day) })}
+                        title={t('newPostOn', { date: dayLabel.format(day) })}
+                      >
+                        +
+                      </Link>
+                    )}
+                  </span>
                 </div>
 
                 <ul className="mt-1 space-y-1">
                   {dayPosts.slice(0, 3).map((post) => (
                     <li key={post.id}>
                       <Link
-                        href="/posts"
+                        href={postHref(post)}
                         className="block rounded border border-slate-200 bg-white px-1.5 py-1 hover:border-brand-300"
                         title={post.message || post.link || ''}
                       >
@@ -189,13 +246,44 @@ export default async function CalendarPage({
       </div>
 
       <div className="flex flex-wrap gap-3 text-xs text-slate-600">
-        {['scheduled', 'publishing', 'published', 'partially_failed', 'failed'].map((status) => (
+        {LEGEND.map((status) => (
           <span key={status} className="flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${STATUS_DOT[status]}`} />
             <StatusBadge status={status} />
           </span>
         ))}
       </div>
+
+      {drafts.length > 0 && (
+        <section className="card p-4 sm:p-5" aria-labelledby="unscheduled-drafts">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="unscheduled-drafts" className="text-sm font-semibold text-slate-900">
+              {t('unscheduledDrafts')}
+            </h2>
+            <Link href="/posts?status=draft" className="text-xs font-medium text-brand-600 hover:underline">
+              {t('allDrafts')}
+            </Link>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">{t('unscheduledDraftsHint', { count: drafts.length })}</p>
+          <ul className="mt-3 divide-y divide-slate-100">
+            {drafts.map((draft) => (
+              <li key={draft.id}>
+                <Link
+                  href={postHref(draft)}
+                  className="flex flex-col gap-0.5 py-2 hover:bg-slate-50 sm:flex-row sm:items-baseline sm:gap-3"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-800">
+                    {draft.message || draft.link || tPosts('mediaOnly')}
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-500">
+                    {t('draftCreated', { date: formatInZone(draft.createdAt, timezone, 'd MMM yyyy', locale) })}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

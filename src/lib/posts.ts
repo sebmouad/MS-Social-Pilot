@@ -23,12 +23,16 @@ import { initialApprovalStatus } from './approvals';
 import {
   canManageOthersPosts,
   canPublishWithoutApproval,
+  NATIVE_SCHEDULE_MAX_SECONDS,
+  NATIVE_SCHEDULE_MIN_SECONDS,
   postEditBlocker,
   PUBLISHABLE_APPROVAL_STATUSES,
   QUEUE_OCCUPYING_STATUSES,
 } from './constants';
 import { notifyApprovalRequest } from './email/notify';
-import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
+import { ApprovalStatus, PostStatus, Prisma, WorkspaceRole } from '@prisma/client';
+import { prepareLinks } from './links';
+import { hasPostContent } from './validation';
 
 /**
  * Post lifecycle: composing, scheduling, editing and cancelling.
@@ -79,28 +83,7 @@ export async function resolveSchedule(
   }
 
   if (input.useQueue) {
-    const [slots, taken] = await Promise.all([
-      client.queueSlot.findMany({ where: { workspaceId } }),
-      client.post.findMany({
-        where: {
-          workspaceId,
-          status: { in: [...QUEUE_OCCUPYING_STATUSES] },
-          scheduledAt: { gte: now },
-        },
-        select: { scheduledAt: true },
-      }),
-    ]);
-
-    if (slots.length === 0) throw errors.queueEmpty();
-
-    const slot = nextAvailableSlot({
-      slots,
-      timeZone: input.timezone,
-      takenUtc: taken.map((post) => post.scheduledAt).filter((date): date is Date => Boolean(date)),
-      now,
-    });
-
-    if (!slot) throw errors.queueFull();
+    const slot = await nextQueueSlot(client, workspaceId, input.timezone, now);
     return { scheduledAt: slot, timezone: input.timezone, publishMode: input.publishMode, usedQueueSlot: true };
   }
 
@@ -117,6 +100,85 @@ export async function resolveSchedule(
   if (scheduledAt.getTime() <= now.getTime()) throw errors.timePassed();
 
   return { scheduledAt, timezone: input.timezone, publishMode: input.publishMode, usedQueueSlot: false };
+}
+
+/**
+ * The next queue slot nothing has claimed, without taking the workspace lock.
+ *
+ * On its own this races — two callers read the same free slot — so anything
+ * that writes a post into the slot goes through {@link allocateQueueSlot}, or
+ * takes {@link lockWorkspaceQueue} itself first, as `createPost` does.
+ */
+async function nextQueueSlot(
+  client: PrismaClientLike,
+  workspaceId: string,
+  timeZone: string,
+  now: Date,
+): Promise<Date> {
+  const [slots, taken] = await Promise.all([
+    client.queueSlot.findMany({ where: { workspaceId } }),
+    client.post.findMany({
+      where: {
+        workspaceId,
+        status: { in: [...QUEUE_OCCUPYING_STATUSES] },
+        scheduledAt: { gte: now },
+      },
+      select: { scheduledAt: true },
+    }),
+  ]);
+
+  if (slots.length === 0) throw errors.queueEmpty();
+
+  const slot = nextAvailableSlot({
+    slots,
+    timeZone,
+    takenUtc: taken.map((post) => post.scheduledAt).filter((date): date is Date => Boolean(date)),
+    now,
+  });
+
+  if (!slot) throw errors.queueFull();
+  return slot;
+}
+
+/**
+ * Serialise queue allocation for one workspace until the transaction ends.
+ *
+ * Concurrent requests queue up behind each other rather than reading the same
+ * free slot. Transaction-scoped, so it is released with the transaction
+ * whatever happens — including a rollback — and one workspace never blocks
+ * another. Re-entrant within a transaction, so taking it twice is harmless.
+ */
+async function lockWorkspaceQueue(tx: Prisma.TransactionClient, workspaceId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${workspaceId}))`;
+}
+
+/**
+ * Claim the next free queue slot for a workspace — the composer's "add to
+ * queue", for any other caller that schedules into the queue.
+ *
+ * Must run inside the `prisma.$transaction` that also writes the post taking
+ * the slot, with the post given a status in `QUEUE_OCCUPYING_STATUSES`. The
+ * lock is what stops two writers being handed the same slot, and it only
+ * covers them if the read and the write share its transaction: allocate in one
+ * transaction and write in another, and the double-booking is back.
+ *
+ * Throws `errors.queueEmpty()` when the workspace has no queue times, and
+ * `errors.queueFull()` when every slot in the look-ahead window is taken.
+ *
+ * @example
+ *   await prisma.$transaction(async (tx) => {
+ *     const at = await allocateQueueSlot(tx, workspaceId, workspace.timezone);
+ *     await tx.post.create({ data: { ...post, status: 'scheduled', scheduledAt: at } });
+ *   });
+ */
+export async function allocateQueueSlot(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  timeZone: string,
+  now: Date = new Date(),
+): Promise<Date> {
+  await lockWorkspaceQueue(tx, workspaceId);
+  return nextQueueSlot(tx, workspaceId, timeZone, now);
 }
 
 /** Load the workspace's targets, rejecting ids that do not belong to it. */
@@ -175,6 +237,7 @@ export async function createPost(
   const needsApproval = approvalStatus === ApprovalStatus.pending;
 
   if (input.publishMode === 'native') assertNativeSupported(targets);
+  if (!input.saveAsDraft) assertInstagramHasMedia(targets, input.media?.length ?? 0);
 
   // Cache the link's Open Graph card so the composer preview and the post list
   // do not have to re-scrape on every render.
@@ -236,11 +299,7 @@ export async function createPost(
 
   const written = allocatesSlot
     ? await prisma.$transaction(async (tx) => {
-        // Serialised per workspace, so concurrent requests queue up behind each
-        // other rather than reading the same free slot. Transaction-scoped, so
-        // it is released with the transaction whatever happens — including a
-        // rollback — and one workspace never blocks another.
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${context.workspaceId}))`;
+        await lockWorkspaceQueue(tx, context.workspaceId);
         return write(tx);
       })
     : await write(prisma);
@@ -291,7 +350,10 @@ export async function createPost(
 async function handOffToFacebook(postId: string, scheduledAt: Date): Promise<void> {
   const post = await prisma.post.findUniqueOrThrow({
     where: { id: postId },
-    include: { targets: { include: { target: { include: { socialAccount: true } } } } },
+    include: {
+      workspace: true,
+      targets: { include: { target: { include: { socialAccount: true } } } },
+    },
   });
 
   const media = await resolveMediaForPublish(parseMedia(post.media));
@@ -304,12 +366,31 @@ async function handOffToFacebook(postId: string, scheduledAt: Date): Promise<voi
         throw new GraphError({ message: 'No token stored for this destination.', kind: 'auth' });
       }
 
+      // The same rewriting the worker applies, per destination, so a campaign
+      // is attributed to the Page it ran on. Skipping it here meant choosing
+      // "let Facebook hold it" quietly dropped the UTM tags and short links the
+      // workspace had asked for — the reports then showed native posts earning
+      // no clicks at all.
+      const prepared = await prepareLinks({
+        workspaceId: post.workspaceId,
+        postId: post.id,
+        message: post.message,
+        link: post.link,
+        settings: {
+          utmSource: post.workspace.utmSource,
+          utmMedium: post.workspace.utmMedium,
+          utmCampaignTemplate: post.workspace.utmCampaignTemplate,
+          shortenerEnabled: post.workspace.shortenerEnabled,
+        },
+        targetName: target.name,
+      });
+
       const result = await publishPost({
         targetType: target.type as TargetType,
         targetId: target.providerId,
         accessToken: decryptSecret(encrypted),
-        message: post.message,
-        link: post.link,
+        message: prepared.message,
+        link: prepared.link,
         media,
         scheduledPublishTime: scheduledAt,
       });
@@ -341,6 +422,71 @@ async function handOffToFacebook(postId: string, scheduledAt: Date): Promise<voi
   }
 
   await refreshPostStatus(postId);
+}
+
+/** Why a native post was left with our own worker instead of Facebook. */
+export type NativeFallback = 'too_soon' | 'too_far' | 'unavailable';
+
+/**
+ * Slack on Facebook's 10-minute floor. The check runs before the Graph call,
+ * and a post that clears the floor by a second here can miss it by the time
+ * Facebook reads the request — failing every destination over a rounding.
+ */
+const NATIVE_FLOOR_MARGIN_SECONDS = 60;
+
+function nativeWindowProblem(scheduledAt: Date, now: Date): NativeFallback | null {
+  const deltaSeconds = Math.floor((scheduledAt.getTime() - now.getTime()) / 1000);
+  if (deltaSeconds < NATIVE_SCHEDULE_MIN_SECONDS + NATIVE_FLOOR_MARGIN_SECONDS) return 'too_soon';
+  if (deltaSeconds > NATIVE_SCHEDULE_MAX_SECONDS) return 'too_far';
+  return null;
+}
+
+/**
+ * Hand a post to Facebook, or keep it with our worker when Facebook would
+ * refuse its time.
+ *
+ * For posts that become publishable later than they were composed — approved
+ * after a wait, or edited back into the schedule. By then the time may have
+ * drifted inside Facebook's 10-minute floor (an overdue approval is the usual
+ * case) and handing it over would fail every destination, leaving a post the
+ * reviewer just approved reading "Failed". Our own worker can still honour the
+ * time, so the post switches to it and the caller is told why — to say so on
+ * screen and in its audit entry, rather than let "Held by Facebook" quietly
+ * stop being true.
+ */
+export async function handOffOrKeep(
+  postId: string,
+  scheduledAt: Date,
+  now: Date = new Date(),
+): Promise<NativeFallback | null> {
+  let problem = nativeWindowProblem(scheduledAt, now);
+  if (!problem) {
+    try {
+      await handOffToFacebook(postId, scheduledAt);
+      return null;
+    } catch (error) {
+      // Each destination's own failure is recorded inside; this is the post
+      // as a whole failing to be prepared — a media file gone from storage,
+      // say. The caller has already committed its decision (an approval, an
+      // edit), so failing the request now would report an error for work
+      // that stood. Our worker still has the post, and will say what is wrong
+      // with it at its time.
+      console.error('[posts] native hand-off failed; keeping the post with the worker', error);
+      problem = 'unavailable';
+    }
+  }
+
+  await prisma.post.update({ where: { id: postId }, data: { publishMode: 'worker' } });
+  return problem;
+}
+
+/** The `posts.*` message explaining a {@link NativeFallback}. */
+export function nativeFallbackKey(
+  reason: NativeFallback,
+): 'nativeTooSoon' | 'nativeTooFar' | 'nativeUnavailable' {
+  if (reason === 'too_soon') return 'nativeTooSoon';
+  if (reason === 'too_far') return 'nativeTooFar';
+  return 'nativeUnavailable';
 }
 
 async function summarise(postId: string): Promise<CreatePostResult> {
@@ -442,13 +588,135 @@ function assertNativeSupported(targets: Array<{ type: string; name: string }>): 
 }
 
 /**
+ * Refuse a post with nothing to show going to Instagram.
+ *
+ * Instagram publishes a picture or a video with a caption, never text alone,
+ * so such a post would only fail at its scheduled time — long after anyone
+ * could fix it. Drafts may still be saved without media: they are unfinished
+ * by definition.
+ */
+function assertInstagramHasMedia(targets: Array<{ type: string; name: string }>, mediaCount: number): void {
+  if (mediaCount > 0) return;
+  const instagram = targets.filter((target) => target.type === 'instagram');
+  if (instagram.length > 0) {
+    throw errors.instagramNeedsMedia(instagram.map((item) => item.name).join(', '));
+  }
+}
+
+/**
+ * Where review leaves a post after an edit.
+ *
+ *   submit — it goes (back) into the review queue.
+ *   hold   — it is already waiting there and stays exactly as it is.
+ *   clear  — it may go out, carrying this approval state.
+ *   revoke — it is not going out now, but the approval it had no longer
+ *            covers what it says, so the next attempt to send it is reviewed.
+ *   keep   — nothing about review changes.
+ */
+type ReviewOutcome =
+  | { kind: 'submit' }
+  | { kind: 'hold' }
+  | { kind: 'clear'; approvalStatus: ApprovalStatus }
+  | { kind: 'revoke' }
+  | { kind: 'keep' };
+
+/** Post states that intend to go out at their time. */
+const GOING_OUT: readonly PostStatus[] = [PostStatus.scheduled, PostStatus.pending_approval];
+
+/**
+ * Decide what an edit does to a post's review.
+ *
+ * Written as one decision, rather than as a status the edit sets and a check
+ * afterwards that sometimes overrides it, because the second shape is how the
+ * holes got in. The edit set `scheduled` whatever the approval said, so:
+ *
+ * - a contributor's draft (saved `not_required`: nothing had been submitted)
+ *   was given a time and published unreviewed;
+ * - a post waiting for review, or one a reviewer had rejected, was flipped to
+ *   `scheduled` while its approval stayed `pending` or `rejected` — gone from
+ *   the Approvals screen, and skipped by the scheduler for ever.
+ *
+ * The rules, with approval on: a post already waiting keeps waiting (whoever
+ * edits it — an editor may publish their own work unreviewed, but they cannot
+ * approve somebody else's); a rejected post goes back to review; an editor's
+ * post is cleared; a contributor's is cleared only when a reviewer approved
+ * exactly this, or when it was already on its way out before review was
+ * switched on and nothing about it changed. Everything else is reviewed.
+ */
+function reviewAfterEdit(options: {
+  requiresApproval: boolean;
+  role: WorkspaceRole;
+  approvalStatus: ApprovalStatus;
+  statusBefore: PostStatus;
+  statusAfter: PostStatus;
+  changed: boolean;
+}): ReviewOutcome {
+  const { approvalStatus } = options;
+
+  if (!GOING_OUT.includes(options.statusAfter)) {
+    const stale =
+      options.requiresApproval &&
+      approvalStatus === ApprovalStatus.approved &&
+      !canPublishWithoutApproval(options.role) &&
+      options.changed;
+    return stale ? { kind: 'revoke' } : { kind: 'keep' };
+  }
+
+  // Nobody is reviewing. A held post is released, the same as switching the
+  // workflow off releases it; a rejected one is the author rescheduling after
+  // the reviewer's note, which is the route back `releaseHeldPosts` leaves for
+  // it.
+  if (!options.requiresApproval) {
+    return {
+      kind: 'clear',
+      approvalStatus:
+        approvalStatus === ApprovalStatus.approved ? ApprovalStatus.approved : ApprovalStatus.not_required,
+    };
+  }
+
+  if (approvalStatus === ApprovalStatus.pending) {
+    // Pending but out of the queue — cancelled or turned into a draft while it
+    // waited — has to be put back in it, or nobody will ever be asked.
+    return options.statusBefore === PostStatus.pending_approval ? { kind: 'hold' } : { kind: 'submit' };
+  }
+  if (approvalStatus === ApprovalStatus.rejected) return { kind: 'submit' };
+
+  if (canPublishWithoutApproval(options.role)) {
+    return { kind: 'clear', approvalStatus: ApprovalStatus.approved };
+  }
+
+  if (!options.changed) {
+    if (approvalStatus === ApprovalStatus.approved) {
+      return { kind: 'clear', approvalStatus };
+    }
+    if (GOING_OUT.includes(options.statusBefore)) {
+      return { kind: 'clear', approvalStatus };
+    }
+  }
+
+  return { kind: 'submit' };
+}
+
+/** Same minute: `datetime-local` carries no seconds, the stored instant may. */
+function sameMinute(a: Date, b: Date): boolean {
+  return Math.floor(a.getTime() / 60_000) === Math.floor(b.getTime() / 60_000);
+}
+
+export interface UpdatePostResult {
+  /**
+   * Set when the post was meant for Facebook to hold but stayed with our
+   * worker, because Facebook would refuse its time.
+   */
+  nativeFallback: NativeFallback | null;
+}
+
+/**
  * Edit a post.
  *
- * The subtle part is approval. A contributor whose post has been approved can
- * still edit it right up until it publishes, and without this the reviewer's
- * decision travels with the row rather than with the content — sign-off on one
- * message, a different one goes out. So an edit by someone who cannot publish
- * without review sends the post back to the queue.
+ * The subtle part is approval: see {@link reviewAfterEdit}. A contributor
+ * whose post has been approved can still edit it right up until it publishes,
+ * and without that the reviewer's decision travels with the row rather than
+ * with the content — sign-off on one message, a different one goes out.
  *
  * Editors and above keep their approval, because they never needed it: in a
  * workspace with review on, `initialApprovalStatus` already grants them
@@ -464,7 +732,8 @@ export async function updatePost(
   },
   postId: string,
   input: UpdatePostInput,
-): Promise<void> {
+  now: Date = new Date(),
+): Promise<UpdatePostResult> {
   const post = await prisma.post.findFirst({
     where: { id: postId, workspaceId: context.workspaceId },
     // The destinations' own rows too: an edit that changes only the mode has
@@ -479,6 +748,13 @@ export async function updatePost(
   if (blocker === 'publishing') throw errors.alreadyPublishing();
   if (blocker === 'published') throw errors.alreadyPublished();
   if (blocker === 'scheduled_remote') throw errors.scheduledInFacebook();
+
+  // The schema can only check the fields it was sent; emptiness depends on the
+  // ones it was not, so it is checked here against what the post will hold.
+  const nextMessage = input.message ?? post.message;
+  const nextLink = input.link !== undefined ? (input.link ?? null) : post.link;
+  const nextMediaCount = input.media !== undefined ? input.media.length : parseMedia(post.media).length;
+  if (!hasPostContent(nextMessage, nextLink, nextMediaCount)) throw errors.emptyPost();
 
   const data: Record<string, unknown> = {};
   if (input.message !== undefined) data.message = input.message;
@@ -506,10 +782,12 @@ export async function updatePost(
   }
 
   let nextScheduledAt: Date | null | undefined;
+  /** The edit asks for the post to go out at a time. */
+  let wantsSchedule = false;
   if (input.scheduledAtLocal !== undefined) {
     if (input.scheduledAtLocal === null) {
       data.scheduledAt = null;
-      data.status = 'draft';
+      data.status = PostStatus.draft;
       nextScheduledAt = null;
     } else {
       const timezone = input.timezone ?? post.timezone;
@@ -517,42 +795,86 @@ export async function updatePost(
         throw errors.clocksGoForward(input.scheduledAtLocal.slice(11, 16));
       }
 
-      const scheduledAt = localInputToUtc(input.scheduledAtLocal, timezone);
-      if (scheduledAt.getTime() <= Date.now()) {
-        throw new GraphError({
-          message: 'That time has already passed. Choose a time in the future.',
-          kind: 'invalid_request',
-        });
+      // Only a time that moved has to be in the future. The composer sends the
+      // time back with every save, so refusing a past one outright meant an
+      // overdue or failed post could not even have a typo fixed: the save was
+      // refused over a field nobody had touched. The stored instant is kept
+      // as it was, seconds and all, so an untouched time is not a change.
+      //
+      // An untouched time that has passed is not a request to publish either:
+      // a failed or cancelled post whose typo is fixed stays failed or
+      // cancelled, rather than going out on the next tick because the form
+      // happened to carry its old time. Retrying is how that is asked for.
+      const requested = localInputToUtc(input.scheduledAtLocal, timezone);
+      if (post.scheduledAt && sameMinute(requested, post.scheduledAt)) {
+        nextScheduledAt = post.scheduledAt;
+        const passed = post.scheduledAt.getTime() <= now.getTime();
+        wantsSchedule = !passed || GOING_OUT.includes(post.status);
+      } else {
+        if (requested.getTime() <= now.getTime()) throw errors.timePassed();
+        data.scheduledAt = requested;
+        nextScheduledAt = requested;
+        wantsSchedule = true;
       }
-      data.scheduledAt = scheduledAt;
-      data.status = 'scheduled';
-      nextScheduledAt = scheduledAt;
     }
   }
 
-  if (input.status !== undefined) data.status = input.status;
+  if (input.status === PostStatus.scheduled) {
+    wantsSchedule = true;
+  } else if (input.status !== undefined) {
+    data.status = input.status;
+    wantsSchedule = false;
+  }
 
-  // Send it back for review if the reviewer's decision no longer covers what
-  // is about to go out. Checked before the write, against the stored row.
-  const needsReReview =
-    context.requiresApproval &&
-    post.approvalStatus === ApprovalStatus.approved &&
-    !canPublishWithoutApproval(context.role) &&
-    changesWhatWasReviewed(
+  const scheduledAfter = nextScheduledAt !== undefined ? nextScheduledAt : post.scheduledAt;
+  if (wantsSchedule && !scheduledAfter) throw errors.pickDateTime();
+
+  const statusAfter: PostStatus = wantsSchedule
+    ? PostStatus.scheduled
+    : ((data.status as PostStatus | undefined) ?? post.status);
+
+  const review = reviewAfterEdit({
+    requiresApproval: context.requiresApproval,
+    role: context.role,
+    approvalStatus: post.approvalStatus,
+    statusBefore: post.status,
+    statusAfter,
+    // Checked before the write, against the stored row.
+    changed: changesWhatWasReviewed(
       post,
       post.targets.map((target) => target.targetId),
       input,
       nextScheduledAt,
-    );
+    ),
+  });
 
-  if (needsReReview) {
-    data.approvalStatus = ApprovalStatus.pending;
-    data.status = PostStatus.pending_approval;
-    data.submittedById = context.userId;
-    data.submittedAt = new Date();
-    data.reviewedById = null;
-    data.reviewedAt = null;
-    data.reviewNote = null;
+  switch (review.kind) {
+    case 'submit':
+      data.approvalStatus = ApprovalStatus.pending;
+      data.status = PostStatus.pending_approval;
+      data.submittedById = context.userId;
+      data.submittedAt = now;
+      data.reviewedById = null;
+      data.reviewedAt = null;
+      data.reviewNote = null;
+      break;
+    case 'hold':
+      data.status = PostStatus.pending_approval;
+      break;
+    case 'clear':
+      data.approvalStatus = review.approvalStatus;
+      // Released from the queue with no time set: nothing for the scheduler
+      // to act on, so it lands as a draft — where approving it would.
+      data.status = scheduledAfter ? PostStatus.scheduled : PostStatus.draft;
+      break;
+    case 'revoke':
+      data.approvalStatus = ApprovalStatus.pending;
+      data.reviewedById = null;
+      data.reviewedAt = null;
+      data.reviewNote = null;
+      break;
+    case 'keep':
+      break;
   }
 
   // Resolved before the write, because the native check needs to know what
@@ -570,10 +892,12 @@ export async function updatePost(
   // The mode the post will have once this edit lands, against the destinations
   // it will have. Both halves can change in the same request.
   const nextMode = input.publishMode ?? post.publishMode;
-  if (nextMode === 'native') {
-    assertNativeSupported(
-      input.targetIds ? valid : post.targets.map((row) => row.target),
-    );
+  const nextTargets = input.targetIds ? valid : post.targets.map((row) => row.target);
+  if (nextMode === 'native') assertNativeSupported(nextTargets);
+
+  const nextStatus = (data.status as PostStatus | undefined) ?? post.status;
+  if (nextStatus !== PostStatus.draft && nextStatus !== PostStatus.cancelled) {
+    assertInstagramHasMedia(nextTargets, nextMediaCount);
   }
 
   await prisma.$transaction(async (tx) => {
@@ -598,8 +922,10 @@ export async function updatePost(
       });
     }
 
-    // A retried post starts from a clean slate on every destination.
-    if (data.status === PostStatus.scheduled) {
+    // A rescheduled post starts from a clean slate on every destination —
+    // including one going to review, or approving it later would change its
+    // status while every destination stayed failed, and nothing would go out.
+    if (data.status === PostStatus.scheduled || data.status === PostStatus.pending_approval) {
       await tx.postTarget.updateMany({
         where: { postId, status: { in: ['failed', 'cancelled'] } },
         data: { status: 'pending', attempts: 0, nextAttemptAt: null, errorCode: null, errorMessage: null },
@@ -607,36 +933,47 @@ export async function updatePost(
     }
   });
 
-  await logActivity(context.workspaceId, 'post.updated', { postId }, context.userId);
-
-  // Switching to native means Facebook is supposed to be holding the post, so
-  // ask it to. Recording the choice and leaving the post for our own worker is
-  // the worst reading of it: the whole reason to pick native is that the post
-  // survives our worker being down, and the screen would say Facebook had it
-  // while nobody had asked Facebook anything.
+  // A post that is native, cleared, and scheduled once this edit lands is one
+  // Facebook is supposed to be holding, so ask it to. Recording the choice and
+  // leaving the post for our own worker is the worst reading of it: the whole
+  // reason to pick native is that the post survives our worker being down, and
+  // the screen would say Facebook had it while nobody had asked Facebook
+  // anything. Nothing here can be handed over twice — a post Facebook already
+  // holds is refused by `postEditBlocker` before any of this runs.
   //
-  // Only from a mode that is not already native — a post Facebook is holding
-  // cannot be edited at all, so there is nothing here to hand over twice.
-  const handOverAt = (data.scheduledAt as Date | null | undefined) ?? post.scheduledAt;
+  // Cleared means cleared: a post going to review, or still waiting there, is
+  // not handed to anyone. Facebook would publish it on schedule, reviewed or
+  // not, and nothing in our queue could then stop it.
+  const statusFinal = (data.status as PostStatus | undefined) ?? post.status;
+  const approvalFinal = (data.approvalStatus as ApprovalStatus | undefined) ?? post.approvalStatus;
+  let nativeFallback: NativeFallback | null = null;
   if (
-    input.publishMode === 'native' &&
-    post.publishMode !== 'native' &&
-    !needsReReview &&
-    data.status !== PostStatus.draft &&
-    handOverAt
+    nextMode === 'native' &&
+    statusFinal === PostStatus.scheduled &&
+    PUBLISHABLE_APPROVAL_STATUSES.includes(approvalFinal) &&
+    scheduledAfter
   ) {
-    await handOffToFacebook(postId, handOverAt);
+    nativeFallback = await handOffOrKeep(postId, scheduledAfter, now);
   }
 
-  if (needsReReview) {
+  await logActivity(
+    context.workspaceId,
+    'post.updated',
+    nativeFallback ? { postId, nativeFallback } : { postId },
+    context.userId,
+  );
+
+  if (review.kind === 'submit') {
     const author = await prisma.user.findUniqueOrThrow({ where: { id: context.userId } });
     await notifyApprovalRequest({
       workspaceId: context.workspaceId,
       authorName: author.name,
-      scheduledAt: (data.scheduledAt as Date | null | undefined) ?? post.scheduledAt,
+      scheduledAt: scheduledAfter,
     });
     await logActivity(context.workspaceId, 'post.submitted', { postId }, context.userId);
   }
+
+  return { nativeFallback };
 }
 
 /**

@@ -1,12 +1,15 @@
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
+import { TargetType } from '@prisma/client';
 
-import { Composer, type EditingPost } from '@/components/Composer';
+import { Composer, type EditingPost, type GoodTime } from '@/components/Composer';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { parseMedia } from '@/lib/json';
-import { utcToLocalInput } from '@/lib/time';
+import { localInputToUtc, utcToLocalInput } from '@/lib/time';
+import { loadPagePosts } from '@/lib/page-analysis-data';
+import { nextGoodTimes, suggestSlots } from '@/lib/queue-suggestions';
 import { postIsEditable, canManageOthersPosts, canPublishWithoutApproval } from '@/lib/constants';
 import { aiAvailable } from '@/lib/ai';
 
@@ -15,6 +18,58 @@ export const dynamic = 'force-dynamic';
 /** The tab says which screen and which client, so several open at once stay apart. */
 export function generateMetadata() {
   return screenMetadata('compose.title');
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** The same ninety days of history as the Queue's suggestions. */
+const LOOKBACK_DAYS = 90;
+/** Nothing sooner than this: time to finish the post, and clear Facebook's floor. */
+const EARLIEST_MINUTES = 30;
+
+/**
+ * When this week the workspace's Pages have done best, as ready-to-use
+ * `datetime-local` values — the Queue's suggestions, brought to the moment
+ * someone picks a time.
+ */
+async function loadGoodTimes(workspaceId: string, timeZone: string): Promise<GoodTime[]> {
+  const now = new Date();
+  const pages = await prisma.target.findMany({
+    where: { workspaceId, type: TargetType.page },
+    select: { id: true, name: true },
+  });
+  if (pages.length === 0) return [];
+
+  const history = await Promise.all(
+    pages.map(async (page) => ({
+      pageName: page.name,
+      posts: await loadPagePosts(page.id, new Date(now.getTime() - LOOKBACK_DAYS * DAY_MS), now),
+    })),
+  );
+  // Every good time counts here, including ones the queue already holds: this
+  // is a time for one post, not a new weekly slot.
+  const suggestions = suggestSlots({ pages: history, timeZone, existing: [] });
+
+  const locale = await getLocale();
+  const label = new Intl.DateTimeFormat(locale, {
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone,
+  });
+
+  return nextGoodTimes({
+    suggestions,
+    timeZone,
+    earliest: new Date(now.getTime() + EARLIEST_MINUTES * 60 * 1000),
+    days: 7,
+    toUtc: localInputToUtc,
+  }).map(({ at, suggestion }) => ({
+    value: utcToLocalInput(at, timeZone),
+    label: label.format(at),
+    lift: suggestion.lift,
+    posts: suggestion.posts,
+  }));
 }
 
 
@@ -49,7 +104,10 @@ export default async function ComposePage({
     }),
   ]);
 
-  const editing = postId ? await loadForEditing(postId, auth) : null;
+  const [editing, goodTimes] = await Promise.all([
+    postId ? loadForEditing(postId, auth) : null,
+    loadGoodTimes(auth.workspace.id, auth.workspace.timezone),
+  ]);
   // A link to a post that is gone, belongs to another client, or has already
   // been published is a 404 rather than a blank composer — silently opening an
   // empty form would lose the edit without saying so.
@@ -57,10 +115,9 @@ export default async function ComposePage({
 
   // One hour out is a friendlier default than "now", and clears Facebook's
   // 10-minute floor for natively scheduled posts.
-  const defaultScheduledAt = utcToLocalInput(
-    new Date(Date.now() + 60 * 60 * 1000),
-    auth.workspace.timezone,
-  );
+  const defaultScheduledAt =
+    requestedTime(params.at, auth.workspace.timezone) ??
+    utcToLocalInput(new Date(Date.now() + 60 * 60 * 1000), auth.workspace.timezone);
 
   return (
     <div className="space-y-6">
@@ -77,6 +134,7 @@ export default async function ComposePage({
         timezone={auth.workspace.timezone}
         hasQueueSlots={queueSlots > 0}
         defaultScheduledAt={defaultScheduledAt}
+        goodTimes={goodTimes}
         aiEnabled={aiAvailable() && workspace.aiEnabled}
         requiresApproval={auth.workspace.requiresApproval}
         canPublishDirectly={canPublishWithoutApproval(auth.role)}
@@ -99,6 +157,20 @@ export default async function ComposePage({
 }
 
 type Auth = Awaited<ReturnType<typeof requirePage>>;
+
+/**
+ * `?at=YYYY-MM-DDTHH:mm`, from the calendar's "new post on this day", when it
+ * names a time far enough ahead to schedule — otherwise the usual default. A
+ * stale link to a day that has gone by opens the composer as normal rather
+ * than on a time it would refuse.
+ */
+function requestedTime(raw: string | string[] | undefined, timeZone: string): string | null {
+  const at = Array.isArray(raw) ? raw[0] : raw;
+  if (!at || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(at)) return null;
+  const instant = localInputToUtc(at, timeZone);
+  if (Number.isNaN(instant.getTime())) return null;
+  return instant.getTime() > Date.now() + EARLIEST_MINUTES * 60 * 1000 ? at : null;
+}
 
 /**
  * The post behind `?post=`, or null if this person may not edit it.

@@ -4,19 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
-const VIEWS = [
-  'overview',
-  'posts',
-  'interactions',
-  'audience',
-  'videos',
-  'comments',
-  'reviews',
-  'inbox',
-  'external',
-  'instagram',
-  'ads',
-] as const;
+import { ANALYTICS_VIEWS as VIEWS, VIEW_SCOPED_PARAMS } from '@/lib/analytics-views';
 
 /**
  * View switcher for the analytics screen.
@@ -38,6 +26,9 @@ export function AnalyticsTabs({ current }: { current: string }) {
   function hrefFor(view: string): string {
     const next = new URLSearchParams(params.toString());
     next.set('view', view);
+    // The destination and the window carry over; one view's search, filter
+    // and page number do not.
+    for (const key of VIEW_SCOPED_PARAMS) next.delete(key);
     return `${pathname}?${next.toString()}`;
   }
 

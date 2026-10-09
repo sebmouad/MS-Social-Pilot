@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocale } from 'next-intl';
 
 import { VIZ, compact, niceTicks, seriesColor } from '@/lib/viz';
 
@@ -44,6 +45,9 @@ export function TimeSeries({
   formatX: (iso: string) => string;
 }) {
   const [active, setActive] = useState<number | null>(null);
+  // The app's language on the server and in the browser alike, so the axis
+  // renders the same number both times rather than failing hydration.
+  const locale = useLocale();
   const svgRef = useRef<SVGSVGElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -109,7 +113,10 @@ export function TimeSeries({
         width={width}
         height={HEIGHT}
         viewBox={`0 0 ${width} ${HEIGHT}`}
-        className="touch-pan-y"
+        // Until the box is measured the width is a guess; on a phone the guess
+        // is wider than the screen. Scaled down to fit meanwhile, and a no-op
+        // once the real width is in.
+        className="h-auto max-w-full touch-pan-y"
         role="img"
         aria-label={lines.map((line) => line.label).join(', ')}
         tabIndex={0}
@@ -141,7 +148,7 @@ export function TimeSeries({
               fill={VIZ.inkMuted}
               style={{ fontVariantNumeric: 'tabular-nums' }}
             >
-              {compact(tick)}
+              {compact(tick, locale)}
             </text>
           </g>
         ))}
@@ -216,7 +223,7 @@ export function TimeSeries({
                     fill={VIZ.ink}
                     style={{ fontVariantNumeric: 'tabular-nums' }}
                   >
-                    {compact(last.y)}
+                    {compact(last.y, locale)}
                   </text>
                 </>
               )}
@@ -255,7 +262,7 @@ export function TimeSeries({
                   style={{ background: seriesColor(line.colorIndex) }}
                 />
                 <span className="nums font-semibold text-slate-900">
-                  {(line.points[active]?.y ?? 0).toLocaleString()}
+                  {(line.points[active]?.y ?? 0).toLocaleString(locale)}
                 </span>
                 <span className="text-slate-500">{line.label}</span>
               </li>

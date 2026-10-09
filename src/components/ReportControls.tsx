@@ -11,14 +11,29 @@ import { useTranslations } from 'next-intl';
  * print-styled page, rather than generating a PDF server-side. That keeps
  * headless Chromium out of the production image for the sake of one feature.
  */
-export function ReportControls({ from, to }: { from: string; to: string }) {
+export function ReportControls({
+  from,
+  to,
+  downloadable = true,
+}: {
+  /** The range the report on screen covers, as calendar days. */
+  from: string;
+  to: string;
+  /** False while the requested range was refused: there is no report to save. */
+  downloadable?: boolean;
+}) {
   const t = useTranslations('reports');
   const router = useRouter();
 
   const [start, setStart] = useState(from);
   const [end, setEnd] = useState(to);
 
-  const query = `from=${start}&to=${end}`;
+  const pending = new URLSearchParams({ from: start, to: end }).toString();
+  // The download is the report on screen, so it is built from the range that
+  // was applied rather than from the fields. Built from the fields, changing a
+  // date and downloading without pressing Generate saved a file for a period
+  // nobody had looked at, under a name that suggested otherwise.
+  const applied = new URLSearchParams({ from, to, format: 'csv' }).toString();
 
   return (
     <div className="flex flex-wrap items-end gap-2 print:hidden">
@@ -49,12 +64,14 @@ export function ReportControls({ from, to }: { from: string; to: string }) {
         />
       </div>
 
-      <button type="button" className="btn-primary" onClick={() => router.push(`/reports?${query}`)}>
+      <button type="button" className="btn-primary" onClick={() => router.push(`/reports?${pending}`)}>
         {t('generate')}
       </button>
-      <a className="btn-secondary" href={`/api/reports?${query}&format=csv`}>
-        {t('downloadCsv')}
-      </a>
+      {downloadable && (
+        <a className="btn-secondary" href={`/api/reports?${applied}`}>
+          {t('downloadCsv')}
+        </a>
+      )}
       <button type="button" className="btn-secondary" onClick={() => window.print()}>
         {t('print')}
       </button>

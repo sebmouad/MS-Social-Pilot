@@ -1,3 +1,5 @@
+import { appLocale } from './time';
+
 /**
  * Chart palette and number formatting, in one place.
  *
@@ -59,11 +61,11 @@ export function seriesColor(index: number): string {
  * Facebook returns impressions in the millions and negative feedback in single
  * digits, often in the same row, so a fixed precision is wrong either way.
  */
-export function compact(value: number): string {
+export function compact(value: number, locale?: string): string {
   const magnitude = Math.abs(value);
   if (magnitude >= 1_000_000) return `${trim(value / 1_000_000)}M`;
   if (magnitude >= 10_000) return `${trim(value / 1_000)}K`;
-  return Math.round(value).toLocaleString();
+  return Math.round(value).toLocaleString(locale ?? appLocale());
 }
 
 function trim(value: number): string {

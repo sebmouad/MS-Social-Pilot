@@ -1,6 +1,6 @@
 # MS Social Pilot 1.0.0
 
-A SocialPilot-style scheduler for Facebook Pages, Groups and Instagram. Compose
+A SocialPilot-style scheduler for Facebook Pages and Instagram. Compose
 once, publish to many destinations, with an approval workflow, RSS auto-posting,
 AI writing help, link tracking and client reporting.
 
@@ -29,10 +29,23 @@ nobody started.
 
 ## What it does
 
+The app is three modules, one tab each in the top bar:
+
+| Module | What it answers | Screens |
+|---|---|---|
+| **Analytics** | How are my Pages doing, and why? | Page analysis, compare pages, every insights view, reports |
+| **Ads** | What did the paid side cost, and what did it buy? | Spend and delivery against the previous period, daily trends, campaign / ad set / ad breakdown |
+| **Schedule** | What is going out, and when? | Calendar, posts, composer, approvals, RSS feeds |
+
+Connections, settings and the home overview serve all three and sit beside
+them rather than in any one.
+
+![The Ads module: findings, spend and delivery against the previous period, daily trends and where the budget went](docs/images/ads.png)
+
 ![The composer: message, link card, media, destinations and the three scheduling modes](docs/images/compose.png)
 
 **Publishing**
-- Many Facebook Pages and Groups from one composer: text, links, photo
+- Many Facebook Pages from one composer: text, links, photo
   galleries, video.
 - **Instagram Business accounts** as destinations alongside them — single
   photo, reel, or carousel. Instagram's API takes a URL rather than an upload,
@@ -43,11 +56,11 @@ nobody started.
 
 **Scheduling** — three modes, because they fail differently:
 
-| Mode | Who holds the post | Editable after saving | Works for Groups | Survives your server being down |
+| Mode | Who holds the post | Editable after saving | How far ahead | Survives your server being down |
 |---|---|---|---|---|
-| Publish now | — | n/a | Yes | n/a |
-| Scheduled (default) | This app | Yes | Yes | No — the worker must be running |
-| Scheduled (native) | Facebook | No, cancel and recreate | No | Yes |
+| Publish now | — | n/a | — | n/a |
+| Scheduled (default) | This app | Yes | Any time | No — the worker must be running |
+| Scheduled (native) | Facebook | No, cancel and recreate | 10 minutes to 30 days | Yes |
 
 - A recurring **queue** ("post at my next free slot"), defined in workspace-local
   time and stable across daylight saving changes.
@@ -66,6 +79,9 @@ nobody started.
 - **Approval workflow**: contributors submit, admins approve or send back with a
   note. Enforced in the scheduler, not just the UI. Contributors upload media —
   they draft posts — but deleting from the shared library is editor and above.
+- **Your own account** under Settings → Account: change your name, language and
+  password, and sign out every other device. Changing the password signs the
+  other devices out as well.
 
 **Automation**
 - **RSS auto-posting** with conditional polling, guid de-duplication, and a
@@ -95,6 +111,18 @@ threads outside that window say so instead of offering a box that would refuse.
 (`POST /?id=<url>&scrape=true`), so you see exactly the card Facebook will
 render and its cache is refreshed. Falls back to parsing `og:` tags directly.
 
+**Page analysis** — the first thing Analytics shows for a connected Page is
+what its numbers *mean*: a health score out of 100 built from four stated
+parts, this period against the one before, posts per week against a target,
+which formats earn the most interactions, a day-by-time grid of when posts do
+best, the strongest and weakest posts, and a short list of findings in plain
+sentences. It reads every post on the Page, not only those published from here,
+and compares the Page with itself rather than with benchmarks nobody can check.
+**Compare pages** puts every Page in a workspace side by side on the same
+figures. **Analyse now** re-reads the Page from Facebook on demand.
+
+![Page analysis: health score, findings, period comparison, cadence, formats and the best-time grid](docs/images/analysis.png)
+
 **Reporting** — impressions, reach, engagement and link clicks per destination
 and per post, with CSV export and a print-styled page for PDF.
 
@@ -119,10 +147,11 @@ npm install
 npm run setup
 ```
 
-`npm run setup` writes `.env` from `.env.example` and generates the two secrets
-that must be unique to your installation — the session signing key and the token
-encryption key. It never overwrites values you have already set, so it is safe to
-run again.
+`npm run setup` writes `.env` from `.env.example` and generates the secrets that
+must be unique to your installation — the session signing key, the token
+encryption key and the password of the bundled Postgres, which Docker Compose
+refuses to start without. It never overwrites values you have already set, so it
+is safe to run again.
 
 Then, with Docker:
 
@@ -139,10 +168,14 @@ root, set `APP_PORT=8080` in `.env` and use <http://localhost:8080>.
 
 Or without Docker, using a Postgres you already have:
 
+The Compose Postgres is published on `127.0.0.1:5432` only, and the
+`DATABASE_URL` that `npm run setup` writes already carries its password:
+
 ```bash
 docker compose up -d postgres   # or point DATABASE_URL at your own
 npm run db:migrate
 npm run db:seed                 # optional: demo login, two workspaces
+npm run db:demo                 # optional: two invented Pages with six months of analytics
 npm run dev                     # http://localhost:3000
 npm run dev:worker              # second terminal
 ```
@@ -236,6 +269,7 @@ how to drive it from a serverless cron instead of a long-running worker.
 | `npm test` | Vitest suite |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run db:migrate` / `db:push` / `db:studio` / `db:seed` | Prisma |
+| `npm run db:demo` | Invented Pages with analytics history, to see the analytics screens without Facebook |
 
 ---
 
@@ -306,8 +340,9 @@ src/lib/settings/     The configuration registry every tunable comes from
 src/lib/              Auth, posts, approvals, team, links, AI, reports, media,
                       engagement, connection health, first-run setup
 src/app/api/          REST endpoints
-src/app/(app)/        Dashboard, composer, calendar, posts, approvals,
-                      connections, accounts, feeds, analytics, reports, settings
+src/app/(app)/        Analytics (analytics, reports), Ads (ads), Schedule (calendar,
+                      posts, compose, approvals, feeds); shared: dashboard,
+                      connections, accounts, settings. src/lib/modules.ts maps them
 src/app/setup/        First-run setup screen
 messages/             en.json, fr.json
 scripts/worker.ts     The background worker
@@ -321,11 +356,14 @@ More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Important limitations
 
-**Groups.** Meta restricted the Groups API in April 2024. `publish_to_groups`
-needs separate approval, and a Group only appears if an admin has added your app
-to it. Off by default (`FACEBOOK_ENABLE_GROUPS=false`). The code paths are
-complete and work once you have the access — but do not plan a product around
-Group publishing before confirming you can get it.
+**Groups.** Meta removed the Groups API from every version on 22 April 2024, so
+no app can publish to a Facebook Group. `publish_to_groups` is never requested:
+asking for a permission that no longer exists fails the whole login.
+
+**Metrics Meta retired.** Impressions and fans went on 15 November 2025 and
+reach on 29 July 2026, on every API version. The app reads Meta's replacements
+(views, viewers, follows) and keeps stored history under the old names; see
+[docs/META_APP_SETUP.md](docs/META_APP_SETUP.md#what-meta-has-retired).
 
 **App Review.** Publishing to Pages you do not own needs `pages_manage_posts`
 approved by Meta. Until then the app works only for people with a role on it.
@@ -372,7 +410,14 @@ based, and Facebook's own scraper is excluded so previews do not inflate counts.
 - Every error the API returns carries a translation key rather than a finished
   English sentence, swept the same way, so a French customer reads French at the
   moment something has gone wrong.
-- Link preview fetches refuse loopback and private address ranges (SSRF).
+- Server-side fetches of user-supplied URLs — link previews and RSS feeds —
+  refuse loopback and private ranges as written, as resolved by DNS, and on
+  every redirect hop (SSRF).
+- Sign-in and sign-up are rate limited; changing a password needs the current
+  one, is rate limited per user, and signs out every other session.
+- API writes started by another site, including a sibling subdomain, are refused
+  on the browser's `Sec-Fetch-Site`. Every response is sent with
+  `X-Frame-Options: DENY`, `nosniff` and a strict referrer policy.
 - `signed_request` verified on Facebook's deauthorize and data-deletion
   callbacks.
 - AI output never publishes on its own — it lands in the composer for a human.

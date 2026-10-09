@@ -8,8 +8,8 @@ import { screenMetadata } from '@/lib/metadata';
 import { summariseConnections } from '@/lib/connections';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
-import { formatInZone, relativeTime } from '@/lib/time';
-import { publishedTotals } from '@/lib/analytics';
+import { formatInZone, relativeTime, appLocale } from '@/lib/time';
+import { publishedTotals, recentOutcomes } from '@/lib/analytics';
 import { canManageInstance } from '@/lib/constants';
 import { readSetupState } from '@/lib/setup';
 
@@ -37,12 +37,7 @@ export default async function DashboardPage() {
       orderBy: { scheduledAt: 'asc' },
       take: 5,
     }),
-    prisma.post.findMany({
-      where: { workspaceId, status: { in: ['published', 'partially_failed', 'failed'] } },
-      include: { targets: { include: { target: { select: { name: true } } } } },
-      orderBy: { publishedAt: 'desc' },
-      take: 5,
-    }),
+    recentOutcomes(workspaceId),
     prisma.post.groupBy({ by: ['status'], where: { workspaceId }, _count: true }),
     prisma.target.count({ where: { workspaceId, enabled: true, canPublish: true } }),
     prisma.socialAccount.findMany({
@@ -55,8 +50,8 @@ export default async function DashboardPage() {
     ]);
 
   // An unfinished installation otherwise greets its owner with four zeros and
-  // no hint why. Setup is owner-only, so only an owner is pointed at it.
-  const setup = canManageInstance(auth.role) ? await readSetupState(workspaceId) : null;
+  // no hint why. Setup belongs to the installation owner, so only they are pointed at it.
+  const setup = canManageInstance(auth) ? await readSetupState(workspaceId) : null;
   const stepsLeft = setup?.steps.filter((step) => !step.optional && !step.done) ?? [];
 
   const countFor = (status: string) => counts.find((entry) => entry.status === status)?._count ?? 0;
@@ -118,7 +113,7 @@ export default async function DashboardPage() {
           <ul className="mt-1 list-inside list-disc">
             {staleAccounts.map((account) => (
               <li key={account.id}>
-                {account.name}: {account.invalidReason ?? 'Reconnect required.'}
+                {account.name}: {account.invalidReason ?? t('reconnectRequired')}
               </li>
             ))}
           </ul>
@@ -169,7 +164,10 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {totals.impressions + totals.reactions > 0 && (
+      {/* Shown once anything at all has come back. Impressions alone cannot
+          gate it: Meta retired the metric, so a Page synced since reads zero
+          there while its reach and comments are real. */}
+      {totals.impressions + totals.reach + totals.reactions + totals.comments > 0 && (
         <div className="card p-5">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Icon name="analytics" className="text-slate-400" /> {t('reachAndEngagement')}
@@ -178,16 +176,21 @@ export default async function DashboardPage() {
             {t('reachSubtitle')}
           </p>
           <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {[
-              [t('impressions'), totals.impressions],
-              [t('peopleReached'), totals.reach],
-              [t('reactions'), totals.reactions],
-              [t('comments'), totals.comments],
-            ].map(([label, value]) => (
-              <div key={String(label)}>
+            {(
+              [
+                // Only where some were recorded: a Page synced since Meta
+                // retired the metric reads a flat zero that means "not
+                // reported", not "nobody saw it".
+                ...(totals.impressions > 0 ? [[t('impressions'), totals.impressions] as const] : []),
+                [t('peopleReached'), totals.reach],
+                [t('reactions'), totals.reactions],
+                [t('comments'), totals.comments],
+              ] as const
+            ).map(([label, value]) => (
+              <div key={label}>
                 <dt className="text-xs text-slate-500">{label}</dt>
                 <dd className="text-lg font-semibold text-slate-900">
-                  {typeof value === 'number' ? value.toLocaleString() : '—'}
+                  {value.toLocaleString(appLocale())}
                 </dd>
               </div>
             ))}
@@ -221,7 +224,7 @@ export default async function DashboardPage() {
                   <p className="mt-1 text-xs text-slate-500">
                     {post.scheduledAt
                       ? `${formatInZone(post.scheduledAt, auth.workspace.timezone)} · ${relativeTime(post.scheduledAt, now)}`
-                      : 'No time set'}{' '}
+                      : t('noTimeSet')}{' '}
                     · {post.targets.map((target) => target.target.name).join(', ')}
                   </p>
                 </li>
@@ -241,7 +244,7 @@ export default async function DashboardPage() {
               {recent.map((post) => (
                 <li key={post.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="line-clamp-2 flex-1 text-sm text-slate-800">
+                    <p className="line-clamp-2 min-w-0 flex-1 [overflow-wrap:anywhere] text-sm text-slate-800">
                       {post.message || post.link || tPosts('mediaOnly')}
                     </p>
                     <StatusBadge status={post.status} />

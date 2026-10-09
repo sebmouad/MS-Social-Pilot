@@ -1,4 +1,4 @@
-import { graphPaged, graphRequest } from './graph';
+import { RATINGS_GRAPH_VERSION, graphPaged, graphRequest } from './graph';
 
 /**
  * Graph edges that are not `/insights`.
@@ -22,13 +22,6 @@ const MAX_POST_PAGES = 5;
 const MAX_VIDEO_PAGES = 3;
 const PAGE_SIZE = 100;
 
-/**
- * Page recommendations were removed from Graph v22.0 onwards: `/ratings`
- * answers error 12 on any later version. v21.0 is the last that serves them,
- * and Meta keeps it available until January 21, 2027 — after that there is no
- * version left to ask, and this edge stops working whatever is pinned here.
- */
-const RATINGS_GRAPH_VERSION = 'v21.0';
 
 export interface GraphComment {
   remoteId: string;

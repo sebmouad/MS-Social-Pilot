@@ -255,11 +255,22 @@ test('the analytics tabs stay usable when there is data behind them', async ({ p
   expect(failures).toEqual([]);
 });
 
-test('the navigation is reachable behind the menu', async ({ page }) => {
+test('the three modules are always on screen, and the rest is behind the menu', async ({ page }) => {
   await open(page, '/dashboard');
 
-  // Ten links do not fit across a phone, so they live behind a button. If that
-  // button is missing or does nothing, the app is one screen deep.
+  // The modules are never hidden: where you are is the one thing that must
+  // always be visible, and three names fit across a phone.
+  for (const name of [/^analytics$/i, /^ads$/i, /^schedule$/i]) {
+    await expect(page.getByRole('banner').getByRole('link', { name })).toBeVisible();
+  }
+
+  // A module's own screens appear under it once you are in it.
+  await page.getByRole('banner').getByRole('link', { name: /^schedule$/i }).click();
+  await page.waitForURL(/\/calendar/);
+  await expect(page.getByRole('banner').getByRole('link', { name: /^posts$/i })).toBeVisible();
+
+  // Connections, settings and home do not fit beside them, so they live behind
+  // a button. If that button is missing or does nothing, they are unreachable.
   const menu = page.getByRole('button', { name: /menu/i });
   await expect(menu).toBeVisible();
 
@@ -271,18 +282,18 @@ test('the navigation is reachable behind the menu', async ({ page }) => {
     await expect(menu).toHaveAttribute('aria-expanded', 'true', { timeout: 1_500 });
   }).toPass({ timeout: 30_000 });
 
-  const posts = page.getByRole('link', { name: /^posts$/i });
-  await expect(posts).toBeVisible();
+  const settings = page.locator('#main-menu').getByRole('link', { name: /^settings$/i });
+  await expect(settings).toBeVisible();
 
   // The button that opens it says what it is and what it did, for somebody who
   // cannot see that a panel appeared.
   await expect(menu).toHaveAttribute('aria-controls', 'main-menu');
 
-  await posts.click();
-  await page.waitForURL(/\/posts/);
+  await settings.click();
+  await page.waitForURL(/\/settings/);
 
   // And it closes on the way, rather than covering the screen it navigated to.
-  await expect(page.getByRole('link', { name: /^calendar$/i })).toHaveCount(0);
+  await expect(page.locator('#main-menu')).toHaveCount(0);
 });
 
 /**

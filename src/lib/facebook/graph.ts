@@ -403,3 +403,30 @@ export function asGraphError(error: unknown): GraphError {
     kind: 'transient',
   });
 }
+
+/** The major number of a Graph version string: "v25.0" is 25. NaN if unreadable. */
+export function graphMajor(version: string): number {
+  const match = /^v?(\d+)\./.exec(version.trim());
+  return match ? Number(match[1]) : Number.NaN;
+}
+
+/** The last Graph version that serves Page ratings. */
+export const RATINGS_GRAPH_VERSION = 'v21.0';
+
+/** When Meta retires v21.0, and with it the last way to read Page ratings. */
+export const RATINGS_VERSION_RETIRES = new Date('2027-01-21T00:00:00Z');
+
+/**
+ * Whether Page ratings can still be read.
+ *
+ * Meta deprecated `GET /{page-id}/ratings` in v22.0 ("Page recommendations
+ * have been deprecated for v22.0 and future versions"), so on a later pinned
+ * version the edge is asked on v21.0 explicitly (see fetchReviews). That works
+ * until v21.0 itself is retired; after that there is no version left to ask,
+ * the edge is not asked at all, and what was stored before stays readable.
+ */
+export function pageRatingsAvailable(version: string, now: Date = new Date()): boolean {
+  const major = graphMajor(version);
+  if (Number.isFinite(major) && major < 22) return true;
+  return now < RATINGS_VERSION_RETIRES;
+}

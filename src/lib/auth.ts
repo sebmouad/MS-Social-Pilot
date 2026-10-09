@@ -9,7 +9,7 @@ import { ensureSettings } from './settings';
 import { env } from './env';
 import { hashPassword, hashToken, randomToken, verifyPassword } from './crypto';
 import { uniqueSlug } from './slug';
-import { DEFAULT_QUEUE_SLOTS } from './time';
+import { DEFAULT_QUEUE_SLOTS, setDateLocale } from './time';
 
 /**
  * Sessions, and resolving which workspace the request is acting on.
@@ -48,6 +48,12 @@ export interface AuthContext {
     defaultLocale: Locale;
   };
   role: WorkspaceRole;
+  /**
+   * The installation's owner, whatever their role in the active workspace.
+   * Only this person may change instance-wide configuration; see
+   * `canManageInstance`.
+   */
+  isInstanceOwner: boolean;
   /** Every workspace this user belongs to, for the switcher. */
   workspaces: WorkspaceSummary[];
 }
@@ -128,20 +134,39 @@ export async function createWorkspace(options: {
  *   the first registration is always allowed.
  * - **An invitation.** Someone holding a live invitation to their own address
  *   was already admitted by a person who could admit them.
+ *
+ * This is the answer for showing or hiding the form. `registerUser` asks the
+ * same question again under a lock, and that is the one that counts.
  */
 export async function mayRegister(email: string): Promise<boolean> {
-  if (env.openRegistration) return true;
-
-  const [users, invitation] = await Promise.all([
-    prisma.user.count(),
-    prisma.invitation.findFirst({
-      where: { email, acceptedAt: null, expiresAt: { gt: new Date() } },
-      select: { id: true },
-    }),
-  ]);
-
-  return users === 0 || invitation !== null;
+  return (await admission(prisma, email)) !== null;
 }
+
+/**
+ * Why an address is let in: as the first account, which makes it the
+ * installation's owner, or as anybody else. Null when it is not let in at all.
+ *
+ * Takes the client so `registerUser` can ask inside its transaction.
+ */
+async function admission(
+  db: Prisma.TransactionClient,
+  email: string,
+): Promise<'first' | 'admitted' | null> {
+  if ((await db.user.count()) === 0) return 'first';
+  if (env.openRegistration) return 'admitted';
+
+  const invitation = await db.invitation.findFirst({
+    where: { email, acceptedAt: null, expiresAt: { gt: new Date() } },
+    select: { id: true },
+  });
+  return invitation ? 'admitted' : null;
+}
+
+/**
+ * Names the advisory lock sign-ups queue on. Any constant would do; nothing
+ * else in the app takes one.
+ */
+const REGISTRATION_LOCK = 7_211_700_101;
 
 /** A unique-constraint violation on the workspace slug, and nothing else. */
 function isSlugTaken(error: unknown): boolean {
@@ -170,20 +195,43 @@ export async function registerUser(input: {
 }): Promise<{ userId: string; token: string }> {
   const email = input.email.trim().toLowerCase();
 
+  // Turn a closed door away before the slow hash, so refusals stay cheap. Not
+  // the decision — that is taken again under the lock below.
   if (!(await mayRegister(email))) throw errors.registrationClosed();
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    throw new AuthError('An account with that email already exists.');
-  }
+  // Slow on purpose, so done before taking the lock rather than while holding it.
+  const passwordHash = hashPassword(input.password);
 
-  const user = await prisma.user.create({
-    data: {
-      email,
-      name: input.name.trim(),
-      passwordHash: hashPassword(input.password),
-      locale: input.locale ?? Locale.en,
-    },
+  // "Is anybody here yet?" and "then this one owns the installation" are two
+  // steps. Two sign-ups arriving together on a fresh installation both found
+  // nobody and both became its owner — or, with the door otherwise shut, a
+  // stranger racing the operator got in. The lock makes each sign-up wait its
+  // turn, so the count each one reads is the count it acts on.
+  const user = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${REGISTRATION_LOCK}::bigint)`;
+
+    const admitted = await admission(tx, email);
+    if (!admitted) throw errors.registrationClosed();
+
+    // Under the lock this check is the answer, not advice: a second sign-up
+    // for the same address waits here until the first has committed.
+    const existing = await tx.user.findUnique({ where: { email } });
+    if (existing) {
+      throw errors.emailTaken();
+    }
+
+    return tx.user.create({
+      data: {
+        email,
+        name: input.name.trim(),
+        passwordHash,
+        locale: input.locale ?? Locale.en,
+        // Only ever the first. Everybody after, invited or not, still gets a
+        // workspace of their own to own below — which is exactly why owning a
+        // workspace can never be what admits someone to instance settings.
+        isInstanceOwner: admitted === 'first',
+      },
+    });
   });
 
   if (!input.skipWorkspace) {
@@ -201,17 +249,28 @@ export async function registerUser(input: {
   return { userId: user.id, token: await createSession(user.id) };
 }
 
+let dummy: string | null = null;
+
+/** A real hash of nothing in particular, made on first use and then kept. */
+function dummyHash(): string {
+  dummy ??= hashPassword(randomToken(16));
+  return dummy;
+}
+
 export async function authenticate(email: string, password: string): Promise<string> {
   const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
 
   // Hash regardless of whether the user exists, so response timing does not
-  // reveal which email addresses are registered.
+  // reveal which email addresses are registered. Against a stored hash made
+  // once, not one made here: hashing a placeholder and then verifying against
+  // it cost two scrypt runs for an unknown address and one for a known one,
+  // which told anybody with a stopwatch exactly which addresses had accounts.
   const valid = user
     ? verifyPassword(password, user.passwordHash)
-    : verifyPassword(password, hashPassword('placeholder'));
+    : verifyPassword(password, dummyHash());
 
   if (!user || !valid) {
-    throw new AuthError('Incorrect email or password.');
+    throw errors.invalidCredentials();
   }
   return createSession(user.id);
 }
@@ -248,6 +307,15 @@ export async function destroySession(): Promise<void> {
   }
   store.delete(SESSION_COOKIE);
   store.delete(WORKSPACE_COOKIE);
+}
+
+/**
+ * The stored hash of this request's session token, or null when there is none.
+ * For telling "this browser" apart from the others when signing them out.
+ */
+export async function currentSessionTokenHash(): Promise<string | null> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  return token ? hashToken(token) : null;
 }
 
 /** Remember the active workspace across requests. */
@@ -302,6 +370,9 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
   const { user } = session;
   if (user.memberships.length === 0) return null;
 
+  // Dates on every screen this request renders are written in this language.
+  setDateLocale(user.locale);
+
   const cookieWorkspaceId = store.get(WORKSPACE_COOKIE)?.value;
   const candidates = [requestedWorkspaceId, cookieWorkspaceId, user.lastActiveWorkspaceId];
 
@@ -324,6 +395,7 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
       defaultLocale: membership.workspace.defaultLocale,
     },
     role: membership.role,
+    isInstanceOwner: user.isInstanceOwner,
     workspaces: user.memberships.map((entry) => ({
       id: entry.workspace.id,
       name: entry.workspace.name,

@@ -52,17 +52,27 @@ export const SIGNED_IN_SCREENS = [
   '/dashboard',
   '/compose',
   '/calendar',
+  '/queue',
   '/posts',
   '/approvals',
   '/connections',
   '/accounts',
   '/feeds',
   '/analytics',
+  // Each analytics view is its own server render with its own data, and one of
+  // them failed on every visit for as long as nothing here opened it.
+  '/analytics?view=compare',
+  '/analytics?view=overview',
+  '/analytics?view=posts',
+  '/analytics?view=interactions',
+  '/analytics?view=audience',
   '/reports',
+  '/ads',
   '/settings',
   '/settings/team',
   '/settings/config',
   '/settings/notifications',
+  '/settings/account',
   '/settings/media',
   '/settings/history',
   '/setup',
@@ -81,25 +91,29 @@ export const OWNER_STATE = 'e2e/.auth/owner.json';
 export const DESKTOP_WIDTHS = [1024, 1280, 1728];
 
 /**
- * Every link in the header's link row is on screen, with nothing scrolled out
- * of sight. The row scrolls rather than wrapping, and a Mac hides the
- * scrollbar, so a link past the edge simply looks absent — which is how
- * Reports and Settings went missing on a desktop.
+ * Every link in the header's navigation rows is on screen, with nothing
+ * scrolled out of sight. The rows scroll rather than wrapping, and a Mac hides
+ * the scrollbar, so a link past the edge simply looks absent — which is how
+ * Reports and Settings once went missing on a desktop.
  */
 export async function expectEveryNavLinkShown(page: Page): Promise<void> {
-  const nav = page.getByRole('banner').getByRole('navigation');
-  const { overflow, offscreen } = await nav.evaluate((element) => {
+  const rows = page.getByRole('banner').getByRole('navigation');
+  const problems = await rows.evaluateAll((elements) => {
     const viewport = document.documentElement.clientWidth;
-    const outside = [...element.querySelectorAll('a')]
-      .filter((link) => {
-        const box = link.getBoundingClientRect();
+    return elements
+      .filter((element) => element.getClientRects().length > 0)
+      .flatMap((element) => {
         const row = element.getBoundingClientRect();
-        return box.width === 0 || box.left < row.left - 1 || box.right > Math.min(row.right, viewport) + 1;
-      })
-      .map((link) => link.textContent?.trim() ?? '');
-    return { overflow: element.scrollWidth - element.clientWidth, offscreen: outside };
+        const hidden = [...element.querySelectorAll('a')]
+          .filter((link) => {
+            const box = link.getBoundingClientRect();
+            return box.width === 0 || box.left < row.left - 1 || box.right > Math.min(row.right, viewport) + 1;
+          })
+          .map((link) => `hidden: ${link.getAttribute('href')}`);
+        const overflow = element.scrollWidth - element.clientWidth;
+        return overflow > 1 ? [...hidden, `${element.getAttribute('aria-label')} scrolls by ${overflow}px`] : hidden;
+      });
   });
 
-  expect(offscreen, 'links hidden past the edge of the header').toEqual([]);
-  expect(overflow, 'the link row scrolls').toBeLessThanOrEqual(1);
+  expect(problems, 'links out of sight in the header').toEqual([]);
 }

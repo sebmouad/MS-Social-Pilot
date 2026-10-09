@@ -5,6 +5,7 @@ import { AppError, errors } from './errors';
 import { canApprove, canManageOthersPosts, canPublishWithoutApproval } from './constants';
 import { notifyApprovalDecision, notifyApprovalRequest } from './email/notify';
 import { logActivity } from './scheduler/runner';
+import type { NativeFallback } from './posts';
 
 /**
  * The approval workflow.
@@ -111,12 +112,69 @@ export async function submitForApproval(options: {
   void workspace;
 }
 
+/**
+ * Take a post back out of review, as a draft.
+ *
+ * For the author who spotted something after submitting: the alternative was
+ * cancelling it and writing it again. The post keeps its content and time, and
+ * approval returns to "not required" — a draft carries no review state, and
+ * scheduling it again goes through review exactly as a new one would.
+ */
+export async function withdrawFromReview(options: {
+  workspaceId: string;
+  postId: string;
+  userId: string;
+  role: WorkspaceRole;
+}): Promise<void> {
+  const post = await prisma.post.findFirst({
+    where: { id: options.postId, workspaceId: options.workspaceId },
+  });
+  if (!post) throw errors.postNotFound();
+
+  if (post.authorId !== options.userId && !canManageOthersPosts(options.role)) {
+    throw errors.noPermission();
+  }
+
+  // Conditional on still waiting, so a reviewer approving at the same moment
+  // wins cleanly rather than having their decision silently undone.
+  const { count } = await prisma.post.updateMany({
+    where: {
+      id: options.postId,
+      status: PostStatus.pending_approval,
+      approvalStatus: ApprovalStatus.pending,
+    },
+    data: {
+      status: PostStatus.draft,
+      approvalStatus: ApprovalStatus.not_required,
+      submittedById: null,
+      submittedAt: null,
+    },
+  });
+  if (count === 0) {
+    throw new AppError({
+      key: 'errors.notPending',
+      fallback: 'That post is not awaiting approval.',
+      status: 409,
+    });
+  }
+
+  await logActivity(options.workspaceId, 'post.withdrawn', { postId: options.postId }, options.userId);
+}
+
+export interface ApproveResult {
+  /**
+   * Set when the post was meant for Facebook to hold, but its time had
+   * drifted outside the window Facebook accepts, so our worker publishes it.
+   */
+  nativeFallback: NativeFallback | null;
+}
+
 export async function approvePost(options: {
   workspaceId: string;
   postId: string;
   reviewerId: string;
   reviewerRole: WorkspaceRole;
-}): Promise<void> {
+}): Promise<ApproveResult> {
   if (!canApprove(options.reviewerRole)) throw errors.noPermission();
 
   const post = await prisma.post.findFirst({
@@ -154,6 +212,19 @@ export async function approvePost(options: {
     },
   });
 
+  // A native post is one the author asked Facebook to hold. Only setting it
+  // `scheduled` left it to our worker, which is the one thing native was
+  // chosen to avoid — and the screen went on saying Facebook had it. Handed
+  // over now, the moment it is cleared, and never before: Facebook publishes
+  // whatever it is given, reviewed or not.
+  let nativeFallback: NativeFallback | null = null;
+  if (nextStatus === PostStatus.scheduled && post.publishMode === 'native' && post.scheduledAt) {
+    // Imported here rather than at the top: `posts` already imports this
+    // module for `initialApprovalStatus`.
+    const { handOffOrKeep } = await import('./posts');
+    nativeFallback = await handOffOrKeep(post.id, post.scheduledAt);
+  }
+
   if (post.submittedById) {
     await notifyApprovalDecision({
       workspaceId: options.workspaceId,
@@ -167,9 +238,11 @@ export async function approvePost(options: {
   await logActivity(
     options.workspaceId,
     'post.approved',
-    { postId: options.postId },
+    nativeFallback ? { postId: options.postId, nativeFallback } : { postId: options.postId },
     options.reviewerId,
   );
+
+  return { nativeFallback };
 }
 
 export async function rejectPost(options: {

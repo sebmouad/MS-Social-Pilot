@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
 
+import { connectPretendPage } from './fixtures';
 import {
   collectFailures,
   DESKTOP_WIDTHS,
   expectEveryNavLinkShown,
   open,
+  OWNER,
   SIGNED_IN_SCREENS,
 } from './helpers';
 
@@ -86,4 +88,49 @@ test('each screen names itself in the tab, with the client it belongs to', async
     expect(clash, `${path} and ${clash} share the title "${title}"`).toBeUndefined();
     seen.set(title, path);
   }
+});
+
+test('the report download covers the range on screen, not the one being typed', async ({ page }) => {
+  await open(page, '/reports?from=2026-08-01&to=2026-08-31');
+
+  const download = page.getByRole('link', { name: 'Download CSV' });
+  await expect(download).toHaveAttribute('href', /from=2026-08-01&to=2026-08-31/);
+
+  // Changed but not applied: the file must still be the report being shown.
+  await page.getByLabel('From').fill('2026-07-01');
+  await expect(download).toHaveAttribute('href', /from=2026-08-01&to=2026-08-31/);
+
+  const response = await page.request.get((await download.getAttribute('href'))!);
+  expect(response.status()).toBe(200);
+  // Named for the workspace's days, and for the whole range.
+  expect(response.headers()['content-disposition']).toContain('2026-08-01_2026-08-31.csv');
+});
+
+test('the export menu closes on Escape and on a click elsewhere', async ({ page }) => {
+  // The menu belongs to a Page's analytics, so there has to be a Page.
+  await connectPretendPage(OWNER.workspace);
+  await open(page, '/analytics');
+
+  const trigger = page.getByRole('button', { name: 'Export' });
+  await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+  // Retry until it reports itself open: the handler is attached at hydration,
+  // which on a development build can land after the first click.
+  await expect(async () => {
+    if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 1_500 });
+  }).toPass({ timeout: 30_000 });
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+  // Focus goes into the menu, so the arrow keys work straight away.
+  await expect(menu.getByRole('menuitem').first()).toBeFocused();
+
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(trigger).toBeFocused();
+
+  await trigger.click();
+  await expect(menu).toBeVisible();
+  await page.getByRole('heading', { level: 1 }).first().click();
+  await expect(menu).toBeHidden();
 });

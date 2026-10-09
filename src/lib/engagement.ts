@@ -1,11 +1,11 @@
-import { TargetType, type WorkspaceRole } from '@prisma/client';
+import { Prisma, TargetType, type WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
 import { env } from './env';
 import { canDeleteComments, canModerateComments } from './constants';
 import { decryptSecret } from './crypto';
 import { parseInsights, toJson, toJsonOrNull } from './json';
-import { asGraphError } from './facebook/graph';
+import { asGraphError, pageRatingsAvailable } from './facebook/graph';
 import { fetchInsights } from './facebook/analytics';
 import { logActivity } from './scheduler/runner';
 import { syncExternalPostInsights } from './analytics';
@@ -42,6 +42,22 @@ function tokenFor(target: {
 }): string | null {
   const encrypted = target.accessToken ?? target.socialAccount?.accessToken ?? null;
   return encrypted ? decryptSecret(encrypted) : null;
+}
+
+/**
+ * How many writes go to the database in one transaction.
+ *
+ * One transaction per chunk rather than per row saves a commit — and its
+ * fsync — for every row. Bounded rather than all-at-once so a Page with
+ * thousands of changed rows does not hold one transaction open for all of
+ * them.
+ */
+const WRITE_CHUNK = 100;
+
+function chunks<T>(items: T[], size = WRITE_CHUNK): T[][] {
+  const out: T[][] = [];
+  for (let index = 0; index < items.length; index += size) out.push(items.slice(index, index + size));
+  return out;
 }
 
 export interface EdgeSyncResult {
@@ -103,10 +119,31 @@ export async function syncCommentsFor(postTargetId: string): Promise<number> {
     since: newest ? new Date(newest.createdTime.getTime() - COMMENT_SYNC_OVERLAP_MS) : undefined,
   });
 
-  for (const comment of comments) {
-    await prisma.postComment.upsert({
-      where: { postTargetId_remoteId: { postTargetId, remoteId: comment.remoteId } },
-      create: {
+  if (comments.length === 0) return 0;
+
+  // Batched the way reviews are: one read to learn what is already held, one
+  // insert for what is new, and writes only for rows that actually changed.
+  // The day of overlap above means most of every sync is comments we already
+  // have, and a round trip each for those was the bulk of a sync's time.
+  const remoteIds = comments.map((comment) => comment.remoteId);
+  const existing = await prisma.postComment.findMany({
+    where: { postTargetId, remoteId: { in: remoteIds } },
+    select: {
+      remoteId: true,
+      message: true,
+      fromName: true,
+      fromId: true,
+      likeCount: true,
+      replyCount: true,
+      isHidden: true,
+    },
+  });
+  const before = new Map(existing.map((row) => [row.remoteId, row]));
+
+  const fresh = comments.filter((comment) => !before.has(comment.remoteId));
+  if (fresh.length > 0) {
+    await prisma.postComment.createMany({
+      data: fresh.map((comment) => ({
         postTargetId,
         remoteId: comment.remoteId,
         parentRemoteId: comment.parentRemoteId,
@@ -117,18 +154,52 @@ export async function syncCommentsFor(postTargetId: string): Promise<number> {
         replyCount: comment.replyCount,
         isHidden: comment.isHidden,
         createdTime: comment.createdTime,
-      },
-      // Counts and hidden state change after the fact; the text does not, but
-      // Facebook does allow editing, so it is refreshed too.
-      update: {
-        message: comment.message,
-        likeCount: comment.likeCount,
-        replyCount: comment.replyCount,
-        isHidden: comment.isHidden,
-        fetchedAt: new Date(),
-      },
+      })),
+      // Facebook can list a comment twice across two pages of one walk.
+      skipDuplicates: true,
     });
   }
+
+  // Counts and hidden state change after the fact; the text does not, but
+  // Facebook does allow editing, so it is refreshed too. The author is
+  // refreshed because a reply this app sent is stored before Facebook has
+  // said who it was from, and "answered" depends on knowing that. An author
+  // Facebook withholds does not erase one we already know.
+  const changed = comments.flatMap((comment) => {
+    const previous = before.get(comment.remoteId);
+    if (!previous) return [];
+
+    const next = {
+      message: comment.message,
+      fromName: comment.fromName ?? previous.fromName,
+      fromId: comment.fromId ?? previous.fromId,
+      likeCount: comment.likeCount,
+      replyCount: comment.replyCount,
+      isHidden: comment.isHidden,
+    };
+    const same = (Object.keys(next) as Array<keyof typeof next>).every(
+      (key) => next[key] === previous[key],
+    );
+    return same ? [] : [{ remoteId: comment.remoteId, data: next }];
+  });
+
+  for (const chunk of chunks(changed)) {
+    await prisma.$transaction(
+      chunk.map(({ remoteId, data }) =>
+        prisma.postComment.update({
+          where: { postTargetId_remoteId: { postTargetId, remoteId } },
+          data,
+        }),
+      ),
+    );
+  }
+
+  // Still moves for every comment seen, so it keeps meaning "when we last had
+  // this from Facebook" rather than "when it last changed".
+  await prisma.postComment.updateMany({
+    where: { postTargetId, remoteId: { in: remoteIds } },
+    data: { fetchedAt: new Date() },
+  });
 
   return comments.length;
 }
@@ -164,55 +235,121 @@ function rowCount(requested: number | undefined, fallback: number): number {
   return Math.trunc(requested);
 }
 
+export interface CommentFilter {
+  workspaceId: string;
+  targetId?: string;
+  hidden?: boolean;
+  search?: string;
+  /**
+   * Only top-level comments the Page has not replied to — the moderation
+   * to-do list. A comment the Page wrote itself is not waiting on anybody.
+   */
+  unanswered?: boolean;
+}
+
+/** `%` and `_` in somebody's search are the characters, not wildcards. */
+function likePattern(search: string): string {
+  return `%${search.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+}
+
 /**
- * The workspace's comment stream, newest first.
- *
- * Scoped through `post.workspaceId` rather than by comment: a comment has no
- * workspace of its own, and joining through the post is what keeps one client's
- * inbox out of another's.
- */
-/**
- * The filter every comment query shares.
+ * The FROM and WHERE every comment query shares.
  *
  * Written once so the count and the page cannot disagree: a count taken over
  * different criteria than the rows gives a pager that offers a page with
  * nothing on it.
+ *
+ * Scoped through the post's workspace rather than by comment: a comment has no
+ * workspace of its own, and joining through the post is what keeps one client's
+ * inbox out of another's.
+ *
+ * SQL rather than a Prisma filter because "answered" compares a reply's author
+ * with its Page's id — two columns on two tables — and Prisma's filters only
+ * compare a column with a value.
  */
-function commentWhere(options: {
-  workspaceId: string;
-  targetId?: string;
-  hidden?: boolean;
-  search?: string;
-}) {
-  return {
-    postTarget: {
-      post: { workspaceId: options.workspaceId },
-      ...(options.targetId ? { targetId: options.targetId } : {}),
-    },
-    ...(options.hidden === undefined ? {} : { isHidden: options.hidden }),
-    ...(options.search ? { message: { contains: options.search, mode: 'insensitive' as const } } : {}),
-  };
+function commentFrom(options: CommentFilter, join: { withParent?: boolean } = {}): Prisma.Sql {
+  const conditions: Prisma.Sql[] = [Prisma.sql`p."workspaceId" = ${options.workspaceId}`];
+
+  if (options.targetId) conditions.push(Prisma.sql`pt."targetId" = ${options.targetId}`);
+  if (options.hidden !== undefined) conditions.push(Prisma.sql`c."isHidden" = ${options.hidden}`);
+  if (options.search) {
+    conditions.push(Prisma.sql`c."message" ILIKE ${likePattern(options.search)} ESCAPE '\\'`);
+  }
+  if (options.unanswered) {
+    conditions.push(Prisma.sql`c."parentRemoteId" IS NULL`);
+    conditions.push(Prisma.sql`c."fromId" IS DISTINCT FROM t."providerId"`);
+    conditions.push(Prisma.sql`NOT EXISTS (
+      SELECT 1 FROM "post_comments" r
+      WHERE r."postTargetId" = c."postTargetId"
+        AND r."parentRemoteId" = c."remoteId"
+        AND r."fromId" = t."providerId"
+    )`);
+  }
+
+  return Prisma.sql`
+    FROM "post_comments" c
+    JOIN "post_targets" pt ON pt."id" = c."postTargetId"
+    JOIN "posts" p ON p."id" = pt."postId"
+    JOIN "targets" t ON t."id" = pt."targetId"
+    ${
+      // A reply's parent and grandparent, for ordering by thread: Facebook
+      // nests one level, but a reply sent to a reply from here is stored
+      // under that reply. At most one row matches each — (postTargetId,
+      // remoteId) is unique — so neither can change a count.
+      join.withParent
+        ? Prisma.sql`
+            LEFT JOIN "post_comments" parent
+              ON parent."postTargetId" = c."postTargetId" AND parent."remoteId" = c."parentRemoteId"
+            LEFT JOIN "post_comments" grand
+              ON grand."postTargetId" = c."postTargetId" AND grand."remoteId" = parent."parentRemoteId"`
+        : Prisma.empty
+    }
+    WHERE ${Prisma.join(conditions, ' AND ')}
+  `;
 }
 
-export async function countComments(options: {
-  workspaceId: string;
-  targetId?: string;
-  hidden?: boolean;
-  search?: string;
-}): Promise<number> {
-  return prisma.postComment.count({ where: commentWhere(options) });
+export async function countComments(options: CommentFilter): Promise<number> {
+  const [row] = await prisma.$queryRaw<Array<{ count: bigint }>>`
+    SELECT COUNT(*) AS "count" ${commentFrom(options)}
+  `;
+  return Number(row?.count ?? 0);
 }
 
-export async function readComments(options: {
-  workspaceId: string;
-  targetId?: string;
-  hidden?: boolean;
-  search?: string;
-  limit?: number;
-  skip?: number;
-}): Promise<CommentRow[]> {
+/**
+ * The workspace's comment stream, newest conversation first.
+ *
+ * Ordered by thread: each top-level comment is followed by its replies, oldest
+ * reply first, so an indented reply sits under the comment it answers rather
+ * than wherever its own timestamp puts it. Threads are ordered by when their
+ * top-level comment was written, so a late reply does not drag a week-old
+ * thread to the top of the list.
+ *
+ * The order is total — every key ends in a unique id — so paging it with
+ * skip and take visits every comment exactly once. A thread can still break
+ * across two pages; that is the price of pages of a fixed size, and the
+ * reply's indentation says where it belongs.
+ */
+export async function readComments(
+  options: CommentFilter & { limit?: number; skip?: number },
+): Promise<CommentRow[]> {
+  const skip = Math.max(0, Math.trunc(options.skip ?? 0)) || 0;
+
+  const ordered = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT c."id"
+    ${commentFrom(options, { withParent: true })}
+    ORDER BY
+      COALESCE(grand."createdTime", parent."createdTime", c."createdTime") DESC,
+      COALESCE(grand."id", parent."id", c."id") DESC,
+      (c."parentRemoteId" IS NOT NULL) ASC,
+      c."createdTime" ASC,
+      c."id" ASC
+    LIMIT ${rowCount(options.limit, 100)} OFFSET ${skip}
+  `;
+
+  if (ordered.length === 0) return [];
+
   const rows = await prisma.postComment.findMany({
-    where: commentWhere(options),
+    where: { id: { in: ordered.map((row) => row.id) } },
     include: {
       postTarget: {
         select: {
@@ -222,14 +359,14 @@ export async function readComments(options: {
         },
       },
     },
-    // `id` last: without a unique tiebreaker, comments sharing a timestamp can
-    // land on two pages while another lands on none.
-    orderBy: [{ createdTime: 'desc' }, { id: 'desc' }],
-    skip: options.skip ?? 0,
-    take: rowCount(options.limit, 100),
   });
+  const byId = new Map(rows.map((row) => [row.id, row]));
 
-  return rows.map((row) => ({
+  return ordered.flatMap(({ id }) => {
+    const row = byId.get(id);
+    // Deleted between the two reads; the next page load will agree.
+    return row ? [row] : [];
+  }).map((row) => ({
     id: row.id,
     remoteId: row.remoteId,
     message: row.message,
@@ -404,7 +541,9 @@ export async function replyToCommentAs(options: {
   const remoteId = await replyToComment(found.comment.remoteId, found.token, options.message);
 
   // Store our own reply immediately rather than waiting for the next sync, so
-  // the thread reads correctly the moment the request returns.
+  // the thread reads correctly the moment the request returns. Written as the
+  // Page, because it was: without an author the comment it answers would still
+  // count as unanswered until the next sync said otherwise.
   await prisma.postComment.upsert({
     where: {
       postTargetId_remoteId: { postTargetId: found.comment.postTargetId, remoteId },
@@ -414,6 +553,8 @@ export async function replyToCommentAs(options: {
       remoteId,
       parentRemoteId: found.comment.remoteId,
       message: options.message,
+      fromName: found.comment.postTarget.target.name,
+      fromId: found.comment.postTarget.target.providerId,
       createdTime: new Date(),
     },
     update: { message: options.message },
@@ -509,6 +650,10 @@ export async function syncTargetEdges(options: {
   });
 
   await attempt('reviews', async () => {
+    // Retired by Meta from v22.0: asking would only record the same error on
+    // every pass. What was stored before stays readable.
+    if (!pageRatingsAvailable(env.graphVersion)) return 0;
+
     /**
      * Store a batch in a handful of statements rather than one per review.
      *
@@ -618,31 +763,43 @@ export async function syncTargetEdges(options: {
     const conversations = await fetchConversations(target.providerId, token);
     const pending: Array<{ conversationId: string } & (typeof conversations)[number]['messages'][number]> = [];
 
-    for (const conversation of conversations) {
-      const stored = await prisma.conversation.upsert({
-        where: { targetId_remoteId: { targetId: target.id, remoteId: conversation.remoteId } },
-        create: {
-          targetId: target.id,
-          remoteId: conversation.remoteId,
-          snippet: conversation.snippet,
-          unreadCount: conversation.unreadCount,
-          messageCount: conversation.messageCount,
-          participants: toJsonOrNull(conversation.participants),
-          updatedTime: conversation.updatedTime,
-        },
-        update: {
-          snippet: conversation.snippet,
-          unreadCount: conversation.unreadCount,
-          messageCount: conversation.messageCount,
-          participants: toJsonOrNull(conversation.participants),
-          updatedTime: conversation.updatedTime,
-          fetchedAt: new Date(),
-        },
-      });
+    // The threads themselves in chunked transactions rather than a commit
+    // each. Upserts still, not an insert-and-diff like comments: a thread's
+    // snippet and counts move every time anybody writes in it, so nearly every
+    // row seen has changed and a diff would save nothing.
+    for (const chunk of chunks(conversations)) {
+      const stored = await prisma.$transaction(
+        chunk.map((conversation) =>
+          prisma.conversation.upsert({
+            where: { targetId_remoteId: { targetId: target.id, remoteId: conversation.remoteId } },
+            create: {
+              targetId: target.id,
+              remoteId: conversation.remoteId,
+              snippet: conversation.snippet,
+              unreadCount: conversation.unreadCount,
+              messageCount: conversation.messageCount,
+              participants: toJsonOrNull(conversation.participants),
+              updatedTime: conversation.updatedTime,
+            },
+            update: {
+              snippet: conversation.snippet,
+              unreadCount: conversation.unreadCount,
+              messageCount: conversation.messageCount,
+              participants: toJsonOrNull(conversation.participants),
+              updatedTime: conversation.updatedTime,
+              fetchedAt: new Date(),
+            },
+            select: { id: true },
+          }),
+        ),
+      );
 
-      for (const message of conversation.messages) {
-        pending.push({ conversationId: stored.id, ...message });
-      }
+      // An array transaction answers in the order it was asked.
+      chunk.forEach((conversation, index) => {
+        for (const message of conversation.messages) {
+          pending.push({ conversationId: stored[index]!.id, ...message });
+        }
+      });
     }
 
     // One insert for every message in every thread, rather than one round trip
@@ -678,18 +835,28 @@ export async function syncTargetEdges(options: {
 
     const external = posts.filter((post) => !ours.has(post.remoteId));
 
-    for (const post of external) {
-      const stored = await prisma.externalPost.upsert({
-        where: { targetId_remoteId: { targetId: target.id, remoteId: post.remoteId } },
-        create: { targetId: target.id, ...post },
-        update: { message: post.message, permalink: post.permalink, fetchedAt: new Date() },
-      });
-
-      // The same catalogue we read for our own posts. Without it this list can
-      // say a colleague posted from the Facebook app but not whether anyone
-      // saw it, and the Page-level totals stay wrong.
-      await syncExternalPostInsights(stored.id);
+    // Stored in chunked transactions first, so the rows are all there even if
+    // the insights reads below are slow or fail part way.
+    const stored: Array<{ id: string }> = [];
+    for (const chunk of chunks(external)) {
+      stored.push(
+        ...(await prisma.$transaction(
+          chunk.map((post) =>
+            prisma.externalPost.upsert({
+              where: { targetId_remoteId: { targetId: target.id, remoteId: post.remoteId } },
+              create: { targetId: target.id, ...post },
+              update: { message: post.message, permalink: post.permalink, fetchedAt: new Date() },
+              select: { id: true },
+            }),
+          ),
+        )),
+      );
     }
+
+    // The same catalogue we read for our own posts. Without it this list can
+    // say a colleague posted from the Facebook app but not whether anyone saw
+    // it, and the Page-level totals stay wrong.
+    for (const row of stored) await syncExternalPostInsights(row.id);
 
     return external.length;
   });
@@ -892,23 +1059,41 @@ export interface ConversationRow {
 /** How many messages back to look; enough for the reply state, more than the screen shows. */
 const CONVERSATION_MESSAGES = 25;
 
+/** Shared by the count and the page, for the same reason as `commentFrom`. */
+function conversationWhere(options: { workspaceId: string; targetId?: string }) {
+  return {
+    target: { workspaceId: options.workspaceId },
+    ...(options.targetId ? { targetId: options.targetId } : {}),
+  };
+}
+
+/** How many inbox threads there are, so the screen can page past the first fifty. */
+export async function countConversations(options: {
+  workspaceId: string;
+  targetId?: string;
+}): Promise<number> {
+  return prisma.conversation.count({ where: conversationWhere(options) });
+}
+
 export async function readConversations(options: {
   workspaceId: string;
   targetId?: string;
   limit?: number;
+  /** Threads to pass over, for the pages after the first. */
+  skip?: number;
   now?: Date;
 }): Promise<ConversationRow[]> {
   const rows = await prisma.conversation.findMany({
-    where: {
-      target: { workspaceId: options.workspaceId },
-      ...(options.targetId ? { targetId: options.targetId } : {}),
-    },
+    where: conversationWhere(options),
     include: {
       target: { select: { name: true, providerId: true } },
       messages: { orderBy: { createdTime: 'desc' }, take: CONVERSATION_MESSAGES },
     },
-    orderBy: { updatedTime: 'desc' },
-    take: options.limit ?? 50,
+    // `id` last, as for comments: threads sharing a timestamp would otherwise
+    // repeat or vanish across pages.
+    orderBy: [{ updatedTime: 'desc' }, { id: 'desc' }],
+    skip: Math.max(0, Math.trunc(options.skip ?? 0)) || 0,
+    take: rowCount(options.limit, 50),
   });
 
   const now = options.now ?? new Date();

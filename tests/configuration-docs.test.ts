@@ -34,11 +34,17 @@ const BOOTSTRAP_ONLY = new Set(['DATABASE_URL', 'ENCRYPTION_KEY', 'SESSION_SECRE
  * anything can be served — including the screen that would change it. Each is
  * asserted below to be read by something in the repository, so this list
  * cannot become a place to hide a name nothing uses.
+ *
+ * `TRUST_PROXY` is here for a different reason: it says how the machine is
+ * wired, and a setting anybody could flip from the screen would let them make
+ * the app believe forged client addresses.
  */
 const PROCESS_ONLY = new Map([
   ['PORT', 'scripts/start.mjs'],
   ['HOST', 'scripts/start.mjs'],
   ['APP_PORT', 'docker-compose.yml'],
+  ['POSTGRES_PASSWORD', 'docker-compose.yml'],
+  ['TRUST_PROXY', 'src/lib/client-ip.ts'],
 ]);
 
 const registryEnvNames = SETTING_DEFINITIONS.flatMap((definition) =>
@@ -80,7 +86,7 @@ describe('configuration documentation', () => {
     // PORT in a comment, and prose describing a variable is exactly what must
     // not count as reading it.
     const unread = [...PROCESS_ONLY].filter(([name, file]) => {
-      const reading = new RegExp(`(['"]${name}['"]|\\$\\{${name}[:}])`);
+      const reading = new RegExp(`(['"]${name}['"]|\\$\\{${name}[:}]|process\\.env\\.${name}\\b)`);
       return !reading.test(readFileSync(file, 'utf8'));
     });
     expect(unread.map(([name]) => name)).toEqual([]);

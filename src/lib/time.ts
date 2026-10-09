@@ -1,5 +1,7 @@
+import { cache } from 'react';
 import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { addDays, startOfDay } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 /**
  * Timezone handling.
@@ -104,8 +106,45 @@ export function utcToLocalInput(date: Date, timeZone: string): string {
   return formatInTimeZone(date, timeZone, "yyyy-MM-dd'T'HH:mm");
 }
 
-export function formatInZone(date: Date, timeZone: string, pattern = 'd MMM yyyy, HH:mm'): string {
-  return formatInTimeZone(date, timeZone, pattern);
+/**
+ * The language dates are written in for the request being rendered.
+ *
+ * Every signed-in screen resolves the user once per request (`getAuthContext`,
+ * itself cached per request), and that is where this is set. React's `cache`
+ * makes the slot per request on the server; outside a request — the worker,
+ * tests, email — it is a fresh empty object each time, so dates there come out
+ * exactly as they always have.
+ *
+ * Without this, a French interface wrote every date in English: "29 Aug",
+ * "Tuesday", and 24 other screens' worth.
+ */
+const requestLocale = cache((): { value?: string } => ({}));
+
+export function setDateLocale(locale: string): void {
+  requestLocale().value = locale;
+}
+
+/**
+ * The language to write numbers in, for a server component: "5 033" for a
+ * French reader rather than "5,033". A client component uses `useLocale()`
+ * instead — this slot does not exist in the browser, and a number written
+ * one way on the server and another in the browser is a hydration mismatch.
+ */
+export function appLocale(): string {
+  return requestLocale().value ?? 'en-US';
+}
+
+/** date-fns's own locales; English is its default, so it needs no entry. */
+const DATE_LOCALES: Record<string, typeof fr> = { fr };
+
+export function formatInZone(
+  date: Date,
+  timeZone: string,
+  pattern = 'd MMM yyyy, HH:mm',
+  locale: string | undefined = requestLocale().value,
+): string {
+  const dateLocale = locale ? DATE_LOCALES[locale] : undefined;
+  return formatInTimeZone(date, timeZone, pattern, dateLocale ? { locale: dateLocale } : undefined);
 }
 
 /** Short UTC-offset label for the UI, e.g. "GMT+02:00". */
@@ -227,7 +266,11 @@ export function monthGrid(year: number, month: number, timeZone: string): Date[]
   });
 }
 
-export function relativeTime(date: Date, now: Date = new Date()): string {
+export function relativeTime(
+  date: Date,
+  now: Date = new Date(),
+  locale: string = requestLocale().value ?? 'en',
+): string {
   const deltaSeconds = Math.round((date.getTime() - now.getTime()) / 1000);
   const absolute = Math.abs(deltaSeconds);
 
@@ -241,7 +284,7 @@ export function relativeTime(date: Date, now: Date = new Date()): string {
     ['year', Number.POSITIVE_INFINITY],
   ];
 
-  const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
   let value = deltaSeconds;
   let magnitude = absolute;
 

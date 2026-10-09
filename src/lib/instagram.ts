@@ -12,7 +12,7 @@ import {
   fetchInstagramProfile,
   findInstagramAccount,
 } from './facebook/instagram';
-import { IG_ACCOUNT_METRICS, IG_MEDIA_METRICS, findMetric } from './facebook/metrics';
+import { IG_ACCOUNT_METRICS, IG_MEDIA_METRICS, findMetric, isServed } from './facebook/metrics';
 import { logActivity } from './scheduler/runner';
 
 /**
@@ -260,15 +260,18 @@ export async function syncInstagramAccount(options: {
       },
     });
 
+    // Only what Meta still serves: a retired name is an error that costs the
+    // whole request, not an empty column.
     const plain = IG_ACCOUNT_METRICS.filter(
       (metric) =>
+        isServed(metric) &&
         metric.periods.includes('day') &&
         !IG_TOTAL_VALUE_METRICS.has(metric.name) &&
         !IG_DEMOGRAPHIC_BREAKDOWNS[metric.name],
     ).map((metric) => metric.name);
 
     const totalValue = IG_ACCOUNT_METRICS.filter(
-      (metric) => IG_TOTAL_VALUE_METRICS.has(metric.name) && metric.periods.includes('day'),
+      (metric) => isServed(metric) && IG_TOTAL_VALUE_METRICS.has(metric.name) && metric.periods.includes('day'),
     ).map((metric) => metric.name);
 
     let stored = 0;
@@ -337,7 +340,7 @@ async function syncInstagramMedia(
   const account = await prisma.instagramAccount.findUniqueOrThrow({ where: { id: accountId } });
   const items = await fetchInstagramMedia(account.igUserId, token, { since });
 
-  const mediaMetrics = IG_MEDIA_METRICS.map((metric) => metric.name);
+  const mediaMetrics = IG_MEDIA_METRICS.filter((metric) => isServed(metric)).map((metric) => metric.name);
 
   for (const item of items) {
     const insights = await fetchInsights({

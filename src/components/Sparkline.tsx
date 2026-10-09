@@ -1,3 +1,5 @@
+import { useLocale, useTranslations } from 'next-intl';
+
 import { VIZ, seriesColor } from '@/lib/viz';
 
 /**
@@ -22,6 +24,9 @@ export function Sparkline({
   width?: number;
   height?: number;
 }) {
+  const t = useTranslations('analytics');
+  const locale = useLocale();
+
   if (values.length < 2) {
     return <div style={{ width, height }} aria-hidden />;
   }
@@ -55,7 +60,10 @@ export function Sparkline({
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label={`Trend from ${values[0]} to ${values[values.length - 1]}`}
+      aria-label={t('trendFromTo', {
+        from: values[0]!.toLocaleString(locale),
+        to: values[values.length - 1]!.toLocaleString(locale),
+      })}
     >
       <path
         d={path}

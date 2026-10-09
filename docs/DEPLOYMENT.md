@@ -41,6 +41,12 @@ Everything here assumes the Meta app already exists. If it does not, start with
       stored Facebook token is unreadable — see [Key rotation](#key-rotation)
 - [ ] `APP_URL` uses https and matches the Meta app's OAuth redirect URI
       **exactly**, trailing slash and all
+- [ ] Behind Cloudflare, a tunnel or a reverse proxy: `TRUST_PROXY="true"` in
+      `.env` — Docker included, it is read from there — and the proxy is the
+      only way in. Unset, every visitor looks like the proxy
+      ([why](#behind-a-reverse-proxy))
+- [ ] Docker: `POSTGRES_PASSWORD` set (`npm run setup` does it), and the
+      Postgres port mapping removed ([Docker](#docker))
 
 **The things that publish**
 
@@ -48,8 +54,19 @@ Everything here assumes the Meta app already exists. If it does not, start with
 - [ ] The scheduler runs — either `npm run worker` or a cron hitting
       `/api/cron/tick`. Without it, nothing scheduled is ever published
 - [ ] "Require app secret proof" enabled in the Meta app
-- [ ] Deauthorize and data-deletion callback URLs set, and reachable from
-      outside your network
+- [ ] Every value in the **Meta app settings** panel (on Setup, and on
+      Connections for an admin) entered in the Meta app: app domain, site URL,
+      OAuth redirect URI, deauthorize and data-deletion callbacks. The panel
+      builds them from `APP_URL` and warns if it is not https or is localhost
+- [ ] Deauthorize and data-deletion callback URLs reachable from outside your
+      network — Meta calls them from its own servers
+- [ ] The Meta app's API version at least the one the app pins
+      (`FACEBOOK_GRAPH_VERSION`, **v25.0** by default, supported until
+      29 July 2028). An old `.env` pinning `v21.0` stops working on
+      21 January 2027 — see
+      [what Meta has retired](META_APP_SETUP.md#what-meta-has-retired)
+- [ ] A Privacy Policy URL in the Meta app (Settings → Basic) — required
+      before the app can go Live, and not something this app publishes for you
 - [ ] If you publish to Instagram: `APP_URL` reachable from the public
       internet, because Facebook fetches your media itself
       ([why](#instagram-needs-app_url-to-be-publicly-reachable))
@@ -67,7 +84,8 @@ Everything here assumes the Meta app already exists. If it does not, start with
 
 - [ ] Backups cover the database **and** `MEDIA_DIR` — they are two halves of
       one thing
-- [ ] A monitor on `GET /api/health`, which round-trips to Postgres
+- [ ] A monitor on `GET /api/health`, which round-trips to Postgres and
+      reports whether the worker is alive ([details](#health-checks))
 
 The app's **Setup** screen checks several of these for you on a fresh
 installation, and **Connections** shows, per account, which permissions were
@@ -248,6 +266,7 @@ Cloudflare answers 443 with its own certificate, and forwards to this server.
 ```
 APP_URL="https://your.domain"
 PORT="80"
+TRUST_PROXY="true"
 ```
 
 **Set the SSL/TLS mode to Full, not Flexible.** Flexible makes the hop from
@@ -294,6 +313,16 @@ and deriving the flag from the request would quietly drop `secure` on every
 session cookie in exactly that deployment. The Docker image sets `NODE_ENV`, and
 `next start` sets it too.
 
+**`TRUST_PROXY` must be set for any forwarding header to be read.** Unset (the
+default), `cf-connecting-ip`, `x-forwarded-for` and `x-real-ip` are all
+ignored: anyone who can reach the app directly can write them, and believing
+them let one machine claim a fresh address for every sign-in attempt. Set
+`TRUST_PROXY="true"` behind Cloudflare, a tunnel or a reverse proxy — and then
+make sure the proxy is the *only* way in (`HOST=127.0.0.1`, or a firewall that
+admits only the proxy), or the headers are no more trustworthy than before.
+Without it the sign-in limit keys on the email address alone, and short-link
+clicks are counted without an address.
+
 **`X-Forwarded-For` is read in two places**, and it is worth knowing what each
 one does with it:
 
@@ -319,15 +348,28 @@ or what you may do is derived from a header.
 
 ## Health checks
 
-`GET /api/health` is unauthenticated and returns `{"status":"ok"}` with a 200,
-or 503 when the database cannot be reached. Point a load balancer, an uptime
-monitor or a container probe at it.
+`GET /api/health` is unauthenticated and returns a 200, or a 503 with
+`{"status":"unavailable"}` when the database cannot be reached. Point a load
+balancer, an uptime monitor or a container probe at it.
+
+```json
+{ "status": "ok", "worker": { "status": "ok", "lastBeatSeconds": 12 } }
+```
 
 It round-trips to Postgres deliberately. A container that has booted but cannot
 reach the database serves errors on every page, and a check that only proves the
-process is alive would call that healthy. It deliberately returns nothing else —
-no version, no hostname, no error text — because everything that can reach the
-port can read it.
+process is alive would call that healthy.
+
+`worker` reports the newest heartbeat from any scheduler worker: `ok` when one
+wrote within the last two minutes, `stale` when the newest is older, `missing`
+when none ever has, and `unknown` when the table cannot be read yet (a first
+boot before migrations finish). **It never changes the status code.** The code
+answers "is this web process healthy", which a stopped worker does not change —
+and Docker restarting `web` would not fix it. To be alerted when publishing
+stops, have your monitor check `worker.status == "ok"` in the body.
+
+It deliberately returns nothing else — no version, no hostname, no worker id, no
+error text — because everything that can reach the port can read it.
 
 ---
 
@@ -394,7 +436,23 @@ any in-flight OAuth state.
 `Dockerfile` and `docker-compose.yml` are in the repository root:
 
 ```bash
+npm run setup          # writes .env, including POSTGRES_PASSWORD
 docker compose up --build
+```
+
+`POSTGRES_PASSWORD` is **required**: Compose refuses to start without it rather
+than falling back to a well-known password. `npm run setup` generates one (hex,
+so it is safe inside a connection string); by hand, `openssl rand -hex 24`. The
+`web` and `worker` containers build their own `DATABASE_URL` from it, so the
+`DATABASE_URL` in `.env` only matters to things run on the host.
+
+Postgres applies the password only when its volume is **first created**. On a
+stack that was started before this was required, the database still has the
+old `postgres` password: either set `POSTGRES_PASSWORD=postgres` to keep it, or
+change it in place and then set the new value —
+
+```bash
+docker compose exec postgres psql -U postgres -c "ALTER USER postgres PASSWORD 'new-value'"
 ```
 
 Three services from one image — `web`, `worker`, `postgres` — with named
@@ -408,5 +466,32 @@ only for the container left the worker polling tables that did not exist yet,
 crashing and restarting until the migration landed. It recovered on its own, but
 every first boot spent a minute producing alarming logs.
 
-For production, drop the `5432` port mapping on `postgres` (it is exposed only
-for local `psql` and Prisma Studio) and put a TLS terminator in front of `web`.
+Postgres is published on **`127.0.0.1` only** (`POSTGRES_HOST_PORT`, 5432 by
+default), for `psql`, Prisma Studio and `npm run dev` on the same machine. It is
+never bound to every interface: a database on `0.0.0.0` is reachable by
+anything that can reach the host. For production, delete the mapping entirely —
+`web` and `worker` reach Postgres over the compose network — and put a TLS
+terminator in front of `web`.
+
+**Behind a proxy, set `TRUST_PROXY="true"` in `.env`.** The compose file does
+not set it, because it publishes `web` on every interface and anyone reaching
+that port directly could forge the forwarding headers. When the proxy is on the
+same host, also change the `web` mapping to `'127.0.0.1:${APP_PORT:-80}:3000'`
+so the proxy really is the only way in. See
+[Behind a reverse proxy](#behind-a-reverse-proxy).
+
+The image carries its own `HEALTHCHECK` against `/api/health`, so a plain
+`docker run` or another orchestrator gets the same probe Compose runs. The
+`worker` service disables it, because no web server listens in that container.
+
+**The build context is filtered by `.dockerignore`.** `.env`, uploaded media,
+`node_modules`, `.next`, the test output and the git history never reach the
+build, and so never land in an image layer. If you add a file the build needs
+at a new top-level path, check it is not excluded there.
+
+**A production container refuses to start with a bad `SESSION_SECRET`.** At
+server start (`src/instrumentation.ts`) the app checks that `DATABASE_URL`,
+`ENCRYPTION_KEY` and `SESSION_SECRET` are set and that the session secret is
+at least 32 characters, and exits with a message naming the variable. Before,
+the same mistake surfaced as a 500 on the first page somebody opened. In
+development the same check only warns.

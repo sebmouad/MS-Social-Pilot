@@ -1,5 +1,8 @@
-import { TargetType } from '@prisma/client';
+import { Prisma, TargetType, WorkspaceRole } from '@prisma/client';
 
+import { atLeast } from './constants';
+import { AppError } from './errors';
+import { hit } from './rate-limit';
 import { prisma } from './prisma';
 import { decryptSecret } from './crypto';
 import { parseInsights, toJson } from './json';
@@ -15,6 +18,7 @@ import {
   CATEGORY_LABELS,
   catalogueSize,
   findMetric,
+  isServed,
   type MetricLevel,
   type MetricPeriod,
 } from './facebook/metrics';
@@ -161,31 +165,35 @@ export async function syncTargetAnalytics(options: {
       unavailable.push(...result.unavailable);
 
       // Record availability so the UI can distinguish "Meta refused this" from
-      // "this Page had no activity".
-      for (const entry of result.unavailable) {
-        await prisma.metricAvailability.upsert({
-          where: {
-            targetId_metric_period: { targetId: target.id, metric: entry.name, period },
-          },
-          create: {
-            targetId: target.id,
-            metric: entry.name,
-            period,
-            available: false,
-            reason: entry.reason,
-          },
-          update: { available: false, reason: entry.reason, checkedAt: new Date() },
-        });
-      }
-      for (const entry of result.series) {
-        await prisma.metricAvailability.upsert({
-          where: {
-            targetId_metric_period: { targetId: target.id, metric: entry.name, period },
-          },
-          create: { targetId: target.id, metric: entry.name, period, available: true },
-          update: { available: true, reason: null, checkedAt: new Date() },
-        });
-      }
+      // "this Page had no activity". One transaction rather than one round trip
+      // per metric: a full catalogue is well over a hundred names a period.
+      const checkedAt = new Date();
+      await prisma.$transaction([
+        ...result.unavailable.map((entry) =>
+          prisma.metricAvailability.upsert({
+            where: {
+              targetId_metric_period: { targetId: target.id, metric: entry.name, period },
+            },
+            create: {
+              targetId: target.id,
+              metric: entry.name,
+              period,
+              available: false,
+              reason: entry.reason,
+            },
+            update: { available: false, reason: entry.reason, checkedAt },
+          }),
+        ),
+        ...result.series.map((entry) =>
+          prisma.metricAvailability.upsert({
+            where: {
+              targetId_metric_period: { targetId: target.id, metric: entry.name, period },
+            },
+            create: { targetId: target.id, metric: entry.name, period, available: true },
+            update: { available: true, reason: null, checkedAt },
+          }),
+        ),
+      ]);
     }
 
     return { ...base, stored, metrics, unavailable };
@@ -242,6 +250,15 @@ export interface StoredSeries {
   /** Change against the first half of the window, as a percentage. */
   trend: number | null;
 }
+
+/**
+ * Metrics that report a standing total rather than a day's activity.
+ *
+ * Adding up a month of "followers today" does not give anything; it gave a
+ * figure thirty times the audience, labelled as new followers. For these the
+ * headline is the latest value.
+ */
+const STOCK_METRICS = new Set(['page_follows', 'page_fans', 'page_fans_online_per_day']);
 
 function humanise(metric: string): string {
   return metric
@@ -316,7 +333,11 @@ export async function readStoredAnalytics(options: {
       categoryLabel: CATEGORY_LABELS[definition?.category ?? 'engagement'],
       breakdown: isBreakdown,
       points,
-      total: isBreakdown ? null : numeric.reduce((sum, value) => sum + value, 0),
+      total: isBreakdown
+        ? null
+        : STOCK_METRICS.has(metricName)
+          ? (numeric[numeric.length - 1] ?? null)
+          : numeric.reduce((sum, value) => sum + value, 0),
       latest: points.length > 0 ? points[points.length - 1]!.value : null,
       trend: isBreakdown ? null : trendOf(numeric),
     });
@@ -375,7 +396,12 @@ export async function readCoverage(targetId: string): Promise<CoverageRow[]> {
   const levels: MetricLevel[] = ['page', 'post', 'video', 'ig_account', 'ig_media'];
 
   return levels.map((level) => {
-    const forLevel = rows.filter((row) => findMetric(row.metric)?.level === level);
+    // Against the served catalogue only, so an old answer about a metric Meta
+    // has since retired cannot push "checked" past the size of the catalogue.
+    const forLevel = rows.filter((row) => {
+      const definition = findMetric(row.metric, level);
+      return definition !== undefined && isServed(definition);
+    });
     return {
       level,
       catalogue: sizes[level],
@@ -595,13 +621,11 @@ function buildPostInsights(
   }
 
   return {
-    // Views and viewers replaced impressions and reach on every Graph version
-    // (November 2025 and June 2026). The old names still answer on Pages that
-    // were synced before then, so they remain the fallback.
+    // Views and viewers first: Meta retired post impressions in November 2025
+    // and post reach when v26.0 shipped in July 2026, on every API version.
+    // The older names are still read, for a Page synced before either date.
     impressions: numberOf(series, 'post_media_view') ?? numberOf(series, 'post_impressions'),
-    reach:
-      numberOf(series, 'post_total_media_view_unique') ??
-      numberOf(series, 'post_impressions_unique'),
+    reach: numberOf(series, 'post_total_media_view_unique') ?? numberOf(series, 'post_impressions_unique'),
     engagedUsers: numberOf(series, 'post_engaged_users'),
     reactions: engagement?.reactions ?? null,
     comments: engagement?.comments ?? null,
@@ -903,9 +927,15 @@ export async function readPostAnalytics(options: {
       paid: value('impressionsPaid'),
       reactionsByType: insights?.reactionsByType ?? {},
       clicksByType: insights?.clicksByType ?? {},
-      // Rate against reach, not impressions: the same person seeing a post
-      // three times is one opportunity to engage, not three.
-      engagementRate: reach > 0 ? Math.round((engaged / reach) * 1000) / 10 : null,
+      // Reactions, comments and shares per hundred people reached — the same
+      // definition as the page analysis. It was engaged users over reach, and
+      // Meta retired `post_engaged_users`, so every post read 0% or nothing.
+      // Against reach, not impressions: the same person seeing a post three
+      // times is one opportunity to engage, not three.
+      engagementRate:
+        reach > 0
+          ? Math.round(((value('reactions') + value('comments') + value('shares')) / reach) * 1000) / 10
+          : null,
       syncedAt: row.insightsSyncedAt,
     };
   });
@@ -931,8 +961,39 @@ export async function readInteractions(options: {
   to: Date;
   targetId?: string;
 }): Promise<InteractionSummary> {
-  const posts = await readPostAnalytics({ ...options, limit: 1000 });
+  const ours = await readPostAnalytics({ ...options, limit: 1000 });
   const { mergeBreakdowns } = await import('./facebook/insights');
+
+  // Posts made on the Page in Facebook itself count too. Reading only what
+  // went out through this app showed zero on every figure for a Page run from
+  // the Facebook app, which is most of them.
+  const found = await prisma.externalPost.findMany({
+    where: {
+      target: { workspaceId: options.workspaceId },
+      ...(options.targetId ? { targetId: options.targetId } : {}),
+      createdTime: { gte: options.from, lte: options.to },
+    },
+    select: { insights: true },
+    take: 2000,
+  });
+
+  const numberIn = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+  const posts = [
+    ...ours,
+    ...found.map((row) => {
+      const insights = parseInsights(row.insights);
+      return {
+        reactions: numberIn(insights?.reactions),
+        comments: numberIn(insights?.comments),
+        shares: numberIn(insights?.shares),
+        clicks: numberIn(insights?.clicks),
+        negativeFeedback: numberIn(insights?.negativeFeedback),
+        engagedUsers: numberIn(insights?.engagedUsers),
+        reactionsByType: insights?.reactionsByType ?? {},
+        clicksByType: insights?.clicksByType ?? {},
+      };
+    }),
+  ];
 
   return {
     reactionsByType: mergeBreakdowns(posts.map((post) => post.reactionsByType)),
@@ -977,52 +1038,65 @@ export async function readAudience(options: {
 }): Promise<AudienceSummary> {
   const target = await prisma.target.findUniqueOrThrow({ where: { id: options.targetId } });
 
-  const latestOf = async (metric: string): Promise<Record<string, number>> => {
-    const row = await prisma.pageInsight.findFirst({
-      where: { targetId: options.targetId, metric },
-      orderBy: { endTime: 'desc' },
-    });
-    const value = row?.value;
-    return value && typeof value === 'object' && !Array.isArray(value)
-      ? (value as Record<string, number>)
-      : {};
+  // Newest name first: Meta replaced the `page_fans_*` breakdowns with
+  // `page_follows_*` on 15 November 2025, and a Page synced since then holds
+  // only the new ones.
+  //
+  // Every candidate name's newest row in one query — DISTINCT ON walks the
+  // (targetId, metric, endTime) index — rather than a round trip per name.
+  const BREAKDOWNS = {
+    country: ['page_follows_country', 'page_fans_country'],
+    city: ['page_follows_city', 'page_fans_city'],
+    locale: ['page_follows_locale', 'page_fans_locale'],
+    genderAge: ['page_fans_gender_age'],
+  } as const;
+
+  const latestRows = prisma.$queryRaw<Array<{ metric: string; value: unknown }>>`
+    SELECT DISTINCT ON (metric) metric, value
+    FROM page_insights
+    WHERE "targetId" = ${options.targetId}
+      AND metric IN (${Prisma.join(Object.values(BREAKDOWNS).flat())})
+    ORDER BY metric, "endTime" DESC
+  `;
+
+  const latestOf = (
+    rows: Array<{ metric: string; value: unknown }>,
+    metrics: readonly string[],
+  ): Record<string, number> => {
+    for (const metric of metrics) {
+      const value = rows.find((row) => row.metric === metric)?.value;
+      if (value && typeof value === 'object' && !Array.isArray(value)) return value as Record<string, number>;
+    }
+    return {};
   };
 
-  const sumOf = async (metric: string): Promise<{ sum: number; rows: number }> => {
-    const result = await prisma.pageInsight.aggregate({
-      where: {
+  // The first of several names that has any daily figures stored. Meta
+  // withdrew `page_fan_adds` and `page_fan_removes` in favour of the follow
+  // metrics, so a Page connected since then holds only the newer names, and
+  // asking for the old ones alone read zero gained and zero lost for ever.
+  const sumOf = async (...metrics: string[]): Promise<number> => {
+    for (const metric of metrics) {
+      const where = {
         targetId: options.targetId,
         metric,
+        period: 'day',
         endTime: { gte: options.from, lte: options.to },
-      },
-      _sum: { numeric: true },
-      _count: { _all: true },
-    });
-    return { sum: Math.round(result._sum.numeric ?? 0), rows: result._count._all };
+      };
+      const result = await prisma.pageInsight.aggregate({ where, _sum: { numeric: true }, _count: true });
+      if (result._count > 0) return Math.round(result._sum.numeric ?? 0);
+    }
+    return 0;
   };
 
-  // Meta retired the Page-likes ("fans") metrics on every version in November
-  // 2025 in favour of follows. Rows stored before then are still worth
-  // showing, so each figure reads the follows metric and falls back to the
-  // fans one only when the follows metric has nothing.
-  const latestPreferring = async (current: string, retired: string) => {
-    const value = await latestOf(current);
-    return Object.keys(value).length > 0 ? value : latestOf(retired);
-  };
-  const sumPreferring = async (current: string, retired: string) => {
-    const value = await sumOf(current);
-    return value.rows > 0 ? value.sum : (await sumOf(retired)).sum;
-  };
-
-  const [byCountry, byCity, byLocale, byGenderAge, adds, removes] = await Promise.all([
-    latestPreferring('page_follows_country', 'page_fans_country'),
-    latestPreferring('page_follows_city', 'page_fans_city'),
-    // No follows equivalent exists for language or gender and age.
-    latestOf('page_fans_locale'),
-    latestOf('page_fans_gender_age'),
-    sumPreferring('page_daily_follows_unique', 'page_fan_adds'),
-    sumPreferring('page_daily_unfollows_unique', 'page_fan_removes'),
+  const [latest, adds, removes] = await Promise.all([
+    latestRows,
+    sumOf('page_daily_follows_unique', 'page_fan_adds_unique', 'page_fan_adds'),
+    sumOf('page_daily_unfollows_unique', 'page_fan_removes_unique', 'page_fan_removes'),
   ]);
+  const byCountry = latestOf(latest, BREAKDOWNS.country);
+  const byCity = latestOf(latest, BREAKDOWNS.city);
+  const byLocale = latestOf(latest, BREAKDOWNS.locale);
+  const byGenderAge = latestOf(latest, BREAKDOWNS.genderAge);
 
   return {
     fans: target.fanCount,
@@ -1036,6 +1110,26 @@ export async function readAudience(options: {
     removes,
     net: adds - removes,
   };
+}
+
+/**
+ * The dashboard's "Recently published": the last few posts that went out, or
+ * tried to.
+ *
+ * Failures are included on purpose — a post that did not go out is exactly
+ * what someone opening the dashboard needs to see. But Postgres sorts NULL
+ * first in a descending order, so a post that failed before anything was
+ * published (no `publishedAt`) used to head the list for ever, above
+ * everything that had actually gone out since. Those now come after, newest
+ * attempt first.
+ */
+export async function recentOutcomes(workspaceId: string, take = 5) {
+  return prisma.post.findMany({
+    where: { workspaceId, status: { in: ['published', 'partially_failed', 'failed'] } },
+    include: { targets: { include: { target: { select: { name: true } } } } },
+    orderBy: [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { updatedAt: 'desc' }],
+    take,
+  });
 }
 
 export interface PublishedTotals {
@@ -1065,8 +1159,20 @@ export interface PublishedTotals {
  * five hundred JSON documents. `->>` yields text, so each value is cast, and a
  * row whose insights have not been fetched yet contributes nothing rather than
  * poisoning the sum with a null.
+ *
+ * The cast is to numeric, behind a shape check, not straight to bigint: one
+ * stored "12.5" — or a breakdown object where a count was expected — made
+ * `::bigint` throw, and the whole dashboard with it. A value that is not a
+ * number now counts as nothing; the sum is rounded back to a whole figure.
  */
 export async function publishedTotals(workspaceId: string): Promise<PublishedTotals> {
+  // The key is one of four literals, never input, so it is inlined rather
+  // than bound as a parameter.
+  const insightNumber = (key: 'impressions' | 'reach' | 'reactions' | 'comments') => {
+    const text = Prisma.raw(`btrim(pt.insights->>'${key}')`);
+    return Prisma.sql`CASE WHEN ${text} ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN ${text}::numeric ELSE 0 END`;
+  };
+
   const [row] = await prisma.$queryRaw<
     Array<{
       impressions: bigint | null;
@@ -1077,10 +1183,10 @@ export async function publishedTotals(workspaceId: string): Promise<PublishedTot
     }>
   >`
     SELECT
-      SUM(COALESCE((pt.insights->>'impressions')::bigint, 0)) AS impressions,
-      SUM(COALESCE((pt.insights->>'reach')::bigint, 0))       AS reach,
-      SUM(COALESCE((pt.insights->>'reactions')::bigint, 0))   AS reactions,
-      SUM(COALESCE((pt.insights->>'comments')::bigint, 0))    AS comments,
+      ROUND(SUM(${insightNumber('impressions')}))::bigint AS impressions,
+      ROUND(SUM(${insightNumber('reach')}))::bigint       AS reach,
+      ROUND(SUM(${insightNumber('reactions')}))::bigint   AS reactions,
+      ROUND(SUM(${insightNumber('comments')}))::bigint    AS comments,
       COUNT(*)                                                 AS posts
     FROM post_targets pt
     JOIN posts p ON p.id = pt."postId"
@@ -1099,4 +1205,36 @@ export async function publishedTotals(workspaceId: string): Promise<PublishedTot
     comments: asNumber(row?.comments ?? null),
     posts: asNumber(row?.posts ?? null),
   };
+}
+
+/**
+ * Make the server walk the Graph catalogue: a sync, a probe, a post refresh.
+ *
+ * Editor and above. Each one is dozens of Graph calls against the app's shared
+ * rate limit, so it is not something every contributor should be able to set
+ * off; reading what has been stored stays open to every member.
+ */
+export function canRefreshAnalytics(role: WorkspaceRole): boolean {
+  return atLeast(role, WorkspaceRole.editor);
+}
+
+/**
+ * The brake on those walks: a handful per workspace per five minutes, shared
+ * by the per-Page sync and probe and the post refresh.
+ *
+ * Per workspace, not per member, because what is being protected — the Graph
+ * quota of the Pages connected to it — is shared by the workspace. Throws a
+ * 429 that says how long to wait.
+ */
+export function throttleAnalyticsRefresh(workspaceId: string, now = Date.now()): void {
+  const attempt = hit(`analytics:refresh:${workspaceId}`, { limit: 6, windowMs: 5 * 60_000, now });
+  if (attempt.allowed) return;
+
+  const minutes = Math.max(1, Math.ceil((attempt.resetAt - now) / 60_000));
+  throw new AppError({
+    key: 'analytics.refreshThrottled',
+    fallback: `Analytics was refreshed several times just now. Try again in ${minutes} minute(s).`,
+    params: { minutes },
+    status: 429,
+  });
 }

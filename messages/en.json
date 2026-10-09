@@ -1,7 +1,36 @@
 {
+  "account": {
+    "changePassword": "Change password",
+    "confirmPassword": "Confirm new password",
+    "currentPassword": "Current password",
+    "email": "Email",
+    "emailHint": "Your email address is how you sign in and cannot be changed here.",
+    "failed": "That did not work. Please try again.",
+    "language": "Language",
+    "languages": {
+      "en": "English",
+      "fr": "Français"
+    },
+    "name": "Name",
+    "newPassword": "New password",
+    "password": "Password",
+    "passwordChanged": "{count, plural, =0 {Password changed.} one {Password changed, and one other device was signed out.} other {Password changed, and # other devices were signed out.}}",
+    "passwordHint": "Changing your password signs you out on every other device.",
+    "passwordMismatch": "The two new passwords do not match.",
+    "passwordTooShort": "Use at least 10 characters.",
+    "profile": "Profile",
+    "profileSaved": "Profile saved.",
+    "sessions": "Signed-in devices",
+    "sessionsCount": "{count, plural, =0 {You are signed in on this device only.} one {You are also signed in on one other device.} other {You are also signed in on # other devices.}}",
+    "sessionsHint": "Lost a phone, or signed in on a shared computer? Sign out everywhere else. This device stays signed in.",
+    "signOutOthers": "Sign out other devices",
+    "signedOutOthers": "{count, plural, =0 {There were no other devices to sign out.} one {Signed out one other device.} other {Signed out # other devices.}}",
+    "subtitle": "Your own name, language, password and signed-in devices. These follow you across every client.",
+    "title": "Account"
+  },
   "accounts": {
     "title": "Connected accounts",
-    "subtitle": "Facebook pages and groups this workspace can publish to.",
+    "subtitle": "Facebook pages this workspace can publish to.",
     "connect": "Connect Facebook",
     "noneTitle": "No accounts connected yet",
     "noneBody": "Connect the Facebook account that manages your pages. We ask for permission to list your pages and publish posts on their behalf, and store the resulting tokens encrypted.",
@@ -13,13 +42,13 @@
     "syncedAt": "synced {when}",
     "tokenExpires": "token expires {when}",
     "reconnectPrompt": "Reconnect this account to resume scheduled posts.",
-    "disconnectConfirm": "Disconnect {name}? Scheduled posts to its pages and groups will be cancelled. Published history is kept.",
+    "disconnectConfirm": "Disconnect {name}? Scheduled posts to its pages will be cancelled. Published history is kept.",
     "syncedResult": "Synced {pages} page(s) and {groups} group(s).",
     "healthy": "Connection is healthy",
-    "groupsDisabled": "Group publishing is turned off. Meta restricted the Groups API in April 2024, so it needs a separately approved permission and the app must be installed in each group."
+    "groupsDisabled": "Groups cannot be published to. Meta removed the Groups API from every version on 22 April 2024."
   },
   "ads": {
-    "none": "No ad account is connected. Finding them needs the ads read permission.",
+    "none": "No ad account is connected yet. Finding them needs the ads read permission on the Facebook connection.",
     "discover": "Find ad accounts",
     "sync": "Pull from Facebook",
     "hint": "Spend next to organic reach, so a jump in reach can be told apart from a jump in budget.",
@@ -38,11 +67,42 @@
     "level": "Break down by",
     "level_campaign": "Campaign",
     "level_adset": "Ad set",
-    "level_ad": "Ad"
+    "level_ad": "Ad",
+    "title": "Ads",
+    "subtitle": "What your paid campaigns cost, what they delivered, and where the budget went",
+    "account": "Ad account",
+    "lastDays": "{count, plural, one {# day} other {# days}}",
+    "lastSynced": "read from Facebook {when}",
+    "neverSynced": "not read from Facebook yet",
+    "vsPrevious": "vs previous",
+    "dailySpend": "Spend per day",
+    "dailyClicks": "Clicks per day",
+    "date": "Date",
+    "breakdownTitle": "Where the budget went",
+    "share": "Share of spend",
+    "findings": {
+      "bestCtr": "“{name}” is clicked {ratio}× as often as the account average.",
+      "concentrated": "“{name}” took {share}% of the spend.",
+      "costlyClicks": "Clicks on “{name}” cost {ratio}× the account average.",
+      "cpcDown": "Clicks cost {percent}% less than in the previous period.",
+      "cpcUp": "Clicks cost {percent}% more than in the previous period.",
+      "ctrDown": "People clicked {percent}% less often than in the previous period.",
+      "ctrUp": "People clicked {percent}% more often than in the previous period.",
+      "noSpend": "This account spent nothing in this period. Pull from Facebook if you expected delivery.",
+      "none": "Nothing unusual in this period.",
+      "title": "What stands out"
+    },
+    "askAdmin": "Ask a workspace owner or admin to find the ad accounts this workspace can read.",
+    "exportCsv": "Download CSV",
+    "coverage": "data from {date}",
+    "noComparison": "No comparison with the previous period: data is pulled from Facebook back to {date}, and the period before this one starts earlier.",
+    "allDisabled": "Every ad account in this workspace is turned off. Turn one back on under Connections to see its spend here.",
+    "openConnections": "Open Connections",
+    "staleComparison": "No comparison with the previous period: the last pull from Facebook was on {when}, so the days since are missing."
   },
   "analytics": {
     "title": "Analytics",
-    "subtitle": "Everything the Facebook Graph API will give us for this page",
+    "subtitle": "How your connected pages are doing, and every figure behind it",
     "noPages": "No Facebook pages are connected yet.",
     "connect": "Connect a page",
     "choosePage": "Choose a page",
@@ -71,7 +131,9 @@
       "inbox": "Inbox",
       "external": "Other posts",
       "instagram": "Instagram",
-      "ads": "Ads"
+      "ads": "Ads",
+      "analysis": "Analysis",
+      "compare": "Compare pages"
     },
     "byPost": "Impressions and interaction per post",
     "byPostHint": "One row per post per destination — the same post can perform very differently on two pages, and averaging that away hides the signal.",
@@ -140,11 +202,17 @@
     "coverageKey": "Darker is served by Facebook; lighter was asked for and refused. The remainder has not been tested yet.",
     "chooseView": "Choose a view",
     "sortBy": "Sort by",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "interactionsTotal": "Interactions",
+    "filterLabel": "Filter metrics",
+    "sortAscending": "Sorted lowest first — reverse",
+    "sortDescending": "Sorted highest first — reverse",
+    "trendFromTo": "Trend from {from} to {to}",
+    "refreshThrottled": "Analytics was refreshed several times just now. Try again in {minutes, plural, one {# minute} other {# minutes}}."
   },
   "app": {
     "name": "MS Social Pilot",
-    "tagline": "Schedule Facebook Page and Group posts from one place."
+    "tagline": "Schedule Facebook Page and Instagram posts from one place."
   },
   "approvals": {
     "title": "Approvals",
@@ -159,7 +227,10 @@
     "rejectedBadge": "Rejected",
     "reviewNote": "Reviewer note",
     "resubmit": "Resubmit",
-    "overdue": "Time has passed — approving publishes it now"
+    "overdue": "Time has passed — approving publishes it now",
+    "overdueConfirm": "Its scheduled time has passed, so approving it publishes it to every destination right now. Approve and publish?",
+    "approvedNow": "Approved. Its time has passed, so it goes out right away.",
+    "moreMedia": "+{count}"
   },
   "auth": {
     "signIn": "Sign in",
@@ -176,12 +247,18 @@
     "createOne": "Create one",
     "somethingWrong": "Something went wrong.",
     "registrationClosedTitle": "Registration is closed",
-    "registrationClosedBody": "This server only accepts people who have been invited. Ask an administrator to send you an invitation."
+    "registrationClosedBody": "This server only accepts people who have been invited. Ask an administrator to send you an invitation.",
+    "networkError": "Could not reach the server. Check your connection and try again."
   },
   "calendar": {
     "title": "Calendar",
     "timesShownIn": "Times shown in {timezone}.",
-    "more": "+{count} more"
+    "newPostOn": "New post on {date}",
+    "more": "+{count} more",
+    "unscheduledDrafts": "Unscheduled drafts",
+    "unscheduledDraftsHint": "Drafts with no date do not appear on the grid. {count, plural, one {The latest one} other {The # latest, newest first}}:",
+    "allDrafts": "All drafts",
+    "draftCreated": "Started {date}"
   },
   "common": {
     "all": "All",
@@ -253,10 +330,13 @@
     "viewOn": "View on {destination}",
     "submitForApproval": "Submit for approval",
     "submittedOk": "Submitted for approval.",
-    "subtitle": "Write once, publish to any number of Facebook pages and groups.",
+    "subtitle": "Write once, publish to any number of Facebook pages.",
     "targetPaused": "Turned off for this workspace.",
     "thisApp": "This app.",
-    "thisAppHint": "Editable until it goes out, and works for groups.",
+    "thisAppHint": "Editable until it goes out, and any distance ahead.",
+    "goodTimes": "Good times this week",
+    "goodTimesHint": "From your Pages' own results over the last 90 days: posts at these times drew more interactions than usual.",
+    "goodTimeTitle": "{lift}× the usual interactions, from {posts} posts",
     "timezoneHint": "Times are in {timezone}, your workspace timezone.",
     "title": "Compose",
     "viaGraph": "the Facebook scraper",
@@ -270,12 +350,23 @@
     "mediaOrDrop": "or drop them here",
     "blockedNoDestinations": "Connect a Facebook Page first, from Connections, to have somewhere to post.",
     "blockedNoneSelected": "Choose at least one Page under “Where to post”.",
-    "blockedNoContent": "Write a message, add a link or attach media."
+    "blockedNoContent": "Write a message, add a link or attach media.",
+    "uploadFailed": "the upload did not go through. Please try again.",
+    "uploading": "Uploading…",
+    "altText": "Describe the image",
+    "altTextFor": "Description of image {number}, for screen readers",
+    "untickSwitchedOff": "Switched off since this post was written: {names}. Untick to save.",
+    "instagramNeedsMedia": "Instagram only takes posts with a photo or a video. Add one, or untick the Instagram destinations. You can still save a draft.",
+    "facebookInstagramWarning": ", and unavailable while an Instagram account is selected",
+    "retryFromList": "The post is saved and the destinations that worked have it. To try the others again, use “Retry failed” on the post list — posting again from here would send a second copy.",
+    "openPostList": "Open the post list",
+    "retryAllFromList": "None of the destinations took it, but the post is saved. Use “Retry failed” on the post list to try again — posting from here again would make a second copy.",
+    "blockedInstagramMedia": "Add a photo or a video: Instagram takes nothing else."
   },
   "config": {
     "title": "Configuration",
     "subtitle": "Everything this installation can be tuned with, without editing a file on the server.",
-    "ownerOnly": "Only a workspace owner can change installation settings.",
+    "ownerOnly": "Only the owner of this installation — whoever created its first account — can change its settings.",
     "footnote": "Values set here override the environment. Clearing one hands the setting back to the environment variable, or to the built-in default when there is none.",
     "saved": "{count, plural, one {# setting saved} other {# settings saved}}.",
     "unsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
@@ -310,7 +401,7 @@
     "featureOff": "Turned off in Configuration. Meta reviews this permission separately, and requesting it before approval fails the whole login.",
     "followers": "{count, plural, one {# follower} other {# followers}}",
     "groups": "Groups",
-    "groupsOff": "Posting to Facebook Groups is off; Pages work as normal. Groups need extra approval from Meta and the app added to each group. Once you have both, turn Groups on in Settings → Configuration.",
+    "groupsOff": "Posting to Facebook Groups isn’t possible; Pages work as normal. Meta removed Group posting for every app on 22 April 2024.",
     "health": {
       "title": "Connection check",
       "subtitle": "Ask Facebook what is working right now, permission by permission and Page by Page.",
@@ -321,7 +412,7 @@
       "checkedAt": "Checked at {when}",
       "appTitle": "Facebook app",
       "permissions": "Permissions",
-      "destinations": "Pages and Groups",
+      "destinations": "Pages",
       "declined": "Refused on Facebook. {consequence}",
       "notRequested": "Not granted. {consequence}",
       "noAccounts": "No Facebook account is connected yet.",
@@ -334,11 +425,11 @@
     "instagramDestinations": "Instagram accounts you can post to",
     "instagramHint": "Business accounts reachable through a connected page. Usable as destinations once instagram_content_publish is approved; until then they appear turned off.",
     "instagramTitle": "Instagram accounts",
-    "noGroups": "No groups. Group publishing needs a separately approved permission.",
+    "noGroups": "No groups. Meta removed the Groups API in April 2024.",
     "noLinkedPage": "No linked page",
     "noPages": "No pages found. Refresh, or check that this account manages any.",
     "noScopes": "None recorded — reconnect to refresh this.",
-    "noneBody": "Connect a Facebook account to bring in the pages and groups you manage. Publishing, analytics and comment moderation all run through that connection.",
+    "noneBody": "Connect a Facebook account to bring in the pages you manage. Publishing, analytics and comment moderation all run through that connection.",
     "noneFound": "None found yet.",
     "noneTitle": "Nothing is connected yet",
     "ownToken": "Has its own page token",
@@ -347,7 +438,7 @@
     "permissions": "Permissions granted",
     "reconnect": "Reconnect",
     "reconnectRequired": "Reconnect required.",
-    "subtitle": "Connected Facebook users, the pages and groups behind them, and the tokens that reach them.",
+    "subtitle": "Connected Facebook users, the pages behind them, and the tokens that reach them.",
     "syncTargets": "Refresh pages",
     "synced": "synced {when}",
     "syncedResult": "Found {pages} pages and {groups} groups.",
@@ -367,6 +458,16 @@
       "inaccessible": "This destination is no longer reachable with the connected Facebook account.",
       "disconnected": "The Facebook account for this destination was disconnected.",
       "instagram_permission": "Publishing to Instagram needs Meta to grant instagram_content_publish. Turn this destination on once it is approved."
+    },
+    "networkError": "Could not reach the server. Check your connection and try again.",
+    "toggleDestination": "Publish to {name}",
+    "toggleAccount": "Use {name}",
+    "dataDeletion": {
+      "title": "Data deletion request",
+      "completed": "Your request has been completed. The Facebook connection and its stored access tokens have been deleted, and any posts still queued for its pages and groups were cancelled.",
+      "code": "Confirmation code:",
+      "noCode": "No confirmation code was supplied. Open this page using the link Facebook gave you when you requested deletion.",
+      "retained": "Records of posts already published to your pages are kept as the workspace owner’s business records. Contact the workspace owner if you need those removed as well."
     }
   },
   "dashboard": {
@@ -395,7 +496,9 @@
     "reviewConnections": "Review connections",
     "setupStepsLeft": "Finish setting up: {count, plural, one {# step} other {# steps}} left. Next: {next}.",
     "setupCheckFailing": "Setup is done, but an installation check is failing.",
-    "continueSetup": "Continue setup"
+    "continueSetup": "Continue setup",
+    "reconnectRequired": "Reconnect required.",
+    "noTimeSet": "No time set"
   },
   "email": {
     "invitation": {
@@ -415,7 +518,7 @@
     "connectionExpired": {
       "subject": "Reconnect {account} to keep posting",
       "heading": "A Facebook connection stopped working",
-      "body": "{account} can no longer publish. Scheduled posts to its pages and groups will fail until it is reconnected.",
+      "body": "{account} can no longer publish. Scheduled posts to its pages will fail until it is reconnected.",
       "cta": "Reconnect now"
     },
     "tokenExpiring": {
@@ -463,6 +566,7 @@
     "hide": "Hide",
     "impressions": "Impressions",
     "inboxHint": "Recent page inbox threads. Reading these needs the messaging permission, and replying needs it too.",
+    "interactions": "Interactions",
     "likes": "{count, plural, one {# like} other {# likes}}",
     "messageCount": "{count, plural, one {# message} other {# messages}}",
     "metricsCount": "Metrics",
@@ -482,10 +586,12 @@
     "replyFailed": "Facebook would not send that reply.",
     "replyNobodyWaiting": "The last message here is the page’s own, so there is nobody to reply to.",
     "replyPlaceholder": "Reply as the page…",
+    "replyToLabel": "Reply to {author}",
     "replyWindowClosed": "Facebook only allows a reply within 24 hours of the last message from the person. This thread has been quiet for longer.",
     "replyWindowOpen": "Facebook accepts a reply on this thread until {until}.",
     "reviewCount": "Ratings",
     "reviewsHint": "Star ratings and recommendations left on the page.",
+    "reviewsRetired": "Meta removed Page ratings from the Graph API from v22.0, and this installation uses {version}, so no new reviews can be read. Anything read before is still shown.",
     "searchComments": "Search comments",
     "searchPlaceholder": "Words in a comment",
     "sendReply": "Send reply",
@@ -493,6 +599,7 @@
     "show": "Show",
     "showAll": "All",
     "showHidden": "Hidden only",
+    "showUnanswered": "Unanswered only",
     "showVisible": "Visible only",
     "totalWatch": "Total watched",
     "unhide": "Unhide",
@@ -535,22 +642,29 @@
     "conversationNotFound": "Conversation not found.",
     "correctFields": "Please correct the highlighted fields.",
     "csvUnterminatedQuote": "A quoted field starting on line {line} is never closed, so everything after it was read as one value. Add the missing quote and upload again.",
+    "currentPasswordWrong": "Your current password is not correct.",
     "dateRange": "Enter a valid date range.",
     "destinationNotFound": "Destination not found.",
+    "destinationBlocked": "This destination cannot be published to right now, so it cannot be turned on.",
     "editorsOnlyDeleteMedia": "Only editors and above can delete files from the library.",
+    "emailTaken": "An account with that email already exists. Sign in instead.",
+    "emptyPost": "Write something, add a link, or attach media.",
     "errorBody": "The page could not be loaded. It is worth trying again — if it keeps happening, the reference below will tell whoever looks into it where to start.",
     "errorTitle": "Something went wrong",
     "feedInstagramUnsupported": "A feed item is a headline and a link, and Instagram takes neither without a picture ({names}). Choose Facebook destinations for this feed.",
     "feedNotFound": "Feed not found.",
+    "feedUrlBlocked": "That feed address points at a private network, which this server does not fetch. Use the feed’s public address.",
     "fileNotFound": "File not found.",
     "fileTooLarge": "That file is larger than the {limit} MB limit.",
     "generic": "Something went wrong. Please try again.",
     "heldByFacebook": "Facebook is already holding this post for its scheduled time. Cancel it first to publish now.",
     "instagramNotFound": "Instagram account not found.",
+    "invalidCredentials": "Incorrect email or password.",
     "lastOwner": "A workspace must keep at least one owner.",
     "mediaInUse": "This file is still used by {count, plural, one {# post that has not gone out yet} other {# posts that have not gone out yet}}. Remove it from them first.",
     "moderateNoPermission": "You do not have permission to moderate comments.",
     "nativeGroupsUnsupported": "Facebook cannot natively schedule Group posts ({names}). Use the built-in scheduler for these.",
+    "instagramNeedsMedia": "Instagram publishes a photo or a video, never text alone ({names}). Add media, or leave Instagram out.",
     "nativeInstagramUnsupported": "Instagram has no scheduling of its own ({names}). Use the built-in scheduler for these.",
     "noAdAccount": "No ad account connected.",
     "noInstagramConnected": "No Instagram account connected.",
@@ -563,20 +677,25 @@
     "notFoundTitle": "That page is not here",
     "notPending": "That post is not awaiting approval.",
     "notSignedIn": "You must be signed in.",
+    "notSubmittable": "That post cannot be sent for review.",
     "ownerOnlyChangeConfig": "Only an owner can change configuration.",
     "ownerOnlyChangeSetup": "Only an owner can change setup.",
     "ownerOnlyViewConfig": "Only an owner can view configuration.",
     "ownerOnlyViewSetup": "Only an owner can view setup.",
+    "passwordUnchanged": "Choose a password different from the current one.",
     "pickDateTime": "Pick a date and time for this post.",
     "postNotFound": "Post not found.",
     "previewHostBlocked": "That host is not reachable for link previews.",
     "previewSchemeUnsupported": "Only http and https URLs can be previewed.",
     "previewUrlInvalid": "Enter a valid URL, including http:// or https://.",
+    "publishNeedsReview": "Posts in this workspace are reviewed before they go out, so they cannot be published on the spot. Schedule it and it will go to the approval queue.",
     "publishOwnOnly": "You can only publish your own posts.",
     "queueEmpty": "Your posting queue is empty. Add publishing times in Settings first.",
     "queueFull": "Every queue slot in the next 90 days is taken. Add more times or pick a date.",
     "quotaFull": "This client has used {used} MB of its {quota} MB media allowance. Delete some files, or raise the limit in Configuration.",
     "reference": "Reference",
+    "refreshNoPermission": "Only editors and above can pull comments and messages from Facebook.",
+    "refreshTooSoon": "This workspace has just pulled from Facebook. Try again in {seconds, plural, one {# second} other {# seconds}}.",
     "registrationClosed": "This server does not accept new accounts. Ask an administrator to invite you.",
     "replyNoPermission": "You do not have permission to reply to messages.",
     "replyWindowClosed": "Facebook only allows a reply within 24 hours of the last message from the person. This thread has gone quiet for longer, so a reply would be refused.",
@@ -585,9 +704,12 @@
     "targetsUnavailable": "One or more selected destinations are no longer available.",
     "timePassed": "That time has already passed. Choose a time in the future.",
     "tooManyAttempts": "{minutes, plural, one {Too many sign-in attempts. Try again in a minute.} other {Too many sign-in attempts. Try again in # minutes.}}",
+    "tooManySignups": "{minutes, plural, one {Too many accounts created from here. Try again in a minute.} other {Too many accounts created from here. Try again in # minutes.}}",
     "tryAgain": "Try again",
     "unknownExport": "Unknown export. Choose one of: {kinds}.",
-    "variantsNeedApproval": "Alternate wordings publish without review, so only editors and above can set them while approval is on."
+    "variantsNeedApproval": "Alternate wordings publish without review, so only editors and above can set them while approval is on.",
+    "dateRangeInverted": "The start of the range comes after its end. Swap the dates.",
+    "adAccountNotFound": "Ad account not found."
   },
   "feeds": {
     "title": "RSS feeds",
@@ -596,7 +718,7 @@
     "name": "Name",
     "url": "Feed URL",
     "template": "Post template",
-    "templateHint": "Use {'{{'}title{'}}'}, {'{{'}link{'}}'} and {'{{'}description{'}}'}.",
+    "templateHint": "Use '{{title}}', '{{link}}' and '{{description}}'.",
     "destinations": "Destinations",
     "autoApprove": "Schedule new items automatically",
     "autoApproveHint": "When off, new items go to the approval queue instead.",
@@ -607,7 +729,21 @@
     "itemsImported": "{count, plural, one {# item imported} other {# items imported}}",
     "pollNow": "Check now",
     "deleteConfirm": "Remove this feed? Posts already created from it are kept.",
-    "errorCount": "{count, plural, one {# consecutive error} other {# consecutive errors}}"
+    "errorCount": "{count, plural, one {# consecutive error} other {# consecutive errors}}",
+    "saved": "Feed saved.",
+    "pollFailed": "The feed could not be checked. The reason is shown on the feed below.",
+    "autoApproveOn": "Schedules automatically",
+    "autoApproveOff": "Needs approval",
+    "recent": "Recently imported",
+    "untitled": "Untitled item",
+    "importedAt": "Imported {when}",
+    "viewPost": "View post",
+    "noPost": "Nothing to post",
+    "preview": "Preview",
+    "previewEmpty": "This template produces an empty post.",
+    "sampleTitle": "An example headline",
+    "sampleDescription": "The first lines of the article appear here.",
+    "noDestinations": "Connect a Facebook Page or Group first: feeds post to those."
   },
   "history": {
     "actions": {
@@ -645,7 +781,8 @@
         "rejected": "sent a post back for changes",
         "retried": "retried a failed post",
         "submitted": "submitted a post for approval",
-        "updated": "edited a post"
+        "updated": "edited a post",
+        "withdrawn": "took a post back out of review"
       },
       "settings": {
         "changed": "changed the workspace settings"
@@ -676,6 +813,7 @@
     "statusSkipped": "Not sent",
     "subtitle": "What happened in this workspace, and what was emailed about it.",
     "tabActivity": "Activity",
+    "tabFailures": "{count, plural, one {, # failed} other {, # failed}}",
     "tabEmail": "Email",
     "title": "History",
     "unknownAction": "did something the app no longer has a name for ({action})"
@@ -716,6 +854,49 @@
     "usageOf": "{used} of {total}",
     "usageTitle": "Storage used"
   },
+  "metaApp": {
+    "copied": "Copied",
+    "copy": "Copy",
+    "copyNamed": "Copy {name}",
+    "fields": {
+      "appDomain": {
+        "label": "App domain",
+        "where": "App settings → Basic → App domains."
+      },
+      "dataDeletion": {
+        "label": "Data deletion request URL",
+        "where": "App settings → Basic → Data deletion → Data deletion callback URL. Required for app review."
+      },
+      "deauthorize": {
+        "label": "Deauthorize callback URL",
+        "where": "Facebook Login → Settings → Deauthorize callback URL. Meta calls it when somebody removes the app from their account."
+      },
+      "graphVersion": {
+        "label": "Graph API version",
+        "where": "App settings → Advanced → Upgrade API version: the app must be on this version or later. Every request is made against it."
+      },
+      "permissions": {
+        "label": "Permissions requested",
+        "where": "App Review → Permissions and features: each needs Advanced Access before people outside your business can connect."
+      },
+      "redirectUri": {
+        "label": "Valid OAuth redirect URI",
+        "where": "Facebook Login → Settings → Valid OAuth Redirect URIs. It must match character for character, including https and without a trailing slash."
+      },
+      "siteUrl": {
+        "label": "Site URL",
+        "where": "App settings → Basic → Add platform → Website → Site URL."
+      }
+    },
+    "privacyNote": "Meta also requires a Privacy Policy URL (App settings → Basic) before the app can go Live. This installation does not publish one for you: use your organisation's.",
+    "subtitle": "The exact values to enter in your app at developers.facebook.com, built from this installation's address.",
+    "title": "Meta app settings",
+    "warnings": {
+      "loopback": "This address is localhost. Facebook cannot call the deauthorize and data-deletion URLs here, and real users cannot sign in through it. Use it for development only.",
+      "notAUrl": "APP_URL is not a valid URL, so none of these values can be right. Fix it in the environment or on the Configuration screen.",
+      "notHttps": "This installation's address is not https. Facebook only accepts an http redirect URI for localhost in development mode: set APP_URL to the public https address before connecting real Pages."
+    }
+  },
   "nav": {
     "dashboard": "Dashboard",
     "compose": "Compose",
@@ -723,14 +904,33 @@
     "posts": "Posts",
     "approvals": "Approvals",
     "accounts": "Accounts",
-    "feeds": "Feeds",
+    "feeds": "RSS feeds",
     "reports": "Reports",
     "settings": "Settings",
     "signOut": "Sign out",
     "switchWorkspace": "Switch client",
     "analytics": "Analytics",
     "menu": "Menu",
-    "connections": "Connections"
+    "connections": "Connections",
+    "module": {
+      "ads": "Ads",
+      "analytics": "Analytics",
+      "schedule": "Schedule"
+    },
+    "moduleShort": {
+      "ads": "Ads",
+      "analytics": "Analytics",
+      "schedule": "Schedule"
+    },
+    "home": "Home",
+    "modules": "Modules",
+    "shared": "Workspace",
+    "pages": "Pages",
+    "adsPerformance": "Performance",
+    "queue": "Queue",
+    "switchFailed": "Could not switch client. Please try again.",
+    "signOutFailed": "Could not sign out. Check your connection and try again.",
+    "dismiss": "Dismiss"
   },
   "notifications": {
     "title": "Notifications",
@@ -739,7 +939,141 @@
     "onTokenExpiry": "A Facebook connection is about to expire",
     "onApprovalRequest": "Someone submits a post for approval",
     "onApprovalDecision": "My post is approved or rejected",
-    "saved": "Notification settings saved."
+    "saved": "Notification settings saved.",
+    "noEmailProvider": "No email provider is configured on this server, so nothing will actually be sent. An owner can add a Resend API key on the Configuration screen.",
+    "saveFailed": "Your notification settings could not be saved. Please try again.",
+    "networkError": "Could not reach the server. Check your connection and try again."
+  },
+  "pageAnalysis": {
+    "analyseNow": "Analyse now",
+    "analysed": "{count, plural, =0 {Up to date.} one {Up to date. One recent post was refreshed.} other {Up to date. # recent posts were refreshed.}}",
+    "analysing": "Reading Facebook…",
+    "bottom": {
+      "hint": "Worth a look before posting something similar.",
+      "title": "Weakest posts"
+    },
+    "cadence": {
+      "hint": "{perWeek} a week on average. The dashed line is {target} a week.",
+      "posts": "{count, plural, =0 {No posts} one {# post} other {# posts}}",
+      "target": "Target",
+      "title": "Posts per week",
+      "week": "Week of {date}"
+    },
+    "compare": {
+      "avg": "Per post",
+      "followers": "Followers",
+      "health": "Health",
+      "hint": "The same figures for every page in this workspace, over the same {days} days, so the ones that need attention stand out.",
+      "net": "Net followers",
+      "none": "No pages are connected.",
+      "open": "Analyse",
+      "page": "Page",
+      "perWeek": "Posts / week",
+      "rate": "Median rate",
+      "reach": "Reached",
+      "title": "All pages side by side"
+    },
+    "empty": "There are no posts or figures for this page yet. Analyse now to read its history from Facebook.",
+    "failed": "The analysis could not be refreshed. Please try again.",
+    "findings": {
+      "bestFormat": "{best} posts earn {ratio}× the interactions of {worst} posts here.",
+      "bestTime": "Posts on {weekday} between {start} and {end} earn {lift}× the typical post ({posts} posts).",
+      "goneQuiet": "Nothing has been posted for {days} days.",
+      "interactionsDown": "Each post earns {percent}% fewer interactions than in the previous period.",
+      "interactionsUp": "Each post earns {percent}% more interactions than in the previous period.",
+      "longGap": "The longest stretch without a post was {days} days.",
+      "losingFollowers": "{count, plural, one {The page lost one more follower than it gained.} other {The page lost # more followers than it gained.}}",
+      "mostPostedUnderperforms": "{format} makes up {share}% of posts but does below average; {best} does best.",
+      "neverSynced": "Nothing has been read from Facebook for this page yet, so this analysis is empty.",
+      "noPosts": "No posts in this period. A page that goes quiet is shown to fewer of its followers when it comes back.",
+      "none": "Nothing unusual in this period. Keep posting and check back.",
+      "reachDown": "The page reached {percent}% fewer people than in the previous period.",
+      "reachUp": "The page reached {percent}% more people than in the previous period.",
+      "stale": "These figures were last read from Facebook {days} days ago. Analyse now to bring them up to date.",
+      "standoutPost": "The best post earned {ratio}× the typical post. It is at the top of the list below.",
+      "title": "What stands out"
+    },
+    "format": {
+      "link": "Link",
+      "other": "Other",
+      "photo": "Photo",
+      "text": "Text",
+      "video": "Video"
+    },
+    "formats": {
+      "avg": "Avg. interactions",
+      "format": "Format",
+      "hint": "Average interactions per post, by format.",
+      "lift": "vs average",
+      "none": "No posts to compare in this period.",
+      "posts": "Posts",
+      "rate": "Median rate",
+      "reach": "Avg. reach",
+      "title": "What kind of post works"
+    },
+    "heading": "How {page} is doing",
+    "health": {
+      "band": {
+        "attention": "Needs attention",
+        "steady": "Steady",
+        "strong": "Strong"
+      },
+      "component": {
+        "consistency": "Posting consistency",
+        "growth": "Follower growth",
+        "momentum": "Interactions per post",
+        "reach": "Reach"
+      },
+      "componentHint": {
+        "consistency": "Posting about {target} times a week, without empty weeks.",
+        "growth": "Net new followers as a share of the audience.",
+        "momentum": "Against the previous period. Level is 50.",
+        "reach": "People reached, against the previous period. Level is 50."
+      },
+      "hint": "A score out of 100 from the four things below. Anything Facebook does not report is left out rather than counted as zero.",
+      "none": "Not enough to go on yet.",
+      "title": "Page health"
+    },
+    "kpi": {
+      "avgInteractions": "Per post",
+      "interactions": "Interactions",
+      "medianRate": "Median rate",
+      "netFollows": "Net followers",
+      "posts": "Posts",
+      "reach": "People reached"
+    },
+    "kpiHint": "Interactions are reactions, comments and shares. The rate is interactions per hundred people reached, the middle value across posts.",
+    "lastRefreshed": "Figures last read from Facebook {when}.",
+    "neverRefreshed": "Nothing has been read from Facebook for this page yet.",
+    "partial": "Some figures could not be read: {detail}",
+    "period": "Last {days} days, compared with the {days} days before",
+    "post": {
+      "fromApp": "Published here",
+      "fromPage": "Posted on Facebook",
+      "noText": "(no text)",
+      "open": "Open on Facebook",
+      "rate": "Rate"
+    },
+    "sample": "{current, plural, =0 {No posts} one {Built from one post} other {Built from # posts}} in this period; the best-time grid uses {timing, plural, one {one post} other {# posts}} from the last 90 days or more.",
+    "times": {
+      "best": "Best times",
+      "cell": "{weekday} {start}–{end}",
+      "cellDetail": "{posts, plural, =0 {No posts} one {One post} other {# posts}}",
+      "cellLift": "{avg} interactions on average · {lift}× typical",
+      "day": "Day",
+      "faded": "Faded cells rest on a single post.",
+      "high": "1.5× or more",
+      "hint": "Average interactions by the day and time a post went out ({timezone}), against the page’s typical post. Darker is better.",
+      "low": "Below typical",
+      "none": "Not enough posts yet to tell which times work.",
+      "title": "When posts do best",
+      "toQueue": "Add the best times to the posting queue"
+    },
+    "top": {
+      "hint": "By interactions in this period.",
+      "title": "Best posts"
+    },
+    "vsPrevious": "vs previous"
   },
   "posts": {
     "title": "Posts",
@@ -757,12 +1091,56 @@
     "retryFailed": "Retry failed",
     "cancelConfirm": "Cancel this post? Anything already scheduled inside Facebook will be deleted there too.",
     "actionFailed": "That action failed.",
+    "statusFilter": "Filter by status",
+    "searchLabel": "Search posts",
+    "searchPlaceholder": "Words in the post",
+    "destinationFilter": "Destination",
+    "allDestinations": "All destinations",
+    "clearFilters": "Clear",
+    "noMatches": "No posts match these filters.",
+    "withdraw": "Withdraw from review",
+    "submitForReview": "Submit for review",
+    "publishNowConfirm": "Publish this now to {count, plural, one {its destination} other {all # destinations}}? It goes out immediately.",
     "failure": {
       "account_disconnected": "Cancelled because the Facebook account was disconnected.",
       "deleted_on_facebook": "This post is no longer on Facebook. It was most likely deleted there, so it never went out.",
       "destination_off": "This destination was turned off when the post was due, so it was not published there.",
       "worker_lost": "Publishing was interrupted and did not recover within the attempt limit. Check the destination and try again."
-    }
+    },
+    "nativeTooSoon": "Facebook only holds posts at least 10 minutes ahead, so this one stays with our own scheduler and goes out at its time.",
+    "nativeTooFar": "Facebook cannot hold a post that far ahead, so this one stays with our own scheduler and goes out at its time.",
+    "nativeUnavailable": "Facebook could not be given this post just now, so it stays with our own scheduler and goes out at its time."
+  },
+  "queue": {
+    "addSlot": "Add slot",
+    "addToQueue": "Add to queue",
+    "added": "Added {day} at {time}.",
+    "alreadyThere": "That time is already in the queue.",
+    "awaitingApproval": "Awaiting approval",
+    "day": "Day",
+    "free": "Free",
+    "noSlots": "No slots",
+    "noText": "(no text)",
+    "readOnly": "Only owners and admins can change the queue.",
+    "removeSlot": "Remove {day} {time}",
+    "removed": "Removed {day} at {time}.",
+    "saveFailed": "The queue could not be saved. Please try again.",
+    "seeAnalysis": "See the page analysis",
+    "slotCount": "{count, plural, =0 {No slots} one {# slot a week} other {# slots a week}}",
+    "subtitle": "When “add to queue” posts go out, what is filling the next week, and when else is worth adding. Times are in {timezone}.",
+    "suggestionDetail": "{lift}× the typical post · {posts} posts · {pages}",
+    "suggestionsHint": "{posts, plural, =0 {No posts} one {One post} other {# posts}} from {pages, plural, =0 {no pages} one {one page} other {# pages}} over the last 90 days, each scored against its own page’s typical post, so a big page cannot outvote a small one.",
+    "suggestionsNoHistory": "No post history yet. Once your pages have a few weeks of posts, the times that work will show here.",
+    "suggestionsNone": "Nothing stands out beyond the times already in the queue.",
+    "suggestionsTitle": "Suggested from your results",
+    "time": "Time",
+    "title": "Posting queue",
+    "upcomingFree": "{free, plural, =0 {All filled} one {One free slot} other {# free slots}} of {total}",
+    "upcomingNone": "The queue has no slots, so nothing is coming up. Add a slot above.",
+    "upcomingTitle": "Coming up in the next 7 days",
+    "weeklyHint": "Every page in this workspace shares these times. A post added to the queue takes the next free one.",
+    "weeklyTitle": "Weekly slots",
+    "writePost": "Write a post"
   },
   "reports": {
     "title": "Reports",
@@ -780,7 +1158,12 @@
     "byDestination": "By destination",
     "destination": "Destination",
     "topPosts": "Top posts",
-    "noData": "No published posts in this range."
+    "noData": "No published posts in this range.",
+    "impressions": "Impressions",
+    "linkClicksLifetime": "Link clicks (all time)",
+    "engagementCount": "{count, plural, other {# engagement}}",
+    "impressionCount": "{count, plural, one {# impression} other {# impressions}}",
+    "sourceNote": "Impressions, reach and engagement come from Facebook. Link clicks are counted by this app’s own short links, over each link’s whole life rather than only this range. They measure different things and are never added together."
   },
   "settings": {
     "addTime": "Add time",
@@ -798,8 +1181,10 @@
     "linkTagging": "Link tagging",
     "name": "Name",
     "noTimes": "No times set yet.",
+    "openQueue": "Open the queue",
     "pasteOrUpload": "Or paste the rows",
     "queue": "Publishing queue",
+    "queueMoved": "The posting queue now lives in Schedule → Queue, with suggested times from your pages’ results.",
     "queueSubtitle": "Recurring times for \"add to the next queue slot\". Each new post takes the earliest free slot.",
     "queueUpdated": "Publishing times updated.",
     "readOnly": "Only workspace owners and admins can change these settings. You can still upload posts below.",
@@ -828,7 +1213,16 @@
     "utmHint": "Appended to links in your posts so you can attribute traffic. Leave blank to post links untouched.",
     "utmMedium": "UTM medium",
     "utmSource": "UTM source",
-    "workspace": "Workspace"
+    "workspace": "Workspace",
+    "networkError": "Could not reach the server. Check your connection and try again.",
+    "aiNotConfigured": "No ANTHROPIC_API_KEY is set on this server, so the composer hides these tools.",
+    "tones": {
+      "friendly": "Friendly",
+      "professional": "Professional",
+      "playful": "Playful",
+      "urgent": "Urgent",
+      "informative": "Informative"
+    }
   },
   "setup": {
     "title": "Set up MS Social Pilot",
@@ -859,13 +1253,13 @@
       },
       "connect": {
         "title": "Connect a Facebook account",
-        "body": "Sign in with Facebook so this app can see the Pages and Groups you manage.",
+        "body": "Sign in with Facebook so this app can see the Pages you manage.",
         "done": "A Facebook account is connected.",
         "action": "Connect Facebook"
       },
       "destination": {
-        "title": "Turn on a Page or Group",
-        "body": "Choose which of your Pages and Groups this workspace may publish to. Nothing goes out until at least one is on.",
+        "title": "Turn on a Page",
+        "body": "Choose which of your Pages this workspace may publish to. Nothing goes out until at least one is on.",
         "done": "At least one destination is ready to publish.",
         "action": "Choose destinations"
       },
@@ -932,7 +1326,7 @@
     "connectAnAccount": "Connect an account",
     "group": "Group",
     "instagram": "Instagram",
-    "noneConnected": "No Facebook pages or groups are connected yet.",
+    "noneConnected": "No Facebook pages are connected yet.",
     "page": "Page",
     "selectAll": "Select all",
     "selectedOf": "{selected} of {total} selected",
@@ -971,6 +1365,18 @@
     "accept": "Accept invitation",
     "acceptExpired": "This invitation has expired. Ask for a new one.",
     "acceptInvalid": "This invitation link is not valid.",
-    "acceptWrongEmail": "This invitation was sent to {email}. Sign in with that address to accept it."
+    "acceptWrongEmail": "This invitation was sent to {email}. Sign in with that address to accept it.",
+    "networkError": "Could not reach the server. Check your connection and try again.",
+    "inviteFailed": "Could not send that invitation.",
+    "actionFailed": "That did not work. Please try again.",
+    "invalidEmail": "Enter a valid email address.",
+    "emailNotConfigured": "Email is not configured on this server, so invitations are not emailed. Once you send one, copy the link shown here and pass it on yourself.",
+    "shareLink": "Share this link with them:",
+    "memberRole": "Role for {name}",
+    "removeMemberNamed": "Remove {name}",
+    "revokeNamed": "Revoke the invitation for {email}",
+    "roleChangeConfirm": "Change {name} from {from} to {to}?",
+    "roleToOwnerWarning": "Owners have full control, including instance configuration and deleting the workspace, and only another owner can take that back.",
+    "roleFromOwnerWarning": "They will lose owner access to this workspace straight away."
   }
 }

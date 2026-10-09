@@ -1,3 +1,5 @@
+import { useLocale } from 'next-intl';
+
 import { VIZ, compact } from '@/lib/viz';
 import { Sparkline } from '@/components/Sparkline';
 
@@ -14,7 +16,10 @@ export function StatTile({
   value,
   delta,
   deltaLabel,
-  /** False when down is the good direction (unfollows, negative feedback). */
+  /**
+   * False when down is the good direction (unfollows, negative feedback); null
+   * when neither is, as for ad spend — the change is shown, uncoloured.
+   */
   upIsGood = true,
   trend,
   hero = false,
@@ -24,14 +29,18 @@ export function StatTile({
   /** Percentage change against a named period. */
   delta?: number | null;
   deltaLabel?: string;
-  upIsGood?: boolean;
+  upIsGood?: boolean | null;
   trend?: number[];
   hero?: boolean;
 }) {
+  // Rendered both from server components and inside client ones; useLocale
+  // answers the same in both, where the request's language slot does not.
+  const locale = useLocale();
   const display =
-    value === null ? '—' : typeof value === 'number' ? compact(value) : value;
+    value === null ? '—' : typeof value === 'number' ? compact(value, locale) : value;
 
-  const good = delta !== null && delta !== undefined ? (delta >= 0) === upIsGood : null;
+  const good =
+    delta !== null && delta !== undefined && upIsGood !== null ? (delta >= 0) === upIsGood : null;
 
   return (
     <div className="card p-4">
@@ -39,7 +48,7 @@ export function StatTile({
 
       <p
         className={`mt-1 font-semibold text-slate-900 ${hero ? 'text-4xl sm:text-5xl' : 'text-xl sm:text-2xl'}`}
-        title={typeof value === 'number' ? value.toLocaleString() : undefined}
+        title={typeof value === 'number' ? value.toLocaleString(locale) : undefined}
       >
         {display}
       </p>
@@ -48,7 +57,7 @@ export function StatTile({
         {delta !== null && delta !== undefined ? (
           <p
             className="text-xs font-medium"
-            style={{ color: good ? VIZ.goodText : VIZ.critical }}
+            style={{ color: good === null ? VIZ.inkSecondary : good ? VIZ.goodText : VIZ.critical }}
           >
             {/* The arrow is the second channel: the direction never rests on
                 colour alone. */}

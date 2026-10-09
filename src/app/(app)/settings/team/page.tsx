@@ -42,7 +42,7 @@ export default async function TeamPage() {
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
 
-      <SettingsNav showConfig={canManageInstance(auth.role)} />
+      <SettingsNav showConfig={canManageInstance(auth)} />
 
       <TeamClient
         canManage={canManageTeam(auth.role)}

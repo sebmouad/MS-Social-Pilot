@@ -18,6 +18,12 @@ export interface PostView {
   scheduledAtLabel: string | null;
   publishedAtLabel: string | null;
   mediaCount: number;
+  /** Why a reviewer sent it back; only set while the post is rejected. */
+  reviewNote: string | null;
+  /** The viewer wrote it, or may manage other people's posts. */
+  mayAct: boolean;
+  /** Its approval state lets it go out now rather than wait for a reviewer. */
+  cleared: boolean;
   targets: Array<{
     id: string;
     name: string;
@@ -31,8 +37,26 @@ export interface PostView {
   }>;
 }
 
-export function PostList({ posts }: { posts: PostView[] }) {
+/** States a post can be sent for review from, as the author sees them. */
+const SUBMITTABLE = ['draft', 'rejected'];
+/** States "Publish now" makes sense from; the API refuses the rest. */
+const PUBLISHABLE_NOW = ['draft', 'scheduled', 'failed', 'partially_failed'];
+/** Nothing has gone out yet, so cancelling loses nothing but the plan. */
+const CANCELLABLE = ['draft', 'scheduled', 'pending_approval', 'rejected'];
+
+export function PostList({
+  posts,
+  needsReview = false,
+  emptyText,
+}: {
+  posts: PostView[];
+  /** The viewer's posts go through review, so drafts offer "Submit for review". */
+  needsReview?: boolean;
+  /** Said instead of the usual empty message, e.g. when a search found nothing. */
+  emptyText?: string;
+}) {
   const t = useTranslations('posts');
+  const tApprovals = useTranslations('approvals');
 
   /**
    * What went wrong, in the reader's language when we are the ones who said it.
@@ -54,47 +78,94 @@ export function PostList({ posts }: { posts: PostView[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  async function act(postId: string, path: string, method: string, confirmText?: string) {
-    if (confirmText && !window.confirm(confirmText)) return;
+  /**
+   * Run one post action.
+   *
+   * `finally` clears the busy state whatever happens, a dropped connection
+   * included: a button left disabled after a failed request reads as the app
+   * having hung, and the only way out was a reload.
+   */
+  async function act(
+    postId: string,
+    request: { path: string; method: string; body?: unknown; confirmText?: string },
+    onSuccess?: (body: { postId?: string }) => void,
+  ) {
+    if (request.confirmText && !window.confirm(request.confirmText)) return;
 
     setBusy(postId);
     setError(null);
+    setNotice(null);
     try {
-      const response = await fetch(path, { method });
-      const body = (await response.json().catch(() => ({}))) as { error?: string; failures?: string[] };
+      const response = await fetch(request.path, {
+        method: request.method,
+        ...(request.body === undefined
+          ? {}
+          : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(request.body) }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        failures?: string[];
+        postId?: string;
+        /** Something the server wants said even though it worked. */
+        notice?: string;
+      };
       if (!response.ok) {
         setError(body.error ?? t('actionFailed'));
         return;
       }
       if (body.failures?.length) setError(body.failures.join(' '));
-      router.refresh();
+      if (body.notice) setNotice(body.notice);
+      if (onSuccess) onSuccess(body);
+      else router.refresh();
+    } catch {
+      setError(t('actionFailed'));
     } finally {
       setBusy(null);
     }
   }
 
-  if (posts.length === 0) {
-    return (
-      <div className="card p-8 text-center text-sm text-slate-600">{t('noPosts')}</div>
-    );
-  }
-
   return (
     <div className="space-y-3">
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {notice && (
+        <div
+          role="status"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+        >
+          {notice}
+        </div>
+      )}
+
+      {/* Below the error, not instead of it: cancelling the last post on a
+          filtered tab empties the tab, and what Facebook refused to remove
+          still has to be said. */}
+      {posts.length === 0 && (
+        <div className="card p-8 text-center text-sm text-slate-600">{emptyText ?? t('noPosts')}</div>
       )}
 
       {posts.map((post) => {
-        const canPublishNow = ['draft', 'scheduled', 'failed', 'partially_failed'].includes(post.status);
-        const canCancel = ['draft', 'scheduled'].includes(post.status);
+        // Facebook is holding it: our worker has nothing to send, and the
+        // publish route refuses it, so offering the button is a dead end.
+        const heldByFacebook = post.targets.some((target) => target.status === 'scheduled_remote');
+        const canPublishNow =
+          post.mayAct && post.cleared && !heldByFacebook && PUBLISHABLE_NOW.includes(post.status);
+        const canCancel = post.mayAct && CANCELLABLE.includes(post.status);
+        const canSubmit = post.mayAct && needsReview && SUBMITTABLE.includes(post.status);
+        const canWithdraw = post.mayAct && post.status === 'pending_approval';
         // The same rule the API enforces, so the button is never a dead end.
-        const canEdit = postIsEditable(post);
-        const canRetry = post.targets.some((target) => target.status === 'failed');
+        const canEdit = post.mayAct && postIsEditable(post);
+        const canRetry = post.mayAct && post.targets.some((target) => target.status === 'failed');
+        const working = busy === post.id;
 
         return (
-          <article key={post.id} className="card p-5">
+          <article key={post.id} className="card p-5" aria-busy={working}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-800">
@@ -120,6 +191,15 @@ export function PostList({ posts }: { posts: PostView[] }) {
               </div>
               <StatusBadge status={post.status} />
             </div>
+
+            {/* The reason is the whole point of a rejection: without it the
+                author can only guess what to change before resubmitting. */}
+            {post.reviewNote && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="text-xs font-medium">{tApprovals('reviewNote')}</p>
+                <p className="mt-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{post.reviewNote}</p>
+              </div>
+            )}
 
             <ul className="mt-4 space-y-1.5">
               {post.targets.map((target) => (
@@ -147,12 +227,52 @@ export function PostList({ posts }: { posts: PostView[] }) {
                   {tCommon('edit')}
                 </Link>
               )}
+              {canSubmit && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={working}
+                  onClick={() =>
+                    act(post.id, {
+                      path: `/api/posts/${post.id}/approve`,
+                      method: 'POST',
+                      body: { action: 'submit' },
+                    })
+                  }
+                >
+                  {post.status === 'rejected' ? tApprovals('resubmit') : t('submitForReview')}
+                </button>
+              )}
+              {canWithdraw && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={working}
+                  onClick={() =>
+                    act(post.id, {
+                      path: `/api/posts/${post.id}/approve`,
+                      method: 'POST',
+                      body: { action: 'withdraw' },
+                    })
+                  }
+                >
+                  {t('withdraw')}
+                </button>
+              )}
               {canPublishNow && (
                 <button
                   type="button"
                   className="btn-secondary"
-                  disabled={busy === post.id}
-                  onClick={() => act(post.id, `/api/posts/${post.id}/publish`, 'POST')}
+                  disabled={working}
+                  onClick={() =>
+                    act(post.id, {
+                      path: `/api/posts/${post.id}/publish`,
+                      method: 'POST',
+                      // It goes to real Pages the moment this is pressed, and
+                      // there is no taking a published post back from here.
+                      confirmText: t('publishNowConfirm', { count: post.targets.length }),
+                    })
+                  }
                 >
                   {tCompose('publishNow')}
                 </button>
@@ -161,8 +281,8 @@ export function PostList({ posts }: { posts: PostView[] }) {
                 <button
                   type="button"
                   className="btn-secondary"
-                  disabled={busy === post.id}
-                  onClick={() => act(post.id, `/api/posts/${post.id}/retry`, 'POST')}
+                  disabled={working}
+                  onClick={() => act(post.id, { path: `/api/posts/${post.id}/retry`, method: 'POST' })}
                 >
                   {t('retryFailed')}
                 </button>
@@ -170,8 +290,16 @@ export function PostList({ posts }: { posts: PostView[] }) {
               <button
                 type="button"
                 className="btn-secondary"
-                disabled={busy === post.id}
-                onClick={() => act(post.id, `/api/posts/${post.id}/duplicate`, 'POST')}
+                disabled={working}
+                onClick={() =>
+                  act(post.id, { path: `/api/posts/${post.id}/duplicate`, method: 'POST' }, (body) => {
+                    // Straight into the copy: a duplicate is made to be changed,
+                    // and one that appears silently somewhere down the list is
+                    // easy to miss and end up publishing twice.
+                    if (body.postId) router.push(`/compose?post=${body.postId}`);
+                    else router.refresh();
+                  })
+                }
               >
                 {tCommon('duplicate')}
               </button>
@@ -179,18 +307,22 @@ export function PostList({ posts }: { posts: PostView[] }) {
                 <button
                   type="button"
                   className="btn-danger"
-                  disabled={busy === post.id}
+                  disabled={working}
                   onClick={() =>
-                    act(
-                      post.id,
-                      `/api/posts/${post.id}`,
-                      'DELETE',
-                      t('cancelConfirm'),
-                    )
+                    act(post.id, {
+                      path: `/api/posts/${post.id}`,
+                      method: 'DELETE',
+                      confirmText: t('cancelConfirm'),
+                    })
                   }
                 >
                   {tCommon('cancel')}
                 </button>
+              )}
+              {working && (
+                <span className="self-center text-xs text-slate-500" role="status">
+                  {tCommon('working')}
+                </span>
               )}
             </div>
           </article>

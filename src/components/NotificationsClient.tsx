@@ -23,6 +23,7 @@ export function NotificationsClient({
   const [preferences, setPreferences] = useState(initial);
   const [pending, setPending] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const rows: Array<{ key: keyof NotificationPreferences; label: string }> = [
     { key: 'onPublishFailure', label: t('onPublishFailure') },
@@ -34,21 +35,33 @@ export function NotificationsClient({
   async function save() {
     setPending(true);
     setSaved(false);
-    await fetch('/api/notifications', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(preferences),
-    });
-    setPending(false);
-    setSaved(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(preferences),
+      });
+      // "Saved" after a refusal is the worst answer here: the person stops
+      // watching for failures on the strength of an email that will never come.
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? t('saveFailed'));
+        return;
+      }
+      setSaved(true);
+    } catch {
+      setError(t('networkError'));
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
     <section className="card p-5">
       {!emailConfigured && (
         <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          No email provider is configured on this server, so nothing will actually be sent. Set
-          RESEND_API_KEY to enable delivery.
+          {t('noEmailProvider')}
         </p>
       )}
 
@@ -70,11 +83,20 @@ export function NotificationsClient({
         ))}
       </ul>
 
-      <div className="mt-5 flex items-center gap-3">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <button type="button" className="btn-primary" onClick={save} disabled={pending}>
           {pending ? tCommon('working') : tCommon('save')}
         </button>
-        {saved && <span className="text-sm text-emerald-600">{t('saved')}</span>}
+        {saved && (
+          <span role="status" className="text-sm text-emerald-600">
+            {t('saved')}
+          </span>
+        )}
+        {error && (
+          <span role="alert" className="text-sm text-red-600">
+            {error}
+          </span>
+        )}
       </div>
     </section>
   );

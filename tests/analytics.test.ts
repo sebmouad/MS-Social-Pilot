@@ -102,8 +102,10 @@ const {
   PAGE_METRICS,
   POST_METRICS,
   VIDEO_METRICS,
+  REMOVED,
   catalogueSize,
   findMetric,
+  isServed,
   metricsFor,
 } = await import('../src/lib/facebook/metrics');
 const { trendOf } = await import('../src/lib/analytics');
@@ -188,7 +190,9 @@ describe('fetchInsights', () => {
   });
 
   it('isolates several removed metrics at once', async () => {
-    removed = new Set(['page_impressions_viral', 'page_consumptions']);
+    // Two names this fake Graph refuses; neither is one Meta has retired, since
+    // retired names are not asked for in the first place.
+    removed = new Set(['page_negative_feedback', 'page_consumptions']);
 
     const result = await fetchInsights({
       objectId: '1000',
@@ -199,7 +203,7 @@ describe('fetchInsights', () => {
 
     expect(result.unavailable.map((entry) => entry.name).sort()).toEqual([
       'page_consumptions',
-      'page_impressions_viral',
+      'page_negative_feedback',
     ]);
     expect(result.series.length).toBeGreaterThan(5);
   });
@@ -271,7 +275,9 @@ describe('fetchInsights', () => {
       period: 'lifetime',
     });
 
-    expect(result.series.some((entry) => entry.name === 'post_impressions')).toBe(true);
+    expect(result.series.some((entry) => entry.name === 'post_media_view')).toBe(true);
+    // Retired on every version in November 2025: not asked for, so not read.
+    expect(result.series.some((entry) => entry.name === 'post_impressions')).toBe(false);
   });
 });
 
@@ -314,12 +320,13 @@ describe('metric catalogue', () => {
   });
 
   it('covers every level and the ad fields', () => {
+    // What Meta still serves, after the 2025 and 2026 retirements.
     const sizes = catalogueSize();
-    expect(sizes.page).toBeGreaterThan(150);
-    expect(sizes.post).toBeGreaterThan(70);
+    expect(sizes.page).toBeGreaterThan(130);
+    expect(sizes.post).toBeGreaterThan(55);
     expect(sizes.video).toBeGreaterThan(50);
-    expect(sizes.ig_account).toBeGreaterThan(20);
-    expect(sizes.ig_media).toBeGreaterThan(20);
+    expect(sizes.ig_account).toBeGreaterThan(15);
+    expect(sizes.ig_media).toBeGreaterThan(15);
     expect(sizes.ads).toBeGreaterThan(100);
   });
 
@@ -353,14 +360,15 @@ describe('metric catalogue', () => {
     }
   });
 
-  it('records when Meta retired a metric on every version', () => {
-    expect(findMetric('post_impressions', 'post')!.deprecatedFrom).toBe('v24.0');
-    expect(findMetric('page_fans', 'page')!.deprecatedFrom).toBe('v24.0');
-    expect(findMetric('post_impressions_unique', 'post')!.deprecatedFrom).toBe('v25.0');
-    expect(findMetric('total_video_impressions', 'video')!.deprecatedFrom).toBe('v25.0');
-    expect(findMetric('page_engaged_users', 'page')!.deprecatedFrom).toBe('v19.0');
-    // An older removal recorded in the catalogue itself is left alone.
-    expect(findMetric('page_stories', 'page')!.deprecatedFrom).toBe('v4.0');
+  it('records when Meta retired a metric on every version, and what replaced it', () => {
+    expect(REMOVED.post_impressions).toMatchObject({ on: '2025-11-15', replacedBy: 'post_media_view' });
+    expect(REMOVED.page_fans).toMatchObject({ on: '2025-11-15', replacedBy: 'page_follows' });
+    expect(REMOVED.post_impressions_unique).toMatchObject({ replacedBy: 'post_total_media_view_unique' });
+
+    // Retired names are never requested; their replacements are.
+    const now = new Date('2026-10-09T12:00:00Z');
+    expect(isServed(findMetric('post_impressions', 'post')!, now)).toBe(false);
+    expect(isServed(findMetric('post_media_view', 'post')!, now)).toBe(true);
   });
 
   it('keeps Instagram account and media catalogues separate', () => {

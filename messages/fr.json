@@ -1,7 +1,36 @@
 {
+  "account": {
+    "changePassword": "Changer le mot de passe",
+    "confirmPassword": "Confirmez le nouveau mot de passe",
+    "currentPassword": "Mot de passe actuel",
+    "email": "E-mail",
+    "emailHint": "Votre adresse e-mail sert à vous connecter et ne peut pas être modifiée ici.",
+    "failed": "Cela n’a pas fonctionné. Veuillez réessayer.",
+    "language": "Langue",
+    "languages": {
+      "en": "English",
+      "fr": "Français"
+    },
+    "name": "Nom",
+    "newPassword": "Nouveau mot de passe",
+    "password": "Mot de passe",
+    "passwordChanged": "{count, plural, =0 {Mot de passe changé.} one {Mot de passe changé, et un autre appareil a été déconnecté.} other {Mot de passe changé, et # autres appareils ont été déconnectés.}}",
+    "passwordHint": "Changer de mot de passe vous déconnecte de tous vos autres appareils.",
+    "passwordMismatch": "Les deux nouveaux mots de passe ne correspondent pas.",
+    "passwordTooShort": "Utilisez au moins 10 caractères.",
+    "profile": "Profil",
+    "profileSaved": "Profil enregistré.",
+    "sessions": "Appareils connectés",
+    "sessionsCount": "{count, plural, =0 {Vous n’êtes connecté que sur cet appareil.} one {Vous êtes aussi connecté sur un autre appareil.} other {Vous êtes aussi connecté sur # autres appareils.}}",
+    "sessionsHint": "Téléphone perdu, ou connexion depuis un ordinateur partagé ? Déconnectez-vous partout ailleurs. Cet appareil reste connecté.",
+    "signOutOthers": "Déconnecter les autres appareils",
+    "signedOutOthers": "{count, plural, =0 {Aucun autre appareil à déconnecter.} one {Un autre appareil a été déconnecté.} other {# autres appareils ont été déconnectés.}}",
+    "subtitle": "Votre nom, votre langue, votre mot de passe et vos appareils connectés. Ces réglages vous suivent chez tous vos clients.",
+    "title": "Compte"
+  },
   "accounts": {
     "title": "Comptes connectés",
-    "subtitle": "Pages et groupes Facebook sur lesquels cet espace de travail peut publier.",
+    "subtitle": "Pages Facebook sur lesquelles cet espace de travail peut publier.",
     "connect": "Connecter Facebook",
     "noneTitle": "Aucun compte connecté",
     "noneBody": "Connectez le compte Facebook qui gère vos pages. Nous demandons l'autorisation de lister vos pages et de publier en leur nom, et les jetons obtenus sont chiffrés.",
@@ -13,13 +42,13 @@
     "syncedAt": "synchronisé {when}",
     "tokenExpires": "jeton expirant le {when}",
     "reconnectPrompt": "Reconnectez ce compte pour reprendre les publications planifiées.",
-    "disconnectConfirm": "Déconnecter {name} ? Les publications planifiées vers ses pages et groupes seront annulées. L'historique est conservé.",
+    "disconnectConfirm": "Déconnecter {name} ? Les publications planifiées vers ses pages seront annulées. L'historique est conservé.",
     "syncedResult": "{pages} page(s) et {groups} groupe(s) synchronisés.",
     "healthy": "La connexion fonctionne",
-    "groupsDisabled": "La publication dans les groupes est désactivée. Meta a restreint l'API Groupes en avril 2024 : une autorisation distincte est nécessaire et l'application doit être installée dans chaque groupe."
+    "groupsDisabled": "Impossible de publier dans les groupes. Meta a retiré l’API Groupes de toutes les versions le 22 avril 2024."
   },
   "ads": {
-    "none": "Aucun compte publicitaire connecté. La recherche nécessite l’autorisation de lecture des publicités.",
+    "none": "Aucun compte publicitaire n’est connecté. Pour les trouver, la connexion Facebook doit avoir l’autorisation de lecture des publicités.",
     "discover": "Rechercher les comptes publicitaires",
     "sync": "Récupérer depuis Facebook",
     "hint": "Les dépenses à côté de la portée organique, pour distinguer une hausse de portée d’une hausse de budget.",
@@ -38,11 +67,42 @@
     "level": "Détailler par",
     "level_campaign": "Campagne",
     "level_adset": "Ensemble de publicités",
-    "level_ad": "Publicité"
+    "level_ad": "Publicité",
+    "title": "Publicités",
+    "subtitle": "Ce que coûtent vos campagnes payantes, ce qu’elles ont apporté et où est allé le budget",
+    "account": "Compte publicitaire",
+    "lastDays": "{count, plural, one {# jour} other {# jours}}",
+    "lastSynced": "lu sur Facebook {when}",
+    "neverSynced": "pas encore lu sur Facebook",
+    "vsPrevious": "vs précédente",
+    "dailySpend": "Dépenses par jour",
+    "dailyClicks": "Clics par jour",
+    "date": "Date",
+    "breakdownTitle": "Où est allé le budget",
+    "share": "Part des dépenses",
+    "findings": {
+      "bestCtr": "« {name} » est cliquée {ratio}× plus souvent que la moyenne du compte.",
+      "concentrated": "« {name} » a absorbé {share} % des dépenses.",
+      "costlyClicks": "Les clics sur « {name} » coûtent {ratio}× la moyenne du compte.",
+      "cpcDown": "Les clics ont coûté {percent} % de moins que sur la période précédente.",
+      "cpcUp": "Les clics ont coûté {percent} % de plus que sur la période précédente.",
+      "ctrDown": "Les gens ont cliqué {percent} % moins souvent que sur la période précédente.",
+      "ctrUp": "Les gens ont cliqué {percent} % plus souvent que sur la période précédente.",
+      "noSpend": "Ce compte n’a rien dépensé sur cette période. Actualisez depuis Facebook si vous attendiez de la diffusion.",
+      "none": "Rien d’inhabituel sur cette période.",
+      "title": "Ce qui ressort"
+    },
+    "askAdmin": "Demandez à un propriétaire ou administrateur de l’espace de rechercher les comptes publicitaires accessibles.",
+    "exportCsv": "Télécharger le CSV",
+    "coverage": "données depuis le {date}",
+    "noComparison": "Pas de comparaison avec la période précédente : les données sont récupérées de Facebook jusqu’au {date}, et la période précédente commence avant.",
+    "allDisabled": "Tous les comptes publicitaires de cet espace sont désactivés. Réactivez-en un dans Connexions pour voir ses dépenses ici.",
+    "openConnections": "Ouvrir Connexions",
+    "staleComparison": "Pas de comparaison avec la période précédente : la dernière récupération depuis Facebook date du {when}, les jours suivants manquent."
   },
   "analytics": {
     "title": "Statistiques",
-    "subtitle": "Toutes les données que l'API Graph de Facebook fournit pour cette page",
+    "subtitle": "Comment se portent vos pages connectées, et tous les chiffres qui le montrent",
     "noPages": "Aucune page Facebook n'est encore connectée.",
     "connect": "Connecter une page",
     "choosePage": "Choisir une page",
@@ -71,7 +131,9 @@
       "inbox": "Messages",
       "external": "Autres publications",
       "instagram": "Instagram",
-      "ads": "Publicités"
+      "ads": "Publicités",
+      "analysis": "Analyse",
+      "compare": "Comparer les pages"
     },
     "byPost": "Impressions et interactions par publication",
     "byPostHint": "Une ligne par publication et par destination : une même publication peut réagir très différemment sur deux pages, et faire la moyenne masquerait l'information utile.",
@@ -140,11 +202,17 @@
     "coverageKey": "Le foncé est fourni par Facebook ; le clair a été demandé et refusé. Le reste n’a pas encore été testé.",
     "chooseView": "Choisir une vue",
     "sortBy": "Trier par",
-    "showLess": "Afficher moins"
+    "showLess": "Afficher moins",
+    "interactionsTotal": "Interactions",
+    "filterLabel": "Filtrer les indicateurs",
+    "sortAscending": "Tri croissant — inverser",
+    "sortDescending": "Tri décroissant — inverser",
+    "trendFromTo": "Tendance de {from} à {to}",
+    "refreshThrottled": "Les statistiques viennent d’être actualisées plusieurs fois. Réessayez dans {minutes, plural, one {# minute} other {# minutes}}."
   },
   "app": {
     "name": "MS Social Pilot",
-    "tagline": "Planifiez vos publications Facebook, pages et groupes, depuis un seul endroit."
+    "tagline": "Planifiez vos publications Facebook et Instagram depuis un seul endroit."
   },
   "approvals": {
     "title": "Validations",
@@ -159,7 +227,10 @@
     "rejectedBadge": "Refusée",
     "reviewNote": "Note du relecteur",
     "resubmit": "Soumettre à nouveau",
-    "overdue": "Heure dépassée — la valider la publie maintenant"
+    "overdue": "Heure dépassée — la valider la publie maintenant",
+    "overdueConfirm": "Son heure prévue est passée : la valider la publie immédiatement sur toutes ses destinations. Valider et publier ?",
+    "approvedNow": "Validée. Son heure est passée, elle part donc tout de suite.",
+    "moreMedia": "+{count}"
   },
   "auth": {
     "signIn": "Se connecter",
@@ -176,12 +247,18 @@
     "createOne": "En créer un",
     "somethingWrong": "Une erreur est survenue.",
     "registrationClosedTitle": "Les inscriptions sont fermées",
-    "registrationClosedBody": "Ce serveur n’accepte que les personnes invitées. Demandez à un administrateur de vous envoyer une invitation."
+    "registrationClosedBody": "Ce serveur n’accepte que les personnes invitées. Demandez à un administrateur de vous envoyer une invitation.",
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez."
   },
   "calendar": {
     "title": "Calendrier",
     "timesShownIn": "Heures affichées en {timezone}.",
-    "more": "+{count} de plus"
+    "newPostOn": "Nouvelle publication le {date}",
+    "more": "+{count} de plus",
+    "unscheduledDrafts": "Brouillons sans date",
+    "unscheduledDraftsHint": "Les brouillons sans date n'apparaissent pas dans la grille. {count, plural, one {Le plus récent} other {Les # plus récents}} :",
+    "allDrafts": "Tous les brouillons",
+    "draftCreated": "Commencé le {date}"
   },
   "common": {
     "all": "Tout",
@@ -253,10 +330,13 @@
     "viewOn": "Voir sur {destination}",
     "submitForApproval": "Soumettre à validation",
     "submittedOk": "Soumise à validation.",
-    "subtitle": "Rédigez une fois, publiez sur autant de pages et de groupes Facebook que vous voulez.",
+    "subtitle": "Rédigez une fois, publiez sur autant de pages Facebook que vous voulez.",
     "targetPaused": "Désactivée pour cet espace de travail.",
     "thisApp": "Cette application.",
-    "thisAppHint": "Modifiable jusqu'à la parution, et compatible avec les groupes.",
+    "thisAppHint": "Modifiable jusqu'à la parution, et sans limite de date.",
+    "goodTimes": "Bons créneaux cette semaine",
+    "goodTimesHint": "D'après les résultats de vos Pages sur les 90 derniers jours : les publications à ces heures ont suscité plus d'interactions que d'habitude.",
+    "goodTimeTitle": "{lift}× les interactions habituelles, sur {posts} publications",
     "timezoneHint": "Les heures sont exprimées en {timezone}, le fuseau de votre espace de travail.",
     "title": "Rédiger",
     "viaGraph": "l'analyseur Facebook",
@@ -270,12 +350,23 @@
     "mediaOrDrop": "ou les déposer ici",
     "blockedNoDestinations": "Connectez d’abord une Page Facebook, depuis Connexions, pour avoir où publier.",
     "blockedNoneSelected": "Choisissez au moins une Page sous « Où publier ».",
-    "blockedNoContent": "Écrivez un message, ajoutez un lien ou joignez un média."
+    "blockedNoContent": "Écrivez un message, ajoutez un lien ou joignez un média.",
+    "uploadFailed": "l'envoi n'a pas abouti. Veuillez réessayer.",
+    "uploading": "Envoi en cours…",
+    "altText": "Décrivez l'image",
+    "altTextFor": "Description de l'image {number}, pour les lecteurs d'écran",
+    "untickSwitchedOff": "Désactivées depuis la rédaction de cette publication : {names}. Décochez-les pour enregistrer.",
+    "instagramNeedsMedia": "Instagram n'accepte que les publications avec une photo ou une vidéo. Ajoutez-en une, ou décochez les destinations Instagram. Vous pouvez toujours enregistrer un brouillon.",
+    "facebookInstagramWarning": ", et indisponible si un compte Instagram est sélectionné",
+    "retryFromList": "La publication est enregistrée et les destinations qui ont fonctionné l’ont reçue. Pour réessayer les autres, utilisez « Réessayer les échecs » dans la liste des publications — publier à nouveau d’ici en enverrait une seconde copie.",
+    "openPostList": "Ouvrir la liste des publications",
+    "retryAllFromList": "Aucune destination ne l’a acceptée, mais la publication est enregistrée. Utilisez « Réessayer les échecs » dans la liste des publications pour réessayer — publier à nouveau d’ici en créerait une seconde copie.",
+    "blockedInstagramMedia": "Ajoutez une photo ou une vidéo : Instagram n’accepte rien d’autre."
   },
   "config": {
     "title": "Configuration",
     "subtitle": "Tous les réglages de cette installation, sans modifier de fichier sur le serveur.",
-    "ownerOnly": "Seul un propriétaire d’espace peut modifier les réglages de l’installation.",
+    "ownerOnly": "Seul le propriétaire de cette installation — la personne qui a créé son premier compte — peut modifier ses réglages.",
     "footnote": "Les valeurs définies ici priment sur l’environnement. Réinitialiser une valeur rend la main à la variable d’environnement, ou à la valeur par défaut s’il n’y en a pas.",
     "saved": "{count, plural, one {# réglage enregistré} other {# réglages enregistrés}}.",
     "unsaved": "{count, plural, one {# modification non enregistrée} other {# modifications non enregistrées}}",
@@ -310,7 +401,7 @@
     "featureOff": "Désactivé dans la Configuration. Meta examine cette autorisation séparément, et la demander avant approbation fait échouer toute la connexion.",
     "followers": "{count, plural, one {# abonné} other {# abonnés}}",
     "groups": "Groupes",
-    "groupsOff": "La publication dans les groupes Facebook est désactivée ; les Pages fonctionnent normalement. Les groupes demandent une approbation supplémentaire de Meta et l’ajout de l’application à chaque groupe. Une fois les deux obtenus, activez les groupes dans Paramètres → Configuration.",
+    "groupsOff": "La publication dans les groupes Facebook n’est plus possible ; les Pages fonctionnent normalement. Meta l’a retirée pour toutes les applications le 22 avril 2024.",
     "health": {
       "title": "Vérification des connexions",
       "subtitle": "Demandez à Facebook ce qui fonctionne, autorisation par autorisation et Page par Page.",
@@ -321,7 +412,7 @@
       "checkedAt": "Vérifié à {when}",
       "appTitle": "Application Facebook",
       "permissions": "Autorisations",
-      "destinations": "Pages et groupes",
+      "destinations": "Pages",
       "declined": "Refusée sur Facebook. {consequence}",
       "notRequested": "Non accordée. {consequence}",
       "noAccounts": "Aucun compte Facebook connecté pour le moment.",
@@ -334,11 +425,11 @@
     "instagramDestinations": "Comptes Instagram où publier",
     "instagramHint": "Comptes professionnels accessibles via une page connectée. Utilisables comme destinations une fois instagram_content_publish approuvé ; jusque-là, ils apparaissent désactivés.",
     "instagramTitle": "Comptes Instagram",
-    "noGroups": "Aucun groupe. La publication dans les groupes nécessite une autorisation approuvée séparément.",
+    "noGroups": "Aucun groupe. Meta a retiré l’API Groupes en avril 2024.",
     "noLinkedPage": "Aucune page reliée",
     "noPages": "Aucune page trouvée. Actualisez, ou vérifiez que ce compte en gère.",
     "noScopes": "Aucune enregistrée — reconnectez pour actualiser.",
-    "noneBody": "Connectez un compte Facebook pour récupérer les pages et groupes que vous gérez. La publication, les statistiques et la modération passent toutes par cette connexion.",
+    "noneBody": "Connectez un compte Facebook pour récupérer les pages que vous gérez. La publication, les statistiques et la modération passent toutes par cette connexion.",
     "noneFound": "Aucun trouvé pour le moment.",
     "noneTitle": "Aucune connexion pour le moment",
     "ownToken": "Possède son propre jeton de page",
@@ -347,7 +438,7 @@
     "permissions": "Autorisations accordées",
     "reconnect": "Reconnecter",
     "reconnectRequired": "Reconnexion nécessaire.",
-    "subtitle": "Comptes Facebook connectés, pages et groupes associés, et les jetons qui y donnent accès.",
+    "subtitle": "Comptes Facebook connectés, pages associées, et les jetons qui y donnent accès.",
     "syncTargets": "Actualiser les pages",
     "synced": "synchronisé {when}",
     "syncedResult": "{pages} pages et {groups} groupes trouvés.",
@@ -367,6 +458,16 @@
       "inaccessible": "Cette destination n’est plus accessible avec le compte Facebook connecté.",
       "disconnected": "Le compte Facebook de cette destination a été déconnecté.",
       "instagram_permission": "Publier sur Instagram nécessite l’autorisation instagram_content_publish de Meta. Réactivez cette destination une fois qu’elle est accordée."
+    },
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+    "toggleDestination": "Publier sur {name}",
+    "toggleAccount": "Utiliser {name}",
+    "dataDeletion": {
+      "title": "Demande de suppression des données",
+      "completed": "Votre demande a été traitée. La connexion Facebook et ses jetons d’accès enregistrés ont été supprimés, et les publications encore en attente pour ses pages et groupes ont été annulées.",
+      "code": "Code de confirmation :",
+      "noCode": "Aucun code de confirmation n’a été fourni. Ouvrez cette page avec le lien que Facebook vous a donné lors de votre demande de suppression.",
+      "retained": "Les traces des publications déjà parues sur vos pages sont conservées dans les archives professionnelles du propriétaire de l’espace de travail. Contactez-le si vous souhaitez aussi les faire supprimer."
     }
   },
   "dashboard": {
@@ -395,7 +496,9 @@
     "reviewConnections": "Vérifier les connexions",
     "setupStepsLeft": "Terminez la configuration : encore {count, plural, one {# étape} other {# étapes}}. Prochaine : {next}.",
     "setupCheckFailing": "La configuration est terminée, mais une vérification de l’installation échoue.",
-    "continueSetup": "Continuer la configuration"
+    "continueSetup": "Continuer la configuration",
+    "reconnectRequired": "Reconnexion nécessaire.",
+    "noTimeSet": "Aucune heure définie"
   },
   "email": {
     "invitation": {
@@ -415,7 +518,7 @@
     "connectionExpired": {
       "subject": "Reconnectez {account} pour continuer à publier",
       "heading": "Une connexion Facebook ne fonctionne plus",
-      "body": "{account} ne peut plus publier. Les publications planifiées vers ses pages et groupes échoueront tant que le compte n'est pas reconnecté.",
+      "body": "{account} ne peut plus publier. Les publications planifiées vers ses pages échoueront tant que le compte n'est pas reconnecté.",
       "cta": "Reconnecter maintenant"
     },
     "tokenExpiring": {
@@ -463,6 +566,7 @@
     "hide": "Masquer",
     "impressions": "Impressions",
     "inboxHint": "Conversations récentes de la boîte de réception. Les lire demande l’autorisation de messagerie, y répondre aussi.",
+    "interactions": "Interactions",
     "likes": "{count, plural, one {# j’aime} other {# j’aime}}",
     "messageCount": "{count, plural, one {# message} other {# messages}}",
     "metricsCount": "Indicateurs",
@@ -482,10 +586,12 @@
     "replyFailed": "Facebook a refusé d’envoyer cette réponse.",
     "replyNobodyWaiting": "Le dernier message est celui de la page : il n’y a personne à qui répondre.",
     "replyPlaceholder": "Répondre en tant que page…",
+    "replyToLabel": "Répondre à {author}",
     "replyWindowClosed": "Facebook n’autorise une réponse que dans les 24 heures suivant le dernier message de la personne. Cette conversation est silencieuse depuis plus longtemps.",
     "replyWindowOpen": "Facebook accepte une réponse sur cette conversation jusqu’à {until}.",
     "reviewCount": "Notes",
     "reviewsHint": "Notes et recommandations laissées sur la page.",
+    "reviewsRetired": "Meta a retiré les avis de Page de l’API Graph à partir de la v22.0, et cette installation utilise {version} : aucun nouvel avis ne peut être lu. Ceux lus auparavant restent affichés.",
     "searchComments": "Rechercher dans les commentaires",
     "searchPlaceholder": "Mots d’un commentaire",
     "sendReply": "Envoyer la réponse",
@@ -493,6 +599,7 @@
     "show": "Afficher",
     "showAll": "Tous",
     "showHidden": "Masqués uniquement",
+    "showUnanswered": "Sans réponse uniquement",
     "showVisible": "Visibles uniquement",
     "totalWatch": "Durée totale",
     "unhide": "Afficher",
@@ -535,22 +642,29 @@
     "conversationNotFound": "Conversation introuvable.",
     "correctFields": "Veuillez corriger les champs signalés.",
     "csvUnterminatedQuote": "Un champ entre guillemets commençant à la ligne {line} n’est jamais fermé : tout ce qui suit a été lu comme une seule valeur. Ajoutez le guillemet manquant et réimportez le fichier.",
+    "currentPasswordWrong": "Votre mot de passe actuel est incorrect.",
     "dateRange": "Saisissez une plage de dates valide.",
     "destinationNotFound": "Destination introuvable.",
+    "destinationBlocked": "Impossible de publier sur cette destination pour le moment : elle ne peut donc pas être activée.",
     "editorsOnlyDeleteMedia": "Seuls les éditeurs et les rôles supérieurs peuvent supprimer des fichiers de la médiathèque.",
+    "emailTaken": "Un compte existe déjà avec cette adresse e-mail. Connectez-vous plutôt.",
+    "emptyPost": "Écrivez quelque chose, ajoutez un lien ou joignez un média.",
     "errorBody": "La page n’a pas pu être chargée. Réessayer en vaut la peine — si cela persiste, la référence ci-dessous indiquera par où commencer.",
     "errorTitle": "Une erreur est survenue",
     "feedInstagramUnsupported": "Un élément de flux est un titre et un lien, et Instagram n’accepte ni l’un ni l’autre sans image ({names}). Choisissez des destinations Facebook pour ce flux.",
     "feedNotFound": "Flux introuvable.",
+    "feedUrlBlocked": "Cette adresse de flux pointe vers un réseau privé, que ce serveur ne consulte pas. Utilisez l’adresse publique du flux.",
     "fileNotFound": "Fichier introuvable.",
     "fileTooLarge": "Ce fichier dépasse la limite de {limit} Mo.",
     "generic": "Une erreur est survenue. Veuillez réessayer.",
     "heldByFacebook": "Facebook conserve déjà cette publication pour l’heure prévue. Annulez-la d’abord pour publier maintenant.",
     "instagramNotFound": "Compte Instagram introuvable.",
+    "invalidCredentials": "Adresse e-mail ou mot de passe incorrect.",
     "lastOwner": "Un espace de travail doit conserver au moins un propriétaire.",
     "mediaInUse": "Ce fichier est encore utilisé par {count, plural, one {# publication non encore parue} other {# publications non encore parues}}. Retirez-le d’abord de celles-ci.",
     "moderateNoPermission": "Vous n’avez pas l’autorisation de modérer les commentaires.",
     "nativeGroupsUnsupported": "Facebook ne peut pas planifier nativement les publications de groupe ({names}). Utilisez le planificateur intégré.",
+    "instagramNeedsMedia": "Instagram publie une photo ou une vidéo, jamais du texte seul ({names}). Ajoutez un média ou retirez Instagram.",
     "nativeInstagramUnsupported": "Instagram ne propose pas de programmation ({names}). Utilisez le planificateur intégré pour celles-ci.",
     "noAdAccount": "Aucun compte publicitaire connecté.",
     "noInstagramConnected": "Aucun compte Instagram connecté.",
@@ -563,20 +677,25 @@
     "notFoundTitle": "Cette page n’est pas ici",
     "notPending": "Cette publication n'est pas en attente de validation.",
     "notSignedIn": "Vous devez être connecté.",
+    "notSubmittable": "Cette publication ne peut pas être envoyée en validation.",
     "ownerOnlyChangeConfig": "Seul un propriétaire peut modifier la configuration.",
     "ownerOnlyChangeSetup": "Seul un propriétaire peut modifier la configuration initiale.",
     "ownerOnlyViewConfig": "Seul un propriétaire peut consulter la configuration.",
     "ownerOnlyViewSetup": "Seul un propriétaire peut consulter la configuration initiale.",
+    "passwordUnchanged": "Choisissez un mot de passe différent de l’actuel.",
     "pickDateTime": "Choisissez une date et une heure pour cette publication.",
     "postNotFound": "Publication introuvable.",
     "previewHostBlocked": "Cet hôte n’est pas accessible pour les aperçus de liens.",
     "previewSchemeUnsupported": "Seules les URL http et https peuvent être prévisualisées.",
     "previewUrlInvalid": "Saisissez une URL valide, avec http:// ou https://.",
+    "publishNeedsReview": "Les publications de cet espace sont validées avant de partir, elles ne peuvent donc pas être publiées immédiatement. Planifiez-la et elle rejoindra la file de validation.",
     "publishOwnOnly": "Vous ne pouvez publier que vos propres publications.",
     "queueEmpty": "Votre file de publication est vide. Ajoutez des créneaux dans les Paramètres.",
     "queueFull": "Tous les créneaux des 90 prochains jours sont pris. Ajoutez des créneaux ou choisissez une date.",
     "quotaFull": "Ce client a utilisé {used} Mo de son quota de {quota} Mo. Supprimez des fichiers ou augmentez la limite dans la Configuration.",
     "reference": "Référence",
+    "refreshNoPermission": "Seuls les éditeurs et au-delà peuvent récupérer les commentaires et messages depuis Facebook.",
+    "refreshTooSoon": "Cet espace de travail vient de récupérer les données de Facebook. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}.",
     "registrationClosed": "Ce serveur n’accepte pas de nouveaux comptes. Demandez à un administrateur de vous inviter.",
     "replyNoPermission": "Vous n’avez pas l’autorisation de répondre aux messages.",
     "replyWindowClosed": "Facebook n’autorise une réponse que dans les 24 heures suivant le dernier message de la personne. Cette conversation est silencieuse depuis plus longtemps, une réponse serait donc refusée.",
@@ -585,9 +704,12 @@
     "targetsUnavailable": "Une ou plusieurs destinations sélectionnées ne sont plus disponibles.",
     "timePassed": "Cette heure est déjà passée. Choisissez une heure future.",
     "tooManyAttempts": "{minutes, plural, one {Trop de tentatives de connexion. Réessayez dans une minute.} other {Trop de tentatives de connexion. Réessayez dans # minutes.}}",
+    "tooManySignups": "{minutes, plural, one {Trop de comptes créés depuis cet endroit. Réessayez dans une minute.} other {Trop de comptes créés depuis cet endroit. Réessayez dans # minutes.}}",
     "tryAgain": "Réessayer",
     "unknownExport": "Export inconnu. Choisissez parmi : {kinds}.",
-    "variantsNeedApproval": "Les formulations alternatives sont publiées sans validation : seuls les éditeurs et rôles supérieurs peuvent les définir lorsque la validation est activée."
+    "variantsNeedApproval": "Les formulations alternatives sont publiées sans validation : seuls les éditeurs et rôles supérieurs peuvent les définir lorsque la validation est activée.",
+    "dateRangeInverted": "Le début de la période est après sa fin. Inversez les dates.",
+    "adAccountNotFound": "Compte publicitaire introuvable."
   },
   "feeds": {
     "title": "Flux RSS",
@@ -596,7 +718,7 @@
     "name": "Nom",
     "url": "URL du flux",
     "template": "Modèle de publication",
-    "templateHint": "Utilisez {'{{'}title{'}}'}, {'{{'}link{'}}'} et {'{{'}description{'}}'}.",
+    "templateHint": "Utilisez '{{title}}', '{{link}}' et '{{description}}'.",
     "destinations": "Destinations",
     "autoApprove": "Planifier automatiquement les nouveaux articles",
     "autoApproveHint": "Si désactivé, les nouveaux articles passent par la file de validation.",
@@ -607,7 +729,21 @@
     "itemsImported": "{count, plural, one {# article importé} other {# articles importés}}",
     "pollNow": "Vérifier maintenant",
     "deleteConfirm": "Supprimer ce flux ? Les publications déjà créées sont conservées.",
-    "errorCount": "{count, plural, one {# erreur consécutive} other {# erreurs consécutives}}"
+    "errorCount": "{count, plural, one {# erreur consécutive} other {# erreurs consécutives}}",
+    "saved": "Flux enregistré.",
+    "pollFailed": "Le flux n’a pas pu être vérifié. La raison est indiquée sur le flux ci-dessous.",
+    "autoApproveOn": "Planification automatique",
+    "autoApproveOff": "Validation requise",
+    "recent": "Importés récemment",
+    "untitled": "Article sans titre",
+    "importedAt": "Importé {when}",
+    "viewPost": "Voir la publication",
+    "noPost": "Rien à publier",
+    "preview": "Aperçu",
+    "previewEmpty": "Ce modèle produit une publication vide.",
+    "sampleTitle": "Un exemple de titre",
+    "sampleDescription": "Les premières lignes de l’article apparaissent ici.",
+    "noDestinations": "Connectez d’abord une Page ou un Groupe Facebook : les flux y publient."
   },
   "history": {
     "actions": {
@@ -645,7 +781,8 @@
         "rejected": "a renvoyé une publication pour modification",
         "retried": "a relancé une publication en échec",
         "submitted": "a soumis une publication pour validation",
-        "updated": "a modifié une publication"
+        "updated": "a modifié une publication",
+        "withdrawn": "a retiré une publication de la validation"
       },
       "settings": {
         "changed": "a modifié les réglages de l’espace de travail"
@@ -676,6 +813,7 @@
     "statusSkipped": "Non envoyé",
     "subtitle": "Ce qui s’est passé dans cet espace de travail, et ce qui a été envoyé par e-mail.",
     "tabActivity": "Activité",
+    "tabFailures": "{count, plural, one {, # en échec} other {, # en échec}}",
     "tabEmail": "E-mails",
     "title": "Historique",
     "unknownAction": "a fait quelque chose que l’application ne sait plus nommer ({action})"
@@ -716,6 +854,49 @@
     "usageOf": "{used} sur {total}",
     "usageTitle": "Stockage utilisé"
   },
+  "metaApp": {
+    "copied": "Copié",
+    "copy": "Copier",
+    "copyNamed": "Copier {name}",
+    "fields": {
+      "appDomain": {
+        "label": "Domaine de l’application",
+        "where": "Paramètres de l’app → Général → Domaines de l’app."
+      },
+      "dataDeletion": {
+        "label": "URL de demande de suppression des données",
+        "where": "Paramètres de l’app → Général → Suppression des données → URL de rappel. Obligatoire pour l’examen de l’application."
+      },
+      "deauthorize": {
+        "label": "URL de rappel de désautorisation",
+        "where": "Facebook Login → Paramètres → URL de rappel de désautorisation. Meta l’appelle quand quelqu’un retire l’application de son compte."
+      },
+      "graphVersion": {
+        "label": "Version de l’API Graph",
+        "where": "Paramètres de l’app → Avancé → Mettre à niveau la version de l’API : l’application doit être au moins sur cette version. Toutes les requêtes l’utilisent."
+      },
+      "permissions": {
+        "label": "Autorisations demandées",
+        "where": "Examen de l’app → Autorisations et fonctionnalités : chacune nécessite l’accès avancé pour que des personnes extérieures à votre entreprise puissent se connecter."
+      },
+      "redirectUri": {
+        "label": "URI de redirection OAuth valide",
+        "where": "Facebook Login → Paramètres → URI de redirection OAuth valides. Elle doit correspondre caractère pour caractère, https compris et sans barre oblique finale."
+      },
+      "siteUrl": {
+        "label": "URL du site",
+        "where": "Paramètres de l’app → Général → Ajouter une plateforme → Site web → URL du site."
+      }
+    },
+    "privacyNote": "Meta exige aussi une URL de politique de confidentialité (Paramètres → Général) avant de passer l’application en mode Live. Cette installation n’en publie pas pour vous : utilisez celle de votre organisation.",
+    "subtitle": "Les valeurs exactes à saisir dans votre application sur developers.facebook.com, calculées à partir de l’adresse de cette installation.",
+    "title": "Réglages de l’application Meta",
+    "warnings": {
+      "loopback": "Cette adresse est localhost. Facebook ne peut pas appeler les URL de désautorisation et de suppression des données, et de vrais utilisateurs ne peuvent pas s’y connecter. À réserver au développement.",
+      "notAUrl": "APP_URL n’est pas une URL valide : aucune de ces valeurs ne peut être juste. Corrigez-la dans l’environnement ou dans l’écran Configuration.",
+      "notHttps": "L’adresse de cette installation n’est pas en https. Facebook n’accepte une URI de redirection http que pour localhost en mode développement : réglez APP_URL sur l’adresse https publique avant de connecter de vraies Pages."
+    }
+  },
   "nav": {
     "dashboard": "Tableau de bord",
     "compose": "Rédiger",
@@ -730,7 +911,26 @@
     "switchWorkspace": "Changer de client",
     "analytics": "Statistiques",
     "menu": "Menu",
-    "connections": "Connexions"
+    "connections": "Connexions",
+    "module": {
+      "ads": "Publicités",
+      "analytics": "Statistiques",
+      "schedule": "Planification"
+    },
+    "moduleShort": {
+      "ads": "Pubs",
+      "analytics": "Stats",
+      "schedule": "Planning"
+    },
+    "home": "Accueil",
+    "modules": "Modules",
+    "shared": "Espace de travail",
+    "pages": "Pages",
+    "adsPerformance": "Performances",
+    "queue": "File d’attente",
+    "switchFailed": "Impossible de changer de client. Veuillez réessayer.",
+    "signOutFailed": "Déconnexion impossible. Vérifiez votre connexion et réessayez.",
+    "dismiss": "Fermer"
   },
   "notifications": {
     "title": "Notifications",
@@ -739,7 +939,141 @@
     "onTokenExpiry": "Une connexion Facebook va expirer",
     "onApprovalRequest": "Quelqu'un soumet une publication à validation",
     "onApprovalDecision": "Ma publication est validée ou refusée",
-    "saved": "Préférences enregistrées."
+    "saved": "Préférences enregistrées.",
+    "noEmailProvider": "Aucun fournisseur d’e-mail n’est configuré sur ce serveur : rien ne sera réellement envoyé. Un propriétaire peut ajouter une clé API Resend dans l’écran Configuration.",
+    "saveFailed": "Vos préférences de notification n’ont pas pu être enregistrées. Veuillez réessayer.",
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez."
+  },
+  "pageAnalysis": {
+    "analyseNow": "Analyser maintenant",
+    "analysed": "{count, plural, =0 {À jour.} one {À jour. Une publication récente a été actualisée.} other {À jour. # publications récentes ont été actualisées.}}",
+    "analysing": "Lecture de Facebook…",
+    "bottom": {
+      "hint": "À regarder avant de publier quelque chose de semblable.",
+      "title": "Publications les plus faibles"
+    },
+    "cadence": {
+      "hint": "{perWeek} par semaine en moyenne. La ligne pointillée correspond à {target} par semaine.",
+      "posts": "{count, plural, =0 {Aucune publication} one {# publication} other {# publications}}",
+      "target": "Objectif",
+      "title": "Publications par semaine",
+      "week": "Semaine du {date}"
+    },
+    "compare": {
+      "avg": "Par publication",
+      "followers": "Abonnés",
+      "health": "Santé",
+      "hint": "Les mêmes chiffres pour chaque page de cet espace, sur les mêmes {days} jours, pour repérer celles qui demandent de l’attention.",
+      "net": "Abonnés nets",
+      "none": "Aucune page n’est connectée.",
+      "open": "Analyser",
+      "page": "Page",
+      "perWeek": "Publications / sem.",
+      "rate": "Taux médian",
+      "reach": "Touchées",
+      "title": "Toutes les pages côte à côte"
+    },
+    "empty": "Aucune publication ni aucun chiffre pour cette page pour l’instant. Lancez l’analyse pour lire son historique sur Facebook.",
+    "failed": "L’analyse n’a pas pu être actualisée. Veuillez réessayer.",
+    "findings": {
+      "bestFormat": "Ici, les publications de type {best} obtiennent {ratio}× les interactions des publications de type {worst}.",
+      "bestTime": "Les publications du {weekday} entre {start} et {end} obtiennent {lift}× la publication type ({posts} publications).",
+      "goneQuiet": "Rien n’a été publié depuis {days} jours.",
+      "interactionsDown": "Chaque publication obtient {percent} % d’interactions de moins que sur la période précédente.",
+      "interactionsUp": "Chaque publication obtient {percent} % d’interactions de plus que sur la période précédente.",
+      "longGap": "La plus longue période sans publication a duré {days} jours.",
+      "losingFollowers": "{count, plural, one {La page a perdu un abonné de plus qu’elle n’en a gagné.} other {La page a perdu # abonnés de plus qu’elle n’en a gagné.}}",
+      "mostPostedUnderperforms": "Le type {format} représente {share} % des publications mais fait moins bien que la moyenne ; le type {best} fait le mieux.",
+      "neverSynced": "Rien n’a encore été lu sur Facebook pour cette page : l’analyse est vide.",
+      "noPosts": "Aucune publication sur cette période. Une page qui se tait est montrée à moins d’abonnés quand elle reprend.",
+      "none": "Rien d’inhabituel sur cette période. Continuez à publier et revenez plus tard.",
+      "reachDown": "La page a touché {percent} % de personnes de moins que sur la période précédente.",
+      "reachUp": "La page a touché {percent} % de personnes de plus que sur la période précédente.",
+      "stale": "Ces chiffres ont été lus sur Facebook il y a {days} jours. Lancez l’analyse pour les mettre à jour.",
+      "standoutPost": "La meilleure publication a obtenu {ratio}× la publication type. Elle est en tête de la liste ci-dessous.",
+      "title": "Ce qui ressort"
+    },
+    "format": {
+      "link": "Lien",
+      "other": "Autre",
+      "photo": "Photo",
+      "text": "Texte",
+      "video": "Vidéo"
+    },
+    "formats": {
+      "avg": "Interactions moy.",
+      "format": "Type",
+      "hint": "Interactions moyennes par publication, selon le type.",
+      "lift": "vs moyenne",
+      "none": "Aucune publication à comparer sur cette période.",
+      "posts": "Publications",
+      "rate": "Taux médian",
+      "reach": "Portée moy.",
+      "title": "Quel type de publication fonctionne"
+    },
+    "heading": "Comment se porte {page}",
+    "health": {
+      "band": {
+        "attention": "À surveiller",
+        "steady": "Stable",
+        "strong": "Solide"
+      },
+      "component": {
+        "consistency": "Régularité",
+        "growth": "Croissance des abonnés",
+        "momentum": "Interactions par publication",
+        "reach": "Portée"
+      },
+      "componentHint": {
+        "consistency": "Publier environ {target} fois par semaine, sans semaine vide.",
+        "growth": "Nouveaux abonnés nets, rapportés à l’audience.",
+        "momentum": "Par rapport à la période précédente. La stabilité vaut 50.",
+        "reach": "Personnes touchées, par rapport à la période précédente. La stabilité vaut 50."
+      },
+      "hint": "Une note sur 100 calculée à partir des quatre éléments ci-dessous. Ce que Facebook ne fournit pas est ignoré plutôt que compté comme zéro.",
+      "none": "Pas encore assez de données.",
+      "title": "Santé de la page"
+    },
+    "kpi": {
+      "avgInteractions": "Par publication",
+      "interactions": "Interactions",
+      "medianRate": "Taux médian",
+      "netFollows": "Abonnés nets",
+      "posts": "Publications",
+      "reach": "Personnes touchées"
+    },
+    "kpiHint": "Les interactions sont les réactions, commentaires et partages. Le taux est le nombre d’interactions pour cent personnes touchées, valeur médiane des publications.",
+    "lastRefreshed": "Chiffres lus sur Facebook {when}.",
+    "neverRefreshed": "Rien n’a encore été lu sur Facebook pour cette page.",
+    "partial": "Certains chiffres n’ont pas pu être lus : {detail}",
+    "period": "{days} derniers jours, comparés aux {days} jours précédents",
+    "post": {
+      "fromApp": "Publiée ici",
+      "fromPage": "Publiée sur Facebook",
+      "noText": "(sans texte)",
+      "open": "Ouvrir sur Facebook",
+      "rate": "Taux"
+    },
+    "sample": "{current, plural, =0 {Aucune publication} one {Établie à partir d’une publication} other {Établie à partir de # publications}} sur cette période ; la grille des meilleurs horaires utilise {timing, plural, one {une publication} other {# publications}} des 90 derniers jours ou plus.",
+    "times": {
+      "best": "Meilleurs horaires",
+      "cell": "{weekday} {start}–{end}",
+      "cellDetail": "{posts, plural, =0 {Aucune publication} one {Une publication} other {# publications}}",
+      "cellLift": "{avg} interactions en moyenne · {lift}× la normale",
+      "day": "Jour",
+      "faded": "Les cases estompées reposent sur une seule publication.",
+      "high": "1,5× ou plus",
+      "hint": "Interactions moyennes selon le jour et l’heure de publication ({timezone}), rapportées à la publication type de la page. Plus c’est foncé, mieux c’est.",
+      "low": "Sous la normale",
+      "none": "Pas encore assez de publications pour dégager les bons horaires.",
+      "title": "Quand les publications fonctionnent le mieux",
+      "toQueue": "Ajouter les meilleurs horaires à la file de publication"
+    },
+    "top": {
+      "hint": "Selon les interactions sur cette période.",
+      "title": "Meilleures publications"
+    },
+    "vsPrevious": "vs précédente"
   },
   "posts": {
     "title": "Publications",
@@ -757,12 +1091,56 @@
     "retryFailed": "Réessayer les échecs",
     "cancelConfirm": "Annuler cette publication ? Ce qui est déjà planifié dans Facebook y sera également supprimé.",
     "actionFailed": "Cette action a échoué.",
+    "statusFilter": "Filtrer par statut",
+    "searchLabel": "Rechercher des publications",
+    "searchPlaceholder": "Mots de la publication",
+    "destinationFilter": "Destination",
+    "allDestinations": "Toutes les destinations",
+    "clearFilters": "Effacer",
+    "noMatches": "Aucune publication ne correspond à ces filtres.",
+    "withdraw": "Retirer de la validation",
+    "submitForReview": "Soumettre pour validation",
+    "publishNowConfirm": "Publier maintenant sur {count, plural, one {sa destination} other {ses # destinations}} ? Elle part immédiatement.",
     "failure": {
       "account_disconnected": "Annulé car le compte Facebook a été déconnecté.",
       "deleted_on_facebook": "Cette publication n’est plus sur Facebook. Elle y a probablement été supprimée, elle n’a donc jamais paru.",
       "destination_off": "Cette destination était désactivée à l’heure prévue, la publication n’y a donc pas été faite.",
       "worker_lost": "La publication a été interrompue et n’a pas repris dans la limite des tentatives. Vérifiez la destination puis réessayez."
-    }
+    },
+    "nativeTooSoon": "Facebook ne conserve que les publications prévues au moins 10 minutes à l’avance : celle-ci reste donc avec notre propre planificateur et partira à l’heure prévue.",
+    "nativeTooFar": "Facebook ne peut pas conserver une publication prévue aussi loin : celle-ci reste donc avec notre propre planificateur et partira à l’heure prévue.",
+    "nativeUnavailable": "Cette publication n’a pas pu être confiée à Facebook pour le moment : elle reste donc avec notre propre planificateur et partira à l’heure prévue."
+  },
+  "queue": {
+    "addSlot": "Ajouter un créneau",
+    "addToQueue": "Ajouter à la file",
+    "added": "{day} à {time} ajouté.",
+    "alreadyThere": "Cet horaire est déjà dans la file.",
+    "awaitingApproval": "En attente de validation",
+    "day": "Jour",
+    "free": "Libre",
+    "noSlots": "Aucun créneau",
+    "noText": "(sans texte)",
+    "readOnly": "Seuls les propriétaires et administrateurs peuvent modifier la file.",
+    "removeSlot": "Retirer {day} {time}",
+    "removed": "{day} à {time} retiré.",
+    "saveFailed": "La file n’a pas pu être enregistrée. Veuillez réessayer.",
+    "seeAnalysis": "Voir l’analyse des pages",
+    "slotCount": "{count, plural, =0 {Aucun créneau} one {# créneau par semaine} other {# créneaux par semaine}}",
+    "subtitle": "Quand partent les publications « ajoutées à la file », ce qui occupe la semaine à venir, et quels horaires ajouter. Heures en {timezone}.",
+    "suggestionDetail": "{lift}× la publication type · {posts} publications · {pages}",
+    "suggestionsHint": "{posts, plural, =0 {Aucune publication} one {Une publication} other {# publications}} de {pages, plural, =0 {aucune page} one {une page} other {# pages}} sur les 90 derniers jours, chacune comparée à la publication type de sa propre page, pour qu’une grande page ne l’emporte pas sur une petite.",
+    "suggestionsNoHistory": "Pas encore d’historique. Après quelques semaines de publications, les horaires qui fonctionnent apparaîtront ici.",
+    "suggestionsNone": "Rien ne ressort en dehors des horaires déjà dans la file.",
+    "suggestionsTitle": "Suggéré d’après vos résultats",
+    "time": "Heure",
+    "title": "File de publication",
+    "upcomingFree": "{free, plural, =0 {Tout est occupé} one {Un créneau libre} other {# créneaux libres}} sur {total}",
+    "upcomingNone": "La file n’a aucun créneau : rien n’est prévu. Ajoutez un créneau ci-dessus.",
+    "upcomingTitle": "Dans les 7 prochains jours",
+    "weeklyHint": "Toutes les pages de cet espace partagent ces horaires. Une publication ajoutée à la file prend le prochain créneau libre.",
+    "weeklyTitle": "Créneaux hebdomadaires",
+    "writePost": "Rédiger une publication"
   },
   "reports": {
     "title": "Rapports",
@@ -780,7 +1158,12 @@
     "byDestination": "Par destination",
     "destination": "Destination",
     "topPosts": "Meilleures publications",
-    "noData": "Aucune publication parue sur cette période."
+    "noData": "Aucune publication parue sur cette période.",
+    "impressions": "Impressions",
+    "linkClicksLifetime": "Clics sur les liens (depuis toujours)",
+    "engagementCount": "{count, plural, one {# interaction} other {# interactions}}",
+    "impressionCount": "{count, plural, one {# impression} other {# impressions}}",
+    "sourceNote": "Les impressions, la portée et l’engagement viennent de Facebook. Les clics sur les liens sont comptés par les liens courts de l’application, sur toute leur durée de vie et pas seulement sur cette période. Ils mesurent des choses différentes et ne sont jamais additionnés."
   },
   "settings": {
     "addTime": "Ajouter un créneau",
@@ -798,8 +1181,10 @@
     "linkTagging": "Marquage des liens",
     "name": "Nom",
     "noTimes": "Aucun créneau défini.",
+    "openQueue": "Ouvrir la file",
     "pasteOrUpload": "Ou collez les lignes",
     "queue": "File de publication",
+    "queueMoved": "La file de publication se trouve désormais dans Planification → File d’attente, avec des horaires suggérés d’après les résultats de vos pages.",
     "queueSubtitle": "Créneaux récurrents pour « ajouter au prochain créneau ». Chaque publication prend le premier créneau libre.",
     "queueUpdated": "Créneaux mis à jour.",
     "readOnly": "Seuls les propriétaires et les administrateurs de l’espace peuvent modifier ces réglages. Vous pouvez toujours importer des publications ci-dessous.",
@@ -828,7 +1213,16 @@
     "utmHint": "Ajouté aux liens de vos publications pour attribuer le trafic. Laissez vide pour publier les liens tels quels.",
     "utmMedium": "Support UTM",
     "utmSource": "Source UTM",
-    "workspace": "Espace de travail"
+    "workspace": "Espace de travail",
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+    "aiNotConfigured": "Aucune clé ANTHROPIC_API_KEY n’est définie sur ce serveur : l’éditeur masque donc ces outils.",
+    "tones": {
+      "friendly": "Amical",
+      "professional": "Professionnel",
+      "playful": "Enjoué",
+      "urgent": "Urgent",
+      "informative": "Informatif"
+    }
   },
   "setup": {
     "title": "Configurer MS Social Pilot",
@@ -859,13 +1253,13 @@
       },
       "connect": {
         "title": "Connecter un compte Facebook",
-        "body": "Connectez-vous avec Facebook pour que l’application voie les Pages et groupes que vous gérez.",
+        "body": "Connectez-vous avec Facebook pour que l’application voie les Pages que vous gérez.",
         "done": "Un compte Facebook est connecté.",
         "action": "Connecter Facebook"
       },
       "destination": {
-        "title": "Activer une Page ou un groupe",
-        "body": "Choisissez les Pages et groupes sur lesquels cet espace peut publier. Rien ne part tant qu’aucun n’est activé.",
+        "title": "Activer une Page",
+        "body": "Choisissez les Pages sur lesquelles cet espace peut publier. Rien ne part tant qu’aucune n’est activée.",
         "done": "Au moins une destination est prête à publier.",
         "action": "Choisir les destinations"
       },
@@ -932,7 +1326,7 @@
     "connectAnAccount": "Connecter un compte",
     "group": "Groupe",
     "instagram": "Instagram",
-    "noneConnected": "Aucune page ni groupe Facebook n'est encore connecté.",
+    "noneConnected": "Aucune page Facebook n'est encore connectée.",
     "page": "Page",
     "selectAll": "Tout sélectionner",
     "selectedOf": "{selected} sur {total} sélectionnées",
@@ -971,6 +1365,18 @@
     "accept": "Accepter l'invitation",
     "acceptExpired": "Cette invitation a expiré. Demandez-en une nouvelle.",
     "acceptInvalid": "Ce lien d'invitation n'est pas valide.",
-    "acceptWrongEmail": "Cette invitation a été envoyée à {email}. Connectez-vous avec cette adresse pour l'accepter."
+    "acceptWrongEmail": "Cette invitation a été envoyée à {email}. Connectez-vous avec cette adresse pour l'accepter.",
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+    "inviteFailed": "Impossible d’envoyer cette invitation.",
+    "actionFailed": "Cela n’a pas fonctionné. Veuillez réessayer.",
+    "invalidEmail": "Saisissez une adresse e-mail valide.",
+    "emailNotConfigured": "L’e-mail n’est pas configuré sur ce serveur : les invitations ne sont pas envoyées. Une fois l’invitation créée, copiez le lien affiché ici et transmettez-le vous-même.",
+    "shareLink": "Transmettez-lui ce lien :",
+    "memberRole": "Rôle de {name}",
+    "removeMemberNamed": "Retirer {name}",
+    "revokeNamed": "Révoquer l’invitation de {email}",
+    "roleChangeConfirm": "Faire passer {name} de {from} à {to} ?",
+    "roleToOwnerWarning": "Les propriétaires ont un contrôle total, y compris la configuration du serveur et la suppression de l’espace de travail, et seul un autre propriétaire peut le leur retirer.",
+    "roleFromOwnerWarning": "Cette personne perdra immédiatement ses droits de propriétaire sur cet espace de travail."
   }
 }

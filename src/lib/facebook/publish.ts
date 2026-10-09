@@ -40,7 +40,12 @@ export type MediaSource = { type: 'url'; url: string } | BinarySource;
 
 /** Media already resolved to something Graph can consume. */
 export type ResolvedMedia =
-  | { kind: 'image'; source: MediaSource }
+  | {
+      kind: 'image';
+      source: MediaSource;
+      /** What the picture shows, for screen readers. Sent as Facebook's custom alt text. */
+      altText?: string;
+    }
   | { kind: 'video'; source: MediaSource };
 
 export interface PublishRequest {
@@ -109,7 +114,7 @@ export function planPublish(request: PublishRequest): PublishPlan {
 /**
  * Validate a native (Facebook-held) schedule.
  *
- * Graph enforces a 10-minute floor and a 6-month ceiling, and returns an
+ * Graph enforces a 10-minute floor and a 30-day ceiling, and returns an
  * opaque code 100 when violated — checking first produces a message the user
  * can act on.
  */
@@ -124,7 +129,7 @@ export function toScheduledPublishTime(when: Date, now: Date = new Date()): numb
   }
   if (deltaSeconds > NATIVE_SCHEDULE_MAX_SECONDS) {
     throw new GraphError({
-      message: 'Facebook cannot schedule a post more than 6 months ahead.',
+      message: 'Facebook cannot hold a post more than 30 days ahead. Let this app schedule it instead.',
       kind: 'invalid_request',
     });
   }
@@ -162,6 +167,34 @@ export function buildFeedBody(request: {
   return body;
 }
 
+/**
+ * The text of a post whose attachment is media rather than a link card.
+ *
+ * The photos and videos edges have no `link` field, and a feed post with
+ * `attached_media` drops it, so a link (often carrying UTM parameters) would
+ * vanish without a trace. Putting it in the text keeps it clickable — Facebook
+ * auto-links URLs in captions. Skipped when the author already wrote it there.
+ */
+export function buildMediaCaption(message: string, link?: string | null): string {
+  const text = message.trim() ? message : '';
+  if (!link || text.includes(link)) return text;
+  return text ? `${text}\n\n${link}` : link;
+}
+
+/**
+ * Public permalink for an uploaded video.
+ *
+ * The videos edge returns a bare video id, which is not a post id: Page
+ * videos live under `/{page}/videos/{id}/`. Groups have no such path, and a
+ * video id in the group post form is a dead link, so their videos use the
+ * bare-id form, which Facebook resolves for any video.
+ */
+export function buildVideoPermalink(targetType: TargetType, targetId: string, videoId: string): string {
+  return targetType === 'group'
+    ? `https://www.facebook.com/${videoId}`
+    : `https://www.facebook.com/${targetId}/videos/${videoId}/`;
+}
+
 /** Public permalink for a created post. */
 export function buildPermalink(targetType: TargetType, targetId: string, remotePostId: string): string {
   // Graph returns "<targetId>_<postId>" for feed posts; photos return a bare id.
@@ -184,6 +217,11 @@ async function uploadPhoto(
   item: Extract<ResolvedMedia, { kind: 'image' }>,
   fields: Record<string, string | number | boolean | object | undefined>,
 ): Promise<PhotoResponse> {
+  // Without it Facebook writes its own guess ("May be an image of…"), which is
+  // rarely what the person who chose the picture would say.
+  const altText = item.altText?.trim();
+  if (altText) fields = { ...fields, alt_text_custom: altText };
+
   if (item.source.type === 'url') {
     const { data } = await graphRequest<PhotoResponse>(`${request.targetId}/photos`, {
       method: 'POST',
@@ -248,7 +286,8 @@ export async function publishPost(request: PublishRequest): Promise<PublishResul
       )!;
 
       const fields: Record<string, string | number | boolean | undefined> = {};
-      if (request.message.trim()) fields.message = request.message;
+      const caption = buildMediaCaption(request.message, request.link);
+      if (caption) fields.message = caption;
       if (request.scheduledPublishTime) {
         fields.published = false;
         fields.scheduled_publish_time = toScheduledPublishTime(request.scheduledPublishTime);
@@ -279,8 +318,8 @@ export async function publishPost(request: PublishRequest): Promise<PublishResul
         method: 'POST',
         accessToken: request.accessToken,
         body: buildFeedBody({
-          message: request.message,
-          link: request.link,
+          // Graph ignores `link` once media is attached; see buildMediaCaption.
+          message: buildMediaCaption(request.message, request.link),
           scheduledPublishTime: request.scheduledPublishTime,
           attachedMediaIds: mediaIds,
         }),
@@ -298,7 +337,8 @@ export async function publishPost(request: PublishRequest): Promise<PublishResul
       )!;
 
       const fields: Record<string, string | number | boolean | undefined> = {};
-      if (request.message.trim()) fields.description = request.message;
+      const caption = buildMediaCaption(request.message, request.link);
+      if (caption) fields.description = caption;
       if (request.scheduledPublishTime) {
         fields.published = false;
         fields.scheduled_publish_time = toScheduledPublishTime(request.scheduledPublishTime);
@@ -312,7 +352,7 @@ export async function publishPost(request: PublishRequest): Promise<PublishResul
         });
         return {
           remotePostId: data.id,
-          remoteUrl: `https://www.facebook.com/${data.id}`,
+          remoteUrl: buildVideoPermalink(request.targetType, request.targetId, data.id),
           scheduled,
         };
       }
@@ -328,7 +368,7 @@ export async function publishPost(request: PublishRequest): Promise<PublishResul
       });
       return {
         remotePostId: data.id,
-        remoteUrl: `https://www.facebook.com/${data.id}`,
+        remoteUrl: buildVideoPermalink(request.targetType, request.targetId, data.id),
         scheduled,
       };
     }

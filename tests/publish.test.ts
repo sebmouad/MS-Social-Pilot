@@ -8,7 +8,14 @@ beforeAll(() => {
   process.env.FACEBOOK_APP_SECRET = 'test-app-secret';
 });
 
-const { planPublish, buildFeedBody, buildPermalink, toScheduledPublishTime } = await import(
+const {
+  planPublish,
+  buildFeedBody,
+  buildMediaCaption,
+  buildPermalink,
+  buildVideoPermalink,
+  toScheduledPublishTime,
+} = await import(
   '../src/lib/facebook/publish'
 );
 const { GraphError } = await import('../src/lib/facebook/graph');
@@ -114,10 +121,12 @@ describe('toScheduledPublishTime', () => {
     );
   });
 
-  it('rejects a time beyond the 6-month ceiling', () => {
-    expect(() => toScheduledPublishTime(new Date('2027-03-01T10:00:00Z'), now)).toThrow(
-      /more than 6 months/i,
+  it('rejects a time beyond the 30-day ceiling', () => {
+    // Meta's limit is 30 days; it used to say six months here.
+    expect(() => toScheduledPublishTime(new Date('2026-04-15T10:00:00Z'), now)).toThrow(
+      /more than 30 days/i,
     );
+    expect(() => toScheduledPublishTime(new Date('2026-03-30T10:00:00Z'), now)).not.toThrow();
   });
 
   it('throws a GraphError so route handlers map it to a 400', () => {
@@ -138,5 +147,38 @@ describe('buildPermalink', () => {
 
   it('handles a bare id, as returned by the photos edge', () => {
     expect(buildPermalink('page', '1234', '5678')).toBe('https://www.facebook.com/1234/posts/5678/');
+  });
+});
+
+describe('buildMediaCaption', () => {
+  it('appends the link to the text', () => {
+    expect(buildMediaCaption('Hi', 'https://example.com/?utm_source=fb')).toBe(
+      'Hi\n\nhttps://example.com/?utm_source=fb',
+    );
+  });
+
+  it('does not repeat a link already in the text', () => {
+    expect(buildMediaCaption('Read https://example.com now', 'https://example.com')).toBe(
+      'Read https://example.com now',
+    );
+  });
+
+  it('uses the link alone when there is no text', () => {
+    expect(buildMediaCaption('   ', 'https://example.com')).toBe('https://example.com');
+  });
+
+  it('leaves the text alone without a link', () => {
+    expect(buildMediaCaption('Hi', null)).toBe('Hi');
+    expect(buildMediaCaption('  ', undefined)).toBe('');
+  });
+});
+
+describe('buildVideoPermalink', () => {
+  it('uses the Page videos path', () => {
+    expect(buildVideoPermalink('page', '1234', '5678')).toBe('https://www.facebook.com/1234/videos/5678/');
+  });
+
+  it('uses the bare video id for a group, which has no videos path', () => {
+    expect(buildVideoPermalink('group', '999', '5678')).toBe('https://www.facebook.com/5678');
   });
 });

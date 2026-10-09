@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { Icon, type IconName } from './Icon';
 
@@ -60,6 +60,7 @@ interface WorkspaceHealth {
  */
 export function ConnectionHealth({ canManage }: { canManage: boolean }) {
   const t = useTranslations('connections');
+  const locale = useLocale();
   const [running, setRunning] = useState(false);
   const [health, setHealth] = useState<WorkspaceHealth | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +126,7 @@ export function ConnectionHealth({ canManage }: { canManage: boolean }) {
         <div className="mt-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span className={`inline-flex h-2 w-2 rounded-full ${tone(overall).dot}`} />
-            <span>{t('health.checkedAt', { when: new Date(health.checkedAt).toLocaleTimeString() })}</span>
+            <span>{t('health.checkedAt', { when: new Date(health.checkedAt).toLocaleTimeString(locale) })}</span>
           </div>
 
           {/* The app itself. When this is wrong every connection below reports

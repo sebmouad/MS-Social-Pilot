@@ -35,6 +35,23 @@ export interface AdSyncResult {
  */
 const LEVELS: AdLevel[] = ['account', 'campaign', 'adset', 'ad'];
 
+/** Rows written per transaction during a sync. */
+const UPSERT_CHUNK = 100;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The earliest day a sync reaches back to, or null before the first one.
+ *
+ * A sync pulls `analytics.adWindowDays` of history and no more, so anything
+ * before this is not "no spend" but "never asked". The screen uses it to stop
+ * offering ranges it has no data for, and to withhold a comparison with a
+ * previous period that was never pulled.
+ */
+export function syncedSince(lastSyncedAt: Date | null, windowDays: number = env.adWindowDays): Date | null {
+  return lastSyncedAt ? new Date(lastSyncedAt.getTime() - windowDays * DAY_MS) : null;
+}
+
 /**
  * Find every ad account the workspace's connected users can read.
  *
@@ -106,7 +123,7 @@ export async function syncAdAccount(options: {
 
   const until = options.until ?? new Date();
   const since =
-    options.since ?? new Date(until.getTime() - env.adWindowDays * 24 * 60 * 60 * 1000);
+    options.since ?? new Date(until.getTime() - env.adWindowDays * DAY_MS);
 
   try {
     const token = decryptSecret(account.socialAccount.accessToken);
@@ -121,51 +138,51 @@ export async function syncAdAccount(options: {
         until,
       });
 
-      for (const row of insights) {
-        await prisma.adInsight.upsert({
-          where: {
-            adAccountId_level_objectId_date: {
-              adAccountId: account.id,
-              level: row.level,
-              objectId: row.objectId,
-              date: row.date,
-            },
-          },
-          create: {
-            adAccountId: account.id,
-            level: row.level,
-            objectId: row.objectId,
-            objectName: row.objectName,
-            date: row.date,
-            spend: row.spend,
-            impressions: row.impressions,
-            clicks: row.clicks,
-            reach: row.reach,
-            cpc: row.cpc,
-            cpm: row.cpm,
-            cpp: row.cpp,
-            ctr: row.ctr,
-            frequency: row.frequency,
-            actions: toJsonOrNull(row.actions),
-            fields: toJsonOrNull(row.fields),
-          },
-          update: {
-            objectName: row.objectName,
-            spend: row.spend,
-            impressions: row.impressions,
-            clicks: row.clicks,
-            reach: row.reach,
-            cpc: row.cpc,
-            cpm: row.cpm,
-            cpp: row.cpp,
-            ctr: row.ctr,
-            frequency: row.frequency,
-            actions: toJsonOrNull(row.actions),
-            fields: toJsonOrNull(row.fields),
-            fetchedAt: new Date(),
-          },
-        });
-        rows += 1;
+      // Batched rather than one round trip per row: ninety days of four levels
+      // on a busy account is thousands of rows, and awaiting each in turn held
+      // the sync (and the button that started it) for minutes. Each chunk is
+      // one transaction, so a failure part-way leaves whole chunks behind,
+      // and re-running the sync upserts over them.
+      for (let start = 0; start < insights.length; start += UPSERT_CHUNK) {
+        const chunk = insights.slice(start, start + UPSERT_CHUNK);
+        const fetchedAt = new Date();
+        await prisma.$transaction(
+          chunk.map((row) => {
+            const values = {
+              objectName: row.objectName,
+              spend: row.spend,
+              impressions: row.impressions,
+              clicks: row.clicks,
+              reach: row.reach,
+              cpc: row.cpc,
+              cpm: row.cpm,
+              cpp: row.cpp,
+              ctr: row.ctr,
+              frequency: row.frequency,
+              actions: toJsonOrNull(row.actions),
+              fields: toJsonOrNull(row.fields),
+            };
+            return prisma.adInsight.upsert({
+              where: {
+                adAccountId_level_objectId_date: {
+                  adAccountId: account.id,
+                  level: row.level,
+                  objectId: row.objectId,
+                  date: row.date,
+                },
+              },
+              create: {
+                adAccountId: account.id,
+                level: row.level,
+                objectId: row.objectId,
+                date: row.date,
+                ...values,
+              },
+              update: { ...values, fetchedAt },
+            });
+          }),
+        );
+        rows += chunk.length;
       }
     }
 
@@ -211,6 +228,8 @@ export async function syncWorkspaceAds(options: {
 
 export interface AdSpendSummary {
   currency: string | null;
+  /** The rows came from accounts billed in different currencies. */
+  mixedCurrencies: boolean;
   spend: number;
   impressions: number;
   clicks: number;
@@ -222,6 +241,29 @@ export interface AdSpendSummary {
   /** Every action type the window produced, summed. */
   actions: Record<string, number>;
   daily: Array<{ date: string; spend: number; impressions: number; clicks: number; reach: number }>;
+}
+
+/**
+ * One point per date, whichever accounts contributed to it.
+ *
+ * Read across several ad accounts the rows arrive one per account per day, and
+ * mapping them straight through drew each date twice — a saw-tooth curve with
+ * every point on it wrong.
+ */
+function dailyTotals(
+  rows: Array<{ date: Date; spend: number; impressions: number; clicks: number; reach: number }>,
+): Array<{ date: string; spend: number; impressions: number; clicks: number; reach: number }> {
+  const byDate = new Map<string, { date: string; spend: number; impressions: number; clicks: number; reach: number }>();
+  for (const row of rows) {
+    const date = row.date.toISOString().slice(0, 10);
+    const day = byDate.get(date) ?? { date, spend: 0, impressions: 0, clicks: 0, reach: 0 };
+    day.spend += row.spend;
+    day.impressions += row.impressions;
+    day.clicks += row.clicks;
+    day.reach += row.reach;
+    byDate.set(date, day);
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** Account-level totals and the daily curve. */
@@ -259,8 +301,14 @@ export async function readAdSummary(options: {
 
   const round = (value: number): number => Math.round(value * 100) / 100;
 
+  // Two accounts in two currencies cannot be added up into one figure with one
+  // symbol on it. Say so with a null rather than label a sum of euros and
+  // dollars as either; the screen asks for one account in that case.
+  const currencies = new Set(rows.map((row) => row.adAccount.currency ?? ''));
+
   return {
-    currency: rows[0]?.adAccount.currency ?? null,
+    currency: currencies.size === 1 ? (rows[0]?.adAccount.currency ?? null) : null,
+    mixedCurrencies: currencies.size > 1,
     spend: round(spend),
     impressions,
     clicks,
@@ -271,19 +319,20 @@ export async function readAdSummary(options: {
     cpm: impressions > 0 ? round((spend / impressions) * 1000) : null,
     ctr: impressions > 0 ? Math.round((clicks / impressions) * 10000) / 100 : null,
     actions,
-    daily: rows.map((row) => ({
-      date: row.date.toISOString().slice(0, 10),
-      spend: round(row.spend),
-      impressions: row.impressions,
-      clicks: row.clicks,
-      reach: row.reach,
-    })),
+    daily: dailyTotals(rows).map((day) => ({ ...day, spend: round(day.spend) })),
   };
 }
 
 export interface CampaignRow {
   objectId: string;
   name: string;
+  /**
+   * The campaign an ad set or ad belongs to, as Facebook named it on the row.
+   * Null at campaign level, and for rows synced before the name was stored.
+   * Ad sets are routinely called "Ad set 1", so without this the breakdown is
+   * a list of names nobody can place.
+   */
+  campaignName: string | null;
   spend: number;
   impressions: number;
   clicks: number;
@@ -320,6 +369,7 @@ export async function readCampaigns(options: {
     const existing = grouped.get(row.objectId) ?? {
       objectId: row.objectId,
       name: row.objectName ?? row.objectId,
+      campaignName: null,
       spend: 0,
       impressions: 0,
       clicks: 0,
@@ -333,6 +383,10 @@ export async function readCampaigns(options: {
     existing.spend += row.spend;
     existing.impressions += row.impressions;
     existing.clicks += row.clicks;
+    if (row.level !== 'campaign' && existing.campaignName === null) {
+      const parent = (row.fields as Record<string, unknown> | null)?.campaign_name;
+      if (typeof parent === 'string' && parent) existing.campaignName = parent;
+    }
     // Reach is unique people, so summing daily values overcounts anyone who
     // saw the ad twice. The highest single day is the closest honest figure
     // available without a second API call per campaign.
@@ -372,9 +426,19 @@ export interface AdAccountSummary {
   lastSyncedAt: Date | null;
 }
 
-export async function listAdAccounts(workspaceId: string): Promise<AdAccountSummary[]> {
+/**
+ * The workspace's ad accounts, by name.
+ *
+ * Disabled accounts are left out unless asked for: a sync skips them, so
+ * offering one on the Ads screen showed a picker entry whose numbers stopped
+ * on the day it was turned off, with nothing to say why.
+ */
+export async function listAdAccounts(
+  workspaceId: string,
+  options: { includeDisabled?: boolean } = {},
+): Promise<AdAccountSummary[]> {
   const rows = await prisma.adAccount.findMany({
-    where: { workspaceId },
+    where: { workspaceId, ...(options.includeDisabled ? {} : { enabled: true }) },
     orderBy: { name: 'asc' },
   });
 

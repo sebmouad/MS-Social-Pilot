@@ -1,4 +1,6 @@
 import { getTranslations } from 'next-intl/server';
+import { MetaAppSettings } from '@/components/MetaAppSettings';
+import { metaAppSettings } from '@/lib/meta-app';
 
 import { ConnectionHealth } from '@/components/ConnectionHealth';
 import { ConnectionsClient } from '@/components/ConnectionsClient';
@@ -96,6 +98,11 @@ export default async function ConnectionsPage({
           </p>
         );
       })}
+
+      {/* Admins set up and repair the connection; the values it depends on
+          belong next to the button that uses them. Open when nothing is
+          connected yet, which is when somebody is most likely to need them. */}
+      {canManage && <MetaAppSettings settings={metaAppSettings()} open={accounts.length === 0} />}
 
       {accounts.length === 0 ? (
         <div className="card flex flex-col items-center gap-3 p-8 text-center">

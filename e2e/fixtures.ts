@@ -1,5 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 
+// Static, not `await import()`: Playwright compiles TypeScript it loads
+// through its require hook, and a dynamic import goes around the hook to
+// Node's own loader, which failed on the first `import` statement and took
+// every spec that seeds a Page down with it. The key is only read when a
+// value is encrypted, so setting it below still comes first.
+import { encryptSecret } from '../src/lib/crypto';
+
 /**
  * A connected Page, invented rather than connected.
  *
@@ -27,7 +34,6 @@ export async function connectPretendPage(workspaceName: string): Promise<string>
   // The token is opaque to everything the walk touches; it is only ever read on
   // the way to a Graph call, and the walk never makes one.
   process.env.ENCRYPTION_KEY ??= 'c3aCfAcoo9L+9hMqSB+2x2mSjeyLwAyhNamW5DsCikc=';
-  const { encryptSecret } = await import('../src/lib/crypto');
 
   const workspace = await prisma.workspace.findFirstOrThrow({ where: { name: workspaceName } });
 

@@ -27,10 +27,20 @@ export async function BreakdownBars({
 }) {
   const t = await getTranslations('analytics');
 
-  const rows = Object.entries(data)
-    .filter(([, value]) => typeof value === 'number' && value > 0)
-    .sort((a, b) => b[1] - a[1])
-    .map(([key, value]) => [formatKey ? formatKey(key) : key, value] as [string, number]);
+  // Relabelled here, on the server, and handed down as plain data. `BarList` is
+  // a client component, and a function cannot cross that boundary: passing
+  // `formatKey` through made the whole Interactions view a 500 the moment it
+  // had anything to show. Keys that relabel to the same name are summed.
+  const labelled: Record<string, number> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    const label = formatKey ? formatKey(key) : key;
+    labelled[label] = (labelled[label] ?? 0) + value;
+  }
+
+  const rows = Object.entries(labelled)
+    .filter(([, value]) => value > 0)
+    .sort((a, b) => b[1] - a[1]);
 
   return (
     <ChartFrame
@@ -38,7 +48,7 @@ export async function BreakdownBars({
       description={description}
       table={rows.length > 0 ? { head: [t('category'), t('value')], rows } : undefined}
     >
-      <BarList data={data} limit={limit} colorIndex={colorIndex} formatKey={formatKey} />
+      <BarList data={labelled} limit={limit} colorIndex={colorIndex} />
     </ChartFrame>
   );
 }

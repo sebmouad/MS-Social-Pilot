@@ -448,6 +448,8 @@ export async function resolveMediaForPublish(media: PostMedia[]): Promise<Resolv
   const resolved: ResolvedMedia[] = [];
 
   for (const item of media) {
+    const alt = item.kind === 'image' && item.altText?.trim() ? { altText: item.altText.trim() } : {};
+
     if (item.storageKey) {
       const storageKey = item.storageKey;
 
@@ -464,14 +466,15 @@ export async function resolveMediaForPublish(media: PostMedia[]): Promise<Resolv
           filename: path.basename(storageKey),
           contentType: item.mimeType ?? (item.kind === 'image' ? 'image/jpeg' : 'video/mp4'),
         },
-      });
+        ...alt,
+      } as ResolvedMedia);
       continue;
     }
 
     if (!/^https?:\/\//i.test(item.url)) {
       throw new MediaError(`Attachment ${item.id} has no file on disk and no public URL.`);
     }
-    resolved.push({ kind: item.kind, source: { type: 'url', url: item.url } });
+    resolved.push({ kind: item.kind, source: { type: 'url', url: item.url }, ...alt } as ResolvedMedia);
   }
 
   return resolved;

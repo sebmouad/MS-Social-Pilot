@@ -8,6 +8,7 @@ import fr from '../messages/fr.json';
 import {
   csvFilename,
   parseReportRange,
+  rankTopPosts,
   reportToCsv,
   spreadClicks,
   type Report,
@@ -42,7 +43,7 @@ describe('reportToCsv', () => {
   it('emits a header row and one row per destination', () => {
     const lines = reportToCsv(report()).trim().split('\n');
     expect(lines[0]).toBe(
-      'destination,type,posts,impressions,reach,reactions,comments,shares,link_clicks',
+      'destination,type,posts,impressions,reach,reactions,comments,shares,link_clicks_lifetime',
     );
     expect(lines[1]).toBe('Acme Page,page,2,100,80,8,3,1,5');
   });
@@ -280,5 +281,94 @@ describe('csvFilename', () => {
 
   it('keeps the export kind in front', () => {
     expect(csvFilename('posts', 'acme', range)).toMatch(/^posts-/);
+  });
+
+  it('names the days the workspace reported on, not the UTC ones', () => {
+    // August in Los Angeles ends at 06:59 UTC on 1 September; named in UTC
+    // the file claimed a day the report does not cover.
+    const tz = 'America/Los_Angeles';
+    const august = parseReportRange({ from: '2026-08-01', to: '2026-08-31', timeZone: tz });
+    expect(august.ok).toBe(true);
+    if (!august.ok) return;
+
+    expect(csvFilename('report', 'acme', august)).toBe('report-acme-2026-08-01_2026-09-01.csv');
+    expect(csvFilename('report', 'acme', august, tz)).toBe('report-acme-2026-08-01_2026-08-31.csv');
+  });
+
+  it('keeps the start day in a zone ahead of UTC', () => {
+    const tz = 'Pacific/Auckland';
+    const august = parseReportRange({ from: '2026-08-01', to: '2026-08-31', timeZone: tz });
+    if (!august.ok) throw new Error('range refused');
+    expect(csvFilename('report', 'acme', august, tz)).toBe('report-acme-2026-08-01_2026-08-31.csv');
+  });
+
+  it('falls back to UTC on a zone it cannot read', () => {
+    expect(csvFilename('report', 'acme', range, 'Mars/Olympus')).toBe('report-acme-2026-06-01_2026-08-31.csv');
+  });
+});
+
+describe('parseReportRange refusals', () => {
+  it('carries a translatable error, not only a sentence', () => {
+    const inverted = parseReportRange({ from: '2026-08-31', to: '2026-08-01' });
+    const unreadable = parseReportRange({ from: 'soon', to: null });
+    if (inverted.ok || unreadable.ok) throw new Error('expected refusals');
+
+    expect(inverted.error.key).toBe('errors.dateRangeInverted');
+    expect(unreadable.error.key).toBe('errors.dateRange');
+    for (const messages of [en, fr]) {
+      const errors = messages.errors as Record<string, string>;
+      expect(errors.dateRangeInverted).toBeTruthy();
+      expect(errors.dateRange).toBeTruthy();
+    }
+  });
+});
+
+describe('rankTopPosts', () => {
+  const delivery = (postId: string, targetName: string, engagement: number, publishedAt = '2026-08-10T09:00:00Z') => ({
+    postId,
+    message: `Post ${postId}`,
+    publishedAt: new Date(publishedAt),
+    targetName,
+    url: `https://facebook.com/${postId}-${targetName}`,
+    engagement,
+    impressions: engagement * 10,
+  });
+
+  it('lists a post once, however many Pages it went to', () => {
+    // Ranked per destination, one post to three Pages took three of the ten
+    // places.
+    const ranked = rankTopPosts(
+      [
+        delivery('a', 'North', 5),
+        delivery('a', 'South', 5),
+        delivery('a', 'East', 5),
+        delivery('b', 'North', 12),
+      ],
+      'UTC',
+    );
+
+    expect(ranked.map((post) => post.postId)).toEqual(['a', 'b']);
+    expect(ranked[0]!.engagement).toBe(15);
+    expect(ranked[0]!.impressions).toBe(150);
+    expect(ranked[0]!.destinations.map((destination) => destination.name)).toEqual(['North', 'South', 'East']);
+  });
+
+  it('keeps ten posts, not ten rows', () => {
+    const deliveries = Array.from({ length: 12 }, (_, index) => [
+      delivery(`p${index}`, 'North', index),
+      delivery(`p${index}`, 'South', index),
+    ]).flat();
+
+    const ranked = rankTopPosts(deliveries, 'UTC');
+    expect(ranked).toHaveLength(10);
+    expect(new Set(ranked.map((post) => post.postId)).size).toBe(10);
+  });
+
+  it('dates a post from its first delivery in the range', () => {
+    const [post] = rankTopPosts(
+      [delivery('a', 'North', 1, '2026-08-12T09:00:00Z'), delivery('a', 'South', 1, '2026-08-10T09:00:00Z')],
+      'UTC',
+    );
+    expect(post!.publishedLabel).toContain('10 Aug 2026');
   });
 });

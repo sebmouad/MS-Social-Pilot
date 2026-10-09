@@ -208,11 +208,26 @@ export const errors = {
       params: { names },
     }),
 
+  instagramNeedsMedia: (names: string) =>
+    new AppError({
+      key: 'errors.instagramNeedsMedia',
+      fallback: `Instagram publishes a photo or a video, never text alone (${names}). Add media, or leave Instagram out.`,
+      params: { names },
+      status: 422,
+    }),
+
   feedInstagramUnsupported: (names: string) =>
     new AppError({
       key: 'errors.feedInstagramUnsupported',
       fallback: `A feed item is a headline and a link, and Instagram takes neither without a picture (${names}). Choose Facebook destinations for this feed.`,
       params: { names },
+      status: 422,
+    }),
+
+  feedUrlBlocked: () =>
+    new AppError({
+      key: 'errors.feedUrlBlocked',
+      fallback: 'That feed address points at a private network, which this server does not fetch. Use the feed’s public address.',
       status: 422,
     }),
 
@@ -285,6 +300,31 @@ export const errors = {
       status: 429,
     }),
 
+  // Sign-in and sign-up refusals have their own keys. They used to be thrown as
+  // `AuthError`, which the API renders as "You must be signed in." — so a
+  // mistyped password, on the sign-in form, told the person to sign in.
+  invalidCredentials: () =>
+    new AppError({ key: 'errors.invalidCredentials', fallback: 'Incorrect email or password.', status: 401 }),
+  emailTaken: () =>
+    new AppError({
+      key: 'errors.emailTaken',
+      fallback: 'An account with that email already exists. Sign in instead.',
+      status: 409,
+    }),
+
+  tooManySignups: (minutes: number) =>
+    new AppError({
+      key: 'errors.tooManySignups',
+      fallback: `Too many accounts created from here. Try again in ${minutes} minute(s).`,
+      params: { minutes },
+      status: 429,
+    }),
+
+  currentPasswordWrong: () =>
+    new AppError({ key: 'errors.currentPasswordWrong', fallback: 'Your current password is not correct.', status: 422 }),
+  passwordUnchanged: () =>
+    new AppError({ key: 'errors.passwordUnchanged', fallback: 'Choose a password different from the current one.', status: 422 }),
+
   registrationClosed: () =>
     new AppError({
       key: 'errors.registrationClosed',
@@ -304,5 +344,52 @@ export const errors = {
       key: 'errors.aiNotConfigured',
       fallback: 'AI assistance is not configured on this server.',
       status: 503,
+    }),
+
+  publishNeedsReview: () =>
+    new AppError({
+      key: 'errors.publishNeedsReview',
+      fallback:
+        'Posts in this workspace are reviewed before they go out, so they cannot be published on the spot. Schedule it and it will go to the approval queue.',
+      status: 403,
+    }),
+
+  emptyPost: () =>
+    new AppError({
+      key: 'errors.emptyPost',
+      fallback: 'Write something, add a link, or attach media.',
+      status: 422,
+    }),
+
+  refreshNoPermission: () =>
+    new AppError({
+      key: 'errors.refreshNoPermission',
+      fallback: 'Only editors and above can pull comments and messages from Facebook.',
+      status: 403,
+    }),
+
+  refreshTooSoon: (seconds: number) =>
+    new AppError({
+      key: 'errors.refreshTooSoon',
+      fallback: `This workspace has just pulled from Facebook. Try again in ${seconds} second(s).`,
+      params: { seconds },
+      status: 429,
+    }),
+
+  dateRangeInverted: () =>
+    new AppError({
+      key: 'errors.dateRangeInverted',
+      fallback: 'The start of the range comes after its end. Swap the dates.',
+      status: 400,
+    }),
+
+  adAccountNotFound: () =>
+    new AppError({ key: 'errors.adAccountNotFound', fallback: 'Ad account not found.', status: 404 }),
+
+  destinationBlocked: () =>
+    new AppError({
+      key: 'errors.destinationBlocked',
+      fallback: 'This destination cannot be published to right now, so it cannot be turned on.',
+      status: 409,
     }),
 };

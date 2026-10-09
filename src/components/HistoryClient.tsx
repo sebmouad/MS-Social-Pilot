@@ -76,9 +76,16 @@ export function HistoryClient({
           >
             {tab.label}
             {tab.key === 'email' && recentFailures > 0 && (
-              <span className="ml-1.5 rounded-full bg-red-100 px-1.5 text-[10px] font-semibold text-red-700">
-                {recentFailures}
-              </span>
+              <>
+                {/* The bare number would be read as part of the tab's name ("Email1"). */}
+                <span
+                  aria-hidden
+                  className="ml-1.5 rounded-full bg-red-100 px-1.5 text-[10px] font-semibold text-red-700"
+                >
+                  {recentFailures}
+                </span>
+                <span className="sr-only">{t('tabFailures', { count: recentFailures })}</span>
+              </>
             )}
           </Link>
         ))}

@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
+import { MetaAppSettings } from '@/components/MetaAppSettings';
 import { SetupClient } from '@/components/SetupClient';
+import { metaAppSettings } from '@/lib/meta-app';
 import { getAuthContext } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { isFirstRun, maySetUp, readSetupState } from '@/lib/setup';
@@ -43,6 +45,14 @@ export default async function SetupPage() {
 
       <div className="mt-8">
         <SetupClient state={state} signedIn={auth !== null} />
+      </div>
+
+      {/* Open while the Facebook step is still to do: it is what that step needs. */}
+      <div className="mt-6">
+        <MetaAppSettings
+          settings={metaAppSettings()}
+          open={!state.steps.find((step) => step.id === 'facebookApp')?.done}
+        />
       </div>
     </div>
   );

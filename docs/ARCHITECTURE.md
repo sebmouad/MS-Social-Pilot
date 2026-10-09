@@ -72,7 +72,7 @@ cost: if the worker is not running, nothing is published.
 
 **`native`** — create the post on Facebook immediately with
 `scheduled_publish_time`, and let Facebook hold it. Survives our downtime
-entirely. The costs: Pages only, minimum 10 minutes and maximum 6 months ahead,
+entirely. The costs: Pages only, minimum 10 minutes and maximum 30 days ahead,
 and editing means deleting it on Facebook and recreating it. Destinations in
 this state get the `scheduled_remote` status so our scheduler leaves them alone,
 and cancelling deletes the remote post rather than silently letting it publish.
@@ -1192,10 +1192,17 @@ the answer.
 
 Redirects are followed manually, three hops at most, checking each one. A guard
 that inspects only the URL it was handed is walked straight past by a public
-address that 302s to `169.254.169.254`. Hostname checks still cannot catch a
-domain that *resolves* to a private address, so an egress proxy remains the
-right answer for genuinely hostile input; this closes what can be closed in
-process.
+address that 302s to `169.254.169.254`.
+
+The hop-by-hop fetch is `fetchPublic` in `src/lib/safe-fetch.ts`, shared with
+the RSS poller — which used to fetch a feed address with no check at all and
+`redirect: 'follow'`, then show the status code on the feeds screen: a port
+scanner with a friendly interface. Each hop is also checked *as resolved*: the
+name is looked up and every answer tested, so `metadata.example.com` pointing at
+169.254.169.254 is refused too. A name that answers publicly to the check and
+privately to the connection (DNS rebinding) still gets through, so an egress
+proxy remains the right answer for genuinely hostile input; this closes what can
+be closed in process.
 
 ## Media
 
@@ -1392,6 +1399,73 @@ walk caught this the moment the group-wide boundary went in: a test that had
 asserted 404 for years started seeing 200.
 
 ---
+
+## Three modules
+
+The top bar is three modules — **Analytics**, **Ads**, **Schedule** — rather
+than ten equal links. `src/lib/modules.ts` is the one map of which screen
+belongs to which; the nav, its sub-navigation and a test that every linked
+route exists all read it. Shared screens (home, connections, settings) belong
+to no module and sit beside them.
+
+The three tabs are never behind a menu, on any width: where you are is the one
+thing that must always be visible. A module's own screens appear as a second
+row under the bar, and only inside that module. Phones use shorter module
+names where a language needs them (French "Planification" becomes "Planning").
+
+Ads was a tab inside Analytics and is its own module now; `/analytics?view=ads`
+redirects there so old bookmarks keep working. It reads **one ad account at a
+time**: two accounts can bill in two currencies, and a total of euros and
+dollars is wrong under either symbol. Its findings follow the page analysis
+rules — the account against its own previous period, with floors (1,000
+impressions before a click-through rate is judged, 30 clicks before a cost per
+click) — and spend changes are shown uncoloured, because spending more is the
+plan as often as it is the problem.
+
+## Page analysis
+
+The analytics screen opens on an analysis of the selected Page rather than on
+its raw figures. `src/lib/page-analysis.ts` is pure — posts and Page totals in,
+analysis out — and `src/lib/page-analysis-data.ts` decides what goes in.
+
+**Every post on the Page.** A Page's history is mostly posts made in Facebook
+itself. Posts published from here (`PostTarget`) and posts found on the Page
+(`ExternalPost`) are read into one list, each tagged with where it came from.
+The older Interaction view read only the first kind, and showed zero on every
+figure for a Page run from the Facebook app; it now reads both.
+
+**Interactions, not engaged users.** Reactions + comments + shares come off the
+post object, need no insights permission and have survived every Graph
+version; `post_engaged_users` has not. The rate divides by reach where reach is
+known and is absent otherwise, never divided by zero.
+
+**The metric Meta still serves.** Page totals are read through a fallback list,
+newest name first (`page_daily_follows_unique` before the withdrawn
+`page_fan_adds`), chosen once across both windows being compared, so a
+comparison never sets one metric against another. The Audience view uses the
+same fallback. `page_follows` is a running total, so its headline is the latest
+value, not a sum.
+
+**The Page against itself.** Every finding compares this Page with its own
+history — "video earns 3.8× the interactions of text here" — and none compares
+it with an industry benchmark nobody here can check. Rules have floors: a format
+needs three posts before it is compared, a time block two before it is called a
+good time, a change 10% before it is mentioned.
+
+**A score that can be explained.** The health score is a weighted mean of four
+parts that each fit in a sentence (consistency, interactions per post against
+the previous period, follower growth, reach). A part Facebook does not report
+is left out and the rest re-weighted, rather than scored zero.
+
+**When to post** is a 7 × 8 grid of three-hour blocks in the workspace's time
+zone, shaded by average interactions against the Page's median post, on fixed
+thresholds so "darker" means the same on every Page. It draws on at least 90
+days of posts whatever range is on screen, because a 7-day window holds too few
+to say anything. This is the grid the scheduling work builds on.
+
+`npm run db:demo` fills a workspace with two invented Pages and six months of
+history with patterns worth finding, so all of this can be seen without a
+Facebook app.
 
 ## A total that is actually a total
 

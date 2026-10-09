@@ -163,6 +163,12 @@ export async function fetchAdInsights(options: {
 }): Promise<AdInsightRow[]> {
   const day = (date: Date): string => date.toISOString().slice(0, 10);
 
+  // Insights return only the fields asked for. Without the level's id, every
+  // campaign (or ad set, or ad) comes back keyed to the account and a day's
+  // rows collapse into one.
+  const requested = new Set(options.fields ?? AD_DEFAULT_FIELDS);
+  requested.add(ID_FIELD[options.level]);
+
   const raw = await graphPaged<Record<string, unknown>>(`${options.actId}/insights`, {
     accessToken: options.accessToken,
     maxPages: MAX_INSIGHT_PAGES,
@@ -172,7 +178,7 @@ export async function fetchAdInsights(options: {
       level: options.level,
       time_increment: 1,
       time_range: JSON.stringify({ since: day(options.since), until: day(options.until) }),
-      fields: (options.fields ?? AD_DEFAULT_FIELDS).join(','),
+      fields: [...requested].join(','),
     },
   });
 

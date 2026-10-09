@@ -75,10 +75,13 @@ export const PUBLISHABLE_APPROVAL_STATUSES: readonly ApprovalStatus[] = [
 
 /**
  * Facebook rejects scheduled_publish_time closer than 10 minutes or further
- * out than 6 months.
+ * out than 30 days — "The publish date must be between 10 minutes and 30 days
+ * from the time of the API request" (Pages API, Posts). This said six months,
+ * which let anything between 30 days and six months through to be refused by
+ * Graph with an opaque code 100 instead of a sentence here.
  */
 export const NATIVE_SCHEDULE_MIN_SECONDS = 10 * 60;
-export const NATIVE_SCHEDULE_MAX_SECONDS = 180 * 24 * 60 * 60;
+export const NATIVE_SCHEDULE_MAX_SECONDS = 30 * 24 * 60 * 60;
 
 /** Hard ceilings enforced before we bother calling Graph. */
 export const LIMITS = {
@@ -132,12 +135,20 @@ export function canManageSettings(role: WorkspaceRole): boolean {
  * Change instance-wide configuration: API credentials, job intervals, feature
  * switches.
  *
- * Owner only. These settings are not scoped to a workspace — an agency admin
- * for one client must not be able to change the Graph version, or read out the
- * fact that an API key is set, for every other client on the installation.
+ * The installation's owner only — the person who created its first account —
+ * and deliberately not a workspace role. These settings are not scoped to a
+ * workspace: an agency admin for one client must not be able to change the
+ * Graph version, or read out the fact that an API key is set, for every other
+ * client on the installation. And owning *a* workspace proves nothing, because
+ * everybody who registers is given one of their own to own; a role check here
+ * let anyone invited as a contributor switch to that workspace and rewrite the
+ * Facebook app credentials for everybody.
+ *
+ * Takes the auth context rather than a role for that reason, so a caller cannot
+ * go back to asking the wrong question by passing `auth.role`.
  */
-export function canManageInstance(role: WorkspaceRole): boolean {
-  return atLeast(role, WorkspaceRole.owner);
+export function canManageInstance(auth: { isInstanceOwner: boolean }): boolean {
+  return auth.isInstanceOwner === true;
 }
 
 /**

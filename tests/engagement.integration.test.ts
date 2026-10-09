@@ -39,7 +39,9 @@ let received: Array<{ path: string; body: string }> = [];
 let asked: Array<{ path: string; params: URLSearchParams }> = [];
 
 beforeAll(async () => {
-  setTestEnv();
+  // Pinned to a version that still serves Page ratings, so the ratings sync
+  // below is exercised; from v22.0 Meta withdrew the edge and the sync skips it.
+  setTestEnv({ FACEBOOK_GRAPH_VERSION: 'v21.0' });
 
   server = createServer((request, response) => {
     const url = new URL(request.url ?? '', 'http://localhost');
@@ -515,16 +517,19 @@ describe('probing every level', () => {
 
   it('records post-level availability against the destination', async () => {
     const { target } = await seedWorkspace();
+    // A metric Meta still serves: retired names are not probed at all.
     routes['/insights'] = () => ({
-      data: [{ name: 'post_impressions', period: 'lifetime', values: [{ value: 1 }] }],
+      data: [{ name: 'post_media_view', period: 'lifetime', values: [{ value: 1 }] }],
     });
 
     const { probeTarget, readAvailability, readCoverage } = await import('../src/lib/analytics');
     await probeTarget(target.id, 'lifetime', 'post');
 
     const availability = await readAvailability(target.id);
-    const impressions = availability.find((row) => row.metric === 'post_impressions');
-    expect(impressions!.available).toBe(true);
+    const views = availability.find((row) => row.metric === 'post_media_view');
+    expect(views!.available).toBe(true);
+    // Retired in November 2025 on every version, so never asked about.
+    expect(availability.find((row) => row.metric === 'post_impressions')).toBeUndefined();
 
     // Everything else in the post catalogue was asked for and did not come
     // back, which is a different fact from never having been asked.
@@ -921,7 +926,7 @@ describe('CSV export', () => {
 
     // No ad account connected: a header and nothing else, not a crash.
     const spend = await parse(await buildExport('ads', window(workspace.id)));
-    expect(spend[0]![0]).toBe('date');
+    expect(spend[0]!.slice(0, 3)).toEqual(['ad_account', 'currency', 'date']);
     expect(spend).toHaveLength(1);
   });
 
@@ -1606,7 +1611,152 @@ describe('searching and paging comments', () => {
 
     expect(found).toEqual([]);
   });
+
+  it('treats % and _ in a search as the characters they are', async () => {
+    const seed = await seedWorkspace();
+    await prisma.postComment.createMany({
+      data: [
+        { postTargetId: seed.postTarget.id, remoteId: 'pct', message: '50% off', createdTime: new Date() },
+        { postTargetId: seed.postTarget.id, remoteId: 'plain', message: '50 cents', createdTime: new Date() },
+      ],
+    });
+
+    const found = await engagement.readComments({ workspaceId: seed.workspace.id, search: '50%' });
+    expect(found.map((row) => row.message)).toEqual(['50% off']);
+  });
 })
+
+/**
+ * Replies under the comment they answer.
+ *
+ * The list indents a reply, which promises it sits under its parent. Ordered by
+ * its own timestamp it landed wherever that put it — often above the comment it
+ * was answering, or a screen away — and the indentation pointed at the wrong
+ * comment.
+ */
+describe('comment threads', () => {
+  async function seedThreads() {
+    const seed = await seedWorkspace();
+    const at = (minute: number) => new Date(Date.UTC(2026, 7, 1, 10, minute));
+    const row = (remoteId: string, minute: number, parentRemoteId: string | null = null, fromId: string | null = 'fan') => ({
+      postTargetId: seed.postTarget.id,
+      remoteId,
+      parentRemoteId,
+      fromId,
+      fromName: fromId === seed.target.providerId ? seed.target.name : 'Fan',
+      message: remoteId,
+      createdTime: at(minute),
+    });
+
+    // Two threads whose replies interleave in time with each other and with
+    // a third, newer, top-level comment.
+    await prisma.postComment.createMany({
+      data: [
+        row('old', 0),
+        row('new', 10),
+        row('old-reply-1', 20, 'old'),
+        row('newest', 30),
+        row('new-reply', 40, 'new', seed.target.providerId),
+        row('old-reply-2', 50, 'old'),
+      ],
+    });
+    return seed;
+  }
+
+  it('puts each reply under its parent, oldest reply first', async () => {
+    const seed = await seedThreads();
+
+    const rows = await engagement.readComments({ workspaceId: seed.workspace.id });
+
+    expect(rows.map((row) => row.remoteId)).toEqual([
+      'newest',
+      'new',
+      'new-reply',
+      'old',
+      'old-reply-1',
+      'old-reply-2',
+    ]);
+  });
+
+  it('pages the thread order without repeating or dropping a comment', async () => {
+    const seed = await seedThreads();
+
+    const all = await engagement.readComments({ workspaceId: seed.workspace.id });
+    const paged: string[] = [];
+    for (let page = 0; page < 3; page += 1) {
+      const rows = await engagement.readComments({ workspaceId: seed.workspace.id, skip: page * 2, limit: 2 });
+      paged.push(...rows.map((row) => row.remoteId));
+    }
+
+    expect(paged).toEqual(all.map((row) => row.remoteId));
+  });
+
+  it('lists only the comments the Page has not answered', async () => {
+    const seed = await seedThreads();
+    // The Page writing a comment of its own is not waiting on anybody.
+    await prisma.postComment.create({
+      data: {
+        postTargetId: seed.postTarget.id,
+        remoteId: 'page-own',
+        message: 'From the page',
+        fromId: seed.target.providerId,
+        createdTime: new Date(),
+      },
+    });
+
+    const filter = { workspaceId: seed.workspace.id, unanswered: true };
+    const rows = await engagement.readComments(filter);
+
+    // `new` has the Page's reply; `old` has only other people's; replies are
+    // not a to-do item of their own.
+    expect(rows.map((row) => row.remoteId)).toEqual(['newest', 'old']);
+    expect(await engagement.countComments(filter)).toBe(2);
+  });
+
+  it('counts a reply sent from here as an answer straight away', async () => {
+    const seed = await seedThreads();
+    routes['/comments'] = () => ({ id: 'sent-reply' });
+
+    const [newest] = await engagement.readComments({
+      workspaceId: seed.workspace.id,
+      search: 'newest',
+    });
+    const result = await engagement.replyToCommentAs({
+      commentId: newest!.id,
+      workspaceId: seed.workspace.id,
+      userId: seed.user.id,
+      role: WorkspaceRole.owner,
+      message: 'Thanks!',
+    });
+    expect(result.outcome).toBe('ok');
+
+    const rows = await engagement.readComments({ workspaceId: seed.workspace.id, unanswered: true });
+    expect(rows.map((row) => row.remoteId)).toEqual(['old']);
+  });
+});
+
+describe('paging the inbox', () => {
+  it('reaches threads past the first fifty, each exactly once', async () => {
+    const seed = await seedWorkspace();
+    await prisma.conversation.createMany({
+      data: Array.from({ length: 60 }, (_, index) => ({
+        targetId: seed.target.id,
+        remoteId: `t_${index}`,
+        // Shared timestamps, so only the tiebreaker keeps pages apart.
+        updatedTime: new Date(Date.UTC(2026, 7, 1, index % 3)),
+      })),
+    });
+
+    expect(await engagement.countConversations({ workspaceId: seed.workspace.id })).toBe(60);
+
+    const seen = new Set<string>();
+    for (let page = 0; page < 2; page += 1) {
+      const rows = await engagement.readConversations({ workspaceId: seed.workspace.id, skip: page * 50, limit: 50 });
+      for (const row of rows) seen.add(row.id);
+    }
+    expect(seen.size).toBe(60);
+  });
+});
 
 /**
  * The rating summary an agency reports to its client.

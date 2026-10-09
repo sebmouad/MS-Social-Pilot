@@ -100,6 +100,27 @@ test('a scheduled post can be corrected without being recreated', async ({ page 
   expect(failures).toEqual([]);
 });
 
+test('the calendar opens a post for editing, and starts a new one on a chosen day', async ({ page }) => {
+  const failures = collectFailures(page);
+
+  await open(page, '/calendar');
+  await page.getByRole('link', { name: new RegExp(CORRECTED.slice(0, 20)) }).first().click();
+  await page.waitForURL(/\/compose\?post=/);
+  await expect(page.getByLabel(/what do you want to say/i)).toHaveValue(CORRECTED);
+
+  // Next month, where every day is ahead whatever today's date.
+  await open(page, '/calendar');
+  await page.getByRole('link', { name: '→' }).click();
+  await page.waitForURL(/\/calendar\?month=/);
+  const plus = page.getByRole('link', { name: /^new post on/i });
+  await plus.nth(10).click();
+  await page.waitForURL(/\/compose\?at=\d{4}-\d{2}-\d{2}T09:00/);
+  const at = new URL(page.url()).searchParams.get('at');
+  await expect(page.getByLabel(/date and time/i)).toHaveValue(at!);
+
+  expect(failures).toEqual([]);
+});
+
 test('a published post offers no way to rewrite it', async ({ page }) => {
   // The Edit button and the API agree on this: the copy on Facebook cannot be
   // changed, so an edit here would only create a second version of the truth.
@@ -203,7 +224,8 @@ test('the history screen says who did what, in words', async ({ page }) => {
   await expect(page.getByText('post.created')).toHaveCount(0);
 
   // The email tab is a click away and renders whether or not anything sent.
-  await page.getByRole('link', { name: /^email$/i }).click();
+  // Named "Email", or "Email, 1 failed" once an earlier spec's invite has failed to send.
+  await page.getByRole('link', { name: /^email\b/i }).click();
   await expect(page).toHaveURL(/view=email/);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
@@ -277,6 +299,38 @@ test('comments can be searched and paged rather than only skimmed', async ({ pag
 
   await expect(page.getByText('The delivery never arrived')).toBeVisible();
   await expect(page.getByText(/Ordinary comment/).first()).toHaveCount(0);
+
+  // A reply sits under the comment it answers, not where its own timestamp
+  // would put it: the Page answered a day later, after a newer comment arrived.
+  await prisma.postComment.createMany({
+    data: [
+      {
+        postTargetId: postTarget.id,
+        remoteId: 'walk_c_7_reply',
+        parentRemoteId: 'walk_c_7',
+        fromId: target.providerId,
+        fromName: PAGE_NAME,
+        message: 'Sorry about the delivery, a replacement is on its way',
+        createdTime: new Date('2026-08-02T09:00:00Z'),
+      },
+      {
+        postTargetId: postTarget.id,
+        remoteId: 'walk_c_newer',
+        fromName: 'Grace Hopper',
+        message: 'My delivery was quick, thanks',
+        createdTime: new Date('2026-08-01T12:00:00Z'),
+      },
+    ],
+  });
+
+  await page.getByLabel(/search comments/i).fill('delivery');
+  await page.getByRole('button', { name: /^filter$/i }).click();
+
+  const messages = page.getByRole('listitem').filter({ hasText: /delivery/i });
+  await expect(messages).toHaveCount(3);
+  await expect(messages.nth(0)).toContainText('My delivery was quick');
+  await expect(messages.nth(1)).toContainText('The delivery never arrived');
+  await expect(messages.nth(2)).toContainText('a replacement is on its way');
 
   expect(failures).toEqual([]);
 });
@@ -401,4 +455,156 @@ test('a caption too long for Instagram is flagged while it is being written', as
   // Removed rather than disabled: a row left behind is state one spec hands
   // to another, and a failure in the second is then nobody's obvious fault.
   await prisma.target.delete({ where: { id: instagram.id } });
+});
+
+test('picking a time offers the times the Page has done best at', async ({ page }) => {
+  const failures = collectFailures(page);
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: target.workspaceId } });
+  expect(workspace.timezone).toBe('UTC');
+
+  // Six weeks of posts: the Wednesday-morning ones did well, the rest did not.
+  const week = 7 * 24 * 60 * 60 * 1000;
+  const lastWednesday = new Date();
+  lastWednesday.setUTCDate(lastWednesday.getUTCDate() - ((lastWednesday.getUTCDay() - 3 + 7) % 7 || 7));
+  lastWednesday.setUTCHours(10, 0, 0, 0);
+  const insights = (reactions: number) => ({ impressions: null, reach: 1000, engagedUsers: null, reactions, comments: 0, shares: 0, clicks: 0 });
+  const rows = Array.from({ length: 6 }, (_, index) => [
+    { at: new Date(lastWednesday.getTime() - index * week), reactions: 90 },
+    { at: new Date(lastWednesday.getTime() - index * week - 2 * 24 * 60 * 60 * 1000 + 6 * 60 * 60 * 1000), reactions: 10 },
+  ]).flat();
+  await prisma.externalPost.createMany({
+    data: rows.map((row, index) => ({
+      targetId: target.id,
+      remoteId: `good-time-${index}`,
+      createdTime: row.at,
+      insights: insights(row.reactions),
+    })),
+  });
+
+  try {
+    await open(page, '/compose');
+    const chips = page.getByRole('group', { name: /good times this week/i }).getByRole('button');
+    await expect(chips).toHaveCount(1);
+    await expect(chips.first()).toHaveText(/Wed.*10:00/);
+
+    // One tap fills the time in.
+    const time = page.getByLabel(/date and time/i);
+    await expect(async () => {
+      await chips.first().click();
+      await expect(time).toHaveValue(/T10:00$/, { timeout: 1_500 });
+    }).toPass({ timeout: 30_000 });
+    await expect(chips.first()).toHaveAttribute('aria-pressed', 'true');
+  } finally {
+    await prisma.externalPost.deleteMany({ where: { remoteId: { startsWith: 'good-time-' } } });
+  }
+
+  expect(failures).toEqual([]);
+});
+
+test('Instagram without a picture is stopped before it is sent, and Facebook cannot hold it', async ({ page }) => {
+  // Instagram has no text-only post and no scheduling of its own; both used to
+  // be learnt from the server's refusal after pressing the button.
+  const failures = collectFailures(page);
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const instagram = await prisma.target.upsert({
+    where: { workspaceId_providerId: { workspaceId: target.workspaceId, providerId: 'ig-walk' } },
+    create: {
+      workspaceId: target.workspaceId,
+      socialAccountId: target.socialAccountId,
+      type: 'instagram',
+      providerId: 'ig-walk',
+      name: '@walkbakery',
+      accessToken: target.accessToken,
+      canPublish: true,
+    },
+    update: { canPublish: true, enabled: true },
+  });
+
+  try {
+    await open(page, '/compose');
+    await page.getByLabel(/what do you want to say/i).fill('Fresh loaves at seven.');
+
+    const box = page.getByRole('checkbox', { name: /@walkbakery/ });
+    await expect(async () => {
+      if (!(await box.isChecked())) await box.click();
+      await expect(page.getByText(/instagram only takes posts with a photo/i)).toBeVisible({ timeout: 1_500 });
+    }).toPass({ timeout: 30_000 });
+
+    await expect(page.getByRole('button', { name: /^schedule$/i })).toBeDisabled();
+    await expect(page.getByRole('radio', { name: /facebook\./i })).toBeDisabled();
+    await expect(page.getByText(/unavailable while an instagram account is selected/i)).toBeVisible();
+  } finally {
+    await prisma.target.delete({ where: { id: instagram.id } });
+  }
+
+  expect(failures).toEqual([]);
+});
+
+test('leaving a half-written post asks first', async ({ page }) => {
+  // Asked of the page directly: whether the browser then shows its prompt
+  // depends on its own rules about user gestures, which a headless run blurs.
+  const wouldAsk = () =>
+    page.evaluate(() => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+
+  await open(page, '/compose');
+  const box = page.getByLabel(/what do you want to say/i);
+  await expect(box).toBeEditable();
+  expect(await wouldAsk()).toBe(false);
+
+  await expect(async () => {
+    await box.fill('Half a thought');
+    expect(await wouldAsk()).toBe(true);
+  }).toPass({ timeout: 30_000 });
+
+  // Nothing left to lose once the box is empty again.
+  await box.fill('');
+  await expect.poll(wouldAsk).toBe(false);
+});
+
+test('an undated draft is listed under the calendar, and a switched-off destination can be unticked', async ({
+  page,
+}) => {
+  const failures = collectFailures(page);
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const author = await prisma.user.findFirstOrThrow({ where: { email: OWNER.email } });
+  const draft = await prisma.post.create({
+    data: {
+      workspaceId: target.workspaceId,
+      authorId: author.id,
+      message: 'Undated draft about rye',
+      status: 'draft',
+      targets: { create: [{ targetId: target.id, status: 'pending' }] },
+    },
+  });
+  // Switched off after the draft was written: it stays ticked in the editor.
+  await prisma.target.update({ where: { id: target.id }, data: { enabled: false } });
+
+  try {
+    await open(page, '/calendar');
+    const drafts = page.getByRole('region', { name: /unscheduled drafts/i });
+    await expect(drafts).toBeVisible();
+    await drafts.getByRole('link', { name: /undated draft about rye/i }).click();
+    await page.waitForURL(new RegExp(`/compose\\?post=${draft.id}`));
+
+    const box = page.getByRole('checkbox', { name: new RegExp(PAGE_NAME) });
+    await expect(box).toBeChecked();
+    await expect(box).toBeEnabled();
+    await expect(page.getByText(/switched off since this post was written/i)).toBeVisible();
+    await expect(async () => {
+      if (await box.isChecked()) await box.click();
+      await expect(box).not.toBeChecked({ timeout: 1_500 });
+    }).toPass({ timeout: 30_000 });
+    // Unticked for good: it cannot be ticked again while switched off.
+    await expect(box).toBeDisabled();
+  } finally {
+    await prisma.target.update({ where: { id: target.id }, data: { enabled: true } });
+    await prisma.post.delete({ where: { id: draft.id } });
+  }
+
+  expect(failures).toEqual([]);
 });

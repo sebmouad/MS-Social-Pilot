@@ -10,7 +10,9 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * Playwright is not a declared dependency: see e2e/README.md.
  */
-const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3100';
+// Its own port, so two walks — from two checkouts, say — can run side by side.
+const port = Number(process.env.E2E_PORT ?? 3100);
+const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${port}`;
 
 const databaseUrl = new URL(
   process.env.E2E_DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:5432/social_pilot_test',
@@ -61,7 +63,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npx tsx e2e/prepare.ts && npx next dev --port 3100 --hostname 127.0.0.1',
+    command: `npx tsx e2e/prepare.ts && npx next dev --port ${port} --hostname 127.0.0.1`,
     url: baseURL,
     reuseExistingServer: false,
     timeout: 180_000,
