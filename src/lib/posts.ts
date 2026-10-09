@@ -275,6 +275,7 @@ export async function createPost(
         workspaceId: context.workspaceId,
         authorId: context.userId,
         message: input.message,
+        firstComment: input.firstComment ?? null,
         link: input.link ?? null,
         linkPreview: toJsonOrNull(linkPreview),
         ...mediaColumns(input.media),
@@ -517,7 +518,7 @@ async function summarise(postId: string): Promise<CreatePostResult> {
  * saying so.
  */
 /** Contributors act on their own posts; editors and above on anyone's. */
-function assertMayAct(
+export function assertMayAct(
   post: { authorId: string },
   context: { userId: string; role: WorkspaceRole },
 ): void {
@@ -534,13 +535,21 @@ function assertMayAct(
  * would bounce a post back into the queue for opening and closing it.
  */
 function changesWhatWasReviewed(
-  post: { message: string; link: string | null; mediaKeys: string[]; scheduledAt: Date | null },
+  post: {
+    message: string;
+    firstComment: string | null;
+    link: string | null;
+    mediaKeys: string[];
+    scheduledAt: Date | null;
+  },
   currentTargetIds: string[],
   input: UpdatePostInput,
   nextScheduledAt: Date | null | undefined,
 ): boolean {
   if (input.message !== undefined && input.message !== post.message) return true;
   if (input.link !== undefined && (input.link ?? null) !== post.link) return true;
+  // Published under the post as the Page, so a reviewer approved it too.
+  if (input.firstComment !== undefined && (input.firstComment ?? null) !== post.firstComment) return true;
 
   if (input.media !== undefined) {
     const next = mediaColumns(input.media).mediaKeys;
@@ -758,6 +767,7 @@ export async function updatePost(
 
   const data: Record<string, unknown> = {};
   if (input.message !== undefined) data.message = input.message;
+  if (input.firstComment !== undefined) data.firstComment = input.firstComment;
   if (input.media !== undefined) {
     // Both columns or neither: stale keys would let a file in use be swept.
     const columns = mediaColumns(input.media);
@@ -1108,6 +1118,7 @@ export async function duplicatePost(
       workspaceId: post.workspaceId,
       authorId: context.userId,
       message: post.message,
+      firstComment: post.firstComment,
       link: post.link,
       linkPreview: toJsonOrNull(parseLinkPreview(post.linkPreview)),
       ...mediaColumns(parseMedia(post.media)),

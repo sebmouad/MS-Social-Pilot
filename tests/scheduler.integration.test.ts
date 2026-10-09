@@ -82,7 +82,7 @@ afterAll(async () => {
 });
 
 /** Build a workspace with one page, and a post due five minutes ago. */
-async function seedDuePost(options: { message?: string; link?: string } = {}) {
+async function seedDuePost(options: { message?: string; link?: string; firstComment?: string } = {}) {
   const { encryptSecret } = await import('../src/lib/crypto');
 
   const workspace = await prisma.workspace.create({
@@ -119,6 +119,7 @@ async function seedDuePost(options: { message?: string; link?: string } = {}) {
       workspaceId: workspace.id,
       authorId: user.id,
       message: options.message ?? 'Hello from the scheduler',
+      firstComment: options.firstComment ?? null,
       link: options.link ?? null,
       status: 'scheduled',
       publishMode: 'worker',
@@ -1357,5 +1358,97 @@ describe('reconciling posts scheduled inside Facebook', () => {
 
     const after = await prisma.postTarget.findUniqueOrThrow({ where: { id: checkable.id } });
     expect(after.status).toBe('published');
+  });
+});
+
+describe('the first comment', () => {
+  it('goes under the post as the Page once the post is out', async () => {
+    const { postTarget } = await seedDuePost({ firstComment: 'Full recipe: https://example.com/r' });
+    responses = [
+      { status: 200, body: { id: '1000_7777' } },
+      { status: 200, body: { id: '7777_9001' } },
+    ];
+
+    await runner.runSchedulerTick();
+
+    expect(received).toHaveLength(2);
+    expect(received[1]!.path).toContain('/1000_7777/comments');
+    expect(received[1]!.body.message).toBe('Full recipe: https://example.com/r');
+    const updated = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(updated).toMatchObject({ status: 'published', firstCommentId: '7777_9001', firstCommentError: null });
+  });
+
+  it('leaves the post published when the comment is refused, and retries only the comment', async () => {
+    const { post, postTarget } = await seedDuePost({ firstComment: 'Link in here' });
+    responses = [
+      { status: 200, body: { id: '1000_7777' } },
+      { status: 400, body: { error: { message: 'Comments are turned off.', type: 'OAuthException', code: 100 } } },
+    ];
+
+    const result = await runner.runSchedulerTick();
+    expect(result).toMatchObject({ published: 1, failed: 0 });
+
+    const refused = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(refused.status).toBe('published');
+    expect(refused.firstCommentId).toBeNull();
+    // The claim is released, so a retry may try again.
+    expect(refused.firstCommentAt).toBeNull();
+    expect(refused.firstCommentError).toBeTruthy();
+
+    const { retryFirstComments } = await import('../src/lib/first-comment');
+    responses = [{ status: 200, body: { id: '7777_9002' } }];
+    expect(await retryFirstComments(post.id)).toEqual({ posted: 1, failed: 0 });
+
+    // One more call, to the comments edge: the post was not sent again.
+    expect(received.slice(2)).toHaveLength(1);
+    expect(received[2]!.path).toContain('/1000_7777/comments');
+    const fixed = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(fixed).toMatchObject({ firstCommentId: '7777_9002', firstCommentError: null });
+  });
+
+  it('is not posted at all when there is none', async () => {
+    await seedDuePost();
+    await runner.runSchedulerTick();
+    expect(received).toHaveLength(1);
+  });
+
+  it('cannot be posted twice by two attempts at once', async () => {
+    const { postTarget } = await seedDuePost({ firstComment: 'Only once' });
+    responses = [{ status: 200, body: { id: '1000_7777' } }];
+    // Publish without the comment going through yet: the stub refuses it.
+    responses.push({ status: 400, body: { error: { message: 'Try later.', type: 'OAuthException', code: 2 } } });
+    await runner.runSchedulerTick();
+
+    const { postFirstComment } = await import('../src/lib/first-comment');
+    received = [];
+    responses = [{ status: 200, body: { id: '7777_1' } }, { status: 200, body: { id: '7777_2' } }];
+    const results = await Promise.all([postFirstComment(postTarget.id), postFirstComment(postTarget.id)]);
+
+    expect(results.filter((result) => result === 'posted')).toHaveLength(1);
+    expect(received.filter((call) => call.path.includes('/comments'))).toHaveLength(1);
+  });
+});
+
+describe('the first comment on a post Facebook held', () => {
+  it('goes under it once the reconcile pass sees it published', async () => {
+    const { postTarget } = await seedDuePost({ firstComment: 'Now live' });
+    await prisma.postTarget.update({
+      where: { id: postTarget.id },
+      data: {
+        status: 'scheduled_remote',
+        remotePostId: '1000_4242',
+        nativeScheduledFor: new Date(Date.now() - 60_000),
+      },
+    });
+    responses = [
+      { status: 200, body: { is_published: true, created_time: new Date(Date.now() - 30_000).toISOString() } },
+      { status: 200, body: { id: '4242_1' } },
+    ];
+
+    await jobs.runNativeReconcile({ now: new Date(), logger: () => {} });
+
+    expect(received[1]!.path).toContain('/1000_4242/comments');
+    const updated = await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } });
+    expect(updated).toMatchObject({ status: 'published', firstCommentId: '4242_1' });
   });
 });

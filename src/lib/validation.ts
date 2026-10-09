@@ -119,9 +119,19 @@ export function hasPostContent(message: string, link: string | null, mediaCount:
   return message.trim().length > 0 || Boolean(link) || mediaCount > 0;
 }
 
+/**
+ * The comment posted as the Page under the post when it goes out. Blank means
+ * none; Facebook takes comments up to 8,000 characters.
+ */
+const firstComment = z
+  .string()
+  .max(8000, 'A first comment can be at most 8,000 characters.')
+  .transform((value) => value.trim() || null);
+
 export const createPostSchema = z
   .object({
     message: postMessage.default(''),
+    firstComment: firstComment.nullish(),
     link: httpUrl.nullish(),
     media: postMedia.default([]),
     targetIds: postTargetIds,
@@ -151,6 +161,7 @@ export const createPostSchema = z
 export const updatePostSchema = z
   .object({
     message: postMessage.optional(),
+    firstComment: firstComment.nullish(),
     link: httpUrl.nullish(),
     media: postMedia.optional(),
     targetIds: postTargetIds.optional(),

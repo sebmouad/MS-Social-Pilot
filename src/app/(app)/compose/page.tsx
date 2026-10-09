@@ -193,6 +193,7 @@ async function loadForEditing(postId: string, auth: Auth): Promise<EditingPost |
   return {
     id: post.id,
     message: post.message,
+    firstComment: post.firstComment,
     link: post.link,
     media: parseMedia(post.media),
     targetIds: post.targets.map((target) => target.targetId),

@@ -381,7 +381,10 @@
     "previewEmpty": "Start writing and your post appears here, the way your followers will see it.",
     "previewLike": "Like",
     "previewComment": "Comment",
-    "previewShare": "Share"
+    "previewShare": "Share",
+    "firstComment": "First comment",
+    "firstCommentPlaceholder": "A link, hashtags or a call to action…",
+    "firstCommentHint": "Posted as the Page under the post the moment it goes out. If Facebook refuses it, the post still goes out and the comment can be retried from the post list."
   },
   "config": {
     "title": "Configuration",
@@ -1160,6 +1163,13 @@
       "reactions": "Reactions",
       "comments": "Comments",
       "shares": "Shares"
+    },
+    "whatsOnYourMind": "Write a new post…",
+    "retryComment": "Retry comment",
+    "firstComment": {
+      "posted": "First comment posted",
+      "pending": "First comment: posted with the post",
+      "refused": "First comment refused"
     }
   },
   "queue": {

@@ -44,6 +44,7 @@ interface Props {
 export interface EditingPost {
   id: string;
   message: string;
+  firstComment: string | null;
   link: string | null;
   media: PostMedia[];
   targetIds: string[];
@@ -87,6 +88,8 @@ export function Composer({
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
   const messageBox = useRef<HTMLTextAreaElement>(null);
+  const commentBox = useRef<HTMLTextAreaElement>(null);
+  const [firstComment, setFirstComment] = useState(editing?.firstComment ?? '');
   const linkBox = useRef<HTMLInputElement>(null);
 
   const [message, setMessage] = useState(editing?.message ?? '');
@@ -128,6 +131,9 @@ export function Composer({
   useEffect(() => {
     const typed = messageBox.current?.value ?? '';
     if (typed) setMessage(typed);
+
+    const commented = commentBox.current?.value ?? '';
+    if (commented) setFirstComment(commented);
 
     const pasted = linkBox.current?.value ?? '';
     if (pasted) {
@@ -277,6 +283,7 @@ export function Composer({
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
               message,
+              firstComment,
               link: link.trim() ? link.trim() : null,
               media,
               targetIds: selected,
@@ -290,6 +297,7 @@ export function Composer({
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
               message,
+              firstComment,
               link: link.trim() ? link.trim() : null,
               media,
               targetIds: selected,
@@ -347,6 +355,8 @@ export function Composer({
       );
       writeMessage('');
       writeLink('');
+      setFirstComment('');
+      if (commentBox.current) commentBox.current.value = '';
       setPreview(null);
       setMedia([]);
       router.refresh();
@@ -439,6 +449,25 @@ export function Composer({
           />
           {/* What a person means by a character: one emoji is one, not two. */}
           <p className="hint">{t('characters', { count: countCharacters(message) })}</p>
+
+          <div className="mt-5">
+            <label className="label" htmlFor="first-comment">
+              {t('firstComment')} <span className="font-normal text-slate-400">{tAuth('optional')}</span>
+            </label>
+            <textarea
+              id="first-comment"
+              ref={commentBox}
+              className="input min-h-[72px] resize-y"
+              placeholder={t('firstCommentPlaceholder')}
+              defaultValue={editing?.firstComment ?? ''}
+              maxLength={8000}
+              aria-describedby="first-comment-hint"
+              onChange={(event) => setFirstComment(event.target.value)}
+            />
+            <p id="first-comment-hint" className="hint">
+              {t('firstCommentHint')}
+            </p>
+          </div>
 
           {/* Instagram's limit is a fifth of Facebook's and genuinely
               reachable. Said here rather than discovered at the scheduled
@@ -602,6 +631,7 @@ export function Composer({
           message={message}
           media={media}
           link={preview}
+          firstComment={firstComment}
           timing={timing}
           scheduledAt={scheduledAt}
         />

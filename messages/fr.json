@@ -381,7 +381,10 @@
     "previewEmpty": "Commencez à écrire : votre publication apparaît ici, telle que vos abonnés la verront.",
     "previewLike": "J’aime",
     "previewComment": "Commenter",
-    "previewShare": "Partager"
+    "previewShare": "Partager",
+    "firstComment": "Premier commentaire",
+    "firstCommentPlaceholder": "Un lien, des hashtags ou un appel à l’action…",
+    "firstCommentHint": "Publié au nom de la Page sous la publication dès sa mise en ligne. Si Facebook le refuse, la publication part quand même et le commentaire peut être relancé depuis la liste des publications."
   },
   "config": {
     "title": "Configuration",
@@ -1160,6 +1163,13 @@
       "reactions": "Réactions",
       "comments": "Commentaires",
       "shares": "Partages"
+    },
+    "whatsOnYourMind": "Écrire une nouvelle publication…",
+    "retryComment": "Relancer le commentaire",
+    "firstComment": {
+      "posted": "Premier commentaire publié",
+      "pending": "Premier commentaire : publié avec la publication",
+      "refused": "Premier commentaire refusé"
     }
   },
   "queue": {

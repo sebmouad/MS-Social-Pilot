@@ -331,6 +331,9 @@ model Post {
   workspaceId String
   authorId    String
   message     String  @default("")
+  /// Posted as the Page under the post the moment it goes out: where a link,
+  /// hashtags or a call to action go without crowding the post itself.
+  firstComment String?
   link        String?
   /// Cached Open Graph metadata for `link`.
   linkPreview Json?
@@ -403,6 +406,13 @@ model PostTarget {
 
   remotePostId       String?
   remoteUrl          String?
+  /// The first comment, once Facebook accepted it.
+  firstCommentId     String?
+  /// When it was last attempted. Set before the call, as the claim that stops
+  /// two workers (or two clicks on Retry) from commenting twice.
+  firstCommentAt     DateTime?
+  /// Why Facebook refused it, until a retry succeeds.
+  firstCommentError  String?
   nativeScheduledFor DateTime?
 
   attempts      Int       @default(0)

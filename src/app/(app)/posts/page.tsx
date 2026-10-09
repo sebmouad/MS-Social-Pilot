@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { getTranslations } from 'next-intl/server';
 
 import { PostList } from '@/components/PostList';
+import { Icon } from '@/components/Icon';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
@@ -141,18 +142,21 @@ export default async function PostsPage({
   };
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto grid max-w-[1040px] items-start gap-6 lg:grid-cols-[280px_minmax(0,680px)] lg:justify-center">
+      {/* Facebook's left menu: it stays put while the feed scrolls beside it. */}
+      <aside className="space-y-4 lg:sticky lg:top-32">
+      <header className="flex items-center justify-between gap-3 lg:block">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
         </div>
-        <Link href="/compose" className="btn-primary">
+        <Link href="/compose" className="btn-primary lg:mt-4 lg:w-full">
+          <Icon name="plus" size={18} />
           {tDash('newPost')}
         </Link>
       </header>
 
-      <nav className="flex flex-wrap gap-2" aria-label={t('statusFilter')}>
+      <nav className="flex flex-wrap gap-2 lg:card lg:flex-col lg:gap-0.5 lg:p-2" aria-label={t('statusFilter')}>
         {FILTERS.map((value) => {
           const active = (raw ?? '') === value;
           return (
@@ -162,8 +166,10 @@ export default async function PostsPage({
               // narrowing down to one Page's failures means both at once.
               href={pageHref('/posts', { ...params, status: value || undefined }, 1)}
               aria-current={active ? 'page' : undefined}
-              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
-                active ? 'bg-brand-50 text-brand-600' : 'bg-white text-slate-700 shadow-surface hover:bg-slate-50'
+              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors lg:justify-between lg:rounded-md lg:px-3 lg:py-2 lg:text-[15px] lg:shadow-none ${
+                active
+                  ? 'bg-brand-50 text-brand-600'
+                  : 'bg-white text-slate-700 shadow-surface hover:bg-slate-50 lg:bg-transparent lg:text-slate-900 lg:hover:bg-slate-100'
               }`}
             >
               {value ? tStatus(value) : tCommon('all')}
@@ -179,10 +185,10 @@ export default async function PostsPage({
 
       {/* A plain GET form, so a search is a URL like every other filter here:
           it pages, bookmarks and survives a refresh. */}
-      <form method="get" action="/posts" role="search" className="flex flex-wrap items-end gap-2">
+      <form method="get" action="/posts" role="search" className="card flex flex-wrap items-end gap-2 p-3 lg:flex-col lg:items-stretch">
         {raw && <input type="hidden" name="status" value={raw} />}
 
-        <div className="min-w-[12rem] flex-1">
+        <div className="min-w-[12rem] flex-1 lg:min-w-0">
           <label className="label" htmlFor="posts-q">
             {t('searchLabel')}
           </label>
@@ -223,6 +229,19 @@ export default async function PostsPage({
           </Link>
         )}
       </form>
+      </aside>
+
+      <div className="min-w-0 space-y-4">
+      {/* Facebook's "What's on your mind?": the way into a new post sits at
+          the top of the feed it will join. */}
+      <Link href="/compose" className="card flex items-center gap-3 p-3 hover:bg-slate-50">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+          <Icon name="compose" size={18} />
+        </span>
+        <span className="flex-1 rounded-full bg-slate-100 px-4 py-2.5 text-[15px] text-slate-600">
+          {t('whatsOnYourMind')}
+        </span>
+      </Link>
 
       <PostList
         emptyText={filtered ? t('noMatches') : undefined}
@@ -230,6 +249,7 @@ export default async function PostsPage({
         posts={posts.map((post) => ({
           id: post.id,
           message: post.message,
+          firstComment: post.firstComment,
           link: post.link,
           status: post.status,
           publishMode: post.publishMode,
@@ -256,6 +276,8 @@ export default async function PostsPage({
             name: postTarget.target.name,
             type: postTarget.target.type,
             pictureUrl: postTarget.target.pictureUrl,
+            firstCommentPosted: postTarget.firstCommentId !== null,
+            firstCommentError: postTarget.firstCommentError,
             status: postTarget.status,
             url: postTarget.remoteUrl,
             error: postTarget.errorMessage,
@@ -266,6 +288,7 @@ export default async function PostsPage({
       />
 
       <Pagination page={page} href={(next) => pageHref('/posts', params, next)} />
+      </div>
     </div>
   );
 }

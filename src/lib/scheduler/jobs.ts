@@ -1,4 +1,5 @@
 import { prisma } from '../prisma';
+import { postFirstComment } from '../first-comment';
 import { env } from '../env';
 import { notifyTokenExpiring } from '../email/notify';
 import { runEvergreenCycle } from '../evergreen';
@@ -209,6 +210,9 @@ export async function runNativeReconcile(context: JobContext): Promise<string | 
 
       published += 1;
       touched.add(row.postId);
+      // Facebook published it on its own; this is the first moment we know,
+      // and so the first moment its comment can go under it.
+      await postFirstComment(row.id, context.now);
     } catch (error) {
       const graphError = asGraphError(error);
 

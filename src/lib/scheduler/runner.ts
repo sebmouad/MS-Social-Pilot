@@ -12,6 +12,7 @@ import { publishToInstagram } from '../facebook/instagram-publish';
 import { decideRetry } from './backoff';
 import { notifyConnectionExpired, notifyPublishFailure } from '../email/notify';
 import { prepareLinks } from '../links';
+import { postFirstComment } from '../first-comment';
 import {
   PUBLISHABLE_APPROVAL_STATUSES,
   TERMINAL_TARGET_STATUSES,
@@ -414,6 +415,16 @@ async function publishClaimed(
     }
 
     options.logger?.(`Published post ${post.id} to ${target.name}.`, { url: result.remoteUrl });
+
+    // Only once the publish is recorded, and never able to throw: a refused
+    // comment is noted on the destination for a retry, and the post stays
+    // published rather than coming back here to be sent a second time.
+    if (post.firstComment?.trim()) {
+      const comment = await postFirstComment(postTargetId, options.now);
+      if (comment === 'failed') {
+        options.logger?.(`Published post ${post.id} to ${target.name}, but its first comment was refused.`);
+      }
+    }
     return 'published';
   } catch (error) {
     const graphError = asGraphError(error);

@@ -11,6 +11,8 @@ interface Props {
   message: string;
   media: PostMedia[];
   link: LinkPreview | null;
+  /** Posted as the Page under the post; drawn as Facebook shows a comment. */
+  firstComment?: string;
   timing: 'now' | 'schedule' | 'queue';
   /** `datetime-local` wall time in the workspace's zone. */
   scheduledAt: string;
@@ -25,7 +27,7 @@ interface Props {
  * Facebook's layout, while it is being written. It is a likeness, not a
  * rendering by Facebook: its actions are drawn, not live.
  */
-export function PostPreview({ page, message, media, link, timing, scheduledAt }: Props) {
+export function PostPreview({ page, message, media, link, firstComment, timing, scheduledAt }: Props) {
   const t = useTranslations('compose');
   const locale = useLocale();
 
@@ -115,6 +117,28 @@ export function PostPreview({ page, message, media, link, timing, scheduledAt }:
             </span>
           ))}
         </div>
+
+        {firstComment?.trim() && (
+          <div className="flex gap-2 border-t border-slate-200 px-4 py-3">
+            {page?.pictureUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={page.pictureUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+            ) : (
+              <span
+                aria-hidden
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600"
+              >
+                {name.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <div className="min-w-0 rounded-2xl bg-slate-100 px-3 py-2">
+              <p className="text-[13px] font-semibold text-slate-900">{name}</p>
+              <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-[15px] leading-5 text-slate-900">
+                {withHashtags(firstComment)}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

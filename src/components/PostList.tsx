@@ -13,6 +13,8 @@ import { postIsEditable } from '@/lib/constants';
 export interface PostView {
   id: string;
   message: string;
+  /** Posted as the Page under the post when it goes out. */
+  firstComment: string | null;
   link: string | null;
   status: string;
   publishMode: string;
@@ -36,6 +38,9 @@ export interface PostView {
     name: string;
     type: string;
     pictureUrl: string | null;
+    firstCommentPosted: boolean;
+    /** Why Facebook refused the first comment, until a retry succeeds. */
+    firstCommentError: string | null;
     status: string;
     url: string | null;
     error: string | null;
@@ -160,7 +165,7 @@ export function PostList({
 
       {groupByDay(posts).map((group) => (
         <section key={group.key} aria-labelledby={`day-${group.key}`} className="space-y-3">
-          <h2 id={`day-${group.key}`} className="pt-2 text-[17px] font-bold text-slate-900">
+          <h2 id={`day-${group.key}`} className="px-1 pt-2 text-[15px] font-semibold text-slate-600">
             {group.label}
           </h2>
           {group.posts.map((post) => {
@@ -175,6 +180,15 @@ export function PostList({
         // The same rule the API enforces, so the button is never a dead end.
         const canEdit = post.mayAct && postIsEditable(post);
         const canRetry = post.mayAct && post.targets.some((target) => target.status === 'failed');
+        const refusedComments = post.targets.filter((target) => target.firstCommentError);
+        const canRetryComment = post.mayAct && Boolean(post.firstComment) && refusedComments.length > 0;
+        const commentState = !post.firstComment
+          ? null
+          : refusedComments.length > 0
+            ? 'refused'
+            : post.targets.some((target) => target.firstCommentPosted)
+              ? 'posted'
+              : 'pending';
         const working = busy === post.id;
         const lead = post.targets[0];
         // One destination that went fine needs no row of its own: the header
@@ -203,25 +217,23 @@ export function PostList({
               <StatusBadge status={post.status} />
             </header>
 
-            <div className="flex gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-[15px] leading-5 text-slate-900">
-                  {post.message || <span className="text-slate-500">{t('noText')}</span>}
-                </p>
-                {post.link && (
-                  <ExternalLink
-                    href={post.link}
-                    className="mt-1 block truncate text-sm text-brand-600 hover:underline"
-                  >
-                    {post.link}
-                  </ExternalLink>
-                )}
-              </div>
-              {post.thumbnailUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={post.thumbnailUrl} alt="" className="h-20 w-20 shrink-0 rounded-md object-cover" />
-              )}
-            </div>
+            <p className="whitespace-pre-wrap px-4 py-3 [overflow-wrap:anywhere] text-[15px] leading-5 text-slate-900">
+              {post.message || <span className="text-slate-500">{t('noText')}</span>}
+            </p>
+            {post.thumbnailUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={post.thumbnailUrl} alt="" className="mb-3 max-h-[32rem] w-full bg-slate-100 object-cover" />
+            )}
+            {post.link && (
+              // Facebook's link card: the address on a grey band under the text.
+              <ExternalLink
+                href={post.link}
+                className="mb-3 block border-y border-slate-200 bg-slate-100 px-4 py-2.5 hover:bg-slate-200"
+              >
+                <span className="block truncate text-[13px] text-slate-600">{hostOf(post.link)}</span>
+                <span className="block truncate text-[15px] font-semibold text-slate-900">{post.link}</span>
+              </ExternalLink>
+            )}
 
             {/* The reason is the whole point of a rejection: without it the
                 author can only guess what to change before resubmitting. */}
@@ -255,14 +267,53 @@ export function PostList({
             )}
 
             {post.results && (
-              <dl className="mx-4 mb-2 flex flex-wrap gap-x-5 gap-y-1 border-t border-slate-200 pt-2 text-[13px] text-slate-600">
-                {(['reach', 'reactions', 'comments', 'shares'] as const).map((key) => (
-                  <div key={key} className="flex gap-1">
-                    <dt>{t(`result.${key}`)}</dt>
-                    <dd className="nums font-semibold text-slate-900">{post.results![key].toLocaleString()}</dd>
-                  </div>
-                ))}
+              <dl className="mx-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2 text-[15px] text-slate-600">
+                <div className="flex items-center gap-1.5">
+                  <dt className="sr-only">{t('result.reactions')}</dt>
+                  <span
+                    aria-hidden
+                    className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-brand-500 text-white"
+                  >
+                    <Icon name="check" size={11} />
+                  </span>
+                  <dd className="nums">{post.results.reactions.toLocaleString()}</dd>
+                </div>
+                <div className="flex flex-wrap gap-x-3">
+                  {(['comments', 'shares', 'reach'] as const).map((key) => (
+                    <div key={key} className="flex gap-1">
+                      <dd className="nums">{post.results![key].toLocaleString()}</dd>
+                      <dt>{t(`result.${key}`).toLowerCase()}</dt>
+                    </div>
+                  ))}
+                </div>
               </dl>
+            )}
+
+            {/* The first comment, drawn as it appears under the post. */}
+            {post.firstComment && (
+              <div className="mx-4 mb-2 flex gap-2 border-t border-slate-200 pt-2">
+                <Avatar name={lead?.name ?? ''} pictureUrl={lead?.pictureUrl ?? null} size="sm" />
+                <div className="min-w-0">
+                  <div className="rounded-2xl bg-slate-100 px-3 py-2">
+                    <p className="text-[13px] font-semibold text-slate-900">{lead?.name}</p>
+                    <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-[15px] leading-5 text-slate-900">
+                      {post.firstComment}
+                    </p>
+                  </div>
+                  <p
+                    className={`mt-0.5 px-3 text-xs font-semibold ${
+                      commentState === 'refused'
+                        ? 'text-red-700'
+                        : commentState === 'posted'
+                          ? 'text-emerald-700'
+                          : 'text-slate-500'
+                    }`}
+                  >
+                    {t(`firstComment.${commentState}`)}
+                    {commentState === 'refused' && `: ${refusedComments[0]!.firstCommentError}`}
+                  </p>
+                </div>
+              </div>
             )}
 
             {/* Facebook's action bar: quiet, equal-width, icon and word. */}
@@ -324,6 +375,17 @@ export function PostList({
                 >
                   <ActionIcon name="megaphone" />
                   {tCompose('publishNow')}
+                </button>
+              )}
+              {canRetryComment && (
+                <button
+                  type="button"
+                  className={ACTION}
+                  disabled={working}
+                  onClick={() => act(post.id, { path: `/api/posts/${post.id}/first-comment`, method: 'POST' })}
+                >
+                  <ActionIcon name="comment" />
+                  {t('retryComment')}
                 </button>
               )}
               {canRetry && (
@@ -388,24 +450,41 @@ export function PostList({
 
 /** The action bar's button: a quiet, flexible strip like Facebook's Like and Share. */
 const ACTION =
-  'btn flex-1 bg-transparent px-2 text-[15px] text-slate-600 hover:bg-slate-100 sm:flex-none sm:px-3';
+  'btn flex-1 gap-1.5 whitespace-nowrap bg-transparent px-1.5 text-[13px] text-slate-600 hover:bg-slate-100 sm:gap-2 sm:px-2 sm:text-[15px]';
 
 function ActionIcon({ name }: { name: IconName }) {
   return <Icon name={name} size={18} className="shrink-0" />;
 }
 
-function Avatar({ name, pictureUrl }: { name: string; pictureUrl: string | null }) {
+function Avatar({
+  name,
+  pictureUrl,
+  size = 'md',
+}: {
+  name: string;
+  pictureUrl: string | null;
+  size?: 'sm' | 'md';
+}) {
+  const box = size === 'sm' ? 'h-8 w-8 text-xs' : 'h-10 w-10 text-[15px]';
   return pictureUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={pictureUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+    <img src={pictureUrl} alt="" className={`${box} shrink-0 rounded-full object-cover`} />
   ) : (
     <span
       aria-hidden
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[15px] font-bold text-brand-600"
+      className={`${box} flex shrink-0 items-center justify-center rounded-full bg-brand-50 font-bold text-brand-600`}
     >
       {name.charAt(0).toUpperCase() || '?'}
     </span>
   );
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 }
 
 /** Consecutive posts sharing a day, in the order the list already has them. */

@@ -454,11 +454,15 @@ async function seedSchedule(workspaceId: string, targetIds: string[], now: Date)
     const published = shape.target === PostTargetStatus.published;
     const reach = Math.round(600 + random() * 4000);
     const targetId = targetIds[index % targetIds.length]!;
+    // Every third post carries a first comment, the way links and hashtags
+    // are usually kept out of the post itself.
+    const firstComment = index % 3 === 0 ? 'Recipes and opening hours: https://halloway.example #bakery' : null;
     await prisma.post.create({
       data: {
         workspaceId,
         authorId: owner.userId,
         message: SCHEDULED_MESSAGES[index % SCHEDULED_MESSAGES.length]!,
+        firstComment,
         status: shape.status,
         scheduledAt: when,
         publishedAt: published ? when : null,
@@ -471,6 +475,7 @@ async function seedSchedule(workspaceId: string, targetIds: string[], now: Date)
             status: shape.target,
             publishedAt: published ? when : null,
             remotePostId: published ? `demo-post-${index}` : null,
+            firstCommentId: published && firstComment ? `demo-comment-${index}` : null,
             errorMessage: shape.error ?? null,
             insights: published
               ? {
