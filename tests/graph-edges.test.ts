@@ -202,6 +202,15 @@ describe('fetchReviews', () => {
 
     expect(await fetchReviews('100', 'token')).toEqual([]);
   });
+
+  it('asks v21.0, the last version that serves recommendations', async () => {
+    // From v22.0 `/ratings` answers error 12, so following the pinned
+    // version here would break the edge on every Page.
+    routes['/ratings'] = () => ({ data: [] });
+
+    await fetchReviews('100', 'token');
+    expect(seen[0]!.path).toBe('/v21.0/100/ratings');
+  });
 });
 
 describe('fetchConversations', () => {
