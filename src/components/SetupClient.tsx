@@ -138,10 +138,18 @@ export function SetupClient({ state, signedIn }: { state: SetupState; signedIn: 
                           </label>
                           <input
                             id="appId"
+                            name="facebook-app-id"
                             className="input"
                             value={appId}
                             onChange={(event) => setAppId(event.target.value)}
+                            // Not a sign-in form: without these, a browser pairs
+                            // this field with the password one below and fills
+                            // in the saved login for this site.
                             autoComplete="off"
+                            inputMode="numeric"
+                            spellCheck={false}
+                            data-1p-ignore=""
+                            data-lpignore="true"
                             required
                           />
                         </div>
@@ -151,11 +159,17 @@ export function SetupClient({ state, signedIn }: { state: SetupState; signedIn: 
                           </label>
                           <input
                             id="appSecret"
+                            name="facebook-app-secret"
                             type="password"
                             className="input"
                             value={appSecret}
                             onChange={(event) => setAppSecret(event.target.value)}
-                            autoComplete="off"
+                            // `off` is ignored on password fields; `new-password`
+                            // is what stops a saved login being filled in.
+                            autoComplete="new-password"
+                            spellCheck={false}
+                            data-1p-ignore=""
+                            data-lpignore="true"
                             required
                           />
                         </div>

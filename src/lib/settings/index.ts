@@ -320,7 +320,11 @@ export function validate(definition: SettingDefinition, raw: unknown): SettingVa
     return text;
   }
 
-  return String(raw);
+  const text = String(raw);
+  if (definition.pattern && text !== '' && !definition.pattern.regex.test(text)) {
+    throw new SettingError(definition.pattern.message);
+  }
+  return text;
 }
 
 /**

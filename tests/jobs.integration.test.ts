@@ -681,7 +681,9 @@ describe('Meta callbacks', () => {
   let dataDeletion: typeof import('../src/app/api/facebook/data-deletion/route');
 
   /** The secret an operator typed on the configuration screen. */
-  const configuredSecret = 'secret-set-on-the-config-screen';
+  // Shaped like a real one: the settings store refuses anything that is not
+  // 32 hex characters, which is what a Meta app secret is.
+  const configuredSecret = 'c0ffee00c0ffee00c0ffee00c0ffee00';
 
   beforeAll(async () => {
     settings = await import('../src/lib/settings');

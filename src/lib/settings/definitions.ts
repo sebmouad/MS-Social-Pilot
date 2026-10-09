@@ -47,6 +47,11 @@ export interface SettingDefinition {
   max?: number;
   /** `select` only. */
   options?: Array<{ value: string; label: string }>;
+  /**
+   * Strings and secrets only: the shape a value must have, and what to say when
+   * it does not. An empty value is not checked, since clearing is allowed.
+   */
+  pattern?: { regex: RegExp; message: string };
   /** Shown under the field: what changing this actually affects. */
   hint?: string;
   /**
@@ -138,6 +143,12 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     description: 'The Meta app this installation authenticates against.',
     default: '',
     env: 'FACEBOOK_APP_ID',
+    // A browser that mistakes the setup form for a sign-in form fills in an
+    // email address here, and the password beside it as the secret.
+    pattern: {
+      regex: /^\d{5,20}$/,
+      message: 'The App ID is the number at the top of your Meta app dashboard, not an email address.',
+    },
   },
   {
     key: 'facebook.appSecret',
@@ -148,6 +159,11 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     default: '',
     env: 'FACEBOOK_APP_SECRET',
     hint: 'Changing this invalidates nothing, but every call fails until it matches the app.',
+    pattern: {
+      regex: /^[0-9a-f]{32}$/i,
+      message:
+        'An app secret is 32 letters and digits, from App settings → Basic in the Meta dashboard. Check that a saved password was not filled in instead.',
+    },
   },
   {
     key: 'facebook.graphVersion',

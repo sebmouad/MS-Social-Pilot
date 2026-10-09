@@ -118,6 +118,25 @@ describe('validation', () => {
     await expect(settings.writeSetting('ai.model', 'gpt-4', null)).rejects.toThrow(/one of/);
   });
 
+  it('refuses a saved sign-in filled into the Facebook app fields', async () => {
+    // What a browser's password manager puts there when it mistakes the setup
+    // form for a sign-in form: the site's login email and password.
+    await expect(
+      settings.writeSetting('facebook.appId', 'owner@example.com', null),
+    ).rejects.toThrow(/not an email address/);
+    await expect(
+      settings.writeSetting('facebook.appSecret', 'a-long-enough-passphrase', null),
+    ).rejects.toThrow(/32 letters and digits/);
+  });
+
+  it('accepts a real-shaped app ID and secret, and clearing the secret', async () => {
+    await settings.writeSetting('facebook.appId', '699780715171676', null);
+    await settings.writeSetting('facebook.appSecret', 'c0ffee00c0ffee00c0ffee00c0ffee00', null);
+    await settings.ensureSettings();
+    expect(settings.settingString('facebook.appId')).toBe('699780715171676');
+    await settings.clearSetting('facebook.appSecret');
+  });
+
   it('refuses a key that does not exist', async () => {
     await expect(settings.writeSetting('nope.nothing', 1, null)).rejects.toThrow(/Unknown setting/);
   });

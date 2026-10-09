@@ -99,11 +99,11 @@ describe('what is left to do', () => {
   it('needs both halves of the Facebook credentials', async () => {
     const { workspace } = await seedWorkspace();
 
-    await settings.writeSetting('facebook.appId', '123', null);
+    await settings.writeSetting('facebook.appId', '123456789012345', null);
     await settings.ensureSettings();
     expect((await step(workspace.id, 'facebookApp'))?.done).toBe(false);
 
-    await settings.writeSetting('facebook.appSecret', 'shh', null);
+    await settings.writeSetting('facebook.appSecret', 'c0ffee00c0ffee00c0ffee00c0ffee00', null);
     await settings.ensureSettings();
     expect((await step(workspace.id, 'facebookApp'))?.done).toBe(true);
   });
@@ -183,8 +183,8 @@ describe('what is left to do', () => {
 
   it('is complete without email, and says email is optional', async () => {
     const { workspace } = await seedWorkspace();
-    await settings.writeSetting('facebook.appId', '123', null);
-    await settings.writeSetting('facebook.appSecret', 'shh', null);
+    await settings.writeSetting('facebook.appId', '123456789012345', null);
+    await settings.writeSetting('facebook.appSecret', 'c0ffee00c0ffee00c0ffee00c0ffee00', null);
     await settings.ensureSettings();
 
     const account = await prisma.socialAccount.create({
@@ -274,8 +274,8 @@ describe('the runtime checks', () => {
 
   it('is not complete while a required check fails, however many boxes are ticked', async () => {
     const { workspace } = await seedWorkspace();
-    await settings.writeSetting('facebook.appId', '123', null);
-    await settings.writeSetting('facebook.appSecret', 'shh', null);
+    await settings.writeSetting('facebook.appId', '123456789012345', null);
+    await settings.writeSetting('facebook.appSecret', 'c0ffee00c0ffee00c0ffee00c0ffee00', null);
     await settings.ensureSettings();
 
     const account = await prisma.socialAccount.create({
