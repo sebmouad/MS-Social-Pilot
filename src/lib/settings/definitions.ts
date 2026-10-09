@@ -155,7 +155,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'string',
     label: 'Graph API version',
     description: 'The pinned version every request is made against.',
-    default: 'v21.0',
+    default: 'v26.0',
     env: 'FACEBOOK_GRAPH_VERSION',
     hint: 'Pin it deliberately. Meta ships breaking changes between versions and supports each for about two years.',
   },
