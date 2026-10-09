@@ -97,6 +97,12 @@ else
   note "Created database ${DB_NAME}"
 fi
 
+# Timestamps are stored as UTC in columns without a time zone, and the scheduler
+# compares them with the current time in SQL. Debian's Postgres follows the
+# machine's zone, which would make every post due early (or late) by the offset.
+su - postgres -c "psql -q -c \"ALTER DATABASE ${DB_NAME} SET timezone TO 'UTC'\""
+note "Database ${DB_NAME} runs in UTC"
+
 # ---------------------------------------------------------------------------
 # Application
 # ---------------------------------------------------------------------------

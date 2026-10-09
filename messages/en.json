@@ -1289,6 +1289,10 @@
         "title": "Database reachable",
         "fix": "The database did not answer. Check DATABASE_URL and that PostgreSQL is running."
       },
+      "databaseTimezone": {
+        "title": "Database clock in UTC",
+        "fix": "Postgres is not running in UTC, so scheduled posts go out early or late by the time difference. Run ALTER DATABASE <your database> SET timezone TO 'UTC', then restart the app and the worker."
+      },
       "mediaDir": {
         "title": "Media directory writable",
         "fix": "Uploads cannot be written. Check MEDIA_DIR exists and that the app's user owns it."

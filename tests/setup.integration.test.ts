@@ -279,6 +279,30 @@ describe('who may set up the installation', () => {
  * the first post, hours later, with nothing connecting the two.
  */
 describe('the runtime checks', () => {
+  it('requires the database to run in UTC, and passes when it does', async () => {
+    const checks = await setup.readSetupChecks();
+    const zone = checks.find((check) => check.id === 'databaseTimezone');
+    expect(zone).toMatchObject({ ok: true, optional: false, detail: 'UTC' });
+  });
+
+  it('would publish early in a local zone, which is what the check guards', async () => {
+    // The scheduler compares a stored UTC time with "now" in SQL. Read in a
+    // Paris session, 21:24 UTC is taken for 21:24 Paris (19:24 UTC), so a post
+    // scheduled for 21:24 counts as due at 21:20. This is what happened on a
+    // Debian server whose Postgres followed the machine's zone.
+    const due = (zone: string) =>
+      prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL TimeZone = '${zone}'`);
+        const [row] = await tx.$queryRaw<Array<{ due: boolean }>>`
+          SELECT '2026-10-09 21:24:00'::timestamp <= ${new Date('2026-10-09T21:20:00Z')} AS due
+        `;
+        return row!.due;
+      });
+
+    expect(await due('Europe/Paris')).toBe(true);
+    expect(await due('UTC')).toBe(false);
+  });
+
   beforeEach(async () => {
     // A heartbeat left behind by another test would make "never started" pass
     // for the wrong reason.

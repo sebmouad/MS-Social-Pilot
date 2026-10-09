@@ -55,6 +55,7 @@ export type CheckId =
   | 'encryptionKey'
   | 'appUrl'
   | 'database'
+  | 'databaseTimezone'
   | 'mediaDir'
   | 'worker';
 
@@ -84,13 +85,22 @@ export interface SetupCheck {
  * two.
  */
 export async function readSetupChecks(): Promise<SetupCheck[]> {
-  const [database, worker, mediaDir] = await Promise.all([
+  const [database, databaseTimezone, worker, mediaDir] = await Promise.all([
     checkDatabase(),
+    checkDatabaseTimezone(),
     checkWorker(),
     checkMediaDir(),
   ]);
 
-  return [checkSessionSecret(), checkEncryptionKey(), checkAppUrl(), database, mediaDir, worker];
+  return [
+    checkSessionSecret(),
+    checkEncryptionKey(),
+    checkAppUrl(),
+    database,
+    databaseTimezone,
+    mediaDir,
+    worker,
+  ];
 }
 
 function checkSessionSecret(): SetupCheck {
@@ -152,6 +162,37 @@ async function checkDatabase(): Promise<SetupCheck> {
   } catch (error) {
     return {
       id: 'database',
+      ok: false,
+      optional: false,
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/** Zone names Postgres may report for UTC. */
+const UTC_ZONES = ['UTC', 'Etc/UTC', 'GMT', 'Etc/GMT', 'UCT', 'Zulu'];
+
+/**
+ * The database session runs in UTC.
+ *
+ * Every timestamp column is `timestamp without time zone` holding UTC, and the
+ * scheduler compares them with the current time in SQL. Postgres reads such a
+ * column in the session's time zone for that comparison, so on a server whose
+ * Postgres follows a local zone (a Debian install inherits the machine's), a
+ * post scheduled for 21:24 counts as due at 21:24 *local* time: two hours
+ * early in Paris in summer. Column defaults are written in that zone too.
+ * `ALTER DATABASE … SET timezone TO 'UTC'` fixes it for every connection.
+ */
+async function checkDatabaseTimezone(): Promise<SetupCheck> {
+  try {
+    const [row] = await prisma.$queryRaw<Array<{ timezone: string }>>`
+      SELECT current_setting('TimeZone') AS timezone
+    `;
+    const zone = row?.timezone ?? '';
+    return { id: 'databaseTimezone', ok: UTC_ZONES.includes(zone), optional: false, detail: zone };
+  } catch (error) {
+    return {
+      id: 'databaseTimezone',
       ok: false,
       optional: false,
       detail: error instanceof Error ? error.message : String(error),

@@ -15,7 +15,7 @@ interface SetupStep {
   optional: boolean;
 }
 
-type CheckId = 'sessionSecret' | 'encryptionKey' | 'appUrl' | 'database' | 'mediaDir' | 'worker';
+type CheckId = 'sessionSecret' | 'encryptionKey' | 'appUrl' | 'database' | 'databaseTimezone' | 'mediaDir' | 'worker';
 
 interface SetupCheck {
   id: CheckId;

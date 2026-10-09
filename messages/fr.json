@@ -1289,6 +1289,10 @@
         "title": "Base de données joignable",
         "fix": "La base de données n’a pas répondu. Vérifiez DATABASE_URL et que PostgreSQL fonctionne."
       },
+      "databaseTimezone": {
+        "title": "Horloge de la base en UTC",
+        "fix": "Postgres ne fonctionne pas en UTC : les publications programmées partent en avance ou en retard du décalage horaire. Exécutez ALTER DATABASE <votre base> SET timezone TO 'UTC', puis redémarrez l’application et le worker."
+      },
       "mediaDir": {
         "title": "Dossier média accessible en écriture",
         "fix": "Les téléversements ne peuvent pas être écrits. Vérifiez que MEDIA_DIR existe et appartient à l’utilisateur de l’application."
