@@ -42,6 +42,16 @@ test('the data deletion page is readable without an account', async ({ page }) =
   expect(failures).toEqual([]);
 });
 
+test('the terms of service are readable without an account', async ({ page }) => {
+  // Meta links here from the Facebook Login dialog, for people with no account.
+  const failures = collectFailures(page);
+
+  await open(page, '/terms');
+  await expect(page.getByRole('heading', { level: 1, name: /terms of service/i })).toBeVisible();
+
+  expect(failures).toEqual([]);
+});
+
 test('an invitation link nobody issued says so rather than breaking', async ({ page }) => {
   const failures = collectFailures(page);
 
