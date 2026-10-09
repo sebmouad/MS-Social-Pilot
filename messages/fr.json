@@ -265,7 +265,12 @@
     "whatToSay": "Que voulez-vous dire ?",
     "whenToPost": "Quand publier",
     "whereToPost": "Où publier",
-    "whoHolds": "Qui conserve la publication jusque-là ?"
+    "whoHolds": "Qui conserve la publication jusque-là ?",
+    "mediaChoose": "Choisir des photos ou une vidéo",
+    "mediaOrDrop": "ou les déposer ici",
+    "blockedNoDestinations": "Connectez d’abord une Page Facebook, depuis Connexions, pour avoir où publier.",
+    "blockedNoneSelected": "Choisissez au moins une Page sous « Où publier ».",
+    "blockedNoContent": "Écrivez un message, ajoutez un lien ou joignez un média."
   },
   "config": {
     "title": "Configuration",
@@ -305,7 +310,7 @@
     "featureOff": "Désactivé dans la Configuration. Meta examine cette autorisation séparément, et la demander avant approbation fait échouer toute la connexion.",
     "followers": "{count, plural, one {# abonné} other {# abonnés}}",
     "groups": "Groupes",
-    "groupsOff": "La publication dans les groupes est désactivée. Meta a restreint l’API Groups en avril 2024 : elle nécessite une autorisation approuvée séparément et l’installation de l’application dans chaque groupe. Activez-la dans la Configuration une fois l’approbation obtenue.",
+    "groupsOff": "La publication dans les groupes Facebook est désactivée ; les Pages fonctionnent normalement. Les groupes demandent une approbation supplémentaire de Meta et l’ajout de l’application à chaque groupe. Une fois les deux obtenus, activez les groupes dans Paramètres → Configuration.",
     "health": {
       "title": "Vérification des connexions",
       "subtitle": "Demandez à Facebook ce qui fonctionne, autorisation par autorisation et Page par Page.",
@@ -387,7 +392,10 @@
     "destinationsFailed": "{count, plural, one {# destination n'a pas pu recevoir la publication} other {# destinations n'ont pas pu recevoir la publication}}.",
     "reviewAndRetry": "Vérifier et réessayer",
     "tokensExpiring": "{count, plural, one {# connexion Facebook expire} other {# connexions Facebook expirent}} sous {days} jours. Les publications programmées s’arrêtent dès qu’une expire.",
-    "reviewConnections": "Vérifier les connexions"
+    "reviewConnections": "Vérifier les connexions",
+    "setupStepsLeft": "Terminez la configuration : encore {count, plural, one {# étape} other {# étapes}}. Prochaine : {next}.",
+    "setupCheckFailing": "La configuration est terminée, mais une vérification de l’installation échoue.",
+    "continueSetup": "Continuer la configuration"
   },
   "email": {
     "invitation": {

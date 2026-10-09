@@ -102,6 +102,16 @@ test.describe('the invited colleague, in French', () => {
     await context.close();
   });
 
+  test('is not sent to setup, which only an owner can finish', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: 'e2e/.auth/colleague.json' });
+    const page = await context.newPage();
+
+    await open(page, '/dashboard');
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+    await expect(page.locator('a[href="/setup"]')).toHaveCount(0);
+    await context.close();
+  });
+
   // French labels run about a third longer than English, so the header row
   // that fits in English is checked again here.
   for (const width of DESKTOP_WIDTHS) {

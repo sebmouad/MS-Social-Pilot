@@ -10,6 +10,8 @@ import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
 import { formatInZone, relativeTime } from '@/lib/time';
 import { publishedTotals } from '@/lib/analytics';
+import { canManageInstance } from '@/lib/constants';
+import { readSetupState } from '@/lib/setup';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +24,7 @@ export function generateMetadata() {
 export default async function DashboardPage() {
   const auth = await requirePage();
   const t = await getTranslations('dashboard');
+  const tSetup = await getTranslations('setup');
   const tPosts = await getTranslations('posts');
   const workspaceId = auth.workspace.id;
   const now = new Date();
@@ -50,6 +53,11 @@ export default async function DashboardPage() {
       publishedTotals(workspaceId),
       summariseConnections(workspaceId, { now, warnWithinDays: env.tokenWarningDays }),
     ]);
+
+  // An unfinished installation otherwise greets its owner with four zeros and
+  // no hint why. Setup is owner-only, so only an owner is pointed at it.
+  const setup = canManageInstance(auth.role) ? await readSetupState(workspaceId) : null;
+  const stepsLeft = setup?.steps.filter((step) => !step.optional && !step.done) ?? [];
 
   const countFor = (status: string) => counts.find((entry) => entry.status === status)?._count ?? 0;
 
@@ -84,6 +92,23 @@ export default async function DashboardPage() {
           <Icon name="plus" size={16} /> {t('newPost')}
         </Link>
       </header>
+
+      {setup && !setup.complete && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+          <p className="flex items-center gap-2">
+            <Icon name="settings" size={16} />
+            {stepsLeft.length > 0
+              ? t('setupStepsLeft', {
+                  count: stepsLeft.length,
+                  next: tSetup(`steps.${stepsLeft[0]!.id}.title`),
+                })
+              : t('setupCheckFailing')}
+          </p>
+          <Link href="/setup" className="btn-primary">
+            {t('continueSetup')}
+          </Link>
+        </div>
+      )}
 
       {staleAccounts.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

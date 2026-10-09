@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { TargetPicker, type TargetOption } from './TargetPicker';
 import { ExternalLink } from './ExternalLink';
 import { AiAssist } from './AiAssist';
+import { Icon } from './Icon';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 import { LIMITS } from '@/lib/constants';
 import { countCharacters } from '@/lib/text';
@@ -82,6 +83,7 @@ export function Composer({
     editing?.scheduledAtLocal ?? defaultScheduledAt,
   );
   const [pending, setPending] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   /** Permalinks for a post that has just gone out, so it can be checked. */
@@ -293,8 +295,20 @@ export function Composer({
   // scheduling, and the button must say so.
   const needsApproval = requiresApproval && !canPublishDirectly;
 
-  const canSubmit =
-    !pending && selected.length > 0 && (message.trim().length > 0 || link.trim().length > 0 || media.length > 0);
+  const hasContent = message.trim().length > 0 || link.trim().length > 0 || media.length > 0;
+  const canSubmit = !pending && selected.length > 0 && hasContent;
+
+  // A greyed-out button with no reason reads as broken. Say what is missing,
+  // in the order someone would fix it.
+  const blocker = pending
+    ? null
+    : targets.length === 0
+      ? t('blockedNoDestinations')
+      : selected.length === 0
+        ? t('blockedNoneSelected')
+        : !hasContent
+          ? t('blockedNoContent')
+          : null;
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -392,15 +406,42 @@ export function Composer({
             <label className="label" htmlFor="media">
               {t('media')}
             </label>
+            {/* The browser's own "Choose Files / No file chosen" control looked
+                like no other control here. The input stays — visually hidden,
+                still focusable and labelled — and the zone is its label, so a
+                click, a keypress or a dropped file all reach the same handler. */}
             <input
               id="media"
               ref={fileInput}
               type="file"
               multiple
               accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime"
-              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-slate-200"
+              className="peer sr-only"
               onChange={(event) => event.target.files && uploadFiles(event.target.files)}
             />
+            <label
+              htmlFor="media"
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragging(false);
+                if (event.dataTransfer.files.length > 0) uploadFiles(event.dataTransfer.files);
+              }}
+              className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-4 py-5 text-center text-sm transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500 ${
+                dragging
+                  ? 'border-brand-400 bg-brand-50 text-brand-700'
+                  : 'border-slate-300 text-slate-600 hover:border-brand-300 hover:bg-slate-50'
+              }`}
+            >
+              <Icon name="image" size={20} className="text-slate-400" />
+              <span>
+                <span className="font-medium text-brand-600">{t('mediaChoose')}</span> {t('mediaOrDrop')}
+              </span>
+            </label>
             <p className="hint">{t('mediaHint', { max: LIMITS.mediaPerPost })}</p>
 
             {media.length > 0 && (
@@ -540,21 +581,34 @@ export function Composer({
           </div>
         )}
 
-        <div className="flex gap-2">
-          <button type="button" className="btn-primary flex-1" disabled={!canSubmit} onClick={() => submit(false)}>
-            {pending
-              ? tCommon('working')
-              : editing
-                ? t('saveChanges')
-                : needsApproval
-                  ? t('submitForApproval')
-                  : timing === 'now'
-                    ? t('publishNow')
-                    : t('schedule')}
-          </button>
-          <button type="button" className="btn-secondary" disabled={pending} onClick={() => submit(true)}>
-            {editing ? t('moveToDrafts') : t('saveDraft')}
-          </button>
+        <div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn-primary flex-1"
+              disabled={!canSubmit}
+              aria-describedby={blocker ? 'submit-blocker' : undefined}
+              onClick={() => submit(false)}
+            >
+              {pending
+                ? tCommon('working')
+                : editing
+                  ? t('saveChanges')
+                  : needsApproval
+                    ? t('submitForApproval')
+                    : timing === 'now'
+                      ? t('publishNow')
+                      : t('schedule')}
+            </button>
+            <button type="button" className="btn-secondary" disabled={pending} onClick={() => submit(true)}>
+              {editing ? t('moveToDrafts') : t('saveDraft')}
+            </button>
+          </div>
+          {blocker && (
+            <p id="submit-blocker" className="hint">
+              {blocker}
+            </p>
+          )}
         </div>
       </div>
     </div>

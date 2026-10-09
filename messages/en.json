@@ -265,7 +265,12 @@
     "whatToSay": "What do you want to say?",
     "whenToPost": "When to post",
     "whereToPost": "Where to post",
-    "whoHolds": "Who holds the post until then?"
+    "whoHolds": "Who holds the post until then?",
+    "mediaChoose": "Choose photos or a video",
+    "mediaOrDrop": "or drop them here",
+    "blockedNoDestinations": "Connect a Facebook Page first, from Connections, to have somewhere to post.",
+    "blockedNoneSelected": "Choose at least one Page under “Where to post”.",
+    "blockedNoContent": "Write a message, add a link or attach media."
   },
   "config": {
     "title": "Configuration",
@@ -305,7 +310,7 @@
     "featureOff": "Turned off in Configuration. Meta reviews this permission separately, and requesting it before approval fails the whole login.",
     "followers": "{count, plural, one {# follower} other {# followers}}",
     "groups": "Groups",
-    "groupsOff": "Group publishing is turned off. Meta restricted the Groups API in April 2024, so it needs a separately approved permission and the app installed in each group. Turn it on in Configuration once you have that approval.",
+    "groupsOff": "Posting to Facebook Groups is off; Pages work as normal. Groups need extra approval from Meta and the app added to each group. Once you have both, turn Groups on in Settings → Configuration.",
     "health": {
       "title": "Connection check",
       "subtitle": "Ask Facebook what is working right now, permission by permission and Page by Page.",
@@ -387,7 +392,10 @@
     "destinationsFailed": "{count, plural, one {# destination failed} other {# destinations failed}} to publish.",
     "reviewAndRetry": "Review and retry",
     "tokensExpiring": "{count, plural, one {# Facebook connection expires} other {# Facebook connections expire}} within {days} days. Scheduled posts stop the moment one does.",
-    "reviewConnections": "Review connections"
+    "reviewConnections": "Review connections",
+    "setupStepsLeft": "Finish setting up: {count, plural, one {# step} other {# steps}} left. Next: {next}.",
+    "setupCheckFailing": "Setup is done, but an installation check is failing.",
+    "continueSetup": "Continue setup"
   },
   "email": {
     "invitation": {

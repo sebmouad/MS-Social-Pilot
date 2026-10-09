@@ -39,6 +39,20 @@ for (const width of DESKTOP_WIDTHS) {
   });
 }
 
+test('an unfinished setup is pointed out on the dashboard', async ({ page }) => {
+  // No worker runs during the walk, so setup is never complete here, and an
+  // owner arriving on the dashboard should be told where to finish it.
+  await open(page, '/dashboard');
+  await expect(page.getByRole('link', { name: 'Continue setup' })).toHaveAttribute('href', '/setup');
+});
+
+test('an empty composer says why it cannot send yet', async ({ page }) => {
+  await open(page, '/compose');
+  const reason = page.locator('#submit-blocker');
+  await expect(reason).toBeVisible();
+  await expect(page.locator('button[aria-describedby="submit-blocker"]')).toBeDisabled();
+});
+
 test('the nav offers every screen it links to', async ({ page }) => {
   await open(page, '/dashboard');
 
