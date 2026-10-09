@@ -194,7 +194,7 @@ export function NavBar({
             <label className="hidden sm:block">
               <span className="sr-only">{t('switchWorkspace')}</span>
               <select
-                className="max-w-[9rem] rounded-lg border border-slate-300 px-2 py-1.5 text-sm font-medium text-slate-900"
+                className="h-10 max-w-[11rem] cursor-pointer rounded-full border-0 bg-slate-200 py-0 pl-3.5 pr-8 text-[15px] font-semibold text-slate-900 hover:bg-slate-300 focus:ring-2 focus:ring-brand-500"
                 value={workspaceId}
                 disabled={switching}
                 onChange={(event) => switchTo(event.target.value)}

@@ -208,7 +208,10 @@
     "sortAscending": "Sorted lowest first — reverse",
     "sortDescending": "Sorted highest first — reverse",
     "trendFromTo": "Trend from {from} to {to}",
-    "refreshThrottled": "Analytics was refreshed several times just now. Try again in {minutes, plural, one {# minute} other {# minutes}}."
+    "refreshThrottled": "Analytics was refreshed several times just now. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+    "genderWomen": "Women {age}",
+    "genderMen": "Men {age}",
+    "genderOther": "Not stated {age}"
   },
   "app": {
     "name": "MS Social Pilot",
@@ -258,7 +261,11 @@
     "unscheduledDrafts": "Unscheduled drafts",
     "unscheduledDraftsHint": "Drafts with no date do not appear on the grid. {count, plural, one {The latest one} other {The # latest, newest first}}:",
     "allDrafts": "All drafts",
-    "draftCreated": "Started {date}"
+    "draftCreated": "Started {date}",
+    "today": "Today",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "monthSummary": "This month"
   },
   "common": {
     "all": "All",
@@ -1118,7 +1125,17 @@
     },
     "nativeTooSoon": "Facebook only holds posts at least 10 minutes ahead, so this one stays with our own scheduler and goes out at its time.",
     "nativeTooFar": "Facebook cannot hold a post that far ahead, so this one stays with our own scheduler and goes out at its time.",
-    "nativeUnavailable": "Facebook could not be given this post just now, so it stays with our own scheduler and goes out at its time."
+    "nativeUnavailable": "Facebook could not be given this post just now, so it stays with our own scheduler and goes out at its time.",
+    "dayToday": "Today",
+    "dayTomorrow": "Tomorrow",
+    "dayYesterday": "Yesterday",
+    "dayNoDate": "No date yet",
+    "result": {
+      "reach": "Reach",
+      "reactions": "Reactions",
+      "comments": "Comments",
+      "shares": "Shares"
+    }
   },
   "queue": {
     "addSlot": "Add slot",
@@ -1391,5 +1408,24 @@
     "roleChangeConfirm": "Change {name} from {from} to {to}?",
     "roleToOwnerWarning": "Owners have full control, including instance configuration and deleting the workspace, and only another owner can take that back.",
     "roleFromOwnerWarning": "They will lose owner access to this workspace straight away."
+  },
+  "dateRange": {
+    "preset": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "90d": "Last 90 days",
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "thisYear": "This year",
+      "all": "All time",
+      "custom": "Custom range"
+    },
+    "presets": "Date range",
+    "custom": "Custom range",
+    "from": "From",
+    "to": "To",
+    "apply": "Apply"
   }
 }

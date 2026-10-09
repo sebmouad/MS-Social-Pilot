@@ -155,7 +155,7 @@ export default async function DashboardPage() {
             href={stat.href}
             className="card group p-4 transition-colors hover:border-brand-200 hover:bg-brand-50/40"
           >
-            <p className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-slate-500">
+            <p className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-600">
               <Icon name={stat.icon} size={14} className="text-slate-400 group-hover:text-brand-500" />
               {stat.label}
             </p>

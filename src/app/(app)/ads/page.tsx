@@ -373,7 +373,7 @@ export default async function AdsPage({
         ) : (
           <div className="scroll-x">
             <table className="mt-3 w-full min-w-[760px] text-sm">
-              <thead className="border-y border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+              <thead className="border-y border-slate-200 bg-slate-50 text-left text-[13px] font-semibold text-slate-600">
                 <tr>
                   {sortHeader('name', t(`level_${level}`), 'px-4 py-2')}
                   {level !== 'campaign' && sortHeader('campaign', t('level_campaign'), 'px-3 py-2')}

@@ -290,7 +290,7 @@ export function FeedsClient({ feeds, targets, canManage }: Props) {
 
             {feed.recentItems.length > 0 && (
               <div className="mt-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('recent')}</h3>
+                <h3 className="text-[13px] font-semibold text-slate-600">{t('recent')}</h3>
                 <ul className="mt-2 divide-y divide-slate-100">
                   {feed.recentItems.map((item) => (
                     <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">

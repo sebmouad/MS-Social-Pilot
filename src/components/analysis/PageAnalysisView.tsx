@@ -158,7 +158,7 @@ async function PostTable({
       </div>
       <div className="scroll-x">
         <table className="mt-3 w-full text-sm">
-          <thead className="border-y border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <thead className="border-y border-slate-200 bg-slate-50 text-left text-[13px] font-semibold text-slate-600">
             <tr>
               <th scope="col" className="px-4 py-2">{ta('post')}</th>
               <th scope="col" className="px-3 py-2 text-right">{t('kpi.interactions')}</th>
@@ -411,6 +411,7 @@ export async function ComparePagesView({
   sort,
   order,
   targetId,
+  rangeQuery,
 }: {
   workspaceId: string;
   from: Date;
@@ -421,6 +422,8 @@ export async function ComparePagesView({
   order?: string;
   /** The Page picked elsewhere on the screen, kept so sorting here does not reset it. */
   targetId?: string;
+  /** `range=…` or `from=…&to=…`, so a sort or a Page link keeps the exact period. */
+  rangeQuery?: string;
 }) {
   const t = await getTranslations('pageAnalysis');
   const locale = appLocale();
@@ -449,7 +452,7 @@ export async function ComparePagesView({
         aria-sort={active ? (ascending ? 'ascending' : 'descending') : undefined}
       >
         <Link
-          href={`/analytics?view=compare${targetId ? `&target=${targetId}` : ''}&days=${days}&sort=${key}&order=${nextOrder}`}
+          href={`/analytics?view=compare${targetId ? `&target=${targetId}` : ''}&${rangeQuery ?? `days=${days}`}&sort=${key}&order=${nextOrder}`}
           className={`hover:text-slate-800 ${active ? 'text-brand-700' : ''}`}
           scroll={false}
         >
@@ -472,7 +475,7 @@ export async function ComparePagesView({
       </div>
       <div className="scroll-x">
         <table className="mt-3 w-full min-w-[760px] text-sm">
-          <thead className="border-y border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <thead className="border-y border-slate-200 bg-slate-50 text-left text-[13px] font-semibold text-slate-600">
             <tr>
               <th scope="col" className="px-4 py-2">{t('compare.page')}</th>
               {header('health', t('compare.health'), 'left')}
@@ -528,7 +531,7 @@ export async function ComparePagesView({
                   <td className="nums px-3 py-3 text-right text-slate-700">{signed(row.netFollows)}</td>
                   <td className="px-4 py-3 text-right">
                     <Link
-                      href={`/analytics?view=analysis&target=${row.targetId}&days=${days}`}
+                      href={`/analytics?view=analysis&target=${row.targetId}&${rangeQuery ?? `days=${days}`}`}
                       className="btn-ghost text-xs"
                     >
                       {t('compare.open')}

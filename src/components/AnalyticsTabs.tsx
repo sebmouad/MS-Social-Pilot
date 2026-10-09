@@ -49,15 +49,17 @@ export function AnalyticsTabs({ current }: { current: string }) {
         </select>
       </label>
 
-      <nav className="scroll-x hidden border-b border-slate-200 pb-2 sm:block" aria-label={t('chooseView')}>
-        <div className="flex gap-1">
+      <nav className="scroll-x hidden pb-1 sm:block" aria-label={t('chooseView')}>
+        <div className="flex gap-2">
           {VIEWS.map((view) => (
             <Link
               key={view}
               href={hrefFor(view)}
               aria-current={view === current ? 'page' : undefined}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                view === current ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
+              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                view === current
+                  ? 'bg-brand-50 text-brand-600'
+                  : 'bg-white text-slate-700 shadow-surface hover:bg-slate-50'
               }`}
             >
               {t(`view.${view}`)}

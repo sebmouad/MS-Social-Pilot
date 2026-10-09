@@ -22,7 +22,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     display: 'standalone',
     background_color: '#ffffff',
     // The same blue as the mark, so the splash and the icon agree.
-    theme_color: '#3563e9',
+    theme_color: '#1877f2',
     icons: [
       {
         src: '/icon.svg',

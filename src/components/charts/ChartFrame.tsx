@@ -91,7 +91,7 @@ export function ChartFrame({
         {showTable && table ? (
           <div id={tableId} className="scroll-x">
             <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
+              <thead className="text-left text-[13px] font-semibold text-slate-600">
                 <tr>
                   {table.head.map((heading, index) => (
                     <th

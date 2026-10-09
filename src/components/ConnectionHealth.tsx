@@ -157,7 +157,7 @@ export function ConnectionHealth({ canManage }: { canManage: boolean }) {
 
               {account.permissions.length > 0 && (
                 <div className="mt-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <p className="text-[13px] font-semibold text-slate-600">
                     {t('health.permissions')}
                   </p>
                   <ul className="mt-1.5 space-y-1.5">
@@ -192,7 +192,7 @@ export function ConnectionHealth({ canManage }: { canManage: boolean }) {
 
               {account.destinations.length > 0 && (
                 <div className="mt-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <p className="text-[13px] font-semibold text-slate-600">
                     {t('health.destinations')}
                   </p>
                   <ul className="mt-1.5 space-y-1.5">

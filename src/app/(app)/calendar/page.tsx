@@ -7,6 +7,7 @@ import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { formatInZone, monthGrid } from '@/lib/time';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Icon } from '@/components/Icon';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,19 @@ const STATUS_DOT: Record<string, string> = {
   failed: 'bg-red-500',
   draft: 'bg-slate-400',
   cancelled: 'bg-slate-300',
+};
+
+/** The same colours as the edge of a post on the grid, as Facebook's planner marks them. */
+const STATUS_EDGE: Record<string, string> = {
+  pending_approval: 'border-l-violet-500',
+  rejected: 'border-l-rose-500',
+  scheduled: 'border-l-blue-500',
+  publishing: 'border-l-amber-500',
+  published: 'border-l-emerald-500',
+  partially_failed: 'border-l-orange-500',
+  failed: 'border-l-red-500',
+  draft: 'border-l-slate-400',
+  cancelled: 'border-l-slate-300',
 };
 
 /** Every status the grid can show; cancelled posts are left off it. */
@@ -77,7 +91,7 @@ export default async function CalendarPage({
         scheduledAt: { gte: gridStart, lt: gridEnd },
         status: { not: 'cancelled' },
       },
-      include: { targets: { include: { target: { select: { name: true } } } } },
+      include: { targets: { include: { target: { select: { name: true, pictureUrl: true } } } } },
       orderBy: { scheduledAt: 'asc' },
     }),
     // A draft saved without a time has no square to sit on, so a calendar of
@@ -131,27 +145,46 @@ export default async function CalendarPage({
   // "New post on this day" starts at nine in the morning; today it keeps the
   // composer's own default of an hour from now.
   const newPostHref = (key: string) => (key === todayKey ? '/compose' : `/compose?at=${key}T09:00`);
+  const monthHref = (date: Date) =>
+    `/calendar?month=${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+
+  // The month at a glance, above the grid: what is planned and what went out.
+  const inMonthPosts = posts.filter(
+    (post) => post.scheduledAt && Number(formatInZone(post.scheduledAt, timezone, 'M')) - 1 === safeMonth,
+  );
+  const summary = LEGEND.map((status) => ({
+    status,
+    count: inMonthPosts.filter((post) => post.status === status).length,
+  })).filter((entry) => entry.count > 0);
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
-          <p className="mt-1 text-sm text-slate-600">{t('timesShownIn', { timezone })}</p>
+          <h1 className="text-2xl font-bold capitalize text-slate-900">{monthLabel}</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            {t('title')} · {t('timesShownIn', { timezone })}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href={`/calendar?month=${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, '0')}`}
-            className="btn-secondary"
-          >
-            ←
+          <Link href="/calendar" className="btn-secondary">
+            {t('today')}
           </Link>
-          <span className="min-w-[10rem] text-center text-sm font-medium text-slate-900">{monthLabel}</span>
           <Link
-            href={`/calendar?month=${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`}
-            className="btn-secondary"
+            href={monthHref(previous)}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-900 hover:bg-slate-300"
+            aria-label={t('previousMonth')}
+            title={t('previousMonth')}
           >
-            →
+            <Icon name="chevronLeft" size={18} />
+          </Link>
+          <Link
+            href={monthHref(next)}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-900 hover:bg-slate-300"
+            aria-label={t('nextMonth')}
+            title={t('nextMonth')}
+          >
+            <Icon name="chevronRight" size={18} />
           </Link>
           <Link href="/compose" className="btn-primary">
             {tDash('newPost')}
@@ -159,11 +192,26 @@ export default async function CalendarPage({
         </div>
       </header>
 
+      {summary.length > 0 && (
+        <ul className="flex flex-wrap gap-2" aria-label={t('monthSummary')}>
+          {summary.map((entry) => (
+            <li
+              key={entry.status}
+              className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm shadow-surface"
+            >
+              <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT[entry.status]}`} />
+              <span className="nums font-semibold text-slate-900">{entry.count}</span>
+              <StatusBadge status={entry.status} />
+            </li>
+          ))}
+        </ul>
+      )}
+
       <div className="card overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+        <div className="grid grid-cols-7 border-b border-slate-200 bg-white">
           {/* Monday-first, matching monthGrid. */}
           {[1, 2, 3, 4, 5, 6, 0].map((day) => (
-            <div key={day} className="px-2 py-2 text-center text-xs font-medium text-slate-500">
+            <div key={day} className="px-2 py-2.5 text-center text-[13px] font-semibold text-slate-600">
               {weekdayName(day)}
             </div>
           ))}
@@ -178,17 +226,17 @@ export default async function CalendarPage({
             return (
               <div
                 key={key}
-                className={`min-h-[7rem] border-b border-r border-slate-100 p-2 ${
-                  inMonth ? 'bg-white' : 'bg-slate-50/60'
+                className={`min-h-[8rem] border-b border-r border-slate-200 p-2 ${
+                  key === todayKey ? 'bg-brand-50/60' : inMonth ? (key < todayKey ? 'bg-slate-50' : 'bg-white') : 'bg-slate-100/70'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span
-                    className={`text-xs font-medium ${
+                    className={`text-[13px] font-semibold ${
                       key === todayKey
-                        ? 'flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white'
+                        ? 'flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-white'
                         : inMonth
-                          ? 'text-slate-700'
+                          ? 'text-slate-900'
                           : 'text-slate-400'
                     }`}
                   >
@@ -201,7 +249,7 @@ export default async function CalendarPage({
                     {key >= todayKey && (
                       <Link
                         href={newPostHref(key)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-sm leading-none text-slate-400 hover:bg-brand-50 hover:text-brand-600 focus-visible:bg-brand-50"
+                        className="flex h-6 w-6 items-center justify-center rounded-full text-base leading-none text-slate-500 hover:bg-brand-50 hover:text-brand-600 focus-visible:bg-brand-50"
                         aria-label={t('newPostOn', { date: dayLabel.format(day) })}
                         title={t('newPostOn', { date: dayLabel.format(day) })}
                       >
@@ -216,18 +264,35 @@ export default async function CalendarPage({
                     <li key={post.id}>
                       <Link
                         href={postHref(post)}
-                        className="block rounded border border-slate-200 bg-white px-1.5 py-1 hover:border-brand-300"
+                        className={`block rounded-md border-l-[3px] bg-white px-2 py-1.5 shadow-surface transition-shadow hover:shadow-md ${
+                          STATUS_EDGE[post.status] ?? 'border-l-slate-400'
+                        }`}
                         title={post.message || post.link || ''}
                       >
-                        <span className="flex items-center gap-1">
-                          <span
-                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[post.status] ?? 'bg-slate-400'}`}
-                          />
-                          <span className="text-[10px] font-medium text-slate-500">
+                        <span className="flex items-center gap-1.5">
+                          {post.targets[0]?.target.pictureUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={post.targets[0].target.pictureUrl}
+                              alt=""
+                              className="h-4 w-4 shrink-0 rounded-full object-cover"
+                            />
+                          ) : (
+                            <span
+                              aria-hidden
+                              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[9px] font-bold text-brand-600"
+                            >
+                              {(post.targets[0]?.target.name ?? '?').charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                          <span className="text-[11px] font-semibold text-slate-900">
                             {post.scheduledAt ? formatInZone(post.scheduledAt, timezone, 'HH:mm') : ''}
                           </span>
+                          <span className="sr-only">
+                            <StatusBadge status={post.status} />
+                          </span>
                         </span>
-                        <span className="mt-0.5 line-clamp-2 block [overflow-wrap:anywhere] text-[11px] leading-tight text-slate-700">
+                        <span className="mt-0.5 line-clamp-2 block [overflow-wrap:anywhere] text-xs leading-tight text-slate-700">
                           {post.message || post.link || tPosts('mediaOnly')}
                         </span>
                       </Link>

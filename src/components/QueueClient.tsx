@@ -178,7 +178,7 @@ export function QueueClient({
               .sort((a, b) => a.hour - b.hour || a.minute - b.minute);
             return (
               <div key={weekday} className="rounded-lg border border-slate-200 p-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{weekdays[weekday]}</h3>
+                <h3 className="text-[13px] font-semibold text-slate-600">{weekdays[weekday]}</h3>
                 {today.length === 0 ? (
                   <p className="mt-2 text-xs text-slate-400">{t('noSlots')}</p>
                 ) : (

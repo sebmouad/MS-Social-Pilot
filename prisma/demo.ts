@@ -385,6 +385,112 @@ async function seedAds(workspaceId: string, accountId: string, now: Date) {
   return { name: adAccount.name, days: 120 };
 }
 
+/**
+ * A schedule to go with the history: posts going out over the next three
+ * weeks, a few drafts, one waiting for review, the last ten days' published
+ * posts and one that failed. Without it the calendar, the queue and the post
+ * list are empty states on every demo, which is the one thing they never look
+ * like in use.
+ */
+const SCHEDULED_MESSAGES = [
+  'Fresh from the oven this morning: our sourdough, ready from 8am.',
+  'This week only: two croissants and a coffee for the price of one breakfast.',
+  'Meet Léa, who bakes everything you see in the window before sunrise.',
+  'Rainy day? Hot chocolate is back on the menu.',
+  'Saturday market stall: find us by the fountain from 9 until we sell out.',
+  'Behind the scenes: shaping 300 baguettes before the doors open.',
+  'New on the shelf: a rye loaf with walnuts and honey.',
+  'Tell us below: plain croissant or pain au chocolat?',
+];
+
+async function seedSchedule(workspaceId: string, targetIds: string[], now: Date) {
+  const owner = await prisma.membership.findFirst({
+    where: { workspaceId, role: 'owner' },
+    select: { userId: true },
+  });
+  if (!owner || targetIds.length === 0) return 0;
+
+  const random = generator(7);
+  const at = (days: number, hour: number) => {
+    const date = new Date(now.getTime() + days * DAY_MS);
+    date.setUTCHours(hour, Math.floor(random() * 4) * 15, 0, 0);
+    return date;
+  };
+  type Shape = {
+    days: number | null;
+    hour: number;
+    status: PostStatus;
+    target: PostTargetStatus;
+    approval?: 'pending';
+    error?: string;
+  };
+  const shapes: Shape[] = [
+    ...[1, 2, 3, 5, 6, 8, 9, 11, 13, 15, 16, 19].map((days, index) => ({
+      days,
+      hour: [8, 12, 17, 19][index % 4]!,
+      status: PostStatus.scheduled,
+      target: PostTargetStatus.pending,
+    })),
+    { days: 4, hour: 10, status: PostStatus.pending_approval, target: PostTargetStatus.pending, approval: 'pending' },
+    { days: null, hour: 0, status: PostStatus.draft, target: PostTargetStatus.pending },
+    { days: null, hour: 0, status: PostStatus.draft, target: PostTargetStatus.pending },
+    ...[-1, -2, -4, -6, -8, -10].map((days, index) => ({
+      days,
+      hour: [9, 18, 12, 19, 8, 17][index]!,
+      status: PostStatus.published,
+      target: PostTargetStatus.published,
+    })),
+    {
+      days: -3,
+      hour: 11,
+      status: PostStatus.failed,
+      target: PostTargetStatus.failed,
+      error: 'The Page token expired. Reconnect the Page from Connections, then retry.',
+    },
+  ];
+
+  for (const [index, shape] of shapes.entries()) {
+    const when = shape.days === null ? null : at(shape.days, shape.hour);
+    const published = shape.target === PostTargetStatus.published;
+    const reach = Math.round(600 + random() * 4000);
+    const targetId = targetIds[index % targetIds.length]!;
+    await prisma.post.create({
+      data: {
+        workspaceId,
+        authorId: owner.userId,
+        message: SCHEDULED_MESSAGES[index % SCHEDULED_MESSAGES.length]!,
+        status: shape.status,
+        scheduledAt: when,
+        publishedAt: published ? when : null,
+        approvalStatus: shape.approval ?? 'not_required',
+        submittedById: shape.approval ? owner.userId : null,
+        submittedAt: shape.approval ? now : null,
+        targets: {
+          create: {
+            targetId,
+            status: shape.target,
+            publishedAt: published ? when : null,
+            remotePostId: published ? `demo-post-${index}` : null,
+            errorMessage: shape.error ?? null,
+            insights: published
+              ? {
+                  impressions: Math.round(reach * 1.3),
+                  reach,
+                  engagedUsers: Math.round(reach * 0.06),
+                  reactions: Math.round(reach * 0.04),
+                  comments: Math.round(reach * 0.006),
+                  shares: Math.round(reach * 0.004),
+                  clicks: Math.round(reach * 0.02),
+                }
+              : undefined,
+          },
+        },
+      },
+    });
+  }
+  return shapes.length;
+}
+
 async function main(): Promise<void> {
   const requested = process.argv[2];
 
@@ -422,10 +528,22 @@ async function main(): Promise<void> {
   });
 
   const now = new Date();
+  // The schedule targets the demo Pages, so a re-run replaces it with them.
+  await prisma.post.deleteMany({
+    where: { workspaceId: workspace.id, targets: { some: { target: { providerId: { startsWith: 'demo-' } } } } },
+  });
   for (const spec of PAGES) {
     const result = await seedPage(workspace.id, account.id, spec, now);
     console.log(`  ${result.name}: ${result.posts} posts over ${result.days} days`);
   }
+
+  const demoTargets = await prisma.target.findMany({
+    where: { workspaceId: workspace.id, providerId: { startsWith: 'demo-' } },
+    select: { id: true },
+    orderBy: { name: 'asc' },
+  });
+  const scheduled = await seedSchedule(workspace.id, demoTargets.map((target) => target.id), now);
+  console.log(`  Schedule: ${scheduled} posts across the calendar, the queue and the post list`);
 
   const ads = await seedAds(workspace.id, account.id, now);
   console.log(`  ${ads.name}: ${ads.days} days of ad delivery`);

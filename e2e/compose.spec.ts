@@ -110,7 +110,7 @@ test('the calendar opens a post for editing, and starts a new one on a chosen da
 
   // Next month, where every day is ahead whatever today's date.
   await open(page, '/calendar');
-  await page.getByRole('link', { name: '→' }).click();
+  await page.getByRole('link', { name: /next month/i }).click();
   await page.waitForURL(/\/calendar\?month=/);
   const plus = page.getByRole('link', { name: /^new post on/i });
   await plus.nth(10).click();

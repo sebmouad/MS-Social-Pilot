@@ -17,6 +17,8 @@
 export type IconName =
   | 'dashboard'
   | 'globe'
+  | 'chevronLeft'
+  | 'chevronRight'
   | 'compose'
   | 'calendar'
   | 'posts'
@@ -237,6 +239,8 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
     </>
   ),
+  chevronLeft: <path d="m15 18-6-6 6-6" />,
+  chevronRight: <path d="m9 18 6-6-6-6" />,
   globe: (
     <>
       <circle cx="12" cy="12" r="9" />

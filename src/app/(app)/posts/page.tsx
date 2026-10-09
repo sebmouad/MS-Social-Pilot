@@ -6,7 +6,7 @@ import { PostList } from '@/components/PostList';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
-import { parseMedia } from '@/lib/json';
+import { parseMedia, type PostInsights } from '@/lib/json';
 import { formatInZone } from '@/lib/time';
 import { canManageOthersPosts, canPublishWithoutApproval, postStatusFilter } from '@/lib/constants';
 import { Pagination } from '@/components/Pagination';
@@ -86,9 +86,22 @@ export default async function PostsPage({
     requested: pageNumber(params.page),
   });
 
+  // How many posts each status filter holds, under the same search and
+  // destination, so the pills say what is behind them before anyone clicks.
+  const { status: _status, ...unfiltered } = where;
+  const byStatus = await prisma.post.groupBy({ by: ['status'], where: unfiltered, _count: true });
+  const countFor = (value: string) => {
+    const scope = value ? postStatusFilter(value) : null;
+    return byStatus
+      .filter((row) => !scope || scope.includes(row.status))
+      .reduce((sum, row) => sum + row._count, 0);
+  };
+
   const posts = await prisma.post.findMany({
     where,
-    include: { targets: { include: { target: { select: { name: true, type: true } } } } },
+    include: {
+      targets: { include: { target: { select: { name: true, type: true, pictureUrl: true } } } },
+    },
     // `id` last, and not for tidiness: without a unique tiebreaker two posts
     // sharing a timestamp can land in a different order on each query, and
     // then page two repeats a row page one already showed.
@@ -102,6 +115,31 @@ export default async function PostsPage({
   const needsReview = auth.workspace.requiresApproval && !canPublishWithoutApproval(auth.role);
   const filtered = Boolean(search || destination);
 
+  // Day headings, as Facebook's planner groups a schedule: today, tomorrow,
+  // yesterday by name, other days by date, in the workspace's own zone.
+  const now = new Date();
+  const dayKey = (date: Date) => formatInZone(date, timezone, 'yyyy-MM-dd');
+  const near = new Map([
+    [dayKey(now), t('dayToday')],
+    [dayKey(new Date(now.getTime() + 86_400_000)), t('dayTomorrow')],
+    [dayKey(new Date(now.getTime() - 86_400_000)), t('dayYesterday')],
+  ]);
+  const dayOf = (date: Date | null) =>
+    date
+      ? { key: dayKey(date), label: near.get(dayKey(date)) ?? formatInZone(date, timezone, 'EEEE d MMMM yyyy') }
+      : { key: 'none', label: t('dayNoDate') };
+
+  /** What the post's published destinations earned, summed. Null before any did. */
+  const resultsOf = (targets: Array<{ status: string; insights: unknown }>) => {
+    const read = targets
+      .filter((target) => target.status === 'published' && target.insights && typeof target.insights === 'object')
+      .map((target) => target.insights as Partial<PostInsights>);
+    if (read.length === 0) return null;
+    const total = (key: 'reach' | 'reactions' | 'comments' | 'shares') =>
+      read.reduce((sum, insights) => sum + (typeof insights[key] === 'number' ? insights[key]! : 0), 0);
+    return { reach: total('reach'), reactions: total('reactions'), comments: total('comments'), shares: total('shares') };
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -114,7 +152,7 @@ export default async function PostsPage({
         </Link>
       </header>
 
-      <nav className="flex flex-wrap gap-1" aria-label={t('statusFilter')}>
+      <nav className="flex flex-wrap gap-2" aria-label={t('statusFilter')}>
         {FILTERS.map((value) => {
           const active = (raw ?? '') === value;
           return (
@@ -124,11 +162,16 @@ export default async function PostsPage({
               // narrowing down to one Page's failures means both at once.
               href={pageHref('/posts', { ...params, status: value || undefined }, 1)}
               aria-current={active ? 'page' : undefined}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
+              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                active ? 'bg-brand-50 text-brand-600' : 'bg-white text-slate-700 shadow-surface hover:bg-slate-50'
               }`}
             >
               {value ? tStatus(value) : tCommon('all')}
+              {/* Decorative: the link is named by its status alone, and the
+                  list below says how many there are once it is open. */}
+              <span aria-hidden className={`nums text-xs ${active ? 'text-brand-600' : 'text-slate-500'}`}>
+                {countFor(value)}
+              </span>
             </Link>
           );
         })}
@@ -193,6 +236,9 @@ export default async function PostsPage({
           scheduledAtLabel: post.scheduledAt ? formatInZone(post.scheduledAt, timezone) : null,
           publishedAtLabel: post.publishedAt ? formatInZone(post.publishedAt, timezone) : null,
           mediaCount: parseMedia(post.media).length,
+          thumbnailUrl: parseMedia(post.media).find((item) => item.kind === 'image')?.url ?? null,
+          day: dayOf(post.publishedAt ?? post.scheduledAt),
+          results: resultsOf(post.targets),
           // Only a rejected post's note is still the reviewer's last word:
           // resubmitting clears it, and an approval never sets one.
           reviewNote: post.status === 'rejected' ? post.reviewNote : null,
@@ -209,6 +255,7 @@ export default async function PostsPage({
             id: postTarget.id,
             name: postTarget.target.name,
             type: postTarget.target.type,
+            pictureUrl: postTarget.target.pictureUrl,
             status: postTarget.status,
             url: postTarget.remoteUrl,
             error: postTarget.errorMessage,

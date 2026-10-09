@@ -487,7 +487,7 @@ export function Composer({
                   <img src={preview.imageUrl} alt="" className="h-40 w-full object-cover" />
                 )}
                 <div className="space-y-1 p-3">
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                  <p className="text-[13px] font-semibold text-slate-600">
                     {preview.siteName ?? new URL(preview.url).hostname}
                   </p>
                   <p className="text-sm font-semibold text-slate-900">

@@ -82,7 +82,7 @@ export default async function ReportsPage({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
           <div key={card.label} className="card p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
+            <p className="text-[13px] font-semibold text-slate-600">{card.label}</p>
             <p className="mt-1 text-2xl font-semibold text-slate-900">{card.value.toLocaleString(appLocale())}</p>
           </div>
         ))}
@@ -100,7 +100,7 @@ export default async function ReportsPage({
             <div className="overflow-x-auto">
               <table className="w-full min-w-[42rem] text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-200 text-left text-[13px] font-semibold text-slate-600">
                     <th scope="col" className="py-2 pr-3 font-medium">{t('destination')}</th>
                     {/* Not the headline figure: that counts posts, this counts
                         the times each destination was posted to, so one post to

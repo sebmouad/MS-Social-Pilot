@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 
 import { StatusBadge } from './StatusBadge';
 import { ExternalLink } from './ExternalLink';
+import { Icon, type IconName } from './Icon';
 import { postIsEditable } from '@/lib/constants';
 
 export interface PostView {
@@ -18,6 +19,12 @@ export interface PostView {
   scheduledAtLabel: string | null;
   publishedAtLabel: string | null;
   mediaCount: number;
+  /** The first photo, shown beside the text as Facebook's planner does. */
+  thumbnailUrl: string | null;
+  /** The day heading the post sits under, in the workspace's zone. */
+  day: { key: string; label: string };
+  /** What its published destinations earned, or null before any did. */
+  results: { reach: number; reactions: number; comments: number; shares: number } | null;
   /** Why a reviewer sent it back; only set while the post is rejected. */
   reviewNote: string | null;
   /** The viewer wrote it, or may manage other people's posts. */
@@ -28,6 +35,7 @@ export interface PostView {
     id: string;
     name: string;
     type: string;
+    pictureUrl: string | null;
     status: string;
     url: string | null;
     error: string | null;
@@ -150,7 +158,12 @@ export function PostList({
         <div className="card p-8 text-center text-sm text-slate-600">{emptyText ?? t('noPosts')}</div>
       )}
 
-      {posts.map((post) => {
+      {groupByDay(posts).map((group) => (
+        <section key={group.key} aria-labelledby={`day-${group.key}`} className="space-y-3">
+          <h2 id={`day-${group.key}`} className="pt-2 text-[17px] font-bold text-slate-900">
+            {group.label}
+          </h2>
+          {group.posts.map((post) => {
         // Facebook is holding it: our worker has nothing to send, and the
         // publish route refuses it, so offering the button is a dead end.
         const heldByFacebook = post.targets.some((target) => target.status === 'scheduled_remote');
@@ -163,23 +176,21 @@ export function PostList({
         const canEdit = post.mayAct && postIsEditable(post);
         const canRetry = post.mayAct && post.targets.some((target) => target.status === 'failed');
         const working = busy === post.id;
+        const lead = post.targets[0];
+        // One destination that went fine needs no row of its own: the header
+        // already names it. Several, a failure or a link to the post do.
+        const showTargets =
+          post.targets.length > 1 || post.targets.some((target) => target.url || failureText(target));
 
         return (
-          <article key={post.id} className="card p-5" aria-busy={working}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <article key={post.id} className="card overflow-hidden" aria-busy={working}>
+            <header className="flex items-start gap-3 px-4 pt-3">
+              <Avatar name={lead?.name ?? ''} pictureUrl={lead?.pictureUrl ?? null} />
               <div className="min-w-0 flex-1">
-                <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-800">
-                  {post.message || <span className="text-slate-400">{t('noText')}</span>}
+                <p className="truncate text-[15px] font-semibold text-slate-900">
+                  {post.targets.map((target) => target.name).join(', ') || t('noText')}
                 </p>
-                {post.link && (
-                  <ExternalLink
-                    href={post.link}
-                    className="mt-1 block truncate text-xs text-brand-600 hover:underline"
-                  >
-                    {post.link}
-                  </ExternalLink>
-                )}
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="text-[13px] text-slate-600">
                   {post.publishedAtLabel
                     ? t('publishedAt', { when: post.publishedAtLabel })
                     : post.scheduledAtLabel
@@ -190,47 +201,82 @@ export function PostList({
                 </p>
               </div>
               <StatusBadge status={post.status} />
+            </header>
+
+            <div className="flex gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-[15px] leading-5 text-slate-900">
+                  {post.message || <span className="text-slate-500">{t('noText')}</span>}
+                </p>
+                {post.link && (
+                  <ExternalLink
+                    href={post.link}
+                    className="mt-1 block truncate text-sm text-brand-600 hover:underline"
+                  >
+                    {post.link}
+                  </ExternalLink>
+                )}
+              </div>
+              {post.thumbnailUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={post.thumbnailUrl} alt="" className="h-20 w-20 shrink-0 rounded-md object-cover" />
+              )}
             </div>
 
             {/* The reason is the whole point of a rejection: without it the
                 author can only guess what to change before resubmitting. */}
             {post.reviewNote && (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                <p className="text-xs font-medium">{tApprovals('reviewNote')}</p>
+              <div className="mx-4 mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="text-xs font-semibold">{tApprovals('reviewNote')}</p>
                 <p className="mt-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{post.reviewNote}</p>
               </div>
             )}
 
-            <ul className="mt-4 space-y-1.5">
-              {post.targets.map((target) => (
-                <li key={target.id} className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="font-medium text-slate-700">{target.name}</span>
-                  <StatusBadge status={target.status} kind="target" />
-                  {target.url && (
-                    <ExternalLink href={target.url} className="text-brand-600 hover:underline">
-                      {t('viewOnFacebook')}
-                    </ExternalLink>
-                  )}
-                  {failureText(target) && (
-                    <span className="text-red-600">
-                      {failureText(target)}
-                      {target.attempts > 1 && ` ${t('attempts', { count: target.attempts })}`}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
+            {showTargets && (
+              <ul className="mx-4 mb-3 space-y-1.5">
+                {post.targets.map((target) => (
+                  <li key={target.id} className="flex flex-wrap items-center gap-2 text-[13px]">
+                    <span className="font-semibold text-slate-700">{target.name}</span>
+                    <StatusBadge status={target.status} kind="target" />
+                    {target.url && (
+                      <ExternalLink href={target.url} className="font-semibold text-brand-600 hover:underline">
+                        {t('viewOnFacebook')}
+                      </ExternalLink>
+                    )}
+                    {failureText(target) && (
+                      <span className="text-red-700">
+                        {failureText(target)}
+                        {target.attempts > 1 && ` ${t('attempts', { count: target.attempts })}`}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            {post.results && (
+              <dl className="mx-4 mb-2 flex flex-wrap gap-x-5 gap-y-1 border-t border-slate-200 pt-2 text-[13px] text-slate-600">
+                {(['reach', 'reactions', 'comments', 'shares'] as const).map((key) => (
+                  <div key={key} className="flex gap-1">
+                    <dt>{t(`result.${key}`)}</dt>
+                    <dd className="nums font-semibold text-slate-900">{post.results![key].toLocaleString()}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
+            {/* Facebook's action bar: quiet, equal-width, icon and word. */}
+            <div className="mx-4 flex flex-wrap items-center gap-1 border-t border-slate-200 py-1">
               {canEdit && (
-                <Link href={`/compose?post=${post.id}`} className="btn-secondary">
+                <Link href={`/compose?post=${post.id}`} className={ACTION}>
+                  <ActionIcon name="compose" />
                   {tCommon('edit')}
                 </Link>
               )}
               {canSubmit && (
                 <button
                   type="button"
-                  className="btn-primary"
+                  className={`${ACTION} text-brand-600`}
                   disabled={working}
                   onClick={() =>
                     act(post.id, {
@@ -240,13 +286,14 @@ export function PostList({
                     })
                   }
                 >
+                  <ActionIcon name="approvals" />
                   {post.status === 'rejected' ? tApprovals('resubmit') : t('submitForReview')}
                 </button>
               )}
               {canWithdraw && (
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className={ACTION}
                   disabled={working}
                   onClick={() =>
                     act(post.id, {
@@ -256,13 +303,14 @@ export function PostList({
                     })
                   }
                 >
+                  <ActionIcon name="close" />
                   {t('withdraw')}
                 </button>
               )}
               {canPublishNow && (
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className={ACTION}
                   disabled={working}
                   onClick={() =>
                     act(post.id, {
@@ -274,22 +322,24 @@ export function PostList({
                     })
                   }
                 >
+                  <ActionIcon name="megaphone" />
                   {tCompose('publishNow')}
                 </button>
               )}
               {canRetry && (
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className={ACTION}
                   disabled={working}
                   onClick={() => act(post.id, { path: `/api/posts/${post.id}/retry`, method: 'POST' })}
                 >
+                  <ActionIcon name="refresh" />
                   {t('retryFailed')}
                 </button>
               )}
               <button
                 type="button"
-                className="btn-secondary"
+                className={ACTION}
                 disabled={working}
                 onClick={() =>
                   act(post.id, { path: `/api/posts/${post.id}/duplicate`, method: 'POST' }, (body) => {
@@ -301,12 +351,13 @@ export function PostList({
                   })
                 }
               >
-                {tCommon('duplicate')}
+                <ActionIcon name="posts" />
+                  {tCommon('duplicate')}
               </button>
               {canCancel && (
                 <button
                   type="button"
-                  className="btn-danger"
+                  className={`${ACTION} text-red-700 hover:bg-red-50`}
                   disabled={working}
                   onClick={() =>
                     act(post.id, {
@@ -316,18 +367,54 @@ export function PostList({
                     })
                   }
                 >
+                  <ActionIcon name="trash" />
                   {tCommon('cancel')}
                 </button>
               )}
               {working && (
-                <span className="self-center text-xs text-slate-500" role="status">
+                <span className="ml-auto self-center text-xs text-slate-500" role="status">
                   {tCommon('working')}
                 </span>
               )}
             </div>
           </article>
         );
-      })}
+          })}
+        </section>
+      ))}
     </div>
   );
+}
+
+/** The action bar's button: a quiet, flexible strip like Facebook's Like and Share. */
+const ACTION =
+  'btn flex-1 bg-transparent px-2 text-[15px] text-slate-600 hover:bg-slate-100 sm:flex-none sm:px-3';
+
+function ActionIcon({ name }: { name: IconName }) {
+  return <Icon name={name} size={18} className="shrink-0" />;
+}
+
+function Avatar({ name, pictureUrl }: { name: string; pictureUrl: string | null }) {
+  return pictureUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={pictureUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+  ) : (
+    <span
+      aria-hidden
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[15px] font-bold text-brand-600"
+    >
+      {name.charAt(0).toUpperCase() || '?'}
+    </span>
+  );
+}
+
+/** Consecutive posts sharing a day, in the order the list already has them. */
+function groupByDay(posts: PostView[]): Array<{ key: string; label: string; posts: PostView[] }> {
+  const groups: Array<{ key: string; label: string; posts: PostView[] }> = [];
+  for (const post of posts) {
+    const last = groups[groups.length - 1];
+    if (last && last.key === post.day.key) last.posts.push(post);
+    else groups.push({ key: post.day.key, label: post.day.label, posts: [post] });
+  }
+  return groups;
 }

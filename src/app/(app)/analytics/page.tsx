@@ -1,16 +1,19 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { TargetType } from '@prisma/client';
 
 import { AnalyticsClient } from '@/components/AnalyticsClient';
 import { AnalyticsTabs } from '@/components/AnalyticsTabs';
 import { ComparePagesView, PageAnalysisView } from '@/components/analysis/PageAnalysisView';
 import { BreakdownBars } from '@/components/BreakdownBars';
+import { countryLabel, genderAgeLabel, languageLabel } from '@/lib/audience-labels';
 import { CommentsPanel } from '@/components/CommentsPanel';
 import { InboxPanel } from '@/components/InboxPanel';
 import { ExportMenu } from '@/components/ExportMenu';
 import { PagePicker } from '@/components/PagePicker';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { parseRange, rangeQuery } from '@/lib/date-range';
 import { PostAnalyticsTable } from '@/components/PostAnalyticsTable';
 import { StatTile } from '@/components/charts/StatTile';
 import { SyncButton } from '@/components/SyncButton';
@@ -93,10 +96,14 @@ export default async function AnalyticsPage({
   const requested = first(params.target);
   const selected = pages.find((page) => page.id === requested) ?? pages[0]!;
 
-  const days = Number.parseInt(first(params.days) ?? '30', 10);
-  const window = Number.isFinite(days) && days > 0 && days <= 365 ? days : 30;
-  const to = new Date();
-  const from = new Date(to.getTime() - window * 24 * 60 * 60 * 1000);
+  // Named periods and custom dates, in the workspace's own days. `window` is
+  // the span in days, which the comparison with "the period before" uses.
+  const range = parseRange(
+    { range: first(params.range), from: first(params.from), to: first(params.to), days: first(params.days) },
+    timezone,
+  );
+  const { from, to } = range;
+  const window = range.days;
 
   // Ads is its own module now; an old bookmark to the tab lands there.
   if (first(params.view) === 'ads') {
@@ -116,12 +123,7 @@ export default async function AnalyticsPage({
         <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-600">
           {t('subtitle')}
-          {!UNWINDOWED_VIEWS.has(view) && (
-            <>
-              {' · '}
-              {formatInZone(from, timezone, 'd MMM')} – {formatInZone(to, timezone, 'd MMM yyyy')}
-            </>
-          )}
+
         </p>
       </header>
 
@@ -129,22 +131,14 @@ export default async function AnalyticsPage({
           because it is the control every reader reaches for. Per-view filters
           would let two panels disagree about which window they are showing. */}
       <div className="filter-row">
-        <div className="segmented">
-          {[7, 30, 90].map((option) => (
-            <Link
-              key={option}
-              href={`/analytics?view=${view}&target=${selected.id}&days=${option}`}
-              className={`segmented-item ${option === window ? 'segmented-item-active' : ''}`}
-            >
-              {t('lastDays', { count: option })}
-            </Link>
-          ))}
-        </div>
+        {!UNWINDOWED_VIEWS.has(view) && (
+          <DateRangePicker range={range} path="/analytics" keep={{ view, target: selected.id }} />
+        )}
 
         <PagePicker
           pages={pages.map((page) => ({ id: page.id, name: page.name }))}
           selectedId={selected.id}
-          days={window}
+          rangeQuery={rangeQuery(range)}
           view={view}
         />
 
@@ -176,6 +170,7 @@ export default async function AnalyticsPage({
           sort={first(params.sort)}
           order={first(params.order)}
           targetId={selected.id}
+          rangeQuery={rangeQuery(range)}
         />
       )}
 
@@ -372,7 +367,13 @@ async function InteractionsView({
 /** Who the audience is, and how it changed over the window. */
 async function AudienceView({ targetId, from, to }: { targetId: string; from: Date; to: Date }) {
   const t = await getTranslations('analytics');
+  const locale = await getLocale();
   const audience = await readAudience({ targetId, from, to });
+  const words = {
+    women: (age: string) => t('genderWomen', { age }),
+    men: (age: string) => t('genderMen', { age }),
+    other: (age: string) => t('genderOther', { age }),
+  };
 
   const cards = [
     { label: t('fans'), value: audience.fans },
@@ -398,10 +399,22 @@ async function AudienceView({ targetId, from, to }: { targetId: string; from: Da
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <BreakdownBars title={t('byCountry')} data={audience.byCountry} />
+        <BreakdownBars
+          title={t('byCountry')}
+          data={audience.byCountry}
+          formatKey={(code) => countryLabel(code, locale)}
+        />
         <BreakdownBars title={t('byCity')} data={audience.byCity} />
-        <BreakdownBars title={t('byGenderAge')} data={audience.byGenderAge} />
-        <BreakdownBars title={t('byLocale')} data={audience.byLocale} />
+        <BreakdownBars
+          title={t('byGenderAge')}
+          data={audience.byGenderAge}
+          formatKey={(key) => genderAgeLabel(key, words)}
+        />
+        <BreakdownBars
+          title={t('byLocale')}
+          data={audience.byLocale}
+          formatKey={(key) => languageLabel(key, locale)}
+        />
       </div>
 
       <p className="text-xs text-slate-500">{t('audienceHint')}</p>
@@ -444,7 +457,7 @@ async function VideosView({
 
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[820px] text-sm">
-          <thead className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+          <thead className="border-b border-slate-200 text-left text-[13px] font-semibold text-slate-600">
             <tr>
               <th className="px-4 py-3">{t('video')}</th>
               <th className="px-4 py-3 text-right">{t('views')}</th>
@@ -541,7 +554,11 @@ async function CommentsView({
           <input type="hidden" name="target" value={params.target} />
         )}
         {/* Otherwise applying the filter quietly resets the window to 30 days. */}
-        {typeof params.days === 'string' && <input type="hidden" name="days" value={params.days} />}
+        {(['days', 'range', 'from', 'to'] as const).map((name) =>
+          typeof params[name] === 'string' ? (
+            <input key={name} type="hidden" name={name} value={params[name] as string} />
+          ) : null,
+        )}
 
         <div className="min-w-[12rem] flex-1">
           <label className="label" htmlFor="q">
@@ -784,7 +801,7 @@ async function ExternalView({
           return (
             <li key={post.id} className="card p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-xs uppercase tracking-wide text-slate-500">
+                <p className="text-[13px] font-semibold text-slate-600">
                   {post.statusType ?? t('postType')}
                 </p>
                 <p className="text-xs text-slate-500">
@@ -798,7 +815,7 @@ async function ExternalView({
                 <dl className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
                   {figures.map((figure) => (
                     <div key={figure.label}>
-                      <dt className="text-[10px] uppercase tracking-wide text-slate-500">
+                      <dt className="text-[11px] font-semibold text-slate-600">
                         {figure.label}
                       </dt>
                       <dd className="text-sm font-medium text-slate-900">
@@ -956,7 +973,7 @@ async function InstagramView({
       ) : (
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[620px] text-sm">
-            <thead className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-slate-200 text-left text-[13px] font-semibold text-slate-600">
               <tr>
                 <th className="px-4 py-3">{t('metric')}</th>
                 <th className="px-4 py-3">{t('period')}</th>
@@ -988,7 +1005,7 @@ async function InstagramView({
       {media.length > 0 && (
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-slate-200 text-left text-[13px] font-semibold text-slate-600">
               <tr>
                 <th className="px-4 py-3">{t('media')}</th>
                 <th className="px-4 py-3 text-right">{t('reach')}</th>

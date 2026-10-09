@@ -245,7 +245,7 @@ export function ConnectionsClient({
             {/* Scopes are the other half of a broken connection: a token can be
                 alive and still be missing the permission a job needs. */}
             <div className="mt-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              <p className="text-[13px] font-semibold text-slate-600">
                 {t('permissions')}
               </p>
               <ul className="mt-1 flex flex-wrap gap-1">
@@ -388,7 +388,7 @@ function TargetList({
 
   return (
     <div className="mt-5">
-      <h3 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+      <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-600">
         <Icon name={icon} size={14} /> {title} · {targets.length}
       </h3>
 

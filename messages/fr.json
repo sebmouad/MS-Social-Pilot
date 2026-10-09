@@ -208,7 +208,10 @@
     "sortAscending": "Tri croissant — inverser",
     "sortDescending": "Tri décroissant — inverser",
     "trendFromTo": "Tendance de {from} à {to}",
-    "refreshThrottled": "Les statistiques viennent d’être actualisées plusieurs fois. Réessayez dans {minutes, plural, one {# minute} other {# minutes}}."
+    "refreshThrottled": "Les statistiques viennent d’être actualisées plusieurs fois. Réessayez dans {minutes, plural, one {# minute} other {# minutes}}.",
+    "genderWomen": "Femmes {age}",
+    "genderMen": "Hommes {age}",
+    "genderOther": "Non précisé {age}"
   },
   "app": {
     "name": "MS Social Pilot",
@@ -258,7 +261,11 @@
     "unscheduledDrafts": "Brouillons sans date",
     "unscheduledDraftsHint": "Les brouillons sans date n'apparaissent pas dans la grille. {count, plural, one {Le plus récent} other {Les # plus récents}} :",
     "allDrafts": "Tous les brouillons",
-    "draftCreated": "Commencé le {date}"
+    "draftCreated": "Commencé le {date}",
+    "today": "Aujourd’hui",
+    "previousMonth": "Mois précédent",
+    "nextMonth": "Mois suivant",
+    "monthSummary": "Ce mois-ci"
   },
   "common": {
     "all": "Tout",
@@ -1118,7 +1125,17 @@
     },
     "nativeTooSoon": "Facebook ne conserve que les publications prévues au moins 10 minutes à l’avance : celle-ci reste donc avec notre propre planificateur et partira à l’heure prévue.",
     "nativeTooFar": "Facebook ne peut pas conserver une publication prévue aussi loin : celle-ci reste donc avec notre propre planificateur et partira à l’heure prévue.",
-    "nativeUnavailable": "Cette publication n’a pas pu être confiée à Facebook pour le moment : elle reste donc avec notre propre planificateur et partira à l’heure prévue."
+    "nativeUnavailable": "Cette publication n’a pas pu être confiée à Facebook pour le moment : elle reste donc avec notre propre planificateur et partira à l’heure prévue.",
+    "dayToday": "Aujourd’hui",
+    "dayTomorrow": "Demain",
+    "dayYesterday": "Hier",
+    "dayNoDate": "Pas encore de date",
+    "result": {
+      "reach": "Couverture",
+      "reactions": "Réactions",
+      "comments": "Commentaires",
+      "shares": "Partages"
+    }
   },
   "queue": {
     "addSlot": "Ajouter un créneau",
@@ -1391,5 +1408,24 @@
     "roleChangeConfirm": "Faire passer {name} de {from} à {to} ?",
     "roleToOwnerWarning": "Les propriétaires ont un contrôle total, y compris la configuration du serveur et la suppression de l’espace de travail, et seul un autre propriétaire peut le leur retirer.",
     "roleFromOwnerWarning": "Cette personne perdra immédiatement ses droits de propriétaire sur cet espace de travail."
+  },
+  "dateRange": {
+    "preset": {
+      "today": "Aujourd’hui",
+      "yesterday": "Hier",
+      "7d": "7 derniers jours",
+      "30d": "30 derniers jours",
+      "90d": "90 derniers jours",
+      "thisMonth": "Ce mois-ci",
+      "lastMonth": "Le mois dernier",
+      "thisYear": "Cette année",
+      "all": "Depuis le début",
+      "custom": "Période personnalisée"
+    },
+    "presets": "Période",
+    "custom": "Période personnalisée",
+    "from": "Du",
+    "to": "Au",
+    "apply": "Appliquer"
   }
 }

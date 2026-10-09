@@ -44,7 +44,7 @@ export function StatTile({
 
   return (
     <div className="card p-4">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-[13px] font-semibold text-slate-600">{label}</p>
 
       <p
         className={`mt-1 font-semibold text-slate-900 ${hero ? 'text-4xl sm:text-5xl' : 'text-xl sm:text-2xl'}`}

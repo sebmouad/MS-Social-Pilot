@@ -12,12 +12,13 @@ import { useTranslations } from 'next-intl';
 export function PagePicker({
   pages,
   selectedId,
-  days,
+  rangeQuery,
   view = 'overview',
 }: {
   pages: Array<{ id: string; name: string }>;
   selectedId: string;
-  days: number;
+  /** `range=30d` or `from=…&to=…`: switching Page keeps the period. */
+  rangeQuery: string;
   /** Kept so switching destination does not also throw away the current tab. */
   view?: string;
 }) {
@@ -30,10 +31,10 @@ export function PagePicker({
     <label>
       <span className="sr-only">{t('choosePage')}</span>
       <select
-        className="input w-auto max-w-[14rem]"
+        className="h-10 w-auto max-w-[14rem] cursor-pointer rounded-md border-0 bg-slate-200 py-0 pl-3.5 pr-8 text-[15px] font-semibold text-slate-900 hover:bg-slate-300 focus:ring-2 focus:ring-brand-500"
         value={selectedId}
         onChange={(event) =>
-          router.push(`/analytics?view=${view}&target=${event.target.value}&days=${days}`)
+          router.push(`/analytics?view=${view}&target=${event.target.value}&${rangeQuery}`)
         }
       >
         {pages.map((page) => (

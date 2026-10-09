@@ -181,7 +181,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
                     {/* One line each, so the values below them share a
                         baseline instead of stepping down the card. */}
                     <dt
-                      className="truncate text-[10px] uppercase tracking-wide text-slate-500"
+                      className="truncate text-[11px] font-semibold text-slate-600"
                       title={column.label}
                     >
                       {column.label}
@@ -205,7 +205,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
       <div className="scroll-x mt-3 hidden sm:block">
         <table className="w-full min-w-[56rem] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-slate-200 text-left text-[13px] font-semibold text-slate-600">
               <th scope="col" className="py-2 pr-3 font-medium">
                 {t('post')}
               </th>

@@ -178,7 +178,7 @@
 
   /* A segmented control: view switchers, period pickers, level pickers. */
   .segmented {
-    @apply flex gap-1 overflow-x-auto rounded-md bg-slate-100 p-1;
+    @apply flex gap-1 overflow-x-auto rounded-full bg-slate-200 p-1;
     scrollbar-width: none;
   }
 
@@ -187,12 +187,12 @@
   }
 
   .segmented-item {
-    @apply whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold text-slate-600
+    @apply whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold text-slate-600
       transition-colors hover:text-slate-900;
   }
 
   .segmented-item-active {
-    @apply bg-white text-slate-900 shadow-sm;
+    @apply bg-white text-brand-600 shadow-surface;
   }
 
   /* Wide content — tables, wide charts — scrolls inside its own box so the
