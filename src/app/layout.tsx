@@ -26,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * metadata export with a warning, which means the tint quietly never happened.
  */
 export const viewport: Viewport = {
-  themeColor: '#3563e9',
+  themeColor: '#1877f2',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

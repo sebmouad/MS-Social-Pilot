@@ -361,7 +361,16 @@
     "retryFromList": "La publication est enregistrée et les destinations qui ont fonctionné l’ont reçue. Pour réessayer les autres, utilisez « Réessayer les échecs » dans la liste des publications — publier à nouveau d’ici en enverrait une seconde copie.",
     "openPostList": "Ouvrir la liste des publications",
     "retryAllFromList": "Aucune destination ne l’a acceptée, mais la publication est enregistrée. Utilisez « Réessayer les échecs » dans la liste des publications pour réessayer — publier à nouveau d’ici en créerait une seconde copie.",
-    "blockedInstagramMedia": "Ajoutez une photo ou une vidéo : Instagram n’accepte rien d’autre."
+    "blockedInstagramMedia": "Ajoutez une photo ou une vidéo : Instagram n’accepte rien d’autre.",
+    "previewTitle": "Aperçu sur Facebook",
+    "previewPage": "Votre Page",
+    "previewNow": "À l’instant",
+    "previewQueued": "Prochain créneau de la file",
+    "previewPublic": "Public",
+    "previewEmpty": "Commencez à écrire : votre publication apparaît ici, telle que vos abonnés la verront.",
+    "previewLike": "J’aime",
+    "previewComment": "Commenter",
+    "previewShare": "Partager"
   },
   "config": {
     "title": "Configuration",

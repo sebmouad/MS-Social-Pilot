@@ -9,6 +9,7 @@ import { TargetPicker, type TargetOption } from './TargetPicker';
 import { ExternalLink } from './ExternalLink';
 import { AiAssist } from './AiAssist';
 import { Icon } from './Icon';
+import { PostPreview } from './PostPreview';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 import { LIMITS } from '@/lib/constants';
 import { countCharacters } from '@/lib/text';
@@ -595,6 +596,15 @@ export function Composer({
             )}
           </div>
         </section>
+
+        <PostPreview
+          page={selectedTargets[0] ?? null}
+          message={message}
+          media={media}
+          link={preview}
+          timing={timing}
+          scheduledAt={scheduledAt}
+        />
       </div>
 
       <div className="min-w-0 space-y-6">

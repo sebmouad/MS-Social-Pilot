@@ -361,7 +361,16 @@
     "retryFromList": "The post is saved and the destinations that worked have it. To try the others again, use “Retry failed” on the post list — posting again from here would send a second copy.",
     "openPostList": "Open the post list",
     "retryAllFromList": "None of the destinations took it, but the post is saved. Use “Retry failed” on the post list to try again — posting from here again would make a second copy.",
-    "blockedInstagramMedia": "Add a photo or a video: Instagram takes nothing else."
+    "blockedInstagramMedia": "Add a photo or a video: Instagram takes nothing else.",
+    "previewTitle": "How it will look on Facebook",
+    "previewPage": "Your Page",
+    "previewNow": "Just now",
+    "previewQueued": "Next queue slot",
+    "previewPublic": "Public",
+    "previewEmpty": "Start writing and your post appears here, the way your followers will see it.",
+    "previewLike": "Like",
+    "previewComment": "Comment",
+    "previewShare": "Share"
   },
   "config": {
     "title": "Configuration",

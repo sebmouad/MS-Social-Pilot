@@ -87,7 +87,8 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    /* Facebook's page grey under white surfaces. */
+    @apply bg-slate-100 text-slate-900 antialiased;
   }
 
   /* Long metric names and Facebook's own copy arrive unwrapped; without this
@@ -109,8 +110,9 @@
 
 @layer components {
   /* Shared primitives, defined once so every screen looks like one product. */
+  /* Facebook's surface: white, 8px corners, one soft shadow, no outline. */
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+    @apply rounded-lg bg-white shadow-surface;
   }
 
   /* A card that is itself the chart surface. */
@@ -119,7 +121,7 @@
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-semibold
       transition-colors disabled:cursor-not-allowed disabled:opacity-50
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2;
     /* Comfortably tappable: below this, a thumb hits the neighbour. */
@@ -127,15 +129,16 @@
   }
 
   .btn-primary {
-    @apply btn bg-brand-500 text-white hover:bg-brand-600;
+    @apply btn bg-brand-600 text-white hover:bg-brand-700;
   }
 
+  /* Facebook's grey button: no outline, the fill does the work. */
   .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
+    @apply btn bg-slate-200 text-slate-900 hover:bg-slate-300;
   }
 
   .btn-danger {
-    @apply btn border border-red-200 bg-white text-red-600 hover:bg-red-50;
+    @apply btn bg-red-50 text-red-700 hover:bg-red-100;
   }
 
   /* A quiet button for tertiary actions inside dense lists. */
@@ -144,7 +147,7 @@
   }
 
   .input {
-    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900
+    @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900
       placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
     /* 16px on small screens: anything smaller makes iOS Safari zoom the page
        on focus, which then never zooms back out. */
@@ -158,7 +161,7 @@
   }
 
   .label {
-    @apply mb-1.5 block text-sm font-medium text-slate-700;
+    @apply mb-1.5 block text-sm font-semibold text-slate-800;
   }
 
   .hint {
@@ -175,7 +178,7 @@
 
   /* A segmented control: view switchers, period pickers, level pickers. */
   .segmented {
-    @apply flex gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1;
+    @apply flex gap-1 overflow-x-auto rounded-md bg-slate-100 p-1;
     scrollbar-width: none;
   }
 
@@ -184,7 +187,7 @@
   }
 
   .segmented-item {
-    @apply whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium text-slate-600
+    @apply whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold text-slate-600
       transition-colors hover:text-slate-900;
   }
 
@@ -235,7 +238,7 @@
     }
 
     .card {
-      @apply border-slate-300 shadow-none;
+      @apply border border-slate-300 shadow-none;
       break-inside: avoid;
     }
 

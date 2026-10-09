@@ -16,6 +16,7 @@
 
 export type IconName =
   | 'dashboard'
+  | 'globe'
   | 'compose'
   | 'calendar'
   | 'posts'
@@ -234,6 +235,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M12 3v12M7.5 10.5 12 15l4.5-4.5" />
       <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
     </>
   ),
   external: (

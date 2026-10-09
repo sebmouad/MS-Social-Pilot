@@ -99,7 +99,7 @@ export function NavBar({
     module.pages.filter((page) => page.href !== '/approvals' || showApprovals);
 
   const moduleTabs = (
-    <div className="flex items-center gap-1">
+    <div className="flex h-14 items-stretch gap-1 lg:justify-center">
       {MODULES.map((module) => {
         const active = current?.key === module.key;
         return (
@@ -108,22 +108,24 @@ export function NavBar({
             href={module.href}
             onClick={() => setMenuOpen(false)}
             aria-current={active ? 'page' : undefined}
-            className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-sm font-semibold transition-colors sm:px-3 ${
-              active ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'
+            className={`relative flex items-center gap-2 whitespace-nowrap px-2 text-[15px] font-semibold transition-colors sm:px-4 ${
+              active ? 'text-brand-600' : 'my-1 rounded-lg text-slate-600 hover:bg-slate-100'
             }`}
           >
+            {/* Facebook's active tab: the colour, and a bar along the bottom. */}
+            {active && (
+              <span aria-hidden className="absolute inset-x-1 bottom-0 h-[3px] rounded-t-sm bg-brand-500" />
+            )}
             {/* Words only on a phone: three names and the menu button have to
                 fit in 390px, and the name is what says where you are. */}
-            <Icon name={module.icon} size={16} className={`hidden sm:block ${active ? '' : 'text-slate-400'}`} />
+            <Icon name={module.icon} size={20} className={`hidden sm:block ${active ? 'text-brand-500' : 'text-slate-600'}`} />
             {/* A shorter name where the width is short: French runs to
                 "Planification", which does not fit beside two others. */}
             <span className="sm:hidden">{t(`moduleShort.${module.key}`)}</span>
             <span className="hidden sm:inline">{t(`module.${module.key}`)}</span>
             {module.key === 'schedule' && showApprovals && pendingApprovals > 0 && (
               <span
-                className={`rounded-full px-1.5 text-[10px] font-semibold ${
-                  active ? 'bg-white/25 text-white' : 'bg-violet-100 text-violet-700'
-                }`}
+                className="rounded-full bg-red-600 px-1.5 text-[11px] font-bold leading-4 text-white"
               >
                 {pendingApprovals}
               </span>
@@ -134,7 +136,7 @@ export function NavBar({
     </div>
   );
 
-  const sharedLinks = (
+  const sharedLinks = (place: 'bar' | 'menu') => (
     <>
       {SHARED_LINKS.map((link) => {
         const active = [link.href, ...(link.also ?? [])].some(
@@ -147,14 +149,20 @@ export function NavBar({
             onClick={() => setMenuOpen(false)}
             aria-current={active ? 'page' : undefined}
             title={t(link.label)}
-            className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors lg:px-2 lg:py-1.5 ${
-              active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
-            }`}
+            className={
+              place === 'bar'
+                ? `flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+                    active ? 'bg-brand-50 text-brand-600' : 'bg-slate-200 text-slate-900 hover:bg-slate-300'
+                  }`
+                : `flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-[15px] font-semibold transition-colors ${
+                    active ? 'bg-brand-50 text-brand-600' : 'text-slate-900 hover:bg-slate-100'
+                  }`
+            }
           >
-            <Icon name={link.icon} size={16} className={active ? '' : 'text-slate-400'} />
-            {/* Icons only in the bar, where the three modules need the room;
-                named in the phone menu, where there is space to say it. */}
-            <span className="lg:sr-only xl:not-sr-only">{t(link.label)}</span>
+            <Icon name={link.icon} size={place === 'bar' ? 20 : 18} />
+            {/* Round icons in the bar, as on Facebook, with the name kept for
+                screen readers and the tooltip; named rows in the phone menu. */}
+            <span className={place === 'bar' ? 'sr-only' : ''}>{t(link.label)}</span>
           </Link>
         );
       })}
@@ -162,11 +170,11 @@ export function NavBar({
   );
 
   return (
-    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center gap-x-2 px-4 py-2.5 sm:gap-x-4 sm:px-6">
+    <header className="sticky top-0 z-20 bg-white shadow-bar">
+      <div className="mx-auto flex max-w-7xl items-center gap-x-2 px-4 sm:gap-x-4 sm:px-6">
         {/* Home: the overview across all three modules. */}
         <Link href="/dashboard" className="flex shrink-0 items-center gap-2" aria-label={t('home')}>
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-[15px] font-bold text-white">
             SP
           </span>
         </Link>
@@ -179,7 +187,7 @@ export function NavBar({
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <nav aria-label={t('shared')} className="hidden items-center gap-0.5 lg:flex">
-            {sharedLinks}
+            {sharedLinks('bar')}
           </nav>
 
           {workspaces.length > 1 ? (
@@ -200,7 +208,7 @@ export function NavBar({
             </label>
           ) : (
             <p
-              className="hidden max-w-[10rem] truncate text-sm font-medium text-slate-900 sm:block"
+              className="hidden max-w-[10rem] truncate text-[15px] font-semibold text-slate-900 sm:block"
               title={workspaceName}
             >
               {workspaceName}
@@ -211,16 +219,21 @@ export function NavBar({
             {userName} · {timezone}
           </p>
 
-          <button type="button" onClick={signOut} className="btn-secondary hidden lg:inline-flex" title={t('signOut')}>
-            <Icon name="signOut" size={15} />
+          <button
+            type="button"
+            onClick={signOut}
+            className="hidden h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-900 transition-colors hover:bg-slate-300 lg:flex"
+            title={t('signOut')}
+          >
+            <Icon name="signOut" size={18} />
             {/* sr-only rather than hidden: `display:none` would take the label
                 away from a screen reader too, leaving an unnamed button. */}
-            <span className="sr-only 2xl:not-sr-only">{t('signOut')}</span>
+            <span className="sr-only">{t('signOut')}</span>
           </button>
 
           <button
             type="button"
-            className="btn-secondary lg:hidden"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-900 hover:bg-slate-300 lg:hidden"
             aria-expanded={menuOpen}
             aria-controls="main-menu"
             onClick={() => setMenuOpen((value) => !value)}
@@ -233,12 +246,12 @@ export function NavBar({
 
       {/* The module's own screens, one row under the modules. */}
       {current && pagesOf(current).length > 1 && (
-        <div className="border-t border-slate-100">
+        <div className="border-t border-slate-200">
           <nav
             aria-label={t(`module.${current.key}`)}
             className="scroll-x mx-auto max-w-7xl px-4 sm:px-6"
           >
-            <div className="flex items-center gap-1 py-1.5">
+            <div className="flex h-12 items-stretch gap-1">
               {pagesOf(current).map((page) => {
                 const active = isPageActive(pathname, page);
                 return (
@@ -246,14 +259,17 @@ export function NavBar({
                     key={page.href}
                     href={page.href}
                     aria-current={active ? 'page' : undefined}
-                    className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
-                      active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
+                    className={`relative flex items-center gap-1.5 whitespace-nowrap px-3 text-sm font-semibold transition-colors ${
+                      active ? 'text-brand-600' : 'my-1.5 rounded-md text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    <Icon name={page.icon} size={15} className={active ? '' : 'text-slate-400'} />
+                    {active && (
+                      <span aria-hidden className="absolute inset-x-2 bottom-0 h-[3px] rounded-t-sm bg-brand-500" />
+                    )}
+                    <Icon name={page.icon} size={16} className={active ? 'text-brand-500' : 'text-slate-500'} />
                     {t(page.label)}
                     {page.href === '/approvals' && pendingApprovals > 0 && (
-                      <span className="rounded-full bg-violet-100 px-1.5 text-[10px] font-semibold text-violet-700">
+                      <span className="rounded-full bg-red-600 px-1.5 text-[11px] font-bold leading-4 text-white">
                         {pendingApprovals}
                       </span>
                     )}
@@ -310,7 +326,7 @@ export function NavBar({
               <Icon name="dashboard" size={16} className="text-slate-400" />
               {t('home')}
             </Link>
-            {sharedLinks}
+            {sharedLinks('menu')}
           </nav>
           <button type="button" onClick={signOut} className="btn-secondary mt-3 w-full">
             {t('signOut')}
