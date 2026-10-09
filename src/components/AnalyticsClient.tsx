@@ -76,6 +76,9 @@ const DOWN_IS_GOOD = /unlike|negative_feedback|fan_removes|unfollows|blocked|rep
 
 /** The metric a page's overview should lead with, in order of preference. */
 const HEADLINE = [
+  'page_total_media_view_unique',
+  'page_media_view',
+  // Retired by Meta; still the lead for history synced before the switch.
   'page_impressions_unique',
   'page_impressions',
   'page_post_engagements',

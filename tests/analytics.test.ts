@@ -336,6 +336,33 @@ describe('metric catalogue', () => {
     expect(deprecated.every((metric) => /^v\d/.test(metric.deprecatedFrom!))).toBe(true);
   });
 
+  it('asks for the views metrics that replaced impressions and reach', () => {
+    // Without these, every post and Page reads blank: the old names answer
+    // "invalid metric" on all Graph versions since Meta retired them.
+    for (const [name, level] of [
+      ['page_media_view', 'page'],
+      ['page_total_media_view_unique', 'page'],
+      ['page_follows_country', 'page'],
+      ['page_follows_city', 'page'],
+      ['post_media_view', 'post'],
+      ['post_total_media_view_unique', 'post'],
+    ] as const) {
+      const metric = findMetric(name, level);
+      expect(metric, name).toBeDefined();
+      expect(metric!.deprecatedFrom, name).toBeUndefined();
+    }
+  });
+
+  it('records when Meta retired a metric on every version', () => {
+    expect(findMetric('post_impressions', 'post')!.deprecatedFrom).toBe('v24.0');
+    expect(findMetric('page_fans', 'page')!.deprecatedFrom).toBe('v24.0');
+    expect(findMetric('post_impressions_unique', 'post')!.deprecatedFrom).toBe('v25.0');
+    expect(findMetric('total_video_impressions', 'video')!.deprecatedFrom).toBe('v25.0');
+    expect(findMetric('page_engaged_users', 'page')!.deprecatedFrom).toBe('v19.0');
+    // An older removal recorded in the catalogue itself is left alone.
+    expect(findMetric('page_stories', 'page')!.deprecatedFrom).toBe('v4.0');
+  });
+
   it('keeps Instagram account and media catalogues separate', () => {
     const accountOnly = IG_ACCOUNT_METRICS.map((metric) => metric.name);
     const mediaOnly = IG_MEDIA_METRICS.map((metric) => metric.name);

@@ -82,6 +82,165 @@ function group(shape: GroupShape, rows: Row[]): MetricDefinition[] {
   }));
 }
 
+/**
+ * Metrics Meta has retired on *every* Graph version, by date rather than by
+ * version bump. Pinning an older version does not bring them back: Graph
+ * answers "invalid metric" for each. The version recorded is the one that was
+ * current when the retirement took effect.
+ *
+ * Source: developers.facebook.com/docs/platforminsights/page/deprecated-metrics
+ * and the v25.0 announcement (developers.facebook.com/blog/post/2026/02/18/).
+ */
+const RETIRED: Record<string, string[]> = {
+  // March 14, 2024.
+  'v19.0': [
+    'page_consumptions',
+    'page_content_activity',
+    'page_content_activity_unique',
+    'page_content_activity_by_action_type',
+    'page_content_activity_by_action_type_unique',
+    'page_content_activity_by_age_gender_unique',
+    'page_content_activity_by_city_unique',
+    'page_content_activity_by_country_unique',
+    'page_content_activity_by_locale_unique',
+    'page_cta_clicks_by_age_gender_logged_in_unique',
+    'page_cta_clicks_by_site_logged_in_unique',
+    'page_cta_clicks_logged_in_by_city_unique',
+    'page_cta_clicks_logged_in_by_country_unique',
+    'page_cta_clicks_logged_in_by_locale_unique',
+    'page_call_phone_clicks_by_age_gender_logged_in_unique',
+    'page_call_phone_clicks_by_site_logged_in_unique',
+    'page_call_phone_clicks_logged_in_by_city_unique',
+    'page_call_phone_clicks_logged_in_by_country_unique',
+    'page_call_phone_clicks_logged_in_by_locale_unique',
+    'page_get_directions_clicks_by_age_gender_logged_in_unique',
+    'page_get_directions_clicks_by_site_logged_in_unique',
+    'page_get_directions_clicks_logged_in_by_city_unique',
+    'page_get_directions_clicks_logged_in_by_country_unique',
+    'page_website_clicks_by_age_gender_logged_in_unique',
+    'page_website_clicks_by_site_logged_in_unique',
+    'page_website_clicks_logged_in_by_city_unique',
+    'page_website_clicks_logged_in_by_country_unique',
+    'page_website_clicks_logged_in_by_locale_unique',
+    'page_daily_follows_by_source_unique',
+    'page_daily_unfollows_by_source_unique',
+    'page_engaged_users',
+    'page_fans_by_like_source',
+    'page_fans_by_like_source_unique',
+    'page_fans_by_unlike_source',
+    'page_fans_by_unlike_source_unique',
+    'page_fans_gender_age',
+    'page_follows_gender_age',
+    'page_follows_locale',
+    'page_impressions_frequency_distribution',
+    'page_places_checkin_mobile',
+    'page_places_checkin_mobile_unique',
+    'page_places_checkins_by_age_gender',
+    'page_places_checkins_by_city',
+    'page_places_checkins_by_country',
+    'page_places_checkins_by_locale',
+    'page_positive_feedback',
+    'page_positive_feedback_unique',
+    'page_positive_feedback_by_type',
+    'page_positive_feedback_by_type_unique',
+    'page_posts_impressions_frequency_distribution',
+    'page_views_by_age_gender_logged_in_unique',
+    'page_views_by_city_logged_in_unique',
+    'page_views_by_country_logged_in_unique',
+    'page_views_by_internal_referer_logged_in_unique',
+    'page_views_by_locale_logged_in_unique',
+    'page_views_by_profile_tab_logged_in_unique',
+    'page_views_by_profile_tab_total',
+    'page_views_by_referers_logged_in_unique',
+    'page_views_by_site_logged_in_unique',
+    'page_views_external_referrals',
+    'page_views_logged_in_total',
+    'page_views_logged_in_unique',
+    'page_views_login',
+    'page_views_login_unique',
+    'page_views_logout',
+    'post_activity',
+    'post_activity_unique',
+    'post_impressions_fan_paid',
+    'post_impressions_fan_paid_unique',
+  ],
+  // November 15, 2025: impressions become views, Page likes become follows.
+  'v24.0': [
+    'page_fans',
+    'page_fans_locale',
+    'page_fans_city',
+    'page_fans_country',
+    'page_fan_adds',
+    'page_fan_adds_unique',
+    'page_fan_removes',
+    'page_fan_removes_unique',
+    'page_impressions',
+    'page_impressions_paid',
+    'page_impressions_viral',
+    'page_impressions_nonviral',
+    'post_impressions',
+    'post_impressions_paid',
+    'post_impressions_fan',
+    'post_impressions_organic',
+    'post_impressions_viral',
+    'post_impressions_nonviral',
+  ],
+  // June 2026: reach becomes viewers, and the 3-second viewer counts go.
+  'v25.0': [
+    'page_impressions_unique',
+    'page_impressions_paid_unique',
+    'page_impressions_viral_unique',
+    'page_impressions_nonviral_unique',
+    'page_posts_impressions',
+    'page_posts_impressions_unique',
+    'page_posts_impressions_paid',
+    'page_posts_impressions_paid_unique',
+    'page_posts_impressions_organic_unique',
+    'page_posts_served_impressions_organic_unique',
+    'page_posts_impressions_viral',
+    'page_posts_impressions_viral_unique',
+    'page_posts_impressions_nonviral',
+    'page_posts_impressions_nonviral_unique',
+    'page_video_views_unique',
+    'post_impressions_unique',
+    'post_impressions_paid_unique',
+    'post_impressions_fan_unique',
+    'post_impressions_organic_unique',
+    'post_impressions_viral_unique',
+    'post_impressions_nonviral_unique',
+    'post_video_views_unique',
+    'post_video_views_organic_unique',
+    'post_video_views_paid_unique',
+    'total_video_impressions',
+    'total_video_impressions_unique',
+    'total_video_impressions_paid',
+    'total_video_impressions_paid_unique',
+    'total_video_impressions_organic',
+    'total_video_impressions_organic_unique',
+    'total_video_impressions_viral',
+    'total_video_impressions_viral_unique',
+    'total_video_impressions_fan',
+    'total_video_impressions_fan_unique',
+    'total_video_impressions_fan_paid',
+    'total_video_impressions_fan_paid_unique',
+    'total_video_views_unique',
+    'total_video_views_organic_unique',
+    'total_video_views_paid_unique',
+  ],
+};
+
+const RETIRED_IN = new Map(
+  Object.entries(RETIRED).flatMap(([version, names]) => names.map((name) => [name, version])),
+);
+
+/** Stamp Meta's retirements onto a list, keeping any earlier version already recorded. */
+function withRetirements(metrics: MetricDefinition[]): MetricDefinition[] {
+  return metrics.map((metric) => {
+    const version = RETIRED_IN.get(metric.name);
+    return version && !metric.deprecatedFrom ? { ...metric, deprecatedFrom: version } : metric;
+  });
+}
+
 /** The three windows most Page metrics accept. */
 const DAILY: MetricPeriod[] = ['day', 'week', 'days_28'];
 const DAY_ONLY: MetricPeriod[] = ['day'];
@@ -91,7 +250,15 @@ const LIFETIME: MetricPeriod[] = ['lifetime'];
 // Page metrics
 // ---------------------------------------------------------------------------
 
-export const PAGE_METRICS: MetricDefinition[] = [
+export const PAGE_METRICS: MetricDefinition[] = withRetirements([
+  // --- Views and viewers -----------------------------------------------------
+  // Meta's replacements for impressions and reach, on every version since
+  // November 2025.
+  ...group({ level: 'page', category: 'reach', periods: DAILY }, [
+    ['page_media_view', 'Times Page content was played or displayed (views).'],
+    ['page_total_media_view_unique', 'People who viewed any Page content (viewers).'],
+  ]),
+
   // --- Impressions and reach -------------------------------------------------
   ...group({ level: 'page', category: 'reach', periods: DAILY }, [
     ['page_impressions', 'Times any content from the Page entered a screen.'],
@@ -208,6 +375,8 @@ export const PAGE_METRICS: MetricDefinition[] = [
     ['page_fans_city', 'Page likes by city.'],
     ['page_fans_country', 'Page likes by country.'],
     ['page_fans_gender_age', 'Page likes by gender and age band.'],
+    ['page_follows_city', 'Page followers by city.'],
+    ['page_follows_country', 'Page followers by country.'],
   ]),
   ...group({ level: 'page', category: 'audience', periods: DAILY }, [
     ['page_fan_adds', 'New Page likes.'],
@@ -365,13 +534,19 @@ export const PAGE_METRICS: MetricDefinition[] = [
   ...group({ level: 'page', category: 'messaging', periods: DAY_ONLY, deprecatedFrom: 'v11.0' }, [
     ['page_daily_messaging_connections_unique', 'People the Page could message that day.'],
   ]),
-];
+]);
 
 // ---------------------------------------------------------------------------
 // Post metrics
 // ---------------------------------------------------------------------------
 
-export const POST_METRICS: MetricDefinition[] = [
+export const POST_METRICS: MetricDefinition[] = withRetirements([
+  // --- Views and viewers -----------------------------------------------------
+  ...group({ level: 'post', category: 'reach', periods: LIFETIME }, [
+    ['post_media_view', 'Times the post was played or displayed (views).'],
+    ['post_total_media_view_unique', 'People who viewed the post (viewers).'],
+  ]),
+
   // --- Impressions and reach -------------------------------------------------
   ...group({ level: 'post', category: 'reach', periods: LIFETIME }, [
     ['post_impressions', 'Times the post entered a screen.'],
@@ -478,7 +653,7 @@ export const POST_METRICS: MetricDefinition[] = [
     ['post_video_view_time_by_age_bucket_and_gender', 'Watch time by gender and age band.'],
     ['post_video_view_time_by_region_id', 'Watch time by region.'],
   ]),
-];
+]);
 
 // ---------------------------------------------------------------------------
 // Video metrics (the /{video-id}/video_insights edge)
@@ -489,7 +664,7 @@ export const POST_METRICS: MetricDefinition[] = [
 // it. For a video shared to three Pages, this is the only place the combined
 // figure exists.
 
-export const VIDEO_METRICS: MetricDefinition[] = [
+export const VIDEO_METRICS: MetricDefinition[] = withRetirements([
   ...group({ level: 'video', category: 'video', periods: LIFETIME }, [
     ['total_video_views', 'Views of at least 3 seconds, across every post of this video.'],
     ['total_video_views_unique', 'People who watched at least 3 seconds.'],
@@ -558,7 +733,7 @@ export const VIDEO_METRICS: MetricDefinition[] = [
     ['total_video_retention_graph_autoplayed', 'Retention curve for autoplayed views.'],
     ['total_video_retention_graph_clicked_to_play', 'Retention curve for click-to-play views.'],
   ]),
-];
+]);
 
 // ---------------------------------------------------------------------------
 // Instagram metrics

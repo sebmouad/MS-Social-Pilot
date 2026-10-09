@@ -398,6 +398,31 @@ describe('external post insights', () => {
     expect(post!.syncedAt).not.toBeNull();
   });
 
+  it('reports views and viewers ahead of the retired impressions and reach', async () => {
+    // Meta replaced impressions with views on every Graph version; a Page
+    // still answering both should show the figure Meta now stands behind.
+    const { workspace, target } = await seedWorkspace();
+    stubEverything();
+    stubPostCatalogue();
+    const catalogue = routes['/insights']!;
+    routes['/insights'] = (url) => {
+      const body = catalogue(url) as { data: unknown[] };
+      return {
+        data: [
+          ...body.data,
+          { name: 'post_media_view', period: 'lifetime', values: [{ value: 5200 }] },
+          { name: 'post_total_media_view_unique', period: 'lifetime', values: [{ value: 3600 }] },
+        ],
+      };
+    };
+
+    await engagement.syncTargetEdges({ targetId: target.id });
+
+    const [post] = await engagement.readExternalPosts({ workspaceId: workspace.id });
+    expect(post!.impressions).toBe(5200);
+    expect(post!.reach).toBe(3600);
+  });
+
   it('backfills the permalink Graph reported', async () => {
     const { workspace, target, user } = await seedWorkspace();
     stubEverything();

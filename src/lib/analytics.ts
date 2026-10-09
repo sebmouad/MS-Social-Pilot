@@ -595,8 +595,13 @@ function buildPostInsights(
   }
 
   return {
-    impressions: numberOf(series, 'post_impressions'),
-    reach: numberOf(series, 'post_impressions_unique'),
+    // Views and viewers replaced impressions and reach on every Graph version
+    // (November 2025 and June 2026). The old names still answer on Pages that
+    // were synced before then, so they remain the fallback.
+    impressions: numberOf(series, 'post_media_view') ?? numberOf(series, 'post_impressions'),
+    reach:
+      numberOf(series, 'post_total_media_view_unique') ??
+      numberOf(series, 'post_impressions_unique'),
     engagedUsers: numberOf(series, 'post_engaged_users'),
     reactions: engagement?.reactions ?? null,
     comments: engagement?.comments ?? null,
@@ -983,7 +988,7 @@ export async function readAudience(options: {
       : {};
   };
 
-  const sumOf = async (metric: string): Promise<number> => {
+  const sumOf = async (metric: string): Promise<{ sum: number; rows: number }> => {
     const result = await prisma.pageInsight.aggregate({
       where: {
         targetId: options.targetId,
@@ -991,17 +996,32 @@ export async function readAudience(options: {
         endTime: { gte: options.from, lte: options.to },
       },
       _sum: { numeric: true },
+      _count: { _all: true },
     });
-    return Math.round(result._sum.numeric ?? 0);
+    return { sum: Math.round(result._sum.numeric ?? 0), rows: result._count._all };
+  };
+
+  // Meta retired the Page-likes ("fans") metrics on every version in November
+  // 2025 in favour of follows. Rows stored before then are still worth
+  // showing, so each figure reads the follows metric and falls back to the
+  // fans one only when the follows metric has nothing.
+  const latestPreferring = async (current: string, retired: string) => {
+    const value = await latestOf(current);
+    return Object.keys(value).length > 0 ? value : latestOf(retired);
+  };
+  const sumPreferring = async (current: string, retired: string) => {
+    const value = await sumOf(current);
+    return value.rows > 0 ? value.sum : (await sumOf(retired)).sum;
   };
 
   const [byCountry, byCity, byLocale, byGenderAge, adds, removes] = await Promise.all([
-    latestOf('page_fans_country'),
-    latestOf('page_fans_city'),
+    latestPreferring('page_follows_country', 'page_fans_country'),
+    latestPreferring('page_follows_city', 'page_fans_city'),
+    // No follows equivalent exists for language or gender and age.
     latestOf('page_fans_locale'),
     latestOf('page_fans_gender_age'),
-    sumOf('page_fan_adds'),
-    sumOf('page_fan_removes'),
+    sumPreferring('page_daily_follows_unique', 'page_fan_adds'),
+    sumPreferring('page_daily_unfollows_unique', 'page_fan_removes'),
   ]);
 
   return {
