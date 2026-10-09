@@ -120,11 +120,15 @@ async function main(): Promise<void> {
   await prisma.$disconnect();
 }
 
+/**
+ * The pause between passes. Deliberately *not* unref'd: between jobs this
+ * timer is the only thing holding the event loop open, and an unref'd one let
+ * Node exit cleanly mid-loop. Under systemd that became a restart every ten
+ * seconds, each of which found every job due again. Shutdown still works,
+ * because the signal handler sets `stopping` and the loop ends within a second.
+ */
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    timer.unref?.();
-  });
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
