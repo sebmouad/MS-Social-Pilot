@@ -1,5 +1,6 @@
 import { TargetType } from '@prisma/client';
 
+import { feedLinkOf, feedMediaOf, feedMediaOfPicture } from './feed';
 import { prisma } from './prisma';
 import { errors } from './errors';
 import { parseInsights, parseMedia } from './json';
@@ -64,6 +65,8 @@ function toAnalysed(options: {
   message: string | null;
   url: string | null;
   imageUrl: string | null;
+  media: AnalysedPost['media'];
+  linkPreview?: AnalysedPost['linkPreview'];
   publishedAt: Date;
   format: AnalysedPost['format'];
   insights: unknown;
@@ -81,6 +84,8 @@ function toAnalysed(options: {
     message: options.message?.trim() || '',
     url: options.url,
     imageUrl: options.imageUrl,
+    media: options.media,
+    linkPreview: options.linkPreview ?? null,
     publishedAt: options.publishedAt,
     format: options.format,
     reach,
@@ -104,7 +109,7 @@ export async function loadPagePosts(targetId: string, from: Date, to: Date): Pro
         publishedAt: true,
         remoteUrl: true,
         insights: true,
-        post: { select: { message: true, media: true, link: true } },
+        post: { select: { message: true, media: true, link: true, linkPreview: true } },
       },
     }),
     prisma.externalPost.findMany({
@@ -129,6 +134,8 @@ export async function loadPagePosts(targetId: string, from: Date, to: Date): Pro
         message: row.post.message,
         url: row.remoteUrl,
         imageUrl: parseMedia(row.post.media).find((item) => item.kind === 'image')?.url ?? null,
+        media: feedMediaOf(row.post.media),
+        linkPreview: feedLinkOf(row.post.linkPreview),
         publishedAt: row.publishedAt!,
         format: formatOfAppPost(parseMedia(row.post.media), row.post.link),
         insights: row.insights,
@@ -141,6 +148,7 @@ export async function loadPagePosts(targetId: string, from: Date, to: Date): Pro
         message: row.message,
         url: row.permalink,
         imageUrl: row.pictureUrl,
+        media: feedMediaOfPicture(row.pictureUrl, row.statusType === 'added_video'),
         publishedAt: row.createdTime,
         format: formatOfStatusType(row.statusType),
         insights: row.insights,

@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 
 import { Icon } from './Icon';
+import { LARGE_TEXT_MAX, LinkCard, MediaGrid, richText } from './FeedPost';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 
 interface Props {
@@ -39,9 +40,8 @@ export function PostPreview({ page, message, media, link, firstComment, timing, 
         : formatWallTime(scheduledAt, locale);
 
   const name = page?.name ?? t('previewPage');
-  const images = media.filter((item) => item.kind === 'image');
-  const video = media.find((item) => item.kind === 'video');
   const empty = !message.trim() && media.length === 0 && !link;
+  const large = message.trim().length > 0 && message.trim().length <= LARGE_TEXT_MAX && media.length === 0 && !link;
 
   return (
     <section aria-labelledby="post-preview-title">
@@ -78,33 +78,21 @@ export function PostPreview({ page, message, media, link, firstComment, timing, 
         ) : (
           <>
             {message.trim() && (
-              <p className="whitespace-pre-wrap px-4 pb-3 pt-2 text-[15px] leading-5 text-slate-900">
-                {withHashtags(message)}
+              <p
+                className={`whitespace-pre-wrap px-4 pb-3 pt-2 [overflow-wrap:anywhere] text-slate-900 ${
+                  large ? 'text-2xl leading-8' : 'text-[15px] leading-5'
+                }`}
+              >
+                {richText(message)}
               </p>
             )}
 
-            {images.length > 0 && <ImageGrid images={images} />}
-
-            {!images.length && video && (
-              <div className="flex aspect-video items-center justify-center bg-slate-900 text-white">
-                <Icon name="video" size={36} />
-                <span className="sr-only">{t('video')}</span>
-              </div>
-            )}
-
-            {!media.length && link && (
-              <div className="border-y border-slate-200 bg-slate-100">
-                {link.imageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={link.imageUrl} alt="" className="aspect-[1.91/1] w-full object-cover" />
-                )}
-                <div className="px-3 py-2.5">
-                  <p className="truncate text-[13px] text-slate-600">{link.siteName ?? hostOf(link.url)}</p>
-                  {link.title && (
-                    <p className="line-clamp-2 text-[15px] font-semibold leading-5 text-slate-900">{link.title}</p>
-                  )}
-                </div>
-              </div>
+            {/* The same layouts the rest of the app draws posts in: photo
+                grids, a video that plays, Facebook's link card. */}
+            {media.length > 0 ? (
+              <MediaGrid media={media.map((item) => ({ kind: item.kind, url: item.url, alt: item.altText }))} />
+            ) : (
+              link && <LinkCard preview={link} />
             )}
           </>
         )}
@@ -134,56 +122,13 @@ export function PostPreview({ page, message, media, link, firstComment, timing, 
             <div className="min-w-0 rounded-2xl bg-slate-100 px-3 py-2">
               <p className="text-[13px] font-semibold text-slate-900">{name}</p>
               <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-[15px] leading-5 text-slate-900">
-                {withHashtags(firstComment)}
+                {richText(firstComment)}
               </p>
             </div>
           </div>
         )}
       </div>
     </section>
-  );
-}
-
-/** Up to four photos in Facebook's grid: one full, two side by side, then a tile row. */
-function ImageGrid({ images }: { images: PostMedia[] }) {
-  const shown = images.slice(0, 4);
-  const extra = images.length - shown.length;
-
-  if (shown.length === 1) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={shown[0]!.url} alt={shown[0]!.altText ?? ''} className="max-h-[28rem] w-full object-cover" />;
-  }
-
-  return (
-    <div className="grid grid-cols-2 gap-0.5">
-      {shown.map((image, index) => (
-        <div
-          key={image.id}
-          className={`relative aspect-square ${shown.length === 3 && index === 0 ? 'col-span-2 aspect-[2/1]' : ''}`}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image.url} alt={image.altText ?? ''} className="h-full w-full object-cover" />
-          {extra > 0 && index === shown.length - 1 && (
-            <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-3xl font-semibold text-white">
-              +{extra}
-            </span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Hashtags in Facebook's link blue, as they will be on the Page. */
-function withHashtags(text: string) {
-  return text.split(/(#[\p{L}\p{N}_]+)/u).map((part, index) =>
-    part.startsWith('#') && part.length > 1 ? (
-      <span key={index} className="font-semibold text-brand-600">
-        {part}
-      </span>
-    ) : (
-      part
-    ),
   );
 }
 
@@ -202,10 +147,3 @@ function formatWallTime(value: string, locale: string): string {
   }).format(wall);
 }
 
-function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
-}

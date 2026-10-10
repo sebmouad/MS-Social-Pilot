@@ -48,6 +48,7 @@ import { pageRatingsAvailable } from '@/lib/facebook/graph';
 import { ExternalLink } from '@/components/ExternalLink';
 import { FeedPost } from '@/components/FeedPost';
 import { formatOfStatusType } from '@/lib/page-analysis';
+import { feedMediaOfPicture } from '@/lib/feed';
 
 export const dynamic = 'force-dynamic';
 
@@ -712,6 +713,7 @@ async function ExternalView({
 }) {
   const t = await getTranslations('engagement');
   const tFormat = await getTranslations('pageAnalysis');
+  const tCommon = await getTranslations('common');
   const posts = await readExternalPosts({ workspaceId, targetId, from, to });
 
   if (posts.length === 0) {
@@ -751,7 +753,9 @@ async function ExternalView({
                 message={post.message}
                 emptyText="—"
                 clamp
-                images={post.pictureUrl ? [{ url: post.pictureUrl }] : []}
+                media={feedMediaOfPicture(post.pictureUrl, post.statusType === 'added_video')}
+                mediaHref={post.permalink}
+                seeMore={tCommon('seeMore')}
                 stats={
                   post.syncedAt
                     ? {

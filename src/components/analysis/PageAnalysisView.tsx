@@ -154,6 +154,7 @@ async function PostTable({
   timeZone: string;
 }) {
   const t = await getTranslations('pageAnalysis');
+  const tCommon = await getTranslations('common');
   if (posts.length === 0) return null;
 
   return (
@@ -179,7 +180,10 @@ async function PostTable({
               }
               message={post.message}
               emptyText={t('post.noText')}
-              images={post.imageUrl ? [{ url: post.imageUrl }] : []}
+              media={post.media ?? []}
+              linkPreview={post.linkPreview}
+              mediaHref={post.url}
+              seeMore={tCommon('seeMore')}
               stats={{
                 reactions: post.reactions,
                 others: [

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { FeedPost } from './FeedPost';
+import { FeedPost, type FeedLinkPreview } from './FeedPost';
 
 export interface PendingPost {
   id: string;
@@ -12,6 +12,7 @@ export interface PendingPost {
   /** Reviewed with the post: it goes out under the same name. */
   firstComment: string | null;
   link: string | null;
+  linkPreview: FeedLinkPreview | null;
   scheduledLabel: string | null;
   /** Its scheduled moment has gone, so approving publishes it immediately. */
   overdue: boolean;
@@ -29,7 +30,6 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
   const t = useTranslations('approvals');
   const tPosts = useTranslations('posts');
   const tCommon = useTranslations('common');
-  const tCompose = useTranslations('compose');
   const router = useRouter();
 
   const [busy, setBusy] = useState<string | null>(null);
@@ -125,18 +125,12 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
             }
             message={post.message}
             emptyText={tPosts('noText')}
-            images={post.media
-              .filter((item) => item.kind === 'image')
-              .map((item) => ({ url: item.url, alt: item.altText }))}
+            media={post.media.map((item) => ({ kind: item.kind, url: item.url, alt: item.altText }))}
             link={post.link}
+            linkPreview={post.linkPreview}
             comment={post.firstComment ? { text: post.firstComment } : undefined}
           />
           <div className="card rounded-t-none border-t border-slate-200 p-4 shadow-surface">
-          {post.media.some((item) => item.kind === 'video') && (
-            <p className="mb-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
-              {tCompose('video')}
-            </p>
-          )}
           <p className="text-xs text-slate-500">
             {t('submittedBy', { name: post.submittedBy })}
             {post.submittedLabel ? ` · ${post.submittedLabel}` : ''}

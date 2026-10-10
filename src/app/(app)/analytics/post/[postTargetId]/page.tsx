@@ -64,8 +64,10 @@ export default async function PostMetricsPage({
           .join(' · ')}
         message={post.message}
         emptyText="—"
-        images={post.imageUrl ? [{ url: post.imageUrl }] : []}
+        media={post.media}
         link={post.link}
+        linkPreview={post.linkPreview}
+        mediaHref={post.url}
         footer={
           post.url ? (
             <ExternalLink href={post.url} className="btn w-full bg-transparent text-[15px] text-slate-600 hover:bg-slate-100">

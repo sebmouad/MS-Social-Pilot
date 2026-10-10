@@ -1,3 +1,4 @@
+import type { FeedLinkPreview, FeedMedia } from '@/components/FeedPost';
 import { formatInTimeZone } from 'date-fns-tz';
 
 /**
@@ -38,6 +39,9 @@ export interface AnalysedPost {
   url: string | null;
   /** The picture the feed shows with it, when there is one. */
   imageUrl?: string | null;
+  /** What it carries, as the feed card draws it. */
+  media?: FeedMedia[];
+  linkPreview?: FeedLinkPreview | null;
   publishedAt: Date;
   format: PostFormat;
   reach: number | null;

@@ -295,7 +295,8 @@
     "search": "Rechercher",
     "showingRange": "{from}–{to} sur {total}",
     "working": "En cours…",
-    "yes": "Oui"
+    "yes": "Oui",
+    "seeMore": "Voir plus"
   },
   "compose": {
     "addToQueue": "Ajouter au prochain créneau",

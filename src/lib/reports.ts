@@ -4,6 +4,8 @@ import { prisma } from './prisma';
 import { parseInsights, parseMedia, type PostInsights } from './json';
 import { DEFAULT_TIMEZONE, firstRealInstant, formatInZone, isValidTimeZone } from './time';
 import { toCsv } from './csv';
+import { feedLinkOf, feedMediaOf } from './feed';
+import type { FeedLinkPreview, FeedMedia } from '@/components/FeedPost';
 import { AppError, errors } from './errors';
 
 /**
@@ -45,6 +47,8 @@ export interface TopPost {
   /** Its first picture and its link, to draw it as the feed does. */
   imageUrl?: string | null;
   link?: string | null;
+  media?: FeedMedia[];
+  linkPreview?: FeedLinkPreview | null;
   /** Summed across those destinations. */
   engagement: number;
   impressions: number;
@@ -230,7 +234,7 @@ export async function buildReport(options: {
     },
     include: {
       target: { select: { id: true, name: true, type: true, pictureUrl: true } },
-      post: { select: { id: true, message: true, media: true, link: true } },
+      post: { select: { id: true, message: true, media: true, link: true, linkPreview: true } },
     },
     orderBy: { publishedAt: 'desc' },
   });
@@ -292,6 +296,8 @@ export async function buildReport(options: {
       url: row.remoteUrl,
       imageUrl: parseMedia(row.post.media).find((item) => item.kind === 'image')?.url ?? null,
       link: row.post.link,
+      media: feedMediaOf(row.post.media),
+      linkPreview: feedLinkOf(row.post.linkPreview),
       engagement,
       impressions: number(insights?.impressions),
     });
@@ -329,6 +335,8 @@ export interface PostDelivery {
   url: string | null;
   imageUrl?: string | null;
   link?: string | null;
+  media?: FeedMedia[];
+  linkPreview?: FeedLinkPreview | null;
   engagement: number;
   impressions: number;
 }
@@ -353,6 +361,8 @@ export function rankTopPosts(deliveries: PostDelivery[], timezone: string, limit
       impressions: 0,
       ...(row.imageUrl !== undefined ? { imageUrl: row.imageUrl } : {}),
       ...(row.link !== undefined ? { link: row.link } : {}),
+      ...(row.media !== undefined ? { media: row.media } : {}),
+      ...(row.linkPreview !== undefined ? { linkPreview: row.linkPreview } : {}),
     };
     post.destinations.push({
       name: row.targetName,

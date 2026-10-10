@@ -6,6 +6,8 @@ import { hit } from './rate-limit';
 import { prisma } from './prisma';
 import { decryptSecret } from './crypto';
 import { parseInsights, parseMedia, toJson } from './json';
+import { feedLinkOf, feedMediaOf, feedMediaOfPicture } from './feed';
+import type { FeedLinkPreview, FeedMedia } from '@/components/FeedPost';
 import { asGraphError } from './facebook/graph';
 import {
   fetchInsights,
@@ -778,6 +780,8 @@ export async function readPostMetrics(options: {
   targetPictureUrl: string | null;
   imageUrl: string | null;
   link: string | null;
+  media: FeedMedia[];
+  linkPreview: FeedLinkPreview | null;
   publishedAt: Date | null;
   url: string | null;
   syncedAt: Date | null;
@@ -789,7 +793,7 @@ export async function readPostMetrics(options: {
           where: { id: options.postTargetId, post: { workspaceId: options.workspaceId } },
           include: {
             target: { select: { name: true, pictureUrl: true } },
-            post: { select: { message: true, media: true, link: true } },
+            post: { select: { message: true, media: true, link: true, linkPreview: true } },
           },
         })
         .then((row) =>
@@ -800,6 +804,8 @@ export async function readPostMetrics(options: {
                 targetPictureUrl: row.target.pictureUrl,
                 imageUrl: parseMedia(row.post.media).find((item) => item.kind === 'image')?.url ?? null,
                 link: row.post.link,
+                media: feedMediaOf(row.post.media),
+                linkPreview: feedLinkOf(row.post.linkPreview),
                 publishedAt: row.publishedAt,
                 url: row.remoteUrl,
                 syncedAt: row.insightsSyncedAt,
@@ -821,6 +827,8 @@ export async function readPostMetrics(options: {
                   targetPictureUrl: row.target.pictureUrl,
                   imageUrl: row.pictureUrl,
                   link: null,
+                  media: feedMediaOfPicture(row.pictureUrl, row.statusType === 'added_video'),
+                  linkPreview: null,
                   publishedAt: row.createdTime,
                   url: row.permalink,
                   syncedAt: row.insightsSyncedAt,
@@ -854,6 +862,8 @@ export async function readPostMetrics(options: {
     targetPictureUrl: source.targetPictureUrl,
     imageUrl: source.imageUrl,
     link: source.link,
+    media: source.media,
+    linkPreview: source.linkPreview,
     publishedAt: source.publishedAt,
     url: source.url,
     syncedAt: source.syncedAt,

@@ -260,8 +260,10 @@ export default async function ReportsPage({
                           }
                           message={post.message}
                           emptyText="—"
-                          images={post.imageUrl ? [{ url: post.imageUrl }] : []}
+                          media={post.media ?? []}
                           link={post.link}
+                          linkPreview={post.linkPreview}
+                          seeMore={tAll('common.seeMore')}
                           footer={
                             <p className="flex flex-wrap items-center gap-x-2 px-1 py-1 text-[13px] text-slate-600">
                               <span className="font-semibold text-slate-900">

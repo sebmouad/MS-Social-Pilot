@@ -295,7 +295,8 @@
     "search": "Search",
     "showingRange": "{from}–{to} of {total}",
     "working": "Working…",
-    "yes": "Yes"
+    "yes": "Yes",
+    "seeMore": "See more"
   },
   "compose": {
     "addToQueue": "Add to the next queue slot",

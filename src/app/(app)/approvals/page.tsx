@@ -7,6 +7,7 @@ import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { canApprove, canManageOthersPosts, postIsEditable } from '@/lib/constants';
 import { IN_APPROVAL_QUEUE } from '@/lib/approvals';
+import { feedLinkOf } from '@/lib/feed';
 import { parseMedia } from '@/lib/json';
 import { formatInZone } from '@/lib/time';
 
@@ -50,6 +51,7 @@ export default async function ApprovalsPage() {
           message: post.message,
           firstComment: post.firstComment,
           link: post.link,
+          linkPreview: feedLinkOf(post.linkPreview),
           scheduledLabel: post.scheduledAt ? formatInZone(post.scheduledAt, timezone) : null,
           // Worked out here, against the same clock the scheduler reads: a
           // post whose moment has gone publishes as soon as it is approved,

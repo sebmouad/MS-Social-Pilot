@@ -8,6 +8,7 @@ import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { parseMedia, type PostInsights } from '@/lib/json';
+import { feedLinkOf, feedMediaOf } from '@/lib/feed';
 import { formatInZone } from '@/lib/time';
 import { canManageOthersPosts, canPublishWithoutApproval, postStatusFilter } from '@/lib/constants';
 import { Pagination } from '@/components/Pagination';
@@ -257,6 +258,8 @@ export default async function PostsPage({
           publishedAtLabel: post.publishedAt ? formatInZone(post.publishedAt, timezone) : null,
           mediaCount: parseMedia(post.media).length,
           thumbnailUrl: parseMedia(post.media).find((item) => item.kind === 'image')?.url ?? null,
+          media: feedMediaOf(post.media),
+          linkPreview: feedLinkOf(post.linkPreview),
           day: dayOf(post.publishedAt ?? post.scheduledAt),
           results: resultsOf(post.targets),
           // Only a rejected post's note is still the reviewer's last word:

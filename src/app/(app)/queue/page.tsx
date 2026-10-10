@@ -14,7 +14,7 @@ import { loadPagePosts } from '@/lib/page-analysis-data';
 import { prisma } from '@/lib/prisma';
 import { suggestSlots, upcomingOccurrences } from '@/lib/queue-suggestions';
 import { localInputToUtc } from '@/lib/time';
-import { parseMedia } from '@/lib/json';
+import { feedLinkOf, feedMediaOf } from '@/lib/feed';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +65,7 @@ export default async function QueuePage() {
         id: true,
         message: true,
         link: true,
+        linkPreview: true,
         media: true,
         scheduledAt: true,
         status: true,
@@ -128,9 +129,8 @@ export default async function QueuePage() {
                 name: post.targets.map((row) => row.target.name).join(', '),
                 pictureUrl: post.targets[0]?.target.pictureUrl ?? null,
               },
-              images: parseMedia(post.media)
-                .filter((item) => item.kind === 'image')
-                .map((item) => ({ url: item.url, alt: item.altText ?? null })),
+              media: feedMediaOf(post.media),
+              linkPreview: feedLinkOf(post.linkPreview),
               pending: post.status === 'pending_approval',
               editable: editable(post),
             }

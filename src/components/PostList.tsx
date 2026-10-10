@@ -8,7 +8,15 @@ import { useTranslations } from 'next-intl';
 import { StatusBadge } from './StatusBadge';
 import { ExternalLink } from './ExternalLink';
 import { Icon, type IconName } from './Icon';
-import { FeedAvatar as Avatar, hostOf } from './FeedPost';
+import {
+  FeedAvatar as Avatar,
+  LinkCard,
+  MediaGrid,
+  richText,
+  LARGE_TEXT_MAX,
+  type FeedLinkPreview,
+  type FeedMedia,
+} from './FeedPost';
 import { postIsEditable } from '@/lib/constants';
 
 export interface PostView {
@@ -24,6 +32,9 @@ export interface PostView {
   mediaCount: number;
   /** The first photo, shown beside the text as Facebook's planner does. */
   thumbnailUrl: string | null;
+  /** Everything attached, drawn in Facebook's layouts. */
+  media?: FeedMedia[];
+  linkPreview?: FeedLinkPreview | null;
   /** The day heading the post sits under, in the workspace's zone. */
   day: { key: string; label: string };
   /** What its published destinations earned, or null before any did. */
@@ -218,22 +229,24 @@ export function PostList({
               <StatusBadge status={post.status} />
             </header>
 
-            <p className="whitespace-pre-wrap px-4 py-3 [overflow-wrap:anywhere] text-[15px] leading-5 text-slate-900">
-              {post.message || <span className="text-slate-500">{t('noText')}</span>}
+            <p
+              className={`whitespace-pre-wrap px-4 py-3 [overflow-wrap:anywhere] text-slate-900 ${
+                // Facebook's large type for a short status with nothing attached.
+                largeText(post) ? 'text-2xl leading-8' : 'text-[15px] leading-5'
+              }`}
+            >
+              {post.message ? richText(post.message) : <span className="text-slate-500">{t('noText')}</span>}
             </p>
-            {post.thumbnailUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={post.thumbnailUrl} alt="" className="mb-3 max-h-[32rem] w-full bg-slate-100 object-cover" />
-            )}
-            {post.link && (
-              // Facebook's link card: the address on a grey band under the text.
-              <ExternalLink
-                href={post.link}
-                className="mb-3 block border-y border-slate-200 bg-slate-100 px-4 py-2.5 hover:bg-slate-200"
-              >
-                <span className="block truncate text-[13px] text-slate-600">{hostOf(post.link)}</span>
-                <span className="block truncate text-[15px] font-semibold text-slate-900">{post.link}</span>
-              </ExternalLink>
+            {attachmentsOf(post).length > 0 ? (
+              <div className="mb-1">
+                <MediaGrid media={attachmentsOf(post)} />
+              </div>
+            ) : (
+              (post.linkPreview || post.link) && (
+                <div className="mb-1">
+                  <LinkCard preview={post.linkPreview ?? { url: post.link! }} />
+                </div>
+              )
             )}
 
             {/* The reason is the whole point of a rejection: without it the
@@ -455,6 +468,17 @@ const ACTION =
 
 function ActionIcon({ name }: { name: IconName }) {
   return <Icon name={name} size={18} className="shrink-0" />;
+}
+
+/** What the post carries; older callers send only the first photo. */
+function attachmentsOf(post: PostView): FeedMedia[] {
+  if (post.media) return post.media;
+  return post.thumbnailUrl ? [{ kind: 'image', url: post.thumbnailUrl }] : [];
+}
+
+function largeText(post: PostView): boolean {
+  const text = post.message.trim();
+  return text.length > 0 && text.length <= LARGE_TEXT_MAX && attachmentsOf(post).length === 0 && !post.link;
 }
 
 /** Consecutive posts sharing a day, in the order the list already has them. */

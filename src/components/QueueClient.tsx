@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import { Icon } from './Icon';
-import { FeedPost } from './FeedPost';
+import { FeedPost, type FeedLinkPreview, type FeedMedia } from './FeedPost';
 
 interface Slot {
   dayOfWeek: number;
@@ -34,7 +34,8 @@ interface Upcoming {
     status: string;
     /** The Page, or Pages, it goes to. */
     author: { name: string; pictureUrl: string | null };
-    images: Array<{ url: string; alt: string | null }>;
+    media: FeedMedia[];
+    linkPreview: FeedLinkPreview | null;
     pending: boolean;
     /** Whether this person may change it now; otherwise it opens the post list. */
     editable: boolean;
@@ -311,8 +312,10 @@ export function QueueClient({
                             }
                             message={entry.post.message}
                             emptyText={t('noText')}
-                            images={entry.post.images}
+                            media={entry.post.media}
                             link={entry.post.link}
+                            linkPreview={entry.post.linkPreview}
+                            seeMore={tCommon('seeMore')}
                           />
                         ) : (
                           <Link

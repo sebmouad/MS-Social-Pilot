@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { Icon, type IconName } from '@/components/Icon';
 import { StatusBadge } from '@/components/StatusBadge';
 import { FeedPost } from '@/components/FeedPost';
-import { parseMedia } from '@/lib/json';
+import { feedLinkOf, feedMediaOf } from '@/lib/feed';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { summariseConnections } from '@/lib/connections';
@@ -28,6 +28,7 @@ export default async function DashboardPage() {
   const t = await getTranslations('dashboard');
   const tSetup = await getTranslations('setup');
   const tPosts = await getTranslations('posts');
+  const tCommon = await getTranslations('common');
   const workspaceId = auth.workspace.id;
   const now = new Date();
 
@@ -231,8 +232,10 @@ export default async function DashboardPage() {
                 badge={<StatusBadge status={post.status} />}
                 message={post.message}
                 emptyText={tPosts('mediaOnly')}
-                images={feedImages(post.media)}
+                media={feedMediaOf(post.media)}
                 link={post.link}
+                linkPreview={feedLinkOf(post.linkPreview)}
+                seeMore={tCommon('seeMore')}
               />
             ))
           )}
@@ -256,8 +259,10 @@ export default async function DashboardPage() {
                 badge={<StatusBadge status={post.status} />}
                 message={post.message}
                 emptyText={tPosts('mediaOnly')}
-                images={feedImages(post.media)}
+                media={feedMediaOf(post.media)}
                 link={post.link}
+                linkPreview={feedLinkOf(post.linkPreview)}
+                seeMore={tCommon('seeMore')}
               />
             ))
           )}
@@ -275,8 +280,3 @@ function feedAuthor(targets: Array<{ target: { name: string; pictureUrl: string 
   };
 }
 
-function feedImages(media: Parameters<typeof parseMedia>[0]) {
-  return parseMedia(media)
-    .filter((item) => item.kind === 'image')
-    .map((item) => ({ url: item.url, alt: item.altText }));
-}
