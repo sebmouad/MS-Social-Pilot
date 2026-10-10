@@ -1,11 +1,10 @@
 import { getTranslations } from 'next-intl/server';
 
-import { SettingsNav } from '@/components/SettingsNav';
 
 import { TeamClient } from '@/components/TeamClient';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
-import { canManageInstance, canManageTeam } from '@/lib/constants';
+import { canManageTeam } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { emailEnabled } from '@/lib/email/send';
 import { formatInZone } from '@/lib/time';
@@ -41,8 +40,6 @@ export default async function TeamPage() {
         <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
-
-      <SettingsNav showConfig={canManageInstance(auth)} />
 
       <TeamClient
         canManage={canManageTeam(auth.role)}

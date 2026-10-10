@@ -1,7 +1,6 @@
-import { canManageInstance, canManageSettings } from '@/lib/constants';
+import { canManageSettings } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 
-import { SettingsNav } from '@/components/SettingsNav';
 import { SettingsClient } from '@/components/SettingsClient';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
@@ -69,8 +68,6 @@ export default async function SettingsPage() {
         <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
-
-      <SettingsNav showConfig={canManageInstance(auth)} />
 
       <SettingsClient
         canManage={canManageSettings(auth.role)}

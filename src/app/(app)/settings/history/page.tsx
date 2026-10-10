@@ -1,10 +1,9 @@
 import { getTranslations } from 'next-intl/server';
 
 import { HistoryClient } from '@/components/HistoryClient';
-import { SettingsNav } from '@/components/SettingsNav';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
-import { canManageInstance, canManageTeam } from '@/lib/constants';
+import { canManageTeam } from '@/lib/constants';
 import {
   countActivity,
   countEmailLog,
@@ -50,7 +49,6 @@ export default async function HistoryPage({
         <header>
           <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
         </header>
-        <SettingsNav showConfig={canManageInstance(auth)} showHistory={false} />
         <p className="card p-8 text-center text-sm text-slate-600">{t('ownerOnly')}</p>
       </div>
     );
@@ -84,8 +82,6 @@ export default async function HistoryPage({
         <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
-
-      <SettingsNav showConfig={canManageInstance(auth)} />
 
       <HistoryClient
         view={view}

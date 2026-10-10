@@ -633,7 +633,10 @@
     "video": "Video",
     "videosHint": "Video-level figures, which combine every post and crosspost of the same video.",
     "viewOnFacebook": "View on Facebook",
-    "views": "Views"
+    "views": "Views",
+    "you": "You",
+    "author": "Author",
+    "emptyHint": "Pull from Facebook to bring them in now. New ones also arrive on their own every few hours."
   },
   "errors": {
     "accountNotFound": "Account not found.",
@@ -767,7 +770,8 @@
     "previewEmpty": "This template produces an empty post.",
     "sampleTitle": "An example headline",
     "sampleDescription": "The first lines of the article appear here.",
-    "noDestinations": "Connect a Facebook Page or Group first: feeds post to those."
+    "noDestinations": "Connect a Facebook Page or Group first: feeds post to those.",
+    "noneHint": "Add a blog or news feed, and each new article becomes a post scheduled to your Pages."
   },
   "history": {
     "actions": {

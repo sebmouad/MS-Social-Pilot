@@ -1,8 +1,6 @@
-import { canManageInstance } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 
 import { NotificationsClient } from '@/components/NotificationsClient';
-import { SettingsNav } from '@/components/SettingsNav';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
@@ -30,8 +28,6 @@ export default async function NotificationsSettingsPage() {
         <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
-
-      <SettingsNav showConfig={canManageInstance(auth)} />
 
       <NotificationsClient
         emailConfigured={emailEnabled()}

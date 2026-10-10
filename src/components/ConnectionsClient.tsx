@@ -1,5 +1,6 @@
 'use client';
 
+import { FeedAvatar } from './FeedPost';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -407,17 +408,18 @@ function TargetList({
             return (
             <li key={target.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
               <div className="flex min-w-0 items-center gap-2.5">
-                {target.pictureUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={target.pictureUrl} alt="" className="h-8 w-8 rounded-lg object-cover" />
+                {/* The Page's own photo, round as Facebook draws it; its
+                    initial when Facebook gave none. */}
+                {target.type === 'page' || target.pictureUrl ? (
+                  <FeedAvatar name={target.name} pictureUrl={target.pictureUrl} />
                 ) : (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
-                    <Icon name={icon} size={15} />
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                    <Icon name={icon} size={18} />
                   </span>
                 )}
 
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900">{target.name}</p>
+                  <p className="truncate text-[15px] font-semibold text-slate-900">{target.name}</p>
                   <p className="text-xs text-slate-500">
                     {/* Which credential publishes this: a Page with its own
                         token keeps working when the user token is re-scoped. */}

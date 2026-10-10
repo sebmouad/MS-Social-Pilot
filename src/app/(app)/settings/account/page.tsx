@@ -1,8 +1,6 @@
-import { canManageInstance } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 
 import { AccountClient } from '@/components/AccountClient';
-import { SettingsNav } from '@/components/SettingsNav';
 import { currentSessionTokenHash, requirePage } from '@/lib/auth';
 import { readAccount } from '@/lib/account';
 import { screenMetadata } from '@/lib/metadata';
@@ -27,8 +25,6 @@ export default async function AccountSettingsPage() {
         <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
-
-      <SettingsNav showConfig={canManageInstance(auth)} />
 
       <AccountClient initial={account} locales={SUPPORTED_LOCALES} />
     </div>

@@ -228,6 +228,9 @@ export interface CommentRow {
   postTargetId: string;
   postMessage: string;
   targetName: string;
+  /** Written by the Page itself: Facebook labels these "Author". */
+  fromPage?: boolean;
+  targetPictureUrl?: string | null;
 }
 
 /**
@@ -365,7 +368,7 @@ export async function readComments(
       postTarget: {
         select: {
           id: true,
-          target: { select: { name: true } },
+          target: { select: { name: true, providerId: true, pictureUrl: true } },
           post: { select: { message: true } },
         },
       },
@@ -390,6 +393,8 @@ export async function readComments(
     postTargetId: row.postTarget.id,
     postMessage: row.postTarget.post.message,
     targetName: row.postTarget.target.name,
+    fromPage: row.fromId !== null && row.fromId === row.postTarget.target.providerId,
+    targetPictureUrl: row.postTarget.target.pictureUrl,
   }));
 }
 
@@ -1072,7 +1077,7 @@ export interface ConversationRow {
   messageCount: number;
   updatedTime: Date;
   targetName: string;
-  messages: Array<{ id: string; from: string; message: string | null; createdTime: Date }>;
+  messages: Array<{ id: string; from: string; fromPage: boolean; message: string | null; createdTime: Date }>;
   /**
    * Whether a reply would be accepted, worked out here so the screen can say
    * why the box is missing instead of letting somebody type a paragraph and
@@ -1150,6 +1155,8 @@ export async function readConversations(options: {
       messages: row.messages.slice(0, 10).map((message) => ({
         id: message.id,
         from: message.fromName ?? 'Unknown',
+        /** Sent by the Page itself: drawn on the right, as Messenger does. */
+        fromPage: message.fromId !== null && message.fromId === row.target.providerId,
         message: message.message,
         createdTime: message.createdTime,
       })),

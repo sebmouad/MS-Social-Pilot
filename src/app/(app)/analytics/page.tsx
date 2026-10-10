@@ -47,6 +47,8 @@ import { env } from '@/lib/env';
 import { pageRatingsAvailable } from '@/lib/facebook/graph';
 import { ExternalLink } from '@/components/ExternalLink';
 import { FeedPost } from '@/components/FeedPost';
+import { EmptyState } from '@/components/EmptyState';
+import type { IconName } from '@/components/Icon';
 import { formatOfStatusType } from '@/lib/page-analysis';
 import { feedMediaOfPicture } from '@/lib/feed';
 
@@ -386,11 +388,27 @@ async function VideosView({
   const videos = await readVideos({ workspaceId, targetId });
 
   if (videos.length === 0) {
-    return <EmptyEdge message={t('noVideos')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
+    return <EmptyEdge icon="video" message={t('noVideos')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
   }
 
   const seconds = (milliseconds: number | null) =>
     milliseconds === null ? '—' : `${Math.round(milliseconds / 1000).toLocaleString(appLocale())}s`;
+  // Hours of watching read as hours: "24 h 33 min", not "88,400s".
+  const watched = (milliseconds: number | null) => {
+    if (milliseconds === null) return '—';
+    const minutes = Math.round(milliseconds / 60000);
+    if (minutes < 1) return seconds(milliseconds);
+    const h = Math.floor(minutes / 60);
+    return h > 0 ? `${h.toLocaleString(appLocale())} h ${minutes % 60} min` : `${minutes} min`;
+  };
+  // 1:05, or 1:02:05 past the hour, as the player writes it.
+  const duration = (total: number) => {
+    const whole = Math.round(total);
+    const h = Math.floor(whole / 3600);
+    const m = Math.floor((whole % 3600) / 60);
+    const sec = String(whole % 60).padStart(2, '0');
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -399,49 +417,69 @@ async function VideosView({
         {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
       </div>
 
-      <div className="card overflow-x-auto">
-        <table className="w-full min-w-[820px] text-sm">
-          <thead className="border-b border-slate-200 text-left text-[13px] font-semibold text-slate-600">
-            <tr>
-              <th className="px-4 py-3">{t('video')}</th>
-              <th className="px-4 py-3 text-right">{t('views')}</th>
-              <th className="px-4 py-3 text-right">{t('uniqueViews')}</th>
-              <th className="px-4 py-3 text-right">{t('completeViews')}</th>
-              <th className="px-4 py-3 text-right">{t('avgWatch')}</th>
-              <th className="px-4 py-3 text-right">{t('totalWatch')}</th>
-              <th className="px-4 py-3 text-right">{t('metricsCount')}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {videos.map((video) => (
-              <tr key={video.id}>
-                <td className="max-w-xs px-4 py-3">
-                  <p className="truncate font-medium text-slate-900" title={video.title}>
-                    {video.permalink ? (
-                      <ExternalLink href={video.permalink} className="hover:underline">
-                        {video.title}
-                      </ExternalLink>
-                    ) : (
-                      video.title
-                    )}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {video.targetName} · {formatInZone(video.createdTime, timezone)}
-                  </p>
-                </td>
-                <td className="px-4 py-3 text-right">{video.views?.toLocaleString(appLocale()) ?? '—'}</td>
-                <td className="px-4 py-3 text-right">{video.uniqueViews?.toLocaleString(appLocale()) ?? '—'}</td>
-                <td className="px-4 py-3 text-right">{video.completeViews?.toLocaleString(appLocale()) ?? '—'}</td>
-                <td className="px-4 py-3 text-right">{seconds(video.avgTimeWatchedMs)}</td>
-                <td className="px-4 py-3 text-right">{seconds(video.totalWatchTimeMs)}</td>
-                <td className="px-4 py-3 text-right text-slate-500">
-                  {Object.keys(video.metrics).length}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Facebook's video tab: the still, its length on it, then the title
+          and what it drew. The full catalogue is one click further. */}
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {videos.map((video) => {
+          const still = (
+            <span className="relative block aspect-video overflow-hidden bg-slate-900">
+              {video.thumbnailUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={video.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+              )}
+              <span aria-hidden className="absolute inset-0 flex items-center justify-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-black/50 text-white">
+                  <svg viewBox="0 0 24 24" className="ml-0.5 h-6 w-6" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </span>
+              </span>
+              {video.lengthSeconds !== null && (
+                <span className="nums absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-xs font-semibold text-white">
+                  {duration(video.lengthSeconds)}
+                </span>
+              )}
+            </span>
+          );
+          return (
+            <li key={video.id} className="card overflow-hidden">
+              {video.permalink ? (
+                <ExternalLink href={video.permalink} className="block hover:opacity-90">
+                  {still}
+                </ExternalLink>
+              ) : (
+                still
+              )}
+              <div className="px-3 py-2.5">
+                <p className="line-clamp-2 text-[15px] font-semibold leading-5 text-slate-900" title={video.title}>
+                  {video.title}
+                </p>
+                <p className="mt-0.5 text-[13px] text-slate-600">
+                  {video.targetName} · {formatInZone(video.createdTime, timezone)}
+                </p>
+                <dl className="mt-2 grid grid-cols-3 gap-1.5">
+                  {[
+                    { label: t('views'), value: video.views?.toLocaleString(appLocale()) ?? '—' },
+                    { label: t('avgWatch'), value: seconds(video.avgTimeWatchedMs) },
+                    { label: t('completeViews'), value: video.completeViews?.toLocaleString(appLocale()) ?? '—' },
+                  ].map((figure) => (
+                    <div key={figure.label} className="rounded-md bg-slate-50 px-2 py-1.5">
+                      <dt className="truncate text-[11px] font-semibold text-slate-600" title={figure.label}>
+                        {figure.label}
+                      </dt>
+                      <dd className="nums text-sm font-semibold text-slate-900">{figure.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-2 text-xs text-slate-500">
+                  {t('uniqueViews')}: {video.uniqueViews?.toLocaleString(appLocale()) ?? '—'} · {t('totalWatch')}:{' '}
+                  {watched(video.totalWatchTimeMs)}
+                </p>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -543,6 +581,8 @@ async function CommentsView({
         createdLabel: formatInZone(comment.createdTime, timezone),
         postMessage: comment.postMessage,
         targetName: comment.targetName,
+        fromPage: comment.fromPage,
+        pagePictureUrl: comment.targetPictureUrl ?? null,
       }))}
     />
 
@@ -579,7 +619,7 @@ async function ReviewsView({
     return retired ? (
       retiredNotice
     ) : (
-      <EmptyEdge message={t('noReviews')} targetId={targetId} label={t('refresh')} canSync={canSync} />
+      <EmptyEdge icon="star" message={t('noReviews')} targetId={targetId} label={t('refresh')} canSync={canSync} />
     );
   }
 
@@ -658,7 +698,7 @@ async function InboxView({
   const conversations = await readConversations({ workspaceId, targetId, skip: page.skip, limit: page.take });
 
   if (page.total === 0) {
-    return <EmptyEdge message={t('noConversations')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
+    return <EmptyEdge icon="inbox" message={t('noConversations')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
   }
 
   const href = (next: number) => pageHref('/analytics', { ...params, view: 'inbox' }, next);
@@ -678,10 +718,14 @@ async function InboxView({
           updatedLabel: formatInZone(thread.updatedTime, timezone),
           messageCount: thread.messageCount,
           unreadCount: thread.unreadCount,
+          snippet: thread.snippet,
+          timeLabel: formatInZone(thread.updatedTime, timezone, 'd MMM, HH:mm'),
           messages: thread.messages.map((message) => ({
             id: message.id,
             from: message.from,
+            fromPage: message.fromPage,
             message: message.message,
+            timeLabel: formatInZone(message.createdTime, timezone, 'd MMM, HH:mm'),
           })),
           reply:
             thread.reply.state === 'open'
@@ -717,7 +761,7 @@ async function ExternalView({
   const posts = await readExternalPosts({ workspaceId, targetId, from, to });
 
   if (posts.length === 0) {
-    return <EmptyEdge message={t('noExternal')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
+    return <EmptyEdge icon="posts" message={t('noExternal')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
   }
 
   return (
@@ -813,25 +857,27 @@ async function EmptyEdge({
   targetId,
   label,
   canSync,
+  icon = 'inbox',
 }: {
   message: string;
+  icon?: IconName;
   targetId: string;
   label: string;
   /** The sync route refuses anyone who cannot moderate comments; so does the button. */
   canSync: boolean;
 }) {
+  const t = await getTranslations('engagement');
   return (
-    <div className="card flex flex-col items-center gap-3 p-8 text-center">
-      <p className="text-sm text-slate-600">{message}</p>
-      {canSync && (
-        <SyncButton
-          endpoint="/api/engagement/sync"
-          body={{ targetId }}
-          label={label}
-          variant="primary"
-        />
-      )}
-    </div>
+    <EmptyState
+      icon={icon}
+      title={message}
+      hint={canSync ? t('emptyHint') : undefined}
+      action={
+        canSync ? (
+          <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={label} variant="primary" />
+        ) : undefined
+      }
+    />
   );
 }
 

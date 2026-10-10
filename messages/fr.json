@@ -633,7 +633,10 @@
     "video": "Vidéo",
     "videosHint": "Données au niveau de la vidéo, qui regroupent toutes les publications et republications de la même vidéo.",
     "viewOnFacebook": "Voir sur Facebook",
-    "views": "Vues"
+    "views": "Vues",
+    "you": "Vous",
+    "author": "Auteur",
+    "emptyHint": "Récupérez-les depuis Facebook dès maintenant. Les nouveaux arrivent aussi d'eux-mêmes toutes les quelques heures."
   },
   "errors": {
     "accountNotFound": "Compte introuvable.",
@@ -767,7 +770,8 @@
     "previewEmpty": "Ce modèle produit une publication vide.",
     "sampleTitle": "Un exemple de titre",
     "sampleDescription": "Les premières lignes de l’article apparaissent ici.",
-    "noDestinations": "Connectez d’abord une Page ou un Groupe Facebook : les flux y publient."
+    "noDestinations": "Connectez d’abord une Page ou un Groupe Facebook : les flux y publient.",
+    "noneHint": "Ajoutez le flux d'un blog ou d'un site d'actualité : chaque nouvel article devient une publication programmée sur vos Pages."
   },
   "history": {
     "actions": {

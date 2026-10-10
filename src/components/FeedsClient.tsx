@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyState } from './EmptyState';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
@@ -180,7 +181,7 @@ export function FeedsClient({ feeds, targets, canManage }: Props) {
       )}
 
       {feeds.length === 0 ? (
-        <div className="card p-8 text-center text-sm text-slate-600">{t('none')}</div>
+        <EmptyState icon="feeds" title={t('none')} hint={t('noneHint')} />
       ) : (
         feeds.map((feed) => (
           <section key={feed.id} className="card p-5">

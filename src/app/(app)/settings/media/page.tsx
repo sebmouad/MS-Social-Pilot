@@ -1,10 +1,9 @@
 import { getTranslations } from 'next-intl/server';
 
 import { MediaLibrary } from '@/components/MediaLibrary';
-import { SettingsNav } from '@/components/SettingsNav';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
-import { canDeleteMedia, canManageInstance } from '@/lib/constants';
+import { canDeleteMedia } from '@/lib/constants';
 import { readMediaLibrary } from '@/lib/media';
 import { formatInZone } from '@/lib/time';
 
@@ -36,8 +35,6 @@ export default async function MediaPage() {
         <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
-
-      <SettingsNav showConfig={canManageInstance(auth)} />
 
       <MediaLibrary
         canDelete={canDeleteMedia(auth.role)}

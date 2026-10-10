@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
+import { Icon } from './Icon';
+import { FeedAvatar } from './FeedPost';
+import { EmptyState } from './EmptyState';
+
 export interface CommentView {
   id: string;
   message: string;
@@ -15,6 +19,9 @@ export interface CommentView {
   createdLabel: string;
   postMessage: string;
   targetName: string;
+  /** The Page's own reply: its photo, and Facebook's "Author" label. */
+  fromPage?: boolean;
+  pagePictureUrl?: string | null;
 }
 
 /**
@@ -120,116 +127,185 @@ export function CommentsPanel({
       )}
 
       {comments.length === 0 ? (
-        <div className="card p-8 text-center text-sm text-slate-600">{t('noComments')}</div>
+        <EmptyState icon="comment" title={t('noComments')} hint={canModerate ? t('emptyHint') : undefined} />
       ) : (
-        <ul className="space-y-3">
-          {comments.map((comment) => (
-            <li
-              key={comment.id}
-              // Hidden is said with a badge and a tint, not by fading the
-              // card: faded grey text on white fails contrast, and a hidden
-              // comment is exactly the one a moderator needs to read clearly.
-              className={`card p-4 ${comment.isHidden ? 'border-amber-200 bg-amber-50' : ''} ${
-                comment.isReply ? 'ml-4 border-l-2 border-l-slate-300 sm:ml-8' : ''
-              }`}
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="flex flex-wrap items-baseline gap-2 text-sm font-medium text-slate-900">
-                  {comment.author}
-                  {comment.isHidden && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
-                      {t('hidden')}
-                    </span>
-                  )}
+        // Facebook's comment threads: the person's initial, their words in a
+        // grey bubble, and the small actions under it. Grouped by post, the
+        // way a moderator reads them — what was said, under what.
+        <div className="space-y-3">
+          {byPost(comments).map((group) => (
+            <section key={group.key} className="card overflow-hidden">
+              <header className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
+                <Icon name="posts" size={16} className="shrink-0 text-slate-500" />
+                <p className="min-w-0 flex-1 truncate text-[13px] text-slate-700" title={group.postMessage}>
+                  <span className="font-semibold text-slate-900">{group.targetName}</span>
+                  {' · '}
+                  {t('onPost', { post: group.postMessage })}
                 </p>
-                <p className="text-xs text-slate-500">
-                  {comment.targetName} · {comment.createdLabel}
-                </p>
-              </div>
+              </header>
+              <ul className="space-y-3 px-4 py-3">
+                {group.comments.map((comment) => (
+                  <li key={comment.id} className={`flex gap-2 ${comment.isReply ? 'ml-10' : ''}`}>
+                    {comment.fromPage ? (
+                      <FeedAvatar
+                        name={comment.author}
+                        pictureUrl={comment.pagePictureUrl ?? null}
+                        size={comment.isReply ? 'xs' : 'sm'}
+                      />
+                    ) : (
+                      <Initial name={comment.author} small={comment.isReply} />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      {/* Hidden is said with a badge and a dashed amber edge,
+                          not by fading: a hidden comment is the one a
+                          moderator most needs to read clearly. */}
+                      <div
+                        className={`inline-block max-w-full rounded-2xl px-3 py-2 ${
+                          comment.isHidden ? 'border border-dashed border-amber-400 bg-amber-50' : 'bg-slate-100'
+                        }`}
+                      >
+                        <p className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-slate-900">
+                          {comment.author}
+                          {comment.fromPage && (
+                            <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-600">
+                              <Icon name="compose" size={11} />
+                              {t('author')}
+                            </span>
+                          )}
+                          {comment.isHidden && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                              {t('hidden')}
+                            </span>
+                          )}
+                        </p>
+                        <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-[15px] leading-5 text-slate-900">
+                          {comment.message}
+                        </p>
+                      </div>
 
-              <p className="mt-1.5 whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-700">{comment.message}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 px-3 text-xs font-semibold text-slate-600">
+                        <span className="font-normal">{comment.createdLabel}</span>
+                        {comment.likeCount > 0 && (
+                          <span className="flex items-center gap-1 font-normal">
+                            <span
+                              aria-hidden
+                              className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-500 text-white"
+                            >
+                              <Icon name="thumbsUp" size={9} />
+                            </span>
+                            {t('likes', { count: comment.likeCount })}
+                          </span>
+                        )}
+                        {comment.replyCount > 0 && (
+                          <span className="font-normal">{t('replies', { count: comment.replyCount })}</span>
+                        )}
 
-              <p className="mt-2 truncate text-xs text-slate-500" title={comment.postMessage}>
-                {t('onPost', { post: comment.postMessage })}
-              </p>
+                        {canModerate && (
+                          <>
+                            <button
+                              type="button"
+                              className="hover:underline disabled:opacity-50"
+                              disabled={busy === comment.id}
+                              aria-expanded={replyTo === comment.id}
+                              onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
+                            >
+                              {t('reply')}
+                            </button>
+                            <button
+                              type="button"
+                              className="hover:underline disabled:opacity-50"
+                              disabled={busy === comment.id}
+                              onClick={() =>
+                                act(
+                                  { action: comment.isHidden ? 'unhide' : 'hide', commentId: comment.id },
+                                  comment.id,
+                                )
+                              }
+                            >
+                              {comment.isHidden ? t('unhide') : t('hide')}
+                            </button>
+                          </>
+                        )}
 
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
-                <span className="text-slate-500">
-                  {t('likes', { count: comment.likeCount })} ·{' '}
-                  {t('replies', { count: comment.replyCount })}
-                </span>
+                        {canDelete && (
+                          <button
+                            type="button"
+                            className="text-rose-600 hover:underline disabled:opacity-50"
+                            disabled={busy === comment.id}
+                            onClick={() => {
+                              if (confirm(t('confirmDelete'))) {
+                                void act({ action: 'delete', commentId: comment.id }, comment.id);
+                              }
+                            }}
+                          >
+                            {tCommon('delete')}
+                          </button>
+                        )}
+                      </div>
 
-                {canModerate && (
-                  <>
-                    <button
-                      type="button"
-                      className="font-medium text-brand-600 hover:underline disabled:opacity-50"
-                      disabled={busy === comment.id}
-                      aria-expanded={replyTo === comment.id}
-                      onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
-                    >
-                      {t('reply')}
-                    </button>
-                    <button
-                      type="button"
-                      className="font-medium text-slate-600 hover:underline disabled:opacity-50"
-                      disabled={busy === comment.id}
-                      onClick={() =>
-                        act(
-                          { action: comment.isHidden ? 'unhide' : 'hide', commentId: comment.id },
-                          comment.id,
-                        )
-                      }
-                    >
-                      {comment.isHidden ? t('unhide') : t('hide')}
-                    </button>
-                  </>
-                )}
-
-                {canDelete && (
-                  <button
-                    type="button"
-                    className="font-medium text-rose-600 hover:underline disabled:opacity-50"
-                    disabled={busy === comment.id}
-                    onClick={() => {
-                      if (confirm(t('confirmDelete'))) {
-                        void act({ action: 'delete', commentId: comment.id }, comment.id);
-                      }
-                    }}
-                  >
-                    {tCommon('delete')}
-                  </button>
-                )}
-              </div>
-
-              {canModerate && replyTo === comment.id && (
-                <div className="mt-3 space-y-2">
-                  <textarea
-                    className="input min-h-[72px]"
-                    aria-label={t('replyToLabel', { author: comment.author })}
-                    value={replyText}
-                    onChange={(event) => setReplyText(event.target.value)}
-                    placeholder={t('replyPlaceholder')}
-                  />
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    disabled={busy === comment.id || replyText.trim().length === 0}
-                    onClick={() =>
-                      act(
-                        { action: 'reply', commentId: comment.id, message: replyText.trim() },
-                        comment.id,
-                      )
-                    }
-                  >
-                    {busy === comment.id ? tCommon('working') : t('sendReply')}
-                  </button>
-                </div>
-              )}
-            </li>
+                      {canModerate && replyTo === comment.id && (
+                        // Facebook's reply box: a rounded field under the
+                        // comment, answered as the Page.
+                        <div className="mt-2 flex items-end gap-2">
+                          <textarea
+                            className="input min-h-[40px] flex-1 resize-y rounded-2xl bg-slate-100 py-2"
+                            aria-label={t('replyToLabel', { author: comment.author })}
+                            value={replyText}
+                            onChange={(event) => setReplyText(event.target.value)}
+                            placeholder={t('replyPlaceholder')}
+                            rows={1}
+                          />
+                          <button
+                            type="button"
+                            className="btn-primary rounded-full"
+                            disabled={busy === comment.id || replyText.trim().length === 0}
+                            onClick={() =>
+                              act(
+                                { action: 'reply', commentId: comment.id, message: replyText.trim() },
+                                comment.id,
+                              )
+                            }
+                          >
+                            {busy === comment.id ? tCommon('working') : t('sendReply')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
     </div>
+  );
+}
+
+/** Consecutive comments on the same post, in the order the list has them. */
+function byPost(comments: CommentView[]) {
+  const groups: Array<{ key: string; postMessage: string; targetName: string; comments: CommentView[] }> = [];
+  for (const comment of comments) {
+    const key = `${comment.targetName}\u0000${comment.postMessage}`;
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.comments.push(comment);
+    else groups.push({ key, postMessage: comment.postMessage, targetName: comment.targetName, comments: [comment] });
+  }
+  return groups;
+}
+
+/** A commenter's initial on a coloured disc; Graph does not give their photo. */
+function Initial({ name, small = false }: { name: string; small?: boolean }) {
+  const palette = ['bg-sky-100 text-sky-700', 'bg-violet-100 text-violet-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-800', 'bg-rose-100 text-rose-700'];
+  const tone = palette[[...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length];
+  return (
+    <span
+      aria-hidden
+      className={`flex shrink-0 items-center justify-center rounded-full font-bold ${tone} ${
+        small ? 'h-6 w-6 text-[11px]' : 'h-8 w-8 text-xs'
+      }`}
+    >
+      {name.trim().charAt(0).toUpperCase() || '?'}
+    </span>
   );
 }
