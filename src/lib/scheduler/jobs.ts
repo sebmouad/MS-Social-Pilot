@@ -1,6 +1,6 @@
 import { prisma } from '../prisma';
 import { backgroundBudget } from '../facebook/budget';
-import { postFirstComment } from '../first-comment';
+import { postDueFirstComments, postFirstComment } from '../first-comment';
 import { env } from '../env';
 import { notifyTokenExpiring } from '../email/notify';
 import { runEvergreenCycle } from '../evergreen';
@@ -486,16 +486,24 @@ export function jobDefinitions(): JobDefinition[] {
       intervalMs: env.pollSeconds * 1000,
       run: async (context) => {
         const result = await runSchedulerTick({ now: context.now, logger: context.logger });
+        // Comments set to wait after their post, whose time has come.
+        const comments = await postDueFirstComments(context.now);
         const moved =
           result.claimed > 0 ||
           result.reclaimedStale > 0 ||
           result.abandonedStale > 0 ||
           result.skipped > 0;
+        const commented =
+          comments.posted + comments.failed > 0
+            ? ` comments=${comments.posted}${comments.failed ? ` commentFailures=${comments.failed}` : ''}`
+            : '';
         return moved
           ? `claimed=${result.claimed} published=${result.published} failed=${result.failed} ` +
               `retrying=${result.retrying} reclaimed=${result.reclaimedStale} ` +
-              `abandoned=${result.abandonedStale} skipped=${result.skipped}`
-          : null;
+              `abandoned=${result.abandonedStale} skipped=${result.skipped}${commented}`
+          : commented
+            ? commented.trim()
+            : null;
       },
     },
     {

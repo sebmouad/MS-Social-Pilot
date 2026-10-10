@@ -19,6 +19,13 @@ export type IconName =
   | 'globe'
   | 'chevronLeft'
   | 'chevronRight'
+  | 'chevronDown'
+  | 'tag'
+  | 'folders'
+  | 'dots'
+  | 'pencil'
+  | 'lightbulb'
+  | 'trendUp'
   | 'compose'
   | 'calendar'
   | 'posts'
@@ -250,6 +257,45 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   chevronLeft: <path d="m15 18-6-6 6-6" />,
   chevronRight: <path d="m9 18 6-6-6-6" />,
+  chevronDown: <path d="m6 9 6 6 6-6" />,
+  tag: (
+    <>
+      <path d="M3.5 12.6V4.5a1 1 0 0 1 1-1h8.1a1 1 0 0 1 .7.3l7.4 7.4a1.5 1.5 0 0 1 0 2.1l-7.2 7.2a1.5 1.5 0 0 1-2.1 0l-7.6-7.6a1 1 0 0 1-.3-.7Z" />
+      <circle cx="8" cy="8" r="1.4" />
+    </>
+  ),
+  folders: (
+    <>
+      <path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2 2h7.4a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
+      <path d="M3.5 10.5h17" />
+    </>
+  ),
+  dots: (
+    <>
+      <circle cx="5.5" cy="12" r="1.2" />
+      <circle cx="12" cy="12" r="1.2" />
+      <circle cx="18.5" cy="12" r="1.2" />
+    </>
+  ),
+  pencil: (
+    <>
+      <path d="M15.5 4.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+      <path d="m13.5 6.5 3 3" />
+    </>
+  ),
+  lightbulb: (
+    <>
+      <path d="M9 17.5h6" />
+      <path d="M10 20.5h4" />
+      <path d="M12 3.5a6 6 0 0 0-3.6 10.8c.6.5 1.1 1.3 1.1 2.2h5c0-.9.5-1.7 1.1-2.2A6 6 0 0 0 12 3.5Z" />
+    </>
+  ),
+  trendUp: (
+    <>
+      <path d="m3.5 16.5 6-6 4 4 7-7.5" />
+      <path d="M15 7h5.5v5.5" />
+    </>
+  ),
   globe: (
     <>
       <circle cx="12" cy="12" r="9" />

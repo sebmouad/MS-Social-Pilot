@@ -7,6 +7,7 @@ import { FeedPost } from '@/components/FeedPost';
 import { PagesHub } from '@/components/PagesHub';
 import { feedLinkOf, feedMediaOf } from '@/lib/feed';
 import { requirePage } from '@/lib/auth';
+import { postScope, postTargetScope, targetScope } from '@/lib/page-access';
 import { screenMetadata } from '@/lib/metadata';
 import { summariseConnections } from '@/lib/connections';
 import { prisma } from '@/lib/prisma';
@@ -32,24 +33,27 @@ export default async function DashboardPage() {
   const tCommon = await getTranslations('common');
   const workspaceId = auth.workspace.id;
   const now = new Date();
+  // A member limited to some Pages sees their Pages' numbers only.
+  const scopeIds = auth.pageScope.all ? undefined : auth.pageScope.ids;
+  const postsIn = postScope(auth.pageScope);
 
   const [upcoming, recent, counts, targetCount, staleAccounts, failures, totals, health] =
     await Promise.all([
     prisma.post.findMany({
-      where: { workspaceId, status: { in: ['scheduled', 'publishing'] }, scheduledAt: { gte: now } },
+      where: { workspaceId, status: { in: ['scheduled', 'publishing'] }, scheduledAt: { gte: now }, ...postsIn },
       include: { targets: { include: { target: { select: { name: true, pictureUrl: true } } } } },
       orderBy: { scheduledAt: 'asc' },
       take: 5,
     }),
-    recentOutcomes(workspaceId),
-    prisma.post.groupBy({ by: ['status'], where: { workspaceId }, _count: true }),
-    prisma.target.count({ where: { workspaceId, enabled: true, canPublish: true } }),
+    recentOutcomes(workspaceId, 5, scopeIds),
+    prisma.post.groupBy({ by: ['status'], where: { workspaceId, ...postsIn }, _count: true }),
+    prisma.target.count({ where: { workspaceId, enabled: true, canPublish: true, ...targetScope(auth.pageScope) } }),
     prisma.socialAccount.findMany({
       where: { workspaceId, invalidatedAt: { not: null } },
       select: { id: true, name: true, invalidReason: true },
     }),
-    prisma.postTarget.count({ where: { status: 'failed', post: { workspaceId } } }),
-      publishedTotals(workspaceId),
+    prisma.postTarget.count({ where: { status: 'failed', post: { workspaceId }, ...postTargetScope(auth.pageScope) } }),
+      publishedTotals(workspaceId, scopeIds),
       summariseConnections(workspaceId, { now, warnWithinDays: env.tokenWarningDays }),
     ]);
 
@@ -154,6 +158,7 @@ export default async function DashboardPage() {
         workspaceId={workspaceId}
         timeZone={auth.workspace.timezone}
         canConnect={canManageAccounts(auth.role)}
+        scope={auth.pageScope}
         now={now}
       />
 

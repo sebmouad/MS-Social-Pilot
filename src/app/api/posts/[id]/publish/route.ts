@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { assertPostInScope } from '@/lib/page-access';
 import {
   canManageOthersPosts,
   canPublishWithoutApproval,
@@ -13,6 +14,7 @@ import { errors } from '@/lib/errors';
 export const POST = route(async (_request: Request, context: { params: Promise<{ id: string }> }) => {
   const auth = await requireAuth();
   const { id } = await context.params;
+  await assertPostInScope(auth.pageScope, auth.workspace.id, id);
 
   const post = await prisma.post.findFirst({
     where: { id, workspaceId: auth.workspace.id },

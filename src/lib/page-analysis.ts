@@ -699,11 +699,110 @@ export function findings(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Day by day, and the two plain-language tips
+// ---------------------------------------------------------------------------
+
+/** Each KPI's value on each day of the window, for the cards' trend lines. */
+export interface DailySeries {
+  /** `yyyy-MM-dd` in the workspace's zone, one per day of the window. */
+  days: string[];
+  posts: number[];
+  interactions: number[];
+  avgInteractions: number[];
+  medianRate: number[];
+  reach: number[];
+}
+
+export function dailySeries(posts: AnalysedPost[], from: Date, to: Date, timeZone: string): DailySeries {
+  const days: string[] = [];
+  const start = Date.parse(`${formatInTimeZone(from, timeZone, 'yyyy-MM-dd')}T12:00:00Z`);
+  const end = Date.parse(`${formatInTimeZone(to, timeZone, 'yyyy-MM-dd')}T12:00:00Z`);
+  // Bounded, so a window of "all time" cannot ask for ten thousand points.
+  for (let day = start; day <= end && days.length < 400; day += DAY_MS) {
+    days.push(new Date(day).toISOString().slice(0, 10));
+  }
+  const byDay = new Map<string, AnalysedPost[]>(days.map((day) => [day, []]));
+  for (const post of posts) {
+    byDay.get(formatInTimeZone(post.publishedAt, timeZone, 'yyyy-MM-dd'))?.push(post);
+  }
+  const of = (fn: (dayPosts: AnalysedPost[]) => number) => days.map((day) => fn(byDay.get(day) ?? []));
+  return {
+    days,
+    posts: of((list) => list.length),
+    interactions: of((list) => list.reduce((sum, post) => sum + post.interactions, 0)),
+    avgInteractions: of((list) => (list.length ? Math.round(list.reduce((sum, post) => sum + post.interactions, 0) / list.length) : 0)),
+    medianRate: of((list) => {
+      const rate = median(list.map((post) => post.rate).filter((value): value is number => value !== null));
+      return rate === null ? 0 : Math.round(rate * 10) / 10;
+    }),
+    reach: of((list) => list.reduce((sum, post) => sum + (post.reach ?? 0), 0)),
+  };
+}
+
+export interface PostingTips {
+  /** The weekday (0 = Sunday) whose posts earn the most, with enough posts behind it. */
+  bestDay: { weekday: number; lift: number; posts: number } | null;
+  /**
+   * How many posts a day bring the most in without each one earning less:
+   * the busiest day count whose posts still average at least 70% of the best.
+   */
+  bestPerDay: { count: number; posts: number; days: number } | null;
+}
+
+/** Days a pattern needs behind it before it is a tip rather than a coincidence. */
+const MIN_TIP_DAYS = 3;
+
+export function postingTips(posts: AnalysedPost[], timeZone: string): PostingTips {
+  const baseline = median(posts.map((post) => post.interactions));
+
+  // Best day: the median post of each weekday, against the median post overall.
+  let bestDay: PostingTips['bestDay'] = null;
+  if (baseline !== null && baseline > 0) {
+    for (let weekday = 0; weekday < 7; weekday += 1) {
+      const list = posts.filter((post) => Number(formatInTimeZone(post.publishedAt, timeZone, 'i')) % 7 === weekday);
+      if (list.length < MIN_TIP_DAYS) continue;
+      const lift = Math.round((median(list.map((post) => post.interactions))! / baseline) * 10) / 10;
+      if (!bestDay || lift > bestDay.lift) bestDay = { weekday, lift, posts: list.length };
+    }
+    if (bestDay && bestDay.lift < 1.05) bestDay = null;
+  }
+
+  // Best frequency: days grouped by how many posts went out on them.
+  const perDay = new Map<string, AnalysedPost[]>();
+  for (const post of posts) {
+    const day = formatInTimeZone(post.publishedAt, timeZone, 'yyyy-MM-dd');
+    perDay.set(day, [...(perDay.get(day) ?? []), post]);
+  }
+  const buckets = new Map<number, { days: number; posts: number; interactions: number }>();
+  for (const list of perDay.values()) {
+    const count = Math.min(list.length, 10);
+    const bucket = buckets.get(count) ?? { days: 0, posts: 0, interactions: 0 };
+    bucket.days += 1;
+    bucket.posts += list.length;
+    bucket.interactions += list.reduce((sum, post) => sum + post.interactions, 0);
+    buckets.set(count, bucket);
+  }
+  const usable = [...buckets.entries()].filter(([, bucket]) => bucket.days >= MIN_TIP_DAYS && bucket.posts > 0);
+  let bestPerDay: PostingTips['bestPerDay'] = null;
+  if (usable.length > 0) {
+    const perPost = (bucket: { posts: number; interactions: number }) => bucket.interactions / bucket.posts;
+    const top = Math.max(...usable.map(([, bucket]) => perPost(bucket)));
+    const holding = usable.filter(([, bucket]) => top > 0 && perPost(bucket) >= top * 0.7).sort((a, b) => b[0] - a[0]);
+    const [count, bucket] = holding[0] ?? usable.sort((a, b) => perPost(b[1]) - perPost(a[1]))[0]!;
+    bestPerDay = { count, posts: bucket.posts, days: bucket.days };
+  }
+
+  return { bestDay, bestPerDay };
+}
+
+// ---------------------------------------------------------------------------
 // Everything together
 // ---------------------------------------------------------------------------
 
 export interface PageAnalysis {
   kpis: Kpi[];
+  daily: DailySeries;
+  tips: PostingTips;
   health: Health;
   cadence: Cadence;
   formats: FormatRow[];
@@ -752,6 +851,8 @@ export function analyse(input: {
 
   return {
     kpis,
+    daily: dailySeries(input.current, input.from, input.to, input.timeZone),
+    tips: postingTips(input.timing, input.timeZone),
     health: healthScore({ cadence: rhythm, kpis, followers: input.followers }),
     cadence: rhythm,
     formats,

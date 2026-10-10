@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { getTranslations } from 'next-intl/server';
 
 import { requireAuth } from '@/lib/auth';
+import { assertPostInScope } from '@/lib/page-access';
 import { approvePost, rejectPost, submitForApproval, withdrawFromReview } from '@/lib/approvals';
 import { ok, readJson, route } from '@/lib/api';
 import { nativeFallbackKey } from '@/lib/posts';
@@ -20,6 +21,7 @@ const schema = z.discriminatedUnion('action', [
 export const POST = route(async (request: Request, context: { params: Promise<{ id: string }> }) => {
   const auth = await requireAuth();
   const { id } = await context.params;
+  await assertPostInScope(auth.pageScope, auth.workspace.id, id);
   const input = schema.parse(await readJson(request));
 
   // Set when approving had something to say beyond "done": a post meant for

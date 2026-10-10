@@ -1,8 +1,13 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+
+import { Dialog } from './Dialog';
+import { FeedAvatar } from './FeedPost';
+import { Icon } from './Icon';
+import { paletteOf } from '@/lib/palette';
 
 /** Ordered strongest first, so a position in this list is a rank. */
 const ROLES = ['owner', 'admin', 'editor', 'contributor'] as const;
@@ -13,6 +18,22 @@ export interface Member {
   email: string;
   role: string;
   isSelf: boolean;
+  /** Every Page, or only `pageIds`. Owners and admins always have every one. */
+  allPages?: boolean;
+  pageIds?: string[];
+}
+
+interface PageOption {
+  id: string;
+  name: string;
+  pictureUrl: string | null;
+}
+
+interface GroupOption {
+  id: string;
+  name: string;
+  color: string;
+  targetIds: string[];
 }
 
 export interface PendingInvitation {
@@ -30,9 +51,14 @@ interface Props {
   viewerRole: string;
   /** False when RESEND_API_KEY is unset — the link is shown instead. */
   emailConfigured: boolean;
+  /** The workspace's Pages and groups, for limiting a member to some. */
+  pages?: PageOption[];
+  groups?: GroupOption[];
 }
 
-export function TeamClient({ members, invitations, canManage, viewerRole, emailConfigured }: Props) {
+const SEES_ALL = new Set(['owner', 'admin']);
+
+export function TeamClient({ members, invitations, canManage, viewerRole, emailConfigured, pages = [], groups = [] }: Props) {
   const t = useTranslations('team');
   const tCommon = useTranslations('common');
   const router = useRouter();
@@ -63,6 +89,26 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
    */
   const [requested, setRequested] = useState<{ userId: string; role: string } | null>(null);
   useEffect(() => setRequested(null), [members]);
+
+  /** The member whose Pages are being chosen, and the choice so far. */
+  const [access, setAccess] = useState<{ member: Member; all: boolean; ids: string[] } | null>(null);
+  const closeAccess = useCallback(() => setAccess(null), []);
+
+  async function saveAccess() {
+    if (!access) return;
+    const ok = await call(access.member.userId, `/api/team/${access.member.userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ pages: { all: access.all, targetIds: access.ids } }),
+    });
+    if (ok) {
+      setNotice(
+        access.all
+          ? t('accessAllSaved', { name: access.member.name })
+          : t('accessSomeSaved', { name: access.member.name, count: access.ids.length }),
+      );
+      setAccess(null);
+    }
+  }
 
   // The API refuses to grant or withdraw a role above the caller's own, so an
   // admin is not shown an "owner" option that would come back a 403, and is not
@@ -308,6 +354,20 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
                 <span className="block truncate text-xs text-slate-500">{member.email}</span>
               </span>
 
+              {pages.length > 0 && (
+                <PagesBadge
+                  member={member}
+                  editable={canManageMember(member) && !SEES_ALL.has(member.role)}
+                  busy={busy.has(member.userId)}
+                  onEdit={() => setAccess({ member, all: member.allPages ?? true, ids: member.pageIds ?? [] })}
+                  label={
+                    SEES_ALL.has(member.role) || member.allPages !== false
+                      ? t('accessAll')
+                      : t('accessSome', { count: member.pageIds?.length ?? 0 })
+                  }
+                  editLabel={t('accessEdit', { name: member.name })}
+                />
+              )}
               {canManageMember(member) ? (
                 <>
                   <select
@@ -344,6 +404,147 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
           ))}
         </ul>
       </section>
+
+      <Dialog
+        open={access !== null}
+        title={access ? t('accessTitle', { name: access.member.name }) : ''}
+        onClose={closeAccess}
+        closeLabel={tCommon('close')}
+        footer={
+          <>
+            <button type="button" className="btn-secondary" onClick={closeAccess}>
+              {tCommon('cancel')}
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!access || busy.has(access.member.userId) || (!access.all && access.ids.length === 0)}
+              onClick={() => void saveAccess()}
+            >
+              {tCommon('save')}
+            </button>
+          </>
+        }
+      >
+        {access && (
+          <div className="space-y-4">
+            <div role="radiogroup" aria-label={t('accessTitle', { name: access.member.name })} className="space-y-2">
+              {[
+                { all: true, title: t('accessAllTitle'), hint: t('accessAllHint') },
+                { all: false, title: t('accessSomeTitle'), hint: t('accessSomeHint') },
+              ].map((option) => (
+                <label
+                  key={String(option.all)}
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${
+                    access.all === option.all ? 'border-brand-400 bg-brand-50/60' : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="page-access"
+                    className="mt-0.5 h-4 w-4 border-slate-300 text-brand-500 focus:ring-brand-500"
+                    checked={access.all === option.all}
+                    onChange={() => setAccess({ ...access, all: option.all })}
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-900">{option.title}</span>
+                    <span className="block text-xs text-slate-600">{option.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {!access.all && (
+              <div className="space-y-2">
+                {groups.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('accessByGroup')}>
+                    {groups.map((group) => {
+                      const on = group.targetIds.length > 0 && group.targetIds.every((id) => access.ids.includes(id));
+                      return (
+                        <button
+                          key={group.id}
+                          type="button"
+                          aria-pressed={on}
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${
+                            on ? paletteOf(group.color).chip : 'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50'
+                          }`}
+                          onClick={() =>
+                            setAccess({
+                              ...access,
+                              ids: on
+                                ? access.ids.filter((id) => !group.targetIds.includes(id))
+                                : [...new Set([...access.ids, ...group.targetIds])],
+                            })
+                          }
+                        >
+                          <span aria-hidden className={`h-2 w-2 rounded-full ${paletteOf(group.color).dot}`} />
+                          {group.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <ul className="max-h-72 space-y-0.5 overflow-y-auto rounded-lg border border-slate-200 p-1.5">
+                  {pages.map((page) => {
+                    const on = access.ids.includes(page.id);
+                    return (
+                      <li key={page.id}>
+                        <label className={`flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 ${on ? 'bg-brand-50' : 'hover:bg-slate-50'}`}>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                            checked={on}
+                            onChange={() =>
+                              setAccess({ ...access, ids: on ? access.ids.filter((id) => id !== page.id) : [...access.ids, page.id] })
+                            }
+                          />
+                          <FeedAvatar name={page.name} pictureUrl={page.pictureUrl} size="sm" />
+                          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{page.name}</span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="hint">{t('accessCount', { count: access.ids.length, total: pages.length })}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
     </div>
+  );
+}
+
+/** Which Pages a member works on, as a chip that opens the chooser. */
+function PagesBadge({
+  member,
+  editable,
+  busy,
+  onEdit,
+  label,
+  editLabel,
+}: {
+  member: Member;
+  editable: boolean;
+  busy: boolean;
+  onEdit: () => void;
+  label: string;
+  editLabel: string;
+}) {
+  const limited = member.allPages === false && !SEES_ALL.has(member.role);
+  const look = `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+    limited ? 'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200' : 'bg-slate-100 text-slate-700'
+  }`;
+  return editable ? (
+    <button type="button" className={`${look} hover:brightness-95`} aria-label={editLabel} disabled={busy} onClick={onEdit}>
+      <Icon name="folders" size={13} />
+      {label}
+      <Icon name="pencil" size={12} />
+    </button>
+  ) : (
+    <span className={look}>
+      <Icon name="folders" size={13} />
+      {label}
+    </span>
   );
 }

@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 
 import { requireAuth } from '@/lib/auth';
+import { assertPagesAllowed, assertPostInScope, postScope } from '@/lib/page-access';
 import { prisma } from '@/lib/prisma';
 import { cancelPost, nativeFallbackKey, updatePost } from '@/lib/posts';
 import { updatePostSchema } from '@/lib/validation';
@@ -15,7 +16,7 @@ export const GET = route(async (_request: Request, context: Context) => {
   const { id } = await context.params;
 
   const post = await prisma.post.findFirst({
-    where: { id, workspaceId: auth.workspace.id },
+    where: { id, workspaceId: auth.workspace.id, ...postScope(auth.pageScope) },
     include: { targets: { include: { target: true } } },
   });
   if (!post) throw errors.postNotFound();
@@ -49,6 +50,8 @@ export const PATCH = route(async (request: Request, context: Context) => {
   const auth = await requireAuth();
   const { id } = await context.params;
   const input = updatePostSchema.parse(await readJson(request));
+  await assertPostInScope(auth.pageScope, auth.workspace.id, id);
+  if (input.targetIds) assertPagesAllowed(auth.pageScope, input.targetIds);
 
   const result = await updatePost(
     {
@@ -77,6 +80,7 @@ export const PATCH = route(async (request: Request, context: Context) => {
 export const DELETE = route(async (_request: Request, context: Context) => {
   const auth = await requireAuth();
   const { id } = await context.params;
+  await assertPostInScope(auth.pageScope, auth.workspace.id, id);
 
   const result = await cancelPost(
     { workspaceId: auth.workspace.id, userId: auth.user.id, role: auth.role },

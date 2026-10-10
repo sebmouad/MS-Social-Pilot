@@ -1,3 +1,4 @@
+import { ownLabels } from './page-groups';
 import { prisma } from './prisma';
 import { env } from './env';
 import { decryptSecret } from './crypto';
@@ -69,7 +70,10 @@ export interface ResolvedSchedule {
  */
 export async function resolveSchedule(
   workspaceId: string,
-  input: Pick<CreatePostInput, 'publishMode' | 'scheduledAtLocal' | 'timezone' | 'useQueue' | 'saveAsDraft'>,
+  input: Pick<CreatePostInput, 'publishMode' | 'scheduledAtLocal' | 'timezone' | 'useQueue' | 'saveAsDraft'> & {
+    /** The Pages it goes to: the queue keeps a timetable per Page. */
+    targetIds?: string[];
+  },
   now: Date = new Date(),
   /** Runs inside the caller's transaction when the queue is being allocated. */
   client: PrismaClientLike = prisma,
@@ -83,7 +87,7 @@ export async function resolveSchedule(
   }
 
   if (input.useQueue) {
-    const slot = await nextQueueSlot(client, workspaceId, input.timezone, now);
+    const slot = await nextQueueSlot(client, workspaceId, input.timezone, now, input.targetIds ?? []);
     return { scheduledAt: slot, timezone: input.timezone, publishMode: input.publishMode, usedQueueSlot: true };
   }
 
@@ -114,19 +118,28 @@ async function nextQueueSlot(
   workspaceId: string,
   timeZone: string,
   now: Date,
+  targetIds: string[] = [],
 ): Promise<Date> {
-  const [slots, taken] = await Promise.all([
-    client.queueSlot.findMany({ where: { workspaceId } }),
+  const [rows, taken] = await Promise.all([
+    client.queueSlot.findMany({
+      where: { workspaceId, OR: [{ targetId: null }, ...(targetIds.length ? [{ targetId: { in: targetIds } }] : [])] },
+      select: { dayOfWeek: true, hour: true, minute: true, targetId: true },
+    }),
     client.post.findMany({
       where: {
         workspaceId,
         status: { in: [...QUEUE_OCCUPYING_STATUSES] },
         scheduledAt: { gte: now },
+        // A time is taken for these Pages when a post already goes to one of
+        // them then. A post for another Page at the same minute does not
+        // stand in the way: each Page has its own feed to fill.
+        ...(targetIds.length ? { targets: { some: { targetId: { in: targetIds } } } } : {}),
       },
       select: { scheduledAt: true },
     }),
   ]);
 
+  const slots = slotsForPages(rows, targetIds);
   if (slots.length === 0) throw errors.queueEmpty();
 
   const slot = nextAvailableSlot({
@@ -138,6 +151,38 @@ async function nextQueueSlot(
 
   if (!slot) throw errors.queueFull();
   return slot;
+}
+
+/**
+ * The queue times a post to these Pages can take.
+ *
+ * Every Page shares the workspace's times (`targetId` null), and a Page can
+ * have times of its own on top. A post going to several Pages goes out once,
+ * at one moment, so it can only take a time that is a queue time for every
+ * one of them: a shared time, or a time each of its Pages has of its own.
+ */
+export function slotsForPages(
+  rows: Array<{ dayOfWeek: number; hour: number; minute: number; targetId: string | null }>,
+  targetIds: string[],
+): Array<{ dayOfWeek: number; hour: number; minute: number }> {
+  const key = (row: { dayOfWeek: number; hour: number; minute: number }) => `${row.dayOfWeek}-${row.hour}-${row.minute}`;
+  const shared = new Map<string, { dayOfWeek: number; hour: number; minute: number }>();
+  const own = new Map<string, { slot: { dayOfWeek: number; hour: number; minute: number }; pages: Set<string> }>();
+  for (const row of rows) {
+    const slot = { dayOfWeek: row.dayOfWeek, hour: row.hour, minute: row.minute };
+    if (row.targetId === null) {
+      shared.set(key(row), slot);
+    } else if (targetIds.includes(row.targetId)) {
+      const entry = own.get(key(row)) ?? { slot, pages: new Set<string>() };
+      entry.pages.add(row.targetId);
+      own.set(key(row), entry);
+    }
+  }
+  const result = new Map(shared);
+  for (const [k, entry] of own) {
+    if (targetIds.length > 0 && targetIds.every((id) => entry.pages.has(id))) result.set(k, entry.slot);
+  }
+  return [...result.values()];
 }
 
 /**
@@ -176,9 +221,10 @@ export async function allocateQueueSlot(
   workspaceId: string,
   timeZone: string,
   now: Date = new Date(),
+  targetIds: string[] = [],
 ): Promise<Date> {
   await lockWorkspaceQueue(tx, workspaceId);
-  return nextQueueSlot(tx, workspaceId, timeZone, now);
+  return nextQueueSlot(tx, workspaceId, timeZone, now, targetIds);
 }
 
 /** Load the workspace's targets, rejecting ids that do not belong to it. */
@@ -226,6 +272,7 @@ export async function createPost(
   now: Date = new Date(),
 ): Promise<CreatePostResult> {
   const targets = await loadTargets(context.workspaceId, input.targetIds);
+  const labelIds = await ownLabels(context.workspaceId, input.labelIds ?? []);
 
   // Decided once, here, and stored on the row: recomputing it later from
   // settings that may since have changed would let a post slip through.
@@ -276,6 +323,8 @@ export async function createPost(
         authorId: context.userId,
         message: input.message,
         firstComment: input.firstComment ?? null,
+        firstCommentDelayMinutes: input.firstComment ? input.firstCommentDelayMinutes ?? 0 : 0,
+        labels: { create: labelIds.map((labelId) => ({ labelId })) },
         link: input.link ?? null,
         linkPreview: toJsonOrNull(linkPreview),
         ...mediaColumns(input.media),
@@ -768,6 +817,8 @@ export async function updatePost(
   const data: Record<string, unknown> = {};
   if (input.message !== undefined) data.message = input.message;
   if (input.firstComment !== undefined) data.firstComment = input.firstComment;
+  if (input.firstCommentDelayMinutes !== undefined) data.firstCommentDelayMinutes = input.firstCommentDelayMinutes;
+  const labelIds = input.labelIds ? await ownLabels(context.workspaceId, input.labelIds) : null;
   if (input.media !== undefined) {
     // Both columns or neither: stale keys would let a file in use be swept.
     const columns = mediaColumns(input.media);
@@ -912,6 +963,11 @@ export async function updatePost(
 
   await prisma.$transaction(async (tx) => {
     await tx.post.update({ where: { id: postId }, data });
+
+    if (labelIds) {
+      await tx.postLabel.deleteMany({ where: { postId } });
+      await tx.postLabel.createMany({ data: labelIds.map((labelId) => ({ postId, labelId })) });
+    }
 
     if (input.targetIds) {
 

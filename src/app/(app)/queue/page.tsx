@@ -3,6 +3,7 @@ import { TargetType } from '@prisma/client';
 
 import { QueueClient } from '@/components/QueueClient';
 import { requirePage } from '@/lib/auth';
+import { targetScope } from '@/lib/page-access';
 import {
   QUEUE_OCCUPYING_STATUSES,
   canManageOthersPosts,
@@ -38,28 +39,42 @@ function weekdayNames(locale: string): string[] {
  * next week of it, and — from the Pages' own results — when else is worth
  * adding.
  */
-export default async function QueuePage() {
+export default async function QueuePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const auth = await requirePage();
+  const params = await searchParams;
+  const requested = Array.isArray(params.for) ? params.for[0] : params.for;
   const t = await getTranslations('queue');
   const locale = await getLocale();
   const timeZone = auth.workspace.timezone;
   const now = new Date();
 
-  const [slots, pages, taken] = await Promise.all([
+  const pages = await prisma.target.findMany({
+    where: { workspaceId: auth.workspace.id, type: TargetType.page, ...targetScope(auth.pageScope) },
+    select: { id: true, name: true, pictureUrl: true },
+    orderBy: { name: 'asc' },
+  });
+  // Whose timetable is on screen: one Page's (its own times on top of the
+  // shared ones), or the shared one. A member limited to some Pages has no
+  // shared view to look at — every time they see is one of their Pages'.
+  const scope =
+    pages.find((page) => page.id === requested) ?? (auth.pageScope.all ? null : pages[0] ?? null);
+
+  const [allSlots, taken] = await Promise.all([
     prisma.queueSlot.findMany({
       where: { workspaceId: auth.workspace.id },
       orderBy: [{ dayOfWeek: 'asc' }, { hour: 'asc' }, { minute: 'asc' }],
-      select: { dayOfWeek: true, hour: true, minute: true },
-    }),
-    prisma.target.findMany({
-      where: { workspaceId: auth.workspace.id, type: TargetType.page },
-      select: { id: true, name: true },
+      select: { dayOfWeek: true, hour: true, minute: true, targetId: true },
     }),
     prisma.post.findMany({
       where: {
         workspaceId: auth.workspace.id,
         status: { in: [...QUEUE_OCCUPYING_STATUSES] },
         scheduledAt: { gte: now, lte: new Date(now.getTime() + (UPCOMING_DAYS + 1) * DAY_MS) },
+        ...(scope ? { targets: { some: { targetId: scope.id } } } : {}),
       },
       select: {
         id: true,
@@ -75,8 +90,15 @@ export default async function QueuePage() {
     }),
   ]);
 
+  // The times this view shows: the shared ones, plus the Page's own.
+  const slots = allSlots
+    .filter((slot) => slot.targetId === null || slot.targetId === scope?.id)
+    .map(({ dayOfWeek, hour, minute, targetId }) => ({ dayOfWeek, hour, minute, own: targetId !== null }));
+  const ownCount = new Map<string, number>();
+  for (const slot of allSlots) if (slot.targetId) ownCount.set(slot.targetId, (ownCount.get(slot.targetId) ?? 0) + 1);
+
   const history = await Promise.all(
-    pages.map(async (page) => ({
+    (scope ? [scope] : pages).map(async (page) => ({
       pageName: page.name,
       posts: await loadPagePosts(page.id, new Date(now.getTime() - LOOKBACK_DAYS * DAY_MS), now),
     })),
@@ -119,6 +141,7 @@ export default async function QueuePage() {
         day: dayOf.format(entry.at),
         time: timeOf.format(entry.at),
         weekday: entry.slot.dayOfWeek,
+        own: entry.slot.own,
         post: post
           ? {
               id: post.id,
@@ -147,12 +170,17 @@ export default async function QueuePage() {
 
       <QueueClient
         canManage={canManageSettings(auth.role)}
+        scope={scope ? { id: scope.id, name: scope.name } : null}
+        scopes={[
+          ...(auth.pageScope.all ? [{ id: null, name: t('everyPage'), pictureUrl: null, own: allSlots.filter((slot) => !slot.targetId).length }] : []),
+          ...pages.map((page) => ({ id: page.id, name: page.name, pictureUrl: page.pictureUrl, own: ownCount.get(page.id) ?? 0 })),
+        ]}
         slots={slots}
         suggestions={suggestions}
         upcoming={upcoming}
         weekdays={weekdayNames(locale)}
         sample={sample}
-        pageCount={pages.length}
+        pageCount={scope ? 1 : pages.length}
       />
     </div>
   );

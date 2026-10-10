@@ -7,6 +7,7 @@ import { Icon, type IconName } from './Icon';
 import { countComments } from '@/lib/engagement';
 import { env } from '@/lib/env';
 import { prisma } from '@/lib/prisma';
+import { ALL_PAGES, targetScope, type PageScope } from '@/lib/page-access';
 import { appLocale, formatInZone, relativeTime } from '@/lib/time';
 
 /** Statuses a post waits in before it goes out. */
@@ -26,18 +27,21 @@ export async function PagesHub({
   workspaceId,
   timeZone,
   canConnect,
+  scope = ALL_PAGES,
   now = new Date(),
 }: {
   workspaceId: string;
   timeZone: string;
   canConnect: boolean;
+  /** The Pages this member may see. */
+  scope?: PageScope;
   now?: Date;
 }) {
   const t = await getTranslations('hub');
 
   const [pages, profiles, adAccounts] = await Promise.all([
     prisma.target.findMany({
-      where: { workspaceId, type: TargetType.page },
+      where: { workspaceId, type: TargetType.page, ...targetScope(scope) },
       orderBy: { name: 'asc' },
       include: {
         socialAccount: { select: { name: true, invalidatedAt: true, tokenExpiresAt: true } },

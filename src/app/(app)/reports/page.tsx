@@ -9,6 +9,10 @@ import { buildReport, parseReportRange } from '@/lib/reports';
 import { parseRange } from '@/lib/date-range';
 import { formatInZone, appLocale } from '@/lib/time';
 import { ReportControls } from '@/components/ReportControls';
+import { ReportBuilder } from '@/components/ReportBuilder';
+import { parseSections } from '@/lib/report-sections';
+import { canManageSettings } from '@/lib/constants';
+import { targetScope } from '@/lib/page-access';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { ExternalLink } from '@/components/ExternalLink';
 import { FeedPost } from '@/components/FeedPost';
@@ -69,15 +73,27 @@ export default async function ReportsPage({
   const { from, to } = range;
 
   const pages = await prisma.target.findMany({
-    where: { workspaceId: auth.workspace.id, type: TargetType.page },
+    where: { workspaceId: auth.workspace.id, type: TargetType.page, ...targetScope(auth.pageScope) },
     orderBy: { name: 'asc' },
     select: { id: true, name: true, pictureUrl: true, followersCount: true, fanCount: true },
+  });
+  const sections = parseSections(first(params.sections));
+  const has = (section: (typeof sections)[number]) => sections.includes(section);
+  const branding = await prisma.workspace.findUniqueOrThrow({
+    where: { id: auth.workspace.id },
+    select: { name: true, logoUrl: true, reportTitle: true, reportSubtitle: true, reportFooter: true },
   });
   const selected = pages.find((page) => page.id === first(params.target)) ?? pages[0] ?? null;
 
   const report = rangeError
     ? null
-    : await buildReport({ workspaceId: auth.workspace.id, timezone, from, to });
+    : await buildReport({
+        workspaceId: auth.workspace.id,
+        timezone,
+        from,
+        to,
+        ...(auth.pageScope.all ? {} : { targetIds: auth.pageScope.ids }),
+      });
 
   const cards = report
     ? [
@@ -88,11 +104,16 @@ export default async function ReportsPage({
       ]
     : [];
 
-  const keep: Record<string, string> = selected ? { target: selected.id } : {};
+  const sectionsParam = first(params.sections);
+  const keep: Record<string, string> = {
+    ...(selected ? { target: selected.id } : {}),
+    ...(sectionsParam ? { sections: sectionsParam } : {}),
+  };
   const pageHref = (id: string) =>
     `/reports?${new URLSearchParams({
       target: id,
       ...(range.key === 'custom' ? { from: range.fromDay, to: range.toDay } : { range: range.key }),
+      ...(sectionsParam ? { sections: sectionsParam } : {}),
     }).toString()}`;
 
   return (
@@ -102,7 +123,19 @@ export default async function ReportsPage({
           <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
         </div>
-        <ReportControls from={range.fromDay} to={range.toDay} downloadable={!rangeError} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ReportControls from={range.fromDay} to={range.toDay} downloadable={!rangeError} />
+          <ReportBuilder
+            sections={sections}
+            canBrand={canManageSettings(auth.role)}
+            branding={{
+              logoUrl: branding.logoUrl ?? '',
+              reportTitle: branding.reportTitle ?? '',
+              reportSubtitle: branding.reportSubtitle ?? '',
+              reportFooter: branding.reportFooter ?? '',
+            }}
+          />
+        </div>
       </header>
 
       <div className="filter-row print:hidden">
@@ -135,47 +168,66 @@ export default async function ReportsPage({
             <>
               {/* The cover: what this is, for whom and for when — the first
                   thing a client sees on the printout. */}
-              <section className="card flex flex-wrap items-center gap-4 p-5">
-                {selected.pictureUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selected.pictureUrl} alt="" className="h-14 w-14 rounded-full object-cover" />
-                ) : (
-                  <span
-                    aria-hidden
-                    className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-xl font-bold text-brand-600"
-                  >
-                    {selected.name.charAt(0).toUpperCase()}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-xl font-bold text-slate-900">{t('coverTitle', { page: selected.name })}</h2>
-                  <p className="text-sm text-slate-600">
-                    {formatInZone(from, timezone, 'd MMMM yyyy')} – {formatInZone(to, timezone, 'd MMMM yyyy')}
+              <section className="card overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-gradient-to-r from-brand-50 to-white px-5 py-4">
+                  {branding.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={branding.logoUrl} alt={branding.name} className="h-10 max-w-[180px] object-contain" />
+                  ) : (
+                    <span className="text-[15px] font-bold text-slate-900">{branding.name}</span>
+                  )}
+                  <p className="text-xs text-slate-500">
+                    {t('generatedOn', { date: formatInZone(new Date(), timezone, 'd MMMM yyyy, HH:mm') })}
                   </p>
                 </div>
-                <p className="text-xs text-slate-500">
-                  {t('generatedOn', { date: formatInZone(new Date(), timezone, 'd MMMM yyyy, HH:mm') })}
-                </p>
+                <div className="flex flex-wrap items-center gap-4 px-5 py-5">
+                  {selected.pictureUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={selected.pictureUrl} alt="" className="h-16 w-16 rounded-full object-cover ring-4 ring-white" />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 text-2xl font-bold text-brand-600"
+                    >
+                      {selected.name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-2xl font-bold text-slate-900">
+                      {branding.reportTitle || t('coverTitle', { page: selected.name })}
+                    </h2>
+                    {branding.reportSubtitle && <p className="text-[15px] text-slate-700">{branding.reportSubtitle}</p>}
+                    <p className="mt-0.5 text-sm text-slate-600">
+                      {branding.reportTitle ? `${selected.name} · ` : ''}
+                      {formatInZone(from, timezone, 'd MMMM yyyy')} – {formatInZone(to, timezone, 'd MMMM yyyy')}
+                    </p>
+                  </div>
+                </div>
               </section>
 
-              <PageAnalysisView
-                workspaceId={auth.workspace.id}
-                targetId={selected.id}
-                from={from}
-                to={to}
-                days={range.days}
-                timeZone={timezone}
-              />
+              {has('analysis') && (
+                <PageAnalysisView
+                  workspaceId={auth.workspace.id}
+                  targetId={selected.id}
+                  from={from}
+                  to={to}
+                  days={range.days}
+                  timeZone={timezone}
+                />
+              )}
 
-              <section aria-labelledby="report-audience" className="space-y-4">
-                <h2 id="report-audience" className="text-[17px] font-bold text-slate-900">
-                  {t('audienceTitle')}
-                </h2>
-                <AudienceView targetId={selected.id} from={from} to={to} timeZone={timezone} />
-              </section>
+              {has('audience') && (
+                <section aria-labelledby="report-audience" className="space-y-4">
+                  <h2 id="report-audience" className="text-[17px] font-bold text-slate-900">
+                    {t('audienceTitle')}
+                  </h2>
+                  <AudienceView targetId={selected.id} from={from} to={to} timeZone={timezone} />
+                </section>
+              )}
             </>
           )}
 
+          {(has('published') || has('destinations') || has('topPosts')) && (
           <section aria-labelledby="report-published" className="space-y-4">
             <div>
               <h2 id="report-published" className="text-[17px] font-bold text-slate-900">
@@ -184,6 +236,7 @@ export default async function ReportsPage({
               <p className="text-sm text-slate-600">{t('publishedHereHint')}</p>
             </div>
 
+            {has('published') && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {cards.map((card) => (
                 <div key={card.label} className="card p-4">
@@ -194,11 +247,13 @@ export default async function ReportsPage({
                 </div>
               ))}
             </div>
+            )}
 
             {!report || report.destinations.length === 0 ? (
               <div className="card p-8 text-center text-sm text-slate-600">{t('noData')}</div>
             ) : (
               <>
+                {has('destinations') && (
                 <section className="card p-5">
                   <h3 className="mb-3 text-sm font-semibold text-slate-900">{t('byDestination')}</h3>
                   {/* Wide table: scrolls inside its own container rather than the page. */}
@@ -238,7 +293,9 @@ export default async function ReportsPage({
                     </table>
                   </div>
                 </section>
+                )}
 
+                {has('topPosts') && (
                 <section className="space-y-3">
                   <h3 className="px-1 text-[17px] font-bold text-slate-900">{t('topPosts')}</h3>
                   {/* The posts themselves, as the Page's followers saw them. */}
@@ -290,13 +347,18 @@ export default async function ReportsPage({
                     ))}
                   </ol>
                 </section>
+                )}
               </>
             )}
           </section>
+          )}
         </>
       )}
 
-      <p className="text-xs text-slate-500">{t('sourceNote')}</p>
+      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 text-xs text-slate-500">
+        <span>{branding.reportFooter || t('sourceNote')}</span>
+        {branding.reportFooter && <span>{t('sourceNote')}</span>}
+      </footer>
     </div>
   );
 }

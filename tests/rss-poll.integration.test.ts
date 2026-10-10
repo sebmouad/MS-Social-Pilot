@@ -168,7 +168,7 @@ describe('an entry whose post cannot be written', () => {
 
 describe('queue allocation', () => {
   it('waits for a composer holding the workspace lock, and does not take its slot', async () => {
-    const { owner, workspace, source } = await seed({ queue: true });
+    const { owner, workspace, source, target } = await seed({ queue: true });
     serveFeed([{ guid: 'one', title: 'One' }]);
 
     // Stand in for `createPost` mid-allocation: it holds the lock and has
@@ -192,6 +192,9 @@ describe('queue allocation', () => {
             publishMode: 'worker',
             scheduledAt: firstSlot,
             timezone: 'UTC',
+            // To the feed's own Page: a queue time is taken per Page, so only
+            // a post to the same Page stands in the feed's way.
+            targets: { create: [{ targetId: target.id }] },
           },
         });
       },

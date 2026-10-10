@@ -215,7 +215,15 @@
     "followerTrend": "Followers gained and lost",
     "followerTrendHint": "New and lost followers each day, from Facebook. A rising total can still hide a day that lost more people than it found.",
     "newFollowers": "New followers",
-    "lostFollowers": "Lost followers"
+    "lostFollowers": "Lost followers",
+    "sourceFilter": "Which posts",
+    "source_all": "All",
+    "source_app": "Via MS Social Pilot",
+    "source_page": "Made on Facebook",
+    "rowsPerPage": "Rows per page",
+    "rowsShowing": "{from}–{to} of {total}",
+    "previousRows": "Previous rows",
+    "nextRows": "Next rows"
   },
   "app": {
     "name": "MS Social Pilot",
@@ -385,7 +393,28 @@
     "previewShare": "Share",
     "firstComment": "First comment",
     "firstCommentPlaceholder": "A link, hashtags or a call to action…",
-    "firstCommentHint": "Posted as the Page under the post the moment it goes out. If Facebook refuses it, the post still goes out and the comment can be retried from the post list."
+    "firstCommentHint": "Posted as the Page under the post the moment it goes out. If Facebook refuses it, the post still goes out and the comment can be retried from the post list.",
+    "delayLabel": "Post the comment",
+    "delayNone": "Straight after the post",
+    "delayMinutes": "{count, plural, one {# minute after} other {# minutes after}}",
+    "delayHours": "{count, plural, one {# hour after} other {# hours after}}",
+    "delayDays": "{count, plural, one {# day after} other {# days after}}",
+    "delayCustom": "Custom…",
+    "delayUnitDays": "days",
+    "delayUnitHours": "h",
+    "delayUnitMinutes": "min",
+    "labelsTitle": "Labels",
+    "labelsHint": "Campaign, client, theme — to find and report on posts later.",
+    "timingSchedule": "Schedule",
+    "timingQueue": "Queue",
+    "timingNow": "Now",
+    "scheduleDescription": "Pick the date and time.",
+    "queueDescription": "Goes in the next free queue time for these Pages.",
+    "nowDescription": "Goes out on Facebook right away.",
+    "queueExplain": "The post takes the next free queue time that every Page you picked shares.",
+    "nowExplain": "The post goes out as soon as you press the button.",
+    "nowNeedsApproval": "It goes to review first, and out as soon as it is approved.",
+    "otherWays": "Other ways to send it"
   },
   "config": {
     "title": "Configuration",
@@ -736,7 +765,11 @@
     "unknownExport": "Unknown export. Choose one of: {kinds}.",
     "variantsNeedApproval": "Alternate wordings publish without review, so only editors and above can set them while approval is on.",
     "dateRangeInverted": "The start of the range comes after its end. Swap the dates.",
-    "adAccountNotFound": "Ad account not found."
+    "adAccountNotFound": "Ad account not found.",
+    "nameTaken": "That name is already used.",
+    "groupNotFound": "Group not found.",
+    "labelNotFound": "Label not found.",
+    "adminsSeeAllPages": "Owners and admins always have every Page. Change their role first."
   },
   "feeds": {
     "title": "RSS feeds",
@@ -820,7 +853,8 @@
         "invited": "invited someone to the workspace",
         "joined": "joined the workspace",
         "removed": "removed someone from the workspace",
-        "roleChanged": "changed someone’s role"
+        "roleChanged": "changed someone’s role",
+        "pageAccessChanged": "changed which Pages someone can use"
       }
     },
     "byDeparted": "Someone no longer in this workspace",
@@ -1126,7 +1160,23 @@
         "link": "Has a link"
       }
     },
-    "stillReading": "Facebook is still answering. The figures will appear when you come back in a few minutes."
+    "stillReading": "Facebook is still answering. The figures will appear when you come back in a few minutes.",
+    "kpiTitle": "Headline figures",
+    "noDaily": "No daily figure",
+    "perDay": "{metric}, day by day",
+    "pickCard": "Pick a card above to chart it",
+    "reachDailyNote": "Day by day, reach is the sum over each day’s posts; the card’s total is the Page’s own figure when Facebook serves it.",
+    "tips": {
+      "title": "Posting tips",
+      "bestDayTitle": "Best day to post",
+      "notYet": "Not enough posts yet",
+      "bestDayHint": "Posts on this day earn {lift}× your usual interactions ({posts} posts).",
+      "bestDayEmpty": "Post on a few different days and this fills in.",
+      "frequencyTitle": "Best frequency",
+      "perDay": "{count, plural, one {# post a day} other {# posts a day}}",
+      "frequencyHint": "On days with {count, plural, one {# post} other {# posts}}, each still did well ({days} days).",
+      "frequencyEmpty": "Needs a few weeks of posting to tell."
+    }
   },
   "posts": {
     "title": "Posts",
@@ -1212,7 +1262,13 @@
     "weeklyTitle": "Weekly slots",
     "writePost": "Write a post",
     "freeHint": "Nothing takes this slot yet. Write a post and add it to the queue.",
-    "inQueue": "In the queue"
+    "inQueue": "In the queue",
+    "everyPage": "Every Page",
+    "timetableFor": "Timetable for",
+    "ownTimesHint": "{page}’s own times, on top of the times every Page shares (in grey).",
+    "sharedTimesHint": "These times are shared by every Page. Pick a Page to give it times of its own.",
+    "weeklyTitleFor": "{page}’s weekly times",
+    "sharedTime": "Shared by every Page"
   },
   "reports": {
     "title": "Reports",
@@ -1241,7 +1297,32 @@
     "generatedOn": "Generated {date}",
     "audienceTitle": "Audience",
     "publishedHere": "Published from MS Social Pilot",
-    "publishedHereHint": "Posts sent from this app in the period, with the link clicks its short links counted."
+    "publishedHereHint": "Posts sent from this app in the period, with the link clicks its short links counted.",
+    "customise": "Customise",
+    "customiseTitle": "Customise the report",
+    "applyChanges": "Apply",
+    "sectionsTitle": "Sections",
+    "sectionsHint": "Tick what this report should show. Saved in the link, so the same report can be printed again.",
+    "brandingTitle": "Branding",
+    "brandingHint": "Your logo and words on every report this workspace prints.",
+    "brandingAdminsOnly": "Only owners and admins can change the branding.",
+    "logoUrl": "Logo (image address)",
+    "coverTitleField": "Cover title",
+    "coverTitlePlaceholder": "e.g. Monthly report",
+    "coverSubtitleField": "Cover subtitle",
+    "coverSubtitlePlaceholder": "e.g. Prepared by your agency",
+    "footerField": "Footer",
+    "footerPlaceholder": "e.g. contact@agency.com · agency.com",
+    "section_analysis": "Page analysis",
+    "section_audience": "Audience",
+    "section_published": "Published from here",
+    "section_destinations": "By destination",
+    "section_topPosts": "Top posts",
+    "sectionHint_analysis": "Health, findings, headline figures, rhythm, formats, best times.",
+    "sectionHint_audience": "Followers, countries, cities, age and gender.",
+    "sectionHint_published": "Posts, reach, engagement and clicks from this app.",
+    "sectionHint_destinations": "The same figures, Page by Page.",
+    "sectionHint_topPosts": "The best posts, as followers saw them."
   },
   "settings": {
     "addTime": "Add time",
@@ -1412,7 +1493,8 @@
     "page": "Page",
     "selectAll": "Select all",
     "selectedOf": "{selected} of {total} selected",
-    "toStart": "to start scheduling."
+    "toStart": "to start scheduling.",
+    "groups": "Pick a group of Pages"
   },
   "team": {
     "title": "Team",
@@ -1459,7 +1541,19 @@
     "revokeNamed": "Revoke the invitation for {email}",
     "roleChangeConfirm": "Change {name} from {from} to {to}?",
     "roleToOwnerWarning": "Owners have full control, including instance configuration and deleting the workspace, and only another owner can take that back.",
-    "roleFromOwnerWarning": "They will lose owner access to this workspace straight away."
+    "roleFromOwnerWarning": "They will lose owner access to this workspace straight away.",
+    "accessAllSaved": "{name} now works on every Page.",
+    "accessSomeSaved": "{count, plural, one {{name} now works on # Page.} other {{name} now works on # Pages.}}",
+    "accessAll": "All Pages",
+    "accessSome": "{count, plural, =0 {No Pages} one {# Page} other {# Pages}}",
+    "accessEdit": "Choose which Pages {name} works on",
+    "accessTitle": "Pages for {name}",
+    "accessAllTitle": "Every Page",
+    "accessAllHint": "Including Pages connected later.",
+    "accessSomeTitle": "Only the Pages I choose",
+    "accessSomeHint": "They see and post to these Pages only, everywhere in the app.",
+    "accessByGroup": "Add a group",
+    "accessCount": "{count} of {total} Pages chosen."
   },
   "dateRange": {
     "preset": {
@@ -1504,5 +1598,89 @@
     "actionsFor": "Actions for {page}",
     "adAccounts": "Ad accounts",
     "groupsNote": "Facebook groups can’t be managed from any app: Meta removed group posting for every app on 22 April 2024."
+  },
+  "pagesSidebar": {
+    "label": "Pages",
+    "allPages": "All Pages",
+    "chooseGroup": "Choose a group",
+    "noGroups": "No groups yet.",
+    "manageGroups": "Edit groups",
+    "newGroup": "Make a group",
+    "search": "Search Pages",
+    "showing": "{shown} of {total} shown",
+    "showAll": "Show all",
+    "showOthers": "Show the other Pages again",
+    "onlyThis": "Show {page} only",
+    "paused": "Paused",
+    "type": {
+      "page": "Facebook Page",
+      "group": "Facebook group",
+      "instagram": "Instagram"
+    },
+    "hide": "Hide {page}",
+    "show": "Show {page}",
+    "noMatch": "No Page matches."
+  },
+  "labels": {
+    "allLabels": "All labels",
+    "filterBy": "Filter by label",
+    "createFailed": "The label could not be made.",
+    "remove": "Remove {label}",
+    "addMore": "Label",
+    "add": "Add a label",
+    "searchOrCreate": "Find or make a label",
+    "title": "Labels",
+    "none": "No labels yet. Type a name to make one.",
+    "create": "Make “{name}”"
+  },
+  "groups": {
+    "title": "Pages & groups",
+    "subtitle": "Sort your Pages into groups and your posts into labels, then filter every screen by them in one click.",
+    "groupsTitle": "Page groups",
+    "groupsHint": "A client, a brand, a country: a group ticks all its Pages at once in the composer and filters the calendar, queue and posts.",
+    "newGroup": "New group",
+    "noGroups": "No groups yet",
+    "noGroupsHint": "Make one for each client or brand, and pick it anywhere a list of Pages appears.",
+    "pageCount": "{count, plural, =0 {No Pages} one {# Page} other {# Pages}}",
+    "editGroup": "Edit {name}",
+    "deleteGroup": "Delete {name}",
+    "pagesIn": "Pages in {name}",
+    "emptyGroup": "No Pages in this group yet.",
+    "labelsTitle": "Post labels",
+    "labelsHint": "Tag posts with a campaign or theme, then filter the calendar and the post list by it.",
+    "noLabels": "No labels yet.",
+    "labelName": "Label name",
+    "color": "Colour",
+    "labelPosts": "{count, plural, =0 {Not used yet} one {On # post} other {On # posts}}",
+    "editLabel": "Edit {name}",
+    "deleteLabel": "Delete {name}",
+    "newLabelPlaceholder": "New label, e.g. Summer sale",
+    "addLabel": "Add label",
+    "editGroupTitle": "Edit group",
+    "newGroupTitle": "New group",
+    "createGroup": "Create group",
+    "groupName": "Name",
+    "groupNamePlaceholder": "e.g. Restaurants, Client A, Morocco",
+    "pagesInGroup": "Pages in this group",
+    "selectedOf": "{selected} of {total}",
+    "searchPages": "Search Pages",
+    "groupSaved": "“{name}” saved.",
+    "groupCreated": "“{name}” created.",
+    "deleteGroupConfirm": "Delete the group “{name}”? Its Pages and their posts stay as they are.",
+    "groupDeleted": "“{name}” deleted.",
+    "labelCreated": "Label “{name}” added.",
+    "labelSaved": "Label “{name}” saved.",
+    "deleteLabelConfirm": "{count, plural, =0 {Delete the label “{name}”?} one {Delete the label “{name}”? It comes off # post.} other {Delete the label “{name}”? It comes off # posts.}}",
+    "labelDeleted": "Label “{name}” deleted.",
+    "colors": {
+      "blue": "Blue",
+      "green": "Green",
+      "amber": "Amber",
+      "red": "Red",
+      "purple": "Purple",
+      "pink": "Pink",
+      "teal": "Teal",
+      "slate": "Grey"
+    }
   }
 }

@@ -34,6 +34,7 @@ export const ACTIVITY_ACTIONS = [
   'team.invitationRevoked',
   'team.invited',
   'team.joined',
+  'team.pageAccessChanged',
   'team.removed',
   'team.roleChanged',
 ] as const;

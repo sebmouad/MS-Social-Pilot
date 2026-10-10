@@ -172,7 +172,7 @@ async function scheduleEntry(options: {
 
       let scheduledAt: Date;
       try {
-        scheduledAt = await allocateQueueSlot(tx, source.workspaceId, options.timezone, options.now);
+        scheduledAt = await allocateQueueSlot(tx, source.workspaceId, options.timezone, options.now, options.targetIds);
       } catch (error) {
         // No queue, or none free: a feed still posts, just not into a slot.
         if (!isQueueUnavailable(error)) throw error;

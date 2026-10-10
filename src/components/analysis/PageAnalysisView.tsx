@@ -6,6 +6,8 @@ import { CadenceChart } from './CadenceChart';
 import { TimeHeatmap } from './TimeHeatmap';
 import { ChartFrame } from '@/components/charts/ChartFrame';
 import { StatTile } from '@/components/charts/StatTile';
+import { KpiExplorer } from './KpiExplorer';
+import type { PostingTips } from '@/lib/page-analysis';
 import { ExternalLink } from '@/components/ExternalLink';
 import { FeedPost } from '@/components/FeedPost';
 import { Icon, type IconName } from '@/components/Icon';
@@ -271,19 +273,22 @@ export async function PageAnalysisView({
             </div>
           </div>
 
+          <PostingTipsTiles tips={analysis.tips} weekdays={longDays} />
+
           <section>
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
-              {analysis.kpis.map((kpi) => (
-                <StatTile
-                  key={kpi.key}
-                  label={t(`kpi.${kpi.key}`)}
-                  value={kpi.current === null ? null : kpi.key === 'medianRate' ? `${kpi.current}%` : kpi.current}
-                  delta={kpi.change}
-                  deltaLabel={t('vsPrevious')}
-                  upIsGood={KPI_UP_IS_GOOD[kpi.key]}
-                />
-              ))}
-            </div>
+            <KpiExplorer
+              vsLabel={t('vsPrevious')}
+              days={analysis.daily.days}
+              cards={analysis.kpis.map((kpi) => ({
+                key: kpi.key,
+                label: t(`kpi.${kpi.key}`),
+                value: kpi.current === null ? null : kpi.key === 'medianRate' ? `${kpi.current}%` : kpi.current,
+                change: kpi.change,
+                upIsGood: KPI_UP_IS_GOOD[kpi.key],
+                series: kpi.key === 'netFollows' ? null : analysis.daily[kpi.key],
+                note: kpi.key === 'reach' ? t('reachDailyNote') : undefined,
+              }))}
+            />
             <p className="mt-2 text-xs text-slate-500">{t('kpiHint')}</p>
           </section>
 
@@ -659,5 +664,48 @@ function LiftList({
         </ul>
       )}
     </ChartFrame>
+  );
+}
+
+/**
+ * The two questions people open analytics to answer, answered in words: which
+ * day to post on, and how many posts a day. Both from this Page's own last
+ * ninety days, and both say so when there is not enough behind them yet.
+ */
+async function PostingTipsTiles({ tips, weekdays }: { tips: PostingTips; weekdays: string[] }) {
+  const t = await getTranslations('pageAnalysis');
+  const tiles = [
+    {
+      icon: 'calendar' as const,
+      title: t('tips.bestDayTitle'),
+      value: tips.bestDay ? weekdays[tips.bestDay.weekday] ?? '—' : t('tips.notYet'),
+      hint: tips.bestDay
+        ? t('tips.bestDayHint', { lift: tips.bestDay.lift, posts: tips.bestDay.posts })
+        : t('tips.bestDayEmpty'),
+    },
+    {
+      icon: 'trendUp' as const,
+      title: t('tips.frequencyTitle'),
+      value: tips.bestPerDay ? t('tips.perDay', { count: tips.bestPerDay.count }) : t('tips.notYet'),
+      hint: tips.bestPerDay
+        ? t('tips.frequencyHint', { count: tips.bestPerDay.count, days: tips.bestPerDay.days })
+        : t('tips.frequencyEmpty'),
+    },
+  ];
+  return (
+    <section aria-label={t('tips.title')} className="grid gap-3 sm:grid-cols-2">
+      {tiles.map((tile) => (
+        <div key={tile.title} className="card relative flex items-start gap-3 overflow-hidden p-4">
+          <span aria-hidden className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+            <Icon name={tile.icon} size={20} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-slate-600">{tile.title}</p>
+            <p className="text-xl font-bold text-slate-900 first-letter:uppercase">{tile.value}</p>
+            <p className="mt-0.5 text-xs text-slate-500">{tile.hint}</p>
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }

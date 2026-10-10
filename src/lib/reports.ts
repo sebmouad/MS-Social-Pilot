@@ -225,12 +225,15 @@ export async function buildReport(options: {
   timezone: string;
   from: Date;
   to: Date;
+  /** Narrow to these Pages: a member limited to some sees only theirs. */
+  targetIds?: string[];
 }): Promise<Report> {
   const published = await prisma.postTarget.findMany({
     where: {
       status: PostTargetStatus.published,
       publishedAt: { gte: options.from, lte: options.to },
       post: { workspaceId: options.workspaceId },
+      ...(options.targetIds ? { targetId: { in: options.targetIds } } : {}),
     },
     include: {
       target: { select: { id: true, name: true, type: true, pictureUrl: true } },

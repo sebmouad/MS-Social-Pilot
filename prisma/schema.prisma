@@ -104,11 +104,11 @@ enum AiGenerationKind {
 // ---------------------------------------------------------------------------
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  passwordHash String
-  locale       Locale   @default(en)
+  id                    String   @id @default(cuid())
+  email                 String   @unique
+  name                  String
+  passwordHash          String
+  locale                Locale   @default(en)
   /// Which workspace to open on sign-in. Not a security boundary — membership
   /// is always re-checked — just a convenience.
   lastActiveWorkspaceId String?
@@ -117,19 +117,19 @@ model User {
   /// Deliberately not derived from workspace roles: anyone who registers gets
   /// a workspace of their own to own, so "owner somewhere" admits everybody.
   /// Set for the first account only, under a lock — see `registerUser`.
-  isInstanceOwner Boolean @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isInstanceOwner       Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  memberships       Membership[]
-  sessions          Session[]
-  posts             Post[]
-  submittedPosts    Post[]         @relation("PostSubmitter")
-  reviewedPosts     Post[]         @relation("PostReviewer")
-  sentInvitations   Invitation[]   @relation("InvitationSender")
+  memberships          Membership[]
+  sessions             Session[]
+  posts                Post[]
+  submittedPosts       Post[]                @relation("PostSubmitter")
+  reviewedPosts        Post[]                @relation("PostReviewer")
+  sentInvitations      Invitation[]          @relation("InvitationSender")
   notificationSettings NotificationSetting[]
-  aiGenerations     AiGeneration[]
-  settingChanges    AppSetting[]
+  aiGenerations        AiGeneration[]
+  settingChanges       AppSetting[]
 
   @@map("users")
 }
@@ -150,18 +150,22 @@ model Session {
 
 /// One client or brand. An agency has several; a single business has one.
 model Workspace {
-  id       String @id @default(cuid())
-  name     String
-  slug     String @unique
-  timezone String @default("UTC")
+  id            String @id @default(cuid())
+  name          String
+  slug          String @unique
+  timezone      String @default("UTC")
   defaultLocale Locale @default(en)
 
   /// Turns the approval workflow on for this client.
   requiresApproval Boolean @default(false)
 
   // Light branding, used on client-facing reports.
-  logoUrl     String?
-  accentColor String?
+  logoUrl        String?
+  accentColor    String?
+  /// Report cover and footer, typed once and printed on every report.
+  reportTitle    String?
+  reportSubtitle String?
+  reportFooter   String?
 
   // Link tagging defaults, applied at publish time.
   utmSource           String?
@@ -183,6 +187,8 @@ model Workspace {
   posts                Post[]
   media                Media[]
   queueSlots           QueueSlot[]
+  pageGroups           PageGroup[]
+  labels               Label[]
   activityLogs         ActivityLog[]
   invitations          Invitation[]
   feedSources          FeedSource[]
@@ -201,10 +207,14 @@ model Membership {
   userId      String
   workspaceId String
   role        WorkspaceRole @default(contributor)
+  /// False once an admin has limited this member to the Pages in `pages`.
+  /// Owners and admins always see every Page, whatever this says.
+  allPages    Boolean       @default(true)
   createdAt   DateTime      @default(now())
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pages     MemberPageAccess[]
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])
@@ -214,16 +224,16 @@ model Membership {
 /// A pending invitation to join a workspace. The token is stored hashed, like
 /// sessions, so a database dump cannot be used to join someone's workspace.
 model Invitation {
-  id          String        @id @default(cuid())
-  workspaceId String
-  email       String
-  role        WorkspaceRole @default(contributor)
-  tokenHash   String        @unique
-  invitedById String
-  expiresAt   DateTime
-  acceptedAt  DateTime?
+  id               String        @id @default(cuid())
+  workspaceId      String
+  email            String
+  role             WorkspaceRole @default(contributor)
+  tokenHash        String        @unique
+  invitedById      String
+  expiresAt        DateTime
+  acceptedAt       DateTime?
   acceptedByUserId String?
-  createdAt   DateTime      @default(now())
+  createdAt        DateTime      @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   invitedBy User      @relation("InvitationSender", fields: [invitedById], references: [id])
@@ -242,23 +252,23 @@ model Invitation {
 /// A connected Facebook user. Holds the long-lived *user* access token, which
 /// is what page tokens and group posting are derived from. Encrypted at rest.
 model SocialAccount {
-  id             String    @id @default(cuid())
-  workspaceId    String
-  provider       String    @default("facebook")
-  providerUserId String
-  name           String
-  pictureUrl     String?
-  accessToken    String
-  tokenExpiresAt DateTime?
-  scopes         String    @default("")
-  invalidatedAt  DateTime?
-  invalidReason  String?
-  lastSyncedAt   DateTime?
+  id                  String    @id @default(cuid())
+  workspaceId         String
+  provider            String    @default("facebook")
+  providerUserId      String
+  name                String
+  pictureUrl          String?
+  accessToken         String
+  tokenExpiresAt      DateTime?
+  scopes              String    @default("")
+  invalidatedAt       DateTime?
+  invalidReason       String?
+  lastSyncedAt        DateTime?
   /// Set when an expiry warning has been emailed, so the daily job warns once
   /// per token rather than every day until it dies.
   expiryWarningSentAt DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   targets           Target[]
@@ -272,43 +282,44 @@ model SocialAccount {
 
 /// A destination: a Facebook Page or Group.
 model Target {
-  id          String @id @default(cuid())
-  workspaceId String
+  id              String     @id @default(cuid())
+  workspaceId     String
   /// Nullable so disconnecting an account can drop the credentials without
   /// cascading away published-post history.
   socialAccountId String?
-  type        TargetType
-  providerId  String
-  name        String
-  pictureUrl  String?
-  category    String?
-  accessToken String?
-  enabled     Boolean @default(true)
-  canPublish  Boolean @default(true)
-  publishBlocker String?
-  lastSyncedAt   DateTime?
+  type            TargetType
+  providerId      String
+  name            String
+  pictureUrl      String?
+  category        String?
+  accessToken     String?
+  enabled         Boolean    @default(true)
+  canPublish      Boolean    @default(true)
+  publishBlocker  String?
+  lastSyncedAt    DateTime?
 
   // Read straight off the Page object: no insights permission, no date range.
-  fanCount           Int?
-  followersCount     Int?
-  talkingAboutCount  Int?
-  profileSyncedAt    DateTime?
+  fanCount          Int?
+  followersCount    Int?
+  talkingAboutCount Int?
+  profileSyncedAt   DateTime?
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  socialAccount SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
-  postTargets   PostTarget[]
-  insights      PageInsight[]
-  availability  MetricAvailability[]
-  reviews           PageReview[]
-  conversations     Conversation[]
-  externalPosts     ExternalPost[]
-  videos            PageVideo[]
-  instagramAccounts InstagramAccount[]
-
-  @@unique([workspaceId, providerId])
+  workspace          Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  socialAccount      SocialAccount?       @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  postTargets        PostTarget[]
+  groups             PageGroupTarget[]
+  memberAccess       MemberPageAccess[]
+  queueSlots         QueueSlot[]
+  insights           PageInsight[]
+  availability       MetricAvailability[]
+  reviews            PageReview[]
+  conversations      Conversation[]
+  externalPosts      ExternalPost[]
+  videos             PageVideo[]
+  instagramAccounts  InstagramAccount[]
   /// Why publishing is blocked, as a code the interface can translate. The
   /// sentence in `publishBlocker` stays as the fallback.
   publishBlockerCode String?
@@ -318,6 +329,7 @@ model Target {
   /// syncs and the average is partial until this is true.
   reviewsBackfilled Boolean @default(false)
 
+  @@unique([workspaceId, providerId])
   @@index([socialAccountId])
   @@map("targets")
 }
@@ -327,22 +339,25 @@ model Target {
 // ---------------------------------------------------------------------------
 
 model Post {
-  id          String  @id @default(cuid())
-  workspaceId String
-  authorId    String
-  message     String  @default("")
+  id                       String   @id @default(cuid())
+  workspaceId              String
+  authorId                 String
+  message                  String   @default("")
   /// Posted as the Page under the post the moment it goes out: where a link,
   /// hashtags or a call to action go without crowding the post itself.
-  firstComment String?
-  link        String?
+  firstComment             String?
+  /// Minutes to wait after the post goes out before the first comment does.
+  /// Zero posts it straight away.
+  firstCommentDelayMinutes Int      @default(0)
+  link                     String?
   /// Cached Open Graph metadata for `link`.
-  linkPreview Json?
+  linkPreview              Json?
   /// Every media id and storage key this post references, flattened out of
   /// `media` so "which posts use this file?" is an indexed lookup rather than a
   /// scan of every post's Json.
-  mediaKeys   String[] @default([])
+  mediaKeys                String[] @default([])
   /// Ordered attachments (PostMedia[]).
-  media       Json    @default("[]")
+  media                    Json     @default("[]")
 
   status      PostStatus  @default(draft)
   publishMode PublishMode @default(worker)
@@ -361,28 +376,29 @@ model Post {
   // --- Evergreen recycling ---
   /// Alternate wordings, rotated between repeats. Facebook rejects identical
   /// repeated content with error 506, so recycling without variants fails.
-  variants          Json    @default("[]")
-  recycleEnabled    Boolean @default(false)
-  recycleEveryDays  Int?
-  recycleLimit      Int?
-  recycleCount      Int     @default(0)
-  recycleNextAt     DateTime?
+  variants         Json      @default("[]")
+  recycleEnabled   Boolean   @default(false)
+  recycleEveryDays Int?
+  recycleLimit     Int?
+  recycleCount     Int       @default(0)
+  recycleNextAt    DateTime?
   /// Set on a recycled copy, pointing at the post it was cloned from.
-  originPostId      String?
+  originPostId     String?
 
   /// Set when this post was created from an RSS item.
-  sourceFeedItemId  String?
+  sourceFeedItemId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  author    User         @relation(fields: [authorId], references: [id])
-  submitter User?        @relation("PostSubmitter", fields: [submittedById], references: [id])
-  reviewer  User?        @relation("PostReviewer", fields: [reviewedById], references: [id])
-  targets   PostTarget[]
+  workspace  Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author     User         @relation(fields: [authorId], references: [id])
+  submitter  User?        @relation("PostSubmitter", fields: [submittedById], references: [id])
+  reviewer   User?        @relation("PostReviewer", fields: [reviewedById], references: [id])
+  targets    PostTarget[]
   shortLinks ShortLink[]
-  feedItem  FeedItem?    @relation(fields: [sourceFeedItemId], references: [id])
+  labels     PostLabel[]
+  feedItem   FeedItem?    @relation(fields: [sourceFeedItemId], references: [id])
 
   @@index([workspaceId, status])
   @@index([mediaKeys], type: Gin)
@@ -446,20 +462,20 @@ model PostTarget {
 }
 
 model Media {
-  id          String          @id @default(cuid())
-  workspaceId String
-  filename    String
-  mimeType    String
-  size        Int
-  kind        MediaKind
+  id              String          @id @default(cuid())
+  workspaceId     String
+  filename        String
+  mimeType        String
+  size            Int
+  kind            MediaKind
   storageProvider StorageProvider @default(local)
   /// Path within the storage backend, or null for externally hosted media.
-  storageKey  String?
-  checksum    String?
-  url         String
-  width       Int?
-  height      Int?
-  createdAt   DateTime        @default(now())
+  storageKey      String?
+  checksum        String?
+  url             String
+  width           Int?
+  height          Int?
+  createdAt       DateTime        @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
@@ -472,6 +488,8 @@ model Media {
 model QueueSlot {
   id          String   @id @default(cuid())
   workspaceId String
+  /// The Page this time belongs to; null for a time every Page shares.
+  targetId    String?
   /// 0 = Sunday … 6 = Saturday.
   dayOfWeek   Int
   hour        Int
@@ -479,10 +497,82 @@ model QueueSlot {
   createdAt   DateTime @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  target    Target?   @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
-  @@unique([workspaceId, dayOfWeek, hour, minute])
+  @@unique([workspaceId, targetId, dayOfWeek, hour, minute])
   @@index([workspaceId])
+  @@index([targetId])
   @@map("queue_slots")
+}
+
+/// A named set of Pages — a client, a brand, a country — used to pick, filter
+/// and report on several Pages at once. A Page can be in any number of them.
+model PageGroup {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  /// One of the palette keys in `src/lib/page-groups.ts`.
+  color       String   @default("blue")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pages     PageGroupTarget[]
+
+  @@unique([workspaceId, name])
+  @@map("page_groups")
+}
+
+model PageGroupTarget {
+  groupId  String
+  targetId String
+
+  group  PageGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  target Target    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, targetId])
+  @@index([targetId])
+  @@map("page_group_targets")
+}
+
+/// The Pages a member limited by `Membership.allPages = false` may work on.
+model MemberPageAccess {
+  membershipId String
+  targetId     String
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  target     Target     @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@id([membershipId, targetId])
+  @@index([targetId])
+  @@map("member_page_access")
+}
+
+/// A tag on posts — campaign, client, theme — for filtering and reporting.
+model Label {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String   @default("blue")
+  createdAt   DateTime @default(now())
+
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  posts     PostLabel[]
+
+  @@unique([workspaceId, name])
+  @@map("labels")
+}
+
+model PostLabel {
+  postId  String
+  labelId String
+
+  post  Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([postId, labelId])
+  @@index([labelId])
+  @@map("post_labels")
 }
 
 // ---------------------------------------------------------------------------
@@ -490,28 +580,28 @@ model QueueSlot {
 // ---------------------------------------------------------------------------
 
 model FeedSource {
-  id          String  @id @default(cuid())
-  workspaceId String
-  name        String
-  url         String
-  enabled     Boolean @default(true)
+  id              String      @id @default(cuid())
+  workspaceId     String
+  name            String
+  url             String
+  enabled         Boolean     @default(true)
   /// Supports {{title}}, {{link}}, {{description}}.
-  messageTemplate String @default("{{title}}\n\n{{link}}")
+  messageTemplate String      @default("{{title}}\n\n{{link}}")
   /// Target ids to publish new items to (string[]).
-  targetIds   Json    @default("[]")
-  publishMode PublishMode @default(worker)
+  targetIds       Json        @default("[]")
+  publishMode     PublishMode @default(worker)
   /// When false, new items land in the approval queue instead of scheduling.
-  autoApprove Boolean @default(true)
+  autoApprove     Boolean     @default(true)
 
   // Conditional-request state, so polling is cheap and polite.
-  lastPolledAt   DateTime?
-  lastEtag       String?
-  lastModified   String?
+  lastPolledAt DateTime?
+  lastEtag     String?
+  lastModified String?
   /// Items published before this are ignored — stops a new subscription from
   /// dumping the feed's whole archive into the queue.
-  ingestFrom     DateTime  @default(now())
+  ingestFrom   DateTime  @default(now())
 
-  pollErrorCount Int     @default(0)
+  pollErrorCount Int      @default(0)
   lastError      String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -525,14 +615,14 @@ model FeedSource {
 }
 
 model FeedItem {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   feedSourceId String
   /// Feed-provided guid, falling back to the canonical URL.
   guid         String
   url          String?
   title        String?
   publishedAt  DateTime?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   feedSource FeedSource @relation(fields: [feedSourceId], references: [id], onDelete: Cascade)
   posts      Post[]
@@ -610,13 +700,13 @@ model AiGeneration {
 
 /// Per user per workspace, so an agency owner is not emailed about every client.
 model NotificationSetting {
-  id          String  @id @default(cuid())
+  id          String @id @default(cuid())
   userId      String
   workspaceId String
 
-  onPublishFailure  Boolean @default(true)
-  onTokenExpiry     Boolean @default(true)
-  onApprovalRequest Boolean @default(true)
+  onPublishFailure   Boolean @default(true)
+  onTokenExpiry      Boolean @default(true)
+  onApprovalRequest  Boolean @default(true)
   onApprovalDecision Boolean @default(true)
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -650,16 +740,16 @@ model EmailLog {
 /// versions, so anything we want to keep must be copied out. The unique key
 /// makes re-fetching the same window idempotent.
 model PageInsight {
-  id       String @id @default(cuid())
-  targetId String
-  metric   String
-  period   String
+  id        String   @id @default(cuid())
+  targetId  String
+  metric    String
+  period    String
   /// End of the window this value covers.
-  endTime  DateTime
+  endTime   DateTime
   /// A number, or a breakdown map for metrics like page_fans_country.
-  value    Json
+  value     Json
   /// Null for breakdowns, where a single figure has no meaning.
-  numeric  Float?
+  numeric   Float?
   fetchedAt DateTime @default(now())
 
   target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
@@ -724,16 +814,16 @@ model PostComment {
 
 /// A star rating or recommendation left on a Page.
 model PageReview {
-  id           String   @id @default(cuid())
-  targetId     String
-  remoteId     String
-  reviewerName String?
-  rating       Int?
+  id                 String   @id @default(cuid())
+  targetId           String
+  remoteId           String
+  reviewerName       String?
+  rating             Int?
   /// Newer Pages expose a recommendation type instead of stars.
   recommendationType String?
-  reviewText   String?
-  createdTime  DateTime
-  fetchedAt    DateTime @default(now())
+  reviewText         String?
+  createdTime        DateTime
+  fetchedAt          DateTime @default(now())
 
   target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
@@ -784,20 +874,20 @@ model ConversationMessage {
 /// Without these, every report understates the Page: someone posting from the
 /// Facebook app directly is invisible to us otherwise.
 model ExternalPost {
-  id          String   @id @default(cuid())
-  targetId    String
-  remoteId    String
-  message     String?
-  permalink   String?
-  statusType  String?
+  id               String    @id @default(cuid())
+  targetId         String
+  remoteId         String
+  message          String?
+  permalink        String?
+  statusType       String?
   /// Facebook's full_picture: the image the post shows in the feed. A CDN
   /// address that expires, refreshed on every sync.
-  pictureUrl  String?
-  createdTime DateTime
+  pictureUrl       String?
+  createdTime      DateTime
   /// Whatever the post-level catalogue returned for it (PostInsights).
-  insights    Json?
+  insights         Json?
   insightsSyncedAt DateTime?
-  fetchedAt   DateTime @default(now())
+  fetchedAt        DateTime  @default(now())
 
   target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
@@ -812,19 +902,19 @@ model ExternalPost {
 /// object and several posts, and only the video object holds the combined
 /// figures.
 model PageVideo {
-  id          String   @id @default(cuid())
-  targetId    String
-  remoteId    String
-  title       String?
-  description String?
-  permalink   String?
-  thumbnailUrl String?
-  lengthSeconds Float?
-  createdTime DateTime
+  id               String    @id @default(cuid())
+  targetId         String
+  remoteId         String
+  title            String?
+  description      String?
+  permalink        String?
+  thumbnailUrl     String?
+  lengthSeconds    Float?
+  createdTime      DateTime
   /// Metric name to number, or to a breakdown map.
-  insights    Json?
+  insights         Json?
   insightsSyncedAt DateTime?
-  fetchedAt   DateTime @default(now())
+  fetchedAt        DateTime  @default(now())
 
   target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
@@ -868,22 +958,22 @@ model InstagramAccount {
 }
 
 model InstagramMedia {
-  id            String   @id @default(cuid())
-  accountId     String
-  remoteId      String
-  caption       String?
-  mediaType     String?
+  id               String    @id @default(cuid())
+  accountId        String
+  remoteId         String
+  caption          String?
+  mediaType        String?
   mediaProductType String?
-  mediaUrl      String?
-  permalink     String?
-  thumbnailUrl  String?
-  timestamp     DateTime
-  likeCount     Int?
-  commentsCount Int?
+  mediaUrl         String?
+  permalink        String?
+  thumbnailUrl     String?
+  timestamp        DateTime
+  likeCount        Int?
+  commentsCount    Int?
   /// Per-media insights, metric name to value.
-  insights      Json?
+  insights         Json?
   insightsSyncedAt DateTime?
-  fetchedAt     DateTime @default(now())
+  fetchedAt        DateTime  @default(now())
 
   account InstagramAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -978,11 +1068,11 @@ model AdInsight {
 /// `Json` because the registry types each key (string, number, boolean, list);
 /// storing everything as text would push parsing into every read.
 model AppSetting {
-  key       String   @id
-  value     Json
+  key         String   @id
+  value       Json
   /// True when `value` holds a ciphertext rather than the value itself.
-  encrypted Boolean  @default(false)
-  updatedAt DateTime @updatedAt
+  encrypted   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
   updatedById String?
 
   updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)

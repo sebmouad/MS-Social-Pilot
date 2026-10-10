@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
+import { assertPageParam } from '@/lib/page-access';
 import { prisma } from '@/lib/prisma';
 import {
   canRefreshAnalytics,
@@ -31,6 +32,7 @@ async function loadTarget(targetId: string, workspaceId: string) {
 export const GET = route(async (request: Request, context: Context) => {
   const auth = await requireAuth();
   const { targetId } = await context.params;
+  assertPageParam(auth.pageScope, targetId);
   const url = new URL(request.url);
 
   const target = await loadTarget(targetId, auth.workspace.id);
@@ -90,6 +92,7 @@ const postSchema = z.object({
 export const POST = route(async (request: Request, context: Context) => {
   const auth = await requireAuth();
   const { targetId } = await context.params;
+  assertPageParam(auth.pageScope, targetId);
   if (!canRefreshAnalytics(auth.role)) throw errors.noPermission();
 
   const target = await loadTarget(targetId, auth.workspace.id);

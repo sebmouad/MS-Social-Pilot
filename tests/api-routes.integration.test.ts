@@ -47,6 +47,9 @@ const VALID_BODY: Record<string, unknown> = {
   'queue-slots': { slots: [{ dayOfWeek: 1, hour: 9, minute: 0 }] },
   'connections/instagram/[id]': { enabled: false },
   'connections/ads/[id]': { enabled: false },
+  'page-groups': { name: 'Client A' },
+  'page-groups/[id]': { name: 'Client B' },
+  'labels/[id]': { name: 'Renamed' },
 };
 
 /** Route path → the params a dynamic segment needs, so the handler can run. */
@@ -199,6 +202,13 @@ const CONTRIBUTOR_MUST_NOT: Array<[Method, string]> = [
   ['DELETE', 'connections/instagram/[id]'],
   ['PATCH', 'connections/ads/[id]'],
   ['DELETE', 'connections/ads/[id]'],
+  // How the Pages are grouped is the workspace's arrangement, not a post's.
+  ['POST', 'page-groups'],
+  ['PATCH', 'page-groups/[id]'],
+  ['DELETE', 'page-groups/[id]'],
+  // Renaming or deleting a label changes it on everybody's posts.
+  ['PATCH', 'labels/[id]'],
+  ['DELETE', 'labels/[id]'],
 ];
 
 describe('a signed-in contributor', () => {

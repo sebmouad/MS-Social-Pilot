@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { TargetType } from '@prisma/client';
 
 import { requireAuth } from '@/lib/auth';
+import { assertPageParam } from '@/lib/page-access';
 import { prisma } from '@/lib/prisma';
 import { errors } from '@/lib/errors';
 import { analysePage } from '@/lib/page-analysis-data';
@@ -42,6 +43,7 @@ async function pageFor(workspaceId: string, targetId: string) {
 export const GET = route(async (request: Request) => {
   const auth = await requireAuth();
   const url = new URL(request.url);
+  assertPageParam(auth.pageScope, url.searchParams.get('targetId'));
   if (url.searchParams.get('status') === '1') {
     const page = await pageFor(auth.workspace.id, url.searchParams.get('targetId') ?? '');
     return ok(refreshState(refreshKey(auth.workspace.id, page.id)));
@@ -73,6 +75,7 @@ export const GET = route(async (request: Request) => {
 export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
   const input = querySchema.parse(await readJson(request));
+  assertPageParam(auth.pageScope, input.targetId);
   const page = await pageFor(auth.workspace.id, input.targetId);
 
   const state = startRefresh(refreshKey(auth.workspace.id, page.id), () =>

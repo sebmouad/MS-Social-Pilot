@@ -3,15 +3,20 @@ import { WorkspaceRole } from '@prisma/client';
 
 import { requireCapability } from '@/lib/auth';
 import { canManageTeam } from '@/lib/constants';
-import { changeRole, removeMember, revokeInvitation } from '@/lib/team';
+import { changeRole, removeMember, revokeInvitation, setPageAccess } from '@/lib/team';
 import { ok, readJson, route } from '@/lib/api';
 
-const patchSchema = z.object({ role: z.nativeEnum(WorkspaceRole) });
+const patchSchema = z.union([
+  z.object({ role: z.nativeEnum(WorkspaceRole) }),
+  z.object({
+    pages: z.object({ all: z.boolean(), targetIds: z.array(z.string().min(1)).max(500).default([]) }),
+  }),
+]);
 
 type Context = { params: Promise<{ id: string }> };
 
 /**
- * Change a member's role. `id` is the user id.
+ * Change a member's role, or the Pages they may work on. `id` is the user id.
  *
  * The caller's own role goes down with the request: `canManageTeam` lets admins
  * in, and an admin creating an owner would be handing themselves the
@@ -20,9 +25,13 @@ type Context = { params: Promise<{ id: string }> };
 export const PATCH = route(async (request: Request, context: Context) => {
   const auth = await requireCapability(canManageTeam);
   const { id } = await context.params;
-  const { role } = patchSchema.parse(await readJson(request));
+  const input = patchSchema.parse(await readJson(request));
 
-  await changeRole(auth.workspace.id, id, role, auth.role);
+  if ('pages' in input) {
+    await setPageAccess(auth.workspace.id, id, input.pages, auth.role);
+  } else {
+    await changeRole(auth.workspace.id, id, input.role, auth.role);
+  }
   return ok({ ok: true });
 });
 

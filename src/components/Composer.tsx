@@ -10,6 +10,10 @@ import { ExternalLink } from './ExternalLink';
 import { AiAssist } from './AiAssist';
 import { Icon } from './Icon';
 import { PostPreview } from './PostPreview';
+import { LabelPicker, type LabelOption } from './LabelPicker';
+import { CommentDelay } from './CommentDelay';
+import { SplitButton } from './SplitButton';
+import type { PageGroupView } from '@/lib/page-groups';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 import { LIMITS } from '@/lib/constants';
 import { countCharacters } from '@/lib/text';
@@ -41,12 +45,19 @@ interface Props {
   editing?: EditingPost;
   /** Destinations ticked to start with: a Page's card opens the composer for it. */
   initialTargetIds?: string[];
+  /** Page groups, for ticking several Pages in one click. */
+  groups?: PageGroupView[];
+  /** The workspace's labels. */
+  labels?: LabelOption[];
+  canEditLabels?: boolean;
 }
 
 export interface EditingPost {
   id: string;
   message: string;
   firstComment: string | null;
+  firstCommentDelayMinutes: number;
+  labelIds: string[];
   link: string | null;
   media: PostMedia[];
   targetIds: string[];
@@ -81,6 +92,8 @@ export function Composer({
   canPublishDirectly,
   editing,
   initialTargetIds,
+  groups = [],
+  labels = [],
 }: Props) {
   const t = useTranslations('compose');
   // Passed explicitly: this runs in the browser, outside the server request
@@ -93,6 +106,8 @@ export function Composer({
   const messageBox = useRef<HTMLTextAreaElement>(null);
   const commentBox = useRef<HTMLTextAreaElement>(null);
   const [firstComment, setFirstComment] = useState(editing?.firstComment ?? '');
+  const [commentDelay, setCommentDelay] = useState(editing?.firstCommentDelayMinutes ?? 0);
+  const [labelIds, setLabelIds] = useState<string[]>(editing?.labelIds ?? []);
   const linkBox = useRef<HTMLInputElement>(null);
 
   const [message, setMessage] = useState(editing?.message ?? '');
@@ -190,6 +205,8 @@ export function Composer({
   const dirty = editing
     ? message !== editing.message ||
       firstComment !== (editing.firstComment ?? '') ||
+      commentDelay !== editing.firstCommentDelayMinutes ||
+      [...labelIds].sort().join() !== [...editing.labelIds].sort().join() ||
       link !== (editing.link ?? '') ||
       mediaKey(media) !== mediaKey(editing.media) ||
       [...selected].sort().join() !== [...editing.targetIds].sort().join() ||
@@ -288,6 +305,8 @@ export function Composer({
             body: JSON.stringify({
               message,
               firstComment,
+              firstCommentDelayMinutes: commentDelay,
+              labelIds,
               link: link.trim() ? link.trim() : null,
               media,
               targetIds: selected,
@@ -302,6 +321,8 @@ export function Composer({
             body: JSON.stringify({
               message,
               firstComment,
+              firstCommentDelayMinutes: commentDelay,
+              labelIds,
               link: link.trim() ? link.trim() : null,
               media,
               targetIds: selected,
@@ -360,6 +381,8 @@ export function Composer({
       writeMessage('');
       writeLink('');
       setFirstComment('');
+      setCommentDelay(0);
+      setLabelIds([]);
       if (commentBox.current) commentBox.current.value = '';
       setPreview(null);
       setMedia([]);
@@ -411,6 +434,19 @@ export function Composer({
   const hasContent = message.trim().length > 0 || link.trim().length > 0 || media.length > 0;
   const canSubmit =
     !pending && !uploading && selected.length > 0 && hasContent && !instagramNeedsMedia;
+
+  const timingOptions: Array<{ value: Timing; short: string; label: string; description: string; disabled?: boolean; reason?: string }> = [
+    { value: 'schedule', short: t('timingSchedule'), label: t('scheduleForTime'), description: t('scheduleDescription') },
+    {
+      value: 'queue',
+      short: t('timingQueue'),
+      label: t('addToQueue'),
+      description: t('queueDescription'),
+      disabled: !hasQueueSlots,
+      reason: t('queueNotSetUp'),
+    },
+    { value: 'now', short: t('timingNow'), label: t('publishNow'), description: t('nowDescription') },
+  ];
 
   // A greyed-out button with no reason reads as broken. Say what is missing,
   // in the order someone would fix it.
@@ -471,6 +507,7 @@ export function Composer({
             <p id="first-comment-hint" className="hint">
               {t('firstCommentHint')}
             </p>
+            {firstComment.trim() && <CommentDelay value={commentDelay} onChange={setCommentDelay} />}
           </div>
 
           {/* Instagram's limit is a fifth of Facebook's and genuinely
@@ -644,7 +681,7 @@ export function Composer({
       <div className="min-w-0 space-y-6">
         <section className="card p-5">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">{t('whereToPost')}</h2>
-          <TargetPicker targets={targets} selected={selected} onChange={setSelected} />
+          <TargetPicker targets={targets} selected={selected} onChange={setSelected} groups={groups} />
           {switchedOff.length > 0 && (
             <p className="mt-2 text-xs text-amber-700">
               {t('untickSwitchedOff', { names: switchedOff.map((target) => target.name).join(', ') })}
@@ -658,34 +695,53 @@ export function Composer({
         </section>
 
         <section className="card p-5">
+          <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <Icon name="tag" size={16} className="text-slate-500" />
+            {t('labelsTitle')}
+          </h2>
+          <p className="mb-3 text-xs text-slate-500">{t('labelsHint')}</p>
+          <LabelPicker labels={labels} selected={labelIds} onChange={setLabelIds} />
+        </section>
+
+        <section className="card p-5">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">{t('whenToPost')}</h2>
 
-          <div className="space-y-2">
-            {(
-              editing
-                ? ([['schedule', t('scheduleForTime')]] as Array<[Timing, string]>)
-                : ([
-                    ['now', t('publishNow')],
-                    ['schedule', t('scheduleForTime')],
-                    ['queue', t('addToQueue')],
-                  ] as Array<[Timing, string]>)
-            ).map(([value, label]) => (
-              <label key={value} className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="radio"
-                  name="timing"
-                  className="h-4 w-4 border-slate-300 text-brand-500 focus:ring-brand-500"
-                  checked={timing === value}
-                  disabled={value === 'queue' && !hasQueueSlots}
-                  onChange={() => setTiming(value)}
-                />
-                {label}
-                {value === 'queue' && !hasQueueSlots && (
-                  <span className="text-xs text-slate-400">{t('queueNotSetUp')}</span>
-                )}
-              </label>
-            ))}
-          </div>
+          {/* Three ways to send it, one at a time. The same choice sits behind
+              the arrow of the button at the bottom, which says what it will do. */}
+          {editing ? (
+            <p className="text-sm text-slate-600">{t('scheduleForTime')}</p>
+          ) : (
+            <div className="segmented w-full" role="radiogroup" aria-label={t('whenToPost')}>
+              {timingOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={timing === option.value}
+                  disabled={option.disabled}
+                  title={option.disabled ? option.reason : undefined}
+                  className={`segmented-item flex-1 disabled:cursor-not-allowed disabled:opacity-50 ${
+                    timing === option.value ? 'segmented-item-active' : ''
+                  }`}
+                  onClick={() => setTiming(option.value)}
+                >
+                  {option.short}
+                </button>
+              ))}
+            </div>
+          )}
+          {!editing && timing === 'queue' && (
+            <p className="mt-3 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+              <Icon name="clock" size={15} className="mt-px shrink-0 text-slate-400" />
+              {t('queueExplain')}
+            </p>
+          )}
+          {!editing && timing === 'now' && (
+            <p className="mt-3 flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+              <Icon name="sparkles" size={15} className="mt-px shrink-0 text-slate-400" />
+              {needsApproval ? t('nowNeedsApproval') : t('nowExplain')}
+            </p>
+          )}
 
           {timing === 'schedule' && (
             <div className="mt-4">
@@ -823,26 +879,42 @@ export function Composer({
 
         <div>
           <div className="flex gap-2">
-            <button
-              type="button"
-              className="btn-primary flex-1"
-              disabled={!canSubmit}
-              aria-describedby={blocker ? 'submit-blocker' : undefined}
-              onClick={() => submit(false)}
-            >
-              {pending
-                ? tCommon('working')
-                : editing
-                  ? t('saveChanges')
-                  : needsApproval
-                    ? t('submitForApproval')
-                    : timing === 'now'
-                      ? t('publishNow')
-                      : t('schedule')}
-            </button>
             <button type="button" className="btn-secondary" disabled={pending || uploading} onClick={() => submit(true)}>
               {editing ? t('moveToDrafts') : t('saveDraft')}
             </button>
+            {editing ? (
+              <button
+                type="button"
+                className="btn-primary flex-1"
+                disabled={!canSubmit}
+                aria-describedby={blocker ? 'submit-blocker' : undefined}
+                onClick={() => submit(false)}
+              >
+                {pending ? tCommon('working') : t('saveChanges')}
+              </button>
+            ) : (
+              <SplitButton
+                value={timing}
+                options={timingOptions}
+                onChoose={setTiming}
+                onClick={() => submit(false)}
+                disabled={!canSubmit}
+                describedBy={blocker ? 'submit-blocker' : undefined}
+                menuLabel={t('otherWays')}
+                icon={<Icon name={timing === 'now' ? 'sparkles' : timing === 'queue' ? 'clock' : 'calendar'} size={16} />}
+                label={
+                  pending
+                    ? tCommon('working')
+                    : needsApproval
+                      ? t('submitForApproval')
+                      : timing === 'now'
+                        ? t('publishNow')
+                        : timing === 'queue'
+                          ? t('addToQueue')
+                          : t('schedule')
+                }
+              />
+            )}
           </div>
           {blocker && (
             <p id="submit-blocker" className="hint">

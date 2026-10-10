@@ -23,6 +23,7 @@ export const GET = route(async (request: Request) => {
     timezone: auth.workspace.timezone,
     from,
     to,
+    ...(auth.pageScope.all ? {} : { targetIds: auth.pageScope.ids }),
   });
 
   if (url.searchParams.get('format') === 'csv') {

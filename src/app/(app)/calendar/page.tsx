@@ -2,7 +2,12 @@ import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import { requirePage } from '@/lib/auth';
-import { canManageOthersPosts, postIsEditable } from '@/lib/constants';
+import { loadPageFilter } from '@/lib/page-filter';
+import { listLabels } from '@/lib/page-groups';
+import { paletteOf } from '@/lib/palette';
+import { PagesSidebar } from '@/components/PagesSidebar';
+import { LabelFilter } from '@/components/LabelFilter';
+import { canManageOthersPosts, canManageSettings, postIsEditable } from '@/lib/constants';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { formatInZone, monthGrid } from '@/lib/time';
@@ -81,6 +86,14 @@ export default async function CalendarPage({
   const safeYear = Number.isFinite(year) ? year : today.getUTCFullYear();
   const safeMonth = Number.isFinite(monthIndex) && monthIndex >= 0 && monthIndex <= 11 ? monthIndex : today.getUTCMonth();
 
+  const [filter, labels] = await Promise.all([loadPageFilter(auth, params), listLabels(auth.workspace.id)]);
+  const labelParam = Array.isArray(params.label) ? params.label[0] : params.label;
+  const activeLabel = labels.find((label) => label.id === labelParam) ?? null;
+  const narrowing = {
+    ...filter.postWhere,
+    ...(activeLabel ? { labels: { some: { labelId: activeLabel.id } } } : {}),
+  };
+
   const days = monthGrid(safeYear, safeMonth, timezone);
   const gridStart = days[0]!;
   const gridEnd = new Date(days[days.length - 1]!.getTime() + 24 * 60 * 60 * 1000);
@@ -91,14 +104,18 @@ export default async function CalendarPage({
         workspaceId: auth.workspace.id,
         scheduledAt: { gte: gridStart, lt: gridEnd },
         status: { not: 'cancelled' },
+        ...narrowing,
       },
-      include: { targets: { include: { target: { select: { name: true, pictureUrl: true } } } } },
+      include: {
+        targets: { include: { target: { select: { name: true, pictureUrl: true } } } },
+        labels: { select: { labelId: true } },
+      },
       orderBy: { scheduledAt: 'asc' },
     }),
     // A draft saved without a time has no square to sit on, so a calendar of
     // only dated posts hid exactly the work that still needs a date.
     prisma.post.findMany({
-      where: { workspaceId: auth.workspace.id, status: 'draft', scheduledAt: null },
+      where: { workspaceId: auth.workspace.id, status: 'draft', scheduledAt: null, ...narrowing },
       include: { targets: { select: { status: true } } },
       orderBy: { createdAt: 'desc' },
       take: DRAFT_LIMIT,
@@ -146,8 +163,16 @@ export default async function CalendarPage({
   // "New post on this day" starts at nine in the morning; today it keeps the
   // composer's own default of an hour from now.
   const newPostHref = (key: string) => (key === todayKey ? '/compose' : `/compose?at=${key}T09:00`);
+  // Moving through the months keeps the Pages and the label being looked at.
+  const keep = new URLSearchParams();
+  for (const key of ['group', 'pages', 'label']) {
+    const value = Array.isArray(params[key]) ? params[key][0] : params[key];
+    if (value) keep.set(key, value);
+  }
+  const kept = keep.toString();
   const monthHref = (date: Date) =>
-    `/calendar?month=${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+    `/calendar?month=${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}${kept ? `&${kept}` : ''}`;
+  const labelById = new Map(labels.map((label) => [label.id, label]));
 
   // The month at a glance, above the grid: what is planned and what went out.
   const inMonthPosts = posts.filter(
@@ -159,7 +184,15 @@ export default async function CalendarPage({
   })).filter((entry) => entry.count > 0);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+      <PagesSidebar
+        pages={filter.pages}
+        groups={filter.groups}
+        group={filter.group}
+        visible={filter.visible}
+        canManageGroups={canManageSettings(auth.role)}
+      />
+    <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold capitalize text-slate-900">{monthLabel}</h1>
@@ -168,7 +201,8 @@ export default async function CalendarPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/calendar" className="btn-secondary">
+          <LabelFilter labels={labels} active={activeLabel?.id ?? null} />
+          <Link href={kept ? `/calendar?${kept}` : '/calendar'} className="btn-secondary">
             {t('today')}
           </Link>
           <Link
@@ -292,6 +326,20 @@ export default async function CalendarPage({
                           <span className="sr-only">
                             <StatusBadge status={post.status} />
                           </span>
+                          {post.labels.length > 0 && (
+                            <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                              {post.labels.slice(0, 3).map((row) => {
+                                const label = labelById.get(row.labelId);
+                                return label ? (
+                                  <span
+                                    key={row.labelId}
+                                    title={label.name}
+                                    className={`h-2 w-2 rounded-full ${paletteOf(label.color).dot}`}
+                                  />
+                                ) : null;
+                              })}
+                            </span>
+                          )}
                         </span>
                         {/* The planner's chip: the photo beside the opening words,
                             as Meta Business Suite draws a planned post. */}
@@ -363,6 +411,7 @@ export default async function CalendarPage({
           </ul>
         </section>
       )}
+    </div>
     </div>
   );
 }

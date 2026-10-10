@@ -6,12 +6,23 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import { Icon } from './Icon';
-import { FeedPost, type FeedLinkPreview, type FeedMedia } from './FeedPost';
+import { FeedAvatar, FeedPost, type FeedLinkPreview, type FeedMedia } from './FeedPost';
 
 interface Slot {
   dayOfWeek: number;
   hour: number;
   minute: number;
+  /** One Page's own time, rather than one every Page shares. */
+  own?: boolean;
+}
+
+interface Scope {
+  /** Null for the timetable every Page shares. */
+  id: string | null;
+  name: string;
+  pictureUrl: string | null;
+  /** Times of its own. */
+  own: number;
 }
 
 interface Suggestion extends Slot {
@@ -50,6 +61,8 @@ const ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 export function QueueClient({
   canManage,
+  scope,
+  scopes,
   slots: initial,
   suggestions,
   upcoming,
@@ -58,6 +71,9 @@ export function QueueClient({
   pageCount,
 }: {
   canManage: boolean;
+  /** The Page whose timetable is open, or null for the shared one. */
+  scope: { id: string; name: string } | null;
+  scopes: Scope[];
   slots: Slot[];
   suggestions: Suggestion[];
   upcoming: Upcoming[];
@@ -76,13 +92,20 @@ export function QueueClient({
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
+  // On a Page's timetable only its own times are changed here; the shared
+  // ones are shown beside them, and edited on the shared timetable.
+  const editable = (slot: Slot) => (scope ? slot.own === true : true);
+
   async function save(next: Slot[], message: string) {
     setPending(true);
     setStatus(null);
     const response = await fetch('/api/queue-slots', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ slots: next }),
+      body: JSON.stringify({
+        slots: next.filter(editable).map(({ dayOfWeek, hour, minute }) => ({ dayOfWeek, hour, minute })),
+        targetId: scope?.id ?? null,
+      }),
     }).catch(() => null);
     setPending(false);
 
@@ -101,7 +124,7 @@ export function QueueClient({
   const add = (slot: Slot) =>
     slots.some((existing) => same(existing, slot))
       ? setStatus({ kind: 'error', text: t('alreadyThere') })
-      : save([...slots, slot], t('added', { day: weekdays[slot.dayOfWeek] ?? '', time: time(slot) }));
+      : save([...slots, { ...slot, own: Boolean(scope) }], t('added', { day: weekdays[slot.dayOfWeek] ?? '', time: time(slot) }));
 
   const remove = (slot: Slot) =>
     save(
@@ -113,6 +136,44 @@ export function QueueClient({
 
   return (
     <div className="space-y-6">
+      {/* Whose timetable: the one every Page shares, or one Page's own. */}
+      {scopes.length > 1 && (
+        <nav aria-label={t('timetableFor')} className="card p-3">
+          <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t('timetableFor')}</p>
+          <ul className="scroll-x flex gap-2">
+            {scopes.map((entry) => {
+              const active = (scope?.id ?? null) === entry.id;
+              return (
+                <li key={entry.id ?? 'shared'} className="shrink-0">
+                  <Link
+                    href={entry.id ? `/queue?for=${entry.id}` : '/queue'}
+                    aria-current={active ? 'page' : undefined}
+                    className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3.5 text-sm font-semibold ring-1 ring-inset transition-colors ${
+                      active ? 'bg-brand-50 text-brand-700 ring-brand-300' : 'bg-white text-slate-800 ring-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {entry.id ? (
+                      <FeedAvatar name={entry.name} pictureUrl={entry.pictureUrl} size="xs" />
+                    ) : (
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                        <Icon name="folders" size={14} />
+                      </span>
+                    )}
+                    <span className="max-w-[12rem] truncate">{entry.name}</span>
+                    <span className={`nums rounded-full px-1.5 text-xs ${active ? 'bg-brand-100' : 'bg-slate-100 text-slate-600'}`}>
+                      {entry.own}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="px-1 pt-2 text-xs text-slate-500">
+            {scope ? t('ownTimesHint', { page: scope.name }) : t('sharedTimesHint')}
+          </p>
+        </nav>
+      )}
+
       {status && (
         <p
           role={status.kind === 'error' ? 'alert' : 'status'}
@@ -176,7 +237,9 @@ export function QueueClient({
 
       <section className="card p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-900">{t('weeklyTitle')}</h2>
+          <h2 className="text-sm font-semibold text-slate-900">
+            {scope ? t('weeklyTitleFor', { page: scope.name }) : t('weeklyTitle')}
+          </h2>
           <p className="text-xs text-slate-500">{t('slotCount', { count: slots.length })}</p>
         </div>
         <p className="mt-1 text-xs text-slate-500">{t('weeklyHint')}</p>
@@ -195,11 +258,17 @@ export function QueueClient({
                   <ul className="mt-2 flex flex-wrap gap-1.5 lg:flex-col">
                     {today.map((slot) => (
                       <li
-                        key={time(slot)}
-                        className="flex items-center justify-between gap-2 rounded-md bg-brand-50 px-2 py-1 text-sm text-brand-700"
+                        key={`${time(slot)}-${slot.own ? 'own' : 'shared'}`}
+                        title={scope && !slot.own ? t('sharedTime') : undefined}
+                        className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm ${
+                          editable(slot) ? 'bg-brand-50 text-brand-700' : 'bg-slate-100 text-slate-600'
+                        }`}
                       >
-                        <span className="nums">{time(slot)}</span>
-                        {canManage && (
+                        <span className="nums flex items-center gap-1">
+                          {scope && !slot.own && <Icon name="folders" size={12} className="text-slate-400" />}
+                          {time(slot)}
+                        </span>
+                        {canManage && editable(slot) && (
                           <button
                             type="button"
                             className="text-brand-400 hover:text-red-600"
@@ -319,7 +388,7 @@ export function QueueClient({
                           />
                         ) : (
                           <Link
-                            href="/compose"
+                            href={scope ? `/compose?to=${scope.id}` : '/compose'}
                             className="flex items-center gap-3 rounded-lg border-2 border-dashed border-slate-200 px-3 py-3 text-sm text-slate-600 hover:border-brand-300 hover:bg-brand-50/40 hover:text-brand-700"
                           >
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">

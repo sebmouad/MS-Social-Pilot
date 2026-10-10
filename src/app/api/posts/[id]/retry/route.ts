@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { assertPostInScope } from '@/lib/page-access';
 import { retryPost } from '@/lib/posts';
 import { ok, route } from '@/lib/api';
 
@@ -6,6 +7,7 @@ import { ok, route } from '@/lib/api';
 export const POST = route(async (_request: Request, context: { params: Promise<{ id: string }> }) => {
   const auth = await requireAuth();
   const { id } = await context.params;
+  await assertPostInScope(auth.pageScope, auth.workspace.id, id);
 
   const retried = await retryPost({ workspaceId: auth.workspace.id, userId: auth.user.id, role: auth.role }, id);
   return ok({ retried });

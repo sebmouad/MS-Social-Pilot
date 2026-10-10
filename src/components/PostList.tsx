@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { StatusBadge } from './StatusBadge';
+import { LabelChips } from './LabelChips';
 import { ExternalLink } from './ExternalLink';
 import { Icon, type IconName } from './Icon';
 import {
@@ -41,6 +42,8 @@ export interface PostView {
   results: { reach: number; reactions: number; comments: number; shares: number } | null;
   /** Why a reviewer sent it back; only set while the post is rejected. */
   reviewNote: string | null;
+  /** The post's labels, in name order. */
+  labels?: Array<{ id: string; name: string; color: string }>;
   /** The viewer wrote it, or may manage other people's posts. */
   mayAct: boolean;
   /** Its approval state lets it go out now rather than wait for a reviewer. */
@@ -228,6 +231,11 @@ export function PostList({
               </div>
               <StatusBadge status={post.status} />
             </header>
+            {post.labels && post.labels.length > 0 && (
+              <div className="px-4 pt-2">
+                <LabelChips labels={post.labels} />
+              </div>
+            )}
 
             <p
               className={`whitespace-pre-wrap px-4 py-3 [overflow-wrap:anywhere] text-slate-900 ${

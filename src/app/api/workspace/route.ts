@@ -32,6 +32,10 @@ export const PATCH = route(async (request: Request) => {
   assign('aiEnabled', input.aiEnabled);
   assign('aiTone', input.aiTone);
   assign('aiBrandVoice', input.aiBrandVoice);
+  assign('logoUrl', input.logoUrl);
+  assign('reportTitle', input.reportTitle);
+  assign('reportSubtitle', input.reportSubtitle);
+  assign('reportFooter', input.reportFooter);
 
   const workspace = await prisma.workspace.update({ where: { id: auth.workspace.id }, data });
 

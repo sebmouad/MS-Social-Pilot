@@ -128,10 +128,18 @@ const firstComment = z
   .max(8000, 'A first comment can be at most 8,000 characters.')
   .transform((value) => value.trim() || null);
 
+/** How long the first comment waits after the post: up to a week. */
+const firstCommentDelay = z.number().int().min(0).max(7 * 24 * 60);
+
+/** The labels a post carries. Ids are checked against the workspace on save. */
+const labelIds = z.array(z.string().min(1)).max(20);
+
 export const createPostSchema = z
   .object({
     message: postMessage.default(''),
     firstComment: firstComment.nullish(),
+    firstCommentDelayMinutes: firstCommentDelay.default(0),
+    labelIds: labelIds.default([]),
     link: httpUrl.nullish(),
     media: postMedia.default([]),
     targetIds: postTargetIds,
@@ -162,6 +170,8 @@ export const updatePostSchema = z
   .object({
     message: postMessage.optional(),
     firstComment: firstComment.nullish(),
+    firstCommentDelayMinutes: firstCommentDelay.optional(),
+    labelIds: labelIds.optional(),
     link: httpUrl.nullish(),
     media: postMedia.optional(),
     targetIds: postTargetIds.optional(),
@@ -198,6 +208,12 @@ export const workspaceSettingsSchema = z.object({
   aiEnabled: z.boolean().optional(),
   aiTone: z.string().trim().max(50).nullish(),
   aiBrandVoice: z.string().trim().max(2000).nullish(),
+
+  // Report branding: the logo on the cover, and the words around it.
+  logoUrl: z.union([httpUrl, z.literal('')]).nullish(),
+  reportTitle: z.string().trim().max(120).nullish(),
+  reportSubtitle: z.string().trim().max(200).nullish(),
+  reportFooter: z.string().trim().max(300).nullish(),
 });
 
 export const queueSlotsSchema = z.object({
@@ -210,6 +226,8 @@ export const queueSlotsSchema = z.object({
       }),
     )
     .max(100),
+  /** Whose timetable this is: one Page's own times, or (null) every Page's. */
+  targetId: z.string().min(1).nullish(),
 });
 
 /**
@@ -266,7 +284,12 @@ export const bulkUploadSchema = z.object({
     .default(PublishMode.worker),
 });
 
-export type CreatePostInput = z.infer<typeof createPostSchema>;
+/**
+ * The parsed post. The two P1 additions stay optional for callers that build
+ * one by hand — the CSV upload, RSS, tests — which have neither to give.
+ */
+export type CreatePostInput = Omit<z.infer<typeof createPostSchema>, 'firstCommentDelayMinutes' | 'labelIds'> &
+  Partial<Pick<z.infer<typeof createPostSchema>, 'firstCommentDelayMinutes' | 'labelIds'>>;
 export type UpdatePostInput = z.infer<typeof updatePostSchema>;
 export type BulkUploadInput = z.infer<typeof bulkUploadSchema>;
 

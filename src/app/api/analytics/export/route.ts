@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { requireAuth } from '@/lib/auth';
+import { assertPageParam } from '@/lib/page-access';
 import { prisma } from '@/lib/prisma';
 import { route } from '@/lib/api';
 import { EXPORT_KINDS, buildExport, type ExportKind } from '@/lib/analytics-export';
@@ -33,6 +34,7 @@ export const GET = route(async (request: Request) => {
   // A target id arrives from the client, so it is checked against the caller's
   // workspace before it reaches a query.
   const requestedTarget = url.searchParams.get('targetId');
+  assertPageParam(auth.pageScope, requestedTarget);
   if (requestedTarget) {
     const owned = await prisma.target.findFirst({
       where: { id: requestedTarget, workspaceId: auth.workspace.id },

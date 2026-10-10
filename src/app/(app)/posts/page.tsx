@@ -5,12 +5,16 @@ import { getTranslations } from 'next-intl/server';
 import { PostList } from '@/components/PostList';
 import { Icon } from '@/components/Icon';
 import { requirePage } from '@/lib/auth';
+import { loadPageFilter } from '@/lib/page-filter';
+import { listLabels } from '@/lib/page-groups';
+import { PagesSidebar } from '@/components/PagesSidebar';
+import { LabelFilter } from '@/components/LabelFilter';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { parseMedia, type PostInsights } from '@/lib/json';
 import { feedLinkOf, feedMediaOf } from '@/lib/feed';
 import { formatInZone } from '@/lib/time';
-import { canManageOthersPosts, canPublishWithoutApproval, postStatusFilter } from '@/lib/constants';
+import { canManageOthersPosts, canManageSettings, canPublishWithoutApproval, postStatusFilter } from '@/lib/constants';
 import { Pagination } from '@/components/Pagination';
 import { pageHref, pageNumber, paginate } from '@/lib/paging';
 
@@ -63,13 +67,12 @@ export default async function PostsPage({
   const search = (first(params.q) ?? '').trim().slice(0, MAX_SEARCH);
   const destination = first(params.target) ?? '';
 
-  // The workspace's destinations, for the filter. Every one, enabled or not:
-  // a Page that was switched off last month still has posts worth finding.
-  const destinations = await prisma.target.findMany({
-    where: { workspaceId: auth.workspace.id },
-    select: { id: true, name: true },
-    orderBy: [{ name: 'asc' }, { id: 'asc' }],
-  });
+  // Every destination this member may see, enabled or not: a Page switched
+  // off last month still has posts worth finding.
+  const [filter, labels] = await Promise.all([loadPageFilter(auth, params), listLabels(auth.workspace.id)]);
+  const labelParam = first(params.label);
+  const activeLabel = labels.find((label) => label.id === labelParam) ?? null;
+  const labelById = new Map(labels.map((label) => [label.id, label]));
 
   const where: Prisma.PostWhereInput = {
     workspaceId: auth.workspace.id,
@@ -78,6 +81,10 @@ export default async function PostsPage({
     // Still scoped by the post's workspace above, so an id from somewhere
     // else simply matches nothing rather than reaching into another client.
     ...(destination ? { targets: { some: { targetId: destination } } } : {}),
+    ...(activeLabel ? { labels: { some: { labelId: activeLabel.id } } } : {}),
+    // The sidebar's Pages, and never more than this member's own. Combined
+    // with the destination above through AND, so each can only narrow.
+    ...(Object.keys(filter.postWhere).length ? { AND: [filter.postWhere] } : {}),
   };
 
   // Counted first, so the page number can be clamped against what is actually
@@ -103,6 +110,7 @@ export default async function PostsPage({
     where,
     include: {
       targets: { include: { target: { select: { name: true, type: true, pictureUrl: true } } } },
+      labels: { select: { labelId: true } },
     },
     // `id` last, and not for tidiness: without a unique tiebreaker two posts
     // sharing a timestamp can land in a different order on each query, and
@@ -115,7 +123,7 @@ export default async function PostsPage({
   const timezone = auth.workspace.timezone;
   // Whether this person's own posts have to be reviewed before they go out.
   const needsReview = auth.workspace.requiresApproval && !canPublishWithoutApproval(auth.role);
-  const filtered = Boolean(search || destination);
+  const filtered = Boolean(search || destination || activeLabel || filter.narrowed);
 
   // Day headings, as Facebook's planner groups a schedule: today, tomorrow,
   // yesterday by name, other days by date, in the workspace's own zone.
@@ -145,7 +153,7 @@ export default async function PostsPage({
   return (
     <div className="mx-auto grid max-w-[1040px] items-start gap-6 lg:grid-cols-[280px_minmax(0,680px)] lg:justify-center">
       {/* Facebook's left menu: it stays put while the feed scrolls beside it. */}
-      <aside className="space-y-4 lg:sticky lg:top-32">
+      <aside className="space-y-4">
       <header className="flex items-center justify-between gap-3 lg:block">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{t('title')}</h1>
@@ -184,10 +192,24 @@ export default async function PostsPage({
         })}
       </nav>
 
+      <PagesSidebar
+        pages={filter.pages}
+        groups={filter.groups}
+        group={filter.group}
+        visible={filter.visible}
+        canManageGroups={canManageSettings(auth.role)}
+        inline
+      />
+
       {/* A plain GET form, so a search is a URL like every other filter here:
           it pages, bookmarks and survives a refresh. */}
       <form method="get" action="/posts" role="search" className="card flex flex-wrap items-end gap-2 p-3 lg:flex-col lg:items-stretch">
         {raw && <input type="hidden" name="status" value={raw} />}
+        {/* The other filters ride along with a search, so typing a word does
+            not throw away the Pages and the label already picked. */}
+        {['group', 'pages', 'label'].map((key) =>
+          first(params[key]) ? <input key={key} type="hidden" name={key} value={first(params[key])} /> : null,
+        )}
 
         <div className="min-w-[12rem] flex-1 lg:min-w-0">
           <label className="label" htmlFor="posts-q">
@@ -204,23 +226,6 @@ export default async function PostsPage({
           />
         </div>
 
-        {/* One destination has nothing to choose between. */}
-        {destinations.length > 1 && (
-          <div className="min-w-0 max-w-full">
-            <label className="label" htmlFor="posts-target">
-              {t('destinationFilter')}
-            </label>
-            <select id="posts-target" name="target" className="input max-w-full" defaultValue={destination}>
-              <option value="">{t('allDestinations')}</option>
-              {destinations.map((target) => (
-                <option key={target.id} value={target.id}>
-                  {target.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
         <button type="submit" className="btn-secondary">
           {tCommon('search')}
         </button>
@@ -235,6 +240,11 @@ export default async function PostsPage({
       <div className="min-w-0 space-y-4">
       {/* Facebook's "What's on your mind?": the way into a new post sits at
           the top of the feed it will join. */}
+      {labels.length > 0 && (
+        <div className="flex items-center justify-end">
+          <LabelFilter labels={labels} active={activeLabel?.id ?? null} />
+        </div>
+      )}
       <Link href="/compose" className="card flex items-center gap-3 p-3 hover:bg-slate-50">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
           <Icon name="compose" size={18} />
@@ -265,6 +275,10 @@ export default async function PostsPage({
           // Only a rejected post's note is still the reviewer's last word:
           // resubmitting clears it, and an approval never sets one.
           reviewNote: post.status === 'rejected' ? post.reviewNote : null,
+          labels: post.labels.flatMap((row) => {
+            const label = labelById.get(row.labelId);
+            return label ? [label] : [];
+          }),
           // The same ownership rule the API applies to edit, cancel, retry,
           // publish and submit, so none of those buttons is a dead end.
           mayAct: post.authorId === auth.user.id || canManageOthersPosts(auth.role),

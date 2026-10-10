@@ -4,6 +4,8 @@ import { TargetType } from '@prisma/client';
 
 import { Composer, type EditingPost, type GoodTime } from '@/components/Composer';
 import { requirePage } from '@/lib/auth';
+import { assertPagesAllowed, targetScope } from '@/lib/page-access';
+import { listLabels, listPageGroups } from '@/lib/page-groups';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { parseMedia } from '@/lib/json';
@@ -31,10 +33,14 @@ const EARLIEST_MINUTES = 30;
  * `datetime-local` values — the Queue's suggestions, brought to the moment
  * someone picks a time.
  */
-async function loadGoodTimes(workspaceId: string, timeZone: string): Promise<GoodTime[]> {
+async function loadGoodTimes(
+  workspaceId: string,
+  timeZone: string,
+  scope: Parameters<typeof targetScope>[0],
+): Promise<GoodTime[]> {
   const now = new Date();
   const pages = await prisma.target.findMany({
-    where: { workspaceId, type: TargetType.page },
+    where: { workspaceId, type: TargetType.page, ...targetScope(scope) },
     select: { id: true, name: true },
   });
   if (pages.length === 0) return [];
@@ -91,9 +97,9 @@ export default async function ComposePage({
   const params = await searchParams;
   const postId = Array.isArray(params.post) ? params.post[0] : params.post;
 
-  const [targets, queueSlots, workspace] = await Promise.all([
+  const [targets, queueSlots, workspace, groups, labels] = await Promise.all([
     prisma.target.findMany({
-      where: { workspaceId: auth.workspace.id },
+      where: { workspaceId: auth.workspace.id, ...targetScope(auth.pageScope) },
       include: { socialAccount: { select: { name: true } } },
       orderBy: [{ type: 'asc' }, { name: 'asc' }],
     }),
@@ -102,11 +108,13 @@ export default async function ComposePage({
       where: { id: auth.workspace.id },
       select: { aiEnabled: true },
     }),
+    listPageGroups(auth.workspace.id, auth.pageScope),
+    listLabels(auth.workspace.id),
   ]);
 
   const [editing, goodTimes] = await Promise.all([
     postId ? loadForEditing(postId, auth) : null,
-    loadGoodTimes(auth.workspace.id, auth.workspace.timezone),
+    loadGoodTimes(auth.workspace.id, auth.workspace.timezone, auth.pageScope),
   ]);
   // A link to a post that is gone, belongs to another client, or has already
   // been published is a 404 rather than a blank composer — silently opening an
@@ -135,6 +143,9 @@ export default async function ComposePage({
         hasQueueSlots={queueSlots > 0}
         defaultScheduledAt={defaultScheduledAt}
         goodTimes={goodTimes}
+        groups={groups.filter((group) => group.targetIds.length > 0)}
+        labels={labels}
+        canEditLabels={canPublishWithoutApproval(auth.role)}
         aiEnabled={aiAvailable() && workspace.aiEnabled}
         requiresApproval={auth.workspace.requiresApproval}
         canPublishDirectly={canPublishWithoutApproval(auth.role)}
@@ -201,11 +212,19 @@ async function loadForEditing(postId: string, auth: Auth): Promise<EditingPost |
 
   if (post.authorId !== auth.user.id && !canManageOthersPosts(auth.role)) return null;
   if (!postIsEditable(post)) return null;
+  try {
+    assertPagesAllowed(auth.pageScope, post.targets.map((target) => target.targetId));
+  } catch {
+    return null;
+  }
+  const labelRows = await prisma.postLabel.findMany({ where: { postId: post.id }, select: { labelId: true } });
 
   return {
     id: post.id,
     message: post.message,
     firstComment: post.firstComment,
+    firstCommentDelayMinutes: post.firstCommentDelayMinutes,
+    labelIds: labelRows.map((row) => row.labelId),
     link: post.link,
     media: parseMedia(post.media),
     targetIds: post.targets.map((target) => target.targetId),

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
+import { assertEngagementInScope } from '@/lib/page-access';
 import { ok, readJson, route } from '@/lib/api';
 import { replyToConversationAs, type ReplyOutcome } from '@/lib/engagement';
 import { errors } from '@/lib/errors';
@@ -21,6 +22,7 @@ const replySchema = z.object({
 export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
   const input = replySchema.parse(await readJson(request));
+  await assertEngagementInScope(auth.pageScope, { conversationId: input.conversationId });
 
   const result = await replyToConversationAs({
     conversationId: input.conversationId,

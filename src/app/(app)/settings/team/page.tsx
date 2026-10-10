@@ -6,6 +6,8 @@ import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { canManageTeam } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
+import { listPageGroups } from '@/lib/page-groups';
+import { ALL_PAGES } from '@/lib/page-access';
 import { emailEnabled } from '@/lib/email/send';
 import { formatInZone } from '@/lib/time';
 
@@ -22,16 +24,25 @@ export default async function TeamPage() {
   const t = await getTranslations('team');
   const timezone = auth.workspace.timezone;
 
-  const [members, invitations] = await Promise.all([
+  const [members, invitations, pages, groups] = await Promise.all([
     prisma.membership.findMany({
       where: { workspaceId: auth.workspace.id },
-      include: { user: { select: { id: true, name: true, email: true } } },
+      include: { user: { select: { id: true, name: true, email: true } }, pages: { select: { targetId: true } } },
       orderBy: { createdAt: 'asc' },
     }),
     prisma.invitation.findMany({
       where: { workspaceId: auth.workspace.id, acceptedAt: null },
       orderBy: { createdAt: 'desc' },
     }),
+    // Only an admin sets limits, and admins see every Page.
+    canManageTeam(auth.role)
+      ? prisma.target.findMany({
+          where: { workspaceId: auth.workspace.id, type: { not: 'group' } },
+          select: { id: true, name: true, pictureUrl: true },
+          orderBy: { name: 'asc' },
+        })
+      : Promise.resolve([]),
+    canManageTeam(auth.role) ? listPageGroups(auth.workspace.id, ALL_PAGES) : Promise.resolve([]),
   ]);
 
   return (
@@ -51,7 +62,11 @@ export default async function TeamPage() {
           email: membership.user.email,
           role: membership.role,
           isSelf: membership.user.id === auth.user.id,
+          allPages: membership.allPages,
+          pageIds: membership.pages.map((row) => row.targetId),
         }))}
+        pages={pages}
+        groups={groups}
         invitations={invitations.map((invitation) => ({
           id: invitation.id,
           email: invitation.email,

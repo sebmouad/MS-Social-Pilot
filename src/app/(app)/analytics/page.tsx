@@ -14,10 +14,11 @@ import { ExportMenu } from '@/components/ExportMenu';
 import { PagePicker } from '@/components/PagePicker';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { parseRange, rangeQuery } from '@/lib/date-range';
-import { PostAnalyticsTable } from '@/components/PostAnalyticsTable';
+import { PostAnalyticsTable, type PostRow } from '@/components/PostAnalyticsTable';
 import { StatTile } from '@/components/charts/StatTile';
 import { SyncButton } from '@/components/SyncButton';
 import { requirePage } from '@/lib/auth';
+import { targetScope } from '@/lib/page-access';
 import { screenMetadata } from '@/lib/metadata';
 import { canDeleteComments, canModerateComments } from '@/lib/constants';
 import { UNWINDOWED_VIEWS, parseAnalyticsView } from '@/lib/analytics-views';
@@ -77,7 +78,7 @@ export default async function AnalyticsPage({
 
   // Groups have no insights edge, so they are not offered here at all.
   const pages = await prisma.target.findMany({
-    where: { workspaceId: auth.workspace.id, type: TargetType.page },
+    where: { workspaceId: auth.workspace.id, type: TargetType.page, ...targetScope(auth.pageScope) },
     orderBy: { name: 'asc' },
   });
 
@@ -181,14 +182,15 @@ export default async function AnalyticsPage({
 
       {view === 'posts' && (
         <PostAnalyticsTable
-          posts={(
-            await readPostAnalytics({
-              workspaceId: auth.workspace.id,
-              targetId: selected.id,
-              from,
-              to,
-            })
-          ).map((post) => ({
+          posts={([] as PostRow[]).concat(
+            (
+              await readPostAnalytics({
+                workspaceId: auth.workspace.id,
+                targetId: selected.id,
+                from,
+                to,
+              })
+            ).map((post) => ({
             postTargetId: post.postTargetId,
             message: post.message,
             targetName: post.targetName,
@@ -208,7 +210,38 @@ export default async function AnalyticsPage({
             organic: post.organic,
             paid: post.paid,
             engagementRate: post.engagementRate,
-          }))}
+            source: 'app' as const,
+          })),
+            // Posts made on Facebook itself, so the table covers the whole Page.
+            (await readExternalPosts({ workspaceId: auth.workspace.id, targetId: selected.id, from, to, limit: 500 })).map(
+              (post) => {
+                const interactions = (post.reactions ?? 0) + (post.comments ?? 0) + (post.shares ?? 0);
+                return {
+                  postTargetId: post.id,
+                  href: `/analytics/post/${post.id}?external=true`,
+                  message: post.message,
+                  targetName: post.targetName,
+                  targetPictureUrl: post.targetPictureUrl,
+                  imageUrl: post.pictureUrl,
+                  publishedLabel: formatInZone(post.createdTime, timezone),
+                  url: post.permalink,
+                  impressions: post.impressions ?? 0,
+                  reach: post.reach ?? 0,
+                  engagedUsers: post.engagedUsers ?? 0,
+                  reactions: post.reactions ?? 0,
+                  comments: post.comments ?? 0,
+                  shares: post.shares ?? 0,
+                  clicks: 0,
+                  negativeFeedback: 0,
+                  videoViews: 0,
+                  organic: 0,
+                  paid: 0,
+                  engagementRate: post.reach ? Math.round((interactions / post.reach) * 1000) / 10 : null,
+                  source: 'page' as const,
+                };
+              },
+            ),
+          )}
         />
       )}
 

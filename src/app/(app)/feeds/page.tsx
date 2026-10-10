@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { FeedsClient } from '@/components/FeedsClient';
 import { requirePage } from '@/lib/auth';
+import { targetScope } from '@/lib/page-access';
 import { screenMetadata } from '@/lib/metadata';
 import { canManageSettings, postIsEditable } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
@@ -63,7 +64,7 @@ export default async function FeedsPage() {
     // Facebook only: see `assertNoInstagram`. Offering a destination every
     // item would fail on is worse than not offering it.
     prisma.target.findMany({
-      where: { workspaceId: auth.workspace.id, type: { not: TargetType.instagram } },
+      where: { workspaceId: auth.workspace.id, type: { not: TargetType.instagram }, ...targetScope(auth.pageScope) },
       include: { socialAccount: { select: { name: true } } },
       orderBy: [{ type: 'asc' }, { name: 'asc' }],
     }),

@@ -4,6 +4,7 @@ import { cache } from 'react';
 import { Locale, Prisma, WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
+import { scopeOf, type PageScope } from './page-access';
 import { errors } from './errors';
 import { ensureSettings } from './settings';
 import { env } from './env';
@@ -56,6 +57,11 @@ export interface AuthContext {
   isInstanceOwner: boolean;
   /** Every workspace this user belongs to, for the switcher. */
   workspaces: WorkspaceSummary[];
+  /**
+   * The Pages this member may work on in the active workspace. See
+   * `src/lib/page-access.ts`, which every Page list and Page action asks.
+   */
+  pageScope: PageScope;
 }
 
 export class AuthError extends Error {
@@ -357,7 +363,7 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
       user: {
         include: {
           memberships: {
-            include: { workspace: true },
+            include: { workspace: true, pages: { select: { targetId: true } } },
             orderBy: { createdAt: 'asc' },
           },
         },
@@ -396,6 +402,7 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
     },
     role: membership.role,
     isInstanceOwner: user.isInstanceOwner,
+    pageScope: scopeOf(membership),
     workspaces: user.memberships.map((entry) => ({
       id: entry.workspace.id,
       name: entry.workspace.name,

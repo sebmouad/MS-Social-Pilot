@@ -1212,9 +1212,13 @@ export async function readFollowerTrend(options: {
     .map(([date, values]) => ({ date, ...values }));
 }
 
-export async function recentOutcomes(workspaceId: string, take = 5) {
+export async function recentOutcomes(workspaceId: string, take = 5, targetIds?: string[]) {
   return prisma.post.findMany({
-    where: { workspaceId, status: { in: ['published', 'partially_failed', 'failed'] } },
+    where: {
+      workspaceId,
+      status: { in: ['published', 'partially_failed', 'failed'] },
+      ...(targetIds ? { targets: { some: { targetId: { in: targetIds } } } } : {}),
+    },
     include: { targets: { include: { target: { select: { name: true, pictureUrl: true } } } } },
     orderBy: [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { updatedAt: 'desc' }],
     take,
@@ -1254,7 +1258,9 @@ export interface PublishedTotals {
  * `::bigint` throw, and the whole dashboard with it. A value that is not a
  * number now counts as nothing; the sum is rounded back to a whole figure.
  */
-export async function publishedTotals(workspaceId: string): Promise<PublishedTotals> {
+export async function publishedTotals(workspaceId: string, targetIds?: string[]): Promise<PublishedTotals> {
+  // Narrowed to some Pages for a member limited to them; everything otherwise.
+  const pages = targetIds ? Prisma.sql`AND pt."targetId" = ANY(${targetIds})` : Prisma.empty;
   // The key is one of four literals, never input, so it is inlined rather
   // than bound as a parameter.
   const insightNumber = (key: 'impressions' | 'reach' | 'reactions' | 'comments') => {
@@ -1281,6 +1287,7 @@ export async function publishedTotals(workspaceId: string): Promise<PublishedTot
     JOIN posts p ON p.id = pt."postId"
     WHERE p."workspaceId" = ${workspaceId}
       AND pt.status = 'published'
+      ${pages}
   `;
 
   // bigint because SUM over bigint is bigint in Postgres; the values here are

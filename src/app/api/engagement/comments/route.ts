@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
+import { assertEngagementInScope, assertPageParam } from '@/lib/page-access';
 import { ok, readJson, route } from '@/lib/api';
 import {
   moderateComment,
@@ -17,6 +18,7 @@ export const GET = route(async (request: Request) => {
   const url = new URL(request.url);
 
   const hidden = url.searchParams.get('hidden');
+  assertPageParam(auth.pageScope, url.searchParams.get('targetId'));
 
   return ok({
     comments: await readComments({
@@ -56,6 +58,7 @@ const actionSchema = z.discriminatedUnion('action', [
 export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
   const input = actionSchema.parse(await readJson(request));
+  await assertEngagementInScope(auth.pageScope, { commentId: input.commentId });
 
   /** One mapping for all four actions, so no branch can forget a case. */
   const respond = (outcome: ModerationOutcome, body: Record<string, unknown>) => {

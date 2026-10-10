@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
+import { assertPostInScope } from '@/lib/page-access';
 import { setRecycling } from '@/lib/evergreen';
 import { LIMITS } from '@/lib/constants';
 import { ok, readJson, route } from '@/lib/api';
@@ -19,6 +20,7 @@ const schema = z.object({
 export const POST = route(async (request: Request, context: { params: Promise<{ id: string }> }) => {
   const auth = await requireAuth();
   const { id } = await context.params;
+  await assertPostInScope(auth.pageScope, auth.workspace.id, id);
   const input = schema.parse(await readJson(request));
 
   await setRecycling({

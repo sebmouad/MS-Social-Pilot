@@ -215,7 +215,15 @@
     "followerTrend": "Abonnés gagnés et perdus",
     "followerTrendHint": "Nouveaux et anciens abonnés chaque jour, d’après Facebook. Un total en hausse peut cacher un jour qui a perdu plus de personnes qu’il n’en a gagné.",
     "newFollowers": "Nouveaux abonnés",
-    "lostFollowers": "Abonnés perdus"
+    "lostFollowers": "Abonnés perdus",
+    "sourceFilter": "Quelles publications",
+    "source_all": "Toutes",
+    "source_app": "Via MS Social Pilot",
+    "source_page": "Faites sur Facebook",
+    "rowsPerPage": "Lignes par page",
+    "rowsShowing": "{from}–{to} sur {total}",
+    "previousRows": "Lignes précédentes",
+    "nextRows": "Lignes suivantes"
   },
   "app": {
     "name": "MS Social Pilot",
@@ -385,7 +393,28 @@
     "previewShare": "Partager",
     "firstComment": "Premier commentaire",
     "firstCommentPlaceholder": "Un lien, des hashtags ou un appel à l’action…",
-    "firstCommentHint": "Publié au nom de la Page sous la publication dès sa mise en ligne. Si Facebook le refuse, la publication part quand même et le commentaire peut être relancé depuis la liste des publications."
+    "firstCommentHint": "Publié au nom de la Page sous la publication dès sa mise en ligne. Si Facebook le refuse, la publication part quand même et le commentaire peut être relancé depuis la liste des publications.",
+    "delayLabel": "Publier le commentaire",
+    "delayNone": "Juste après la publication",
+    "delayMinutes": "{count, plural, one {# minute après} other {# minutes après}}",
+    "delayHours": "{count, plural, one {# heure après} other {# heures après}}",
+    "delayDays": "{count, plural, one {# jour après} other {# jours après}}",
+    "delayCustom": "Personnalisé…",
+    "delayUnitDays": "j",
+    "delayUnitHours": "h",
+    "delayUnitMinutes": "min",
+    "labelsTitle": "Libellés",
+    "labelsHint": "Campagne, client, thème — pour retrouver les publications et en faire le bilan.",
+    "timingSchedule": "Programmer",
+    "timingQueue": "File",
+    "timingNow": "Maintenant",
+    "scheduleDescription": "Choisissez la date et l’heure.",
+    "queueDescription": "Prend le prochain créneau libre de ces Pages.",
+    "nowDescription": "Part sur Facebook tout de suite.",
+    "queueExplain": "La publication prend le prochain créneau libre commun à toutes les Pages choisies.",
+    "nowExplain": "La publication part dès que vous appuyez sur le bouton.",
+    "nowNeedsApproval": "Elle passe d’abord en validation, puis part dès qu’elle est approuvée.",
+    "otherWays": "Autres façons de l’envoyer"
   },
   "config": {
     "title": "Configuration",
@@ -736,7 +765,11 @@
     "unknownExport": "Export inconnu. Choisissez parmi : {kinds}.",
     "variantsNeedApproval": "Les formulations alternatives sont publiées sans validation : seuls les éditeurs et rôles supérieurs peuvent les définir lorsque la validation est activée.",
     "dateRangeInverted": "Le début de la période est après sa fin. Inversez les dates.",
-    "adAccountNotFound": "Compte publicitaire introuvable."
+    "adAccountNotFound": "Compte publicitaire introuvable.",
+    "nameTaken": "Ce nom est déjà utilisé.",
+    "groupNotFound": "Groupe introuvable.",
+    "labelNotFound": "Libellé introuvable.",
+    "adminsSeeAllPages": "Les propriétaires et administrateurs ont toujours accès à toutes les Pages. Changez d’abord leur rôle."
   },
   "feeds": {
     "title": "Flux RSS",
@@ -820,7 +853,8 @@
         "invited": "a invité quelqu’un dans l’espace de travail",
         "joined": "a rejoint l’espace de travail",
         "removed": "a retiré quelqu’un de l’espace de travail",
-        "roleChanged": "a changé le rôle d’une personne"
+        "roleChanged": "a changé le rôle d’une personne",
+        "pageAccessChanged": "a changé les Pages accessibles à une personne"
       }
     },
     "byDeparted": "Une personne qui n’est plus dans cet espace",
@@ -1126,7 +1160,23 @@
         "link": "Contient un lien"
       }
     },
-    "stillReading": "Facebook répond encore. Les chiffres apparaîtront si vous revenez dans quelques minutes."
+    "stillReading": "Facebook répond encore. Les chiffres apparaîtront si vous revenez dans quelques minutes.",
+    "kpiTitle": "Chiffres clés",
+    "noDaily": "Pas de chiffre par jour",
+    "perDay": "{metric}, jour par jour",
+    "pickCard": "Choisissez une carte pour l’afficher",
+    "reachDailyNote": "Jour par jour, la portée est la somme des publications du jour ; le total de la carte est le chiffre de la Page quand Facebook le fournit.",
+    "tips": {
+      "title": "Conseils de publication",
+      "bestDayTitle": "Meilleur jour pour publier",
+      "notYet": "Pas encore assez de publications",
+      "bestDayHint": "Les publications ce jour-là font {lift}× vos interactions habituelles ({posts} publications).",
+      "bestDayEmpty": "Publiez sur plusieurs jours différents et ce conseil apparaîtra.",
+      "frequencyTitle": "Meilleure fréquence",
+      "perDay": "{count, plural, one {# publication par jour} other {# publications par jour}}",
+      "frequencyHint": "Les jours avec {count, plural, one {# publication} other {# publications}}, chacune a encore bien marché ({days} jours).",
+      "frequencyEmpty": "Il faut quelques semaines de publications pour le dire."
+    }
   },
   "posts": {
     "title": "Publications",
@@ -1212,7 +1262,13 @@
     "weeklyTitle": "Créneaux hebdomadaires",
     "writePost": "Rédiger une publication",
     "freeHint": "Aucune publication n'occupe ce créneau. Écrivez-en une et ajoutez-la à la file.",
-    "inQueue": "Dans la file"
+    "inQueue": "Dans la file",
+    "everyPage": "Toutes les Pages",
+    "timetableFor": "Horaires de",
+    "ownTimesHint": "Les créneaux propres à {page}, en plus de ceux partagés par toutes les Pages (en gris).",
+    "sharedTimesHint": "Ces créneaux sont partagés par toutes les Pages. Choisissez une Page pour lui donner les siens.",
+    "weeklyTitleFor": "Créneaux de {page}",
+    "sharedTime": "Partagé par toutes les Pages"
   },
   "reports": {
     "title": "Rapports",
@@ -1241,7 +1297,32 @@
     "generatedOn": "Généré le {date}",
     "audienceTitle": "Audience",
     "publishedHere": "Publié depuis MS Social Pilot",
-    "publishedHereHint": "Publications envoyées depuis cette application sur la période, avec les clics comptés par ses liens courts."
+    "publishedHereHint": "Publications envoyées depuis cette application sur la période, avec les clics comptés par ses liens courts.",
+    "customise": "Personnaliser",
+    "customiseTitle": "Personnaliser le rapport",
+    "applyChanges": "Appliquer",
+    "sectionsTitle": "Sections",
+    "sectionsHint": "Cochez ce que le rapport doit montrer. Enregistré dans le lien, pour réimprimer le même rapport.",
+    "brandingTitle": "Image de marque",
+    "brandingHint": "Votre logo et vos mots sur chaque rapport de cet espace.",
+    "brandingAdminsOnly": "Seuls les propriétaires et administrateurs peuvent changer l’image de marque.",
+    "logoUrl": "Logo (adresse de l’image)",
+    "coverTitleField": "Titre de couverture",
+    "coverTitlePlaceholder": "ex. Rapport mensuel",
+    "coverSubtitleField": "Sous-titre",
+    "coverSubtitlePlaceholder": "ex. Préparé par votre agence",
+    "footerField": "Pied de page",
+    "footerPlaceholder": "ex. contact@agence.com · agence.com",
+    "section_analysis": "Analyse de la Page",
+    "section_audience": "Audience",
+    "section_published": "Publié d’ici",
+    "section_destinations": "Par destination",
+    "section_topPosts": "Meilleures publications",
+    "sectionHint_analysis": "Santé, constats, chiffres clés, rythme, formats, meilleurs moments.",
+    "sectionHint_audience": "Abonnés, pays, villes, âge et genre.",
+    "sectionHint_published": "Publications, portée, engagement et clics depuis l’application.",
+    "sectionHint_destinations": "Les mêmes chiffres, Page par Page.",
+    "sectionHint_topPosts": "Les meilleures publications, telles que vues par les abonnés."
   },
   "settings": {
     "addTime": "Ajouter un créneau",
@@ -1412,7 +1493,8 @@
     "page": "Page",
     "selectAll": "Tout sélectionner",
     "selectedOf": "{selected} sur {total} sélectionnées",
-    "toStart": "pour commencer à planifier."
+    "toStart": "pour commencer à planifier.",
+    "groups": "Choisir un groupe de Pages"
   },
   "team": {
     "title": "Équipe",
@@ -1459,7 +1541,19 @@
     "revokeNamed": "Révoquer l’invitation de {email}",
     "roleChangeConfirm": "Faire passer {name} de {from} à {to} ?",
     "roleToOwnerWarning": "Les propriétaires ont un contrôle total, y compris la configuration du serveur et la suppression de l’espace de travail, et seul un autre propriétaire peut le leur retirer.",
-    "roleFromOwnerWarning": "Cette personne perdra immédiatement ses droits de propriétaire sur cet espace de travail."
+    "roleFromOwnerWarning": "Cette personne perdra immédiatement ses droits de propriétaire sur cet espace de travail.",
+    "accessAllSaved": "{name} travaille maintenant sur toutes les Pages.",
+    "accessSomeSaved": "{count, plural, one {{name} travaille maintenant sur # Page.} other {{name} travaille maintenant sur # Pages.}}",
+    "accessAll": "Toutes les Pages",
+    "accessSome": "{count, plural, =0 {Aucune Page} one {# Page} other {# Pages}}",
+    "accessEdit": "Choisir les Pages de {name}",
+    "accessTitle": "Pages de {name}",
+    "accessAllTitle": "Toutes les Pages",
+    "accessAllHint": "Y compris les Pages connectées plus tard.",
+    "accessSomeTitle": "Seulement les Pages choisies",
+    "accessSomeHint": "Cette personne ne voit et ne publie que sur ces Pages, partout dans l’application.",
+    "accessByGroup": "Ajouter un groupe",
+    "accessCount": "{count, plural, one {# Page choisie sur {total}.} other {# Pages choisies sur {total}.}}"
   },
   "dateRange": {
     "preset": {
@@ -1504,5 +1598,89 @@
     "actionsFor": "Actions pour {page}",
     "adAccounts": "Comptes publicitaires",
     "groupsNote": "Les groupes Facebook ne peuvent être gérés depuis aucune application : Meta a retiré la publication dans les groupes le 22 avril 2024."
+  },
+  "pagesSidebar": {
+    "label": "Pages",
+    "allPages": "Toutes les Pages",
+    "chooseGroup": "Choisir un groupe",
+    "noGroups": "Aucun groupe pour l’instant.",
+    "manageGroups": "Modifier les groupes",
+    "newGroup": "Créer un groupe",
+    "search": "Rechercher une Page",
+    "showing": "{shown} sur {total} affichées",
+    "showAll": "Tout afficher",
+    "showOthers": "Réafficher les autres Pages",
+    "onlyThis": "Afficher seulement {page}",
+    "paused": "En pause",
+    "type": {
+      "page": "Page Facebook",
+      "group": "Groupe Facebook",
+      "instagram": "Instagram"
+    },
+    "hide": "Masquer {page}",
+    "show": "Afficher {page}",
+    "noMatch": "Aucune Page ne correspond."
+  },
+  "labels": {
+    "allLabels": "Tous les libellés",
+    "filterBy": "Filtrer par libellé",
+    "createFailed": "Le libellé n’a pas pu être créé.",
+    "remove": "Retirer {label}",
+    "addMore": "Libellé",
+    "add": "Ajouter un libellé",
+    "searchOrCreate": "Chercher ou créer un libellé",
+    "title": "Libellés",
+    "none": "Aucun libellé. Tapez un nom pour en créer un.",
+    "create": "Créer « {name} »"
+  },
+  "groups": {
+    "title": "Pages et groupes",
+    "subtitle": "Rangez vos Pages en groupes et vos publications par libellés, puis filtrez chaque écran en un clic.",
+    "groupsTitle": "Groupes de Pages",
+    "groupsHint": "Un client, une marque, un pays : un groupe coche toutes ses Pages d’un coup dans l’éditeur et filtre le calendrier, la file et les publications.",
+    "newGroup": "Nouveau groupe",
+    "noGroups": "Aucun groupe pour l’instant",
+    "noGroupsHint": "Créez-en un par client ou par marque, et choisissez-le partout où une liste de Pages apparaît.",
+    "pageCount": "{count, plural, =0 {Aucune Page} one {# Page} other {# Pages}}",
+    "editGroup": "Modifier {name}",
+    "deleteGroup": "Supprimer {name}",
+    "pagesIn": "Pages de {name}",
+    "emptyGroup": "Pas encore de Page dans ce groupe.",
+    "labelsTitle": "Libellés de publication",
+    "labelsHint": "Étiquetez les publications par campagne ou thème, puis filtrez le calendrier et la liste par libellé.",
+    "noLabels": "Aucun libellé pour l’instant.",
+    "labelName": "Nom du libellé",
+    "color": "Couleur",
+    "labelPosts": "{count, plural, =0 {Pas encore utilisé} one {Sur # publication} other {Sur # publications}}",
+    "editLabel": "Modifier {name}",
+    "deleteLabel": "Supprimer {name}",
+    "newLabelPlaceholder": "Nouveau libellé, ex. Soldes d’été",
+    "addLabel": "Ajouter",
+    "editGroupTitle": "Modifier le groupe",
+    "newGroupTitle": "Nouveau groupe",
+    "createGroup": "Créer le groupe",
+    "groupName": "Nom",
+    "groupNamePlaceholder": "ex. Restaurants, Client A, Maroc",
+    "pagesInGroup": "Pages du groupe",
+    "selectedOf": "{selected} sur {total}",
+    "searchPages": "Rechercher une Page",
+    "groupSaved": "« {name} » enregistré.",
+    "groupCreated": "« {name} » créé.",
+    "deleteGroupConfirm": "Supprimer le groupe « {name} » ? Ses Pages et leurs publications restent telles quelles.",
+    "groupDeleted": "« {name} » supprimé.",
+    "labelCreated": "Libellé « {name} » ajouté.",
+    "labelSaved": "Libellé « {name} » enregistré.",
+    "deleteLabelConfirm": "{count, plural, =0 {Supprimer le libellé « {name} » ?} one {Supprimer le libellé « {name} » ? Il sera retiré de # publication.} other {Supprimer le libellé « {name} » ? Il sera retiré de # publications.}}",
+    "labelDeleted": "Libellé « {name} » supprimé.",
+    "colors": {
+      "blue": "Bleu",
+      "green": "Vert",
+      "amber": "Ambre",
+      "red": "Rouge",
+      "purple": "Violet",
+      "pink": "Rose",
+      "teal": "Turquoise",
+      "slate": "Gris"
+    }
   }
 }

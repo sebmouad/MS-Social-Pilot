@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { assertEngagementInScope } from '@/lib/page-access';
 import { fail, ok, route } from '@/lib/api';
 import { readPostMetrics, syncExternalPostInsights, syncPostInsights } from '@/lib/analytics';
 import { errors } from '@/lib/errors';
@@ -17,6 +18,7 @@ export const GET = route(async (request: Request, context: Context) => {
   const auth = await requireAuth();
   const { postTargetId } = await context.params;
   const external = new URL(request.url).searchParams.get('external') === 'true';
+  await assertEngagementInScope(auth.pageScope, external ? { externalPostId: postTargetId } : { postTargetId });
 
   const result = await readPostMetrics({
     workspaceId: auth.workspace.id,
@@ -32,6 +34,7 @@ export const POST = route(async (request: Request, context: Context) => {
   const auth = await requireAuth();
   const { postTargetId } = await context.params;
   const external = new URL(request.url).searchParams.get('external') === 'true';
+  await assertEngagementInScope(auth.pageScope, external ? { externalPostId: postTargetId } : { postTargetId });
 
   // Confirm ownership before spending a Graph call on someone else's id.
   const owned = await readPostMetrics({

@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 
 import { targetTypeKey } from '@/lib/constants';
+import { paletteOf } from '@/lib/palette';
 import { blockerMessage } from './blockerMessage';
 
 export interface TargetOption {
@@ -20,9 +21,11 @@ interface Props {
   targets: TargetOption[];
   selected: string[];
   onChange: (selected: string[]) => void;
+  /** Page groups: one click ticks, or unticks, every Page in one. */
+  groups?: Array<{ id: string; name: string; color: string; targetIds: string[] }>;
 }
 
-export function TargetPicker({ targets, selected, onChange }: Props) {
+export function TargetPicker({ targets, selected, onChange, groups = [] }: Props) {
   const t = useTranslations('targets');
   // The blocker copy lives with the connections screen, which is where the
   // reasons are acted on; this screen only repeats them.
@@ -51,8 +54,42 @@ export function TargetPicker({ targets, selected, onChange }: Props) {
     );
   }
 
+  // A group counts as picked when every Page of it that can take a post is.
+  const groupPages = (group: { targetIds: string[] }) =>
+    selectable.filter((target) => group.targetIds.includes(target.id)).map((target) => target.id);
+  const usableGroups = groups.filter((group) => groupPages(group).length > 0);
+
+  function toggleGroup(group: { targetIds: string[] }) {
+    const ids = groupPages(group);
+    const all = ids.every((id) => selected.includes(id));
+    onChange(all ? selected.filter((id) => !ids.includes(id)) : [...new Set([...selected, ...ids])]);
+  }
+
   return (
     <div className="space-y-2">
+      {usableGroups.length > 0 && (
+        <div role="group" aria-label={t('groups')} className="flex flex-wrap gap-1.5 pb-1">
+          {usableGroups.map((group) => {
+            const ids = groupPages(group);
+            const on = ids.every((id) => selected.includes(id));
+            return (
+              <button
+                key={group.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggleGroup(group)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset transition-colors ${
+                  on ? paletteOf(group.color).chip : 'bg-white text-slate-700 ring-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span aria-hidden className={`h-2 w-2 rounded-full ${paletteOf(group.color).dot}`} />
+                {group.name}
+                <span className="nums opacity-70">{ids.length}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <span className="text-xs text-slate-500">
           {t('selectedOf', {

@@ -28,7 +28,14 @@ export interface PostRow {
   organic: number;
   paid: number;
   engagementRate: number | null;
+  /** Published through this app, or found on the Page. */
+  source?: 'app' | 'page';
+  /** Where the row opens; the post's own analytics by default. */
+  href?: string;
 }
+
+type Source = 'all' | 'app' | 'page';
+const PAGE_SIZES = [10, 25, 50] as const;
 
 type SortKey =
   | 'publishedLabel'
@@ -52,9 +59,22 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
   const locale = useLocale();
   const [sort, setSort] = useState<SortKey>('impressions');
   const [descending, setDescending] = useState(true);
+  const [source, setSource] = useState<Source>('all');
+  const [size, setSize] = useState<(typeof PAGE_SIZES)[number]>(25);
+  const [page, setPage] = useState(0);
+
+  const counts = {
+    all: posts.length,
+    app: posts.filter((post) => (post.source ?? 'app') === 'app').length,
+    page: posts.filter((post) => post.source === 'page').length,
+  };
+  const filtered = useMemo(
+    () => (source === 'all' ? posts : posts.filter((post) => (post.source ?? 'app') === source)),
+    [posts, source],
+  );
 
   const sorted = useMemo(() => {
-    const copy = [...posts];
+    const copy = [...filtered];
     copy.sort((a, b) => {
       const left = a[sort];
       const right = b[sort];
@@ -73,7 +93,12 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
         : String(left).localeCompare(String(right), locale);
     });
     return copy;
-  }, [posts, sort, descending, locale]);
+  }, [filtered, sort, descending, locale]);
+
+  const pages = Math.max(1, Math.ceil(sorted.length / size));
+  const current = Math.min(page, pages - 1);
+  const visible = sorted.slice(current * size, current * size + size);
+  const hrefOf = (post: PostRow) => post.href ?? `/analytics/post/${post.postTargetId}`;
 
   function toggle(key: SortKey) {
     if (key === sort) {
@@ -104,6 +129,28 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
     <section className="card-viz">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-900">{t('byPost')}</h2>
+
+        {/* Which posts: the ones this app published, the ones made on Facebook
+            itself, or both. Only offered when there are both kinds. */}
+        {counts.page > 0 && counts.app > 0 && (
+          <div className="segmented" role="radiogroup" aria-label={t('sourceFilter')}>
+            {(['all', 'app', 'page'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={source === value}
+                className={`segmented-item ${source === value ? 'segmented-item-active' : ''}`}
+                onClick={() => {
+                  setSource(value);
+                  setPage(0);
+                }}
+              >
+                {t(`source_${value}`)} <span className="nums text-xs opacity-70">{counts[value]}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* A ten-column table has no sortable headers on a phone, so the sort
             moves into a control the card layout can use too. */}
@@ -143,7 +190,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
           320px screen is technically readable and practically not: the post
           text scrolls out of view exactly when the numbers come into it. */}
       <ul className="mt-3 space-y-3 sm:hidden">
-        {sorted.map((post) => (
+        {visible.map((post) => (
           <li key={post.postTargetId} className="rounded-lg border border-slate-200 p-3">
             {/* The post as the feed draws it, then its numbers. */}
             <div className="flex items-center gap-2">
@@ -157,7 +204,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
               </div>
             </div>
             <Link
-              href={`/analytics/post/${post.postTargetId}`}
+              href={hrefOf(post)}
               className="mt-2 line-clamp-3 [overflow-wrap:anywhere] text-sm text-slate-900"
             >
               {post.message || '—'}
@@ -243,7 +290,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((post) => (
+            {visible.map((post) => (
               <tr key={post.postTargetId} className="border-b border-slate-100 last:border-0">
                 <td className="max-w-sm py-2 pr-3">
                   <div className="flex items-start gap-2.5">
@@ -257,7 +304,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
                   {/* The table shows seven numbers; the drill-down shows the
                       rest of the catalogue Graph returned for this post. */}
                   <Link
-                    href={`/analytics/post/${post.postTargetId}`}
+                    href={hrefOf(post)}
                     className="line-clamp-2 text-slate-800 hover:text-brand-700 hover:underline"
                   >
                     {post.message || '—'}
@@ -265,6 +312,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
                   <p className="mt-0.5 text-xs text-slate-500">
                     {post.targetName}
                     {post.publishedLabel ? ` · ${post.publishedLabel}` : ''}
+                    {post.source === 'page' && ` · ${t('source_page')}`}
                     {post.paid > 0 && ` · ${t('paid')}`}
                     {post.url && (
                       <>
@@ -296,7 +344,53 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
         </table>
       </div>
 
-      <p className="mt-3 text-xs text-slate-500">{t('byPostHint')}</p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+        <label className="flex items-center gap-2 text-xs text-slate-600">
+          {t('rowsPerPage')}
+          <select
+            className="input w-auto py-1 text-sm"
+            value={size}
+            onChange={(event) => {
+              setSize(Number(event.target.value) as (typeof PAGE_SIZES)[number]);
+              setPage(0);
+            }}
+          >
+            {PAGE_SIZES.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex items-center gap-2">
+          <span className="nums text-xs text-slate-600">
+            {t('rowsShowing', {
+              from: sorted.length ? current * size + 1 : 0,
+              to: Math.min(sorted.length, current * size + size),
+              total: sorted.length,
+            })}
+          </span>
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-40"
+            aria-label={t('previousRows')}
+            disabled={current === 0}
+            onClick={() => setPage(current - 1)}
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-40"
+            aria-label={t('nextRows')}
+            disabled={current >= pages - 1}
+            onClick={() => setPage(current + 1)}
+          >
+            ›
+          </button>
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">{t('byPostHint')}</p>
     </section>
   );
 }

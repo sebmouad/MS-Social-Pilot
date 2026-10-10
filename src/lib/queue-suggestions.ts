@@ -119,14 +119,14 @@ export function suggestSlots(options: {
  * For the "coming up" list: each weekly slot as a real instant over the next
  * `days`, earliest first.
  */
-export function upcomingOccurrences(options: {
-  slots: QueueSlotLike[];
+export function upcomingOccurrences<S extends QueueSlotLike>(options: {
+  slots: S[];
   timeZone: string;
   from: Date;
   days: number;
   toUtc: (localInput: string, timeZone: string) => Date;
-}): Array<{ at: Date; slot: QueueSlotLike }> {
-  const out: Array<{ at: Date; slot: QueueSlotLike }> = [];
+}): Array<{ at: Date; slot: S }> {
+  const out: Array<{ at: Date; slot: S }> = [];
   const dayMs = 24 * 60 * 60 * 1000;
 
   for (let offset = 0; offset <= options.days; offset += 1) {

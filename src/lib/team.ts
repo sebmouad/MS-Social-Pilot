@@ -300,3 +300,50 @@ export async function changeRole(
   });
   await logActivity(workspaceId, 'team.roleChanged', { userId, role });
 }
+
+/**
+ * Limit a member to some of the workspace's Pages, or give them all back.
+ *
+ * Only for people below admin: an admin can change anybody's access, their own
+ * included, so limiting one would hold nothing (see `src/lib/page-access.ts`).
+ * Ids that are not Pages of this workspace are dropped.
+ */
+export async function setPageAccess(
+  workspaceId: string,
+  userId: string,
+  access: { all: boolean; targetIds: string[] },
+  actorRole: WorkspaceRole,
+): Promise<void> {
+  const membership = await prisma.membership.findUnique({
+    where: { userId_workspaceId: { userId, workspaceId } },
+  });
+  if (!membership) throw new AppError({ key: 'errors.notFound', fallback: 'Not found.', status: 404 });
+  assertRankPermits(actorRole, membership.role);
+  if (atLeast(membership.role, WorkspaceRole.admin) && !access.all) {
+    throw new AppError({
+      key: 'errors.adminsSeeAllPages',
+      fallback: 'Owners and admins always have every Page. Change their role first.',
+      status: 409,
+    });
+  }
+
+  const targets = access.all
+    ? []
+    : await prisma.target.findMany({
+        where: { workspaceId, id: { in: access.targetIds } },
+        select: { id: true },
+      });
+
+  await prisma.$transaction([
+    prisma.membership.update({ where: { id: membership.id }, data: { allPages: access.all } }),
+    prisma.memberPageAccess.deleteMany({ where: { membershipId: membership.id } }),
+    prisma.memberPageAccess.createMany({
+      data: targets.map((target) => ({ membershipId: membership.id, targetId: target.id })),
+    }),
+  ]);
+  await logActivity(workspaceId, 'team.pageAccessChanged', {
+    userId,
+    all: access.all,
+    pages: targets.length,
+  });
+}

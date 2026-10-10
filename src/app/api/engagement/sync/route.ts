@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
+import { assertPageParam } from '@/lib/page-access';
 import { ok, readJson, route } from '@/lib/api';
 import { canModerateComments } from '@/lib/constants';
 import { EDGE_NAMES, syncWorkspaceEdges } from '@/lib/engagement';
@@ -50,6 +51,7 @@ export const POST = route(async (request: Request) => {
   }
 
   const input = schema.parse((await readJson(request).catch(() => ({}))) ?? {});
+  assertPageParam(auth.pageScope, input.targetId);
 
   const { results, empty } = await syncWorkspaceEdges({
     workspaceId: auth.workspace.id,

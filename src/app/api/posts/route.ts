@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
+import { assertPagesAllowed, postScope } from '@/lib/page-access';
 import { prisma } from '@/lib/prisma';
 import { createPost } from '@/lib/posts';
 import { createPostSchema } from '@/lib/validation';
@@ -39,6 +40,7 @@ export const GET = route(async (request: Request) => {
   const posts = await prisma.post.findMany({
     where: {
       workspaceId: auth.workspace.id,
+      ...postScope(auth.pageScope),
       ...(statuses ? { status: { in: statuses } } : {}),
       ...(from || to ? { scheduledAt } : {}),
     },
@@ -77,6 +79,7 @@ export const GET = route(async (request: Request) => {
 export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
   const input = createPostSchema.parse(await readJson(request));
+  assertPagesAllowed(auth.pageScope, input.targetIds);
 
   const result = await createPost(
         {

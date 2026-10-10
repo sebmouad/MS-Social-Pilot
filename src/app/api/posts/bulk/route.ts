@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth';
+import { assertPagesAllowed } from '@/lib/page-access';
 import { assertBulkRowsAllowed, createPost } from '@/lib/posts';
 import { parseCsvWithHeader } from '@/lib/csv';
 import { bulkUploadSchema, bulkRowSchema } from '@/lib/validation';
@@ -16,6 +17,7 @@ import { logActivity } from '@/lib/scheduler/runner';
 export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
   const input = bulkUploadSchema.parse(await readJson(request));
+  assertPagesAllowed(auth.pageScope, input.targetIds);
 
   const { rows, problems } = parseCsvWithHeader(input.csv);
 
