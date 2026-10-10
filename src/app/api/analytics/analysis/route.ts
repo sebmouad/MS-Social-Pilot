@@ -8,6 +8,7 @@ import { analysePage } from '@/lib/page-analysis-data';
 import { syncPostInsights, syncTargetAnalytics } from '@/lib/analytics';
 import { syncWorkspaceEdges } from '@/lib/engagement';
 import { ok, readJson, route } from '@/lib/api';
+import { refreshState, startRefresh } from '@/lib/background-refresh';
 
 /**
  * Page analysis, as data — and the button that brings it up to date.
@@ -19,8 +20,6 @@ import { ok, readJson, route } from '@/lib/api';
  * leaves nothing stale behind it.
  */
 export const dynamic = 'force-dynamic';
-/** A Page with a long history and many posts takes a while to read. */
-export const maxDuration = 120;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Our own posts refreshed per press: the worker catches up on the rest. */
@@ -43,6 +42,10 @@ async function pageFor(workspaceId: string, targetId: string) {
 export const GET = route(async (request: Request) => {
   const auth = await requireAuth();
   const url = new URL(request.url);
+  if (url.searchParams.get('status') === '1') {
+    const page = await pageFor(auth.workspace.id, url.searchParams.get('targetId') ?? '');
+    return ok(refreshState(refreshKey(auth.workspace.id, page.id)));
+  }
   const input = querySchema.parse({
     targetId: url.searchParams.get('targetId') ?? undefined,
     days: url.searchParams.get('days') ?? undefined,
@@ -62,22 +65,41 @@ export const GET = route(async (request: Request) => {
   });
 });
 
+/**
+ * Start reading Facebook for this Page and answer at once; GET with
+ * `status=1` says how it is going. The read can take longer than the proxy
+ * waits, so it is never held open on the request (lib/background-refresh).
+ */
 export const POST = route(async (request: Request) => {
   const auth = await requireAuth();
   const input = querySchema.parse(await readJson(request));
   const page = await pageFor(auth.workspace.id, input.targetId);
 
+  const state = startRefresh(refreshKey(auth.workspace.id, page.id), () =>
+    refreshPage(auth.workspace.id, page.id, input.days),
+  );
+  return ok(state, 202);
+});
+
+function refreshKey(workspaceId: string, targetId: string): string {
+  return `analysis:${workspaceId}:${targetId}`;
+}
+
+async function refreshPage(workspaceId: string, pageId: string, days: number) {
+  const page = { id: pageId };
   const now = new Date();
   // Both halves of the comparison, and at least the ninety days the best-time
   // grid is drawn from.
-  const since = new Date(now.getTime() - Math.max(input.days * 2, 90) * DAY_MS);
+  const since = new Date(now.getTime() - Math.max(days * 2, 90) * DAY_MS);
 
   const problems: string[] = [];
 
   const insights = await syncTargetAnalytics({ targetId: page.id, since, until: now });
   if (insights.error) problems.push(insights.error);
 
-  const edges = await syncWorkspaceEdges({ workspaceId: auth.workspace.id, targetId: page.id, since });
+  // Only the Page's own posts: the analysis is built from posts and Page
+  // figures, and the inbox, comments and videos have their own buttons.
+  const edges = await syncWorkspaceEdges({ workspaceId, targetId: page.id, since, edges: ['externalPosts'] });
   for (const result of edges.results) {
     for (const failure of result.errors) problems.push(`${failure.edge}: ${failure.message}`);
   }
@@ -95,10 +117,10 @@ export const POST = route(async (request: Request) => {
     else if (result.error) problems.push(result.error);
   }
 
-  return ok({
+  return {
     stored: insights.stored,
     postsRefreshed: refreshed,
     // Each distinct problem once: one expired token fails every call the same way.
     problems: [...new Set(problems)].slice(0, 5),
-  });
-});
+  };
+}

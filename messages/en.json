@@ -1125,7 +1125,8 @@
         "hashtags": "Has hashtags",
         "link": "Has a link"
       }
-    }
+    },
+    "stillReading": "Facebook is still answering. The figures will appear when you come back in a few minutes."
   },
   "posts": {
     "title": "Posts",

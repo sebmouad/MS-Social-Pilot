@@ -1125,7 +1125,8 @@
         "hashtags": "Contient des hashtags",
         "link": "Contient un lien"
       }
-    }
+    },
+    "stillReading": "Facebook répond encore. Les chiffres apparaîtront si vous revenez dans quelques minutes."
   },
   "posts": {
     "title": "Publications",
