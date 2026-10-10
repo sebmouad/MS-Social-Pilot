@@ -1204,7 +1204,9 @@
     "upcomingTitle": "Coming up in the next 7 days",
     "weeklyHint": "Every page in this workspace shares these times. A post added to the queue takes the next free one.",
     "weeklyTitle": "Weekly slots",
-    "writePost": "Write a post"
+    "writePost": "Write a post",
+    "freeHint": "Nothing takes this slot yet. Write a post and add it to the queue.",
+    "inQueue": "In the queue"
   },
   "reports": {
     "title": "Reports",

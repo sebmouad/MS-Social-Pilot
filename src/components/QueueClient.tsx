@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import { Icon } from './Icon';
+import { FeedPost } from './FeedPost';
 
 interface Slot {
   dayOfWeek: number;
@@ -23,9 +24,17 @@ interface Upcoming {
   iso: string;
   label: string;
   weekday: number;
+  /** The day heading and the time on the rail, in the workspace's zone. */
+  day: string;
+  time: string;
   post: {
     id: string;
     message: string;
+    link: string | null;
+    status: string;
+    /** The Page, or Pages, it goes to. */
+    author: { name: string; pictureUrl: string | null };
+    images: Array<{ url: string; alt: string | null }>;
     pending: boolean;
     /** Whether this person may change it now; otherwise it opens the post list. */
     editable: boolean;
@@ -266,26 +275,67 @@ export function QueueClient({
         {upcoming.length === 0 ? (
           <p className="px-4 py-6 text-sm text-slate-600 sm:px-5">{t('upcomingNone')}</p>
         ) : (
-          <ul className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
-            {upcoming.map((entry) => (
-              <li key={entry.iso} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
-                <span className="nums w-40 shrink-0 text-sm text-slate-700 sm:w-48">{entry.label}</span>
-                {entry.post ? (
-                  <Link
-                    href={entry.post.editable ? `/compose?post=${entry.post.id}` : '/posts'}
-                    className="min-w-0 flex-1 truncate text-sm text-slate-900 hover:underline"
-                  >
-                    {entry.post.message || t('noText')}
-                  </Link>
-                ) : (
-                  <span className="flex-1 text-sm text-slate-400">{t('free')}</span>
-                )}
-                {entry.post?.pending && (
-                  <span className="badge shrink-0 bg-violet-50 text-violet-700">{t('awaitingApproval')}</span>
-                )}
-              </li>
+          // A timeline, day by day: each slot's time on the rail, and beside
+          // it the post that takes it, drawn as the feed will draw it — or,
+          // where nothing does yet, the way in to writing one.
+          <div className="mt-3 border-t border-slate-100 bg-slate-50/60">
+          <div className="mx-auto max-w-[720px] space-y-5 px-3 py-4 sm:px-5">
+            {days(upcoming).map((group) => (
+              <section key={group.day} aria-label={group.day}>
+                <h3 className="mb-2 px-1 text-[15px] font-semibold text-slate-600 first-letter:uppercase">
+                  {group.day}
+                </h3>
+                <ol className="space-y-3">
+                  {group.entries.map((entry) => (
+                    <li key={entry.iso} className="flex gap-3">
+                      <time
+                        dateTime={entry.iso}
+                        className="nums w-12 shrink-0 pt-3 text-right text-sm font-semibold text-slate-900"
+                        title={entry.label}
+                      >
+                        {entry.time}
+                      </time>
+                      <div className="min-w-0 flex-1">
+                        {entry.post ? (
+                          <FeedPost
+                            compact
+                            clamp
+                            className="ring-1 ring-black/5"
+                            href={entry.post.editable ? `/compose?post=${entry.post.id}` : '/posts'}
+                            author={entry.post.author}
+                            meta={t('inQueue')}
+                            badge={
+                              entry.post.pending ? (
+                                <span className="badge bg-violet-50 text-violet-700">{t('awaitingApproval')}</span>
+                              ) : undefined
+                            }
+                            message={entry.post.message}
+                            emptyText={t('noText')}
+                            images={entry.post.images}
+                            link={entry.post.link}
+                          />
+                        ) : (
+                          <Link
+                            href="/compose"
+                            className="flex items-center gap-3 rounded-lg border-2 border-dashed border-slate-200 px-3 py-3 text-sm text-slate-600 hover:border-brand-300 hover:bg-brand-50/40 hover:text-brand-700"
+                          >
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                              <Icon name="plus" size={16} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-semibold text-slate-700">{t('free')}</span>
+                              <span className="block text-xs">{t('freeHint')}</span>
+                            </span>
+                          </Link>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
             ))}
-          </ul>
+          </div>
+          </div>
         )}
         <div className="px-4 py-3 sm:px-5">
           <Link href="/compose" className="btn-secondary">
@@ -296,4 +346,15 @@ export function QueueClient({
       </section>
     </div>
   );
+}
+
+/** Consecutive slots sharing a day, in the order they come. */
+function days(entries: Upcoming[]): Array<{ day: string; entries: Upcoming[] }> {
+  const groups: Array<{ day: string; entries: Upcoming[] }> = [];
+  for (const entry of entries) {
+    const last = groups[groups.length - 1];
+    if (last && last.day === entry.day) last.entries.push(entry);
+    else groups.push({ day: entry.day, entries: [entry] });
+  }
+  return groups;
 }

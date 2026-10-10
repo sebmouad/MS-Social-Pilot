@@ -14,6 +14,7 @@ import { loadPagePosts } from '@/lib/page-analysis-data';
 import { prisma } from '@/lib/prisma';
 import { suggestSlots, upcomingOccurrences } from '@/lib/queue-suggestions';
 import { localInputToUtc } from '@/lib/time';
+import { parseMedia } from '@/lib/json';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,10 +64,12 @@ export default async function QueuePage() {
       select: {
         id: true,
         message: true,
+        link: true,
+        media: true,
         scheduledAt: true,
         status: true,
         authorId: true,
-        targets: { select: { status: true } },
+        targets: { select: { status: true, target: { select: { name: true, pictureUrl: true } } } },
       },
     }),
   ]);
@@ -95,6 +98,10 @@ export default async function QueuePage() {
     timeZone,
   });
 
+  // The timeline's day headings and the time beside each slot.
+  const dayOf = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone });
+  const timeOf = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone });
+
   const byTime = new Map(taken.map((post) => [post.scheduledAt!.getTime(), post]));
   // The calendar's rule: a post this person can still change opens in the
   // composer, anything else opens the list, which says why it cannot be.
@@ -108,11 +115,22 @@ export default async function QueuePage() {
       return {
         iso: entry.at.toISOString(),
         label: when.format(entry.at),
+        day: dayOf.format(entry.at),
+        time: timeOf.format(entry.at),
         weekday: entry.slot.dayOfWeek,
         post: post
           ? {
               id: post.id,
               message: post.message,
+              link: post.link,
+              status: post.status,
+              author: {
+                name: post.targets.map((row) => row.target.name).join(', '),
+                pictureUrl: post.targets[0]?.target.pictureUrl ?? null,
+              },
+              images: parseMedia(post.media)
+                .filter((item) => item.kind === 'image')
+                .map((item) => ({ url: item.url, alt: item.altText ?? null })),
               pending: post.status === 'pending_approval',
               editable: editable(post),
             }

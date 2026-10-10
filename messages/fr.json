@@ -1204,7 +1204,9 @@
     "upcomingTitle": "Dans les 7 prochains jours",
     "weeklyHint": "Toutes les pages de cet espace partagent ces horaires. Une publication ajoutée à la file prend le prochain créneau libre.",
     "weeklyTitle": "Créneaux hebdomadaires",
-    "writePost": "Rédiger une publication"
+    "writePost": "Rédiger une publication",
+    "freeHint": "Aucune publication n'occupe ce créneau. Écrivez-en une et ajoutez-la à la file.",
+    "inQueue": "Dans la file"
   },
   "reports": {
     "title": "Rapports",
