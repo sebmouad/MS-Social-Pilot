@@ -1478,5 +1478,30 @@
     "from": "Du",
     "to": "Au",
     "apply": "Appliquer"
+  },
+  "hub": {
+    "title": "Vos Pages",
+    "summary": "{pages, plural, =0 {Aucune Page} one {Une Page} other {# Pages}} depuis {profiles, plural, =0 {aucun profil Facebook} one {un profil Facebook} other {# profils Facebook}}{ads, plural, =0 {} one { · un compte publicitaire} other { · # comptes publicitaires}}",
+    "connectProfile": "Connecter un autre profil",
+    "noPages": "Aucune Page pour l’instant",
+    "noPagesHint": "Connectez un profil Facebook : toutes les Pages qu’il gère apparaissent ici, prêtes à publier.",
+    "paused": "En pause",
+    "reconnect": "À reconnecter",
+    "cannotPublish": "Publication impossible",
+    "expiresSoon": "Accès jusqu’à {when}",
+    "ready": "Prête",
+    "followers": "{count, plural, one {# abonné} other {# abonnés}}",
+    "via": "Via {profile}",
+    "write": "Écrire",
+    "inbox": "Messages",
+    "comments": "Commentaires",
+    "insights": "Statistiques",
+    "nextPost": "Prochaine publication",
+    "nothingPlanned": "Rien de prévu",
+    "lastPost": "Dernière publication",
+    "waiting": "{count, plural, =0 {Rien en attente de publication} one {Une publication en attente} other {# publications en attente}}",
+    "actionsFor": "Actions pour {page}",
+    "adAccounts": "Comptes publicitaires",
+    "groupsNote": "Les groupes Facebook ne peuvent être gérés depuis aucune application : Meta a retiré la publication dans les groupes le 22 avril 2024."
   }
 }

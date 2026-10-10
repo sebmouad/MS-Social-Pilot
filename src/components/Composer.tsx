@@ -39,6 +39,8 @@ interface Props {
    * cancelling the post and typing it again.
    */
   editing?: EditingPost;
+  /** Destinations ticked to start with: a Page's card opens the composer for it. */
+  initialTargetIds?: string[];
 }
 
 export interface EditingPost {
@@ -78,6 +80,7 @@ export function Composer({
   requiresApproval,
   canPublishDirectly,
   editing,
+  initialTargetIds,
 }: Props) {
   const t = useTranslations('compose');
   // Passed explicitly: this runs in the browser, outside the server request
@@ -97,7 +100,7 @@ export function Composer({
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [media, setMedia] = useState<PostMedia[]>(editing?.media ?? []);
-  const [selected, setSelected] = useState<string[]>(editing?.targetIds ?? []);
+  const [selected, setSelected] = useState<string[]>(editing?.targetIds ?? initialTargetIds ?? []);
   const [timing, setTiming] = useState<Timing>('schedule');
   const [handler, setHandler] = useState<Handler>(
     editing?.publishMode === 'native' ? 'native' : 'worker',

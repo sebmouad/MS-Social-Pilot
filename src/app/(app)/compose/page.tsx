@@ -139,6 +139,8 @@ export default async function ComposePage({
         requiresApproval={auth.workspace.requiresApproval}
         canPublishDirectly={canPublishWithoutApproval(auth.role)}
         {...(editing ? { editing } : {})}
+        // `?to=` from a Page's card: start with that Page ticked.
+        initialTargetIds={editing ? undefined : requestedTargets(params.to, targets)}
         targets={targets.map((target) => ({
           id: target.id,
           name: target.name,
@@ -157,6 +159,16 @@ export default async function ComposePage({
 }
 
 type Auth = Awaited<ReturnType<typeof requirePage>>;
+
+/** The destinations named by `?to=`, kept only where they can be posted to. */
+function requestedTargets(
+  raw: string | string[] | undefined,
+  targets: Array<{ id: string; canPublish: boolean; enabled: boolean }>,
+): string[] | undefined {
+  const ids = (Array.isArray(raw) ? raw : raw ? [raw] : []).flatMap((value) => value.split(','));
+  const usable = targets.filter((target) => ids.includes(target.id) && target.canPublish && target.enabled);
+  return usable.length > 0 ? usable.map((target) => target.id) : undefined;
+}
 
 /**
  * `?at=YYYY-MM-DDTHH:mm`, from the calendar's "new post on this day", when it

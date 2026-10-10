@@ -1478,5 +1478,30 @@
     "from": "From",
     "to": "To",
     "apply": "Apply"
+  },
+  "hub": {
+    "title": "Your Pages",
+    "summary": "{pages, plural, =0 {No Pages} one {One Page} other {# Pages}} from {profiles, plural, =0 {no Facebook profile} one {one Facebook profile} other {# Facebook profiles}}{ads, plural, =0 {} one { · one ad account} other { · # ad accounts}}",
+    "connectProfile": "Connect another profile",
+    "noPages": "No Pages yet",
+    "noPagesHint": "Connect a Facebook profile and every Page it manages appears here, ready to post to.",
+    "paused": "Paused",
+    "reconnect": "Reconnect",
+    "cannotPublish": "Can’t publish",
+    "expiresSoon": "Access ends {when}",
+    "ready": "Ready",
+    "followers": "{count, plural, one {# follower} other {# followers}}",
+    "via": "Through {profile}",
+    "write": "Write",
+    "inbox": "Inbox",
+    "comments": "Comments",
+    "insights": "Insights",
+    "nextPost": "Next post",
+    "nothingPlanned": "Nothing planned",
+    "lastPost": "Last post",
+    "waiting": "{count, plural, =0 {Nothing waiting to go out} one {One post waiting to go out} other {# posts waiting to go out}}",
+    "actionsFor": "Actions for {page}",
+    "adAccounts": "Ad accounts",
+    "groupsNote": "Facebook groups can’t be managed from any app: Meta removed group posting for every app on 22 April 2024."
   }
 }

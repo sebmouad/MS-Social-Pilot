@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { Icon, type IconName } from '@/components/Icon';
 import { StatusBadge } from '@/components/StatusBadge';
 import { FeedPost } from '@/components/FeedPost';
+import { PagesHub } from '@/components/PagesHub';
 import { feedLinkOf, feedMediaOf } from '@/lib/feed';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
@@ -12,7 +13,7 @@ import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
 import { formatInZone, relativeTime, appLocale } from '@/lib/time';
 import { publishedTotals, recentOutcomes } from '@/lib/analytics';
-import { canManageInstance } from '@/lib/constants';
+import { canManageAccounts, canManageInstance } from '@/lib/constants';
 import { readSetupState } from '@/lib/setup';
 
 export const dynamic = 'force-dynamic';
@@ -148,6 +149,13 @@ export default async function DashboardPage() {
           </Link>
         </div>
       )}
+
+      <PagesHub
+        workspaceId={workspaceId}
+        timeZone={auth.workspace.timezone}
+        canConnect={canManageAccounts(auth.role)}
+        now={now}
+      />
 
       {/* Each tile is a link to the list it counts: a number nobody can act on
           is decoration, and the count is exactly the filter someone wants. */}
