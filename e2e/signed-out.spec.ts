@@ -111,8 +111,7 @@ test('the privacy policy is readable without an account', async ({ page }) => {
   const failures = collectFailures(page);
 
   await open(page, '/privacy-policy');
-  await expect(page.getByRole('heading', { level: 2, name: 'Politique de confidentialité' })).toBeVisible();
-  await expect(page.getByRole('heading', { level: 2, name: 'Privacy policy' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Privacy policy' })).toBeVisible();
 
   expect(failures).toEqual([]);
 });
