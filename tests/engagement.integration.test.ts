@@ -63,6 +63,7 @@ beforeAll(async () => {
           error: {
             message: 'Unsupported get request. Object with ID does not exist.',
             code: 100,
+            error_subcode: 33,
             type: 'GraphMethodException',
           },
         }),
@@ -300,6 +301,43 @@ describe('syncTargetEdges', () => {
     expect(result.conversations).toBe(0);
     expect(result.errors.map((error) => error.edge)).toEqual(['conversations']);
     expect(result.errors[0]!.message).toMatch(/permission/i);
+  });
+
+  it('reads every other post when one was deleted on Facebook', async () => {
+    // The newest post was binned on Facebook. Its comments read used to end
+    // the pass, every pass, so no other post's comments were ever stored.
+    const { workspace, user, target } = await seedWorkspace();
+    stubEverything();
+    const gone = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: user.id,
+        message: 'Binned on Facebook',
+        status: 'published',
+        targets: {
+          create: {
+            targetId: target.id,
+            status: 'published',
+            remotePostId: 'binned-post',
+            publishedAt: new Date('2026-09-01T10:00:00Z'),
+          },
+        },
+      },
+      include: { targets: true },
+    });
+    vanished = ['binned-post/comments'];
+
+    const result = await engagement.syncTargetEdges({ targetId: target.id });
+
+    expect(result.comments).toBe(1);
+    expect(result.errors).toEqual([]);
+    const row = await prisma.postTarget.findUniqueOrThrow({ where: { id: gone.targets[0]!.id } });
+    expect(row.remoteMissingAt).not.toBeNull();
+
+    // Noted once, then left alone: the next pass does not ask about it.
+    asked = [];
+    await engagement.syncTargetEdges({ targetId: target.id });
+    expect(asked.some((call) => call.path.includes('binned-post'))).toBe(false);
   });
 
   it('is idempotent', async () => {

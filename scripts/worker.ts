@@ -14,7 +14,7 @@
 
 import { prisma } from '../src/lib/prisma';
 import { jobDefinitions, type JobDefinition } from '../src/lib/scheduler/jobs';
-import { createLoopState, dueJobs, markFinished, markStarted } from '../src/lib/scheduler/loop';
+import { createLoopState, dueJobs, markFinished, markStarted, seedFromHistory } from '../src/lib/scheduler/loop';
 import { ensureSettings } from '../src/lib/settings';
 
 const workerId = `${process.env.HOSTNAME ?? 'host'}-${process.pid}`;
@@ -40,12 +40,16 @@ function log(message: string, detail?: unknown): void {
  * A failing RSS poll must not stop posts publishing, so no job is allowed to
  * take the loop down with it.
  */
-async function runJob(job: JobDefinition): Promise<void> {
+async function runJob(job: JobDefinition): Promise<number | undefined> {
   const started = Date.now();
+  let deferMs: number | undefined;
   try {
     const summary = await job.run({
       now: new Date(),
       logger: (message, detail) => log(`[${job.name}] ${message}`, detail),
+      defer: (ms) => {
+        deferMs = ms;
+      },
     });
     // Quiet when there was nothing to do: a worker that logs every 30 seconds
     // trains people to ignore its output.
@@ -53,6 +57,7 @@ async function runJob(job: JobDefinition): Promise<void> {
   } catch (error) {
     console.error(`${new Date().toISOString()} [${workerId}] [${job.name}] failed`, error);
   }
+  return deferMs;
 }
 
 async function main(): Promise<void> {
@@ -68,6 +73,13 @@ async function main(): Promise<void> {
   );
 
   const state = createLoopState();
+  // Pick the schedule up where the last process left it. Never fatal: a
+  // worker that cannot read its history runs everything once, as it used to.
+  const history = await prisma.workerJobRun
+    .findMany()
+    .then((rows) => new Map(rows.map((row) => [row.name, row.finishedAt.getTime()])))
+    .catch(() => new Map<string, number>());
+  seedFromHistory(state, jobDefinitions(), history);
   let lastHeartbeat = 0;
 
   while (!stopping) {
@@ -81,11 +93,23 @@ async function main(): Promise<void> {
     for (const job of dueJobs(jobs, state, Date.now())) {
       markStarted(state, job);
 
-      const running = runJob(job).finally(() => {
+      const running = runJob(job).then((deferMs) => {
         // Scheduled from the finish, so a job that overruns its interval
         // settles into a longer cycle rather than running back to back.
-        markFinished(state, job, Date.now());
+        const finished = Date.now();
+        markFinished(state, job, finished, deferMs);
         inFlight.delete(running);
+        // A deferred run did not happen, so it does not reset the clock a
+        // restart would read.
+        if (deferMs === undefined) {
+          void prisma.workerJobRun
+            .upsert({
+              where: { name: job.name },
+              create: { name: job.name, finishedAt: new Date(finished) },
+              update: { finishedAt: new Date(finished) },
+            })
+            .catch((error: unknown) => log('job history write failed', error));
+        }
       });
       inFlight.add(running);
     }

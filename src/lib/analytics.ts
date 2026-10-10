@@ -8,7 +8,7 @@ import { decryptSecret } from './crypto';
 import { parseInsights, parseMedia, toJson } from './json';
 import { feedLinkOf, feedMediaOf, feedMediaOfPicture } from './feed';
 import type { FeedLinkPreview, FeedMedia } from '@/components/FeedPost';
-import { asGraphError } from './facebook/graph';
+import { asGraphError, isMissingObject } from './facebook/graph';
 import {
   fetchInsights,
   fetchPageProfile,
@@ -704,6 +704,12 @@ export async function syncPostInsights(postTargetId: string): Promise<{
 
     return { ok: true, metrics: result.count };
   } catch (error) {
+    // Gone from Facebook: say so once, and stop asking about it.
+    if (isMissingObject(error)) {
+      await prisma.postTarget
+        .updateMany({ where: { id: postTargetId, remoteMissingAt: null }, data: { remoteMissingAt: new Date() } })
+        .catch(() => undefined);
+    }
     return { ok: false, metrics: 0, error: asGraphError(error).displayMessage };
   }
 }

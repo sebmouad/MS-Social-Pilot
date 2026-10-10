@@ -54,7 +54,28 @@ export function markStarted(state: LoopState, job: JobDefinition): void {
  * Measured from now rather than from when this run began, so a job that
  * overruns its interval does not come due the instant it stops.
  */
-export function markFinished(state: LoopState, job: JobDefinition, now: number): void {
+export function markFinished(state: LoopState, job: JobDefinition, now: number, nextInMs?: number): void {
   state.running.delete(job.name);
-  state.nextRunAt.set(job.name, now + job.intervalMs);
+  state.nextRunAt.set(job.name, now + (nextInMs ?? job.intervalMs));
+}
+
+/**
+ * Carry the schedule over from before a restart.
+ *
+ * A fresh worker used to find every job due and run them all at once: each
+ * deploy spent a full analytics, insights and comments pass, and on a small
+ * Meta app a few deploys in a day were enough to spend the hour's call
+ * allowance and have Facebook refuse the next scheduled post. A job that
+ * finished recently now waits out the rest of its interval; one that never
+ * ran, or is overdue, still runs straight away.
+ */
+export function seedFromHistory(
+  state: LoopState,
+  jobs: JobDefinition[],
+  finishedAt: Map<string, number>,
+): void {
+  for (const job of jobs) {
+    const finished = finishedAt.get(job.name);
+    if (finished !== undefined) state.nextRunAt.set(job.name, finished + job.intervalMs);
+  }
 }

@@ -1,4 +1,5 @@
 import { prisma } from '../prisma';
+import { backgroundBudget } from '../facebook/budget';
 import { postFirstComment } from '../first-comment';
 import { env } from '../env';
 import { notifyTokenExpiring } from '../email/notify';
@@ -42,6 +43,25 @@ export type JobName =
 export interface JobContext {
   now: Date;
   logger: (message: string, detail?: unknown) => void;
+  /** Ask to run again sooner than the interval: a sync that stood aside. */
+  defer?: (ms: number) => void;
+}
+
+/**
+ * A background sync that spends Graph calls only while the app has some to
+ * spare. Publishing is never wrapped: it is what the allowance is kept for.
+ * A sync that stands aside asks to be tried again once the window has moved,
+ * rather than waiting out a six- or twelve-hour interval.
+ */
+function withinBudget(run: (context: JobContext) => Promise<string | null>) {
+  return async (context: JobContext): Promise<string | null> => {
+    const verdict = backgroundBudget(context.now.getTime());
+    if (!verdict.ok) {
+      context.defer?.(verdict.retryInMs);
+      return `waiting: ${verdict.reason}; publishing keeps the rest`;
+    }
+    return run(context);
+  };
 }
 
 export interface JobDefinition {
@@ -258,7 +278,7 @@ export async function runNativeReconcile(context: JobContext): Promise<string | 
  */
 export async function runAnalyticsRefresh(context: JobContext): Promise<string | null> {
   const rows = await prisma.postTarget.findMany({
-    where: { status: 'published', remotePostId: { not: null } },
+    where: { status: 'published', remotePostId: { not: null }, remoteMissingAt: null },
     orderBy: [{ insightsSyncedAt: { sort: 'asc', nulls: 'first' } }, { publishedAt: 'desc' }],
     take: env.analyticsBatch,
     select: { id: true, target: { select: { name: true } } },
@@ -508,17 +528,17 @@ export function jobDefinitions(): JobDefinition[] {
     {
       name: 'analytics',
       intervalMs: env.analyticsRefreshHours * 60 * 60 * 1000,
-      run: runAnalyticsRefresh,
+      run: withinBudget(runAnalyticsRefresh),
     },
     {
       name: 'pageInsights',
       intervalMs: env.pageInsightsHours * 60 * 60 * 1000,
-      run: runPageInsightsSync,
+      run: withinBudget(runPageInsightsSync),
     },
     {
       name: 'edges',
       intervalMs: env.edgeSyncHours * 60 * 60 * 1000,
-      run: runEdgeSync,
+      run: withinBudget(runEdgeSync),
     },
     // Instagram and Ads need permissions Meta reviews separately. Running them
     // unapproved would spend the rate limit on a permission error every pass,
@@ -528,7 +548,7 @@ export function jobDefinitions(): JobDefinition[] {
           {
             name: 'instagram' as const,
             intervalMs: env.instagramSyncHours * 60 * 60 * 1000,
-            run: runInstagramSync,
+            run: withinBudget(runInstagramSync),
           },
         ]
       : []),
@@ -537,7 +557,7 @@ export function jobDefinitions(): JobDefinition[] {
           {
             name: 'ads' as const,
             intervalMs: env.adsSyncHours * 60 * 60 * 1000,
-            run: runAdsSync,
+            run: withinBudget(runAdsSync),
           },
         ]
       : []),

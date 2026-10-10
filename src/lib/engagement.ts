@@ -5,7 +5,7 @@ import { env } from './env';
 import { canDeleteComments, canModerateComments } from './constants';
 import { decryptSecret } from './crypto';
 import { parseInsights, toJson, toJsonOrNull } from './json';
-import { asGraphError, pageRatingsAvailable } from './facebook/graph';
+import { asGraphError, isMissingObject, pageRatingsAvailable } from './facebook/graph';
 import { fetchInsights } from './facebook/analytics';
 import { logActivity } from './scheduler/runner';
 import { syncExternalPostInsights } from './analytics';
@@ -98,6 +98,17 @@ const COMMENT_SYNC_OVERLAP_MS = 24 * 60 * 60 * 1000;
  * where the last one stopped, and the ceiling applies to what arrived since
  * rather than to the post's whole history.
  */
+/**
+ * Facebook says this post is gone — deleted, or binned, on Facebook. Noted so
+ * the comment and analytics syncs stop spending a call on it every pass.
+ */
+export async function markRemoteMissing(postTargetId: string, now: Date = new Date()): Promise<void> {
+  await prisma.postTarget.updateMany({
+    where: { id: postTargetId, remoteMissingAt: null },
+    data: { remoteMissingAt: now },
+  });
+}
+
 export async function syncCommentsFor(postTargetId: string): Promise<number> {
   const row = await prisma.postTarget.findUniqueOrThrow({
     where: { id: postTargetId },
@@ -638,14 +649,31 @@ export async function syncTargetEdges(options: {
 
   await attempt('comments', async () => {
     const posts = await prisma.postTarget.findMany({
-      where: { targetId: target.id, status: 'published', remotePostId: { not: null } },
+      where: { targetId: target.id, status: 'published', remotePostId: { not: null }, remoteMissingAt: null },
       orderBy: { publishedAt: 'desc' },
       take: env.commentPostLimit,
       select: { id: true },
     });
 
+    // Post by post: one post deleted on Facebook used to end the pass at
+    // that post, every pass, and no other post's comments were ever read.
     let total = 0;
-    for (const post of posts) total += await syncCommentsFor(post.id);
+    let failure: unknown = null;
+    for (const post of posts) {
+      try {
+        total += await syncCommentsFor(post.id);
+      } catch (error) {
+        if (isMissingObject(error)) {
+          await markRemoteMissing(post.id);
+          continue;
+        }
+        failure ??= error;
+        // The app is over its allowance: every further call would be refused.
+        if (asGraphError(error).code === 4) break;
+      }
+    }
+    if (failure && total === 0) throw failure;
+    if (failure) result.errors.push({ edge: 'comments', message: asGraphError(failure).displayMessage });
     return total;
   });
 

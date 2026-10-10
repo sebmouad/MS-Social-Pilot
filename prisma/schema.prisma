@@ -427,6 +427,9 @@ model PostTarget {
   /// Last analytics snapshot (PostInsights).
   insights         Json?
   insightsSyncedAt DateTime?
+  /// When Facebook said the post no longer exists — deleted or binned on
+  /// Facebook. The syncs stop asking about it; what was read stays.
+  remoteMissingAt  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1003,6 +1006,16 @@ model WorkerHeartbeat {
 
   @@index([seenAt])
   @@map("worker_heartbeats")
+}
+
+/// When each background job last finished, so a restarted worker carries on
+/// its schedule instead of running every sync at once — which, on a small
+/// Meta app, spends the hour's call allowance in one go.
+model WorkerJobRun {
+  name       String   @id
+  finishedAt DateTime
+
+  @@map("worker_job_runs")
 }
 
 model ActivityLog {

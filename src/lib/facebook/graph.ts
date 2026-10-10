@@ -1,5 +1,6 @@
 import { env } from '../env';
 import { hmacHex } from '../crypto';
+import { noteAppUsage, noteThrottled } from './budget';
 
 /**
  * A thin, typed client over the Facebook Graph API.
@@ -90,6 +91,9 @@ export class GraphError extends Error {
  *
  * Reference: developers.facebook.com/docs/graph-api/guides/error-handling
  */
+/** "Application request limit reached": the whole app is over its allowance. */
+const APP_RATE_LIMIT_CODE = 4;
+
 const ERROR_CODE_KINDS: Record<number, GraphFailureKind> = {
   1: 'transient', // Unknown error — Meta explicitly advises retrying.
   2: 'transient', // Service temporarily unavailable.
@@ -275,15 +279,21 @@ export async function graphRequest<T = unknown>(
     }
   }
 
+  // Every answer says how much of the app's allowance is gone; the budget
+  // keeps the last word, so background syncs stop before publishing has to.
+  const appUsagePercent = parseAppUsage(response.headers.get('x-app-usage'));
+  noteAppUsage(appUsagePercent);
+
   if (!response.ok) {
     const body = (parsed as { error?: GraphErrorBody } | null)?.error ?? null;
-    throw toGraphError(body, response.status, `Graph API request failed (HTTP ${response.status}).`);
+    const error = toGraphError(body, response.status, `Graph API request failed (HTTP ${response.status}).`);
+    // Code 4 is the app's own limit — the one every Page shares. A Page's or
+    // a user's limit (32, 17) holds only that Page back.
+    if (error.code === APP_RATE_LIMIT_CODE) noteThrottled();
+    throw error;
   }
 
-  return {
-    data: parsed as T,
-    appUsagePercent: parseAppUsage(response.headers.get('x-app-usage')),
-  };
+  return { data: parsed as T, appUsagePercent };
 }
 
 interface PagedResponse<T> {
@@ -429,4 +439,13 @@ export function pageRatingsAvailable(version: string, now: Date = new Date()): b
   const major = graphMajor(version);
   if (Number.isFinite(major) && major < 22) return true;
   return now < RATINGS_VERSION_RETIRES;
+}
+
+/**
+ * Facebook no longer has the object: the post was deleted, or moved to the
+ * bin, on Facebook itself. Code 100 with subcode 33 ("does not exist, cannot
+ * be loaded due to missing permissions, or does not support this operation").
+ */
+export function isMissingObject(error: unknown): boolean {
+  return error instanceof GraphError && error.code === 100 && error.subcode === 33;
 }
