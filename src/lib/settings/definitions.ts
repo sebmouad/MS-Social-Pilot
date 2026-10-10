@@ -222,6 +222,9 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
       'pages_read_engagement',
       'pages_manage_posts',
       'pages_manage_engagement',
+      // Visitors' comments on the Page's posts: Meta requires it alongside
+      // pages_manage_engagement, which moderates them.
+      'pages_read_user_content',
       'read_insights',
       'business_management',
     ],

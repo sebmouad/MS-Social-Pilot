@@ -56,6 +56,10 @@ const CATALOGUE: Record<string, { label: string; consequence: string }> = {
     label: 'Hide, delete and reply to comments on your Pages',
     consequence: 'Comments can be read but not moderated.',
   },
+  pages_read_user_content: {
+    label: "Read what visitors post on your Pages, such as comments",
+    consequence: "Visitors' comments may be missing from the comment list.",
+  },
   read_insights: {
     label: "Read your Pages' insights",
     consequence: 'Reach, impressions and follower figures stay empty.',
