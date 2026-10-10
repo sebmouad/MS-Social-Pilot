@@ -105,3 +105,14 @@ test('the app has a mark of its own, and enough to pin to a home screen', async 
   await expect(page.locator('link[rel="manifest"]')).toHaveCount(1);
   await expect(page.locator('link[rel="icon"]')).not.toHaveCount(0);
 });
+
+test('the privacy policy is readable without an account', async ({ page }) => {
+  // Meta links here from the Facebook Login dialog and the app's details.
+  const failures = collectFailures(page);
+
+  await open(page, '/privacy-policy');
+  await expect(page.getByRole('heading', { level: 2, name: 'Politique de confidentialité' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'Privacy policy' })).toBeVisible();
+
+  expect(failures).toEqual([]);
+});

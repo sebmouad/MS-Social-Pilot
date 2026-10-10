@@ -307,7 +307,7 @@ test('the three modules are always on screen, and the rest is behind the menu', 
 test.describe('before signing in', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  const PUBLIC_SCREENS = ['/login', '/register', '/data-deletion', '/terms', '/invite/not-a-real-token'];
+  const PUBLIC_SCREENS = ['/login', '/register', '/data-deletion', '/terms', '/privacy-policy', '/invite/not-a-real-token'];
 
   for (const path of PUBLIC_SCREENS) {
     test(`${path} fits on a phone`, async ({ page }) => {

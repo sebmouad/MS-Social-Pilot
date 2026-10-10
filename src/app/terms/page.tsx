@@ -6,7 +6,7 @@
  * sits outside the signed-in layout and is in English only.
  */
 
-const PRIVACY_POLICY_URL = 'https://newsgeet.com/privacy-policy/';
+const PRIVACY_POLICY_URL = '/privacy-policy';
 const CONTACT_EMAIL = 'sebmouad@gmail.com';
 
 export default function TermsPage() {

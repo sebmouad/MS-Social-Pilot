@@ -32,6 +32,7 @@ const INHERITS: Record<string, string> = {
   'src/app/page.tsx': 'Redirects before rendering; nobody sees a tab for it.',
   'src/app/data-deletion/page.tsx': 'A legal notice Meta links to, in English only.',
   'src/app/terms/page.tsx': 'A legal notice Meta links to, in English only.',
+  'src/app/privacy-policy/page.tsx': 'A legal notice Meta links to, in French and English.',
   'src/app/invite/[token]/page.tsx': 'Shown before the invitee belongs to any workspace.',
   'src/app/(app)/analytics/post/[postTargetId]/page.tsx':
     'Titled by the post it shows, which is not known until it is fetched.',
