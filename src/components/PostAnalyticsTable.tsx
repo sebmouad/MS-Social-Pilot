@@ -6,11 +6,14 @@ import { useLocale, useTranslations } from 'next-intl';
 
 import { VIZ, seriesColor } from '@/lib/viz';
 import { ExternalLink } from './ExternalLink';
+import { FeedAvatar } from './FeedPost';
 
 export interface PostRow {
   postTargetId: string;
   message: string;
   targetName: string;
+  targetPictureUrl?: string | null;
+  imageUrl?: string | null;
   publishedLabel: string | null;
   url: string | null;
   impressions: number;
@@ -142,18 +145,27 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
       <ul className="mt-3 space-y-3 sm:hidden">
         {sorted.map((post) => (
           <li key={post.postTargetId} className="rounded-lg border border-slate-200 p-3">
+            {/* The post as the feed draws it, then its numbers. */}
+            <div className="flex items-center gap-2">
+              <FeedAvatar name={post.targetName} pictureUrl={post.targetPictureUrl ?? null} size="sm" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900">{post.targetName}</p>
+                <p className="truncate text-xs text-slate-600">
+                  {post.publishedLabel ?? ''}
+                  {post.paid > 0 && ` · ${t('paid')}`}
+                </p>
+              </div>
+            </div>
             <Link
               href={`/analytics/post/${post.postTargetId}`}
-              className="line-clamp-3 [overflow-wrap:anywhere] text-sm text-slate-800"
+              className="mt-2 line-clamp-3 [overflow-wrap:anywhere] text-sm text-slate-900"
             >
               {post.message || '—'}
             </Link>
-
-            <p className="mt-1 text-xs text-slate-500">
-              {post.targetName}
-              {post.publishedLabel ? ` · ${post.publishedLabel}` : ''}
-              {post.paid > 0 && ` · ${t('paid')}`}
-            </p>
+            {post.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={post.imageUrl} alt="" loading="lazy" className="-mx-3 mt-2 max-h-48 w-[calc(100%+1.5rem)] max-w-none object-cover" />
+            )}
 
             {/* Reach against the best-performing post in the range: the one
                 comparison a single row cannot make on its own. */}
@@ -233,7 +245,15 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
           <tbody>
             {sorted.map((post) => (
               <tr key={post.postTargetId} className="border-b border-slate-100 last:border-0">
-                <td className="max-w-xs py-2 pr-3">
+                <td className="max-w-sm py-2 pr-3">
+                  <div className="flex items-start gap-2.5">
+                  {post.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={post.imageUrl} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                  ) : (
+                    <FeedAvatar name={post.targetName} pictureUrl={post.targetPictureUrl ?? null} size="sm" />
+                  )}
+                  <div className="min-w-0">
                   {/* The table shows seven numbers; the drill-down shows the
                       rest of the catalogue Graph returned for this post. */}
                   <Link
@@ -255,6 +275,8 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
                       </>
                     )}
                   </p>
+                  </div>
+                  </div>
                 </td>
                 {columns.map((column) => {
                   const value = post[column.key];

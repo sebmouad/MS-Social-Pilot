@@ -845,7 +845,7 @@ export async function syncTargetEdges(options: {
             prisma.externalPost.upsert({
               where: { targetId_remoteId: { targetId: target.id, remoteId: post.remoteId } },
               create: { targetId: target.id, ...post },
-              update: { message: post.message, permalink: post.permalink, fetchedAt: new Date() },
+              update: { message: post.message, permalink: post.permalink, pictureUrl: post.pictureUrl, fetchedAt: new Date() },
               select: { id: true },
             }),
           ),
@@ -1197,6 +1197,9 @@ export interface ExternalPostRow {
   statusType: string | null;
   createdTime: Date;
   targetName: string;
+  targetPictureUrl: string | null;
+  /** The picture Facebook shows with it. */
+  pictureUrl: string | null;
   impressions: number | null;
   reach: number | null;
   engagedUsers: number | null;
@@ -1224,7 +1227,7 @@ export async function readExternalPosts(options: {
         ? { createdTime: { ...(options.from ? { gte: options.from } : {}), ...(options.to ? { lte: options.to } : {}) } }
         : {}),
     },
-    include: { target: { select: { name: true } } },
+    include: { target: { select: { name: true, pictureUrl: true } } },
     orderBy: { createdTime: 'desc' },
     take: options.limit ?? 100,
   });
@@ -1239,6 +1242,8 @@ export async function readExternalPosts(options: {
       statusType: row.statusType,
       createdTime: row.createdTime,
       targetName: row.target.name,
+      targetPictureUrl: row.target.pictureUrl,
+      pictureUrl: row.pictureUrl,
       impressions: insights?.impressions ?? null,
       reach: insights?.reach ?? null,
       engagedUsers: insights?.engagedUsers ?? null,

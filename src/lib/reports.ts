@@ -1,7 +1,7 @@
 import { PostTargetStatus } from '@prisma/client';
 
 import { prisma } from './prisma';
-import { parseInsights, type PostInsights } from './json';
+import { parseInsights, parseMedia, type PostInsights } from './json';
 import { DEFAULT_TIMEZONE, firstRealInstant, formatInZone, isValidTimeZone } from './time';
 import { toCsv } from './csv';
 import { AppError, errors } from './errors';
@@ -41,7 +41,10 @@ export interface TopPost {
   /** When it first went out in the range. */
   publishedLabel: string | null;
   /** Every destination it reached in the range, each with its link there. */
-  destinations: Array<{ name: string; url: string | null }>;
+  destinations: Array<{ name: string; url: string | null; pictureUrl?: string | null }>;
+  /** Its first picture and its link, to draw it as the feed does. */
+  imageUrl?: string | null;
+  link?: string | null;
   /** Summed across those destinations. */
   engagement: number;
   impressions: number;
@@ -226,8 +229,8 @@ export async function buildReport(options: {
       post: { workspaceId: options.workspaceId },
     },
     include: {
-      target: { select: { id: true, name: true, type: true } },
-      post: { select: { id: true, message: true } },
+      target: { select: { id: true, name: true, type: true, pictureUrl: true } },
+      post: { select: { id: true, message: true, media: true, link: true } },
     },
     orderBy: { publishedAt: 'desc' },
   });
@@ -285,7 +288,10 @@ export async function buildReport(options: {
       message: row.post.message,
       publishedAt: row.publishedAt,
       targetName: row.target.name,
+      targetPictureUrl: row.target.pictureUrl,
       url: row.remoteUrl,
+      imageUrl: parseMedia(row.post.media).find((item) => item.kind === 'image')?.url ?? null,
+      link: row.post.link,
       engagement,
       impressions: number(insights?.impressions),
     });
@@ -319,7 +325,10 @@ export interface PostDelivery {
   message: string;
   publishedAt: Date | null;
   targetName: string;
+  targetPictureUrl?: string | null;
   url: string | null;
+  imageUrl?: string | null;
+  link?: string | null;
   engagement: number;
   impressions: number;
 }
@@ -342,8 +351,14 @@ export function rankTopPosts(deliveries: PostDelivery[], timezone: string, limit
       destinations: [],
       engagement: 0,
       impressions: 0,
+      ...(row.imageUrl !== undefined ? { imageUrl: row.imageUrl } : {}),
+      ...(row.link !== undefined ? { link: row.link } : {}),
     };
-    post.destinations.push({ name: row.targetName, url: row.url });
+    post.destinations.push({
+      name: row.targetName,
+      url: row.url,
+      ...(row.targetPictureUrl !== undefined ? { pictureUrl: row.targetPictureUrl } : {}),
+    });
     post.engagement += row.engagement;
     post.impressions += row.impressions;
     if (row.publishedAt && (!post.firstPublished || row.publishedAt < post.firstPublished)) {

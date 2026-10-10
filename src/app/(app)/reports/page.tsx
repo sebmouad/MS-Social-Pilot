@@ -11,6 +11,7 @@ import { formatInZone, appLocale } from '@/lib/time';
 import { ReportControls } from '@/components/ReportControls';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { ExternalLink } from '@/components/ExternalLink';
+import { FeedPost } from '@/components/FeedPost';
 import { PageAnalysisView } from '@/components/analysis/PageAnalysisView';
 import { AudienceView } from '@/components/AudienceSection';
 
@@ -238,33 +239,51 @@ export default async function ReportsPage({
                   </div>
                 </section>
 
-                <section className="card p-5">
-                  <h3 className="mb-3 text-sm font-semibold text-slate-900">{t('topPosts')}</h3>
-                  <ol className="space-y-3">
-                    {report.topPosts.map((post) => (
-                      <li key={post.postId} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                        <p className="line-clamp-2 [overflow-wrap:anywhere] text-sm text-slate-800">
-                          {post.message || '—'}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {/* Each destination by name, linked to the post there:
-                              one entry per post, however many Pages it went to. */}
-                          {post.destinations.map((destination, index) => (
-                            <span key={`${destination.name}-${index}`}>
-                              {index > 0 && ', '}
-                              {destination.url ? (
-                                <ExternalLink href={destination.url} className="text-brand-600 hover:underline">
-                                  {destination.name}
-                                </ExternalLink>
-                              ) : (
-                                destination.name
-                              )}
+                <section className="space-y-3">
+                  <h3 className="px-1 text-[17px] font-bold text-slate-900">{t('topPosts')}</h3>
+                  {/* The posts themselves, as the Page's followers saw them. */}
+                  <ol className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {report.topPosts.map((post, index) => (
+                      <li key={post.postId} className="break-inside-avoid">
+                        <FeedPost
+                          compact
+                          clamp
+                          author={{
+                            name: post.destinations.map((destination) => destination.name).join(', '),
+                            pictureUrl: post.destinations[0]?.pictureUrl ?? null,
+                          }}
+                          meta={post.publishedLabel ?? '—'}
+                          badge={
+                            <span className="nums rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
+                              #{index + 1}
                             </span>
-                          ))}
-                          {post.publishedLabel ? ` · ${post.publishedLabel}` : ''} ·{' '}
-                          {t('engagementCount', { count: post.engagement })}
-                          {post.impressions > 0 && ` · ${t('impressionCount', { count: post.impressions })}`}
-                        </p>
+                          }
+                          message={post.message}
+                          emptyText="—"
+                          images={post.imageUrl ? [{ url: post.imageUrl }] : []}
+                          link={post.link}
+                          footer={
+                            <p className="flex flex-wrap items-center gap-x-2 px-1 py-1 text-[13px] text-slate-600">
+                              <span className="font-semibold text-slate-900">
+                                {t('engagementCount', { count: post.engagement })}
+                              </span>
+                              {post.impressions > 0 && <span>· {t('impressionCount', { count: post.impressions })}</span>}
+                              {/* Each destination by name, linked to the post there:
+                                  one entry per post, however many Pages it went to. */}
+                              {post.destinations.map((destination, index) =>
+                                destination.url ? (
+                                  <ExternalLink
+                                    key={`${destination.name}-${index}`}
+                                    href={destination.url}
+                                    className="text-brand-600 hover:underline"
+                                  >
+                                    · {destination.name}
+                                  </ExternalLink>
+                                ) : null,
+                              )}
+                            </p>
+                          }
+                        />
                       </li>
                     ))}
                   </ol>

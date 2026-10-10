@@ -3,6 +3,8 @@ import { getTranslations } from 'next-intl/server';
 
 import { Icon, type IconName } from '@/components/Icon';
 import { StatusBadge } from '@/components/StatusBadge';
+import { FeedPost } from '@/components/FeedPost';
+import { parseMedia } from '@/lib/json';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { summariseConnections } from '@/lib/connections';
@@ -33,7 +35,7 @@ export default async function DashboardPage() {
     await Promise.all([
     prisma.post.findMany({
       where: { workspaceId, status: { in: ['scheduled', 'publishing'] }, scheduledAt: { gte: now } },
-      include: { targets: { include: { target: { select: { name: true } } } } },
+      include: { targets: { include: { target: { select: { name: true, pictureUrl: true } } } } },
       orderBy: { scheduledAt: 'asc' },
       take: 5,
     }),
@@ -198,13 +200,15 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="card p-5">
-          <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <Icon name="clock" className="text-slate-400" /> {t('goingOutNext')}
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        {/* Two feeds side by side, each post drawn as the Page's followers
+            will see it — or saw it. */}
+        <section className="space-y-3" aria-labelledby="dash-next">
+          <h2 id="dash-next" className="flex items-center gap-2 px-1 text-[17px] font-bold text-slate-900">
+            <Icon name="clock" className="text-slate-500" /> {t('goingOutNext')}
           </h2>
           {upcoming.length === 0 ? (
-            <p className="text-sm text-slate-500">
+            <p className="card p-5 text-sm text-slate-600">
               {t('nothingScheduled')}{' '}
               <Link href="/compose" className="font-medium text-brand-600 hover:underline">
                 {t('writeAPost')}
@@ -212,53 +216,67 @@ export default async function DashboardPage() {
               .
             </p>
           ) : (
-            <ul className="space-y-3">
-              {upcoming.map((post) => (
-                <li key={post.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="line-clamp-2 min-w-0 flex-1 [overflow-wrap:anywhere] text-sm text-slate-800">
-                      {post.message || post.link || tPosts('mediaOnly')}
-                    </p>
-                    <StatusBadge status={post.status} />
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {post.scheduledAt
-                      ? `${formatInZone(post.scheduledAt, auth.workspace.timezone)} · ${relativeTime(post.scheduledAt, now)}`
-                      : t('noTimeSet')}{' '}
-                    · {post.targets.map((target) => target.target.name).join(', ')}
-                  </p>
-                </li>
-              ))}
-            </ul>
+            upcoming.map((post) => (
+              <FeedPost
+                key={post.id}
+                compact
+                clamp
+                href={`/compose?post=${post.id}`}
+                author={feedAuthor(post.targets)}
+                meta={
+                  post.scheduledAt
+                    ? `${formatInZone(post.scheduledAt, auth.workspace.timezone)} · ${relativeTime(post.scheduledAt, now)}`
+                    : t('noTimeSet')
+                }
+                badge={<StatusBadge status={post.status} />}
+                message={post.message}
+                emptyText={tPosts('mediaOnly')}
+                images={feedImages(post.media)}
+                link={post.link}
+              />
+            ))
           )}
         </section>
 
-        <section className="card p-5">
-          <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <Icon name="posts" className="text-slate-400" /> {t('recentlyPublished')}
+        <section className="space-y-3" aria-labelledby="dash-recent">
+          <h2 id="dash-recent" className="flex items-center gap-2 px-1 text-[17px] font-bold text-slate-900">
+            <Icon name="posts" className="text-slate-500" /> {t('recentlyPublished')}
           </h2>
           {recent.length === 0 ? (
-            <p className="text-sm text-slate-500">{t('nothingPublished')}</p>
+            <p className="card p-5 text-sm text-slate-600">{t('nothingPublished')}</p>
           ) : (
-            <ul className="space-y-3">
-              {recent.map((post) => (
-                <li key={post.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="line-clamp-2 min-w-0 flex-1 [overflow-wrap:anywhere] text-sm text-slate-800">
-                      {post.message || post.link || tPosts('mediaOnly')}
-                    </p>
-                    <StatusBadge status={post.status} />
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {post.publishedAt ? relativeTime(post.publishedAt, now) : '—'} ·{' '}
-                    {post.targets.map((target) => target.target.name).join(', ')}
-                  </p>
-                </li>
-              ))}
-            </ul>
+            recent.map((post) => (
+              <FeedPost
+                key={post.id}
+                compact
+                clamp
+                href="/posts?status=published"
+                author={feedAuthor(post.targets)}
+                meta={post.publishedAt ? relativeTime(post.publishedAt, now) : '—'}
+                badge={<StatusBadge status={post.status} />}
+                message={post.message}
+                emptyText={tPosts('mediaOnly')}
+                images={feedImages(post.media)}
+                link={post.link}
+              />
+            ))
           )}
         </section>
       </div>
     </div>
   );
+}
+
+/** The Page a post goes to, or every Page's name with the first one's photo. */
+function feedAuthor(targets: Array<{ target: { name: string; pictureUrl: string | null } }>) {
+  return {
+    name: targets.map((entry) => entry.target.name).join(', '),
+    pictureUrl: targets[0]?.target.pictureUrl ?? null,
+  };
+}
+
+function feedImages(media: Parameters<typeof parseMedia>[0]) {
+  return parseMedia(media)
+    .filter((item) => item.kind === 'image')
+    .map((item) => ({ url: item.url, alt: item.altText }));
 }

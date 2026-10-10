@@ -7,6 +7,7 @@ import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { formatInZone, monthGrid } from '@/lib/time';
 import { StatusBadge } from '@/components/StatusBadge';
+import { parseMedia } from '@/lib/json';
 import { Icon } from '@/components/Icon';
 
 export const dynamic = 'force-dynamic';
@@ -292,8 +293,21 @@ export default async function CalendarPage({
                             <StatusBadge status={post.status} />
                           </span>
                         </span>
-                        <span className="mt-0.5 line-clamp-2 block [overflow-wrap:anywhere] text-xs leading-tight text-slate-700">
-                          {post.message || post.link || tPosts('mediaOnly')}
+                        {/* The planner's chip: the photo beside the opening words,
+                            as Meta Business Suite draws a planned post. */}
+                        <span className="mt-0.5 flex items-start gap-1.5">
+                          <span className="line-clamp-2 block min-w-0 flex-1 [overflow-wrap:anywhere] text-xs leading-tight text-slate-700">
+                            {post.message || post.link || tPosts('mediaOnly')}
+                          </span>
+                          {firstImage(post.media) && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={firstImage(post.media)!}
+                              alt=""
+                              loading="lazy"
+                              className="hidden h-7 w-7 shrink-0 rounded object-cover sm:block"
+                            />
+                          )}
                         </span>
                       </Link>
                     </li>
@@ -351,4 +365,8 @@ export default async function CalendarPage({
       )}
     </div>
   );
+}
+
+function firstImage(media: Parameters<typeof parseMedia>[0]): string | null {
+  return parseMedia(media).find((item) => item.kind === 'image')?.url ?? null;
 }

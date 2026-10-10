@@ -787,6 +787,9 @@ model ExternalPost {
   message     String?
   permalink   String?
   statusType  String?
+  /// Facebook's full_picture: the image the post shows in the feed. A CDN
+  /// address that expires, refreshed on every sync.
+  pictureUrl  String?
   createdTime DateTime
   /// Whatever the post-level catalogue returned for it (PostInsights).
   insights    Json?

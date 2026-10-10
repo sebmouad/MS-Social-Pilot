@@ -264,6 +264,7 @@ export interface GraphPublishedPost {
   message: string | null;
   permalink: string | null;
   statusType: string | null;
+  pictureUrl: string | null;
   createdTime: Date;
 }
 
@@ -273,6 +274,7 @@ interface RawPublishedPost {
   story?: string;
   permalink_url?: string;
   status_type?: string;
+  full_picture?: string;
   created_time?: string;
 }
 
@@ -296,7 +298,7 @@ export async function fetchPublishedPosts(
     limit: PAGE_SIZE,
     signal: options.signal,
     params: {
-      fields: 'id,message,story,permalink_url,status_type,created_time',
+      fields: 'id,message,story,permalink_url,status_type,full_picture,created_time',
       since: options.since ? Math.floor(options.since.getTime() / 1000) : undefined,
       until: options.until ? Math.floor(options.until.getTime() / 1000) : undefined,
     },
@@ -313,6 +315,7 @@ export async function fetchPublishedPosts(
         message: entry.message ?? entry.story ?? null,
         permalink: entry.permalink_url ?? null,
         statusType: entry.status_type ?? null,
+        pictureUrl: entry.full_picture ?? null,
         createdTime,
       } satisfies GraphPublishedPost;
     })

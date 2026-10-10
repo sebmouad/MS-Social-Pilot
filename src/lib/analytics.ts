@@ -5,7 +5,7 @@ import { AppError } from './errors';
 import { hit } from './rate-limit';
 import { prisma } from './prisma';
 import { decryptSecret } from './crypto';
-import { parseInsights, toJson } from './json';
+import { parseInsights, parseMedia, toJson } from './json';
 import { asGraphError } from './facebook/graph';
 import {
   fetchInsights,
@@ -775,6 +775,9 @@ export async function readPostMetrics(options: {
 }): Promise<{
   message: string;
   targetName: string;
+  targetPictureUrl: string | null;
+  imageUrl: string | null;
+  link: string | null;
   publishedAt: Date | null;
   url: string | null;
   syncedAt: Date | null;
@@ -784,13 +787,19 @@ export async function readPostMetrics(options: {
     ? await prisma.postTarget
         .findFirst({
           where: { id: options.postTargetId, post: { workspaceId: options.workspaceId } },
-          include: { target: { select: { name: true } }, post: { select: { message: true } } },
+          include: {
+            target: { select: { name: true, pictureUrl: true } },
+            post: { select: { message: true, media: true, link: true } },
+          },
         })
         .then((row) =>
           row
             ? {
                 message: row.post.message,
                 targetName: row.target.name,
+                targetPictureUrl: row.target.pictureUrl,
+                imageUrl: parseMedia(row.post.media).find((item) => item.kind === 'image')?.url ?? null,
+                link: row.post.link,
                 publishedAt: row.publishedAt,
                 url: row.remoteUrl,
                 syncedAt: row.insightsSyncedAt,
@@ -802,13 +811,16 @@ export async function readPostMetrics(options: {
       ? await prisma.externalPost
           .findFirst({
             where: { id: options.externalPostId, target: { workspaceId: options.workspaceId } },
-            include: { target: { select: { name: true } } },
+            include: { target: { select: { name: true, pictureUrl: true } } },
           })
           .then((row) =>
             row
               ? {
                   message: row.message ?? '(no text)',
                   targetName: row.target.name,
+                  targetPictureUrl: row.target.pictureUrl,
+                  imageUrl: row.pictureUrl,
+                  link: null,
                   publishedAt: row.createdTime,
                   url: row.permalink,
                   syncedAt: row.insightsSyncedAt,
@@ -839,6 +851,9 @@ export async function readPostMetrics(options: {
   return {
     message: source.message,
     targetName: source.targetName,
+    targetPictureUrl: source.targetPictureUrl,
+    imageUrl: source.imageUrl,
+    link: source.link,
     publishedAt: source.publishedAt,
     url: source.url,
     syncedAt: source.syncedAt,
@@ -853,6 +868,9 @@ export interface PostAnalyticsRow {
   postId: string;
   message: string;
   targetName: string;
+  targetPictureUrl: string | null;
+  /** The post's first picture, for the thumbnail beside it. */
+  imageUrl: string | null;
   publishedAt: Date | null;
   url: string | null;
   impressions: number;
@@ -894,8 +912,8 @@ export async function readPostAnalytics(options: {
       ...(options.targetId ? { targetId: options.targetId } : {}),
     },
     include: {
-      target: { select: { name: true } },
-      post: { select: { id: true, message: true } },
+      target: { select: { name: true, pictureUrl: true } },
+      post: { select: { id: true, message: true, media: true } },
     },
     orderBy: { publishedAt: 'desc' },
     take: options.limit ?? 200,
@@ -916,6 +934,8 @@ export async function readPostAnalytics(options: {
       postId: row.post.id,
       message: row.post.message,
       targetName: row.target.name,
+      targetPictureUrl: row.target.pictureUrl,
+      imageUrl: parseMedia(row.post.media).find((item) => item.kind === 'image')?.url ?? null,
       publishedAt: row.publishedAt,
       url: row.remoteUrl,
       impressions: value('impressions'),
@@ -1179,7 +1199,7 @@ export async function readFollowerTrend(options: {
 export async function recentOutcomes(workspaceId: string, take = 5) {
   return prisma.post.findMany({
     where: { workspaceId, status: { in: ['published', 'partially_failed', 'failed'] } },
-    include: { targets: { include: { target: { select: { name: true } } } } },
+    include: { targets: { include: { target: { select: { name: true, pictureUrl: true } } } } },
     orderBy: [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { updatedAt: 'desc' }],
     take,
   });

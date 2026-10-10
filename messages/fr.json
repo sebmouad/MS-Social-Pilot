@@ -1075,7 +1075,10 @@
       "fromPage": "Publiée sur Facebook",
       "noText": "(sans texte)",
       "open": "Ouvrir sur Facebook",
-      "rate": "Taux"
+      "rate": "Taux",
+      "commentCount": "{count, plural, one {# commentaire} other {# commentaires}}",
+      "shareCount": "{count, plural, one {# partage} other {# partages}}",
+      "reachCount": "{count, plural, one {# personne atteinte} other {# personnes atteintes}}"
     },
     "sample": "{current, plural, =0 {Aucune publication} one {Établie à partir d’une publication} other {Établie à partir de # publications}} sur cette période ; la grille des meilleurs horaires utilise {timing, plural, one {une publication} other {# publications}} des 90 derniers jours ou plus.",
     "times": {

@@ -63,6 +63,7 @@ function toAnalysed(options: {
   source: AnalysedPost['source'];
   message: string | null;
   url: string | null;
+  imageUrl: string | null;
   publishedAt: Date;
   format: AnalysedPost['format'];
   insights: unknown;
@@ -79,6 +80,7 @@ function toAnalysed(options: {
     source: options.source,
     message: options.message?.trim() || '',
     url: options.url,
+    imageUrl: options.imageUrl,
     publishedAt: options.publishedAt,
     format: options.format,
     reach,
@@ -107,7 +109,15 @@ export async function loadPagePosts(targetId: string, from: Date, to: Date): Pro
     }),
     prisma.externalPost.findMany({
       where: { targetId, createdTime: { gte: from, lte: to } },
-      select: { id: true, message: true, permalink: true, statusType: true, createdTime: true, insights: true },
+      select: {
+        id: true,
+        message: true,
+        permalink: true,
+        statusType: true,
+        pictureUrl: true,
+        createdTime: true,
+        insights: true,
+      },
     }),
   ]);
 
@@ -118,6 +128,7 @@ export async function loadPagePosts(targetId: string, from: Date, to: Date): Pro
         source: 'app',
         message: row.post.message,
         url: row.remoteUrl,
+        imageUrl: parseMedia(row.post.media).find((item) => item.kind === 'image')?.url ?? null,
         publishedAt: row.publishedAt!,
         format: formatOfAppPost(parseMedia(row.post.media), row.post.link),
         insights: row.insights,
@@ -129,6 +140,7 @@ export async function loadPagePosts(targetId: string, from: Date, to: Date): Pro
         source: 'page',
         message: row.message,
         url: row.permalink,
+        imageUrl: row.pictureUrl,
         publishedAt: row.createdTime,
         format: formatOfStatusType(row.statusType),
         insights: row.insights,
@@ -212,7 +224,7 @@ async function lastSynced(targetId: string, profileSyncedAt: Date | null): Promi
 }
 
 export interface PageAnalysisResult extends PageAnalysis {
-  page: { id: string; name: string; followers: number | null };
+  page: { id: string; name: string; pictureUrl: string | null; followers: number | null };
   window: { from: Date; to: Date; previousFrom: Date };
   lastSyncedAt: Date | null;
 }
@@ -262,7 +274,7 @@ export async function analysePage(options: {
       lastSyncedAt: syncedAt,
       now,
     }),
-    page: { id: page.id, name: page.name, followers },
+    page: { id: page.id, name: page.name, pictureUrl: page.pictureUrl, followers },
     window: { from: options.from, to: options.to, previousFrom },
     lastSyncedAt: syncedAt,
   };

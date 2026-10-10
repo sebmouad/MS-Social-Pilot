@@ -1075,7 +1075,10 @@
       "fromPage": "Posted on Facebook",
       "noText": "(no text)",
       "open": "Open on Facebook",
-      "rate": "Rate"
+      "rate": "Rate",
+      "commentCount": "{count, plural, one {# comment} other {# comments}}",
+      "shareCount": "{count, plural, one {# share} other {# shares}}",
+      "reachCount": "{count, plural, one {# person reached} other {# people reached}}"
     },
     "sample": "{current, plural, =0 {No posts} one {Built from one post} other {Built from # posts}} in this period; the best-time grid uses {timing, plural, one {one post} other {# posts}} from the last 90 days or more.",
     "times": {

@@ -36,6 +36,8 @@ export interface AnalysedPost {
   source: 'app' | 'page';
   message: string;
   url: string | null;
+  /** The picture the feed shows with it, when there is one. */
+  imageUrl?: string | null;
   publishedAt: Date;
   format: PostFormat;
   reach: number | null;

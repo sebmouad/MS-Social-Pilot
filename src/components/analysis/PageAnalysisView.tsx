@@ -7,6 +7,7 @@ import { TimeHeatmap } from './TimeHeatmap';
 import { ChartFrame } from '@/components/charts/ChartFrame';
 import { StatTile } from '@/components/charts/StatTile';
 import { ExternalLink } from '@/components/ExternalLink';
+import { FeedPost } from '@/components/FeedPost';
 import { Icon, type IconName } from '@/components/Icon';
 import { analysePage, comparePages, type PageComparisonRow } from '@/lib/page-analysis-data';
 import {
@@ -135,70 +136,74 @@ async function FindingsList({ findings, weekdays }: { findings: Finding[]; weekd
   );
 }
 
+/**
+ * The best and weakest posts, each drawn as the post itself rather than a
+ * table row: what a post looked like is half of why it did well.
+ */
 async function PostTable({
   title,
   hint,
   posts,
+  page,
   timeZone,
 }: {
   title: string;
   hint: string;
   posts: AnalysedPost[];
+  page: { name: string; pictureUrl: string | null };
   timeZone: string;
 }) {
   const t = await getTranslations('pageAnalysis');
-  const ta = await getTranslations('analytics');
   if (posts.length === 0) return null;
 
   return (
-    <section className="card overflow-hidden">
-      <div className="px-4 pt-4 sm:px-5">
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-        <p className="mt-0.5 text-xs text-slate-500">{hint}</p>
+    <section className="space-y-3">
+      <div className="px-1">
+        <h3 className="text-[17px] font-bold text-slate-900">{title}</h3>
+        <p className="mt-0.5 text-sm text-slate-600">{hint}</p>
       </div>
-      <div className="scroll-x">
-        <table className="mt-3 w-full text-sm">
-          <thead className="border-y border-slate-200 bg-slate-50 text-left text-[13px] font-semibold text-slate-600">
-            <tr>
-              <th scope="col" className="px-4 py-2">{ta('post')}</th>
-              <th scope="col" className="px-3 py-2 text-right">{t('kpi.interactions')}</th>
-              {/* Reach and rate step aside on a phone: the post and what it
-                  earned are the row; the rest is one rotation away. */}
-              <th scope="col" className="hidden px-3 py-2 text-right sm:table-cell">{ta('reach')}</th>
-              <th scope="col" className="hidden px-4 py-2 text-right sm:table-cell">{t('post.rate')}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {posts.map((post) => (
-              <tr key={post.id}>
-                <td className="max-w-xs px-4 py-2.5">
-                  <p className="line-clamp-2 text-slate-900">{post.message || t('post.noText')}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {t(`format.${post.format}`)} · {formatInZone(post.publishedAt, timeZone, 'd MMM, HH:mm')} ·{' '}
-                    {post.source === 'app' ? t('post.fromApp') : t('post.fromPage')}
-                    {post.url && (
-                      <>
-                        {' · '}
-                        <ExternalLink href={post.url} className="text-brand-600 hover:underline">
-                          {t('post.open')}
-                        </ExternalLink>
-                      </>
-                    )}
-                  </p>
-                </td>
-                <td className="nums px-4 py-2.5 text-right font-medium text-slate-900 sm:px-3">
-                  {post.interactions.toLocaleString(appLocale())}
-                  <span className="block text-[11px] font-normal text-slate-500">
-                    {post.reactions.toLocaleString(appLocale())} · {post.comments.toLocaleString(appLocale())} · {post.shares.toLocaleString(appLocale())}
+      <ol className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {posts.map((post, index) => (
+          <li key={post.id}>
+            <FeedPost
+              compact
+              clamp
+              author={page}
+              meta={`${formatInZone(post.publishedAt, timeZone, 'd MMM, HH:mm')} · ${t(`format.${post.format}`)} · ${
+                post.source === 'app' ? t('post.fromApp') : t('post.fromPage')
+              }`}
+              badge={
+                <span className="nums rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
+                  #{index + 1}
+                </span>
+              }
+              message={post.message}
+              emptyText={t('post.noText')}
+              images={post.imageUrl ? [{ url: post.imageUrl }] : []}
+              stats={{
+                reactions: post.reactions,
+                others: [
+                  t('post.commentCount', { count: post.comments }),
+                  t('post.shareCount', { count: post.shares }),
+                ],
+              }}
+              footer={
+                <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-1 text-[13px] text-slate-600">
+                  <span>
+                    {post.reach !== null && t('post.reachCount', { count: post.reach })}
+                    {post.rate !== null && ` · ${t('post.rate')} ${post.rate}%`}
                   </span>
-                </td>
-                <td className="nums hidden px-3 py-2.5 text-right text-slate-700 sm:table-cell">{post.reach?.toLocaleString(appLocale()) ?? '—'}</td>
-                <td className="nums hidden px-4 py-2.5 text-right text-slate-700 sm:table-cell">{post.rate !== null ? `${post.rate}%` : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  {post.url && (
+                    <ExternalLink href={post.url} className="font-semibold text-brand-600 hover:underline">
+                      {t('post.open')}
+                    </ExternalLink>
+                  )}
+                </div>
+              }
+            />
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }
@@ -400,9 +405,9 @@ export async function PageAnalysisView({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <PostTable title={t('top.title')} hint={t('top.hint')} posts={analysis.top} timeZone={timeZone} />
-            <PostTable title={t('bottom.title')} hint={t('bottom.hint')} posts={analysis.bottom} timeZone={timeZone} />
+          <div className="space-y-6">
+            <PostTable title={t('top.title')} hint={t('top.hint')} posts={analysis.top} page={analysis.page} timeZone={timeZone} />
+            <PostTable title={t('bottom.title')} hint={t('bottom.hint')} posts={analysis.bottom} page={analysis.page} timeZone={timeZone} />
           </div>
 
           <p className="text-xs text-slate-500">

@@ -46,6 +46,8 @@ import { formatInZone, appLocale } from '@/lib/time';
 import { env } from '@/lib/env';
 import { pageRatingsAvailable } from '@/lib/facebook/graph';
 import { ExternalLink } from '@/components/ExternalLink';
+import { FeedPost } from '@/components/FeedPost';
+import { formatOfStatusType } from '@/lib/page-analysis';
 
 export const dynamic = 'force-dynamic';
 
@@ -186,6 +188,8 @@ export default async function AnalyticsPage({
             postTargetId: post.postTargetId,
             message: post.message,
             targetName: post.targetName,
+            targetPictureUrl: post.targetPictureUrl,
+            imageUrl: post.imageUrl,
             publishedLabel: post.publishedAt ? formatInZone(post.publishedAt, timezone) : null,
             url: post.url,
             impressions: post.impressions,
@@ -707,6 +711,7 @@ async function ExternalView({
   canSync: boolean;
 }) {
   const t = await getTranslations('engagement');
+  const tFormat = await getTranslations('pageAnalysis');
   const posts = await readExternalPosts({ workspaceId, targetId, from, to });
 
   if (posts.length === 0) {
@@ -720,7 +725,7 @@ async function ExternalView({
         {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
       </div>
 
-      <ul className="space-y-3">
+      <ul className="mx-auto max-w-[680px] space-y-3">
         {posts.map((post) => {
           const figures = [
             { label: t('impressions'), value: post.impressions },
@@ -738,48 +743,58 @@ async function ExternalView({
           ];
 
           return (
-            <li key={post.id} className="card p-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-[13px] font-semibold text-slate-600">
-                  {post.statusType ?? t('postType')}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {post.targetName} · {formatInZone(post.createdTime, timezone)}
-                </p>
-              </div>
-
-              <p className="mt-1.5 whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-700">{post.message}</p>
-
-              {post.syncedAt && (
-                <dl className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
-                  {figures.map((figure) => (
-                    <div key={figure.label}>
-                      <dt className="text-[11px] font-semibold text-slate-600">
-                        {figure.label}
-                      </dt>
-                      <dd className="text-sm font-medium text-slate-900">
-                        {figure.value === null ? '—' : figure.value.toLocaleString(appLocale())}
-                      </dd>
+            <li key={post.id}>
+              {/* As it sits on the Page's timeline, with what it earned under it. */}
+              <FeedPost
+                author={{ name: post.targetName, pictureUrl: post.targetPictureUrl }}
+                meta={`${formatInZone(post.createdTime, timezone)} · ${tFormat(`format.${formatOfStatusType(post.statusType)}`)}`}
+                message={post.message}
+                emptyText="—"
+                clamp
+                images={post.pictureUrl ? [{ url: post.pictureUrl }] : []}
+                stats={
+                  post.syncedAt
+                    ? {
+                        reactions: post.reactions ?? 0,
+                        others: [
+                          `${(post.comments ?? 0).toLocaleString(appLocale())} ${t('comments').toLowerCase()}`,
+                          `${(post.shares ?? 0).toLocaleString(appLocale())} ${t('shares').toLowerCase()}`,
+                        ],
+                      }
+                    : undefined
+                }
+                footer={
+                  <div className="space-y-2 py-2">
+                    {post.syncedAt && (
+                      <dl className="grid grid-cols-3 gap-2">
+                        {figures.slice(0, 3).filter((figure) => figure.value !== null).map((figure) => (
+                          <div key={figure.label} className="rounded-md bg-slate-50 px-2 py-1.5">
+                            <dt className="text-[11px] font-semibold text-slate-600">{figure.label}</dt>
+                            <dd className="nums text-sm font-semibold text-slate-900">
+                              {figure.value === null ? '—' : figure.value.toLocaleString(appLocale())}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                    <div className="flex flex-wrap gap-3 text-[13px] font-semibold">
+                      {post.metricCount > 0 && (
+                        <Link
+                          href={`/analytics/post/${post.id}?external=true`}
+                          className="text-brand-600 hover:underline"
+                        >
+                          {t('allMetrics', { count: post.metricCount })}
+                        </Link>
+                      )}
+                      {post.permalink && (
+                        <ExternalLink href={post.permalink} className="text-brand-600 hover:underline">
+                          {t('viewOnFacebook')}
+                        </ExternalLink>
+                      )}
                     </div>
-                  ))}
-                </dl>
-              )}
-
-              <div className="mt-2 flex flex-wrap gap-3 text-xs font-medium">
-                {post.metricCount > 0 && (
-                  <Link
-                    href={`/analytics/post/${post.id}?external=true`}
-                    className="text-brand-600 hover:underline"
-                  >
-                    {t('allMetrics', { count: post.metricCount })}
-                  </Link>
-                )}
-                {post.permalink && (
-                  <ExternalLink href={post.permalink} className="text-brand-600 hover:underline">
-                    {t('viewOnFacebook')}
-                  </ExternalLink>
-                )}
-              </div>
+                  </div>
+                }
+              />
             </li>
           );
         })}

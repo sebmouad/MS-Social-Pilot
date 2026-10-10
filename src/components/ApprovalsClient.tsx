@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { ExternalLink } from './ExternalLink';
+import { FeedPost } from './FeedPost';
 
 export interface PendingPost {
   id: string;
   message: string;
+  /** Reviewed with the post: it goes out under the same name. */
+  firstComment: string | null;
   link: string | null;
   scheduledLabel: string | null;
   /** Its scheduled moment has gone, so approving publishes it immediately. */
@@ -16,13 +18,12 @@ export interface PendingPost {
   submittedBy: string;
   submittedLabel: string | null;
   targets: string[];
+  /** The first destination's photo, for the post's header. */
+  pictureUrl: string | null;
   media: Array<{ id: string; kind: 'image' | 'video'; url: string; altText: string | null }>;
   /** The reviewer may open it in the composer and change it themselves. */
   editable: boolean;
 }
-
-/** Enough to recognise what is attached; the composer shows the rest. */
-const THUMBNAILS = 4;
 
 export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
   const t = useTranslations('approvals');
@@ -107,63 +108,40 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
       )}
 
       {posts.map((post) => (
-        <article key={post.id} className="card p-5" aria-busy={busy === post.id}>
-          <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm text-slate-800">
-            {post.message || <span className="text-slate-400">{tPosts('noText')}</span>}
-          </p>
-
-          {post.link && (
-            <ExternalLink
-              href={post.link}
-              className="mt-1 block truncate text-xs text-brand-600 hover:underline"
-            >
-              {post.link}
-            </ExternalLink>
-          )}
-
-          {post.media.length > 0 && (
-            <ul className="mt-3 flex flex-wrap gap-2" aria-label={tPosts('attachments', { count: post.media.length })}>
-              {post.media.slice(0, THUMBNAILS).map((item, index) => (
-                <li key={item.id ?? index}>
-                  {item.kind === 'image' ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- uploads and external URLs alike; next/image would need every host allow-listed
-                    <img
-                      src={item.url}
-                      alt={item.altText ?? ''}
-                      loading="lazy"
-                      className="h-16 w-16 rounded-lg border border-slate-200 object-cover"
-                    />
-                  ) : (
-                    <span className="flex h-16 w-16 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-xs text-slate-600">
-                      {tCompose('video')}
-                    </span>
-                  )}
-                </li>
-              ))}
-              {post.media.length > THUMBNAILS && (
-                <li className="flex h-16 w-16 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-600">
-                  {t('moreMedia', { count: post.media.length - THUMBNAILS })}
-                </li>
-              )}
-            </ul>
-          )}
-
-          <p className="mt-2 text-xs text-slate-500">
-            {t('submittedBy', { name: post.submittedBy })}
-            {post.submittedLabel ? ` · ${post.submittedLabel}` : ''}
-            {post.scheduledLabel ? ` · ${tPosts('scheduledFor', { when: post.scheduledLabel })}` : ''}
-            {post.media.length > 0 ? ` · ${tPosts('attachments', { count: post.media.length })}` : ''}
-          </p>
-
-          {/* A queue worked through after a week away is where this matters:
-              every overdue post in it goes out the moment it is approved. */}
-          {post.overdue && (
-            <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-              {t('overdue')}
+        <article key={post.id} aria-busy={busy === post.id}>
+          {/* Exactly what will go out, drawn as Facebook will draw it: the
+              reviewer signs off on the post, not on a description of it. */}
+          <FeedPost
+            as="div"
+            className="rounded-b-none"
+            author={{ name: post.targets.join(', '), pictureUrl: post.pictureUrl }}
+            meta={post.scheduledLabel ? tPosts('scheduledFor', { when: post.scheduledLabel }) : tPosts('noTimeSet')}
+            badge={
+              post.overdue ? (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  {t('overdue')}
+                </span>
+              ) : undefined
+            }
+            message={post.message}
+            emptyText={tPosts('noText')}
+            images={post.media
+              .filter((item) => item.kind === 'image')
+              .map((item) => ({ url: item.url, alt: item.altText }))}
+            link={post.link}
+            comment={post.firstComment ? { text: post.firstComment } : undefined}
+          />
+          <div className="card rounded-t-none border-t border-slate-200 p-4 shadow-surface">
+          {post.media.some((item) => item.kind === 'video') && (
+            <p className="mb-2 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+              {tCompose('video')}
             </p>
           )}
-
-          <p className="mt-1 text-xs text-slate-500">{post.targets.join(', ')}</p>
+          <p className="text-xs text-slate-500">
+            {t('submittedBy', { name: post.submittedBy })}
+            {post.submittedLabel ? ` · ${post.submittedLabel}` : ''}
+            {post.media.length > 0 ? ` · ${tPosts('attachments', { count: post.media.length })}` : ''}
+          </p>
 
           {rejecting === post.id ? (
             <div className="mt-4 space-y-2">
@@ -229,6 +207,7 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
               )}
             </div>
           )}
+          </div>
         </article>
       ))}
     </div>

@@ -58,7 +58,9 @@ export type IconName =
   | 'search'
   | 'sparkles'
   | 'facebook'
-  | 'group';
+  | 'group'
+  | 'thumbsUp'
+  | 'share';
 
 /** Path data only — the wrapper supplies every shared attribute. */
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -169,6 +171,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   check: <path d="m5 13 4 4L19 7" />,
+  thumbsUp: (
+    <>
+      <path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3Z" />
+      <path d="M7 10l4-7a2 2 0 0 1 3 2l-1 5h6a2 2 0 0 1 2 2.3l-1.4 7A2 2 0 0 1 17.6 21H7" />
+    </>
+  ),
+  share: <path d="M14 5l7 7-7 7v-4c-5 0-8 1.5-11 5 1-5 4-9 11-10V5Z" />,
   warning: (
     <>
       <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />

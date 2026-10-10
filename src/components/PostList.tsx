@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { StatusBadge } from './StatusBadge';
 import { ExternalLink } from './ExternalLink';
 import { Icon, type IconName } from './Icon';
+import { FeedAvatar as Avatar, hostOf } from './FeedPost';
 import { postIsEditable } from '@/lib/constants';
 
 export interface PostView {
@@ -274,7 +275,7 @@ export function PostList({
                     aria-hidden
                     className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-brand-500 text-white"
                   >
-                    <Icon name="check" size={11} />
+                    <Icon name="thumbsUp" size={11} />
                   </span>
                   <dd className="nums">{post.results.reactions.toLocaleString()}</dd>
                 </div>
@@ -454,37 +455,6 @@ const ACTION =
 
 function ActionIcon({ name }: { name: IconName }) {
   return <Icon name={name} size={18} className="shrink-0" />;
-}
-
-function Avatar({
-  name,
-  pictureUrl,
-  size = 'md',
-}: {
-  name: string;
-  pictureUrl: string | null;
-  size?: 'sm' | 'md';
-}) {
-  const box = size === 'sm' ? 'h-8 w-8 text-xs' : 'h-10 w-10 text-[15px]';
-  return pictureUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={pictureUrl} alt="" className={`${box} shrink-0 rounded-full object-cover`} />
-  ) : (
-    <span
-      aria-hidden
-      className={`${box} flex shrink-0 items-center justify-center rounded-full bg-brand-50 font-bold text-brand-600`}
-    >
-      {name.charAt(0).toUpperCase() || '?'}
-    </span>
-  );
-}
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
 }
 
 /** Consecutive posts sharing a day, in the order the list already has them. */
