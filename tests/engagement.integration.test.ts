@@ -340,6 +340,22 @@ describe('syncTargetEdges', () => {
     expect(asked.some((call) => call.path.includes('binned-post'))).toBe(false);
   });
 
+  it('reads only what a screen asks for', async () => {
+    // The Comments screen's button: a whole pass took longer than the proxy
+    // waits, so the person saw an error for a sync that went on to work.
+    const { target } = await seedWorkspace();
+    stubEverything();
+    asked = [];
+
+    const result = await engagement.syncTargetEdges({ targetId: target.id, edges: ['comments'] });
+
+    expect(result.comments).toBe(1);
+    expect(result.conversations).toBe(0);
+    expect(result.videos).toBe(0);
+    expect(asked.some((call) => /conversations|videos|published_posts|ratings/.test(call.path))).toBe(false);
+    expect(await prisma.conversation.count()).toBe(0);
+  });
+
   it('is idempotent', async () => {
     const { target } = await seedWorkspace();
     stubEverything();

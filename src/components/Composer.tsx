@@ -189,11 +189,12 @@ export function Composer({
    */
   const dirty = editing
     ? message !== editing.message ||
+      firstComment !== (editing.firstComment ?? '') ||
       link !== (editing.link ?? '') ||
       mediaKey(media) !== mediaKey(editing.media) ||
       [...selected].sort().join() !== [...editing.targetIds].sort().join() ||
       scheduledAt !== (editing.scheduledAtLocal ?? defaultScheduledAt)
-    : message.trim().length > 0 || link.trim().length > 0 || media.length > 0;
+    : message.trim().length > 0 || firstComment.trim().length > 0 || link.trim().length > 0 || media.length > 0;
 
   useEffect(() => {
     if (!dirty) return;

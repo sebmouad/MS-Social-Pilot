@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { ok, readJson, route } from '@/lib/api';
 import { canModerateComments } from '@/lib/constants';
-import { syncWorkspaceEdges } from '@/lib/engagement';
+import { EDGE_NAMES, syncWorkspaceEdges } from '@/lib/engagement';
 import { errors } from '@/lib/errors';
 import { hit } from '@/lib/rate-limit';
 
@@ -11,6 +11,8 @@ const schema = z.object({
   /** Omit to refresh every enabled Page in the workspace. */
   targetId: z.string().min(1).optional(),
   since: z.string().datetime().optional(),
+  /** Only what the screen shows; omit for everything. */
+  edges: z.array(z.enum(EDGE_NAMES)).min(1).optional(),
 });
 
 /**
@@ -53,6 +55,7 @@ export const POST = route(async (request: Request) => {
     workspaceId: auth.workspace.id,
     targetId: input.targetId,
     since: input.since ? new Date(input.since) : undefined,
+    edges: input.edges,
   });
 
   if (empty) throw errors.noPageToRefresh();

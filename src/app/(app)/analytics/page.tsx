@@ -48,6 +48,7 @@ import { pageRatingsAvailable } from '@/lib/facebook/graph';
 import { ExternalLink } from '@/components/ExternalLink';
 import { FeedPost } from '@/components/FeedPost';
 import { EmptyState } from '@/components/EmptyState';
+import type { EdgeName } from '@/lib/engagement';
 import type { IconName } from '@/components/Icon';
 import { formatOfStatusType } from '@/lib/page-analysis';
 import { feedMediaOfPicture } from '@/lib/feed';
@@ -388,7 +389,7 @@ async function VideosView({
   const videos = await readVideos({ workspaceId, targetId });
 
   if (videos.length === 0) {
-    return <EmptyEdge icon="video" message={t('noVideos')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
+    return <EmptyEdge icon="video" edge="videos" message={t('noVideos')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
   }
 
   const seconds = (milliseconds: number | null) =>
@@ -414,7 +415,7 @@ async function VideosView({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('videosHint')}</p>
-        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
+        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId, edges: ['videos'] }} label={t('refresh')} />}
       </div>
 
       {/* Facebook's video tab: the still, its length on it, then the title
@@ -619,7 +620,7 @@ async function ReviewsView({
     return retired ? (
       retiredNotice
     ) : (
-      <EmptyEdge icon="star" message={t('noReviews')} targetId={targetId} label={t('refresh')} canSync={canSync} />
+      <EmptyEdge icon="star" edge="reviews" message={t('noReviews')} targetId={targetId} label={t('refresh')} canSync={canSync} />
     );
   }
 
@@ -635,7 +636,7 @@ async function ReviewsView({
       {retired && retiredNotice}
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('reviewsHint')}</p>
-        {!retired && canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
+        {!retired && canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId, edges: ['reviews'] }} label={t('refresh')} />}
       </div>
 
       <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -698,7 +699,7 @@ async function InboxView({
   const conversations = await readConversations({ workspaceId, targetId, skip: page.skip, limit: page.take });
 
   if (page.total === 0) {
-    return <EmptyEdge icon="inbox" message={t('noConversations')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
+    return <EmptyEdge icon="inbox" edge="conversations" message={t('noConversations')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
   }
 
   const href = (next: number) => pageHref('/analytics', { ...params, view: 'inbox' }, next);
@@ -707,7 +708,7 @@ async function InboxView({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('inboxHint')}</p>
-        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
+        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId, edges: ['conversations'] }} label={t('refresh')} />}
       </div>
 
       <InboxPanel
@@ -761,14 +762,14 @@ async function ExternalView({
   const posts = await readExternalPosts({ workspaceId, targetId, from, to });
 
   if (posts.length === 0) {
-    return <EmptyEdge icon="posts" message={t('noExternal')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
+    return <EmptyEdge icon="posts" edge="externalPosts" message={t('noExternal')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('externalHint')}</p>
-        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={t('refresh')} />}
+        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId, edges: ['externalPosts'] }} label={t('refresh')} />}
       </div>
 
       <ul className="mx-auto max-w-[680px] space-y-3">
@@ -858,9 +859,12 @@ async function EmptyEdge({
   label,
   canSync,
   icon = 'inbox',
+  edge,
 }: {
   message: string;
   icon?: IconName;
+  /** The one thing to read from Facebook: what this empty screen would show. */
+  edge?: EdgeName;
   targetId: string;
   label: string;
   /** The sync route refuses anyone who cannot moderate comments; so does the button. */
@@ -874,7 +878,12 @@ async function EmptyEdge({
       hint={canSync ? t('emptyHint') : undefined}
       action={
         canSync ? (
-          <SyncButton endpoint="/api/engagement/sync" body={{ targetId }} label={label} variant="primary" />
+          <SyncButton
+            endpoint="/api/engagement/sync"
+            body={{ targetId, ...(edge ? { edges: [edge] } : {}) }}
+            label={label}
+            variant="primary"
+          />
         ) : undefined
       }
     />

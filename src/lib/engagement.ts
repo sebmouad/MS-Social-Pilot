@@ -589,10 +589,21 @@ export async function replyToCommentAs(options: {
  * Groups are skipped entirely: none of these edges exist for a Group, and
  * asking produces a permission error per edge on every pass.
  */
+/** The parts of a Page a sync can read, each on its own. */
+export const EDGE_NAMES = ['comments', 'reviews', 'conversations', 'externalPosts', 'videos'] as const;
+export type EdgeName = (typeof EDGE_NAMES)[number];
+
 export async function syncTargetEdges(options: {
   targetId: string;
   since?: Date;
   now?: Date;
+  /**
+   * Only these, when a screen asks for what it shows. A whole pass reads the
+   * inbox, every post's comments, videos and the Page's own posts: a minute
+   * or more, longer than the proxy waits for a button press, and calls the
+   * scheduler needs. The worker leaves it out and reads everything.
+   */
+  edges?: readonly EdgeName[];
 }): Promise<EdgeSyncResult> {
   const now = options.now ?? new Date();
   const since =
@@ -643,7 +654,8 @@ export async function syncTargetEdges(options: {
   }
 
   /** Run one edge, recording its failure instead of aborting the pass. */
-  const attempt = async (edge: string, run: () => Promise<number>): Promise<void> => {
+  const attempt = async (edge: EdgeName, run: () => Promise<number>): Promise<void> => {
+    if (options.edges && !options.edges.includes(edge)) return;
     try {
       const count = await run();
       result[edge as 'comments'] = count;
@@ -956,6 +968,7 @@ export async function syncWorkspaceEdges(options: {
   workspaceId: string;
   targetId?: string;
   since?: Date;
+  edges?: readonly EdgeName[];
 }): Promise<WorkspaceEdgeSync> {
   const targets = await prisma.target.findMany({
     where: {
@@ -972,7 +985,7 @@ export async function syncWorkspaceEdges(options: {
 
   const results: EdgeSyncResult[] = [];
   for (const target of targets) {
-    results.push(await syncTargetEdges({ targetId: target.id, since: options.since }));
+    results.push(await syncTargetEdges({ targetId: target.id, since: options.since, edges: options.edges }));
   }
 
   return { results, empty: false };

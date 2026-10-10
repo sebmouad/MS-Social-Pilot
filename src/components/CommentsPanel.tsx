@@ -102,7 +102,7 @@ export function CommentsPanel({
     setSyncing(true);
     setError(null);
     try {
-      if (await post('/api/engagement/sync', { targetId })) router.refresh();
+      if (await post('/api/engagement/sync', { targetId, edges: ['comments'] })) router.refresh();
     } finally {
       setSyncing(false);
     }
