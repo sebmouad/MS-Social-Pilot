@@ -373,7 +373,13 @@
     "aiPlanBriefPlaceholder": "New autumn menu from Tuesday, pumpkin soup and chestnut cake, 10% off for students on Wednesday",
     "aiPlanCount": "Posts",
     "aiPlanStart": "First day",
-    "ideaStart": "✨ Today is {day}! "
+    "ideaStart": "✨ Today is {day}! ",
+    "moveFailed": "The post could not be moved. Open it and change the date there.",
+    "moved": "Moved to {when}.",
+    "statusFilterOn": "Show only posts with this status (pick several to combine)",
+    "statusFilterOff": "Stop filtering on this status",
+    "statusFilterClear": "Show every status",
+    "dragHint": "Drag a post to another day to move it."
   },
   "common": {
     "all": "All",

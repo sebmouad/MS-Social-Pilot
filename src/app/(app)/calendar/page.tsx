@@ -10,6 +10,7 @@ import { paletteOf } from '@/lib/palette';
 import { PagesSidebar } from '@/components/PagesSidebar';
 import { LabelFilter } from '@/components/LabelFilter';
 import { WeekGrid } from '@/components/CalendarWeek';
+import { CalendarDrag } from '@/components/CalendarDrag';
 import { PageFeedPreview } from '@/components/PageFeedPreview';
 import { feedLinkOf, feedMediaOf, feedMediaOfPicture } from '@/lib/feed';
 import { canManageOthersPosts, canManageSettings, postIsEditable } from '@/lib/constants';
@@ -239,6 +240,8 @@ export default async function CalendarPage({
     postIsEditable(post) && (manageOthers || post.authorId === auth.user.id)
       ? `/compose?post=${post.id}`
       : '/posts';
+  // Only what the composer would open may be dragged to another day.
+  const movable = (post: Parameters<typeof postHref>[0]) => postHref(post) !== '/posts';
   // "New post on this day" starts at nine in the morning; today it keeps the
   // composer's own default of an hour from now.
   const newPostHref = (key: string) => (key === todayKey ? '/compose' : `/compose?at=${key}T09:00`);
@@ -247,7 +250,7 @@ export default async function CalendarPage({
     `${newPostHref(key)}${key === todayKey ? '?' : '&'}text=${encodeURIComponent(t('ideaStart', { day: name }))}`;
   // Moving through the months keeps the Pages and the label being looked at.
   const keep = new URLSearchParams();
-  for (const key of ['group', 'pages', 'label', 'drafts']) {
+  for (const key of ['group', 'pages', 'label', 'drafts', 'status']) {
     const value = Array.isArray(params[key]) ? params[key][0] : params[key];
     if (value) keep.set(key, value);
   }
@@ -288,11 +291,26 @@ export default async function CalendarPage({
     count: inMonthPosts.filter((post) => post.status === status).length,
   })).filter((entry) => entry.count > 0);
 
+  // Status pills filter the grid; counts stay those of the whole month.
+  const shownStatuses = new Set((pick('status') ?? '').split(',').filter((status) => LEGEND.includes(status)));
+  const statusHref = (status: string) => {
+    const next = new Set(shownStatuses);
+    if (next.has(status)) next.delete(status);
+    else next.add(status);
+    return linkWith({ status: next.size > 0 ? [...next].join(',') : null });
+  };
+  if (shownStatuses.size > 0) {
+    for (const [key, list] of byDay) byDay.set(key, list.filter((post) => shownStatuses.has(post.status)));
+  }
+
   type CalendarPost = (typeof posts)[number];
   /** One planned post as the grid draws it: Page, time, labels, opening words and picture. */
   const renderChip = (post: CalendarPost) => (
         <Link
           href={postHref(post)}
+          {...(movable(post) && post.scheduledAt
+            ? { draggable: true, 'data-drag-post': post.id, 'data-drag-time': formatInZone(post.scheduledAt, timezone, 'HH:mm') }
+            : { draggable: false })}
           className={`relative block overflow-hidden rounded-md border-l-[3px] bg-white px-2 py-1.5 shadow-surface transition-shadow hover:shadow-md ${
             STATUS_EDGE[post.status] ?? 'border-l-slate-400'
           }`}
@@ -369,6 +387,7 @@ export default async function CalendarPage({
           <h1 className="text-2xl font-bold capitalize text-slate-900">{title}</h1>
           <p className="mt-1 text-sm text-slate-600">
             {t('title')} · {t('timesShownIn', { timezone })}
+            {view !== 'feed' && <span className="hidden sm:inline"> · {t('dragHint')}</span>}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -445,17 +464,34 @@ export default async function CalendarPage({
       </header>
 
       {view !== 'feed' && summary.length > 0 && (
-        <ul className="flex flex-wrap gap-2" aria-label={t('monthSummary')}>
-          {summary.map((entry) => (
-            <li
-              key={entry.status}
-              className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm shadow-surface"
-            >
-              <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT[entry.status]}`} />
-              <span className="nums font-semibold text-slate-900">{entry.count}</span>
-              <StatusBadge status={entry.status} />
+        <ul className="flex flex-wrap items-center gap-2" aria-label={t('monthSummary')}>
+          {summary.map((entry) => {
+            const on = shownStatuses.has(entry.status);
+            return (
+              <li key={entry.status}>
+                <Link
+                  href={statusHref(entry.status)}
+                  aria-pressed={on}
+                  title={on ? t('statusFilterOff') : t('statusFilterOn')}
+                  scroll={false}
+                  className={`flex min-h-[36px] items-center gap-2 rounded-full px-3 py-1.5 text-sm shadow-surface ${
+                    on ? 'bg-brand-50 ring-2 ring-brand-500' : shownStatuses.size > 0 ? 'bg-white opacity-60 hover:opacity-100' : 'bg-white hover:bg-slate-50'
+                  }`}
+                >
+                  <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT[entry.status]}`} />
+                  <span className="nums font-semibold text-slate-900">{entry.count}</span>
+                  <StatusBadge status={entry.status} />
+                </Link>
+              </li>
+            );
+          })}
+          {shownStatuses.size > 0 && (
+            <li>
+              <Link href={linkWith({ status: null })} scroll={false} className="text-sm font-semibold text-brand-700 hover:underline">
+                {t('statusFilterClear')}
+              </Link>
             </li>
-          ))}
+          )}
         </ul>
       )}
 
@@ -501,7 +537,9 @@ export default async function CalendarPage({
         ) : (
           <div className="card p-8 text-center text-sm text-slate-600">{t('feedNoPage')}</div>
         )
-      ) : view === 'week' ? (
+      ) : (
+      <CalendarDrag timeZone={timezone} todayKey={todayKey}>
+      {view === 'week' ? (
         <WeekGrid
           days={days}
           timeZone={timezone}
@@ -534,6 +572,7 @@ export default async function CalendarPage({
             return (
               <div
                 key={key}
+                data-drop-day={key}
                 className={`min-h-[8rem] min-w-0 border-b border-r border-slate-200 p-1 sm:p-2 ${
                   key === todayKey ? 'bg-brand-50/60' : inMonth ? (key < todayKey ? 'bg-slate-50' : 'bg-white') : 'bg-slate-100/70'
                 }`}
@@ -600,7 +639,8 @@ export default async function CalendarPage({
           })}
         </div>
       </div>
-
+      )}
+      </CalendarDrag>
       )}
 
       <div className="flex flex-wrap gap-3 text-xs text-slate-600">

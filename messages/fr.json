@@ -373,7 +373,13 @@
     "aiPlanBriefPlaceholder": "Nouveau menu d’automne dès mardi, soupe de potiron et gâteau aux châtaignes, -10 % pour les étudiants mercredi",
     "aiPlanCount": "Publications",
     "aiPlanStart": "Premier jour",
-    "ideaStart": "✨ Aujourd’hui, c’est {day} ! "
+    "ideaStart": "✨ Aujourd’hui, c’est {day} ! ",
+    "moveFailed": "La publication n’a pas pu être déplacée. Ouvrez-la et changez la date.",
+    "moved": "Déplacée au {when}.",
+    "statusFilterOn": "N’afficher que les publications avec ce statut (cumulable)",
+    "statusFilterOff": "Ne plus filtrer sur ce statut",
+    "statusFilterClear": "Afficher tous les statuts",
+    "dragHint": "Faites glisser une publication vers un autre jour pour la déplacer."
   },
   "common": {
     "all": "Tout",

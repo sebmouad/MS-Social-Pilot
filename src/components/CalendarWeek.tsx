@@ -96,6 +96,8 @@ export function WeekGrid<P extends WeekPost>({
                 return (
                   <div
                     key={key}
+                    data-drop-day={key}
+                    data-drop-hour={hour}
                     className={`group relative min-h-[3.25rem] border-l border-slate-100 p-1 ${
                       key === todayKey ? 'bg-brand-50/40' : key < todayKey ? 'bg-slate-50/70' : 'bg-white'
                     }`}

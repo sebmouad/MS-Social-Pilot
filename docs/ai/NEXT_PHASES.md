@@ -300,6 +300,10 @@ the summed followers equal the sum of the Pages' numbers on Facebook.
 ## Phase C — Publishing views on the same selection, better design
 
 Skills: `frontend-design`, `profile-selection`.
+*Progress (2026-10-11):* calendar status pills filter the grid (`?status=`,
+several combine, counts stay the month's) and editable posts drag to another
+day (month) or hour (week) — `CalendarDrag`, a PATCH like any edit; past days
+do not take a drop. E2e for the drag is due at the next browser checkpoint.
 - Calendar: profile colour dots on chips, filter by status (planned / posted /
   failed / draft / review) as pills next to the bar, drag-and-drop rescheduling,
   collapse the Pages column (ROADMAP UX backlog), day hover actions (ref 40).
