@@ -313,6 +313,90 @@ catalogue, link-in-bio, design editor, Facebook coloured text backgrounds,
 location tags and @mentions, tasks & workflows, billing/seats/usage, custom
 domain and custom fields, mobile app / Chrome extension.
 
+## Phase G — Owner-approved additions (2026-10-11)
+
+All 18 ideas below were approved by the owner. Order: **G1–G3 right after
+Phase 0** (they protect the installation), **G5–G6 with Phase A** (they save the
+most time), the rest after Phase D2. S/M/L = effort.
+
+### Security and reliability
+- **G1. Two-step sign-in (S)** — TOTP (authenticator app) and passkeys
+  (WebAuthn); **mandatory for root and admins**, optional for others; 10
+  recovery codes shown once; "remember this device 30 days". Lost device →
+  root resets it for others; root's own reset only by the SSH recovery script
+  (PERMISSIONS.md). Tests: sign-in blocked without the second step.
+- **G2. Off-site backups (S)** — after the nightly
+  `/usr/local/sbin/ms-social-pilot-backup`, push the dump + media archive,
+  encrypted (age/gpg, key held by the owner), to Backblaze B2 / S3 / Google
+  Drive via `rclone`; keep 30 daily + 12 monthly; **monthly restore test** into
+  a scratch database on the server that reports row counts; status shown in the
+  root section. Owner creates the storage account and enters its key. Document
+  in RELEASE.md.
+- **G3. Alerts when something breaks (S)** — worker heartbeat missing > 5 min,
+  publish failures above a threshold, Page disconnected / token expiring, disk
+  > 85 %, backup or restore test failed, Meta usage near the limit. Channels:
+  email (Phase 0.1) and Telegram (chat channel code exists). One alert per
+  incident, a "resolved" message after; settings in the root section.
+- **G4. Active sessions (S)** — list of a user's sessions (device, browser,
+  IP/country, last seen) with "Sign out" and "Sign out everywhere else"; email
+  on sign-in from a new device; root sees all users' sessions.
+
+### Facebook growth and safety
+- **G5. WordPress auto-share (M)** — per site: feed URL or WordPress REST API
+  (`/wp-json/wp/v2/posts?_embed`), target Pages, caption template
+  (`{title}`, `{excerpt}`, `{link}`, hashtags), featured image, spread rule
+  (e.g. one Page every 20 min, Page-specific best times), UTM per Page; new
+  articles become scheduled posts (or drafts for review). Builds on the existing
+  RSS feature. Sites: recettes.newsgeet.com, desomemes.com, goltaf.com.
+- **G6. Spam-risk guard (M)** — before scheduling, detect the same link or
+  near-identical text going to many Pages within a short window; warn with the
+  count and suggest **auto-stagger** (spread over N hours) and **AI caption
+  variants** per Page; workspace setting for the minimum gap. Never block —
+  explain and offer the fix.
+- **G7. Comment moderation rules (M)** — rules per Page or group: hide comments
+  with links / phone numbers / keywords, alert on keywords, auto-reply to
+  matching questions (with a daily cap and "only once per user"); log every
+  automatic action, undo from the log. Reminder: a Page cannot hide its own
+  comments (META_API_NOTES). Uses `pages_manage_engagement` (already
+  requested); comment webhooks make it real time (`webhook-setup` skill).
+- **G8. Saved replies (S)** — reusable answers with variables (`{first_name}`,
+  `{page}`) for comments and Messenger; shortcut `/` in the reply box; shared
+  per workspace.
+- **G9. Caption A/B tests (M)** — two (or more) captions for the same content on
+  comparable Pages or times; after N hours compare engagement rate per view;
+  declare a winner only with enough views (show "not enough data" otherwise);
+  learnings saved to the Page voice.
+- **G10. Best time per Page, automatically (S)** — weekly job recalculates each
+  Page's best hours from its own posts (existing heatmap) and proposes or
+  applies queue slots (setting: suggest / apply); shows what changed.
+
+### Content
+- **G11. AI translation (S, after 0.2)** — translate a post into FR / AR / EN as
+  per-Page variants; Arabic right-to-left preview; keep hashtags and links.
+- **G12. Arabic interface (M)** — `messages/ar.json`, RTL layout (`dir="rtl"`,
+  logical CSS properties), Arabic plurals in ICU; e2e for RTL screens.
+- **G13. Watermark and auto-crop (M)** — per-Page logo/text watermark (position,
+  opacity), applied when the post is published (original kept); crops/resizes
+  per network format (feed 4:5, story 9:16, link 1.91:1) with a focal point.
+- **G14. Short-link click analytics (S)** — dashboard of clicks per Page, post,
+  article and day (data already collected by the shortener), top articles,
+  clicks per 1,000 views; obeys the shared selection.
+
+### Operations
+- **G15. Status page (S)** — public or root-only `/status`: app, worker,
+  database, last publish, last backup, uptime history (90 days).
+- **G16. Error tracking (S)** — self-hosted GlitchTip or Sentry: server, worker
+  and browser errors with release hash; no personal data or tokens in events
+  (scrub); link from the root section.
+- **G17. Export everything (M)** — per workspace: posts, schedule, analytics,
+  comments, media as a ZIP (JSON + CSV + files), built in the background with
+  a download link that expires; also answers GDPR requests.
+- **G18. Promote a post (L)** — boost a published post (budget, duration,
+  audience: location/age/interests, ad account) from the post card; results in
+  the Ads view. Needs `ads_management` + Meta review and the owner's OK for each
+  spend; build after Meta step 2. Never spend without an explicit confirmation
+  showing the amount.
+
 ## Phase E — Blocked on owner / Meta (unchanged)
 Meta App Review step 2 → Live mode; owner enters the Gmail app password and the
 Anthropic / OpenAI / Gemini keys (after Phase 0); LinkedIn / Threads
