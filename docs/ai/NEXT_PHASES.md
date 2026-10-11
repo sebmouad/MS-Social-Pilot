@@ -397,6 +397,87 @@ most time), the rest after Phase D2. S/M/L = effort.
   spend; build after Meta step 2. Never spend without an explicit confirmation
   showing the amount.
 
+## Phase H — More owner-approved additions (2026-10-11)
+
+All 20 approved. Suggested order: **H2, H3, H10, H18, H1** first (best fit for
+the recipe Pages and a Moroccan audience), then the rest. Several need the AI
+setup from Phase 0.2 (marked AI).
+
+### Planning and content
+- **H1. Content mix planner (M)** — per Page or group, a weekly mix by category
+  (e.g. 4 recipes · 1 tip · 1 question); the queue fills slots to match from
+  drafts, evergreen and WordPress items, and warns when a category runs dry.
+  Categories = post labels (exist).
+- **H2. Ramadan and holiday mode (S)** — Ramadan dates per year and daily iftar /
+  suhoor times per city (prayer-times API or a stored table, e.g. Casablanca,
+  Rabat, Paris); posting slots shift relative to iftar ("iftar − 2 h", "after
+  iftar + 1 h"); Moroccan and French holiday calendar on the calendar view
+  (awareness days exist — add these sets). Workspace setting: city, on/off.
+- **H3. Recipe posts from WordPress (M)** — read recipe structured data
+  (JSON-LD `Recipe`: ingredients, times, steps, image; WP Recipe Maker / Tasty
+  / Yoast schema) from the article; templates: ingredients list post, step-by-
+  step carousel (one image per step when available), "ready in N min" teaser;
+  extends G5.
+- **H4. Post templates by category (S)** — saved structures (recipe, tip, poll,
+  promo) with placeholders, default hashtags and first comment; pick in Compose.
+- **H5. AI alt text and subtitles (M, AI)** — alt text suggested for every photo
+  (editable, sent as Facebook alt text — already supported); Reel/video
+  transcription to burned-in or SRT captions (speech-to-text provider; OpenAI
+  or Gemini from 0.2).
+- **H6. Engagement prediction (M, AI)** — before scheduling, compare the draft
+  (format, length, time, topic) with the Page's past posts; show "likely above
+  / around / below this Page's usual" with the reasons; never a fake precise
+  number.
+- **H7. Trending topics (S)** — Google Trends daily trends for Morocco and
+  France (and the Page's country), filtered by the workspace's themes; "Make a
+  post" opens Compose with the topic.
+
+### Team and clients
+- **H8. Internal notes on posts (S)** — team-only comment thread on each post
+  with @mentions (notifies), never published; shown in Compose, calendar
+  popover and approvals.
+- **H9. Post version history (S)** — every save stores a version (text, media,
+  targets, time, who); compare and restore.
+- **H10. Undo send (S)** — "Publish now" waits 30 s (setting 0–60 s) with an
+  "Undo" toast; the worker publishes after the delay; scheduled posts
+  unaffected.
+- **H11. Inbox response time (S)** — first-response and resolution time per
+  Page and per member (median, slowest), business hours aware; in analytics
+  and reports.
+- **H12. Goals per Page (S)** — monthly targets (followers, views, engagement,
+  posts) with progress bars and pace ("on track / behind"), in the dashboard
+  and reports.
+- **H13. Notes on charts (S)** — annotations (date, label, colour) on analytics
+  timelines, per Page or workspace; shown in reports.
+- **H14. Agency overview for root (M)** — in the root section: KPIs for every
+  workspace (Pages, posts scheduled/failed, followers change, engagement,
+  disconnected Pages, AI spend), sortable, drill-down.
+
+### Monitoring
+- **H15. Negative-comment alert (M, AI)** — sentiment on new comments (batch,
+  cheap model); alert when negative share or volume spikes vs the Page's
+  baseline; links to the comments; respects G7 rules.
+- **H16. Meta API usage per Page (S)** — record call counts and the
+  `x-app-usage` / `x-business-use-case-usage` headers per Page (budget.ts
+  already reads them); root view with the heaviest Pages and jobs.
+- **H17. Earnings tracking (M, check first)** — verify which monetisation
+  metrics the Graph API still returns for these Pages (META_API_NOTES, the
+  `search-meta-docs` skill); build only what is available; otherwise document
+  "not available" and stop.
+
+### Connections
+- **H18. Outgoing webhooks + Zapier / n8n / Make (S)** — events: post
+  scheduled, published, failed; comment received; Page disconnected; report
+  ready. Signed payloads (HMAC), retries with backoff, delivery log; uses the
+  public API tokens that exist.
+- **H19. Calendar feed (S)** — private ICS URL per member (selection-aware:
+  pages/group in the token), revocable; Google Calendar / Outlook subscribe.
+- **H20. Bulk Page info editing (M, check permission)** — edit hours,
+  description, website, phone, cover across selected Pages; confirm Meta
+  permission (`pages_manage_metadata` or Page settings fields) and add it behind
+  a switch like the other optional scopes; preview the change per Page; log
+  and undo.
+
 ## Phase E — Blocked on owner / Meta (unchanged)
 Meta App Review step 2 → Live mode; owner enters the Gmail app password and the
 Anthropic / OpenAI / Gemini keys (after Phase 0); LinkedIn / Threads
