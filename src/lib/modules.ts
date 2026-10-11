@@ -87,3 +87,41 @@ export const SHARED_LINKS: Array<{ href: string; label: string; icon: IconName; 
   { href: '/connections', label: 'connections', icon: 'connections', also: ['/accounts'] },
   { href: '/settings', label: 'settings', icon: 'settings', also: ['/setup'] },
 ];
+
+/** The request path, set by `src/middleware.ts`, so server code knows which module is asked for. */
+export const PATHNAME_HEADER = 'x-msp-pathname';
+
+export const MODULE_KEYS: ModuleKey[] = MODULES.map((module) => module.key);
+
+export function isModuleKey(value: string): value is ModuleKey {
+  return (MODULE_KEYS as string[]).includes(value);
+}
+
+/**
+ * The modules a member may use: everything, minus what root switched off for
+ * the workspace, minus what root switched off for this member.
+ */
+export function enabledModules(workspaceOff: readonly string[], memberOff: readonly string[] = []): ModuleKey[] {
+  return MODULE_KEYS.filter((key) => !workspaceOff.includes(key) && !memberOff.includes(key));
+}
+
+/** API routes that belong to one module, refused when it is switched off. */
+const API_MODULES: Array<{ prefix: string; module: ModuleKey }> = [
+  { prefix: '/api/analytics', module: 'analytics' },
+  { prefix: '/api/reports', module: 'analytics' },
+  { prefix: '/api/report-schedules', module: 'analytics' },
+  { prefix: '/api/report-templates', module: 'analytics' },
+  { prefix: '/api/ads', module: 'ads' },
+  { prefix: '/api/posts', module: 'schedule' },
+  { prefix: '/api/queue', module: 'schedule' },
+  { prefix: '/api/queue-slots', module: 'schedule' },
+  { prefix: '/api/feeds', module: 'schedule' },
+];
+
+/** The module a screen or API path belongs to, or null when it serves all of them. */
+export function moduleOfPath(pathname: string): ModuleKey | null {
+  if (pathname.startsWith('/api/')) {
+    return API_MODULES.find((entry) => matches(pathname, entry.prefix))?.module ?? null;
+  }
+  return moduleFor(pathname)?.key ?? null;
+}

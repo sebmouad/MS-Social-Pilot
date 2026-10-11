@@ -1003,7 +1003,12 @@
     "twoStepNotStarted": "Start setting up the authenticator app again.",
     "twoStepRequired": "Two-step sign-in is required for your account, so it can't be turned off.",
     "twoStepExpired": "This sign-in took too long. Enter your email and password again.",
-    "passkeyFailed": "The passkey couldn't be checked. Try again, or use a code."
+    "passkeyFailed": "The passkey couldn't be checked. Try again, or use a code.",
+    "workspaceSuspended": "This workspace is suspended. Contact the service administrator.",
+    "moduleOff": "This part of the app is not switched on for you.",
+    "rootNoSuchUser": "Nobody has an account with that email. Invite them from Registration instead.",
+    "rootAlreadyMember": "That person is already a member of this workspace.",
+    "rootLastOwner": "A workspace needs an owner. Make someone else owner first."
   },
   "feeds": {
     "title": "RSS feeds",
@@ -1235,7 +1240,10 @@
     "closeMenu": "Close menu",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
-    "root": "Root"
+    "root": "Root",
+    "rootVisit": "You are looking after {name} as root. Every visit is logged.",
+    "leaveVisit": "Leave workspace",
+    "leaveVisitFailed": "Could not leave the workspace. Check your connection and try again."
   },
   "notifications": {
     "title": "Notifications",
@@ -2305,7 +2313,7 @@
       "capability": "Action",
       "yes": "Allowed",
       "no": "Not allowed",
-      "rootNote": "Root is separate from these roles: it changes the installation from the root section and has no extra rights inside a workspace.",
+      "rootNote": "Root is separate from these roles: it changes the installation from the root section and can open any workspace as its owner, and every visit is logged.",
       "members": "{count, plural, one {# member} other {# members}}",
       "workspace": "Workspace",
       "person": "Person",
@@ -2344,7 +2352,15 @@
         "root_transferred": "Root handed from {from} to {to}",
         "user_twoStepReset": "Reset two-step sign-in for {email}",
         "client_invited": "Invited {email} to create a workspace",
-        "client_invitationRevoked": "Revoked {email}'s invitation to create a workspace"
+        "client_invitationRevoked": "Revoked {email}'s invitation to create a workspace",
+        "workspace_suspended": "Suspended workspace {workspace}",
+        "workspace_resumed": "Resumed workspace {workspace}",
+        "workspace_modulesChanged": "Modules switched off in {workspace}: {off}",
+        "workspace_visited": "Opened workspace {workspace} as root",
+        "member_added": "Added {email} to {workspace} as {role}",
+        "member_roleChanged": "Changed {email}'s role in {workspace} from {from} to {to}",
+        "member_modulesChanged": "Modules switched off for {email} in {workspace}: {off}",
+        "member_removed": "Removed {email} from {workspace}"
       }
     },
     "danger": {
@@ -2410,6 +2426,36 @@
       "revoke": "Revoke",
       "revokeQuestion": "Revoke the invitation for {email}?",
       "revokeBody": "The link stops working. You can invite them again later."
+    },
+    "workspace": {
+      "title": "Workspace",
+      "summary": "{pages, plural, =0 {No profile} one {# profile} other {# profiles}} · {posts, plural, =0 {no post} one {# post} other {# posts}} · created {created}",
+      "access": "Access",
+      "open": "Open as root",
+      "openHelp": "You see and act as its owner. A banner stays on every screen and the visit is logged.",
+      "suspendedBadge": "Suspended",
+      "suspend": "Suspend workspace",
+      "suspendQuestion": "Suspend {name}?",
+      "suspendBody": "Its members see a notice instead of their screens and cannot use the API, and scheduled posts are held until you resume it. Nothing is deleted.",
+      "suspendedDone": "Workspace suspended.",
+      "resume": "Resume workspace",
+      "resumed": "Workspace resumed.",
+      "modules": "Modules",
+      "modulesHelp": "Untick a module to hide it from everyone in this workspace: its links disappear and its screens and API answer as if it did not exist.",
+      "modulesSaved": "Modules saved.",
+      "membersTitle": "{count, plural, =0 {No member} one {# member} other {# members}}",
+      "membersHelp": "Change a role, switch modules off for one person, or remove them. A workspace always keeps one owner.",
+      "role": "Role",
+      "memberModules": "Modules",
+      "roleSaved": "{name}'s role changed.",
+      "remove": "Remove",
+      "removeQuestion": "Remove {name} from {workspace}?",
+      "removeBody": "They lose access to this workspace at once. Their account and other workspaces are not touched.",
+      "removed": "{name} removed.",
+      "addEmail": "Email of an existing account",
+      "add": "Add member",
+      "added": "Member added.",
+      "addHelp": "Only for people who already have an account. Anyone else: invite them from Registration."
     }
   },
   "twoStep": {
@@ -2539,5 +2585,9 @@
       "x": "X",
       "pinterest": "Pinterest"
     }
+  },
+  "suspended": {
+    "title": "This workspace is suspended",
+    "body": "Nobody in it can work on posts, profiles or reports for now. Contact the service administrator to have it resumed."
   }
 }

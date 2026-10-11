@@ -72,8 +72,8 @@ query filtering on `auth.workspace.id` (+ `pageScope`), and pinned by
 every `[id]` API route with workspace A's real ids (must answer 404/403 and
 change nothing), every list route (must not mention A), and passes A's Page
 ids in bodies (nothing may end up pointing at them). A new `[id]` route fails
-that test until it is mapped. Root sees all workspaces only in the root
-section (names, counts), never their posts, Pages or tokens.
+that test until it is mapped. Root sees every workspace in the root section
+and may open one as its owner (logged visit, see below).
 
 ## Two kinds of invitation (owner, 2026-10-11 — beta before selling)
 - **Join an existing workspace**: a workspace owner/admin invites from
@@ -103,8 +103,35 @@ section (names, counts), never their posts, Pages or tokens.
 - `CAPABILITIES` in `constants.ts` is the single table the `can…` functions
   read; printed at `/root/privileges` (+ every member's role, Page access,
   last sign-in, CSV export) and read-only for admins at `/settings/permissions`.
-- Not built, waiting on the owner: root passing workspace checks / opening
-  another workspace (item 2 below), suspending a workspace, deleting users.
+- Still not built: deleting users, creating a workspace from the root section.
+
+## Root oversight and modules (owner, 2026-10-11 — "root sees all; clients
+only get what root configured, activated and authorised; root can change
+anything")
+Built as a first, customisable version (`tests/root-oversight.integration.test.ts`):
+- **Modules** (`src/lib/modules.ts`: analytics, ads, schedule). Root switches
+  them off per workspace (`Workspace.disabledModules`) and per member
+  (`Membership.disabledModules`). What a member may use =
+  `enabledModules(workspace, member)` → `auth.modules`. Switched-off modules
+  have no sidebar links; their screens 404 (`requirePage` + the (app) layout)
+  and their API routes answer 403 (`requireAuth`), using the request path that
+  `src/middleware.ts` passes in `x-msp-pathname` and `moduleOfPath()` (API
+  prefixes listed there). Shared screens (dashboard, connections, settings)
+  belong to no module and stay.
+- **Suspend / resume a workspace** (`Workspace.suspendedAt`): members see a
+  notice instead of their screens, API calls answer 403, the scheduler holds
+  its posts (`findDue` skips it) until resumed. Root still gets in.
+- **Open any workspace as root** (`POST /api/root/workspaces/[id]/visit`):
+  root acts as its owner without a membership row (cookie `msp_root_visit`,
+  honoured only for root), an amber banner with "Leave workspace" shows on
+  every screen, and each visit is logged (`workspace.visited`). Leaving or
+  switching workspace ends it.
+- **Members** (`/root/workspaces/[id]`): add an existing account with a role,
+  change a role, switch modules off for one person, remove. A workspace always
+  keeps an owner (last owner cannot be re-roled or removed).
+- Every change is in Root activity. Roles' capability matrix is unchanged.
+- Next to customise: plans (module bundles per client), per-member Page access
+  from root, limits per workspace (profiles, posts, AI budget).
 
 ## To build (NEXT_PHASES Phase 0.3)
 1. **Root console** (inside the `/root` section above): all workspaces (create,

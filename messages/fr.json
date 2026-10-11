@@ -1003,7 +1003,12 @@
     "twoStepNotStarted": "Recommencez la configuration de l’application d’authentification.",
     "twoStepRequired": "La connexion en deux étapes est obligatoire pour votre compte : elle ne peut pas être désactivée.",
     "twoStepExpired": "Cette connexion a pris trop de temps. Saisissez à nouveau votre e-mail et votre mot de passe.",
-    "passkeyFailed": "La clé d’accès n’a pas pu être vérifiée. Réessayez, ou utilisez un code."
+    "passkeyFailed": "La clé d’accès n’a pas pu être vérifiée. Réessayez, ou utilisez un code.",
+    "workspaceSuspended": "Cet espace de travail est suspendu. Contactez l’administrateur du service.",
+    "moduleOff": "Cette partie de l’application n’est pas activée pour vous.",
+    "rootNoSuchUser": "Aucun compte n’existe avec cet e-mail. Invitez cette personne depuis Inscription.",
+    "rootAlreadyMember": "Cette personne est déjà membre de cet espace de travail.",
+    "rootLastOwner": "Un espace de travail doit avoir un propriétaire. Nommez d’abord quelqu’un d’autre propriétaire."
   },
   "feeds": {
     "title": "Flux RSS",
@@ -1235,7 +1240,10 @@
     "closeMenu": "Fermer le menu",
     "collapseSidebar": "Réduire la barre latérale",
     "expandSidebar": "Déplier la barre latérale",
-    "root": "Root"
+    "root": "Root",
+    "rootVisit": "Vous gérez {name} en tant que root. Chaque visite est journalisée.",
+    "leaveVisit": "Quitter l’espace",
+    "leaveVisitFailed": "Impossible de quitter l’espace de travail. Vérifiez votre connexion et réessayez."
   },
   "notifications": {
     "title": "Notifications",
@@ -2305,7 +2313,7 @@
       "capability": "Action",
       "yes": "Autorisé",
       "no": "Non autorisé",
-      "rootNote": "Root est à part de ces rôles : il modifie l’installation depuis la section root et n’a aucun droit supplémentaire dans un espace de travail.",
+      "rootNote": "Root est distinct de ces rôles : il modifie l’installation depuis la section root et peut ouvrir n’importe quel espace de travail comme propriétaire ; chaque visite est journalisée.",
       "members": "{count, plural, one {# membre} other {# membres}}",
       "workspace": "Espace de travail",
       "person": "Personne",
@@ -2344,7 +2352,15 @@
         "root_transferred": "Root transféré de {from} à {to}",
         "user_twoStepReset": "Connexion en deux étapes réinitialisée pour {email}",
         "client_invited": "{email} invité à créer un espace de travail",
-        "client_invitationRevoked": "Invitation de {email} à créer un espace révoquée"
+        "client_invitationRevoked": "Invitation de {email} à créer un espace révoquée",
+        "workspace_suspended": "Espace {workspace} suspendu",
+        "workspace_resumed": "Espace {workspace} réactivé",
+        "workspace_modulesChanged": "Modules désactivés dans {workspace} : {off}",
+        "workspace_visited": "Espace {workspace} ouvert en tant que root",
+        "member_added": "{email} ajouté(e) à {workspace} comme {role}",
+        "member_roleChanged": "Rôle de {email} dans {workspace} changé de {from} à {to}",
+        "member_modulesChanged": "Modules désactivés pour {email} dans {workspace} : {off}",
+        "member_removed": "{email} retiré(e) de {workspace}"
       }
     },
     "danger": {
@@ -2410,6 +2426,36 @@
       "revoke": "Révoquer",
       "revokeQuestion": "Révoquer l’invitation de {email} ?",
       "revokeBody": "Le lien ne fonctionne plus. Vous pourrez l’inviter à nouveau plus tard."
+    },
+    "workspace": {
+      "title": "Espace de travail",
+      "summary": "{pages, plural, =0 {Aucun profil} one {# profil} other {# profils}} · {posts, plural, =0 {aucune publication} one {# publication} other {# publications}} · créé le {created}",
+      "access": "Accès",
+      "open": "Ouvrir en tant que root",
+      "openHelp": "Vous voyez et agissez comme son propriétaire. Un bandeau reste affiché sur chaque écran et la visite est journalisée.",
+      "suspendedBadge": "Suspendu",
+      "suspend": "Suspendre l’espace",
+      "suspendQuestion": "Suspendre {name} ?",
+      "suspendBody": "Ses membres voient un avis à la place de leurs écrans et ne peuvent plus utiliser l’API ; les publications programmées attendent sa réactivation. Rien n’est supprimé.",
+      "suspendedDone": "Espace de travail suspendu.",
+      "resume": "Réactiver l’espace",
+      "resumed": "Espace de travail réactivé.",
+      "modules": "Modules",
+      "modulesHelp": "Décochez un module pour le masquer à tout l’espace : ses liens disparaissent et ses écrans et son API répondent comme s’il n’existait pas.",
+      "modulesSaved": "Modules enregistrés.",
+      "membersTitle": "{count, plural, =0 {Aucun membre} one {# membre} other {# membres}}",
+      "membersHelp": "Changez un rôle, désactivez des modules pour une personne ou retirez-la. Un espace garde toujours un propriétaire.",
+      "role": "Rôle",
+      "memberModules": "Modules",
+      "roleSaved": "Rôle de {name} modifié.",
+      "remove": "Retirer",
+      "removeQuestion": "Retirer {name} de {workspace} ?",
+      "removeBody": "Cette personne perd immédiatement l’accès à cet espace. Son compte et ses autres espaces ne changent pas.",
+      "removed": "{name} retiré(e).",
+      "addEmail": "E-mail d’un compte existant",
+      "add": "Ajouter le membre",
+      "added": "Membre ajouté.",
+      "addHelp": "Uniquement pour les personnes qui ont déjà un compte. Pour les autres : invitez-les depuis Inscription."
     }
   },
   "twoStep": {
@@ -2539,5 +2585,9 @@
       "x": "X",
       "pinterest": "Pinterest"
     }
+  },
+  "suspended": {
+    "title": "Cet espace de travail est suspendu",
+    "body": "Personne ne peut y travailler sur les publications, profils ou rapports pour l’instant. Contactez l’administrateur du service pour le réactiver."
   }
 }

@@ -142,7 +142,10 @@ prices (overrides cover the gap).
 ### 0.3 Root and separate privileges
 **Done 2026-10-11** (see PERMISSIONS.md "Built"): `/root/*` section, users,
 workspaces, invitations, privileges + CSV, root log, transfer + SSH script.
-Waiting on the owner: root inside other workspaces, workspace suspension.
+**Root oversight done 2026-10-11** (PERMISSIONS.md "Root oversight and
+modules"): modules per workspace and per member, suspend/resume, open any
+workspace as root (logged, banner), members managed from
+`/root/workspaces/[id]`. Next: plans/limits per client, delete users.
 Owner's rule (2026-10-11): the first registered user is root and sets up every
 aspect of the app; other admins and users have separate privileges, which the
 owner will audit. Root already exists (`isInstanceOwner`, first account only;

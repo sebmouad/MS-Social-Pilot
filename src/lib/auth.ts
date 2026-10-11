@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { Locale, Prisma, WorkspaceRole } from '@prisma/client';
@@ -12,6 +12,7 @@ import { hashPassword, hashToken, randomToken, verifyPassword } from './crypto';
 import { uniqueSlug } from './slug';
 import { DEFAULT_QUEUE_SLOTS, setDateLocale } from './time';
 import { nextStepAfterPassword, type PendingStep } from './two-step';
+import { enabledModules, moduleOfPath, PATHNAME_HEADER, type ModuleKey } from './modules';
 
 /**
  * Sessions, and resolving which workspace the request is acting on.
@@ -28,6 +29,8 @@ import { nextStepAfterPassword, type PendingStep } from './two-step';
 
 const SESSION_COOKIE = 'msp_session';
 const WORKSPACE_COOKIE = 'msp_workspace';
+/** Root looking after a workspace they are not a member of. See `startRootVisit`. */
+const ROOT_VISIT_COOKIE = 'msp_root_visit';
 const SESSION_TTL_DAYS = 30;
 const TRUSTED_COOKIE = 'msp_trusted';
 /** Time to finish the second step before the password has to be typed again. */
@@ -51,8 +54,17 @@ export interface AuthContext {
     timezone: string;
     requiresApproval: boolean;
     defaultLocale: Locale;
+    /** Root suspended it: members are refused, root still gets in. */
+    suspended: boolean;
   };
   role: WorkspaceRole;
+  /** The modules this member may use here (root's switches, `src/lib/modules.ts`). */
+  modules: ModuleKey[];
+  /**
+   * Root is looking after this workspace without being a member: they act as
+   * its owner, every visit is logged, and a banner says so.
+   */
+  rootVisit: boolean;
   /**
    * The installation's owner, whatever their role in the active workspace.
    * Only this person may change instance-wide configuration; see
@@ -467,7 +479,16 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
   if (!session || session.pending || session.expiresAt < new Date()) return null;
 
   const { user } = session;
-  if (user.disabledAt || user.memberships.length === 0) return null;
+  if (user.disabledAt) return null;
+
+  // Root may open any workspace (owner decision, PERMISSIONS.md): they act as
+  // its owner, without a membership row, so the client's team list is unchanged.
+  const visitId = user.isInstanceOwner ? store.get(ROOT_VISIT_COOKIE)?.value : undefined;
+  const visited =
+    visitId && !user.memberships.some((entry) => entry.workspaceId === visitId)
+      ? await prisma.workspace.findUnique({ where: { id: visitId } })
+      : null;
+  if (!visited && user.memberships.length === 0) return null;
 
   // Dates on every screen this request renders are written in this language.
   setDateLocale(user.locale);
@@ -477,11 +498,18 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
 
   // Membership lookup is the authorisation check: an id nobody has a
   // membership for simply does not match, and we fall through to the default.
-  const membership =
-    candidates
-      .filter((id): id is string => Boolean(id))
-      .map((id) => user.memberships.find((entry) => entry.workspaceId === id))
-      .find((entry) => entry !== undefined) ?? user.memberships[0]!;
+  const membership = visited
+    ? {
+        workspace: visited,
+        role: WorkspaceRole.owner,
+        allPages: true,
+        pages: [] as Array<{ targetId: string }>,
+        disabledModules: [] as string[],
+      }
+    : (candidates
+        .filter((id): id is string => Boolean(id))
+        .map((id) => user.memberships.find((entry) => entry.workspaceId === id))
+        .find((entry) => entry !== undefined) ?? user.memberships[0]!);
 
   return {
     user: { id: user.id, email: user.email, name: user.name, locale: user.locale },
@@ -492,11 +520,14 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
       timezone: membership.workspace.timezone,
       requiresApproval: membership.workspace.requiresApproval,
       defaultLocale: membership.workspace.defaultLocale,
+      suspended: membership.workspace.suspendedAt !== null,
     },
     role: membership.role,
+    modules: enabledModules(membership.workspace.disabledModules, membership.disabledModules),
+    rootVisit: visited !== null,
     isInstanceOwner: user.isInstanceOwner,
     pageScope: scopeOf(membership),
-    workspaces: user.memberships.map((entry) => ({
+    workspaces: [...(visited ? [{ ...membership, workspaceId: visited.id }] : []), ...user.memberships].map((entry) => ({
       id: entry.workspace.id,
       name: entry.workspace.name,
       slug: entry.workspace.slug,
@@ -518,6 +549,8 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
 export async function requirePage(requestedWorkspaceId?: string): Promise<AuthContext> {
   const context = await getAuthContext(requestedWorkspaceId);
   if (!context) redirect('/login');
+  // The (app) layout shows the suspended notice; a switched-off module is not there.
+  if ((await accessRefusal(context)) === 'module') notFound();
   return context;
 }
 
@@ -538,11 +571,43 @@ export async function requireRootApi(): Promise<AuthContext> {
   return context;
 }
 
+/**
+ * Why root's switches refuse this request, if they do: the workspace is
+ * suspended (root still gets in), or the path belongs to a module switched off
+ * for this member. The path comes from `src/middleware.ts`.
+ */
+export async function accessRefusal(context: AuthContext): Promise<'suspended' | 'module' | null> {
+  if (context.workspace.suspended && !context.isInstanceOwner) return 'suspended';
+  const pathname = (await headers()).get(PATHNAME_HEADER);
+  const module = pathname ? moduleOfPath(pathname) : null;
+  if (module && !context.modules.includes(module)) return 'module';
+  return null;
+}
+
 /** Same as {@link getAuthContext} but throws — for routes that require a login. */
 export async function requireAuth(requestedWorkspaceId?: string): Promise<AuthContext> {
   const context = await getAuthContext(requestedWorkspaceId);
   if (!context) throw new AuthError('You must be signed in.');
+  const refusal = await accessRefusal(context);
+  if (refusal === 'suspended') throw errors.workspaceSuspended();
+  if (refusal === 'module') throw errors.moduleOff();
   return context;
+}
+
+/** Root opens a workspace they are not a member of; the caller logs it. */
+export async function startRootVisit(workspaceId: string): Promise<void> {
+  const store = await cookies();
+  store.set(ROOT_VISIT_COOKIE, workspaceId, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.isProduction,
+    path: '/',
+    maxAge: 60 * 60 * 8,
+  });
+}
+
+export async function endRootVisit(): Promise<void> {
+  (await cookies()).delete(ROOT_VISIT_COOKIE);
 }
 
 /**
@@ -566,6 +631,7 @@ export async function switchWorkspace(userId: string, workspaceId: string): Prom
   });
   if (!membership) throw new ForbiddenError('You are not a member of that workspace.');
 
+  await endRootVisit();
   await prisma.user.update({ where: { id: userId }, data: { lastActiveWorkspaceId: workspaceId } });
   await setActiveWorkspaceCookie(workspaceId);
 }

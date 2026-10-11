@@ -2,15 +2,22 @@ import { z } from 'zod';
 
 import { requireRootApi } from '@/lib/auth';
 import { ok, readJson, route } from '@/lib/api';
-import { renameWorkspace } from '@/lib/root';
+import { MODULE_KEYS, type ModuleKey } from '@/lib/modules';
+import { renameWorkspace, setWorkspaceModules, setWorkspaceSuspended } from '@/lib/root';
 
-const schema = z.object({ name: z.string().trim().min(1).max(100) });
+const schema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  suspended: z.boolean().optional(),
+  disabledModules: z.array(z.enum(MODULE_KEYS as [ModuleKey, ...ModuleKey[]])).optional(),
+});
 
-/** Rename a workspace. Root only (404 for everyone else). */
+/** Rename, suspend or resume a workspace, or switch its modules. Root only (404 for everyone else). */
 export const PATCH = route(async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const auth = await requireRootApi();
   const { id } = await params;
-  const { name } = schema.parse(await readJson(request));
-  await renameWorkspace(auth.user.id, id, name);
+  const body = schema.parse(await readJson(request));
+  if (body.name !== undefined) await renameWorkspace(auth.user.id, id, body.name);
+  if (body.suspended !== undefined) await setWorkspaceSuspended(auth.user.id, id, body.suspended);
+  if (body.disabledModules !== undefined) await setWorkspaceModules(auth.user.id, id, body.disabledModules);
   return ok({ ok: true });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFormatter, useTranslations } from 'next-intl';
 
@@ -70,6 +71,7 @@ export interface RootWorkspace {
   pages: number;
   posts: number;
   owners: string[];
+  suspended: boolean;
 }
 
 export function WorkspacesTable({ workspaces }: { workspaces: RootWorkspace[] }) {
@@ -126,7 +128,12 @@ export function WorkspacesTable({ workspaces }: { workspaces: RootWorkspace[] })
                       </button>
                     </form>
                   ) : (
-                    <span className="font-semibold text-slate-900">{workspace.name}</span>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <Link href={`/root/workspaces/${workspace.id}`} className="font-semibold text-brand-700 hover:underline">
+                        {workspace.name}
+                      </Link>
+                      {workspace.suspended && <span className="badge bg-red-100 text-red-700">{t('workspace.suspendedBadge')}</span>}
+                    </span>
                   )}
                 </td>
                 <td className="px-4 py-2 text-slate-600">{workspace.owners.join(', ') || '—'}</td>
@@ -547,6 +554,246 @@ export function InviteClient({ invitations }: { invitations: RootClientInvitatio
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+const ROLE_OPTIONS = ['owner', 'admin', 'editor', 'contributor'] as const;
+
+export interface RootWorkspaceDetail {
+  id: string;
+  name: string;
+  suspended: boolean;
+  disabledModules: string[];
+  members: Array<{
+    id: string;
+    name: string;
+    email: string;
+    disabled: boolean;
+    role: string;
+    disabledModules: string[];
+  }>;
+}
+
+/** Module switches as a row of checkboxes: checked means the module is on. */
+function ModuleSwitches({
+  id,
+  moduleKeys,
+  off,
+  locked = [],
+  disabled,
+  onChange,
+}: {
+  id: string;
+  moduleKeys: readonly string[];
+  off: string[];
+  /** Off for the whole workspace: shown off, not changeable here. */
+  locked?: string[];
+  disabled: boolean;
+  onChange: (off: string[]) => void;
+}) {
+  const tNav = useTranslations('nav.module');
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1">
+      {moduleKeys.map((key) => {
+        const isLocked = locked.includes(key);
+        return (
+          <label key={key} className={`inline-flex h-9 items-center gap-2 text-sm ${isLocked ? 'text-slate-400' : 'text-slate-700'}`}>
+            <input
+              id={`${id}-${key}`}
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-brand-600"
+              checked={!isLocked && !off.includes(key)}
+              disabled={disabled || isLocked}
+              onChange={(event) =>
+                onChange(event.target.checked ? off.filter((entry) => entry !== key) : [...off, key])
+              }
+            />
+            {tNav(key)}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWorkspaceDetail; moduleKeys: readonly string[] }) {
+  const t = useTranslations('root');
+  const tRoles = useTranslations('team.roles');
+  const confirm = useConfirm();
+  const router = useRouter();
+  const { busy, run, messages } = useAction();
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<string>('editor');
+
+  const base = `/api/root/workspaces/${workspace.id}`;
+
+  return (
+    <div className="space-y-6">
+      {messages}
+
+      <section className="card space-y-3 p-4 sm:p-5">
+        <h2 className="text-base font-semibold text-slate-900">{t('workspace.access')}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="btn-primary h-10"
+            disabled={busy === 'visit'}
+            onClick={async () => {
+              if (await run('visit', `${base}/visit`, 'POST')) router.push('/dashboard');
+            }}
+          >
+            <Icon name="shield" size={16} /> {t('workspace.open')}
+          </button>
+          <p className="text-sm text-slate-600">{t('workspace.openHelp')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+          {workspace.suspended ? (
+            <>
+              <span className="badge bg-red-100 text-red-700">{t('workspace.suspendedBadge')}</span>
+              <button
+                type="button"
+                className="btn-secondary h-10"
+                disabled={busy === 'suspend'}
+                onClick={() => void run('suspend', base, 'PATCH', { suspended: false }, t('workspace.resumed'))}
+              >
+                {t('workspace.resume')}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn-ghost h-10 text-red-700"
+              disabled={busy === 'suspend'}
+              onClick={async () => {
+                const ok = await confirm({
+                  title: t('workspace.suspendQuestion', { name: workspace.name }),
+                  body: t('workspace.suspendBody'),
+                  confirmLabel: t('workspace.suspend'),
+                  danger: true,
+                });
+                if (ok) await run('suspend', base, 'PATCH', { suspended: true }, t('workspace.suspendedDone'));
+              }}
+            >
+              {t('workspace.suspend')}
+            </button>
+          )}
+        </div>
+      </section>
+
+      <section className="card space-y-2 p-4 sm:p-5">
+        <h2 className="text-base font-semibold text-slate-900">{t('workspace.modules')}</h2>
+        <p className="text-sm text-slate-600">{t('workspace.modulesHelp')}</p>
+        <ModuleSwitches
+          id="workspace-modules"
+          moduleKeys={moduleKeys}
+          off={workspace.disabledModules}
+          disabled={busy === 'modules'}
+          onChange={(off) => void run('modules', base, 'PATCH', { disabledModules: off }, t('workspace.modulesSaved'))}
+        />
+      </section>
+
+      <section className="card space-y-3 p-0">
+        <div className="px-4 pt-4 sm:px-5">
+          <h2 className="text-base font-semibold text-slate-900">{t('workspace.membersTitle', { count: workspace.members.length })}</h2>
+          <p className="text-sm text-slate-600">{t('workspace.membersHelp')}</p>
+        </div>
+        <div className="scroll-x">
+          <table className="w-full min-w-[44rem] text-left text-sm">
+            <thead className="border-y border-slate-200 text-xs text-slate-500">
+              <tr>
+                <th className="px-4 py-2 font-medium">{t('users.person')}</th>
+                <th className="px-4 py-2 font-medium">{t('workspace.role')}</th>
+                <th className="px-4 py-2 font-medium">{t('workspace.memberModules')}</th>
+                <th className="px-4 py-2"><span className="sr-only">{t('actions')}</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {workspace.members.map((member) => (
+                <tr key={member.id}>
+                  <td className="px-4 py-2">
+                    <p className="font-semibold text-slate-900">{member.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {member.email}
+                      {member.disabled && <span className="badge ml-2 bg-red-100 text-red-700">{t('users.disabled')}</span>}
+                    </p>
+                  </td>
+                  <td className="px-4 py-2">
+                    <label className="sr-only" htmlFor={`role-${member.id}`}>{t('workspace.role')}</label>
+                    <select
+                      id={`role-${member.id}`}
+                      className="input h-9 w-auto"
+                      value={member.role}
+                      disabled={busy === member.id}
+                      onChange={(event) =>
+                        void run(member.id, `/api/root/members/${member.id}`, 'PATCH', { role: event.target.value }, t('workspace.roleSaved', { name: member.name }))
+                      }
+                    >
+                      {ROLE_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{tRoles(option)}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-2">
+                    <ModuleSwitches
+                      id={`modules-${member.id}`}
+                      moduleKeys={moduleKeys}
+                      off={member.disabledModules}
+                      locked={workspace.disabledModules}
+                      disabled={busy === member.id}
+                      onChange={(off) =>
+                        void run(member.id, `/api/root/members/${member.id}`, 'PATCH', { disabledModules: off }, t('workspace.modulesSaved'))
+                      }
+                    />
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <button
+                      type="button"
+                      className="btn-ghost h-9 whitespace-nowrap text-red-700"
+                      disabled={busy === member.id}
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: t('workspace.removeQuestion', { name: member.name, workspace: workspace.name }),
+                          body: t('workspace.removeBody'),
+                          confirmLabel: t('workspace.remove'),
+                          danger: true,
+                        });
+                        if (ok) await run(member.id, `/api/root/members/${member.id}`, 'DELETE', undefined, t('workspace.removed', { name: member.name }));
+                      }}
+                    >
+                      {t('workspace.remove')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <form
+          className="flex flex-wrap items-end gap-2 border-t border-slate-100 px-4 pb-4 pt-3 sm:px-5"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (await run('add', `${base}/members`, 'POST', { email, role }, t('workspace.added'))) setEmail('');
+          }}
+        >
+          <label className="min-w-[14rem] flex-1">
+            <span className="label">{t('workspace.addEmail')}</span>
+            <input className="input" type="email" value={email} autoComplete="off" required onChange={(event) => setEmail(event.target.value)} />
+          </label>
+          <label>
+            <span className="label">{t('workspace.role')}</span>
+            <select className="input h-10 w-auto" value={role} onChange={(event) => setRole(event.target.value)}>
+              {ROLE_OPTIONS.map((option) => (
+                <option key={option} value={option}>{tRoles(option)}</option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="btn-primary h-10" disabled={busy === 'add' || !email.trim()}>
+            {t('workspace.add')}
+          </button>
+          <p className="w-full text-xs text-slate-500">{t('workspace.addHelp')}</p>
+        </form>
+      </section>
     </div>
   );
 }

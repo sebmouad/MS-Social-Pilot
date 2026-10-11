@@ -42,6 +42,16 @@ export class AppError extends Error {
 
 /** Shorthands for the errors thrown from more than one place. */
 export const errors = {
+  rootNoSuchUser: () =>
+    new AppError({ key: 'errors.rootNoSuchUser', fallback: 'Nobody has an account with that email. Invite them from Registration instead.', status: 404 }),
+  rootAlreadyMember: () =>
+    new AppError({ key: 'errors.rootAlreadyMember', fallback: 'That person is already a member of this workspace.', status: 409 }),
+  rootLastOwner: () =>
+    new AppError({ key: 'errors.rootLastOwner', fallback: 'A workspace needs an owner. Make someone else owner first.', status: 422 }),
+  workspaceSuspended: () =>
+    new AppError({ key: 'errors.workspaceSuspended', fallback: 'This workspace is suspended. Contact the service administrator.', status: 403 }),
+  moduleOff: () =>
+    new AppError({ key: 'errors.moduleOff', fallback: 'This part of the app is not switched on for you.', status: 403 }),
   accountNotFound: () =>
     new AppError({ key: 'errors.accountNotFound', fallback: 'Account not found.', status: 404 }),
   destinationNotFound: () =>

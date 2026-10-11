@@ -195,6 +195,18 @@ describe('runSchedulerTick', () => {
     expect(received).toHaveLength(0);
   });
 
+  it('holds the posts of a workspace root suspended, until it is resumed', async () => {
+    const { workspace, postTarget } = await seedDuePost();
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { suspendedAt: new Date() } });
+
+    expect((await runner.runSchedulerTick()).claimed).toBe(0);
+    expect((await prisma.postTarget.findUniqueOrThrow({ where: { id: postTarget.id } })).status).toBe('pending');
+
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { suspendedAt: null } });
+    responses = [{ status: 200, body: { id: '1000_8888' } }];
+    expect((await runner.runSchedulerTick()).published).toBe(1);
+  });
+
   it('does not publish the same destination twice across ticks', async () => {
     await seedDuePost();
 

@@ -8,15 +8,18 @@ import { clientInvitationEmail, rootTransferEmail } from './email/templates';
 import { env } from './env';
 import { hashToken, randomToken } from './crypto';
 import { clearSecondFactors } from './two-step';
+import { MODULE_KEYS, type ModuleKey } from './modules';
 
 /**
  * What root can do to the whole installation, from the root section
  * (`/root/*`): see every workspace and user, disable or sign out an account,
  * rename a workspace, revoke any invitation, hand root to someone else.
  *
- * Root does not pass workspace checks here: opening another client's
- * workspace as root is an owner decision still to take (PERMISSIONS.md), so
- * nothing in this file reads or changes a workspace's posts, Pages or tokens.
+ * Root also runs each client: suspends or resumes a workspace, switches
+ * modules off for a workspace or for one member, adds, re-roles and removes
+ * members, and opens any workspace as its owner (a "visit", see
+ * `startRootVisit` in auth.ts). Nothing in this file reads a workspace's posts,
+ * Pages or tokens itself; a visit goes through the normal screens.
  * Every change is written to `RootActivity`.
  */
 
@@ -31,6 +34,14 @@ export const ROOT_ACTIONS = [
   'client.invited',
   'client.invitationRevoked',
   'root.transferred',
+  'workspace.suspended',
+  'workspace.resumed',
+  'workspace.modulesChanged',
+  'workspace.visited',
+  'member.added',
+  'member.roleChanged',
+  'member.modulesChanged',
+  'member.removed',
 ] as const;
 
 export type RootAction = (typeof ROOT_ACTIONS)[number];
@@ -66,6 +77,7 @@ export async function listWorkspaces() {
       slug: true,
       timezone: true,
       createdAt: true,
+      suspendedAt: true,
       _count: { select: { memberships: true, targets: true, posts: true } },
       memberships: {
         where: { role: WorkspaceRole.owner },
@@ -84,6 +96,7 @@ export async function listWorkspaces() {
     pages: row._count.targets,
     posts: row._count.posts,
     owners: row.memberships.map((membership) => membership.user.name || membership.user.email),
+    suspended: row.suspendedAt !== null,
   }));
 }
 
@@ -326,4 +339,147 @@ export async function revokeClientInvitation(actorId: string, id: string): Promi
   if (!invitation) throw errors.notFound();
   await prisma.clientInvitation.delete({ where: { id } });
   await logRootActivity(actorId, 'client.invitationRevoked', { email: invitation.email });
+}
+
+/** One workspace as root manages it: switches, members and their modules. */
+export async function workspaceDetail(workspaceId: string) {
+  const row = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: {
+      id: true,
+      name: true,
+      createdAt: true,
+      suspendedAt: true,
+      disabledModules: true,
+      _count: { select: { targets: true, posts: true } },
+      memberships: {
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          role: true,
+          allPages: true,
+          disabledModules: true,
+          createdAt: true,
+          user: { select: { id: true, name: true, email: true, disabledAt: true } },
+        },
+      },
+    },
+  });
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    createdAt: row.createdAt.toISOString(),
+    suspended: row.suspendedAt !== null,
+    disabledModules: row.disabledModules.filter(isKnownModule),
+    pages: row._count.targets,
+    posts: row._count.posts,
+    members: row.memberships.map((membership) => ({
+      id: membership.id,
+      userId: membership.user.id,
+      name: membership.user.name,
+      email: membership.user.email,
+      disabled: membership.user.disabledAt !== null,
+      role: membership.role,
+      allPages: membership.allPages,
+      disabledModules: membership.disabledModules.filter(isKnownModule),
+      createdAt: membership.createdAt.toISOString(),
+    })),
+  };
+}
+
+function isKnownModule(value: string): value is ModuleKey {
+  return (MODULE_KEYS as string[]).includes(value);
+}
+
+async function findWorkspace(workspaceId: string) {
+  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+  if (!workspace) throw errors.notFound();
+  return workspace;
+}
+
+export async function setWorkspaceSuspended(actorId: string, workspaceId: string, suspended: boolean): Promise<void> {
+  const workspace = await findWorkspace(workspaceId);
+  if ((workspace.suspendedAt !== null) === suspended) return;
+  await prisma.workspace.update({ where: { id: workspaceId }, data: { suspendedAt: suspended ? new Date() : null } });
+  await logRootActivity(actorId, suspended ? 'workspace.suspended' : 'workspace.resumed', { workspace: workspace.name });
+}
+
+export async function setWorkspaceModules(actorId: string, workspaceId: string, disabled: ModuleKey[]): Promise<void> {
+  const workspace = await findWorkspace(workspaceId);
+  const off = MODULE_KEYS.filter((key) => disabled.includes(key));
+  await prisma.workspace.update({ where: { id: workspaceId }, data: { disabledModules: off } });
+  await logRootActivity(actorId, 'workspace.modulesChanged', { workspace: workspace.name, off: off.join(', ') || '—' });
+}
+
+/** Root adds someone who already has an account; anyone else gets an invitation. */
+export async function addMember(actorId: string, workspaceId: string, email: string, role: WorkspaceRole): Promise<void> {
+  const workspace = await findWorkspace(workspaceId);
+  const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+  if (!user) throw errors.rootNoSuchUser();
+  const existing = await prisma.membership.findUnique({
+    where: { userId_workspaceId: { userId: user.id, workspaceId } },
+  });
+  if (existing) throw errors.rootAlreadyMember();
+  await prisma.membership.create({ data: { userId: user.id, workspaceId, role } });
+  await logRootActivity(actorId, 'member.added', { email: user.email, workspace: workspace.name, role });
+}
+
+async function findMembership(membershipId: string) {
+  const membership = await prisma.membership.findUnique({
+    where: { id: membershipId },
+    include: { user: { select: { email: true } }, workspace: { select: { name: true } } },
+  });
+  if (!membership) throw errors.notFound();
+  return membership;
+}
+
+/** A workspace always keeps an owner: the last one cannot be re-roled or removed. */
+async function assertNotLastOwner(membership: { workspaceId: string; role: WorkspaceRole }) {
+  if (membership.role !== WorkspaceRole.owner) return;
+  const owners = await prisma.membership.count({
+    where: { workspaceId: membership.workspaceId, role: WorkspaceRole.owner },
+  });
+  if (owners <= 1) throw errors.rootLastOwner();
+}
+
+export async function changeMemberRole(actorId: string, membershipId: string, role: WorkspaceRole): Promise<void> {
+  const membership = await findMembership(membershipId);
+  if (membership.role === role) return;
+  await assertNotLastOwner(membership);
+  await prisma.membership.update({ where: { id: membershipId }, data: { role } });
+  await logRootActivity(actorId, 'member.roleChanged', {
+    email: membership.user.email,
+    workspace: membership.workspace.name,
+    from: membership.role,
+    to: role,
+  });
+}
+
+export async function setMemberModules(actorId: string, membershipId: string, disabled: ModuleKey[]): Promise<void> {
+  const membership = await findMembership(membershipId);
+  const off = MODULE_KEYS.filter((key) => disabled.includes(key));
+  await prisma.membership.update({ where: { id: membershipId }, data: { disabledModules: off } });
+  await logRootActivity(actorId, 'member.modulesChanged', {
+    email: membership.user.email,
+    workspace: membership.workspace.name,
+    off: off.join(', ') || '—',
+  });
+}
+
+export async function removeMemberAsRoot(actorId: string, membershipId: string): Promise<void> {
+  const membership = await findMembership(membershipId);
+  await assertNotLastOwner(membership);
+  await prisma.membership.delete({ where: { id: membershipId } });
+  await logRootActivity(actorId, 'member.removed', { email: membership.user.email, workspace: membership.workspace.name });
+}
+
+/** Logged before root opens a workspace as its owner. */
+export async function logVisit(actorId: string, workspaceId: string): Promise<{ member: boolean }> {
+  const workspace = await findWorkspace(workspaceId);
+  const member = await prisma.membership.findUnique({
+    where: { userId_workspaceId: { userId: actorId, workspaceId } },
+  });
+  await logRootActivity(actorId, 'workspace.visited', { workspace: workspace.name });
+  return { member: member !== null };
 }

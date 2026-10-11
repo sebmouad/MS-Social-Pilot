@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Icon, type IconName } from './Icon';
-import { isPageActive } from '@/lib/modules';
+import { isPageActive, moduleOfPath, MODULE_KEYS, type ModuleKey } from '@/lib/modules';
 
 export interface WorkspaceOption {
   id: string;
@@ -25,6 +25,10 @@ interface Props {
   pendingApprovals: number;
   /** Root only: the way into the root section. */
   isRoot?: boolean;
+  /** Root is looking after this workspace without being a member of it. */
+  rootVisit?: boolean;
+  /** The modules this member may use; links to the others are not shown. */
+  modules?: ModuleKey[];
   children: ReactNode;
 }
 
@@ -53,6 +57,8 @@ export function AppShell({
   showApprovals,
   pendingApprovals,
   isRoot = false,
+  rootVisit = false,
+  modules = MODULE_KEYS,
   children,
 }: Props) {
   const t = useTranslations('nav');
@@ -132,7 +138,26 @@ export function AppShell({
     router.refresh();
   }
 
-  const sections: Array<{ key: string; label: string | null; items: Item[] }> = [
+  async function leaveVisit() {
+    setError(null);
+    try {
+      const response = await fetch('/api/root/visit', { method: 'DELETE' });
+      if (!response.ok) throw new Error(`leave answered ${response.status}`);
+    } catch {
+      setError(t('leaveVisitFailed'));
+      return;
+    }
+    router.push(`/root/workspaces/${workspaceId}`);
+    router.refresh();
+  }
+
+  const usable = (href: string) => {
+    const module = moduleOfPath(href);
+    return module === null || modules.includes(module);
+  };
+  const canCompose = modules.includes('schedule');
+
+  const allSections: Array<{ key: string; label: string | null; items: Item[] }> = [
     { key: 'home', label: null, items: [{ href: '/dashboard', label: t('home'), icon: 'dashboard' }] },
     {
       key: 'publish',
@@ -164,6 +189,11 @@ export function AppShell({
       ],
     },
   ];
+
+  // Root's switches: a module that is off has no links, and an empty section goes.
+  const sections = allSections
+    .map((section) => ({ ...section, items: section.items.filter((item) => usable(item.href)) }))
+    .filter((section) => section.items.length > 0);
 
   // The most specific link wins: /settings/sharing lights itself, not Settings.
   const allItems = sections.flatMap((section) => section.items);
@@ -231,6 +261,7 @@ export function AppShell({
           )}
         </div>
 
+        {canCompose && (
         <div className="px-3 pb-2 pt-1">
           <Link
             href="/compose"
@@ -242,6 +273,7 @@ export function AppShell({
             {open ? t('newPost') : <span className="sr-only">{t('newPost')}</span>}
           </Link>
         </div>
+        )}
 
         <nav aria-label={t('modules')} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-2">
           {sections.map((section) => (
@@ -357,10 +389,12 @@ export function AppShell({
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-xs font-bold text-white">SP</span>
             <span className="truncate text-[15px] font-bold text-slate-900">{workspaceName}</span>
           </Link>
-          <Link href="/compose" className="btn-primary ml-auto h-9 px-3" aria-label={t('newPost')}>
-            <Icon name="plus" size={18} />
-            <span className="hidden sm:inline">{t('newPost')}</span>
-          </Link>
+          {canCompose && (
+            <Link href="/compose" className="btn-primary ml-auto h-9 px-3" aria-label={t('newPost')}>
+              <Icon name="plus" size={18} />
+              <span className="hidden sm:inline">{t('newPost')}</span>
+            </Link>
+          )}
         </div>
 
         {drawer && (
@@ -374,6 +408,17 @@ export function AppShell({
       </header>
 
       <div className="min-w-0 flex-1">
+        {rootVisit && (
+          <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 sm:px-6">
+            <p className="flex min-w-0 items-center gap-2">
+              <Icon name="shield" size={16} className="shrink-0 text-amber-700" />
+              {t('rootVisit', { name: workspaceName })}
+            </p>
+            <button type="button" className="btn-secondary h-9" onClick={() => void leaveVisit()}>
+              {t('leaveVisit')}
+            </button>
+          </div>
+        )}
         {error && (
           <div role="alert" className="flex items-start justify-between gap-3 border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 sm:px-6">
             <p className="min-w-0">{error}</p>

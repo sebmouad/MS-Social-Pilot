@@ -188,6 +188,11 @@ model Workspace {
   /// Turns the approval workflow on for this client.
   requiresApproval Boolean @default(false)
 
+  /// Set by root: members cannot use the workspace (root still can).
+  suspendedAt     DateTime?
+  /// Modules root has switched off for this workspace (`src/lib/modules.ts` keys).
+  disabledModules String[]  @default([])
+
   // Light branding, used on client-facing reports.
   logoUrl        String?
   accentColor    String?
@@ -245,6 +250,8 @@ model Membership {
   /// False once an admin has limited this member to the Pages in `pages`.
   /// Owners and admins always see every Page, whatever this says.
   allPages    Boolean       @default(true)
+  /// Modules root has switched off for this member, on top of the workspace's.
+  disabledModules String[]  @default([])
   createdAt   DateTime      @default(now())
 
   user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)

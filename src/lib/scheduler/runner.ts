@@ -176,6 +176,7 @@ async function findDue(now: Date, limit: number): Promise<string[]> {
       FROM "post_targets" pt
       JOIN "posts" p ON p.id = pt."postId"
       JOIN "targets" t ON t.id = pt."targetId"
+      JOIN "workspaces" w ON w.id = p."workspaceId"
       WHERE pt.status = 'pending'::"PostTargetStatus"
         AND (pt."nextAttemptAt" IS NULL OR pt."nextAttemptAt" <= ${now})
         AND p.status IN ('scheduled'::"PostStatus", 'publishing'::"PostStatus")
@@ -187,6 +188,8 @@ async function findDue(now: Date, limit: number): Promise<string[]> {
           'approved'::"ApprovalStatus"
         )
         AND t.enabled = true
+        -- Root suspended the client: its posts wait until it is resumed.
+        AND w."suspendedAt" IS NULL
     ) ranked
     -- One from each client, then a second from each, and so on. Within a
     -- client the order is still oldest-first, so a backlog drains the way its

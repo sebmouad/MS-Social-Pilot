@@ -61,3 +61,23 @@ describe('the modules', () => {
     for (const href of links) expect(routes.has(href), href).toBe(true);
   });
 });
+
+describe('root switching modules off', () => {
+  it('leaves what neither the workspace nor the member has off', async () => {
+    const { enabledModules } = await import('../src/lib/modules');
+    expect(enabledModules([], [])).toEqual(['analytics', 'ads', 'schedule']);
+    expect(enabledModules(['ads'], ['schedule'])).toEqual(['analytics']);
+    expect(enabledModules(['unknown'])).toEqual(['analytics', 'ads', 'schedule']);
+  });
+
+  it('places API routes in their module, and leaves the shared ones out', async () => {
+    const { moduleOfPath } = await import('../src/lib/modules');
+    expect(moduleOfPath('/api/ads/accounts')).toBe('ads');
+    expect(moduleOfPath('/api/posts/abc')).toBe('schedule');
+    expect(moduleOfPath('/api/queue-slots')).toBe('schedule');
+    expect(moduleOfPath('/api/reports')).toBe('analytics');
+    expect(moduleOfPath('/api/settings/workspace')).toBeNull();
+    expect(moduleOfPath('/calendar')).toBe('schedule');
+    expect(moduleOfPath('/dashboard')).toBeNull();
+  });
+});
