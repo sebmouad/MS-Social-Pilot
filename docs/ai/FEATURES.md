@@ -71,7 +71,7 @@ external posts, videos), Instagram, ads, housekeeping, token expiry warnings,
 scheduled reports (every 10 min).
 
 ## Integrations
-REST `/api/v1/pages`, `/api/v1/pages/:id/analytics`, `/api/v1/posts` (GET with `?status=`/api/v1/posts` (GET/POST);from=`/api/v1/posts` (GET/POST);to=`/api/v1/posts` (GET/POST);limit=`/api/v1/posts` (GET/POST);pages=id,id`, POST);
+REST `/api/v1/pages`, `/api/v1/pages/:id/analytics`, `/api/v1/posts` (GET with `status`, `from`, `to`, `limit`, `pages=id,id`; POST);
 MCP `POST /api/mcp` (tools: list_pages, list_posts, create_post,
 get_page_analytics); API keys read or read/write, acting as their owner. PWA
 (manifest, icons, offline page, share target, shortcuts). Slack incoming
