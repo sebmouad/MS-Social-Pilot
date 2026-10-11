@@ -2,7 +2,10 @@
 
 **The ordered build plan is [NEXT_PHASES.md](NEXT_PHASES.md)** (Phase A: one
 profile selection everywhere; B: multi-profile analytics with every Meta metric;
-C: publishing views; D: design pass). This file is the full backlog.
+C: publishing views; D: design pass; D2: owner's picks — icon rail shell, warm
+theme, Sheets, cloud media, competitor tracking, referrals). This file is the
+full backlog. Items the owner decided out on 2026-10-11 are listed at the end of
+NEXT_PHASES Phase D2 — remove them from consideration.
 
 Ordered by value. Check `docs/inspiration/simplified/COMPARISON.md` for the
 competitor baseline. Each item: build → unit + browser tests → deploy → verify

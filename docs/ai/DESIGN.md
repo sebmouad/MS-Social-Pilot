@@ -1,6 +1,7 @@
 # Design system and UX rules
 
-**Look:** Facebook. **Structure:** Simplified (see
+**Look:** Facebook (default). Planned: a selectable *Warm* theme (cream + amber)
+and an icon-rail shell — `NEXT_PHASES.md` Phase D2. **Structure:** Simplified (see
 `docs/inspiration/simplified/README.md` and its screenshots). **Navigation:**
 always the left sidebar (`src/components/AppShell.tsx`).
 

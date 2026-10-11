@@ -184,6 +184,52 @@ Skills: `frontend-design`, `design:design-critique`,
   `tailwind.config.ts`).
 - Connections page: tabs or anchor chips.
 
+## Phase D2 — Owner's picks from the Simplified crawl (decided 2026-10-11)
+
+The owner reviewed everything skipped after the full crawl and chose to
+**include** these. Everything else that was skipped stays out (see "Decided
+out" below); don't propose it again unless the owner asks.
+
+**Design (do with Phase D):**
+- **App shell like Simplified: icon rail + module sidebar + top bar.** Far-left
+  narrow icon rail for the main areas (Home, Publishing, Analytics, Inbox,
+  Reports, Settings…), next to it the module sidebar with that area's pages, and
+  a slim top utility bar (collapse sidebar, breadcrumb, search, notifications,
+  help, workspace settings, avatar). This is still left-side navigation: **no
+  top tab row for modules**; the top bar holds utilities only. Ref
+  `screens/20`, `CRAWL-2026-10-11.md` § Visual note, README §2. Update
+  `AppShell.tsx`; phone: rail + sidebar become one drawer.
+- **Warm light theme (cream + amber), as a selectable theme.** Add theme tokens
+  in `tailwind.config.ts`/`globals.css` (CSS variables) with two themes:
+  *Facebook* (blue `#1877f2`, today's look, default) and *Warm* (cream
+  sidebar, white cards, amber accent, dark icon rail). User setting in
+  Settings → Preferences; build dark mode on the same variables. Check contrast
+  (amber on white needs a darker amber for text, WCAG AA). Ask the owner which
+  is the default before shipping.
+
+**Integrations:**
+- **Google Sheets import/export**: export posts, schedule and analytics tables
+  to a Sheet; import posts from a Sheet (same columns as the CSV bulk upload).
+  Google OAuth (Sheets + Drive file scope), owner creates the Google Cloud app.
+- **Media from Dropbox, Box, Google Drive** in the composer and media library
+  (each provider's file picker; copy the file into our media storage, never
+  hot-link). Owner creates the developer apps; keys in Configuration.
+- **Competitor tracking**: add public Pages to watch (followers, posting
+  frequency, engagement per post, top posts), benchmark against the selection.
+  Needs Meta **Page Public Content Access** (feature review) — prepare it with
+  the `app-review-prep` skill after step 2. Until approved, build the UI with
+  the data the app can read and show "Waiting for Meta approval".
+- **Referral & rewards programme**: a referral link per user, sign-ups
+  attributed, rewards ledger (e.g. free months/credits), Settings → Rewards.
+  Ask the owner for the reward rules before building; no payments handled by
+  the app.
+
+### Decided out (owner, 2026-10-11)
+AI agent with schedules, AI image/video/voice hub, workspace brand book, agents
+catalogue, link-in-bio, design editor, Facebook coloured text backgrounds,
+location tags and @mentions, tasks & workflows, billing/seats/usage, custom
+domain and custom fields, mobile app / Chrome extension.
+
 ## Phase E — Blocked on owner / Meta (unchanged)
 Meta App Review step 2 → Live mode; Resend + Anthropic keys; LinkedIn / Threads
 / X / Pinterest developer apps; first live Bluesky / Mastodon posts. See

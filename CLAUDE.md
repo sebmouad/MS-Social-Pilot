@@ -28,8 +28,9 @@ translations, migrations, new network connector, release).
    that is not merged.
 2. **Every UI string in both `messages/en.json` and `messages/fr.json`**, same
    placeholders; anything that counts uses ICU plurals.
-3. **Navigation is a left sidebar** (`src/components/AppShell.tsx`). Never add a
-   top tab bar for a module. Facebook look: blue `#1877f2`, white cards on
+3. **Navigation is on the left** (`src/components/AppShell.tsx`): sidebar today;
+   planned icon rail + module sidebar + a top bar for utilities only
+   (NEXT_PHASES D2). Never add a top tab bar for a module. Facebook look: blue `#1877f2`, white cards on
    `#f0f2f5`, rounded pills.
 4. **Never `window.confirm`** — use `useConfirm()` from
    `src/components/ConfirmProvider.tsx`.
