@@ -8,6 +8,8 @@ import { compact } from '@/lib/viz';
 
 const DAY = 24 * 60 * 60 * 1000;
 const KEYS = ['posts', 'interactions', 'reach', 'netFollows'] as const;
+const PROFILE_CHANGE =
+  /(a changé sa photo de (profil|couverture)|a mis à jour sa photo de (profil|couverture)|updated (his|her|their|its) (profile|cover) (picture|photo)|changed (his|her|their|its) (profile|cover) (picture|photo))/i;
 
 /**
  * The portal's "Results": each Page's last 30 days in four figures, against
@@ -26,9 +28,16 @@ export async function PortalResults({ link }: { link: { workspaceId: string; pag
   });
   const to = new Date();
   const from = new Date(to.getTime() - 30 * DAY);
-  const results = [];
-  for (const page of pages) {
-    results.push(await analysePage({ workspaceId: link.workspaceId, targetId: page.id, from, to, timeZone: link.workspace.timezone }));
+  // Four at a time: twelve Pages one after another kept a client waiting.
+  const results: Awaited<ReturnType<typeof analysePage>>[] = [];
+  for (let index = 0; index < pages.length; index += 4) {
+    results.push(
+      ...(await Promise.all(
+        pages.slice(index, index + 4).map((page) =>
+          analysePage({ workspaceId: link.workspaceId, targetId: page.id, from, to, timeZone: link.workspace.timezone }),
+        ),
+      )),
+    );
   }
 
   if (results.length === 0) return <div className="card p-8 text-center text-sm text-slate-600">{t('empty')}</div>;
@@ -36,7 +45,8 @@ export async function PortalResults({ link }: { link: { workspaceId: string; pag
   return (
     <div className="space-y-4">
       {results.map((result) => {
-        const best = result.top[0];
+        // A new profile or cover picture is a "post" to Facebook, not one to show a client.
+        const best = result.top.find((post) => !PROFILE_CHANGE.test(post.message));
         return (
           <section key={result.page.id} className="card overflow-hidden">
             <header className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">

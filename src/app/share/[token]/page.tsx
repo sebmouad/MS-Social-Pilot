@@ -176,7 +176,7 @@ export default async function SharePage({
 
         {mode === 'results' && <PortalResults link={link} />}
 
-        {mode !== 'results' && items.length === 0 && <div className="card p-8 text-center text-sm text-slate-600">{t('empty')}</div>}
+        {mode === 'calendar' && items.length === 0 && <div className="card p-8 text-center text-sm text-slate-600">{t('empty')}</div>}
 
         {[...days.entries()].map(([day, list]) => (
           <section key={day} aria-label={day} className="space-y-3">

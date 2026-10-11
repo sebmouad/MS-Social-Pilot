@@ -23,16 +23,24 @@ export function PageMenu({ page, canManageQueue, canSettings }: { page: { id: st
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  // Fixed to the viewport: the Page list scrolls, and a menu inside it was cut off.
+  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
     const close = (event: MouseEvent) => !box.current?.contains(event.target as Node) && setOpen(false);
     const escape = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
+    const away = () => setOpen(false);
     document.addEventListener('mousedown', close);
     document.addEventListener('keydown', escape);
+    window.addEventListener('scroll', away, true);
+    window.addEventListener('resize', away);
     return () => {
       document.removeEventListener('mousedown', close);
       document.removeEventListener('keydown', escape);
+      window.removeEventListener('scroll', away, true);
+      window.removeEventListener('resize', away);
     };
   }, [open]);
 
@@ -68,16 +76,28 @@ export function PageMenu({ page, canManageQueue, canSettings }: { page: { id: st
   return (
     <div ref={box} className="relative">
       <button
+        ref={trigger}
         type="button"
-        className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 opacity-0 hover:bg-slate-200 focus-visible:opacity-100 group-hover:opacity-100 aria-expanded:opacity-100"
+        className="flex h-8 w-6 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700 aria-expanded:bg-slate-200 aria-expanded:text-slate-700"
         aria-label={t('menuFor', { page: page.name })}
         aria-expanded={open}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          const rect = trigger.current?.getBoundingClientRect();
+          if (rect) {
+            const width = 224;
+            setAt({ top: Math.min(rect.bottom + 4, window.innerHeight - 320), left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)) });
+          }
+          setOpen(!open);
+        }}
       >
         <span aria-hidden className="text-lg leading-none">⋮</span>
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-full z-40 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+        <div
+          role="menu"
+          className="fixed z-50 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+          style={at ?? undefined}
+        >
           {links.map((item) => (
             <Link key={item.href} role="menuitem" href={item.href} className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50" onClick={() => setOpen(false)}>
               <Icon name={item.icon} size={16} />
@@ -103,7 +123,7 @@ export function PageMenu({ page, canManageQueue, canSettings }: { page: { id: st
         </div>
       )}
       {done && (
-        <p role="status" className="absolute right-0 top-full z-40 mt-1 w-56 rounded-lg bg-slate-900 px-3 py-2 text-xs text-white shadow-lg">
+        <p role="status" className="fixed z-50 w-56 rounded-lg bg-slate-900 px-3 py-2 text-xs text-white shadow-lg" style={at ?? undefined}>
           {done}
         </p>
       )}
