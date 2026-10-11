@@ -6,6 +6,8 @@ import { hashToken, randomToken } from './crypto';
 import { AuthError, ForbiddenError } from './auth';
 import { scopeOf, type PageScope } from './page-access';
 import { ensureSettings } from './settings';
+import { errors } from './errors';
+import { enabledModules, type ModuleKey } from './modules';
 
 /**
  * Keys for the public API and the MCP endpoint.
@@ -48,6 +50,11 @@ export async function createApiToken(options: {
   return { id: row.id, token };
 }
 
+/** Refuse a call into a module root switched off for this key's owner. */
+export function assertApiModule(ctx: Pick<ApiContext, 'modules'>, module: ModuleKey): void {
+  if (!ctx.modules.includes(module)) throw errors.moduleOff();
+}
+
 export interface ApiContext {
   tokenId: string;
   scope: ApiScope;
@@ -55,6 +62,8 @@ export interface ApiContext {
   workspace: { id: string; name: string; timezone: string; requiresApproval: boolean; defaultLocale: string };
   role: WorkspaceRole;
   pageScope: PageScope;
+  /** The modules root left on for this key's owner (`src/lib/modules.ts`). */
+  modules: ModuleKey[];
 }
 
 /** The caller behind `Authorization: Bearer msp_…`, or a 401. */
@@ -68,7 +77,8 @@ export async function requireApiToken(request: Request, need: ApiScope = 'read')
     where: { tokenHash: hashToken(match[1]!) },
     include: { user: true, workspace: true },
   });
-  if (!row || row.revokedAt) throw new AuthError('That API key is not valid.');
+  if (!row || row.revokedAt || row.user.disabledAt) throw new AuthError('That API key is not valid.');
+  if (row.workspace.suspendedAt) throw errors.workspaceSuspended();
 
   const membership = await prisma.membership.findUnique({
     where: { userId_workspaceId: { userId: row.userId, workspaceId: row.workspaceId } },
@@ -97,5 +107,6 @@ export async function requireApiToken(request: Request, need: ApiScope = 'read')
     },
     role: membership.role,
     pageScope: scopeOf(membership),
+    modules: enabledModules(row.workspace.disabledModules, membership.disabledModules),
   };
 }

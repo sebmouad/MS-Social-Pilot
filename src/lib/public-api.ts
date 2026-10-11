@@ -4,12 +4,12 @@ import { z } from 'zod';
 import { prisma } from './prisma';
 import { createPost } from './posts';
 import { createPostSchema } from './validation';
-import { assertPageParam, assertPagesAllowed, postScope, targetScope } from './page-access';
+import { assertPageParam, assertPagesAllowed, mayUsePage, postScope, targetScope } from './page-access';
 import { analysePage } from './page-analysis-data';
 import { postStatusFilter } from './constants';
 import { parseMedia } from './json';
 import { errors } from './errors';
-import type { ApiContext } from './api-tokens';
+import { assertApiModule, type ApiContext } from './api-tokens';
 
 /**
  * What the public API and the MCP tools can do, written once.
@@ -40,15 +40,22 @@ export const listPostsSchema = z.object({
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
+  /** Comma-separated Page ids, like the app's selection; ids the key may not see are dropped. */
+  pages: z.string().max(4000).optional(),
 });
 
 export async function apiListPosts(ctx: ApiContext, raw: unknown) {
+  assertApiModule(ctx, 'schedule');
   const query = listPostsSchema.parse(raw);
   const statuses = postStatusFilter(query.status);
+  const pages = query.pages
+    ?.split(',')
+    .map((id) => id.trim())
+    .filter((id) => id && mayUsePage(ctx.pageScope, id));
   const posts = await prisma.post.findMany({
     where: {
       workspaceId: ctx.workspace.id,
-      ...postScope(ctx.pageScope),
+      ...postScope(pages ? { all: false, ids: pages } : ctx.pageScope),
       ...(statuses ? { status: { in: statuses } } : {}),
       ...(query.from || query.to ? { scheduledAt: { gte: query.from, lte: query.to } } : {}),
     },
@@ -70,6 +77,7 @@ export async function apiListPosts(ctx: ApiContext, raw: unknown) {
 }
 
 export async function apiCreatePost(ctx: ApiContext, raw: unknown) {
+  assertApiModule(ctx, 'schedule');
   const input = createPostSchema.parse(raw);
   assertPagesAllowed(ctx.pageScope, input.targetIds);
   return createPost(
@@ -84,6 +92,7 @@ export const pageAnalyticsSchema = z.object({
 
 /** The analysis screen's headline answer for one Page, as data. */
 export async function apiPageAnalytics(ctx: ApiContext, targetId: string, raw: unknown) {
+  assertApiModule(ctx, 'analytics');
   assertPageParam(ctx.pageScope, targetId);
   const { days } = pageAnalyticsSchema.parse(raw);
   const to = new Date();

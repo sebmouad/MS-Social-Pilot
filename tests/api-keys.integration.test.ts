@@ -95,6 +95,43 @@ describe('API keys', () => {
   });
 });
 
+describe('API keys under root’s switches', () => {
+  it('stop working for a disabled person or a suspended workspace, and respect switched-off modules', async () => {
+    const { user, workspace } = await seed();
+    const posts = await import('../src/app/api/v1/posts/route');
+    const pages = await import('../src/app/api/v1/pages/route');
+    const made = await tokens.createApiToken({ workspaceId: workspace.id, userId: user.id, name: 'k', scope: 'read' });
+
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { disabledModules: ['schedule'] } });
+    expect((await call(posts.GET, { key: made.token })).status).toBe(403);
+    expect((await call(pages.GET, { key: made.token })).status).toBe(200);
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { disabledModules: [] } });
+
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { suspendedAt: new Date() } });
+    expect((await call(pages.GET, { key: made.token })).status).toBe(403);
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { suspendedAt: null } });
+
+    await prisma.user.update({ where: { id: user.id }, data: { disabledAt: new Date() } });
+    expect((await call(pages.GET, { key: made.token })).status).toBe(401);
+  });
+
+  it('narrow the post list with ?pages=, never beyond the owner’s access', async () => {
+    const { user, workspace, bakery, garage } = await seed();
+    for (const target of [bakery, garage]) {
+      await prisma.post.create({
+        data: { workspaceId: workspace.id, authorId: user.id, message: target.name, status: 'draft', targets: { create: { targetId: target.id } } },
+      });
+    }
+    const posts = await import('../src/app/api/v1/posts/route');
+    const made = await tokens.createApiToken({ workspaceId: workspace.id, userId: user.id, name: 'k', scope: 'read' });
+    const list = async (query: string) =>
+      ((await (await call(posts.GET, { key: made.token, url: `http://localhost/api/v1/posts?${query}` })).json()) as { posts: Array<{ message: string }> }).posts.map((post) => post.message);
+    expect((await list('')).sort()).toEqual(['Bakery', 'Garage']);
+    expect(await list(`pages=${bakery.id}`)).toEqual(['Bakery']);
+    expect(await list('pages=someone-else')).toEqual([]);
+  });
+});
+
 describe('the MCP server', () => {
   const rpc = (method: string, params?: unknown) => ({ jsonrpc: '2.0', id: 1, method, params });
 

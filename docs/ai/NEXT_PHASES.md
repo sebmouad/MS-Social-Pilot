@@ -169,9 +169,12 @@ obeys, kept as you move around the app.
 `scope` drop-in for `auth.pageScope`); A2 bar `ProfileScope` (search, groups,
 networks, Only, Select all/Clear, phone bottom sheet) + `PagesSidebar`
 remembers too; A3 on Dashboard, Calendar, Posts, Queue, Approvals,
-Analytics, Reports. Still: Ads (ad accounts are not linked to Pages in the
-schema), Inbox/Comments/Reviews/Videos screens, exports and API parity,
-headings with counts, e2e A4.
+Analytics, Reports; CSV export follows the selection (limited members get
+their Pages, workspace-wide files need every Page); public API
+`GET /api/v1/posts?pages=` (clamped to the key owner's Pages). API keys also
+obey root's switches (suspension, modules, disabled account). Still: Ads (ad
+accounts are not linked to Pages in the schema), Inbox/Comments/Reviews/Videos
+screens (none exist yet as screens), headings with counts, e2e A4.
 
 ### A1. Selection model (server)
 - Keep the URL as the source of truth (`?group=<id>&pages=<id,id>`; `pages`
