@@ -37,6 +37,7 @@ interface InsightsResponse {
 }
 
 interface EngagementResponse {
+  reactions?: { summary?: { total_count?: number } };
   likes?: { summary?: { total_count?: number } };
   comments?: { summary?: { total_count?: number } };
   shares?: { count?: number };
@@ -63,9 +64,11 @@ export async function fetchPostInsights(
   try {
     const { data } = await graphRequest<EngagementResponse>(remotePostId, {
       accessToken,
-      params: { fields: 'likes.summary(true).limit(0),comments.summary(true).limit(0),shares' },
+      params: { fields: 'reactions.summary(total_count).limit(0),comments.summary(true).limit(0),shares' },
     });
-    result.reactions = data.likes?.summary?.total_count ?? null;
+    // `reactions`, not `likes`: the likes edge counts only the thumbs-up, so a
+    // post with hearts and laughs read as far less engaging than it was.
+    result.reactions = data.reactions?.summary?.total_count ?? data.likes?.summary?.total_count ?? null;
     result.comments = data.comments?.summary?.total_count ?? null;
     result.shares = data.shares?.count ?? 0;
   } catch (error) {

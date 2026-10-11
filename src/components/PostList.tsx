@@ -120,10 +120,10 @@ export function PostList({
    */
   async function act(
     postId: string,
-    request: { path: string; method: string; body?: unknown; confirmText?: string; confirmLabel?: string; danger?: boolean },
+    request: { path: string; method: string; body?: unknown; confirmText?: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean },
     onSuccess?: (body: { postId?: string }) => void,
   ) {
-    if (request.confirmText && !(await confirm({ title: request.confirmText, confirmLabel: request.confirmLabel, danger: request.danger }))) return;
+    if (request.confirmText && !(await confirm({ title: request.confirmText, confirmLabel: request.confirmLabel, cancelLabel: request.cancelLabel, danger: request.danger }))) return;
 
     setBusy(postId);
     setError(null);
@@ -275,7 +275,8 @@ export function PostList({
                   <li key={target.id} className="flex flex-wrap items-center gap-2 text-[13px]">
                     <span className="font-semibold text-slate-700">{target.name}</span>
                     <StatusBadge status={target.status} kind="target" />
-                    {target.url && (
+                    {/* A cancelled post was taken off Facebook: its old address leads nowhere. */}
+                    {target.url && target.status !== 'cancelled' && (
                       <ExternalLink href={target.url} className="font-semibold text-brand-600 hover:underline">
                         {t('viewOnFacebook')}
                       </ExternalLink>
@@ -395,6 +396,7 @@ export function PostList({
                       // It goes to real Pages the moment this is pressed, and
                       // there is no taking a published post back from here.
                       confirmText: t('publishNowConfirm', { count: post.targets.length }),
+                      confirmLabel: t('publishNow'),
                     })
                   }
                 >
@@ -451,6 +453,9 @@ export function PostList({
                       path: `/api/posts/${post.id}`,
                       method: 'DELETE',
                       confirmText: t('cancelConfirm'),
+                      confirmLabel: t('cancelPost'),
+                      cancelLabel: t('keepPost'),
+                      danger: true,
                     })
                   }
                 >

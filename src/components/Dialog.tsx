@@ -64,7 +64,7 @@ export function Dialog({
         }`}
       >
         <div className="relative flex items-center justify-center border-b border-slate-200 px-12 py-3.5">
-          <h2 id={titleId} className="truncate text-center text-xl font-bold text-slate-900">
+          <h2 id={titleId} className="text-center text-xl font-bold leading-snug text-slate-900 [text-wrap:balance]">
             {title}
           </h2>
           <button

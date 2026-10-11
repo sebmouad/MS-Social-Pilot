@@ -393,7 +393,8 @@
     "yes": "Yes",
     "seeMore": "See more",
     "continue": "Continue",
-    "remove": "Remove"
+    "remove": "Remove",
+    "confirmNoUndo": "Check before you go on."
   },
   "compose": {
     "addToQueue": "Add to the next queue slot",
@@ -1450,7 +1451,10 @@
       "pending": "First comment: posted with the post",
       "refused": "First comment refused"
     },
-    "exportCsv": "Export CSV"
+    "exportCsv": "Export CSV",
+    "cancelPost": "Cancel post",
+    "keepPost": "Keep post",
+    "publishNow": "Publish now"
   },
   "queue": {
     "addSlot": "Add slot",

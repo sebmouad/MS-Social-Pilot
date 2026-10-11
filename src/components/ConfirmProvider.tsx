@@ -14,9 +14,22 @@ export interface ConfirmOptions {
   confirmLabel?: string;
   /** Red button: it deletes, removes or cannot be undone. */
   danger?: boolean;
+  /** The way out, when "Cancel" would be ambiguous: "Keep post" beside "Cancel post". */
+  cancelLabel?: string;
 }
 
 type Ask = (options: ConfirmOptions | string) => Promise<boolean>;
+
+/**
+ * A long question reads as a headline and its consequences: "Cancel this
+ * post?" on top, "Anything already scheduled on Facebook is removed." under
+ * it — rather than one sentence cut off in the title bar.
+ */
+export function splitQuestion(options: ConfirmOptions): ConfirmOptions {
+  if (options.body || options.title.length <= 60) return options;
+  const match = /^(.{8,}?[?.!])\s+(.+)$/s.exec(options.title);
+  return match ? { ...options, title: match[1]!, body: match[2]! } : options;
+}
 
 const ConfirmContext = createContext<Ask | null>(null);
 
@@ -32,7 +45,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 
   const ask = useCallback<Ask>((options) => {
     resolver.current?.(false);
-    setCurrent(typeof options === 'string' ? { title: options } : options);
+    setCurrent(splitQuestion(typeof options === 'string' ? { title: options } : options));
     return new Promise<boolean>((resolve) => {
       resolver.current = resolve;
     });
@@ -56,7 +69,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         footer={
           <>
             <button type="button" className="btn-secondary" onClick={cancel}>
-              {t('cancel')}
+              {current?.cancelLabel ?? t('cancel')}
             </button>
             <button
               type="button"
@@ -69,7 +82,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           </>
         }
       >
-        {current?.body ? <p className="text-sm text-slate-700">{current.body}</p> : <span className="sr-only">{current?.title}</span>}
+        {current?.body ? (
+          <p className="text-[15px] leading-relaxed text-slate-700">{current.body}</p>
+        ) : (
+          <p className="text-sm text-slate-500">{t('confirmNoUndo')}</p>
+        )}
       </Dialog>
     </ConfirmContext.Provider>
   );

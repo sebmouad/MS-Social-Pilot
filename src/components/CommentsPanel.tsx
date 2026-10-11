@@ -214,19 +214,22 @@ export function CommentsPanel({
                             >
                               {t('reply')}
                             </button>
-                            <button
-                              type="button"
-                              className="hover:underline disabled:opacity-50"
-                              disabled={busy === comment.id}
-                              onClick={() =>
-                                act(
-                                  { action: comment.isHidden ? 'unhide' : 'hide', commentId: comment.id },
-                                  comment.id,
-                                )
-                              }
-                            >
-                              {comment.isHidden ? t('unhide') : t('hide')}
-                            </button>
+                            {/* Facebook does not let a Page hide its own comments. */}
+                            {!comment.fromPage && (
+                              <button
+                                type="button"
+                                className="hover:underline disabled:opacity-50"
+                                disabled={busy === comment.id}
+                                onClick={() =>
+                                  act(
+                                    { action: comment.isHidden ? 'unhide' : 'hide', commentId: comment.id },
+                                    comment.id,
+                                  )
+                                }
+                              >
+                                {comment.isHidden ? t('unhide') : t('hide')}
+                              </button>
+                            )}
                           </>
                         )}
 

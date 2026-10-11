@@ -47,8 +47,9 @@ async function pressAndAnswer(
     if (!(await dialog.isVisible())) await button.click();
     await expect(dialog).toBeVisible({ timeout: 1_500 });
   }).toPass({ timeout: 30_000 });
-  const asked = (await dialog.getByRole('heading').first().textContent()) ?? '';
-  await (answer === 'accept' ? dialog.locator('[data-confirm]') : dialog.getByRole('button', { name: /^cancel$/i })).click();
+  // The question and what follows it: a long one is split into a title and a line under it.
+  const asked = ((await dialog.textContent()) ?? '').replace(/\s+/g, ' ');
+  await (answer === 'accept' ? dialog.locator('[data-confirm]') : dialog.locator('[data-close]')).click();
   await expect(dialog).toHaveCount(0);
   return asked;
 }

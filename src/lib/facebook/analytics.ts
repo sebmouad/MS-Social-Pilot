@@ -338,6 +338,7 @@ export async function fetchPostEngagement(
   accessToken: string,
 ): Promise<PostEngagement> {
   const { data } = await graphRequest<{
+    reactions?: { summary?: { total_count?: number } };
     likes?: { summary?: { total_count?: number } };
     comments?: { summary?: { total_count?: number } };
     shares?: { count?: number };
@@ -348,12 +349,13 @@ export async function fetchPostEngagement(
     accessToken,
     params: {
       fields:
-        'likes.summary(true).limit(0),comments.summary(true).limit(0),shares,permalink_url,created_time,status_type',
+        'reactions.summary(total_count).limit(0),comments.summary(true).limit(0),shares,permalink_url,created_time,status_type',
     },
   });
 
   return {
-    reactions: data.likes?.summary?.total_count ?? null,
+    // Every kind of reaction; `likes` counted only the thumbs-up.
+    reactions: data.reactions?.summary?.total_count ?? data.likes?.summary?.total_count ?? null,
     comments: data.comments?.summary?.total_count ?? null,
     // Absent `shares` means zero, not unknown — Graph omits the field at 0.
     shares: data.shares?.count ?? 0,
