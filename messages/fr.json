@@ -133,7 +133,8 @@
       "instagram": "Instagram",
       "ads": "Publicités",
       "analysis": "Analyse",
-      "compare": "Comparer les pages"
+      "compare": "Comparer les pages",
+      "total": "Tous les profils"
     },
     "byPost": "Impressions et interactions par publication",
     "byPostHint": "Une ligne par publication et par destination : une même publication peut réagir très différemment sur deux pages, et faire la moyenne masquerait l'information utile.",
@@ -2590,5 +2591,26 @@
   "suspended": {
     "title": "Cet espace de travail est suspendu",
     "body": "Personne ne peut y travailler sur les publications, profils ou rapports pour l’instant. Contactez l’administrateur du service pour le réactiver."
+  },
+  "totalView": {
+    "none": "Aucun profil à additionner pour l’instant. Connectez une Page ou choisissez des profils ci-dessus.",
+    "noRanking": "Rien à classer sur cette période.",
+    "intro": "{count, plural, one {Totaux pour # profil} other {Totaux pour # profils}} sur {days, plural, one {le dernier jour} other {les # derniers jours}}.",
+    "followers": "Abonnés",
+    "followersHelp": "Somme des abonnés de chaque profil choisi à la fin de la période.",
+    "netFollows": "Abonnements nets",
+    "netFollowsHelp": "Nouveaux abonnements moins désabonnements, additionnés sur les profils choisis.",
+    "posts": "Publications",
+    "postsHelp": "Publications parues sur la période sur les profils choisis.",
+    "interactions": "Interactions",
+    "interactionsHelp": "Réactions, commentaires et partages, additionnés.",
+    "perPost": "Interactions par publication",
+    "perPostHelp": "Total des interactions divisé par le total des publications, et non la moyenne des taux de chaque profil.",
+    "reach": "Portée",
+    "upTo": "jusqu’à {value}",
+    "reachHelp": "{count, plural, one {Portée de # profil.} other {Somme de la portée de # profils.}} Une même personne peut être touchée par plusieurs profils : le nombre réel de personnes est au plus celui-ci.",
+    "topInteractions": "Le plus d’interactions",
+    "topGrowth": "Le plus de nouveaux abonnés",
+    "seeTable": "Voir tous les profils côte à côte"
   }
 }

@@ -7,6 +7,7 @@
  * reaches the server as a reference, not as the array.
  */
 export const ANALYTICS_VIEWS = [
+  'total',
   'analysis',
   'compare',
   'overview',
@@ -37,6 +38,15 @@ export const UNWINDOWED_VIEWS: ReadonlySet<AnalyticsView> = new Set([
   'reviews',
   'inbox',
 ]);
+
+/**
+ * The view /analytics opens on with no `?view=`: the total of the selection
+ * when it holds several profiles, one profile's analysis otherwise
+ * (NEXT_PHASES B1).
+ */
+export function defaultAnalyticsView(profiles: number): AnalyticsView {
+  return profiles > 1 ? 'total' : DEFAULT_ANALYTICS_VIEW;
+}
 
 /** Narrow a `?view=` value to a known view, falling back to the default. */
 export function parseAnalyticsView(value: string | undefined): AnalyticsView {

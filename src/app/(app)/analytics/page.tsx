@@ -24,7 +24,8 @@ import { targetScope } from '@/lib/page-access';
 import { listPageGroups } from '@/lib/page-groups';
 import { screenMetadata } from '@/lib/metadata';
 import { canDeleteComments, canModerateComments } from '@/lib/constants';
-import { UNWINDOWED_VIEWS, parseAnalyticsView } from '@/lib/analytics-views';
+import { UNWINDOWED_VIEWS, defaultAnalyticsView, parseAnalyticsView } from '@/lib/analytics-views';
+import { TotalProfilesView } from '@/components/analysis/TotalProfilesView';
 import { Pagination } from '@/components/Pagination';
 import { pageHref, pageNumber, paginate } from '@/lib/paging';
 import { prisma } from '@/lib/prisma';
@@ -130,7 +131,9 @@ export default async function AnalyticsPage({
   // behind it are one tab away for anyone who wants the figures themselves.
   // An unknown view — a typo, a retired tab — lands there too rather than on
   // a screen with a tab strip and nothing under it.
-  const view = parseAnalyticsView(first(params.view));
+  // Several profiles selected and no view or Page asked for: their total first.
+  const askedView = first(params.view);
+  const view = askedView || requested ? parseAnalyticsView(askedView) : defaultAnalyticsView(pages.length);
 
   return (
     <div className="space-y-6">
@@ -169,6 +172,19 @@ export default async function AnalyticsPage({
 
       {/* Instagram stays out of sight until it is switched on; its tab only ever said "nothing here". */}
       <AnalyticsTabs current={view} hidden={env.instagramEnabled ? [] : ['instagram']} />
+
+      {view === 'total' && (
+        <TotalProfilesView
+          workspaceId={auth.workspace.id}
+          from={from}
+          to={to}
+          days={window}
+          timeZone={timezone}
+          compare={compare}
+          targetIds={pageScope.all ? undefined : pageScope.ids}
+          rangeQuery={periodQuery}
+        />
+      )}
 
       {view === 'analysis' && (
         <PageAnalysisView

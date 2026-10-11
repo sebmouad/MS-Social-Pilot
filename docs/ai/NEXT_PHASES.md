@@ -232,6 +232,12 @@ Skills: `analytics-dashboard`, `dataviz`, `meta-api-integration`,
 `frontend-design`.
 
 ### B1. Modes driven by the selection
+*Progress (2026-10-11):* the **All profiles** view (`view=total`,
+`TotalProfilesView`) is the default with 2+ profiles: summed KPI tiles
+(reach labelled "up to"), rate recomputed, top profiles by interactions and
+growth, link to Compare. Rules live in `src/lib/aggregate.ts`
+(`tests/aggregate.test.ts`). Still to do: legend toggles, top-8 + Others,
+Table totals row, multi-Page post table.
 - **1 profile selected** → today's deep Page view (all sections).
 - **2+ profiles** → **Aggregate** view by default with a segmented switch
   **Total · Compare · Table**:

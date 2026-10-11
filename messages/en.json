@@ -133,7 +133,8 @@
       "instagram": "Instagram",
       "ads": "Ads",
       "analysis": "Analysis",
-      "compare": "Compare pages"
+      "compare": "Compare pages",
+      "total": "All profiles"
     },
     "byPost": "Impressions and interaction per post",
     "byPostHint": "One row per post per destination — the same post can perform very differently on two pages, and averaging that away hides the signal.",
@@ -2590,5 +2591,26 @@
   "suspended": {
     "title": "This workspace is suspended",
     "body": "Nobody in it can work on posts, profiles or reports for now. Contact the service administrator to have it resumed."
+  },
+  "totalView": {
+    "none": "No profile to add up yet. Connect a Page or pick profiles above.",
+    "noRanking": "Nothing to rank for this period.",
+    "intro": "{count, plural, one {Totals for # profile} other {Totals for # profiles}} over {days, plural, one {the last day} other {the last # days}}.",
+    "followers": "Followers",
+    "followersHelp": "Sum of the followers of every selected profile at the end of the period.",
+    "netFollows": "Net follows",
+    "netFollowsHelp": "New follows minus unfollows, added up over the selected profiles.",
+    "posts": "Posts",
+    "postsHelp": "Posts published in the period on the selected profiles.",
+    "interactions": "Interactions",
+    "interactionsHelp": "Reactions, comments and shares, added up.",
+    "perPost": "Interactions per post",
+    "perPostHelp": "Total interactions divided by total posts, not an average of each profile's rate.",
+    "reach": "Reach",
+    "upTo": "up to {value}",
+    "reachHelp": "{count, plural, one {Reach of # profile.} other {Sum of the reach of # profiles.}} The same person can be reached by several profiles, so the real number of people is at most this.",
+    "topInteractions": "Most interactions",
+    "topGrowth": "Most new followers",
+    "seeTable": "See every profile side by side"
   }
 }
