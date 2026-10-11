@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { collectFailures, open, SIGNED_IN_SCREENS } from './helpers';
+import { collectFailures, open, ROOT_SCREENS, SIGNED_IN_SCREENS } from './helpers';
 
 /** Nobody signed in, and the app has been used — so the first-run excuses are gone. */
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -9,6 +9,13 @@ for (const path of SIGNED_IN_SCREENS) {
   test(`${path} is not served to a stranger`, async ({ page }) => {
     await open(page, path);
     await expect(page, `${path} rendered without a session`).toHaveURL(/\/(login|setup)$/);
+  });
+}
+
+for (const path of ROOT_SCREENS) {
+  test(`${path} does not exist for a stranger`, async ({ page }) => {
+    const response = await page.goto(path);
+    expect(response?.status(), `${path} answered a stranger`).toBe(404);
   });
 }
 

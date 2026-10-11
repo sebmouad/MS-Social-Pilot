@@ -80,6 +80,18 @@ describe('message catalogues', () => {
     expect(fr.filter((key) => !en.includes(key))).toEqual([]);
   });
 
+  it('has no dot inside a key, which next-intl refuses at run time', () => {
+    const dotted = (value: unknown, prefix = ''): string[] =>
+      typeof value !== 'object' || value === null
+        ? []
+        : Object.entries(value as Record<string, unknown>).flatMap(([key, child]) => [
+            ...(key.includes('.') ? [`${prefix}${key}`] : []),
+            ...dotted(child, `${prefix}${key} › `),
+          ]);
+    expect(dotted(load('en'))).toEqual([]);
+    expect(dotted(load('fr'))).toEqual([]);
+  });
+
   it('covers a meaningful amount of the interface', () => {
     expect(en.length).toBeGreaterThan(150);
   });

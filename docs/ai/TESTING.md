@@ -2,7 +2,9 @@
 
 When to run what (owner, 2026-10-11): small edits → `npx tsc --noEmit` + the
 test files they touch (`npx vitest run tests/x.test.ts`, `npx playwright test
-e2e/x.spec.ts -g …`). Full suites only after a big change or before a deploy.
+e2e/x.spec.ts -g …`). Full unit suite after a big change. The Playwright browser
+suite (~20 min) only after every ~25% of NEXT_PHASES is built, and before a
+deploy (owner, 2026-10-11).
 
 Three layers, all required before a deploy: **typecheck → unit/integration →
 browser walk**, then a **live check on production with real data**.

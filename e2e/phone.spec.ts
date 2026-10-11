@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { collectFailures, open, OWNER, SIGNED_IN_SCREENS } from './helpers';
+import { collectFailures, open, OWNER, SIGNED_IN_SCREENS, ROOT_SCREENS } from './helpers';
 import { connectPretendPage, PAGE_NAME, prisma } from './fixtures';
 
 /**
@@ -166,7 +166,7 @@ async function overflowingElements(page: import('@playwright/test').Page): Promi
   }, SLACK);
 }
 
-for (const path of SIGNED_IN_SCREENS) {
+for (const path of [...SIGNED_IN_SCREENS, ...ROOT_SCREENS]) {
   test(`${path} fits on a phone`, async ({ page }) => {
     const failures = collectFailures(page);
 

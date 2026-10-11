@@ -69,10 +69,12 @@ export type IconName =
   | 'facebook'
   | 'group'
   | 'thumbsUp'
-  | 'share';
+  | 'share'
+  | 'shield';
 
 /** Path data only — the wrapper supplies every shared attribute. */
 const PATHS: Record<IconName, React.ReactNode> = {
+  shield: <path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6L12 3Z" />,
   dashboard: (
     <>
       <rect x="3" y="3" width="7" height="9" rx="1.5" />

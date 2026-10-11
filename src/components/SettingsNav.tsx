@@ -8,10 +8,11 @@ import { Icon, type IconName } from './Icon';
 
 /** Sub-navigation shared by every settings screen. */
 export function SettingsNav({
-  showConfig = false,
+  showPermissions = false,
   showHistory = true,
 }: {
-  showConfig?: boolean;
+  /** Admins: the read-only list of who may do what in this workspace. */
+  showPermissions?: boolean;
   /** Hidden from anyone who would only reach a refusal by clicking it. */
   showHistory?: boolean;
 }) {
@@ -30,10 +31,9 @@ export function SettingsNav({
     ...(showHistory
       ? [{ href: '/settings/history', label: t('history.title'), icon: 'clock' as IconName }]
       : []),
-    // Instance configuration is owner-only, so the tab is not shown to anyone
-    // who would only reach a refusal by clicking it.
-    ...(showConfig
-      ? [{ href: '/settings/config', label: t('config.title'), icon: 'config' as IconName }]
+    // Instance configuration lives in the root section now (/root/config).
+    ...(showPermissions
+      ? [{ href: '/settings/permissions', label: t('root.privileges.workspaceTitle'), icon: 'key' as IconName }]
       : []),
   ];
 

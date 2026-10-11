@@ -18,7 +18,8 @@ session can continue without the old one.
 - Replies in a terse style were requested earlier ("caveman") — optional.
 - "Don't test on every step, test after big changes" (2026-10-11): small edits
   get `tsc` + the affected test files; the full unit + Playwright suites run
-  once per finished feature, before commit/deploy.
+  once per finished feature, before commit/deploy. The browser suite runs only
+  after every ~25% of the plan (it takes ~20 min).
 - Security limits the owner set: never type passwords/secrets into web pages,
   never sign in to production with the owner's credentials, never create accounts
   or set passwords for them, ask before deleting unmerged branches, explicit OK

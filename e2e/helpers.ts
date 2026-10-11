@@ -74,7 +74,7 @@ export const SIGNED_IN_SCREENS = [
   '/ads',
   '/settings',
   '/settings/team',
-  '/settings/config',
+  '/settings/permissions',
   '/settings/notifications',
   '/settings/account',
   '/settings/media',
@@ -83,6 +83,18 @@ export const SIGNED_IN_SCREENS = [
   '/settings/api',
   '/settings/pages',
   '/setup',
+];
+
+/** The root section: root (the first account, the e2e owner) only; 404 for everybody else. */
+export const ROOT_SCREENS = [
+  '/root',
+  '/root/config',
+  '/root/workspaces',
+  '/root/users',
+  '/root/registration',
+  '/root/privileges',
+  '/root/activity',
+  '/root/danger',
 ];
 
 export const OWNER = {

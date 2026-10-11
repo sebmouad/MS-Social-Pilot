@@ -94,7 +94,7 @@ test('an invitation that never reaches the server gives the button back', async 
 });
 
 test('root sees AI spend and can only save prices written as model=input/output', async ({ page }) => {
-  await open(page, '/settings/config');
+  await open(page, '/root/config');
   await expect(page.getByRole('heading', { name: /AI spend|Dépenses IA/ })).toBeVisible();
   await expect(page.getByText(/No AI generations in the last 30 days|Aucune génération IA/)).toBeVisible();
 
@@ -107,7 +107,7 @@ test('root sees AI spend and can only save prices written as model=input/output'
   await page.getByRole('button', { name: /^(Save|Enregistrer)$/ }).click();
   await expect(prices).toHaveValue('my-model=2/10');
 
-  const reset = await page.request.post('/api/settings/config', { data: { values: { 'ai.priceOverrides': null } } });
+  const reset = await page.request.post('/api/root/config', { data: { values: { 'ai.priceOverrides': null } } });
   expect(reset.status()).toBe(200);
 });
 

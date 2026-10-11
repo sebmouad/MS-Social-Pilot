@@ -795,6 +795,13 @@
       "review_approved": "👍 {workspace}: {name} approved a post on “{link}”{comment}",
       "review_rejected": "✋ {workspace}: {name} asked for changes on “{link}”{comment}",
       "review_comment": "💬 {workspace}: {name} commented on “{link}”{comment}"
+    },
+    "rootTransfer": {
+      "subject": "Root access has changed hands",
+      "heading": "Root access has changed hands",
+      "bodyNew": "{from} made you root of this installation. You can now change its configuration, users and workspaces.",
+      "bodyOld": "You handed root of this installation to {to}. You keep your workspaces and roles, but no longer the root section.",
+      "cta": "Open the root section"
     }
   },
   "engagement": {
@@ -981,7 +988,10 @@
     "network_tooManyImages": "{target} ({network}) takes up to {max} pictures.",
     "network_noVideo": "{target} ({network}) cannot take a video from here. Use photos, or leave it out of this post.",
     "network_needsImage": "{target} ({network}) needs a picture: add one, or leave it out of this post.",
-    "aiBudgetReached": "This month's AI budget has been reached. AI help is back next month, or sooner if the administrator raises the budget."
+    "aiBudgetReached": "This month's AI budget has been reached. AI help is back next month, or sooner if the administrator raises the budget.",
+    "accountDisabled": "This account has been disabled by the administrator of this installation.",
+    "rootCannotBeDisabled": "Root cannot be disabled from here. Hand root to someone else first.",
+    "rootTargetDisabled": "That account is disabled. Enable it before handing root to it."
   },
   "feeds": {
     "title": "RSS feeds",
@@ -1212,7 +1222,8 @@
     "newPost": "New post",
     "closeMenu": "Close menu",
     "collapseSidebar": "Collapse sidebar",
-    "expandSidebar": "Expand sidebar"
+    "expandSidebar": "Expand sidebar",
+    "root": "Root"
   },
   "notifications": {
     "title": "Notifications",
@@ -2178,5 +2189,155 @@
     "mastodonHint": "Type the server your account is on. You will sign in there and come straight back.",
     "mastodonServer": "Server",
     "mastodonContinue": "Continue to sign in"
+  },
+  "root": {
+    "title": "Root",
+    "banner": "Root — changes here affect the whole installation.",
+    "actions": "Actions",
+    "save": "Save",
+    "cancel": "Cancel",
+    "working": "Working…",
+    "networkError": "Couldn't reach the server. Check your connection and try again.",
+    "nav": {
+      "label": "Root section",
+      "menu": "Root menu",
+      "overview": "Overview",
+      "config": "Configuration",
+      "workspaces": "Workspaces",
+      "users": "Users",
+      "registration": "Registration & invitations",
+      "privileges": "Privileges",
+      "activity": "Root activity",
+      "danger": "Danger zone",
+      "back": "Back to the app"
+    },
+    "overview": {
+      "title": "Installation overview",
+      "subtitle": "Every workspace and account on this installation.",
+      "workspaces": "Workspaces",
+      "users": "Accounts",
+      "pages": "Connected profiles",
+      "invitations": "Invitations waiting",
+      "scheduled": "Posts scheduled",
+      "failed": "Failed publications, 30 days",
+      "setupMissing": "{count, plural, one {# required setup step is missing. Open the setup checklist.} other {# required setup steps are missing. Open the setup checklist.}}",
+      "disabled": "{count, plural, one {# account is disabled.} other {# accounts are disabled.}}"
+    },
+    "workspaces": {
+      "title": "Workspaces",
+      "subtitle": "{count, plural, one {# workspace} other {# workspaces}}",
+      "name": "Name",
+      "owners": "Owners",
+      "members": "Members",
+      "pages": "Profiles",
+      "posts": "Posts",
+      "created": "Created",
+      "rename": "Rename",
+      "renamed": "Workspace renamed."
+    },
+    "users": {
+      "title": "Users",
+      "subtitle": "{count, plural, one {# account} other {# accounts}}",
+      "person": "Person",
+      "workspaces": "Workspaces and roles",
+      "lastSignIn": "Last sign-in",
+      "status": "Status",
+      "never": "Never",
+      "root": "Root",
+      "disabled": "Disabled",
+      "active": "Active",
+      "signOut": "Sign out everywhere",
+      "signOutQuestion": "Sign {name} out everywhere?",
+      "signOutBody": "Every browser and device they use is signed out. They can sign in again straight away.",
+      "signedOut": "{name} is signed out everywhere.",
+      "disable": "Disable",
+      "disableQuestion": "Disable {name}?",
+      "disableBody": "They are signed out everywhere and can't sign in until you enable the account again. Their workspaces and posts stay as they are.",
+      "disabledDone": "{name} is disabled.",
+      "enable": "Enable",
+      "enabled": "{name} can sign in again."
+    },
+    "registration": {
+      "title": "Registration & invitations",
+      "openNow": "Anyone can create an account",
+      "closedNow": "Accounts by invitation only",
+      "hint": "Invited people can always join, whatever this says.",
+      "open": "Open registration",
+      "close": "Invitation only",
+      "openQuestion": "Let anyone create an account?",
+      "openBody": "Anyone who finds this address can sign up and get a workspace of their own.",
+      "invitations": "{count, plural, =0 {Invitations waiting} one {# invitation waiting} other {# invitations waiting}}",
+      "noInvitations": "No invitation is waiting. Workspace admins invite people from Settings → Team.",
+      "email": "Email",
+      "workspace": "Workspace",
+      "invitedBy": "Invited by",
+      "expires": "Expires",
+      "revoke": "Revoke",
+      "revokeQuestion": "Revoke the invitation for {email}?",
+      "revokeBody": "The link in their email stops working. They can be invited again later."
+    },
+    "privileges": {
+      "title": "Privileges",
+      "subtitle": "Who may do what, read from the same table the app checks. Export it for an audit.",
+      "export": "Export CSV",
+      "workspaceTitle": "Permissions",
+      "workspaceSubtitle": "Who may do what in this workspace. Read-only: roles are changed in Team.",
+      "adminsOnly": "Only owners and admins of this workspace can see its permissions.",
+      "matrix": "What each role may do",
+      "capability": "Action",
+      "yes": "Allowed",
+      "no": "Not allowed",
+      "rootNote": "Root is separate from these roles: it changes the installation from the root section and has no extra rights inside a workspace.",
+      "members": "{count, plural, one {# member} other {# members}}",
+      "workspace": "Workspace",
+      "person": "Person",
+      "role": "Role",
+      "pages": "Profiles",
+      "lastSignIn": "Last sign-in",
+      "root": "Root",
+      "disabled": "Disabled",
+      "allPages": "All",
+      "somePages": "{count, plural, =0 {No profile} one {# profile} other {# profiles}}",
+      "never": "Never",
+      "capabilities": {
+        "manageAccounts": "Connect and remove profiles",
+        "manageTeam": "Invite people, change roles and profile access",
+        "manageSettings": "Change workspace settings",
+        "approve": "Approve or reject posts",
+        "deleteComments": "Delete comments",
+        "moderateComments": "Reply to and hide comments",
+        "publishWithoutApproval": "Publish without approval",
+        "manageOthersPosts": "Edit or delete other people's posts",
+        "deleteMedia": "Delete media",
+        "compose": "Write posts and drafts"
+      }
+    },
+    "activity": {
+      "title": "Root activity",
+      "subtitle": "What root changed on this installation, newest first.",
+      "empty": "Nothing yet. Changes made in the root section are listed here.",
+      "actions": {
+        "config_changed": "Configuration changed: {keys}",
+        "user_disabled": "Disabled {email}",
+        "user_enabled": "Enabled {email}",
+        "user_signedOut": "Signed {email} out everywhere",
+        "workspace_renamed": "Renamed workspace {from} to {to}",
+        "invitation_revoked": "Revoked the invitation for {email} ({workspace})",
+        "root_transferred": "Root handed from {from} to {to}"
+      }
+    },
+    "danger": {
+      "title": "Danger zone",
+      "transferTitle": "Hand root to someone else",
+      "transferHint": "The person you pick becomes root and you lose access to this section. Only they can hand it back, or the server's operator with scripts/admin/set-root.ts.",
+      "to": "New root",
+      "pick": "Pick an account",
+      "password": "Your password",
+      "submit": "Hand root over",
+      "question": "Hand root to {name}?",
+      "body": "You lose access to the root section straight away. Both of you are emailed if email is set up.",
+      "confirm": "Hand root over",
+      "nobody": "There is no other active account to hand root to. Invite someone first."
+    }
   }
 }

@@ -113,11 +113,11 @@ enum AiGenerationKind {
 // ---------------------------------------------------------------------------
 
 model User {
-  id                    String   @id @default(cuid())
-  email                 String   @unique
+  id                    String    @id @default(cuid())
+  email                 String    @unique
   name                  String
   passwordHash          String
-  locale                Locale   @default(en)
+  locale                Locale    @default(en)
   /// Which workspace to open on sign-in. Not a security boundary — membership
   /// is always re-checked — just a convenience.
   lastActiveWorkspaceId String?
@@ -126,9 +126,11 @@ model User {
   /// Deliberately not derived from workspace roles: anyone who registers gets
   /// a workspace of their own to own, so "owner somewhere" admits everybody.
   /// Set for the first account only, under a lock — see `registerUser`.
-  isInstanceOwner       Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  isInstanceOwner       Boolean   @default(false)
+  /// Set by root: the account cannot sign in and its sessions are gone.
+  disabledAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   memberships          Membership[]
   sessions             Session[]
@@ -140,6 +142,7 @@ model User {
   aiGenerations        AiGeneration[]
   settingChanges       AppSetting[]
   apiTokens            ApiToken[]
+  rootActions          RootActivity[]
 
   @@map("users")
 }
@@ -1305,4 +1308,20 @@ model ChatChannel {
 
   @@index([workspaceId])
   @@map("chat_channels")
+}
+
+/// What root did to the installation (configuration, users, workspaces, root
+/// transfer). Kept apart from workspace activity: it belongs to no workspace
+/// and is shown only in the root section.
+model RootActivity {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("root_activities")
 }

@@ -116,19 +116,49 @@ export function atLeast(role: WorkspaceRole, minimum: WorkspaceRole): boolean {
   return ROLE_RANK[role] >= ROLE_RANK[minimum];
 }
 
+/**
+ * The minimum role for each capability: the one table the `can…` functions
+ * below read, and the one the privileges screen (root and Settings →
+ * Permissions) prints for the owner's audit, so what is shown is what is
+ * enforced. Changing a row changes who may do what — owner's audit first
+ * (docs/ai/PERMISSIONS.md).
+ */
+export const CAPABILITIES = {
+  manageAccounts: WorkspaceRole.admin,
+  manageTeam: WorkspaceRole.admin,
+  manageSettings: WorkspaceRole.admin,
+  approve: WorkspaceRole.admin,
+  deleteComments: WorkspaceRole.admin,
+  moderateComments: WorkspaceRole.editor,
+  publishWithoutApproval: WorkspaceRole.editor,
+  manageOthersPosts: WorkspaceRole.editor,
+  deleteMedia: WorkspaceRole.editor,
+  compose: WorkspaceRole.contributor,
+} as const satisfies Record<string, WorkspaceRole>;
+
+export type Capability = keyof typeof CAPABILITIES;
+
+/** Highest role first, for tables. */
+export const ROLES_BY_RANK: WorkspaceRole[] = [
+  WorkspaceRole.owner,
+  WorkspaceRole.admin,
+  WorkspaceRole.editor,
+  WorkspaceRole.contributor,
+];
+
 /** Connect, sync and disconnect Facebook accounts. */
 export function canManageAccounts(role: WorkspaceRole): boolean {
-  return atLeast(role, WorkspaceRole.admin);
+  return atLeast(role, CAPABILITIES.manageAccounts);
 }
 
 /** Invite, remove and re-role members. */
 export function canManageTeam(role: WorkspaceRole): boolean {
-  return atLeast(role, WorkspaceRole.admin);
+  return atLeast(role, CAPABILITIES.manageTeam);
 }
 
 /** Change workspace settings, queue times, branding, AI and UTM defaults. */
 export function canManageSettings(role: WorkspaceRole): boolean {
-  return atLeast(role, WorkspaceRole.admin);
+  return atLeast(role, CAPABILITIES.manageSettings);
 }
 
 /**
@@ -159,7 +189,7 @@ export function canManageInstance(auth: { isInstanceOwner: boolean }): boolean {
  * is immediately visible on the client's page.
  */
 export function canModerateComments(role: WorkspaceRole): boolean {
-  return atLeast(role, WorkspaceRole.editor);
+  return atLeast(role, CAPABILITIES.moderateComments);
 }
 
 /**
@@ -170,12 +200,12 @@ export function canModerateComments(role: WorkspaceRole): boolean {
  * nothing brings them back.
  */
 export function canDeleteComments(role: WorkspaceRole): boolean {
-  return atLeast(role, WorkspaceRole.admin);
+  return atLeast(role, CAPABILITIES.deleteComments);
 }
 
 /** Approve or reject posts submitted for review. */
 export function canApprove(role: WorkspaceRole): boolean {
-  return atLeast(role, WorkspaceRole.admin);
+  return atLeast(role, CAPABILITIES.approve);
 }
 
 /**
@@ -184,7 +214,7 @@ export function canApprove(role: WorkspaceRole): boolean {
  * always route through the approval queue.
  */
 export function canPublishWithoutApproval(role: WorkspaceRole): boolean {
-  return atLeast(role, WorkspaceRole.editor);
+  return atLeast(role, CAPABILITIES.publishWithoutApproval);
 }
 
 /** Everyone with a membership may write a post. */
@@ -205,7 +235,7 @@ export function canCompose(): boolean {
  * been sent, whoever is asking.
  */
 export function canDeleteMedia(role: WorkspaceRole): boolean {
-  return atLeast(role, WorkspaceRole.editor);
+  return atLeast(role, CAPABILITIES.deleteMedia);
 }
 
 /**
@@ -219,7 +249,7 @@ export function canDeleteMedia(role: WorkspaceRole): boolean {
  * authored by the copier, which faces review like anything else they write.
  */
 export function canManageOthersPosts(role: WorkspaceRole): boolean {
-  return atLeast(role, WorkspaceRole.editor);
+  return atLeast(role, CAPABILITIES.manageOthersPosts);
 }
 
 /**

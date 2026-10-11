@@ -140,6 +140,9 @@ prices (overrides cover the gap).
   one caption generation per provider, verify the cost line.
 
 ### 0.3 Root and separate privileges
+**Done 2026-10-11** (see PERMISSIONS.md "Built"): `/root/*` section, users,
+workspaces, invitations, privileges + CSV, root log, transfer + SSH script.
+Waiting on the owner: root inside other workspaces, workspace suspension.
 Owner's rule (2026-10-11): the first registered user is root and sets up every
 aspect of the app; other admins and users have separate privileges, which the
 owner will audit. Root already exists (`isInstanceOwner`, first account only;

@@ -305,6 +305,24 @@ export const errors = {
   // mistyped password, on the sign-in form, told the person to sign in.
   invalidCredentials: () =>
     new AppError({ key: 'errors.invalidCredentials', fallback: 'Incorrect email or password.', status: 401 }),
+  rootCannotBeDisabled: () =>
+    new AppError({
+      key: 'errors.rootCannotBeDisabled',
+      fallback: 'Root cannot be disabled or signed out from here. Hand root to someone else first.',
+      status: 409,
+    }),
+  rootTargetDisabled: () =>
+    new AppError({
+      key: 'errors.rootTargetDisabled',
+      fallback: 'That account is disabled. Enable it before handing root to it.',
+      status: 409,
+    }),
+  accountDisabled: () =>
+    new AppError({
+      key: 'errors.accountDisabled',
+      fallback: 'This account has been disabled by the administrator of this installation.',
+      status: 403,
+    }),
   emailTaken: () =>
     new AppError({
       key: 'errors.emailTaken',

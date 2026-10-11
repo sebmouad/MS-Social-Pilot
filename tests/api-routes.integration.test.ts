@@ -58,7 +58,17 @@ const VALID_BODY: Record<string, unknown> = {
   'chat-channels': { kind: 'slack', name: 'x', url: 'https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXXXXXXXXXX', events: ['publishFailure'] },
   'chat-channels/[id]': { enabled: false },
   'report-schedules': { targetId: 'x', frequency: 'weekly', recipients: ['a@example.test'] },
+  'root/users/[id]': { disabled: true },
+  'root/workspaces/[id]': { name: 'Renamed' },
+  'root/transfer': { userId: 'x', password: 'x' },
+  'root/config': { values: { 'auth.openRegistration': true } },
+  'settings/config': { values: { 'auth.openRegistration': true } },
 };
+
+/** The root section's routes, and the old configuration addresses that now lead to them. */
+function isRootOnly(routePath: string): boolean {
+  return routePath === 'root' || routePath.startsWith('root/') || routePath.startsWith('settings/config');
+}
 
 /** Route path → the params a dynamic segment needs, so the handler can run. */
 function paramsFor(routePath: string): Record<string, string> {
@@ -153,9 +163,14 @@ describe('every API endpoint', () => {
 
         const isPublic = routePath in PUBLIC;
         // 401 is the honest answer; a 3xx to the sign-in screen is the same
-        // refusal in a different dialect and a couple of routes use it.
-        const refused = response.status === 401 || response.status === 403 ||
-          (response.status >= 300 && response.status < 400);
+        // refusal in a different dialect and a couple of routes use it. The
+        // root section answers 404 to everybody but root, so it is not
+        // advertised (docs/ai/PERMISSIONS.md).
+        const rootOnly = isRootOnly(routePath);
+        const refused = rootOnly
+          ? response.status === 404
+          : response.status === 401 || response.status === 403 ||
+            (response.status >= 300 && response.status < 400);
 
         if (!isPublic && !refused) {
           leaks.push(`${method} /api/${routePath} answered ${response.status}`);
@@ -197,6 +212,17 @@ const CONTRIBUTOR_MUST_NOT: Array<[Method, string]> = [
   ['PATCH', 'workspace'],
   ['GET', 'settings/config'],
   ['POST', 'settings/config'],
+  // The root section: 404 for everybody but root.
+  ['GET', 'root/config'],
+  ['POST', 'root/config'],
+  ['GET', 'root/config/ai-models'],
+  ['POST', 'root/config/test-email'],
+  ['PATCH', 'root/users/[id]'],
+  ['POST', 'root/users/[id]/sign-out'],
+  ['PATCH', 'root/workspaces/[id]'],
+  ['DELETE', 'root/invitations/[id]'],
+  ['POST', 'root/transfer'],
+  ['GET', 'root/privileges'],
   ['PUT', 'queue-slots'],
   ['DELETE', 'accounts/[id]'],
   ['POST', 'accounts/[id]/sync'],

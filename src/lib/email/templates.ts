@@ -418,3 +418,24 @@ export function scheduledReportEmail(options: {
     ...block,
   };
 }
+
+/** Root moved to another account: sent to both people. */
+export function rootTransferEmail(options: {
+  locale: Locale;
+  from: string;
+  to: string;
+  /** True for the person who is root now. */
+  forNewRoot: boolean;
+}): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(options.locale, key, params);
+  const block = layout({
+    heading: t('email.rootTransfer.heading'),
+    body: t(options.forNewRoot ? 'email.rootTransfer.bodyNew' : 'email.rootTransfer.bodyOld', {
+      from: options.from,
+      to: options.to,
+    }),
+    cta: options.forNewRoot ? { label: t('email.rootTransfer.cta'), url: `${env.appUrl}/root` } : undefined,
+  });
+  return { subject: t('email.rootTransfer.subject'), ...block };
+}

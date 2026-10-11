@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { open, SIGNED_IN_SCREENS } from './helpers';
+import { open, SIGNED_IN_SCREENS, ROOT_SCREENS } from './helpers';
 
 /**
  * Whether the app can be used without a mouse or without sight.
@@ -85,7 +85,7 @@ async function unnamedControls(page: import('@playwright/test').Page): Promise<O
   });
 }
 
-for (const path of SIGNED_IN_SCREENS) {
+for (const path of [...SIGNED_IN_SCREENS, ...ROOT_SCREENS]) {
   test(`${path} announces every control it shows`, async ({ page }) => {
     await open(page, path);
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();

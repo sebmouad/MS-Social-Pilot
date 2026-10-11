@@ -5,6 +5,7 @@ import {
   DESKTOP_WIDTHS,
   expectEveryNavLinkShown,
   open,
+  ROOT_SCREENS,
   SIGNED_IN_SCREENS,
 } from './helpers';
 
@@ -135,15 +136,19 @@ test.describe('the invited colleague, in French', () => {
     const context = await browser.newContext({ storageState: 'e2e/.auth/colleague.json' });
     const page = await context.newPage();
 
-    await open(page, '/settings/config');
-    await expect(page.getByText(/only the owner of this installation|seul le propriétaire de cette installation/i))
-      .toBeVisible();
+    // The root section does not exist for them: 404, old addresses included.
+    for (const path of ['/settings/config', ...ROOT_SCREENS]) {
+      expect((await page.goto(path))?.status(), path).toBe(404);
+    }
+    await expect(page.getByRole('link', { name: 'Root' })).toHaveCount(0);
 
-    expect((await page.request.get('/api/settings/config')).status()).toBe(403);
-    const write = await page.request.post('/api/settings/config', {
-      data: { values: { 'facebook.graphVersion': 'v1.0' } },
-    });
-    expect(write.status()).toBe(403);
+    for (const path of ['/api/settings/config', '/api/root/config']) {
+      expect((await page.request.get(path)).status(), path).toBe(404);
+      const write = await page.request.post(path, {
+        data: { values: { 'facebook.graphVersion': 'v1.0' } },
+      });
+      expect(write.status(), path).toBe(404);
+    }
     const setup = await page.request.post('/api/setup', {
       data: { facebookAppId: 'someone-else', facebookAppSecret: 'x' },
     });

@@ -595,12 +595,12 @@ describe('authenticate', () => {
  */
 describe('the installation owner', () => {
   let settings: typeof import('../src/lib/settings');
-  let config: typeof import('../src/app/api/settings/config/route');
+  let config: typeof import('../src/app/api/root/config/route');
   let setupRoute: typeof import('../src/app/api/setup/route');
 
   beforeAll(async () => {
     settings = await import('../src/lib/settings');
-    config = await import('../src/app/api/settings/config/route');
+    config = await import('../src/app/api/root/config/route');
     setupRoute = await import('../src/app/api/setup/route');
   });
 
@@ -696,8 +696,9 @@ describe('the installation owner', () => {
           body: JSON.stringify({ values: { 'facebook.appId': 'attacker-app' } }),
         }),
       );
-      expect(write.status).toBe(403);
-      expect((await config.GET()).status).toBe(403);
+      // The root section answers 404, so it is not even advertised.
+      expect(write.status).toBe(404);
+      expect((await config.GET()).status).toBe(404);
       expect((await setupWrite()).status).toBe(403);
     });
   });

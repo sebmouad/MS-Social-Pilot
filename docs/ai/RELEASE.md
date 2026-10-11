@@ -71,6 +71,17 @@ ls -t /var/backups/ms-social-pilot/db-*.dump | head -1
 ```
 Ask the user before restoring a database.
 
+## Root recovery
+
+If root is lost (person gone, password and mailbox unreachable), on the server
+in the app directory, with the app's environment loaded:
+
+```bash
+npx tsx scripts/admin/set-root.ts someone@example.com
+```
+The previous root stops being root; the change is in the root activity log.
+There is deliberately no web path for this.
+
 ## Migrations
 
 - Create: `npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url postgresql://postgres:postgres@127.0.0.1:55432/sp_shadow2 --script > prisma/migrations/<YYYYMMDDHHMMSS>_<name>/migration.sql`

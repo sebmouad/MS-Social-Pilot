@@ -795,6 +795,13 @@
       "review_approved": "👍 {workspace} : {name} a approuvé une publication sur « {link} »{comment}",
       "review_rejected": "✋ {workspace} : {name} demande des modifications sur « {link} »{comment}",
       "review_comment": "💬 {workspace} : {name} a commenté sur « {link} »{comment}"
+    },
+    "rootTransfer": {
+      "subject": "L’accès root a changé de mains",
+      "heading": "L’accès root a changé de mains",
+      "bodyNew": "{from} vous a nommé root de cette installation. Vous pouvez désormais modifier sa configuration, ses utilisateurs et ses espaces de travail.",
+      "bodyOld": "Vous avez transféré root de cette installation à {to}. Vous gardez vos espaces de travail et vos rôles, mais plus la section root.",
+      "cta": "Ouvrir la section root"
     }
   },
   "engagement": {
@@ -981,7 +988,10 @@
     "network_tooManyImages": "{target} ({network}) accepte jusqu’à {max} images.",
     "network_noVideo": "{target} ({network}) ne peut pas recevoir de vidéo d’ici. Utilisez des photos, ou retirez-le de cette publication.",
     "network_needsImage": "{target} ({network}) a besoin d’une image : ajoutez-en une, ou retirez-le de cette publication.",
-    "aiBudgetReached": "Le budget IA de ce mois est atteint. L’aide IA revient le mois prochain, ou plus tôt si l’administrateur augmente le budget."
+    "aiBudgetReached": "Le budget IA de ce mois est atteint. L’aide IA revient le mois prochain, ou plus tôt si l’administrateur augmente le budget.",
+    "accountDisabled": "Ce compte a été désactivé par l’administrateur de cette installation.",
+    "rootCannotBeDisabled": "Root ne peut pas être désactivé ici. Transférez d’abord root à quelqu’un d’autre.",
+    "rootTargetDisabled": "Ce compte est désactivé. Réactivez-le avant de lui transférer root."
   },
   "feeds": {
     "title": "Flux RSS",
@@ -1212,7 +1222,8 @@
     "newPost": "Nouvelle publication",
     "closeMenu": "Fermer le menu",
     "collapseSidebar": "Réduire la barre latérale",
-    "expandSidebar": "Déplier la barre latérale"
+    "expandSidebar": "Déplier la barre latérale",
+    "root": "Root"
   },
   "notifications": {
     "title": "Notifications",
@@ -2178,5 +2189,155 @@
     "mastodonHint": "Indiquez le serveur de votre compte. Vous vous y connecterez puis reviendrez ici.",
     "mastodonServer": "Serveur",
     "mastodonContinue": "Continuer vers la connexion"
+  },
+  "root": {
+    "title": "Root",
+    "banner": "Root — les modifications faites ici concernent toute l’installation.",
+    "actions": "Actions",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "working": "En cours…",
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+    "nav": {
+      "label": "Section root",
+      "menu": "Menu root",
+      "overview": "Vue d’ensemble",
+      "config": "Configuration",
+      "workspaces": "Espaces de travail",
+      "users": "Utilisateurs",
+      "registration": "Inscriptions et invitations",
+      "privileges": "Privilèges",
+      "activity": "Activité root",
+      "danger": "Zone sensible",
+      "back": "Retour à l’application"
+    },
+    "overview": {
+      "title": "Vue d’ensemble de l’installation",
+      "subtitle": "Tous les espaces de travail et comptes de cette installation.",
+      "workspaces": "Espaces de travail",
+      "users": "Comptes",
+      "pages": "Profils connectés",
+      "invitations": "Invitations en attente",
+      "scheduled": "Publications programmées",
+      "failed": "Publications échouées, 30 jours",
+      "setupMissing": "{count, plural, one {# étape de configuration obligatoire manque. Ouvrez la liste de configuration.} other {# étapes de configuration obligatoires manquent. Ouvrez la liste de configuration.}}",
+      "disabled": "{count, plural, one {# compte est désactivé.} other {# comptes sont désactivés.}}"
+    },
+    "workspaces": {
+      "title": "Espaces de travail",
+      "subtitle": "{count, plural, one {# espace de travail} other {# espaces de travail}}",
+      "name": "Nom",
+      "owners": "Propriétaires",
+      "members": "Membres",
+      "pages": "Profils",
+      "posts": "Publications",
+      "created": "Créé le",
+      "rename": "Renommer",
+      "renamed": "Espace de travail renommé."
+    },
+    "users": {
+      "title": "Utilisateurs",
+      "subtitle": "{count, plural, one {# compte} other {# comptes}}",
+      "person": "Personne",
+      "workspaces": "Espaces de travail et rôles",
+      "lastSignIn": "Dernière connexion",
+      "status": "Statut",
+      "never": "Jamais",
+      "root": "Root",
+      "disabled": "Désactivé",
+      "active": "Actif",
+      "signOut": "Déconnecter partout",
+      "signOutQuestion": "Déconnecter {name} partout ?",
+      "signOutBody": "Tous ses navigateurs et appareils sont déconnectés. La personne peut se reconnecter tout de suite.",
+      "signedOut": "{name} est déconnecté partout.",
+      "disable": "Désactiver",
+      "disableQuestion": "Désactiver {name} ?",
+      "disableBody": "La personne est déconnectée partout et ne peut plus se connecter tant que vous ne réactivez pas le compte. Ses espaces de travail et publications restent tels quels.",
+      "disabledDone": "{name} est désactivé.",
+      "enable": "Réactiver",
+      "enabled": "{name} peut de nouveau se connecter."
+    },
+    "registration": {
+      "title": "Inscriptions et invitations",
+      "openNow": "Tout le monde peut créer un compte",
+      "closedNow": "Comptes sur invitation uniquement",
+      "hint": "Les personnes invitées peuvent toujours rejoindre, quel que soit ce réglage.",
+      "open": "Ouvrir les inscriptions",
+      "close": "Sur invitation uniquement",
+      "openQuestion": "Laisser tout le monde créer un compte ?",
+      "openBody": "Toute personne qui trouve cette adresse peut s’inscrire et obtenir son propre espace de travail.",
+      "invitations": "{count, plural, =0 {Invitations en attente} one {# invitation en attente} other {# invitations en attente}}",
+      "noInvitations": "Aucune invitation en attente. Les administrateurs d’un espace invitent depuis Paramètres → Équipe.",
+      "email": "E-mail",
+      "workspace": "Espace de travail",
+      "invitedBy": "Invité par",
+      "expires": "Expire le",
+      "revoke": "Révoquer",
+      "revokeQuestion": "Révoquer l’invitation de {email} ?",
+      "revokeBody": "Le lien de son e-mail ne fonctionne plus. La personne pourra être réinvitée plus tard."
+    },
+    "privileges": {
+      "title": "Privilèges",
+      "subtitle": "Qui peut faire quoi, lu dans la même table que celle vérifiée par l’application. Exportez-la pour un audit.",
+      "export": "Exporter en CSV",
+      "workspaceTitle": "Permissions",
+      "workspaceSubtitle": "Qui peut faire quoi dans cet espace de travail. Lecture seule : les rôles se changent dans Équipe.",
+      "adminsOnly": "Seuls les propriétaires et administrateurs de cet espace de travail voient ses permissions.",
+      "matrix": "Ce que chaque rôle peut faire",
+      "capability": "Action",
+      "yes": "Autorisé",
+      "no": "Non autorisé",
+      "rootNote": "Root est à part de ces rôles : il modifie l’installation depuis la section root et n’a aucun droit supplémentaire dans un espace de travail.",
+      "members": "{count, plural, one {# membre} other {# membres}}",
+      "workspace": "Espace de travail",
+      "person": "Personne",
+      "role": "Rôle",
+      "pages": "Profils",
+      "lastSignIn": "Dernière connexion",
+      "root": "Root",
+      "disabled": "Désactivé",
+      "allPages": "Tous",
+      "somePages": "{count, plural, =0 {Aucun profil} one {# profil} other {# profils}}",
+      "never": "Jamais",
+      "capabilities": {
+        "manageAccounts": "Connecter et retirer des profils",
+        "manageTeam": "Inviter, changer les rôles et l’accès aux profils",
+        "manageSettings": "Modifier les paramètres de l’espace",
+        "approve": "Approuver ou refuser des publications",
+        "deleteComments": "Supprimer des commentaires",
+        "moderateComments": "Répondre aux commentaires et les masquer",
+        "publishWithoutApproval": "Publier sans approbation",
+        "manageOthersPosts": "Modifier ou supprimer les publications des autres",
+        "deleteMedia": "Supprimer des médias",
+        "compose": "Rédiger des publications et brouillons"
+      }
+    },
+    "activity": {
+      "title": "Activité root",
+      "subtitle": "Ce que root a modifié sur cette installation, du plus récent au plus ancien.",
+      "empty": "Rien pour l’instant. Les modifications faites dans la section root apparaissent ici.",
+      "actions": {
+        "config_changed": "Configuration modifiée : {keys}",
+        "user_disabled": "{email} désactivé",
+        "user_enabled": "{email} réactivé",
+        "user_signedOut": "{email} déconnecté partout",
+        "workspace_renamed": "Espace {from} renommé en {to}",
+        "invitation_revoked": "Invitation de {email} révoquée ({workspace})",
+        "root_transferred": "Root transféré de {from} à {to}"
+      }
+    },
+    "danger": {
+      "title": "Zone sensible",
+      "transferTitle": "Transférer root à quelqu’un d’autre",
+      "transferHint": "La personne choisie devient root et vous perdez l’accès à cette section. Elle seule peut vous le rendre, ou l’opérateur du serveur avec scripts/admin/set-root.ts.",
+      "to": "Nouveau root",
+      "pick": "Choisir un compte",
+      "password": "Votre mot de passe",
+      "submit": "Transférer root",
+      "question": "Transférer root à {name} ?",
+      "body": "Vous perdez immédiatement l’accès à la section root. Vous recevez tous deux un e-mail si l’envoi d’e-mails est configuré.",
+      "confirm": "Transférer root",
+      "nobody": "Aucun autre compte actif à qui transférer root. Invitez d’abord quelqu’un."
+    }
   }
 }

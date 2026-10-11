@@ -23,6 +23,8 @@ interface Props {
   /** Hides the approvals link for people who cannot act on it. */
   showApprovals: boolean;
   pendingApprovals: number;
+  /** Root only: the way into the root section. */
+  isRoot?: boolean;
   children: ReactNode;
 }
 
@@ -50,6 +52,7 @@ export function AppShell({
   workspaces,
   showApprovals,
   pendingApprovals,
+  isRoot = false,
   children,
 }: Props) {
   const t = useTranslations('nav');
@@ -283,6 +286,18 @@ export function AppShell({
         </nav>
 
         <div className="border-t border-slate-200 px-3 py-3">
+          {isRoot && (
+            <Link
+              href="/root"
+              title={open ? undefined : t('root')}
+              className={`mb-2 flex h-10 items-center gap-3 rounded-lg bg-amber-50 text-[15px] font-semibold text-amber-900 hover:bg-amber-100 ${
+                open ? 'px-2.5' : 'justify-center'
+              }`}
+            >
+              <Icon name="shield" size={20} className="text-amber-700" />
+              <span className={open ? 'truncate' : 'sr-only'}>{t('root')}</span>
+            </Link>
+          )}
           {open && (
             <p className="mb-2 truncate px-2 text-xs text-slate-500" title={`${userName} · ${timezone}`}>
               <span className="font-semibold text-slate-700">{userName}</span> · {timezone}

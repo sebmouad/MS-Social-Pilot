@@ -100,7 +100,7 @@ export function ConfigClient({
     setMessage(null);
 
     try {
-      const response = await fetch('/api/settings/config', {
+      const response = await fetch('/api/root/config', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ values }),
@@ -358,7 +358,7 @@ function AiModelPicker({
   async function load(refresh: boolean) {
     setLoading(true);
     try {
-      const response = await fetch(`/api/settings/config/ai-models${refresh ? '?refresh=1' : ''}`);
+      const response = await fetch(`/api/root/config/ai-models${refresh ? '?refresh=1' : ''}`);
       const body = (await response.json()) as { models?: AiModelOption[]; error?: string | null };
       setModels(body.models ?? []);
       setError(response.ok ? (body.error ?? null) : 'unreachable');
@@ -424,7 +424,7 @@ function TestEmailButton() {
     setSending(true);
     setResult(null);
     try {
-      const response = await fetch('/api/settings/config/test-email', { method: 'POST' });
+      const response = await fetch('/api/root/config/test-email', { method: 'POST' });
       const body = (await response.json()) as { status?: string; error?: string | null; to?: string };
       if (body.status === 'sent') setResult({ ok: true, text: t('testEmailSent', { to: body.to ?? '' }) });
       else if (body.status === 'skipped') setResult({ ok: false, text: t('testEmailNoProvider') });

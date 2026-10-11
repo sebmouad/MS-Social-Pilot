@@ -8,6 +8,7 @@ import {
   open,
   OWNER,
   SIGNED_IN_SCREENS,
+  ROOT_SCREENS,
 } from './helpers';
 
 /**
@@ -18,7 +19,7 @@ import {
  * because none of them render one.
  */
 
-for (const path of SIGNED_IN_SCREENS) {
+for (const path of [...SIGNED_IN_SCREENS, ...ROOT_SCREENS]) {
   test(`${path} renders for a signed-in owner`, async ({ page }) => {
     const failures = collectFailures(page);
 

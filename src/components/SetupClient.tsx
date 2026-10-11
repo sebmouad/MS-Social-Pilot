@@ -201,7 +201,7 @@ export function SetupClient({ state, signedIn }: { state: SetupState; signedIn: 
                     )}
 
                     {step.id === 'email' && (
-                      <Link href="/settings/config" className="btn-secondary inline-flex">
+                      <Link href="/root/config" className="btn-secondary inline-flex">
                         {t('steps.email.action')}
                       </Link>
                     )}

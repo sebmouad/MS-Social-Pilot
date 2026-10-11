@@ -22,6 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         timezone={auth.workspace.timezone}
         showApprovals={showApprovals}
         pendingApprovals={pendingApprovals}
+        isRoot={auth.isInstanceOwner}
         workspaces={auth.workspaces.map((workspace) => ({
           id: workspace.id,
           name: workspace.name,

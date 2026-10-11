@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { Locale, Prisma, WorkspaceRole } from '@prisma/client';
 
@@ -278,6 +278,8 @@ export async function authenticate(email: string, password: string): Promise<str
   if (!user || !valid) {
     throw errors.invalidCredentials();
   }
+  // Said only after the right password, so it reveals nothing to a guesser.
+  if (user.disabledAt) throw errors.accountDisabled();
   return createSession(user.id);
 }
 
@@ -374,7 +376,7 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
   if (!session || session.expiresAt < new Date()) return null;
 
   const { user } = session;
-  if (user.memberships.length === 0) return null;
+  if (user.disabledAt || user.memberships.length === 0) return null;
 
   // Dates on every screen this request renders are written in this language.
   setDateLocale(user.locale);
@@ -425,6 +427,23 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
 export async function requirePage(requestedWorkspaceId?: string): Promise<AuthContext> {
   const context = await getAuthContext(requestedWorkspaceId);
   if (!context) redirect('/login');
+  return context;
+}
+
+/**
+ * The root section's guard (`/root/*`). Anyone but root gets a 404, not a
+ * refusal, so the section is not advertised to people who cannot use it.
+ */
+export async function requireRoot(): Promise<AuthContext> {
+  const context = await getAuthContext();
+  if (!context?.isInstanceOwner) notFound();
+  return context;
+}
+
+/** The same guard for `/api/root/*`: 404 for everyone but root, signed out included. */
+export async function requireRootApi(): Promise<AuthContext> {
+  const context = await getAuthContext();
+  if (!context?.isInstanceOwner) throw errors.notFound();
   return context;
 }
 

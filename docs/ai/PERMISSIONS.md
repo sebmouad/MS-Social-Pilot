@@ -64,6 +64,28 @@ Root access lives in **a unique section, separated from the rest of the app**:
 - Workspace roles (owner/admin/…) keep using workspace Settings; nothing of the
   root section appears there.
 
+## Built (2026-10-11)
+- `/root/*` (`src/app/(root)/root/`): Overview · Configuration · Workspaces ·
+  Users · Registration & invitations · Privileges · Root activity · Danger zone.
+  Guard `requireRoot()` (pages) / `requireRootApi()` (`/api/root/*`): 404 for
+  everybody but root, signed out included. Sidebar entry "Root" (amber, shield)
+  only for root; banner on every root screen; "Back to the app".
+- `/settings/config` redirects root to `/root/config`, 404 for others;
+  `/api/settings/config*` re-export the `/api/root/config*` handlers.
+- Users: disable / enable (`User.disabledAt`; disabled = sessions deleted,
+  sign-in refused, existing cookie no longer signs in; root cannot be
+  disabled), sign out everywhere. Workspaces: list + rename. Invitations across
+  every workspace + revoke. Open registration switch.
+- Transfer root (root's password; both emailed) and the SSH recovery script
+  `scripts/admin/set-root.ts <email>` (RELEASE.md).
+- `RootActivity` table = the separate root log (a table of its own rather than
+  `ActivityLog`, which belongs to a workspace).
+- `CAPABILITIES` in `constants.ts` is the single table the `can…` functions
+  read; printed at `/root/privileges` (+ every member's role, Page access,
+  last sign-in, CSV export) and read-only for admins at `/settings/permissions`.
+- Not built, waiting on the owner: root passing workspace checks / opening
+  another workspace (item 2 below), suspending a workspace, deleting users.
+
 ## To build (NEXT_PHASES Phase 0.3)
 1. **Root console** (inside the `/root` section above): all workspaces (create,
    rename, suspend, open any as root), all users (disable, reset sign-in,

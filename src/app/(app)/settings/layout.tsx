@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { SettingsNav } from '@/components/SettingsNav';
 import { requirePage } from '@/lib/auth';
-import { canManageInstance, canManageTeam } from '@/lib/constants';
+import { canManageTeam } from '@/lib/constants';
 
 /**
  * Settings as Facebook lays them out: the sections in a menu down the left,
@@ -19,7 +19,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
     <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside className="min-w-0 lg:sticky lg:top-6">
         <p className="mb-2 hidden px-2 text-2xl font-bold text-slate-900 lg:block">{t('title')}</p>
-        <SettingsNav showConfig={canManageInstance(auth)} showHistory={canManageTeam(auth.role)} />
+        <SettingsNav showPermissions={canManageTeam(auth.role)} showHistory={canManageTeam(auth.role)} />
       </aside>
       <div className="min-w-0">{children}</div>
     </div>
