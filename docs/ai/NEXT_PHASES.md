@@ -33,6 +33,77 @@ Work the phases in order. Each phase: build → unit + Playwright → deploy
 
 ---
 
+## Phase 0 — Email via Gmail + AI with Anthropic, OpenAI, Gemini (do first)
+
+Owner's request (2026-10-11): "add Gmail app password in settings" and "add
+also OpenAI and Gemini with models fetched automatically and API costs".
+Skills: `frontend-design`, `ux-copy-house`, `run-tests`, `claude-api`
+(Anthropic SDK usage), `security-review` (secrets).
+
+### 0.1 Email: Gmail (SMTP) as a second provider
+Today: `src/lib/email/send.ts` uses Resend only (`email.apiKey`,
+`email.from` in `src/lib/settings/definitions.ts`; blank = log only).
+- New settings (group `email`): `email.provider` select `resend | smtp`
+  (default: `smtp` when an SMTP password is set, else `resend`);
+  `email.smtpHost` (default `smtp.gmail.com`), `email.smtpPort` (465),
+  `email.smtpSecure` (true), `email.smtpUser` (the Gmail address),
+  `email.smtpPassword` (type `secret`, encrypted like the others — the 16-letter
+  Google **app password**, needs 2-Step Verification on the Google account).
+- `send.ts`: `nodemailer` transport for `smtp`; keep Resend path. `from` must be
+  the Gmail address (or a verified "Send mail as" alias) — Gmail rewrites other
+  senders; say so in the hint. Gmail limit ≈ 500 recipients/day: show it.
+- Settings → Configuration → Email: provider switch, fields, **"Send test
+  email"** button (to the signed-in owner) that reports the exact result
+  (sent / auth failed "Use an app password, not your Google password" / blocked).
+- `emailEnabled()` true when the chosen provider is configured.
+- **The owner types the app password himself** in the UI; agents never enter or
+  read it.
+- Tests: unit for provider selection and error mapping (nodemailer mocked); e2e
+  that the form saves and the secret is never echoed back.
+
+### 0.2 AI: three providers, live model lists, costs
+Today: `src/lib/ai.ts` is Anthropic-only (`ai.apiKey`, `ai.model` with a
+**hard-coded, now outdated** model list: `claude-opus-5`, `claude-sonnet-5`,
+`claude-haiku-4-5…`). `AiGeneration` rows store input/output tokens;
+`usageSummary()` shows 30-day tokens, no money.
+- Settings (group `ai`): `ai.provider` select `anthropic | openai | gemini`;
+  keys `ai.anthropicKey` (migrate from `ai.apiKey`), `ai.openaiKey`,
+  `ai.geminiKey` (all `secret`); `ai.model` becomes a free value chosen from the
+  fetched list. Optional per-feature model (captions vs. plan week) later.
+- **Provider adapter** `src/lib/ai/providers/{anthropic,openai,gemini}.ts` with
+  one interface: `listModels()`, `generate({system, prompt, maxTokens})` →
+  `{text, inputTokens, outputTokens, model}`. Use `fetch` for OpenAI and Gemini
+  (no new SDKs needed):
+  - Anthropic: `GET https://api.anthropic.com/v1/models` (headers `x-api-key`,
+    `anthropic-version`), `POST /v1/messages`; current ids in this era:
+    `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`, `claude-fable-5-1`.
+  - OpenAI: `GET https://api.openai.com/v1/models`, `POST /v1/chat/completions`
+    (or `/v1/responses`); usage in `usage.prompt_tokens/completion_tokens`.
+  - Gemini: `GET https://generativelanguage.googleapis.com/v1beta/models?key=…`
+    (filter `supportedGenerationMethods` contains `generateContent`),
+    `POST /v1beta/models/<id>:generateContent`; usage in `usageMetadata`.
+  Check each provider's current docs before coding (`search-meta-docs`-style:
+  official docs only).
+- **Models fetched automatically**: on saving a key and from a "Refresh models"
+  button; cached in the DB (new table `AiModelCache { provider, id, label,
+  contextWindow?, fetchedAt }`), refreshed daily by the worker; the select shows
+  only text-generation models, newest first, with the current choice kept even
+  if it disappears (warn "no longer offered by <provider>").
+- **API costs**: no provider exposes prices through its API, so keep a
+  **price table** `src/lib/ai/prices.ts` (USD per 1M input / output tokens per
+  model id prefix, with the date checked and the source URL), editable
+  overrides in Configuration (`ai.priceOverrides` JSON). Store `provider` and
+  `costUsd` on each `AiGeneration` (migration). Settings → AI shows: spend this
+  month and last 30 days per provider/model, per workspace, cost per
+  generation, and an optional **monthly budget** (`ai.monthlyBudgetUsd`) that
+  stops AI calls with a clear message when reached. Unknown model price →
+  show tokens and "price unknown — add it", never a fake $0.
+- Model select shows the price next to each model ("$3 / $15 per 1M tokens").
+- Tests: adapters with mocked fetch (model list parsing, usage parsing, error
+  → "key rejected" / "rate limited" / "model not found"), cost maths, budget
+  stop; e2e for the settings screen. Live: owner pastes the keys himself; then
+  one caption generation per provider, verify the cost line.
+
 ## Phase A — One profile selection, everywhere (highest priority)
 
 Skills: `profile-selection`, `frontend-design`, `ux-copy-house`, `run-tests`.
@@ -231,7 +302,8 @@ location tags and @mentions, tasks & workflows, billing/seats/usage, custom
 domain and custom fields, mobile app / Chrome extension.
 
 ## Phase E — Blocked on owner / Meta (unchanged)
-Meta App Review step 2 → Live mode; Resend + Anthropic keys; LinkedIn / Threads
+Meta App Review step 2 → Live mode; owner enters the Gmail app password and the
+Anthropic / OpenAI / Gemini keys (after Phase 0); LinkedIn / Threads
 / X / Pinterest developer apps; first live Bluesky / Mastodon posts. See
 `ROADMAP.md`.
 

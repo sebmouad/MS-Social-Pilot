@@ -14,8 +14,8 @@ live in the owner's Chrome.
 ## Blocked on the owner or Meta
 1. **Meta App Review step 2** (Inbox + Instagram) once step 1 is decided —
    package in `docs/meta-review/step2-inbox-instagram.md`. Then Live mode.
-2. **Email** (Resend key) → verify scheduled report emails and alerts live.
-3. **AI** (Anthropic key, workspace AI on) → verify AI writing, hashtags, Plan
+2. **Email** (Gmail app password via SMTP, or Resend key — NEXT_PHASES Phase 0) → verify scheduled report emails and alerts live.
+3. **AI** (Anthropic, OpenAI or Gemini key — Phase 0; workspace AI on) → verify AI writing, hashtags, Plan
    with AI live. Default model is set in Configuration → AI.
 4. **Developer apps** for LinkedIn, Threads, X, Pinterest → first live posts.
 5. **First live Bluesky / Mastodon posts** (owner connects an account, OKs a test).

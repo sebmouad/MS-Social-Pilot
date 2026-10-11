@@ -104,7 +104,9 @@ post has been made to them yet — needs the owner to connect an account.
 
 ## Open items / next steps
 
-0. **Next session starts with [NEXT_PHASES.md](NEXT_PHASES.md) Phase A** — the
+0. **Next session starts with [NEXT_PHASES.md](NEXT_PHASES.md) Phase 0** (Gmail
+   SMTP email; Anthropic + OpenAI + Gemini with auto-fetched models and costs),
+   **then Phase A** — the
    owner asked (2026-10-11) for one shared profile selection (single / multiple /
    group, show or hide) that planned, posted and analytics all obey; analytics
    across all selected profiles with every Meta metric; and a better design.
