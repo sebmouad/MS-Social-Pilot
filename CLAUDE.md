@@ -14,7 +14,9 @@ conventions, commands. Then the file for your task:
 | Any UI work | [docs/ai/DESIGN.md](docs/ai/DESIGN.md) |
 | Tests, before and after every change | [docs/ai/TESTING.md](docs/ai/TESTING.md) |
 | Facebook / Instagram / Graph API work | [docs/ai/META_API_NOTES.md](docs/ai/META_API_NOTES.md) |
-| Shipping | [docs/ai/RELEASE.md](docs/ai/RELEASE.md) |
+| Shipping (server, scripts, rollback) | [docs/ai/RELEASE.md](docs/ai/RELEASE.md) |
+| Where things stand, decisions, Meta review, gaps | [docs/ai/STATUS.md](docs/ai/STATUS.md) |
+| Which skill for which task | [docs/ai/SKILLS.md](docs/ai/SKILLS.md) |
 
 Project skills live in [.claude/skills/](.claude/skills/) — load the one that
 matches the task (frontend design, Meta API, app review, live Facebook tests,
@@ -36,8 +38,8 @@ translations, migrations, new network connector, release).
    real Facebook Pages needs the user's explicit OK for each action (the agreed
    test Page is *DIY Page 3*; switch it on for the test and off afterwards, and
    delete test posts).
-6. **Deploy when tests pass** (see RELEASE.md), then check
-   `/api/health` and the three WordPress sites on the same server.
+6. **Deploy when tests pass**: `scripts/deploy/deploy.sh` (see RELEASE.md). It
+   checks `/api/health` and the three WordPress sites on the same server.
 7. **Never type passwords, tokens or secrets into web pages**, never create
    accounts for the user, and never read production database contents.
 8. Client components must not import server modules (anything that reaches

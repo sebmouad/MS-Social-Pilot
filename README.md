@@ -17,6 +17,7 @@ French.
 | Understand how it works | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Know what it was built to be | [docs/PROJECT_SCHEMA.md](docs/PROJECT_SCHEMA.md) |
 | Run the browser tests | [e2e/README.md](e2e/README.md) |
+| Work on it as an AI agent (Claude) | [CLAUDE.md](CLAUDE.md) and [docs/ai/](docs/ai/README.md) |
 
 The app also explains itself as you go: a fresh installation opens on a **Setup**
 screen that says what is done, what is next, and what the installation itself
