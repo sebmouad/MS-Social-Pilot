@@ -80,6 +80,8 @@ export const DELETE = route(async (_request: Request, context: Context) => {
 
   // Posts already created keep their sourceFeedItemId relation nulled by the
   // schema, so removing a feed does not delete published history.
-  await prisma.feedSource.deleteMany({ where: { id, workspaceId: auth.workspace.id } });
+  const { count } = await prisma.feedSource.deleteMany({ where: { id, workspaceId: auth.workspace.id } });
+  // Another workspace's feed (or none at all) answers like any missing row.
+  if (count === 0) throw errors.feedNotFound();
   return ok({ ok: true });
 });

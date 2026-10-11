@@ -223,7 +223,8 @@ export async function acceptInvitation(token: string, userId: string): Promise<s
 }
 
 export async function revokeInvitation(workspaceId: string, invitationId: string): Promise<void> {
-  await prisma.invitation.deleteMany({ where: { id: invitationId, workspaceId } });
+  const { count } = await prisma.invitation.deleteMany({ where: { id: invitationId, workspaceId } });
+  if (count === 0) throw errors.notFound();
   await logActivity(workspaceId, 'team.invitationRevoked', { invitationId });
 }
 
@@ -241,7 +242,8 @@ export async function removeMember(
   const membership = await prisma.membership.findUnique({
     where: { userId_workspaceId: { userId, workspaceId } },
   });
-  if (!membership) return;
+  // Not a member here — including a member of another workspace.
+  if (!membership) throw errors.notFound();
 
   assertRankPermits(actorRole, membership.role);
 

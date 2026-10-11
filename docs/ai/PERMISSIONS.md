@@ -64,6 +64,17 @@ Root access lives in **a unique section, separated from the rest of the app**:
 - Workspace roles (owner/admin/…) keep using workspace Settings; nothing of the
   root section appears there.
 
+## Workspace isolation (owner's rule, 2026-10-11)
+Each workspace is one client: its own data and team, and nobody in another
+workspace can see or touch it — workspace owners included. Enforced by every
+query filtering on `auth.workspace.id` (+ `pageScope`), and pinned by
+`tests/tenant-isolation.integration.test.ts`: as workspace B's owner it calls
+every `[id]` API route with workspace A's real ids (must answer 404/403 and
+change nothing), every list route (must not mention A), and passes A's Page
+ids in bodies (nothing may end up pointing at them). A new `[id]` route fails
+that test until it is mapped. Root sees all workspaces only in the root
+section (names, counts), never their posts, Pages or tokens.
+
 ## Built (2026-10-11)
 - `/root/*` (`src/app/(root)/root/`): Overview · Configuration · Workspaces ·
   Users · Registration & invitations · Privileges · Root activity · Danger zone.

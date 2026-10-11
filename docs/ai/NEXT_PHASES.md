@@ -586,7 +586,7 @@ generic (CLAUDE.md rule 9). Items:
   (Pages, members, scheduled posts, AI spend), payment provider (Stripe or
   Paddle; the app never stores card data), invoices, plan changes, dunning,
   usage page. Ask the owner for the plans, prices and limits before building.
-- **S5. Tenant isolation review** — every query scoped by workspace and
+- **S5. Tenant isolation review** — **started 2026-10-11 (owner asked to do it first):** cross-workspace sweep test + three routes fixed to answer 404; rate limits per workspace and AI metering still to do — every query scoped by workspace and
   `pageScope`; e2e that one customer can never read another's data; rate
   limits per workspace; per-tenant AI keys or shared keys with metering
   (ties to 0.2 costs).
