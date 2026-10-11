@@ -162,6 +162,8 @@ export const errors = {
 
   notFound: (what = 'errors.notFound') => new AppError({ key: what, fallback: 'Not found.', status: 404 }),
 
+  noScheduledTime: () =>
+    new AppError({ key: 'errors.noScheduledTime', fallback: 'This post has no date to move.', status: 422 }),
   postNotFound: () =>
     new AppError({ key: 'errors.postNotFound', fallback: 'Post not found.', status: 404 }),
 

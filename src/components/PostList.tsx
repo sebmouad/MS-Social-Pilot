@@ -80,8 +80,11 @@ export function PostList({
   posts,
   needsReview = false,
   emptyText,
+  labels = [],
 }: {
   posts: PostView[];
+  /** The workspace's labels, for the bulk "add / remove label" action. */
+  labels?: Array<{ id: string; name: string }>;
   /** The viewer's posts go through review, so drafts offer "Submit for review". */
   needsReview?: boolean;
   /** Said instead of the usual empty message, e.g. when a search found nothing. */
@@ -112,6 +115,69 @@ export function PostList({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const tBulk = useTranslations('posts.bulk');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  // Posts that left the list (cancelled, filtered out) drop out of the selection.
+  const chosen = posts.filter((post) => selected.has(post.id)).map((post) => post.id);
+
+  function toggle(ids: string[], on: boolean) {
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  /** One action on every selected post; the server reports the ones it refused. */
+  async function bulk(action: { kind: 'cancel' } | { kind: 'shift'; days: number } | { kind: 'label'; labelId: string; add: boolean }) {
+    if (chosen.length === 0) return;
+    if (
+      action.kind === 'cancel' &&
+      !(await confirm({
+        title: tBulk('cancelTitle', { count: chosen.length }),
+        body: tBulk('cancelBody'),
+        confirmLabel: tBulk('cancel'),
+        cancelLabel: tBulk('keep'),
+        danger: true,
+      }))
+    )
+      return;
+    setBulkBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch('/api/posts/actions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ids: chosen, action }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        done?: number;
+        failed?: Array<{ id: string; message: string }>;
+      };
+      if (!response.ok) {
+        setError(body.error ?? t('actionFailed'));
+        return;
+      }
+      if (body.done) setNotice(tBulk('done', { count: body.done }));
+      if (body.failed?.length) {
+        setError(`${tBulk('someFailed', { count: body.failed.length })} ${[...new Set(body.failed.map((entry) => entry.message))].join(' ')}`);
+        setSelected(new Set(body.failed.map((entry) => entry.id)));
+      } else {
+        setSelected(new Set());
+      }
+      router.refresh();
+    } catch {
+      setError(t('actionFailed'));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   /**
    * Run one post action.
@@ -176,6 +242,83 @@ export function PostList({
         </div>
       )}
 
+      {chosen.length > 0 && (
+        <div
+          role="toolbar"
+          aria-label={tBulk('selected', { count: chosen.length })}
+          className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-lg ring-1 ring-slate-200"
+          aria-busy={bulkBusy}
+        >
+          <span className="text-sm font-semibold text-slate-900">{tBulk('selected', { count: chosen.length })}</span>
+          <label className="flex items-center gap-1.5 text-sm text-slate-600">
+            <span>{tBulk('moveBy')}</span>
+            <select
+              className="input h-9 w-auto py-0"
+              value=""
+              disabled={bulkBusy}
+              onChange={(event) => {
+                const days = Number(event.target.value);
+                if (days) void bulk({ kind: 'shift', days });
+              }}
+            >
+              <option value="">{tBulk('move')}</option>
+              {[1, 2, 7, 14, 30].map((days) => (
+                <option key={days} value={days}>
+                  {tBulk('days', { count: days })}
+                </option>
+              ))}
+              {[1, 7].map((days) => (
+                <option key={-days} value={-days}>
+                  {tBulk('daysEarlier', { count: days })}
+                </option>
+              ))}
+            </select>
+          </label>
+          {labels.length > 0 && (
+            <>
+              <label className="flex items-center gap-1.5 text-sm">
+                <span className="sr-only">{tBulk('addLabel')}</span>
+                <select
+                  className="input h-9 w-auto py-0"
+                  value=""
+                  disabled={bulkBusy}
+                  onChange={(event) => event.target.value && void bulk({ kind: 'label', labelId: event.target.value, add: true })}
+                >
+                  <option value="">{tBulk('addLabel')}</option>
+                  {labels.map((label) => (
+                    <option key={label.id} value={label.id}>
+                      {label.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-1.5 text-sm">
+                <span className="sr-only">{tBulk('removeLabel')}</span>
+                <select
+                  className="input h-9 w-auto py-0"
+                  value=""
+                  disabled={bulkBusy}
+                  onChange={(event) => event.target.value && void bulk({ kind: 'label', labelId: event.target.value, add: false })}
+                >
+                  <option value="">{tBulk('removeLabel')}</option>
+                  {labels.map((label) => (
+                    <option key={label.id} value={label.id}>
+                      {label.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          <button type="button" className="btn-danger" disabled={bulkBusy} onClick={() => void bulk({ kind: 'cancel' })}>
+            {tBulk('cancel')}
+          </button>
+          <button type="button" className="btn-ghost ml-auto" disabled={bulkBusy} onClick={() => setSelected(new Set())}>
+            {tBulk('clear')}
+          </button>
+        </div>
+      )}
+
       {/* Below the error, not instead of it: cancelling the last post on a
           filtered tab empties the tab, and what Facebook refused to remove
           still has to be said. */}
@@ -185,7 +328,16 @@ export function PostList({
 
       {groupByDay(posts).map((group) => (
         <section key={group.key} aria-labelledby={`day-${group.key}`} className="space-y-3">
-          <h2 id={`day-${group.key}`} className="px-1 pt-2 text-[15px] font-semibold text-slate-600">
+          <h2 id={`day-${group.key}`} className="flex items-center gap-2 px-1 pt-2 text-[15px] font-semibold text-slate-600">
+            {group.posts.some((post) => post.mayAct) && (
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-brand-600"
+                aria-label={tBulk('selectDay')}
+                checked={group.posts.filter((post) => post.mayAct).every((post) => selected.has(post.id))}
+                onChange={(event) => toggle(group.posts.filter((post) => post.mayAct).map((post) => post.id), event.target.checked)}
+              />
+            )}
             {group.label}
           </h2>
           {group.posts.map((post) => {
@@ -221,6 +373,15 @@ export function PostList({
         return (
           <article key={post.id} className="card overflow-hidden" aria-busy={working}>
             <header className="flex items-start gap-3 px-4 pt-3">
+              {post.mayAct && (
+                <input
+                  type="checkbox"
+                  className="mt-3 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-600"
+                  aria-label={tBulk('select')}
+                  checked={selected.has(post.id)}
+                  onChange={(event) => toggle([post.id], event.target.checked)}
+                />
+              )}
               <Avatar name={lead?.name ?? ''} pictureUrl={lead?.pictureUrl ?? null} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-semibold text-slate-900">

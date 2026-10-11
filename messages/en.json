@@ -1023,7 +1023,8 @@
     "rootNoSuchUser": "Nobody has an account with that email. Invite them from Registration instead.",
     "rootAlreadyMember": "That person is already a member of this workspace.",
     "rootLastOwner": "A workspace needs an owner. Make someone else owner first.",
-    "exportNeedsAllPages": "This export covers the whole workspace. Ask an admin for access to every profile."
+    "exportNeedsAllPages": "This export covers the whole workspace. Ask an admin for access to every profile.",
+    "noScheduledTime": "This post has no date to move. Open it and set one."
   },
   "feeds": {
     "title": "RSS feeds",
@@ -1097,7 +1098,8 @@
         "retried": "retried a failed post",
         "submitted": "submitted a post for approval",
         "updated": "edited a post",
-        "withdrawn": "took a post back out of review"
+        "withdrawn": "took a post back out of review",
+        "bulkAction": "acted on several posts at once"
       },
       "settings": {
         "changed": "changed the workspace settings"
@@ -1544,7 +1546,26 @@
     "publishNow": "Publish now",
     "removeAction": "Delete from Facebook",
     "removedFromFacebook": "Removed from Facebook",
-    "removeConfirm": "{count, plural, one {Delete this post from Facebook? It disappears from the Page, with its reactions and comments. This cannot be undone.} other {Delete this post from # Pages on Facebook? It disappears from each, with its reactions and comments. This cannot be undone.}}"
+    "removeConfirm": "{count, plural, one {Delete this post from Facebook? It disappears from the Page, with its reactions and comments. This cannot be undone.} other {Delete this post from # Pages on Facebook? It disappears from each, with its reactions and comments. This cannot be undone.}}",
+    "bulk": {
+      "select": "Select this post",
+      "selectDay": "Select every post of this day",
+      "selected": "{count, plural, one {# post selected} other {# posts selected}}",
+      "clear": "Clear selection",
+      "move": "Move",
+      "moveBy": "Move by",
+      "days": "{count, plural, one {# day later} other {# days later}}",
+      "daysEarlier": "{count, plural, one {# day earlier} other {# days earlier}}",
+      "addLabel": "Add label",
+      "removeLabel": "Remove label",
+      "chooseLabel": "Choose a label",
+      "cancel": "Cancel posts",
+      "cancelTitle": "{count, plural, one {Cancel this post?} other {Cancel these # posts?}}",
+      "cancelBody": "Scheduled posts will not go out. Posts Facebook is holding are removed from Facebook too. This cannot be undone.",
+      "keep": "Keep them",
+      "done": "{count, plural, one {Done for # post.} other {Done for # posts.}}",
+      "someFailed": "{count, plural, one {# post was left as it was:} other {# posts were left as they were:}}"
+    }
   },
   "queue": {
     "addSlot": "Add slot",

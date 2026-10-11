@@ -303,7 +303,10 @@ Skills: `frontend-design`, `profile-selection`.
 *Progress (2026-10-11):* calendar status pills filter the grid (`?status=`,
 several combine, counts stay the month's) and editable posts drag to another
 day (month) or hour (week) — `CalendarDrag`, a PATCH like any edit; past days
-do not take a drop. E2e for the drag is due at the next browser checkpoint.
+do not take a drop. Posts: tick posts (or a whole day) and move them by N
+days, add/remove a label or cancel them (`POST /api/posts/actions`,
+`src/lib/post-bulk.ts`; each post keeps its own rules, refusals are listed).
+E2e for drag and bulk is due at the next browser checkpoint.
 - Calendar: profile colour dots on chips, filter by status (planned / posted /
   failed / draft / review) as pills next to the bar, drag-and-drop rescheduling,
   collapse the Pages column (ROADMAP UX backlog), day hover actions (ref 40).

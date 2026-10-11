@@ -272,6 +272,7 @@ export default async function PostsPage({
       </Link>
 
       <PostList
+        labels={labels.map((label) => ({ id: label.id, name: label.name }))}
         emptyText={filtered ? t('noMatches') : undefined}
         needsReview={needsReview}
         posts={posts.map((post) => ({

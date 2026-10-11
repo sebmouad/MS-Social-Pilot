@@ -1023,7 +1023,8 @@
     "rootNoSuchUser": "Aucun compte n’existe avec cet e-mail. Invitez cette personne depuis Inscription.",
     "rootAlreadyMember": "Cette personne est déjà membre de cet espace de travail.",
     "rootLastOwner": "Un espace de travail doit avoir un propriétaire. Nommez d’abord quelqu’un d’autre propriétaire.",
-    "exportNeedsAllPages": "Cet export couvre tout l’espace de travail. Demandez à un administrateur l’accès à tous les profils."
+    "exportNeedsAllPages": "Cet export couvre tout l’espace de travail. Demandez à un administrateur l’accès à tous les profils.",
+    "noScheduledTime": "Cette publication n’a pas de date à déplacer. Ouvrez-la pour en choisir une."
   },
   "feeds": {
     "title": "Flux RSS",
@@ -1097,7 +1098,8 @@
         "retried": "a relancé une publication en échec",
         "submitted": "a soumis une publication pour validation",
         "updated": "a modifié une publication",
-        "withdrawn": "a retiré une publication de la validation"
+        "withdrawn": "a retiré une publication de la validation",
+        "bulkAction": "a agi sur plusieurs publications à la fois"
       },
       "settings": {
         "changed": "a modifié les réglages de l’espace de travail"
@@ -1544,7 +1546,26 @@
     "publishNow": "Publier maintenant",
     "removeAction": "Supprimer de Facebook",
     "removedFromFacebook": "Retirée de Facebook",
-    "removeConfirm": "{count, plural, one {Supprimer cette publication de Facebook ? Elle disparaît de la Page, avec ses réactions et commentaires. Action définitive.} other {Supprimer cette publication de # Pages sur Facebook ? Elle disparaît de chacune, avec ses réactions et commentaires. Action définitive.}}"
+    "removeConfirm": "{count, plural, one {Supprimer cette publication de Facebook ? Elle disparaît de la Page, avec ses réactions et commentaires. Action définitive.} other {Supprimer cette publication de # Pages sur Facebook ? Elle disparaît de chacune, avec ses réactions et commentaires. Action définitive.}}",
+    "bulk": {
+      "select": "Sélectionner cette publication",
+      "selectDay": "Sélectionner toutes les publications de ce jour",
+      "selected": "{count, plural, one {# publication sélectionnée} other {# publications sélectionnées}}",
+      "clear": "Tout désélectionner",
+      "move": "Déplacer",
+      "moveBy": "Déplacer de",
+      "days": "{count, plural, one {# jour plus tard} other {# jours plus tard}}",
+      "daysEarlier": "{count, plural, one {# jour plus tôt} other {# jours plus tôt}}",
+      "addLabel": "Ajouter une étiquette",
+      "removeLabel": "Retirer une étiquette",
+      "chooseLabel": "Choisir une étiquette",
+      "cancel": "Annuler les publications",
+      "cancelTitle": "{count, plural, one {Annuler cette publication ?} other {Annuler ces # publications ?}}",
+      "cancelBody": "Les publications programmées ne partiront pas. Celles que Facebook garde en attente y sont aussi supprimées. C’est irréversible.",
+      "keep": "Les garder",
+      "done": "{count, plural, one {Fait pour # publication.} other {Fait pour # publications.}}",
+      "someFailed": "{count, plural, one {# publication est restée telle quelle :} other {# publications sont restées telles quelles :}}"
+    }
   },
   "queue": {
     "addSlot": "Ajouter un créneau",

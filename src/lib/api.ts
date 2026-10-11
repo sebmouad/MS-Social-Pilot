@@ -34,7 +34,7 @@ export function fail(message: string, status = 400, extra?: Omit<ApiErrorBody, '
  * English text carried on the error if the catalogue lookup fails for any
  * reason. An error response must never itself throw.
  */
-async function translate(key: string, params: Record<string, string | number>, fallback: string): Promise<string> {
+export async function translate(key: string, params: Record<string, string | number>, fallback: string): Promise<string> {
   try {
     const [namespace, ...rest] = key.split('.');
     const t = await getTranslations(namespace);
