@@ -128,4 +128,13 @@ describe('the CSV export', () => {
 
     expect((await route.GET(new Request(`http://test/api/analytics/export?kind=ads&${range}`))).status).toBe(403);
   });
+
+  it('the post table reads every selected Page, and only those', async () => {
+    const { readPostAnalytics } = await import('../src/lib/analytics');
+    const window = { workspaceId: auth.workspace.id, from: new Date(Date.now() - 86_400_000), to: new Date(Date.now() + 86_400_000) };
+    const both = await readPostAnalytics({ ...window, targetIds: [ids.one!, ids.two!] });
+    expect(both.map((row) => row.message).sort()).toEqual(['post on one', 'post on two']);
+    const one = await readPostAnalytics({ ...window, targetIds: [ids.one!] });
+    expect(one.map((row) => row.message)).toEqual(['post on one']);
+  });
 });

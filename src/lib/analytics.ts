@@ -942,6 +942,8 @@ export async function readPostAnalytics(options: {
   from: Date;
   to: Date;
   targetId?: string;
+  /** Several Pages at once (the shared selection); ignored when `targetId` is given. */
+  targetIds?: string[];
   limit?: number;
 }): Promise<PostAnalyticsRow[]> {
   const rows = await prisma.postTarget.findMany({
@@ -949,7 +951,7 @@ export async function readPostAnalytics(options: {
       status: 'published',
       publishedAt: { gte: options.from, lte: options.to },
       post: { workspaceId: options.workspaceId },
-      ...(options.targetId ? { targetId: options.targetId } : {}),
+      ...(options.targetId ? { targetId: options.targetId } : options.targetIds ? { targetId: { in: options.targetIds } } : {}),
     },
     include: {
       target: { select: { name: true, pictureUrl: true } },

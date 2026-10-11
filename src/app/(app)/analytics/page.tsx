@@ -135,6 +135,9 @@ export default async function AnalyticsPage({
   const askedView = first(params.view);
   const view = askedView || requested ? parseAnalyticsView(askedView) : defaultAnalyticsView(pages.length);
 
+  // The post table covers every selected profile until one Page is picked.
+  const postsScope = requested ? { targetId: selected.id } : { targetIds: pages.map((page) => page.id) };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -160,9 +163,10 @@ export default async function AnalyticsPage({
 
         <PagePicker
           pages={pages.map((page) => ({ id: page.id, name: page.name }))}
-          selectedId={selected.id}
+          selectedId={view === 'posts' && !requested ? '' : selected.id}
           rangeQuery={periodQuery}
           view={view}
+          allLabel={view === 'posts' ? t('allSelected', { count: pages.length }) : undefined}
         />
 
         <div className="ml-auto">
@@ -222,7 +226,7 @@ export default async function AnalyticsPage({
             (
               await readPostAnalytics({
                 workspaceId: auth.workspace.id,
-                targetId: selected.id,
+                ...postsScope,
                 from,
                 to,
               })
@@ -249,7 +253,7 @@ export default async function AnalyticsPage({
             source: 'app' as const,
           })),
             // Posts made on Facebook itself, so the table covers the whole Page.
-            (await readExternalPosts({ workspaceId: auth.workspace.id, targetId: selected.id, from, to, limit: 500 })).map(
+            (await readExternalPosts({ workspaceId: auth.workspace.id, ...postsScope, from, to, limit: 500 })).map(
               (post) => {
                 const interactions = (post.reactions ?? 0) + (post.comments ?? 0) + (post.shares ?? 0);
                 return {

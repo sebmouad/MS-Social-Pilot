@@ -239,7 +239,8 @@ growth, link to Compare. Rules live in `src/lib/aggregate.ts`
 (`tests/aggregate.test.ts`). Compare has a chart with one line per profile
 (interactions / posts / reach, top 8 + Others, legend hides lines without
 touching the selection; `CompareChart`) and its totals row says reach "up to".
-Still to do: multi-Page post table, CSV of the compare table.
+By post covers every selected profile (Page column, picker "All N selected
+profiles") until one Page is picked. Still to do: CSV of the compare table.
 - **1 profile selected** → today's deep Page view (all sections).
 - **2+ profiles** → **Aggregate** view by default with a segmented switch
   **Total · Compare · Table**:

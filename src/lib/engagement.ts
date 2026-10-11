@@ -1263,6 +1263,8 @@ export interface ExternalPostRow {
 export async function readExternalPosts(options: {
   workspaceId: string;
   targetId?: string;
+  /** Several Pages at once (the shared selection); ignored when `targetId` is given. */
+  targetIds?: string[];
   from?: Date;
   to?: Date;
   limit?: number;
@@ -1270,7 +1272,7 @@ export async function readExternalPosts(options: {
   const rows = await prisma.externalPost.findMany({
     where: {
       target: { workspaceId: options.workspaceId },
-      ...(options.targetId ? { targetId: options.targetId } : {}),
+      ...(options.targetId ? { targetId: options.targetId } : options.targetIds ? { targetId: { in: options.targetIds } } : {}),
       ...(options.from || options.to
         ? { createdTime: { ...(options.from ? { gte: options.from } : {}), ...(options.to ? { lte: options.to } : {}) } }
         : {}),

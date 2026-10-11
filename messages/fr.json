@@ -235,7 +235,8 @@
       "netChange": "Nouveaux abonnés moins abonnés perdus sur la période."
     },
     "mapLabel": "Carte des abonnés par pays",
-    "technicalDetails": "Détails techniques : métriques que Facebook fournit pour cette Page"
+    "technicalDetails": "Détails techniques : métriques que Facebook fournit pour cette Page",
+    "allSelected": "{count, plural, one {Le profil choisi} other {Les # profils choisis}}"
   },
   "app": {
     "name": "MS Social Pilot",

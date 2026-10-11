@@ -235,7 +235,8 @@
       "netChange": "New followers minus lost followers in the period."
     },
     "mapLabel": "Map of followers by country",
-    "technicalDetails": "Technical details: which metrics Facebook serves this Page"
+    "technicalDetails": "Technical details: which metrics Facebook serves this Page",
+    "allSelected": "{count, plural, one {The selected profile} other {All # selected profiles}}"
   },
   "app": {
     "name": "MS Social Pilot",
