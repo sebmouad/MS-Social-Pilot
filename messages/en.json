@@ -233,7 +233,8 @@
       "lostLikes": "People who stopped following the Page in the period.",
       "netChange": "New followers minus lost followers in the period."
     },
-    "mapLabel": "Map of followers by country"
+    "mapLabel": "Map of followers by country",
+    "technicalDetails": "Technical details: which metrics Facebook serves this Page"
   },
   "app": {
     "name": "MS Social Pilot",
@@ -394,7 +395,10 @@
     "seeMore": "See more",
     "continue": "Continue",
     "remove": "Remove",
-    "confirmNoUndo": "Check before you go on."
+    "confirmNoUndo": "Check before you go on.",
+    "syncFetched": "{count, plural, one {1 item read from Facebook.} other {# items read from Facebook.}}",
+    "syncNothingNew": "Up to date: nothing new on Facebook.",
+    "syncRefused": "Facebook refused: {message}"
   },
   "compose": {
     "addToQueue": "Add to the next queue slot",
@@ -823,7 +827,9 @@
     "views": "Views",
     "you": "You",
     "author": "Author",
-    "emptyHint": "Pull from Facebook to bring them in now. New ones also arrive on their own every few hours."
+    "emptyHint": "Pull from Facebook to bring them in now. New ones also arrive on their own every few hours.",
+    "inboxWaiting": "Inbox opens once Meta approves Messenger access",
+    "inboxWaitingHint": "Reading and answering Page messages needs Meta’s approval of the pages_messaging permission, which is part of the app review. Once it is granted, an owner switches Inbox on under Settings → Configuration."
   },
   "errors": {
     "accountNotFound": "Account not found.",
@@ -1762,7 +1768,9 @@
     "linkedin": "LinkedIn",
     "threads": "Threads",
     "x": "X",
-    "pinterest": "Pinterest board"
+    "pinterest": "Pinterest board",
+    "search": "Search Pages",
+    "noMatch": "No Page matches that."
   },
   "team": {
     "title": "Team",

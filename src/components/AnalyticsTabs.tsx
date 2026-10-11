@@ -17,7 +17,7 @@ import { ANALYTICS_VIEWS as VIEWS, VIEW_SCOPED_PARAMS } from '@/lib/analytics-vi
  * — one tap, the full list, no horizontal hunting — and the tab strip appears
  * from `sm` up where there is room for it.
  */
-export function AnalyticsTabs({ current }: { current: string }) {
+export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidden?: string[] }) {
   const t = useTranslations('analytics');
   const pathname = usePathname();
   const params = useSearchParams();
@@ -41,7 +41,7 @@ export function AnalyticsTabs({ current }: { current: string }) {
           value={current}
           onChange={(event) => router.push(hrefFor(event.target.value))}
         >
-          {VIEWS.map((view) => (
+          {VIEWS.filter((view) => !hidden.includes(view) || view === current).map((view) => (
             <option key={view} value={view}>
               {t(`view.${view}`)}
             </option>
@@ -51,7 +51,7 @@ export function AnalyticsTabs({ current }: { current: string }) {
 
       <nav className="scroll-x hidden pb-1 sm:block" aria-label={t('chooseView')}>
         <div className="flex gap-2">
-          {VIEWS.map((view) => (
+          {VIEWS.filter((view) => !hidden.includes(view) || view === current).map((view) => (
             <Link
               key={view}
               href={hrefFor(view)}

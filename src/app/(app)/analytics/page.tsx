@@ -162,7 +162,8 @@ export default async function AnalyticsPage({
         </div>
       </div>
 
-      <AnalyticsTabs current={view} />
+      {/* Instagram stays out of sight until it is switched on; its tab only ever said "nothing here". */}
+      <AnalyticsTabs current={view} hidden={env.instagramEnabled ? [] : ['instagram']} />
 
       {view === 'analysis' && (
         <PageAnalysisView
@@ -746,6 +747,11 @@ async function InboxView({
   const conversations = await readConversations({ workspaceId, targetId, skip: page.skip, limit: page.take });
 
   if (page.total === 0) {
+    // Messenger access is the second half of Meta's review. Until it is on,
+    // a pull reads nothing, and the honest thing is to say why.
+    if (!env.messagingEnabled) {
+      return <EmptyState icon="inbox" title={t('inboxWaiting')} hint={t('inboxWaitingHint')} />;
+    }
     return <EmptyEdge icon="inbox" edge="conversations" message={t('noConversations')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
   }
 

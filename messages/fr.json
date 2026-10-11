@@ -233,7 +233,8 @@
       "lostLikes": "Personnes qui se sont désabonnées pendant la période.",
       "netChange": "Nouveaux abonnés moins abonnés perdus sur la période."
     },
-    "mapLabel": "Carte des abonnés par pays"
+    "mapLabel": "Carte des abonnés par pays",
+    "technicalDetails": "Détails techniques : métriques que Facebook fournit pour cette Page"
   },
   "app": {
     "name": "MS Social Pilot",
@@ -394,7 +395,10 @@
     "seeMore": "Voir plus",
     "continue": "Continuer",
     "remove": "Retirer",
-    "confirmNoUndo": "Vérifiez avant de continuer."
+    "confirmNoUndo": "Vérifiez avant de continuer.",
+    "syncFetched": "{count, plural, one {1 élément lu sur Facebook.} other {# éléments lus sur Facebook.}}",
+    "syncNothingNew": "À jour : rien de nouveau sur Facebook.",
+    "syncRefused": "Facebook a refusé : {message}"
   },
   "compose": {
     "addToQueue": "Ajouter au prochain créneau",
@@ -823,7 +827,9 @@
     "views": "Vues",
     "you": "Vous",
     "author": "Auteur",
-    "emptyHint": "Récupérez-les depuis Facebook dès maintenant. Les nouveaux arrivent aussi d'eux-mêmes toutes les quelques heures."
+    "emptyHint": "Récupérez-les depuis Facebook dès maintenant. Les nouveaux arrivent aussi d'eux-mêmes toutes les quelques heures.",
+    "inboxWaiting": "La messagerie s’ouvrira quand Meta aura validé l’accès Messenger",
+    "inboxWaitingHint": "Lire et répondre aux messages de la Page nécessite l’autorisation pages_messaging de Meta, comprise dans la revue de l’app. Une fois accordée, un propriétaire active la messagerie dans Paramètres → Configuration."
   },
   "errors": {
     "accountNotFound": "Compte introuvable.",
@@ -1762,7 +1768,9 @@
     "linkedin": "LinkedIn",
     "threads": "Threads",
     "x": "X",
-    "pinterest": "Tableau Pinterest"
+    "pinterest": "Tableau Pinterest",
+    "search": "Rechercher une Page",
+    "noMatch": "Aucune Page ne correspond."
   },
   "team": {
     "title": "Équipe",

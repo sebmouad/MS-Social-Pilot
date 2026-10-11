@@ -286,7 +286,12 @@ export function AnalyticsClient({
       {/* Catalogue coverage: what we know to ask for, against what this
           destination has actually been shown to serve. A level with nothing
           checked has never been probed, which is not the same as refused. */}
-      <section className="card-viz">
+      <details className="card-viz group">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">
+          {t('technicalDetails')}
+          <span aria-hidden className="text-slate-400 transition-transform group-open:rotate-180">⌄</span>
+        </summary>
+        <div className="mt-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h2 className="text-sm font-semibold text-slate-900">{t('coverageTitle')}</h2>
@@ -337,7 +342,8 @@ export function AnalyticsClient({
         </ul>
 
         <p className="mt-3 text-[11px] text-slate-500">{t('coverageKey')}</p>
-      </section>
+      </div>
+      </details>
 
       {/* The browsable catalogue. Filter row above the content it scopes. */}
       <div className="filter-row justify-between">

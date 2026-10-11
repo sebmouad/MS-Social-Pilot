@@ -1,6 +1,7 @@
 'use client';
 
 import { NetworkMark } from './NetworkMark';
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { targetTypeKey } from '@/lib/constants';
@@ -31,6 +32,10 @@ export function TargetPicker({ targets, selected, onChange, groups = [] }: Props
   // The blocker copy lives with the connections screen, which is where the
   // reasons are acted on; this screen only repeats them.
   const tBlocked = useTranslations('connections');
+  const [query, setQuery] = useState('');
+  const needle = query.trim().toLowerCase();
+  // Ticked destinations always stay in view, so a search never hides a choice already made.
+  const listed = needle ? targets.filter((target) => selected.includes(target.id) || target.name.toLowerCase().includes(needle)) : targets;
 
   function toggle(target: TargetOption) {
     if (selected.includes(target.id)) {
@@ -107,8 +112,19 @@ export function TargetPicker({ targets, selected, onChange, groups = [] }: Props
         </button>
       </div>
 
-      <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-lg border border-slate-200 p-2">
-        {targets.map((target) => {
+      {targets.length > 6 && (
+        <input
+          type="search"
+          className="input mb-2 py-1.5 text-sm"
+          placeholder={t('search')}
+          aria-label={t('search')}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      )}
+      <div className="max-h-[22rem] space-y-1.5 overflow-y-auto rounded-lg border border-slate-200 p-2">
+        {listed.length === 0 && <p className="px-2 py-3 text-sm text-slate-500">{t('noMatch')}</p>}
+        {listed.map((target) => {
           const disabled = !target.canPublish;
           const checked = selected.includes(target.id);
           // A post being edited can still name a destination switched off

@@ -266,7 +266,31 @@ export interface StoredSeries {
  */
 const STOCK_METRICS = new Set(['page_follows', 'page_fans', 'page_fans_online_per_day']);
 
+/** What people call the figures Facebook gives machine names to. */
+const PLAIN_NAMES: Record<string, string> = {
+  page_total_media_view_unique: 'People reached',
+  page_media_view: 'Views',
+  page_follows: 'Followers',
+  page_daily_follows: 'Follows',
+  page_daily_follows_unique: 'New followers',
+  page_daily_unfollows_unique: 'Lost followers',
+  page_fan_adds_by_paid_non_paid_unique: 'New followers, paid and unpaid',
+  page_follows_country: 'Followers by country',
+  page_follows_city: 'Followers by city',
+  page_post_engagements: 'Post interactions',
+  page_impressions_unique: 'People reached (old measure)',
+  page_impressions: 'Impressions (old measure)',
+  page_views_total: 'Page views',
+  page_video_views: 'Video views',
+  page_actions_post_reactions_total: 'Reactions by type',
+  post_media_view: 'Views',
+  post_total_media_view_unique: 'People reached',
+  post_clicks: 'Clicks',
+  post_reactions_by_type_total: 'Reactions by type',
+};
+
 function humanise(metric: string): string {
+  if (PLAIN_NAMES[metric]) return PLAIN_NAMES[metric]!;
   return metric
     .replace(/^page_|^post_/, '')
     .replace(/_/g, ' ')

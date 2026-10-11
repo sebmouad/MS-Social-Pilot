@@ -236,7 +236,12 @@ export function PostList({
                   {post.mediaCount > 0 && ` · ${t('attachments', { count: post.mediaCount })}`}
                 </p>
               </div>
-              <StatusBadge status={post.status} />
+              {post.targets.some((target) => target.removed) &&
+              post.targets.every((target) => target.removed || target.status !== 'published') ? (
+                <span className="badge bg-slate-100 text-slate-600">{t('removedFromFacebook')}</span>
+              ) : (
+                <StatusBadge status={post.status} />
+              )}
             </header>
             {post.labels && post.labels.length > 0 && (
               <div className="px-4 pt-2">

@@ -28,18 +28,34 @@ export function SyncButton({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   async function run() {
     setBusy(true);
     setError(null);
+    setNote(null);
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body ?? {}),
       });
-      const payload = (await response.json()) as { error?: string };
+      const payload = (await response.json()) as {
+        error?: string;
+        results?: Array<Record<string, unknown> & { errors?: Array<{ edge: string; message: string }> }>;
+      };
       if (!response.ok) throw new Error(payload.error ?? tCommon('genericError'));
+      // Say what came back: a pull that changes nothing on screen otherwise
+      // reads as a button that does nothing.
+      const results = payload.results ?? [];
+      const refused = results.flatMap((row) => row.errors ?? [])[0];
+      const fetched = results.reduce(
+        (sum, row) =>
+          sum + Object.values(row).reduce<number>((inner, value) => inner + (typeof value === 'number' ? value : 0), 0),
+        0,
+      );
+      if (refused) setError(tCommon('syncRefused', { message: refused.message }));
+      else if (payload.results) setNote(fetched > 0 ? tCommon('syncFetched', { count: fetched }) : tCommon('syncNothingNew'));
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -58,7 +74,8 @@ export function SyncButton({
       >
         {busy ? tCommon('working') : label}
       </button>
-      {error && <span className="text-xs text-rose-600">{error}</span>}
+      {error && <span role="alert" className="max-w-xs text-right text-xs text-rose-600">{error}</span>}
+      {note && <span role="status" className="text-xs text-slate-500">{note}</span>}
     </span>
   );
 }
