@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { AppShell } from '@/components/AppShell';
+import { ConfirmProvider } from '@/components/ConfirmProvider';
 import { getAuthContext } from '@/lib/auth';
 import { canApprove } from '@/lib/constants';
 import { pendingApprovalCount } from '@/lib/approvals';
@@ -13,6 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const pendingApprovals = showApprovals ? await pendingApprovalCount(auth.workspace.id) : 0;
 
   return (
+    <ConfirmProvider>
     <AppShell
         userName={auth.user.name}
         workspaceId={auth.workspace.id}
@@ -28,5 +30,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       {children}
     </AppShell>
+    </ConfirmProvider>
   );
 }

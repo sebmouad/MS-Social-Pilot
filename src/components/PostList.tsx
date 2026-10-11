@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { useConfirm } from './ConfirmProvider';
+
 import { StatusBadge } from './StatusBadge';
 import { LabelChips } from './LabelChips';
 import { ExternalLink } from './ExternalLink';
@@ -102,6 +104,7 @@ export function PostList({
     return target.error;
   }
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const tCompose = useTranslations('compose');
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -117,10 +120,10 @@ export function PostList({
    */
   async function act(
     postId: string,
-    request: { path: string; method: string; body?: unknown; confirmText?: string },
+    request: { path: string; method: string; body?: unknown; confirmText?: string; confirmLabel?: string; danger?: boolean },
     onSuccess?: (body: { postId?: string }) => void,
   ) {
-    if (request.confirmText && !window.confirm(request.confirmText)) return;
+    if (request.confirmText && !(await confirm({ title: request.confirmText, confirmLabel: request.confirmLabel, danger: request.danger }))) return;
 
     setBusy(postId);
     setError(null);

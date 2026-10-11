@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+
+import { useConfirm } from './ConfirmProvider';
 import { FeedPost, type FeedLinkPreview } from './FeedPost';
 
 export interface PendingPost {
@@ -30,6 +32,7 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
   const t = useTranslations('approvals');
   const tPosts = useTranslations('posts');
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const router = useRouter();
 
   const [busy, setBusy] = useState<string | null>(null);
@@ -76,11 +79,11 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
     }
   }
 
-  function approve(post: PendingPost) {
+  async function approve(post: PendingPost) {
     // The badge says it, but a reviewer clearing a queue presses the same
     // button down the list; an overdue post goes out to real Pages the moment
     // this lands, so it gets asked about rather than just labelled.
-    if (post.overdue && !window.confirm(t('overdueConfirm'))) return;
+    if (post.overdue && !(await confirm({ title: t('overdueConfirm'), confirmLabel: t('approve') }))) return;
     void act(post.id, { action: 'approve' }, post.overdue ? t('approvedNow') : t('approved'));
   }
 

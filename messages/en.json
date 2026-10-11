@@ -391,7 +391,9 @@
     "showingRange": "{from}–{to} of {total}",
     "working": "Working…",
     "yes": "Yes",
-    "seeMore": "See more"
+    "seeMore": "See more",
+    "continue": "Continue",
+    "remove": "Remove"
   },
   "compose": {
     "addToQueue": "Add to the next queue slot",
@@ -1819,7 +1821,8 @@
       "admin": "Sees every Page. Connects Facebook, manages the team, client links and alerts.",
       "editor": "Can be limited to some Pages. Approves others’ posts, edits the queue.",
       "contributor": "Can be limited to some Pages. Their posts wait for an approver when approval is on."
-    }
+    },
+    "roleChangeAction": "Make {role}"
   },
   "dateRange": {
     "preset": {

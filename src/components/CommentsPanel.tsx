@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
+import { useConfirm } from './ConfirmProvider';
+
 import { Icon } from './Icon';
 import { FeedAvatar } from './FeedPost';
 import { EmptyState } from './EmptyState';
@@ -48,6 +50,7 @@ export function CommentsPanel({
 }) {
   const t = useTranslations('engagement');
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const router = useRouter();
 
   const [busy, setBusy] = useState<string | null>(null);
@@ -232,8 +235,8 @@ export function CommentsPanel({
                             type="button"
                             className="text-rose-600 hover:underline disabled:opacity-50"
                             disabled={busy === comment.id}
-                            onClick={() => {
-                              if (confirm(t('confirmDelete'))) {
+                            onClick={async () => {
+                              if (await confirm({ title: t('confirmDelete'), danger: true, confirmLabel: tCommon('delete') })) {
                                 void act({ action: 'delete', commentId: comment.id }, comment.id);
                               }
                             }}

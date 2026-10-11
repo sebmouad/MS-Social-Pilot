@@ -391,7 +391,9 @@
     "showingRange": "{from}–{to} sur {total}",
     "working": "En cours…",
     "yes": "Oui",
-    "seeMore": "Voir plus"
+    "seeMore": "Voir plus",
+    "continue": "Continuer",
+    "remove": "Retirer"
   },
   "compose": {
     "addToQueue": "Ajouter au prochain créneau",
@@ -1819,7 +1821,8 @@
       "admin": "Voit toutes les Pages. Connecte Facebook, gère l’équipe, les liens clients et les alertes.",
       "editor": "Peut être limité à certaines Pages. Valide les publications des autres, gère la file.",
       "contributor": "Peut être limité à certaines Pages. Ses publications attendent un validateur si la validation est active."
-    }
+    },
+    "roleChangeAction": "Passer {role}"
   },
   "dateRange": {
     "preset": {

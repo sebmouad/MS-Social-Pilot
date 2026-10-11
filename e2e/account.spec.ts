@@ -55,20 +55,19 @@ test('changing a role asks first, and a refusal changes nothing', async ({ page 
   });
 
   // Cancelled: the menu goes back to what is stored and nothing is sent.
-  page.once('dialog', (dialog) => {
-    expect(dialog.message()).toContain(`Change ${MEMBER.name} from Contributor to Editor?`);
-    void dialog.dismiss();
-  });
   await select.selectOption('editor');
+  const confirmDialog = page.getByRole('dialog');
+  await expect(confirmDialog).toContainText(`Change ${MEMBER.name} from Contributor to Editor?`);
+  await confirmDialog.getByRole('button', { name: /^cancel$/i }).click();
   await expect(select).toHaveValue('contributor');
   expect(patches).toBe(0);
 
   // Confirmed: the change is sent once, and the menu is locked while it is.
-  page.once('dialog', (dialog) => void dialog.accept());
   const patched = page.waitForResponse(
     (response) => response.request().method() === 'PATCH' && response.url().includes('/api/team/'),
   );
   await select.selectOption('editor');
+  await page.getByRole('dialog').locator('[data-confirm]').click();
   expect((await patched).status()).toBe(200);
   await expect(select).toHaveValue('editor');
   await expect(select).toBeEnabled();

@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { useConfirm } from './ConfirmProvider';
+
 import { Dialog } from './Dialog';
 import { FeedAvatar } from './FeedPost';
 import { Icon } from './Icon';
@@ -61,6 +63,7 @@ const SEES_ALL = new Set(['owner', 'admin']);
 export function TeamClient({ members, invitations, canManage, viewerRole, emailConfigured, pages = [], groups = [] }: Props) {
   const t = useTranslations('team');
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -194,23 +197,21 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
    * somebody the instance configuration, or take a co-owner's away, and the
    * select gives no other moment to notice.
    */
-  function changeRole(member: Member, next: string) {
+  async function changeRole(member: Member, next: string) {
     if (next === member.role) return;
 
-    const question = [
-      t('roleChangeConfirm', {
-        name: member.name,
-        from: t(`roles.${member.role}`),
-        to: t(`roles.${next}`),
-      }),
-      next === 'owner' ? t('roleToOwnerWarning') : member.role === 'owner' ? t('roleFromOwnerWarning') : null,
-    ]
-      .filter(Boolean)
-      .join('\n\n');
+    const warning = next === 'owner' ? t('roleToOwnerWarning') : member.role === 'owner' ? t('roleFromOwnerWarning') : undefined;
 
     // Cancelling needs no undo: the select is controlled by the member's
     // stored role, so it snaps back on the next render.
-    if (!window.confirm(question)) return;
+    if (
+      !(await confirm({
+        title: t('roleChangeConfirm', { name: member.name, from: t(`roles.${member.role}`), to: t(`roles.${next}`) }),
+        body: warning,
+        confirmLabel: t('roleChangeAction', { role: t(`roles.${next}`) }),
+      }))
+    )
+      return;
 
     setRequested({ userId: member.userId, role: next });
     void call(member.userId, `/api/team/${member.userId}`, {
@@ -388,8 +389,8 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
                     className="btn-danger"
                     aria-label={t('removeMemberNamed', { name: member.name })}
                     disabled={busy.has(member.userId)}
-                    onClick={() => {
-                      if (window.confirm(t('removeConfirm', { name: member.name }))) {
+                    onClick={async () => {
+                      if (await confirm({ title: t('removeConfirm', { name: member.name }), danger: true, confirmLabel: tCommon('remove') })) {
                         void call(member.userId, `/api/team/${member.userId}`, { method: 'DELETE' });
                       }
                     }}

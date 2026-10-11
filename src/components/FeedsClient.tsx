@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { useConfirm } from './ConfirmProvider';
+
 import type { TargetOption } from './TargetPicker';
 import { ExternalLink } from './ExternalLink';
 import { StatusBadge } from './StatusBadge';
@@ -54,6 +56,7 @@ interface FeedFields {
 export function FeedsClient({ feeds, targets, canManage }: Props) {
   const t = useTranslations('feeds');
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const router = useRouter();
 
   const [adding, setAdding] = useState(false);
@@ -246,8 +249,8 @@ export function FeedsClient({ feeds, targets, canManage }: Props) {
                     type="button"
                     className="btn-danger"
                     disabled={pending}
-                    onClick={() => {
-                      if (window.confirm(t('deleteConfirm'))) {
+                    onClick={async () => {
+                      if (await confirm({ title: t('deleteConfirm'), danger: true, confirmLabel: tCommon('delete') })) {
                         call(`/api/feeds/${feed.id}`, { method: 'DELETE' });
                       }
                     }}

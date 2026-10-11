@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { useConfirm } from './ConfirmProvider';
+
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 
@@ -33,6 +35,7 @@ export function ReportTemplates({
 }) {
   const t = useTranslations('reports');
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -63,7 +66,7 @@ export function ReportTemplates({
   }
 
   async function remove(row: TemplateRow) {
-    if (!window.confirm(t('templateDeleteConfirm', { name: row.name }))) return;
+    if (!(await confirm({ title: t('templateDeleteConfirm', { name: row.name }), danger: true, confirmLabel: tCommon('delete') }))) return;
     await fetch(`/api/report-templates/${row.id}`, { method: 'DELETE' }).catch(() => null);
     router.refresh();
   }

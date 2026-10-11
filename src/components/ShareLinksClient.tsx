@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { useConfirm } from './ConfirmProvider';
+
 import { Dialog } from './Dialog';
 import { EmptyState } from './EmptyState';
 import { FeedAvatar } from './FeedPost';
@@ -40,6 +42,7 @@ export function ShareLinksClient({
 }) {
   const t = useTranslations('sharing');
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const router = useRouter();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [made, setMade] = useState<string | null>(null);
@@ -73,7 +76,7 @@ export function ShareLinksClient({
   }
 
   async function revoke(link: LinkRow) {
-    if (!window.confirm(t('revokeConfirm', { title: link.title }))) return;
+    if (!(await confirm({ title: t('revokeConfirm', { title: link.title }), danger: true, confirmLabel: t('revoke') }))) return;
     await fetch(`/api/share-links/${link.id}`, { method: 'DELETE' }).catch(() => null);
     router.refresh();
   }

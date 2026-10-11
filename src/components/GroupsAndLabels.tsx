@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { useConfirm } from './ConfirmProvider';
+
 import { Dialog } from './Dialog';
 import { EmptyState } from './EmptyState';
 import { FeedAvatar } from './FeedPost';
@@ -49,6 +51,7 @@ export function GroupsAndLabels({
 }) {
   const t = useTranslations('groups');
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const router = useRouter();
 
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -99,7 +102,7 @@ export function GroupsAndLabels({
   }
 
   async function removeGroup(group: Group) {
-    if (!window.confirm(t('deleteGroupConfirm', { name: group.name }))) return;
+    if (!(await confirm({ title: t('deleteGroupConfirm', { name: group.name }), danger: true, confirmLabel: tCommon('delete') }))) return;
     await call(`/api/page-groups/${group.id}`, { method: 'DELETE' }, t('groupDeleted', { name: group.name }));
   }
 
@@ -126,7 +129,7 @@ export function GroupsAndLabels({
   }
 
   async function removeLabel(label: Label) {
-    if (!window.confirm(t('deleteLabelConfirm', { name: label.name, count: label.posts }))) return;
+    if (!(await confirm({ title: t('deleteLabelConfirm', { name: label.name, count: label.posts }), danger: true, confirmLabel: tCommon('delete') }))) return;
     await call(`/api/labels/${label.id}`, { method: 'DELETE' }, t('labelDeleted', { name: label.name }));
   }
 

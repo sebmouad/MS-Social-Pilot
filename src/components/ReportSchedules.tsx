@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { useConfirm } from './ConfirmProvider';
+
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 
@@ -37,6 +39,7 @@ export function ReportSchedules({
 }) {
   const t = useTranslations('reports');
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('monthly');
@@ -73,7 +76,7 @@ export function ReportSchedules({
   }
 
   async function remove(row: ScheduleRow) {
-    if (!window.confirm(t('scheduleDeleteConfirm'))) return;
+    if (!(await confirm({ title: t('scheduleDeleteConfirm'), danger: true, confirmLabel: t('scheduleDelete') }))) return;
     await fetch(`/api/report-schedules/${row.id}`, { method: 'DELETE' }).catch(() => null);
     router.refresh();
   }

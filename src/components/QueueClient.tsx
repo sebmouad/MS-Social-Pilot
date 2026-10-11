@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
+import { useConfirm } from './ConfirmProvider';
+
 import { Icon } from './Icon';
 import { FeedAvatar, FeedPost, type FeedLinkPreview, type FeedMedia } from './FeedPost';
 
@@ -88,6 +90,7 @@ export function QueueClient({
 }) {
   const t = useTranslations('queue');
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const router = useRouter();
 
   const [slots, setSlots] = useState<Slot[]>(initial);
@@ -148,7 +151,7 @@ export function QueueClient({
   }
 
   async function act(action: 'shuffle' | 'clear') {
-    if (!window.confirm(action === 'shuffle' ? t('shuffleConfirm') : t('clearConfirm'))) return;
+    if (!(await confirm({ title: action === 'shuffle' ? t('shuffleConfirm') : t('clearConfirm'), confirmLabel: action === 'shuffle' ? t('shuffle') : t('clear'), danger: action === 'clear' }))) return;
     setPending(true);
     setStatus(null);
     const response = await fetch('/api/queue', {

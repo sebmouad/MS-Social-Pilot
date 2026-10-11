@@ -49,10 +49,10 @@ describe('text on each network', () => {
   it('Bluesky: links and hashtags as facets, in UTF-8 bytes', () => {
     const facets = blueskyFacets('Café 🥐 https://example.com #brunch');
     expect(facets).toHaveLength(2);
-    const link = facets.find((facet) => facet.features[0]!.$type.endsWith('#link'))!;
+    const link = facets.find((facet) => facet.features[0]!.$type!.endsWith('#link'))!;
     // "Café " is 6 bytes, the croissant 4, the space 1.
     expect(link.index.byteStart).toBe(11);
-    expect(facets.find((facet) => facet.features[0]!.$type.endsWith('#tag'))!.features[0]!.tag).toBe('brunch');
+    expect(facets.find((facet) => facet.features[0]!.$type!.endsWith('#tag'))!.features[0]!.tag).toBe('brunch');
   });
 
   it('LinkedIn: markup characters escaped, hashtags as templates', () => {

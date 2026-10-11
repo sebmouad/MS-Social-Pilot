@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 
 import { Icon, type IconName } from './Icon';
+import { useConfirm } from './ConfirmProvider';
 import { blockerMessage } from './blockerMessage';
 
 export interface TargetView {
@@ -71,6 +72,7 @@ export function ConnectionsClient({
   const t = useTranslations('connections');
   const locale = useLocale();
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const router = useRouter();
 
   const [busy, setBusy] = useState<string | null>(null);
@@ -288,8 +290,8 @@ export function ConnectionsClient({
                   type="button"
                   className="btn-danger"
                   disabled={busy === connection.id}
-                  onClick={() => {
-                    if (window.confirm(t('disconnectConfirm', { name: connection.name }))) {
+                  onClick={async () => {
+                    if (await confirm({ title: t('disconnectConfirm', { name: connection.name }), danger: true, confirmLabel: t('disconnect') })) {
                       void disconnectAccount(connection.id);
                     }
                   }}

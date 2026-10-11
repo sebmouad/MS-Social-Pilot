@@ -1,4 +1,4 @@
-import { expect, test, type Dialog, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
@@ -40,20 +40,16 @@ async function pressAndAnswer(
   button: Locator,
   answer: 'accept' | 'dismiss',
 ): Promise<string> {
-  let asked = '';
-  const handler = (dialog: Dialog) => {
-    asked = dialog.message();
-    void (answer === 'accept' ? dialog.accept() : dialog.dismiss());
-  };
-  page.on('dialog', handler);
-  try {
-    await expect(async () => {
-      if (!asked) await button.click();
-      await expect.poll(() => asked, { timeout: 1_500 }).not.toBe('');
-    }).toPass({ timeout: 30_000 });
-  } finally {
-    page.off('dialog', handler);
-  }
+  // The app's own confirmation dialog. Retried until it appears: a click that
+  // lands before hydration does nothing the first time.
+  const dialog = page.getByRole('dialog');
+  await expect(async () => {
+    if (!(await dialog.isVisible())) await button.click();
+    await expect(dialog).toBeVisible({ timeout: 1_500 });
+  }).toPass({ timeout: 30_000 });
+  const asked = (await dialog.getByRole('heading').first().textContent()) ?? '';
+  await (answer === 'accept' ? dialog.locator('[data-confirm]') : dialog.getByRole('button', { name: /^cancel$/i })).click();
+  await expect(dialog).toHaveCount(0);
   return asked;
 }
 

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { useConfirm } from './ConfirmProvider';
+
 import { Icon } from './Icon';
 
 export interface MediaFileView {
@@ -45,13 +47,14 @@ function megabytes(bytes: number): string {
 export function MediaLibrary({ files, usage, truncated, canDelete }: Props) {
   const t = useTranslations('media');
   const tCommon = useTranslations('common');
+  const confirm = useConfirm();
   const router = useRouter();
 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function remove(file: MediaFileView) {
-    if (!window.confirm(t('deleteConfirm', { filename: file.filename }))) return;
+    if (!(await confirm({ title: t('deleteConfirm', { filename: file.filename }), danger: true, confirmLabel: tCommon('delete') }))) return;
 
     setBusy(file.id);
     setError(null);

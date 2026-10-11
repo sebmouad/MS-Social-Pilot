@@ -142,6 +142,11 @@ export function Composer({
   const [published, setPublished] = useState<Array<{ name: string; url: string }>>([]);
   /** A post that was made but reached only some of its destinations. */
   const [partial, setPartial] = useState<{ text: string; allFailed: boolean } | null>(null);
+  /** Writing the next post clears the last one's "Scheduled": it was about that one. */
+  const startedNext = () => {
+    setResult(null);
+    setPartial(null);
+  };
   const [uploading, setUploading] = useState(false);
 
   /**
@@ -564,7 +569,10 @@ export function Composer({
             placeholder={t('placeholder')}
             defaultValue={editing?.message ?? initialMessage ?? ''}
             maxLength={LIMITS.messageLength}
-            onChange={(event) => setMessage(event.target.value)}
+            onChange={(event) => {
+              startedNext();
+              setMessage(event.target.value);
+            }}
           />
           {/* What a person means by a character: one emoji is one, not two. */}
           <ComposerTools text={message} insert={insertAtCursor} canDelete={canEditLabels} />
@@ -622,7 +630,10 @@ export function Composer({
                 className="input"
                 placeholder={t('linkPlaceholder')}
                 defaultValue={editing?.link ?? initialLink ?? ''}
-                onChange={(event) => setLink(event.target.value)}
+                onChange={(event) => {
+                  startedNext();
+                  setLink(event.target.value);
+                }}
                 onBlur={(event) => loadPreview(event.target.value)}
               />
               <button
@@ -715,17 +726,17 @@ export function Composer({
             {media.length > 0 && (
               <ul className="mt-3 flex flex-wrap gap-3">
                 {media.map((item, index) => (
-                  <li key={item.id} className="w-28">
-                    <div className="relative h-20 w-20">
+                  <li key={item.id} className="w-40">
+                    <div className="relative h-28 w-40">
                       {item.kind === 'image' ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={item.url}
                           alt={item.altText ?? ''}
-                          className="h-20 w-20 rounded-lg border border-slate-200 object-cover"
+                          className="h-28 w-40 rounded-lg border border-slate-200 object-cover"
                         />
                       ) : (
-                        <span className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-xs text-slate-600">
+                        <span className="flex h-28 w-40 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-xs text-slate-600">
                           {t('video')}
                         </span>
                       )}
@@ -742,8 +753,9 @@ export function Composer({
                         with the picture it describes. Only photos ask for one:
                         a video carries its own captions. */}
                     {item.kind === 'image' && (
-                      <input
-                        className="input mt-1.5 px-2 py-1 text-xs"
+                      <textarea
+                        className="input mt-1.5 min-h-[52px] resize-y px-2 py-1 text-xs leading-snug"
+                        rows={2}
                         placeholder={t('altText')}
                         aria-label={t('altTextFor', { number: index + 1 })}
                         maxLength={1000}
@@ -773,7 +785,15 @@ export function Composer({
       <div className="min-w-0 space-y-6">
         <section className="card p-5">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">{t('whereToPost')}</h2>
-          <TargetPicker targets={targets} selected={selected} onChange={setSelected} groups={groups} />
+          <TargetPicker
+            targets={targets}
+            selected={selected}
+            onChange={(next) => {
+              startedNext();
+              setSelected(next);
+            }}
+            groups={groups}
+          />
           {switchedOff.length > 0 && (
             <p className="mt-2 text-xs text-amber-700">
               {t('untickSwitchedOff', { names: switchedOff.map((target) => target.name).join(', ') })}
