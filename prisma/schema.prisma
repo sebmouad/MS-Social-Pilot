@@ -721,12 +721,18 @@ model AiGeneration {
   model        String
   inputTokens  Int              @default(0)
   outputTokens Int              @default(0)
+  /// anthropic | openai | gemini. Null on rows written before providers were recorded.
+  provider     String?
+  /// US dollars from the price table at the time of the call. Null = price unknown, never 0.
+  costUsd      Float?
   createdAt    DateTime         @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, createdAt])
+  /// The monthly budget sums every workspace's spend since the 1st.
+  @@index([createdAt])
   @@map("ai_generations")
 }
 

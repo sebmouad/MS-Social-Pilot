@@ -77,6 +77,8 @@ beforeEach(async () => {
   await prisma.user.deleteMany();
   await prisma.workspace.deleteMany();
   await settings.clearSetting('ai.rateLimitPerHour');
+  await settings.clearSetting('ai.monthlyBudgetUsd');
+  await settings.clearSetting('ai.priceOverrides');
   await settings.ensureSettings();
 });
 
@@ -194,6 +196,100 @@ describe('what it costs', () => {
     await generate(theirs.workspace.id, theirs.user.id);
 
     expect((await ai.usageSummary(mine.workspace.id)).generations).toBe(0);
+  });
+});
+
+describe('what it costs in dollars', () => {
+  it('a model with no known price is recorded as unknown, not as free', async () => {
+    const { user, workspace } = await seed();
+    await generate(workspace.id, user.id);
+
+    const row = await prisma.aiGeneration.findFirstOrThrow({ where: { workspaceId: workspace.id } });
+    expect(row.provider).toBe('anthropic');
+    expect(row.costUsd).toBeNull();
+  });
+
+  it('prices each generation from the price root set', async () => {
+    await settings.writeSetting('ai.priceOverrides', ['test-model-newest=3/15'], null);
+    await settings.ensureSettings();
+    const { user, workspace } = await seed();
+    await generate(workspace.id, user.id);
+
+    const row = await prisma.aiGeneration.findFirstOrThrow({ where: { workspaceId: workspace.id } });
+    // 120 input tokens at $3 and 45 output tokens at $15 per million.
+    expect(row.costUsd).toBeCloseTo(0.001035, 9);
+  });
+
+  it('refuses a price written the wrong way', async () => {
+    await expect(settings.writeSetting('ai.priceOverrides', ['test-model-newest=$3'], null)).rejects.toThrow(
+      /model=input\/output/,
+    );
+  });
+
+  it('adds spend up by model and workspace, keeping unpriced generations apart', async () => {
+    const mine = await seed();
+    const theirs = await seed();
+    await generate(mine.workspace.id, mine.user.id);
+    await settings.writeSetting('ai.priceOverrides', ['test-model-newest=3/15'], null);
+    await settings.ensureSettings();
+    await generate(mine.workspace.id, mine.user.id);
+    await generate(theirs.workspace.id, theirs.user.id);
+
+    const spend = await ai.aiSpend();
+    expect(spend.last30Usd).toBeCloseTo(0.00207, 9);
+    expect(spend.byModel).toEqual([
+      expect.objectContaining({ provider: 'anthropic', model: 'test-model-newest', generations: 3, unpriced: 1 }),
+    ]);
+    const workspaces = Object.fromEntries(spend.byWorkspace.map((row) => [row.workspaceId, row]));
+    expect(workspaces[mine.workspace.id]).toMatchObject({ generations: 2, unpriced: 1 });
+    expect(workspaces[theirs.workspace.id]).toMatchObject({ generations: 1, unpriced: 0 });
+  });
+});
+
+describe('the monthly budget', () => {
+  it('stops every workspace once this month\'s spend reaches it', async () => {
+    await settings.writeSetting('ai.priceOverrides', ['test-model-newest=3/15'], null);
+    await settings.writeSetting('ai.monthlyBudgetUsd', 0.002, null);
+    await settings.ensureSettings();
+    const mine = await seed();
+    const theirs = await seed();
+
+    await generate(mine.workspace.id, mine.user.id);
+    await generate(mine.workspace.id, mine.user.id);
+    await expect(generate(theirs.workspace.id, theirs.user.id)).rejects.toMatchObject({
+      key: 'errors.aiBudgetReached',
+    });
+    expect(sent).toHaveLength(2);
+  });
+
+  it('does not count last month', async () => {
+    await settings.writeSetting('ai.monthlyBudgetUsd', 1, null);
+    await settings.ensureSettings();
+    const { user, workspace } = await seed();
+    const now = new Date();
+    await prisma.aiGeneration.create({
+      data: {
+        workspaceId: workspace.id,
+        userId: user.id,
+        kind: AiGenerationKind.generate,
+        prompt: 'x',
+        output: 'y',
+        model: 'test-model-newest',
+        costUsd: 50,
+        createdAt: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) - 1000),
+      },
+    });
+
+    await expect(generate(workspace.id, user.id)).resolves.toBeTruthy();
+  });
+
+  it('0 means no budget', async () => {
+    const { user, workspace } = await seed();
+    await prisma.aiGeneration.create({
+      data: { workspaceId: workspace.id, userId: user.id, kind: AiGenerationKind.generate, prompt: 'x', output: 'y', model: 'm', costUsd: 1e6 },
+    });
+
+    await expect(generate(workspace.id, user.id)).resolves.toBeTruthy();
   });
 });
 

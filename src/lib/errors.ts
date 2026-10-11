@@ -339,6 +339,12 @@ export const errors = {
       status: 429,
     }),
 
+  aiBudgetReached: () =>
+    new AppError({
+      key: 'errors.aiBudgetReached',
+      fallback: 'This month\'s AI budget has been reached. AI help is back next month, or sooner if the administrator raises the budget.',
+      status: 429,
+    }),
   aiNotConfigured: () =>
     new AppError({
       key: 'errors.aiNotConfigured',

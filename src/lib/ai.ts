@@ -3,6 +3,7 @@ import { AiGenerationKind, Locale } from '@prisma/client';
 import { prisma } from './prisma';
 import { resolveAiModel } from './ai-models';
 import { activeAiProvider, generateWith, providerKey } from './ai-providers';
+import { costUsd, priceFor, type AiSpendView } from './ai-prices';
 import { env } from './env';
 import { errors } from './errors';
 
@@ -55,6 +56,29 @@ async function assertWithinRateLimit(workspaceId: string): Promise<void> {
   if (used >= env.aiRateLimitPerHour) throw errors.aiRateLimited();
 }
 
+function startOfMonth(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+/** Every workspace's priced spend since the 1st of this month (UTC). */
+async function monthSpendUsd(now: Date): Promise<number> {
+  const result = await prisma.aiGeneration.aggregate({
+    where: { createdAt: { gte: startOfMonth(now) } },
+    _sum: { costUsd: true },
+  });
+  return result._sum.costUsd ?? 0;
+}
+
+/**
+ * Root's monthly budget covers the whole installation, because it is root's
+ * key that gets billed. Same check-then-record trade as the rate limit: calls
+ * already in flight when the budget is reached can overshoot it by their cost.
+ */
+async function assertWithinBudget(): Promise<void> {
+  const budget = env.aiMonthlyBudgetUsd;
+  if (budget > 0 && (await monthSpendUsd(new Date())) >= budget) throw errors.aiBudgetReached();
+}
+
 function systemPrompt(options: {
   locale: Locale;
   tone: string | null;
@@ -95,6 +119,7 @@ async function complete(options: {
   maxTokens?: number;
 }): Promise<GenerationResult> {
   await assertWithinRateLimit(options.workspaceId);
+  await assertWithinBudget();
 
   const provider = activeAiProvider();
   const apiKey = provider ? providerKey(provider) : null;
@@ -116,6 +141,7 @@ async function complete(options: {
     outputTokens: generated.outputTokens,
   };
 
+  const price = priceFor(model, env.aiPriceOverrides);
   try {
     await prisma.aiGeneration.create({
       data: {
@@ -127,6 +153,8 @@ async function complete(options: {
         model,
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
+        provider,
+        costUsd: price ? costUsd(price, result.inputTokens, result.outputTokens) : null,
       },
     });
   } catch (error) {
@@ -312,5 +340,69 @@ export async function usageSummary(workspaceId: string): Promise<{
     generations: result._count,
     inputTokens: result._sum.inputTokens ?? 0,
     outputTokens: result._sum.outputTokens ?? 0,
+  };
+}
+
+/**
+ * What AI has cost, for root's Configuration screen: this month against the
+ * budget, and the last 30 days by model and by workspace. Generations whose
+ * price was unknown are counted apart instead of as $0.
+ */
+export async function aiSpend(now: Date = new Date()): Promise<AiSpendView> {
+  const since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const window = { createdAt: { gte: since } };
+  const unpricedWindow = { ...window, costUsd: null };
+
+  const [monthUsd, last30, models, unpricedModels, workspaces, unpricedWorkspaces] = await Promise.all([
+    monthSpendUsd(now),
+    prisma.aiGeneration.aggregate({ where: window, _sum: { costUsd: true } }),
+    prisma.aiGeneration.groupBy({
+      by: ['provider', 'model'],
+      where: window,
+      _count: true,
+      _sum: { inputTokens: true, outputTokens: true, costUsd: true },
+    }),
+    prisma.aiGeneration.groupBy({ by: ['provider', 'model'], where: unpricedWindow, _count: true }),
+    prisma.aiGeneration.groupBy({ by: ['workspaceId'], where: window, _count: true, _sum: { costUsd: true } }),
+    prisma.aiGeneration.groupBy({ by: ['workspaceId'], where: unpricedWindow, _count: true }),
+  ]);
+
+  const names = new Map(
+    (
+      await prisma.workspace.findMany({
+        where: { id: { in: workspaces.map((row) => row.workspaceId) } },
+        select: { id: true, name: true },
+      })
+    ).map((workspace) => [workspace.id, workspace.name]),
+  );
+  const unpricedByModel = new Map(unpricedModels.map((row) => [`${row.provider}:${row.model}`, row._count]));
+  const unpricedByWorkspace = new Map(unpricedWorkspaces.map((row) => [row.workspaceId, row._count]));
+  const byCost = (a: { costUsd: number; generations: number }, b: { costUsd: number; generations: number }) =>
+    b.costUsd - a.costUsd || b.generations - a.generations;
+
+  return {
+    monthUsd,
+    last30Usd: last30._sum.costUsd ?? 0,
+    budgetUsd: env.aiMonthlyBudgetUsd,
+    byModel: models
+      .map((row) => ({
+        provider: row.provider,
+        model: row.model,
+        generations: row._count,
+        unpriced: unpricedByModel.get(`${row.provider}:${row.model}`) ?? 0,
+        inputTokens: row._sum.inputTokens ?? 0,
+        outputTokens: row._sum.outputTokens ?? 0,
+        costUsd: row._sum.costUsd ?? 0,
+      }))
+      .sort(byCost),
+    byWorkspace: workspaces
+      .map((row) => ({
+        workspaceId: row.workspaceId,
+        name: names.get(row.workspaceId) ?? row.workspaceId,
+        generations: row._count,
+        unpriced: unpricedByWorkspace.get(row.workspaceId) ?? 0,
+        costUsd: row._sum.costUsd ?? 0,
+      }))
+      .sort(byCost),
   };
 }

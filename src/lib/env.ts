@@ -243,6 +243,12 @@ export const env = {
   get aiRateLimitPerHour(): number {
     return settingNumber('ai.rateLimitPerHour');
   },
+  get aiMonthlyBudgetUsd(): number {
+    return settingNumber('ai.monthlyBudgetUsd');
+  },
+  get aiPriceOverrides(): string[] {
+    return settingList('ai.priceOverrides');
+  },
 
   // --- Link shortener ---
   /** Bare host, e.g. "go.example.com". Blank means links live under APP_URL. */

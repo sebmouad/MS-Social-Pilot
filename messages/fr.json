@@ -574,7 +574,27 @@
     "testEmailHint": "Utilise les réglages enregistrés. Enregistrez d’abord vos modifications.",
     "testEmailSent": "E-mail de test envoyé à {to}. Vérifiez la boîte de réception (et les spams).",
     "testEmailNoProvider": "Rien n’a été envoyé : aucun fournisseur d’e-mail n’est configuré. Remplissez les champs SMTP (ou une clé Resend) et enregistrez.",
-    "testEmailFailed": "L’e-mail de test a échoué. {reason}"
+    "testEmailFailed": "L’e-mail de test a échoué. {reason}",
+    "aiPrice": "{input} / {output} par million de jetons",
+    "aiPriceUnknown": "prix inconnu — à ajouter",
+    "aiSpendTitle": "Dépenses IA",
+    "aiSpendMonth": "Ce mois-ci",
+    "aiSpendNoBudget": "Aucun budget mensuel défini",
+    "aiSpendOfBudget": "{percent} % du budget de {budget}",
+    "aiSpend30": "30 derniers jours",
+    "aiSpendGenerations": "Générations, 30 derniers jours",
+    "aiSpendUnpriced": "{count, plural, one {# génération a utilisé un modèle sans prix connu : elle n’est pas comptée dans ces totaux. Ajoutez son prix dans « Model prices ».} other {# générations ont utilisé un modèle sans prix connu : elles ne sont pas comptées dans ces totaux. Ajoutez le prix dans « Model prices ».}}",
+    "aiSpendEmpty": "Aucune génération IA ces 30 derniers jours. Les dépenses s’affichent ici dès qu’un espace de travail utilise la rédaction IA.",
+    "aiSpendByModel": "Dépenses IA par modèle, 30 derniers jours",
+    "aiSpendByWorkspace": "Dépenses IA par espace de travail, 30 derniers jours",
+    "aiSpendModel": "Modèle",
+    "aiSpendGenerationsShort": "Générations",
+    "aiSpendTokens": "Jetons entrée / sortie",
+    "aiSpendCost": "Coût",
+    "aiSpendPerGeneration": "Par génération",
+    "aiSpendWorkspace": "Espace de travail",
+    "aiSpendPlusUnpriced": "{count, plural, one {+ # sans prix} other {+ # sans prix}}",
+    "aiSpendFootnote": "Calculé avec le prix de chaque modèle au moment de la rédaction. La facture du fournisseur fait foi."
   },
   "connections": {
     "active": "Actif",
@@ -960,7 +980,8 @@
     "network_tooLong": "{target} ({network}) accepte {limit} caractères ; cette publication en a {length}.",
     "network_tooManyImages": "{target} ({network}) accepte jusqu’à {max} images.",
     "network_noVideo": "{target} ({network}) ne peut pas recevoir de vidéo d’ici. Utilisez des photos, ou retirez-le de cette publication.",
-    "network_needsImage": "{target} ({network}) a besoin d’une image : ajoutez-en une, ou retirez-le de cette publication."
+    "network_needsImage": "{target} ({network}) a besoin d’une image : ajoutez-en une, ou retirez-le de cette publication.",
+    "aiBudgetReached": "Le budget IA de ce mois est atteint. L’aide IA revient le mois prochain, ou plus tôt si l’administrateur augmente le budget."
   },
   "feeds": {
     "title": "Flux RSS",

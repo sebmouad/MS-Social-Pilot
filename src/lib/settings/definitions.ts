@@ -1,3 +1,5 @@
+import { PRICE_OVERRIDE_PATTERN, PRICES_CHECKED } from '../ai-prices';
+
 /**
  * The registry of everything an operator can change without a redeploy.
  *
@@ -49,7 +51,7 @@ export interface SettingDefinition {
   /** `select` only. */
   options?: Array<{ value: string; label: string }>;
   /**
-   * Strings and secrets only: the shape a value must have, and what to say when
+   * Strings, secrets and each entry of a list: the shape a value must have, and what to say when
    * it does not. An empty value is not checked, since clearing is allowed.
    */
   pattern?: { regex: RegExp; message: string };
@@ -652,6 +654,28 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     env: 'AI_RATE_LIMIT_PER_HOUR',
     min: 1,
     max: 10000,
+  },
+  {
+    key: 'ai.monthlyBudgetUsd',
+    group: 'ai',
+    type: 'number',
+    label: 'Monthly budget (USD)',
+    description: 'AI help stops for every workspace once this calendar month\'s spend reaches it. 0 means no budget.',
+    default: 0,
+    env: 'AI_MONTHLY_BUDGET_USD',
+    min: 0,
+    max: 1000000,
+    hint: 'Spend is worked out from each model\'s price. Generations with a model whose price is unknown are not counted: add their price below.',
+  },
+  {
+    key: 'ai.priceOverrides',
+    group: 'ai',
+    type: 'list',
+    label: 'Model prices',
+    description: `Add or correct a model's price in US dollars per million tokens, as model=input/output (e.g. my-model=2/10). Wins over the built-in prices, checked ${PRICES_CHECKED}.`,
+    default: [],
+    env: 'AI_PRICE_OVERRIDES',
+    pattern: { regex: PRICE_OVERRIDE_PATTERN, message: 'Write each price as model=input/output, e.g. my-model=2/10.' },
   },
 
   // --- Email -----------------------------------------------------------------

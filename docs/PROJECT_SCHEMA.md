@@ -201,7 +201,11 @@ existing text) with tone options, seeded by the workspace's brand voice.
 
 - Streams into the textarea; the user always edits before posting. Nothing is
   ever auto-published from AI output.
-- Every call is logged to `AiGeneration` with token counts.
+- Every call is logged to `AiGeneration` with token counts, provider and cost
+  in USD (`src/lib/ai-prices.ts`; null when the model's price is unknown).
+- Optional monthly budget for the whole installation (`AI_MONTHLY_BUDGET_USD`)
+  stops AI calls once reached; root sees spend by model and workspace in
+  Configuration → AI.
 - Rate-limited per workspace per hour **[assumption: 100/hour]** so a stuck
   client loop cannot run up a bill.
 - Degrades cleanly: no `ANTHROPIC_API_KEY` means the buttons are hidden, not
@@ -371,6 +375,8 @@ OPENAI_API_KEY=
 GEMINI_API_KEY=
 AI_MODEL=claude-sonnet-5
 AI_RATE_LIMIT_PER_HOUR=100
+AI_MONTHLY_BUDGET_USD=0          # whole installation; 0 = no budget
+AI_PRICE_OVERRIDES=              # e.g. my-model=2/10 (USD per 1M tokens in/out)
 
 # Link shortener
 SHORTENER_DOMAIN=          # e.g. go.yourdomain.com; blank uses APP_URL/l/

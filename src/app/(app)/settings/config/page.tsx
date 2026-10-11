@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 
 import { ConfigClient } from '@/components/ConfigClient';
+import { aiSpend } from '@/lib/ai';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { canManageInstance } from '@/lib/constants';
@@ -40,7 +41,7 @@ export default async function ConfigPage() {
     );
   }
 
-  const settings = await describeSettings();
+  const [settings, spend] = await Promise.all([describeSettings(), aiSpend()]);
 
   return (
     <div className="space-y-6">
@@ -49,7 +50,7 @@ export default async function ConfigPage() {
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
 
-      <ConfigClient settings={settings} groupLabels={GROUP_LABELS} groupOrder={GROUP_ORDER} />
+      <ConfigClient settings={settings} groupLabels={GROUP_LABELS} groupOrder={GROUP_ORDER} aiSpend={spend} />
 
       <p className="text-xs text-slate-500">{t('footnote')}</p>
     </div>

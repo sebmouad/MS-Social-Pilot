@@ -16,6 +16,9 @@ session can continue without the old one.
 - "All tests must be in real browsers with real data."
 - Minimum impact on the WordPress sites hosted on the same server.
 - Replies in a terse style were requested earlier ("caveman") — optional.
+- "Don't test on every step, test after big changes" (2026-10-11): small edits
+  get `tsc` + the affected test files; the full unit + Playwright suites run
+  once per finished feature, before commit/deploy.
 - Security limits the owner set: never type passwords/secrets into web pages,
   never sign in to production with the owner's credentials, never create accounts
   or set passwords for them, ask before deleting unmerged branches, explicit OK
@@ -110,6 +113,8 @@ assumptions. The product stays generic (README.md).*
 0. **Next session starts with [NEXT_PHASES.md](NEXT_PHASES.md) Phase 0** (Gmail
    SMTP email; Anthropic + OpenAI + Gemini with auto-fetched models and costs),
    **then G1–G3 (2-step sign-in, off-site backups, alerts), then Phase A**.
+   Phase 0 is built (SMTP email; three AI providers; prices, costs and monthly
+   budget); it waits on the owner entering the Gmail app password and AI keys.
    The app will be **sold as a service**: keep everything generic (CLAUDE.md
    rule 9) and see Phase S (legal pages still name Morocco — S1/S2) — the
    owner asked (2026-10-11) for one shared profile selection (single / multiple /

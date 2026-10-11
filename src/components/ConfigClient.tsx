@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 
+import type { AiSpendView, ModelPrice } from '@/lib/ai-prices';
 import { Icon } from './Icon';
 
 export interface SettingView {
@@ -58,10 +59,12 @@ export function ConfigClient({
   settings,
   groupLabels,
   groupOrder,
+  aiSpend,
 }: {
   settings: SettingView[];
   groupLabels: Record<string, string>;
   groupOrder: string[];
+  aiSpend?: AiSpendView;
 }) {
   const t = useTranslations('config');
   const tCommon = useTranslations('common');
@@ -278,6 +281,7 @@ export function ConfigClient({
             })}
           </div>
           {group === 'email' && <TestEmailButton />}
+          {group === 'ai' && aiSpend && <AiSpendPanel spend={aiSpend} />}
         </section>
       ))}
 
@@ -328,6 +332,7 @@ function groupIcon(group: string) {
 interface AiModelOption {
   id: string;
   label: string;
+  price?: ModelPrice | null;
 }
 
 /**
@@ -345,6 +350,7 @@ function AiModelPicker({
   onChange: (value: string) => void;
 }) {
   const t = useTranslations('config');
+  const usd = useUsd();
   const [models, setModels] = useState<AiModelOption[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -378,7 +384,10 @@ function AiModelPicker({
           {value && !known && <option value={value}>{t('aiModelNotListed', { id: value })}</option>}
           {models?.map((model) => (
             <option key={model.id} value={model.id}>
-              {model.label} ({model.id})
+              {model.label} ({model.id}) ·{' '}
+              {model.price
+                ? t('aiPrice', { input: usd(model.price.input), output: usd(model.price.output) })
+                : t('aiPriceUnknown')}
             </option>
           ))}
         </select>
@@ -441,6 +450,140 @@ function TestEmailButton() {
           {result.text}
         </p>
       )}
+    </div>
+  );
+}
+
+/** Dollars with cents, or more digits for the fractions of a cent one caption costs. */
+function useUsd() {
+  const format = useFormatter();
+  return (value: number) =>
+    format.number(value, {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: value !== 0 && Math.abs(value) < 0.01 ? 4 : 2,
+    });
+}
+
+/**
+ * What AI has cost: this month against the budget, then the last 30 days by
+ * model and by workspace. A model with no known price says so and points at
+ * the price field instead of showing $0, which would look like free.
+ */
+function AiSpendPanel({ spend }: { spend: AiSpendView }) {
+  const t = useTranslations('config');
+  const format = useFormatter();
+  const usd = useUsd();
+  const unpriced = spend.byModel.reduce((sum, row) => sum + row.unpriced, 0);
+  const generations = spend.byModel.reduce((sum, row) => sum + row.generations, 0);
+  const used = spend.budgetUsd > 0 ? Math.min(100, Math.round((spend.monthUsd / spend.budgetUsd) * 100)) : null;
+
+  return (
+    <div className="mt-2 space-y-4 border-t border-slate-100 pt-4">
+      <h3 className="text-sm font-semibold text-slate-900">{t('aiSpendTitle')}</h3>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs text-slate-500">{t('aiSpendMonth')}</p>
+          <p className="text-lg font-semibold text-slate-900">{usd(spend.monthUsd)}</p>
+          <p className="text-xs text-slate-500">
+            {used === null ? t('aiSpendNoBudget') : t('aiSpendOfBudget', { budget: usd(spend.budgetUsd), percent: used })}
+          </p>
+          {used !== null && (
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200" aria-hidden>
+              <div
+                className={`h-full rounded-full ${used >= 100 ? 'bg-rose-500' : used >= 80 ? 'bg-amber-500' : 'bg-brand-600'}`}
+                style={{ width: `${used}%` }}
+              />
+            </div>
+          )}
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs text-slate-500">{t('aiSpend30')}</p>
+          <p className="text-lg font-semibold text-slate-900">{usd(spend.last30Usd)}</p>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs text-slate-500">{t('aiSpendGenerations')}</p>
+          <p className="text-lg font-semibold text-slate-900">{format.number(generations)}</p>
+        </div>
+      </div>
+
+      {unpriced > 0 && (
+        <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <Icon name="error" size={14} className="mt-0.5 shrink-0" /> {t('aiSpendUnpriced', { count: unpriced })}
+        </p>
+      )}
+
+      {generations === 0 ? (
+        <p className="text-sm text-slate-600">{t('aiSpendEmpty')}</p>
+      ) : (
+        <>
+          <div className="scroll-x">
+            <table className="w-full min-w-[32rem] text-left text-sm tabular-nums">
+              <caption className="sr-only">{t('aiSpendByModel')}</caption>
+              <thead className="text-xs text-slate-500">
+                <tr>
+                  <th className="py-1 pr-3 font-medium">{t('aiSpendModel')}</th>
+                  <th className="py-1 pr-3 text-right font-medium">{t('aiSpendGenerationsShort')}</th>
+                  <th className="py-1 pr-3 text-right font-medium">{t('aiSpendTokens')}</th>
+                  <th className="py-1 pr-3 text-right font-medium">{t('aiSpendCost')}</th>
+                  <th className="py-1 text-right font-medium">{t('aiSpendPerGeneration')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {spend.byModel.map((row) => {
+                  const priced = row.generations - row.unpriced;
+                  return (
+                    <tr key={`${row.provider}:${row.model}`}>
+                      <td className="py-1.5 pr-3">
+                        <span className="font-mono text-xs text-slate-900" translate="no">{row.model}</span>
+                        {row.provider && <span className="ml-1 text-xs text-slate-500">· {row.provider}</span>}
+                      </td>
+                      <td className="py-1.5 pr-3 text-right">{format.number(row.generations)}</td>
+                      <td className="py-1.5 pr-3 text-right text-slate-600">
+                        {format.number(row.inputTokens)} / {format.number(row.outputTokens)}
+                      </td>
+                      <td className="py-1.5 pr-3 text-right">
+                        {priced > 0 ? usd(row.costUsd) : <span className="text-amber-700">{t('aiPriceUnknown')}</span>}
+                      </td>
+                      <td className="py-1.5 text-right text-slate-600">{priced > 0 ? usd(row.costUsd / priced) : '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="scroll-x">
+            <table className="w-full min-w-[20rem] text-left text-sm tabular-nums">
+              <caption className="sr-only">{t('aiSpendByWorkspace')}</caption>
+              <thead className="text-xs text-slate-500">
+                <tr>
+                  <th className="py-1 pr-3 font-medium">{t('aiSpendWorkspace')}</th>
+                  <th className="py-1 pr-3 text-right font-medium">{t('aiSpendGenerationsShort')}</th>
+                  <th className="py-1 text-right font-medium">{t('aiSpendCost')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {spend.byWorkspace.map((row) => (
+                  <tr key={row.workspaceId}>
+                    <td className="py-1.5 pr-3 text-slate-900">{row.name}</td>
+                    <td className="py-1.5 pr-3 text-right">{format.number(row.generations)}</td>
+                    <td className="py-1.5 text-right">
+                      {usd(row.costUsd)}
+                      {row.unpriced > 0 && (
+                        <span className="ml-1 text-xs text-amber-700">{t('aiSpendPlusUnpriced', { count: row.unpriced })}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      <p className="hint">{t('aiSpendFootnote')}</p>
     </div>
   );
 }

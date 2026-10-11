@@ -574,7 +574,27 @@
     "testEmailHint": "Uses the saved settings. Save your changes first.",
     "testEmailSent": "Test email sent to {to}. Check the inbox (and spam).",
     "testEmailNoProvider": "Nothing sent: no email provider is configured. Fill in the SMTP fields (or a Resend key) and save.",
-    "testEmailFailed": "The test email failed. {reason}"
+    "testEmailFailed": "The test email failed. {reason}",
+    "aiPrice": "{input} / {output} per 1M tokens",
+    "aiPriceUnknown": "price unknown — add it",
+    "aiSpendTitle": "AI spend",
+    "aiSpendMonth": "This month",
+    "aiSpendNoBudget": "No monthly budget set",
+    "aiSpendOfBudget": "{percent}% of the {budget} budget",
+    "aiSpend30": "Last 30 days",
+    "aiSpendGenerations": "Generations, last 30 days",
+    "aiSpendUnpriced": "{count, plural, one {# generation used a model with no known price, so it is not in these totals. Add its price under Model prices.} other {# generations used a model with no known price, so they are not in these totals. Add the price under Model prices.}}",
+    "aiSpendEmpty": "No AI generations in the last 30 days. Spend shows here once someone uses AI writing in a workspace.",
+    "aiSpendByModel": "AI spend by model, last 30 days",
+    "aiSpendByWorkspace": "AI spend by workspace, last 30 days",
+    "aiSpendModel": "Model",
+    "aiSpendGenerationsShort": "Generations",
+    "aiSpendTokens": "Tokens in / out",
+    "aiSpendCost": "Cost",
+    "aiSpendPerGeneration": "Per generation",
+    "aiSpendWorkspace": "Workspace",
+    "aiSpendPlusUnpriced": "{count, plural, one {+ # unpriced} other {+ # unpriced}}",
+    "aiSpendFootnote": "Worked out from each model's price when the text was written. The provider's invoice is the final figure."
   },
   "connections": {
     "active": "Active",
@@ -960,7 +980,8 @@
     "network_tooLong": "{target} ({network}) takes {limit} characters; this post has {length}.",
     "network_tooManyImages": "{target} ({network}) takes up to {max} pictures.",
     "network_noVideo": "{target} ({network}) cannot take a video from here. Use photos, or leave it out of this post.",
-    "network_needsImage": "{target} ({network}) needs a picture: add one, or leave it out of this post."
+    "network_needsImage": "{target} ({network}) needs a picture: add one, or leave it out of this post.",
+    "aiBudgetReached": "This month's AI budget has been reached. AI help is back next month, or sooner if the administrator raises the budget."
   },
   "feeds": {
     "title": "RSS feeds",

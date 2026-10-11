@@ -93,6 +93,24 @@ test('an invitation that never reaches the server gives the button back', async 
   await expect(send).toBeEnabled();
 });
 
+test('root sees AI spend and can only save prices written as model=input/output', async ({ page }) => {
+  await open(page, '/settings/config');
+  await expect(page.getByRole('heading', { name: /AI spend|Dépenses IA/ })).toBeVisible();
+  await expect(page.getByText(/No AI generations in the last 30 days|Aucune génération IA/)).toBeVisible();
+
+  const prices = page.locator('#ai\\.priceOverrides');
+  await prices.fill('my-model=$2');
+  await page.getByRole('button', { name: /^(Save|Enregistrer)$/ }).click();
+  await expect(page.getByText(/Write each price as model=input\/output/)).toBeVisible();
+
+  await prices.fill('my-model=2/10');
+  await page.getByRole('button', { name: /^(Save|Enregistrer)$/ }).click();
+  await expect(prices).toHaveValue('my-model=2/10');
+
+  const reset = await page.request.post('/api/settings/config', { data: { values: { 'ai.priceOverrides': null } } });
+  expect(reset.status()).toBe(200);
+});
+
 test.describe('signed out', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 

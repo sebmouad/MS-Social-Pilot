@@ -309,7 +309,11 @@ export function validate(definition: SettingDefinition, raw: unknown): SettingVa
 
   if (definition.type === 'list') {
     const list = Array.isArray(raw) ? raw.map(String) : parseList(String(raw));
-    return list.map((entry) => entry.trim()).filter(Boolean);
+    const entries = list.map((entry) => entry.trim()).filter(Boolean);
+    if (definition.pattern && entries.some((entry) => !definition.pattern!.regex.test(entry))) {
+      throw new SettingError(definition.pattern.message);
+    }
+    return entries;
   }
 
   if (definition.type === 'select') {

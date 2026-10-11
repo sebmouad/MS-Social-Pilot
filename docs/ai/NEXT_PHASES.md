@@ -88,9 +88,19 @@ OpenAI `/v1/models` + `/v1/chat/completions` and Gemini `v1beta/models` +
 `:generateContent`); settings `ai.provider` (auto | anthropic | openai | gemini),
 `ai.openaiKey`, `ai.geminiKey`; a chosen model the provider no longer lists falls
 back to the provider's first model.
-Still to do: **prices and costs** (below), optional per-feature model, DB cache
-table only if the 1 h memory cache proves too short. `AiGeneration` rows store input/output tokens;
-`usageSummary()` shows 30-day tokens, no money.
+**Prices and costs done (2026-10-11):** `src/lib/ai-prices.ts` (USD per 1M
+tokens per model id, copied from the three official pricing pages on
+2026-10-11, dated snapshots/aliases matched, unknown model = "price unknown",
+never $0; Gemini's announced 2027 prices switch on their date);
+`ai.priceOverrides` (list `model=input/output`, validated) and
+`ai.monthlyBudgetUsd` (whole installation, calendar month UTC, 0 = none;
+`errors.aiBudgetReached`); `AiGeneration.provider` + `costUsd` (migration
+`20261013090000_ai_generation_cost`); Configuration → AI shows this month vs
+budget, last 30 days by model and by workspace, cost per generation, unpriced
+generations counted apart; the model picker shows each model's price.
+Still to do: optional per-feature model; DB model cache table only if the 1 h
+memory cache proves too short; refresh the price table when providers change
+prices (overrides cover the gap).
 - Settings (group `ai`): `ai.provider` select `anthropic | openai | gemini`;
   keys `ai.anthropicKey` (migrate from `ai.apiKey`), `ai.openaiKey`,
   `ai.geminiKey` (all `secret`); `ai.model` becomes a free value chosen from the
@@ -355,6 +365,7 @@ most time), the rest after Phase D2. S/M/L = effort.
   recovery codes shown once; "remember this device 30 days". Lost device →
   root resets it for others; root's own reset only by the SSH recovery script
   (PERMISSIONS.md). Tests: sign-in blocked without the second step.
+  Skills: `secure-code-guardian`, `security-review`, `playwright-expert`.
 - **G2. Off-site backups (S)** — after the nightly
   `/usr/local/sbin/ms-social-pilot-backup`, push the dump + media archive,
   encrypted (age/gpg, key held by the owner), to Backblaze B2 / S3 / Google
