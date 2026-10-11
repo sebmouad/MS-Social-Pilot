@@ -277,6 +277,13 @@ export function Composer({
     [],
   );
 
+  // A link shared in from the phone gets its card straight away, as a typed one does on blur.
+  useEffect(() => {
+    if (!editing && initialLink) void loadPreview(initialLink);
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function uploadFiles(files: FileList) {
     setError(null);
     setUploading(true);
@@ -544,7 +551,7 @@ export function Composer({
             ref={messageBox}
             className="input min-h-[160px] resize-y"
             placeholder={t('placeholder')}
-            defaultValue={editing?.message ?? ''}
+            defaultValue={editing?.message ?? initialMessage ?? ''}
             maxLength={LIMITS.messageLength}
             onChange={(event) => setMessage(event.target.value)}
           />
@@ -603,7 +610,7 @@ export function Composer({
                 ref={linkBox}
                 className="input"
                 placeholder={t('linkPlaceholder')}
-                defaultValue={editing?.link ?? ''}
+                defaultValue={editing?.link ?? initialLink ?? ''}
                 onChange={(event) => setLink(event.target.value)}
                 onBlur={(event) => loadPreview(event.target.value)}
               />

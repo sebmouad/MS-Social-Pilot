@@ -608,3 +608,9 @@ test('an undated draft is listed under the calendar, and a switched-off destinat
 
   expect(failures).toEqual([]);
 });
+
+test('what a phone shares to the app arrives in the composer', async ({ page }) => {
+  await open(page, `/compose?title=${encodeURIComponent('Recipe of the day')}&text=${encodeURIComponent('A lovely tart https://example.com/tart')}`);
+  await expect(page.locator('#message')).toHaveValue('Recipe of the day\n\nA lovely tart');
+  await expect(page.locator('#link')).toHaveValue('https://example.com/tart');
+});

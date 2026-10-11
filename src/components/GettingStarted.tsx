@@ -26,9 +26,9 @@ export async function GettingStarted({ workspaceId }: { workspaceId: string }) {
     prisma.post.count({ where: { workspaceId } }),
     prisma.queueSlot.count({ where: { workspaceId } }),
     prisma.membership.count({ where: { workspaceId } }),
-    prisma.shareLink.count({ where: { workspaceId } }),
+    prisma.shareLink.count({ where: { workspaceId, revokedAt: null } }),
     prisma.reportSchedule.count({ where: { workspaceId } }),
-    prisma.apiToken.count({ where: { workspaceId } }),
+    prisma.apiToken.count({ where: { workspaceId, revokedAt: null } }),
   ]);
   const done: Record<string, boolean> = {
     connect: pages > 0,
