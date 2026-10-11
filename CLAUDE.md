@@ -48,6 +48,8 @@ translations, migrations, new network connector, release).
    the app, in its **own separate section** (`/root/*`, planned — today
    Configuration is at `/settings/config`). Workspace owners/admins are not root. Don't
    widen or change role privileges without the owner's audit (PERMISSIONS.md).
-9. Client components must not import server modules (anything that reaches
+9. **No audience is assumed**: country, language, holidays and time zone come
+   from the target audience the user defines per Page (NEXT_PHASES H0).
+10. Client components must not import server modules (anything that reaches
    `@/lib/prisma`). Shared constants go in plain modules (`src/lib/palette.ts`,
    `src/lib/network-rules.ts`, `src/lib/report-sections.ts`).

@@ -5,8 +5,9 @@ profile selection everywhere; B: multi-profile analytics with every Meta metric;
 C: publishing views; D: design pass; D2: owner's picks — icon rail shell, warm
 theme, Sheets, cloud media, competitor tracking, referrals). This file is the
 full backlog. Phase G (18 owner-approved additions: security, WordPress
-auto-share, spam guard, moderation, translation, Arabic UI, ops) is in
-NEXT_PHASES, then Phase H (20 more: content mix, Ramadan mode, recipe posts,
+auto-share, spam guard, moderation, translation, more UI languages, ops) is in
+NEXT_PHASES, then Phase H (20 more: target audience per Page, content mix,
+cultural calendars, recipe posts,
 undo send, webhooks, calendar feed, goals, agency overview, …). Items the owner decided out on 2026-10-11 are listed at the end of
 NEXT_PHASES Phase D2 — remove them from consideration.
 

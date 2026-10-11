@@ -371,10 +371,15 @@ most time), the rest after Phase D2. S/M/L = effort.
   applies queue slots (setting: suggest / apply); shows what changed.
 
 ### Content
-- **G11. AI translation (S, after 0.2)** — translate a post into FR / AR / EN as
-  per-Page variants; Arabic right-to-left preview; keep hashtags and links.
-- **G12. Arabic interface (M)** — `messages/ar.json`, RTL layout (`dir="rtl"`,
-  logical CSS properties), Arabic plurals in ICU; e2e for RTL screens.
+- **G11. AI translation (S, after 0.2)** — translate a post into each language
+  of the target Pages' audiences (H0: e.g. French, English US, Spanish) as
+  per-Page variants; right-to-left preview when an audience language needs it;
+  keep hashtags and links.
+- **G12. More interface languages (M)** — beyond en/fr, add languages the
+  owner picks (e.g. Spanish `messages/es.json`, Arabic `messages/ar.json`);
+  make the layout RTL-ready (`dir`, logical CSS properties) so right-to-left
+  languages work; ICU plurals per language; locale tests check every file has
+  the same keys and placeholders.
 - **G13. Watermark and auto-crop (M)** — per-Page logo/text watermark (position,
   opacity), applied when the post is published (original kept); crops/resizes
   per network format (feed 4:5, story 9:16, link 1.91:1) with a focal point.
@@ -399,8 +404,20 @@ most time), the rest after Phase D2. S/M/L = effort.
 
 ## Phase H — More owner-approved additions (2026-10-11)
 
-All 20 approved. Suggested order: **H2, H3, H10, H18, H1** first (best fit for
-the recipe Pages and a Moroccan audience), then the rest. Several need the AI
+All 20 approved. Suggested order: **H0 first** (everything audience-related
+depends on it), then **H2, H3, H10, H18, H1**, then the rest.
+
+**No audience is assumed.** The target audience is whatever the user defines
+per Page (French, US, Spanish, …) — never hard-code a country, language,
+religion or holiday set.
+
+- **H0. Target audience per Page (S, foundation)** — Page settings → Audience:
+  countries (multi), languages (multi, BCP-47: `fr-FR`, `en-US`, `es-ES`, …),
+  audience time zone (default: the main country's; used for best times and
+  queue slots), and cultural calendars to follow (chosen from a list, none by
+  default). Workspace default that new Pages inherit. Suggest values from the
+  Page's own follower countries (`page_follows_country`) but the user decides.
+  Used by H2, H7, G10, G11, AI writing (language + tone) and reports. Several need the AI
 setup from Phase 0.2 (marked AI).
 
 ### Planning and content
@@ -408,11 +425,15 @@ setup from Phase 0.2 (marked AI).
   (e.g. 4 recipes · 1 tip · 1 question); the queue fills slots to match from
   drafts, evergreen and WordPress items, and warns when a category runs dry.
   Categories = post labels (exist).
-- **H2. Ramadan and holiday mode (S)** — Ramadan dates per year and daily iftar /
-  suhoor times per city (prayer-times API or a stored table, e.g. Casablanca,
-  Rabat, Paris); posting slots shift relative to iftar ("iftar − 2 h", "after
-  iftar + 1 h"); Moroccan and French holiday calendar on the calendar view
-  (awareness days exist — add these sets). Workspace setting: city, on/off.
+- **H2. Cultural calendar and seasonal modes (S)** — from the audience (H0):
+  public holidays of each chosen country (e.g. France, United States, Spain —
+  from a holidays dataset/API, not hand-typed) and the cultural calendars the
+  user ticked (e.g. Christmas season, Thanksgiving, Black Friday, Ramadan,
+  Lunar New Year, back-to-school) shown on the calendar with "Make a post"
+  (awareness days exist — add these sets). **Seasonal posting modes** the user
+  can switch on per Page, e.g. Ramadan mode: slots shift relative to daily
+  iftar time for a city the user picks; holiday mode: fewer posts or different
+  times on public holidays. Nothing on by default.
 - **H3. Recipe posts from WordPress (M)** — read recipe structured data
   (JSON-LD `Recipe`: ingredients, times, steps, image; WP Recipe Maker / Tasty
   / Yoast schema) from the article; templates: ingredients list post, step-by-
@@ -428,8 +449,8 @@ setup from Phase 0.2 (marked AI).
   (format, length, time, topic) with the Page's past posts; show "likely above
   / around / below this Page's usual" with the reasons; never a fake precise
   number.
-- **H7. Trending topics (S)** — Google Trends daily trends for Morocco and
-  France (and the Page's country), filtered by the workspace's themes; "Make a
+- **H7. Trending topics (S)** — Google Trends daily trends for each country in
+  the Page's audience (H0), filtered by the workspace's themes; "Make a
   post" opens Compose with the topic.
 
 ### Team and clients
