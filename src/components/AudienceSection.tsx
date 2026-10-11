@@ -72,19 +72,30 @@ export async function AudienceView({
           formatKey={(code) => countryLabel(code, locale)}
         />
         <BreakdownBars title={t('byCity')} data={audience.byCity} />
-        <BreakdownBars
-          title={t('byGenderAge')}
-          data={audience.byGenderAge}
-          formatKey={(key) => genderAgeLabel(key, words)}
-        />
-        <BreakdownBars
-          title={t('byLocale')}
-          data={audience.byLocale}
-          formatKey={(key) => languageLabel(key, locale)}
-        />
+        {/* Meta withdrew both breakdowns from Page insights. A Page synced
+            before then still has a snapshot; otherwise an empty card would
+            read as "nobody", so say what happened instead. */}
+        {Object.keys(audience.byGenderAge).length > 0 && (
+          <BreakdownBars
+            title={t('byGenderAge')}
+            data={audience.byGenderAge}
+            formatKey={(key) => genderAgeLabel(key, words)}
+          />
+        )}
+        {Object.keys(audience.byLocale).length > 0 && (
+          <BreakdownBars
+            title={t('byLocale')}
+            data={audience.byLocale}
+            formatKey={(key) => languageLabel(key, locale)}
+          />
+        )}
       </div>
 
-      <p className="text-xs text-slate-500">{t('audienceHint')}</p>
+      <p className="text-xs text-slate-500">
+        {t('audienceHint')}
+        {(Object.keys(audience.byGenderAge).length === 0 || Object.keys(audience.byLocale).length === 0) &&
+          ` ${t('audienceWithdrawn')}`}
+      </p>
     </div>
   );
 }

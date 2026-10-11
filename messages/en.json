@@ -223,7 +223,8 @@
     "rowsPerPage": "Rows per page",
     "rowsShowing": "{from}–{to} of {total}",
     "previousRows": "Previous rows",
-    "nextRows": "Next rows"
+    "nextRows": "Next rows",
+    "audienceWithdrawn": "Meta no longer shares followers’ age, gender or language with apps, so those breakdowns are not shown."
   },
   "app": {
     "name": "MS Social Pilot",

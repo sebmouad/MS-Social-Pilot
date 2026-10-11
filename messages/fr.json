@@ -223,7 +223,8 @@
     "rowsPerPage": "Lignes par page",
     "rowsShowing": "{from}–{to} sur {total}",
     "previousRows": "Lignes précédentes",
-    "nextRows": "Lignes suivantes"
+    "nextRows": "Lignes suivantes",
+    "audienceWithdrawn": "Meta ne communique plus l’âge, le genre ni la langue des abonnés aux applications : ces répartitions ne sont donc pas affichées."
   },
   "app": {
     "name": "MS Social Pilot",
