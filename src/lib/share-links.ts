@@ -16,7 +16,7 @@ import { prisma } from './prisma';
  * the link itself is shown once, when it is made.
  */
 
-export const SHARE_KINDS = ['review', 'calendar'] as const;
+export const SHARE_KINDS = ['review', 'calendar', 'portal'] as const;
 export type ShareKind = (typeof SHARE_KINDS)[number];
 
 export const shareLinkSchema = z.object({

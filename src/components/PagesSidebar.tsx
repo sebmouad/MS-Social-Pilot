@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 
 import { FeedAvatar } from './FeedPost';
 import { Icon } from './Icon';
+import { PageMenu } from './PageMenu';
 import { paletteOf } from '@/lib/palette';
 import type { PageGroupView } from '@/lib/page-groups';
 import type { SidebarPage } from '@/lib/page-filter';
@@ -21,6 +22,8 @@ interface Props {
   canManageGroups: boolean;
   /** Inside a column that already has its own width and stickiness. */
   inline?: boolean;
+  /** Editors and up: shuffle, clear the queue and drafts from a Page's ⋮. */
+  canManageQueue?: boolean;
 }
 
 /**
@@ -35,7 +38,7 @@ interface Props {
  *
  * On a phone the column folds into one line above the screen it filters.
  */
-export function PagesSidebar({ pages, groups, group, visible, canManageGroups, inline = false }: Props) {
+export function PagesSidebar({ pages, groups, group, visible, canManageGroups, inline = false, canManageQueue = false }: Props) {
   const t = useTranslations('pagesSidebar');
   const router = useRouter();
   const pathname = usePathname();
@@ -221,6 +224,7 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
               >
                 <Icon name={on ? 'eye' : 'eyeOff'} size={17} />
               </button>
+              <PageMenu page={page} canManageQueue={canManageQueue} canSettings={canManageGroups} />
             </li>
           );
         })}

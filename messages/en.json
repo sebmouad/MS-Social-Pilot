@@ -363,7 +363,8 @@
     "aiPlanBrief": "This week…",
     "aiPlanBriefPlaceholder": "New autumn menu from Tuesday, pumpkin soup and chestnut cake, 10% off for students on Wednesday",
     "aiPlanCount": "Posts",
-    "aiPlanStart": "First day"
+    "aiPlanStart": "First day",
+    "ideaStart": "✨ Today is {day}! "
   },
   "common": {
     "all": "All",
@@ -1869,7 +1870,24 @@
     },
     "hide": "Hide {page}",
     "show": "Show {page}",
-    "noMatch": "No Page matches."
+    "noMatch": "No Page matches.",
+    "menuFor": "More for {page}",
+    "menuNewPost": "New post",
+    "menuFeed": "Feed preview",
+    "menuAnalysis": "Page analysis",
+    "menuVoice": "Voice & links",
+    "menu_shuffle": "Shuffle queue",
+    "menu_clear": "Clear queue",
+    "menu_clearDrafts": "Delete drafts",
+    "done_shuffle": "{count, plural, =0 {Nothing to shuffle.} one {1 post moved.} other {# posts shuffled.}}",
+    "done_clear": "{count, plural, =0 {Nothing in the queue.} one {1 post back in drafts.} other {# posts back in drafts.}}",
+    "done_clearDrafts": "{count, plural, =0 {No drafts to delete.} one {1 draft deleted.} other {# drafts deleted.}}",
+    "confirmTitle_shuffle": "Shuffle {page}’s queue?",
+    "confirmTitle_clear": "Clear {page}’s queue?",
+    "confirmTitle_clearDrafts": "Delete {page}’s drafts?",
+    "confirmHint_shuffle": "The same times stay booked; the posts are dealt out among them in a new order.",
+    "confirmHint_clear": "Every upcoming post sent from here goes back to drafts. Nothing is deleted; posts Facebook holds or that wait for review keep their place.",
+    "confirmHint_clearDrafts": "Drafts written for this Page only are deleted for good. Drafts shared with other Pages are kept."
   },
   "labels": {
     "allLabels": "All labels",
@@ -1967,7 +1985,18 @@
     "approve": "Approve",
     "requestChanges": "Request changes",
     "commentOnly": "Comment",
-    "title": "Shared posts"
+    "title": "Shared posts",
+    "portalBadge": "Client portal",
+    "portalTabs": "Sections",
+    "tab_review": "To review",
+    "tab_calendar": "Calendar",
+    "tab_results": "Results",
+    "resultsHint": "The last 30 days, against the 30 before.",
+    "followers": "{count, plural, one {1 follower} other {# followers}}",
+    "healthHint": "Page health: posting rhythm, engagement and growth, out of 100.",
+    "bestPost": "Best post",
+    "bestPostFigures": "{count, plural, one {1 interaction} other {# interactions}}",
+    "resultsFoot": "Figures from Facebook, refreshed every few hours."
   },
   "sharing": {
     "title": "Client links",
@@ -1999,7 +2028,9 @@
     "pagesHint": "Leave all unticked to include every Page.",
     "daysBack": "Days in the past",
     "daysAhead": "Days ahead",
-    "allowComments": "Let the client write comments"
+    "allowComments": "Let the client write comments",
+    "kind_portal": "Client portal",
+    "kindHint_portal": "Everything in one link: posts to approve, the calendar, and each Page’s results."
   },
   "apiKeys": {
     "title": "API & Claude",

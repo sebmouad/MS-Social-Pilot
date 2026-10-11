@@ -11,7 +11,7 @@ import { Icon } from './Icon';
 
 interface LinkRow {
   id: string;
-  kind: 'review' | 'calendar';
+  kind: 'review' | 'calendar' | 'portal';
   title: string;
   pages: string[];
   createdLabel: string;
@@ -20,7 +20,7 @@ interface LinkRow {
 }
 
 interface Draft {
-  kind: 'review' | 'calendar';
+  kind: 'review' | 'calendar' | 'portal';
   title: string;
   description: string;
   targetIds: string[];
@@ -29,7 +29,7 @@ interface Draft {
   allowComments: boolean;
 }
 
-const EMPTY: Draft = { kind: 'review', title: '', description: '', targetIds: [], daysBack: 7, daysAhead: 30, allowComments: true };
+const EMPTY: Draft = { kind: 'portal', title: '', description: '', targetIds: [], daysBack: 7, daysAhead: 30, allowComments: true };
 
 export function ShareLinksClient({
   links,
@@ -105,16 +105,20 @@ export function ShareLinksClient({
             <li key={link.id} className={`flex flex-wrap items-center gap-3 px-4 py-3 ${link.revoked ? 'opacity-55' : ''}`}>
               <span
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                  link.kind === 'review' ? 'bg-violet-50 text-violet-700' : 'bg-brand-50 text-brand-600'
+                  link.kind === 'review'
+                    ? 'bg-violet-50 text-violet-700'
+                    : link.kind === 'portal'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-brand-50 text-brand-600'
                 }`}
               >
-                <Icon name={link.kind === 'review' ? 'approvals' : 'calendar'} size={18} />
+                <Icon name={link.kind === 'review' ? 'approvals' : link.kind === 'portal' ? 'analytics' : 'calendar'} size={18} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[15px] font-semibold text-slate-900">{link.title}</span>
                 <span className="block truncate text-xs text-slate-500">
                   {t(`kind_${link.kind}`)} · {link.pages.length ? link.pages.join(', ') : t('allPages')} · {link.createdLabel}
-                  {link.kind === 'review' && ` · ${t('answers', { count: link.answers })}`}
+                  {link.kind !== 'calendar' && ` · ${t('answers', { count: link.answers })}`}
                 </span>
               </span>
               {link.revoked ? (
@@ -167,8 +171,8 @@ export function ShareLinksClient({
           draft && (
             <div className="space-y-4">
               {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label={t('kindLabel')}>
-                {(['review', 'calendar'] as const).map((kind) => (
+              <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label={t('kindLabel')}>
+                {(['portal', 'review', 'calendar'] as const).map((kind) => (
                   <label
                     key={kind}
                     className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${
@@ -238,7 +242,7 @@ export function ShareLinksClient({
                   })}
                 </ul>
               </div>
-              {draft.kind === 'calendar' ? (
+              {draft.kind !== 'review' && (
                 <div className="grid grid-cols-2 gap-3">
                   <label className="text-sm">
                     <span className="label">{t('daysBack')}</span>
@@ -249,7 +253,8 @@ export function ShareLinksClient({
                     <input type="number" min={1} max={120} className="input" value={draft.daysAhead} onChange={(event) => setDraft({ ...draft, daysAhead: Number(event.target.value) || 1 })} />
                   </label>
                 </div>
-              ) : (
+              )}
+              {draft.kind !== 'calendar' && (
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input
                     type="checkbox"

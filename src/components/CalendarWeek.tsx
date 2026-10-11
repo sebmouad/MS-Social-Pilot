@@ -26,6 +26,7 @@ export function WeekGrid<P extends WeekPost>({
   newPostLabel,
   weekdayName,
   dayName,
+  ideaHref,
 }: {
   days: Date[];
   timeZone: string;
@@ -37,6 +38,8 @@ export function WeekGrid<P extends WeekPost>({
   weekdayName: (day: number) => string;
   /** The awareness days falling on a day. */
   dayName: (key: string) => string[];
+  /** Where an awareness day's chip leads: the composer, with a first line. Null for past days. */
+  ideaHref?: (key: string, name: string) => string | null;
 }) {
   const keys = days.map((day) => formatInZone(day, timeZone, 'yyyy-MM-dd'));
   const hourOf = (post: P) => (post.scheduledAt ? Number(formatInZone(post.scheduledAt, timeZone, 'H')) : 0);
@@ -62,11 +65,19 @@ export function WeekGrid<P extends WeekPost>({
                   >
                     {formatInZone(day, timeZone, 'd')}
                   </p>
-                  {names.map((name) => (
-                    <p key={name} className="mt-1 truncate rounded bg-emerald-50 px-1 py-0.5 text-[10px] font-semibold text-emerald-700" title={name}>
-                      {name}
-                    </p>
-                  ))}
+                  {names.map((name) => {
+                    const href = ideaHref?.(key, name);
+                    const look = 'mt-1 block truncate rounded bg-emerald-50 px-1 py-0.5 text-[10px] font-semibold text-emerald-700';
+                    return href ? (
+                      <Link key={name} href={href} className={`${look} hover:bg-emerald-100`} title={name}>
+                        {name}
+                      </Link>
+                    ) : (
+                      <p key={name} className={look} title={name}>
+                        {name}
+                      </p>
+                    );
+                  })}
                 </div>
               );
             })}

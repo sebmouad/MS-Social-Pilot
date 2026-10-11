@@ -3,11 +3,12 @@ import { z } from 'zod';
 import { requireCapability } from '@/lib/auth';
 import { canManageOthersPosts } from '@/lib/constants';
 import { assertPageParam } from '@/lib/page-access';
-import { clearQueue, shuffleQueue } from '@/lib/queue-actions';
+import { clearDrafts, clearQueue, shuffleQueue } from '@/lib/queue-actions';
+import { errors } from '@/lib/errors';
 import { ok, readJson, route } from '@/lib/api';
 
 const schema = z.object({
-  action: z.enum(['shuffle', 'clear']),
+  action: z.enum(['shuffle', 'clear', 'clearDrafts']),
   /** One Page's queue, or every Page's when absent. */
   targetId: z.string().min(1).nullish(),
 });
@@ -22,6 +23,11 @@ export const POST = route(async (request: Request) => {
   assertPageParam(auth.pageScope, input.targetId);
   const targetIds = input.targetId ? [input.targetId] : auth.pageScope.all ? null : auth.pageScope.ids;
   const options = { workspaceId: auth.workspace.id, userId: auth.user.id, targetIds };
+  if (input.action === 'clearDrafts') {
+    // One Page at a time: clearing every draft in the workspace is not a click.
+    if (!input.targetId) throw errors.notFound();
+    return ok({ moved: await clearDrafts({ workspaceId: auth.workspace.id, userId: auth.user.id, targetId: input.targetId }) });
+  }
   const moved = input.action === 'shuffle' ? await shuffleQueue(options) : await clearQueue(options);
   return ok({ moved });
 });

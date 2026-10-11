@@ -48,7 +48,7 @@ export default async function SharingPage() {
         pages={pages}
         links={links.map((link) => ({
           id: link.id,
-          kind: link.kind as 'review' | 'calendar',
+          kind: link.kind as 'review' | 'calendar' | 'portal',
           title: link.title,
           pages: parseTargetIds(link.targetIds).map((id) => pageName.get(id) ?? '').filter(Boolean),
           createdLabel: formatInZone(link.createdAt, auth.workspace.timezone, 'd MMM yyyy'),

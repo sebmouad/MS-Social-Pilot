@@ -363,7 +363,8 @@
     "aiPlanBrief": "Cette semaine…",
     "aiPlanBriefPlaceholder": "Nouveau menu d’automne dès mardi, soupe de potiron et gâteau aux châtaignes, -10 % pour les étudiants mercredi",
     "aiPlanCount": "Publications",
-    "aiPlanStart": "Premier jour"
+    "aiPlanStart": "Premier jour",
+    "ideaStart": "✨ Aujourd’hui, c’est {day} ! "
   },
   "common": {
     "all": "Tout",
@@ -1869,7 +1870,24 @@
     },
     "hide": "Masquer {page}",
     "show": "Afficher {page}",
-    "noMatch": "Aucune Page ne correspond."
+    "noMatch": "Aucune Page ne correspond.",
+    "menuFor": "Plus pour {page}",
+    "menuNewPost": "Nouvelle publication",
+    "menuFeed": "Aperçu du fil",
+    "menuAnalysis": "Analyse de la Page",
+    "menuVoice": "Ton et liens",
+    "menu_shuffle": "Mélanger la file",
+    "menu_clear": "Vider la file",
+    "menu_clearDrafts": "Supprimer les brouillons",
+    "done_shuffle": "{count, plural, =0 {Rien à mélanger.} one {1 publication déplacée.} other {# publications mélangées.}}",
+    "done_clear": "{count, plural, =0 {La file est vide.} one {1 publication repassée en brouillon.} other {# publications repassées en brouillon.}}",
+    "done_clearDrafts": "{count, plural, =0 {Aucun brouillon à supprimer.} one {1 brouillon supprimé.} other {# brouillons supprimés.}}",
+    "confirmTitle_shuffle": "Mélanger la file de {page} ?",
+    "confirmTitle_clear": "Vider la file de {page} ?",
+    "confirmTitle_clearDrafts": "Supprimer les brouillons de {page} ?",
+    "confirmHint_shuffle": "Les mêmes créneaux restent réservés ; les publications y sont redistribuées dans un nouvel ordre.",
+    "confirmHint_clear": "Chaque publication à venir envoyée d’ici repasse en brouillon. Rien n’est supprimé ; celles que Facebook détient ou en attente de validation restent en place.",
+    "confirmHint_clearDrafts": "Les brouillons écrits pour cette seule Page sont supprimés définitivement. Ceux partagés avec d’autres Pages sont conservés."
   },
   "labels": {
     "allLabels": "Tous les libellés",
@@ -1967,7 +1985,18 @@
     "approve": "Approuver",
     "requestChanges": "Demander des modifications",
     "commentOnly": "Commenter",
-    "title": "Publications partagées"
+    "title": "Publications partagées",
+    "portalBadge": "Espace client",
+    "portalTabs": "Rubriques",
+    "tab_review": "À valider",
+    "tab_calendar": "Calendrier",
+    "tab_results": "Résultats",
+    "resultsHint": "Les 30 derniers jours, comparés aux 30 précédents.",
+    "followers": "{count, plural, one {1 abonné} other {# abonnés}}",
+    "healthHint": "Santé de la Page : rythme, engagement et croissance, sur 100.",
+    "bestPost": "Meilleure publication",
+    "bestPostFigures": "{count, plural, one {1 interaction} other {# interactions}}",
+    "resultsFoot": "Chiffres de Facebook, actualisés toutes les quelques heures."
   },
   "sharing": {
     "title": "Liens clients",
@@ -1999,7 +2028,9 @@
     "pagesHint": "Ne cochez rien pour inclure toutes les Pages.",
     "daysBack": "Jours passés",
     "daysAhead": "Jours à venir",
-    "allowComments": "Autoriser les commentaires du client"
+    "allowComments": "Autoriser les commentaires du client",
+    "kind_portal": "Espace client",
+    "kindHint_portal": "Tout dans un lien : publications à valider, calendrier et résultats de chaque Page."
   },
   "apiKeys": {
     "title": "API et Claude",

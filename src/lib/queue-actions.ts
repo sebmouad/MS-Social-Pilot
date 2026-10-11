@@ -67,3 +67,22 @@ export async function clearQueue(options: {
   await logActivity(options.workspaceId, 'post.updated', { action: 'queue.cleared', posts: posts.length }, options.userId);
   return posts.length;
 }
+
+/**
+ * Delete the drafts written for one Page only. A draft meant for several
+ * Pages is left alone: it is somebody else's work too.
+ */
+export async function clearDrafts(options: { workspaceId: string; userId: string; targetId: string }): Promise<number> {
+  const drafts = await prisma.post.findMany({
+    where: {
+      workspaceId: options.workspaceId,
+      status: 'draft',
+      targets: { some: { targetId: options.targetId }, every: { targetId: options.targetId } },
+    },
+    select: { id: true },
+  });
+  if (drafts.length === 0) return 0;
+  await prisma.post.deleteMany({ where: { id: { in: drafts.map((post) => post.id) } } });
+  await logActivity(options.workspaceId, 'post.cancelled', { action: 'drafts.cleared', posts: drafts.length }, options.userId);
+  return drafts.length;
+}

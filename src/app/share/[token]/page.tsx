@@ -1,8 +1,10 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
 import { FeedPost } from '@/components/FeedPost';
 import { ShareReview } from '@/components/ShareReview';
+import { PortalResults } from '@/components/PortalResults';
 import { StatusBadge } from '@/components/StatusBadge';
 import { feedLinkOf, feedMediaOf, feedMediaOfPicture } from '@/lib/feed';
 import { prisma } from '@/lib/prisma';
@@ -23,19 +25,31 @@ const DAY = 24 * 60 * 60 * 1000;
  * for their decision, or the plan for the coming weeks. Branded with the
  * workspace's logo, and nothing else of the app around it.
  */
-export default async function SharePage({ params }: { params: Promise<{ token: string }> }) {
+export default async function SharePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { token } = await params;
   const link = await openShareLink(token);
   if (!link) notFound();
+  // A portal is the three in one: what waits for the client, the plan, and
+  // how the Pages are doing. A review or calendar link is one of them.
+  const tabParam = (await searchParams).tab;
+  const tab = Array.isArray(tabParam) ? tabParam[0] : tabParam;
+  const mode: 'review' | 'calendar' | 'results' =
+    link.kind === 'portal' ? (tab === 'calendar' || tab === 'results' ? tab : 'review') : (link.kind as 'review' | 'calendar');
   const t = await getTranslations('share');
   const tCommon = await getTranslations('common');
   const timezone = link.workspace.timezone;
   const now = new Date();
 
-  const posts = await prisma.post.findMany({
+  const posts = mode === 'results' ? [] : await prisma.post.findMany({
     where: {
       ...sharedPostWhere(link),
-      ...(link.kind === 'review'
+      ...(mode === 'review'
         ? { status: { in: ['pending_approval', 'scheduled', 'draft'] }, OR: [{ scheduledAt: { gte: now } }, { scheduledAt: null }] }
         : {
             status: { in: ['scheduled', 'published', 'partially_failed', 'failed', 'pending_approval'] },
@@ -47,7 +61,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
         where: link.pageIds.length ? { targetId: { in: link.pageIds } } : {},
         include: { target: { select: { name: true, pictureUrl: true } } },
       },
-      reviewDecisions: link.kind === 'review' ? { where: { shareLinkId: link.id }, orderBy: { createdAt: 'asc' } } : false,
+      reviewDecisions: mode === 'review' ? { where: { shareLinkId: link.id }, orderBy: { createdAt: 'asc' } } : false,
     },
     orderBy: [{ scheduledAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
     take: 100,
@@ -57,7 +71,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
   // belongs on it too — not only what was sent from here.
   const sentFromHere = new Set(posts.flatMap((post) => post.targets.map((row) => row.remotePostId)).filter(Boolean));
   const found =
-    link.kind === 'calendar'
+    mode === 'calendar'
       ? await prisma.externalPost.findMany({
           where: {
             target: { workspaceId: link.workspaceId },
@@ -127,7 +141,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
             <span className="text-[15px] font-bold text-slate-900">{link.workspace.name}</span>
           )}
           <span className="ml-auto rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-            {link.kind === 'review' ? t('reviewBadge') : t('calendarBadge')}
+            {link.kind === 'portal' ? t('portalBadge') : link.kind === 'review' ? t('reviewBadge') : t('calendarBadge')}
           </span>
         </div>
       </header>
@@ -137,11 +151,32 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
           <h1 className="text-2xl font-bold text-slate-900">{link.title}</h1>
           {link.description && <p className="mt-1 text-[15px] text-slate-700">{link.description}</p>}
           <p className="mt-1 text-sm text-slate-500">
-            {link.kind === 'review' ? t('reviewHint', { count: items.length }) : t('calendarHint', { back: link.daysBack, ahead: link.daysAhead })}
+            {mode === 'review'
+              ? t('reviewHint', { count: items.length })
+              : mode === 'calendar'
+                ? t('calendarHint', { back: link.daysBack, ahead: link.daysAhead })
+                : t('resultsHint')}
           </p>
         </div>
 
-        {items.length === 0 && <div className="card p-8 text-center text-sm text-slate-600">{t('empty')}</div>}
+        {link.kind === 'portal' && (
+          <nav className="segmented w-fit" aria-label={t('portalTabs')}>
+            {(['review', 'calendar', 'results'] as const).map((key) => (
+              <Link
+                key={key}
+                href={`/share/${token}${key === 'review' ? '' : `?tab=${key}`}`}
+                aria-current={mode === key ? 'page' : undefined}
+                className={`segmented-item ${mode === key ? 'segmented-item-active' : ''}`}
+              >
+                {t(`tab_${key}`)}
+              </Link>
+            ))}
+          </nav>
+        )}
+
+        {mode === 'results' && <PortalResults link={link} />}
+
+        {mode !== 'results' && items.length === 0 && <div className="card p-8 text-center text-sm text-slate-600">{t('empty')}</div>}
 
         {[...days.entries()].map(([day, list]) => (
           <section key={day} aria-label={day} className="space-y-3">
@@ -160,7 +195,7 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
                   seeMore={tCommon('seeMore')}
                   clamp
                 />
-                {link.kind === 'review' && item.post && (
+                {mode === 'review' && item.post && (
                   <ShareReview
                     token={token}
                     postId={item.post.id}

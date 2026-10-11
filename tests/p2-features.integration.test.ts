@@ -129,6 +129,22 @@ describe('the whole queue', () => {
   });
 });
 
+describe('a Page’s drafts', () => {
+  it('are deleted only when written for that Page alone', async () => {
+    const { owner, workspace, bakery, garage } = await seed();
+    const draft = (targetIds: string[], message: string) =>
+      prisma.post.create({
+        data: { workspaceId: workspace.id, authorId: owner.id, message, status: 'draft', targets: { create: targetIds.map((targetId) => ({ targetId })) } },
+      });
+    await draft([bakery.id], 'Mine');
+    await draft([bakery.id, garage.id], 'Shared');
+    await draft([garage.id], 'Theirs');
+    expect(await queue.clearDrafts({ workspaceId: workspace.id, userId: owner.id, targetId: bakery.id })).toBe(1);
+    const left = await prisma.post.findMany({ orderBy: { message: 'asc' } });
+    expect(left.map((post) => post.message)).toEqual(['Shared', 'Theirs']);
+  });
+});
+
 describe('emailed reports', () => {
   it('go to every recipient when due, then move to the next run', async () => {
     const { workspace, bakery } = await seed();

@@ -24,7 +24,7 @@ export const POST = route(async (request: Request, context: { params: Promise<{ 
   }
 
   const link = await openShareLink(token);
-  if (!link || link.kind !== 'review') throw new AppError({ key: 'errors.notFound', fallback: 'Not found.', status: 404 });
+  if (!link || (link.kind !== 'review' && link.kind !== 'portal')) throw new AppError({ key: 'errors.notFound', fallback: 'Not found.', status: 404 });
 
   const input = decisionSchema.parse(await readJson(request));
   if (input.decision === 'comment' && !input.comment) {

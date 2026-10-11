@@ -242,6 +242,9 @@ export default async function CalendarPage({
   // "New post on this day" starts at nine in the morning; today it keeps the
   // composer's own default of an hour from now.
   const newPostHref = (key: string) => (key === todayKey ? '/compose' : `/compose?at=${key}T09:00`);
+  /** An awareness day as a post idea: the composer opens on that day with a first line written. */
+  const ideaHref = (key: string, name: string) =>
+    `${newPostHref(key)}${key === todayKey ? '?' : '&'}text=${encodeURIComponent(t('ideaStart', { day: name }))}`;
   // Moving through the months keeps the Pages and the label being looked at.
   const keep = new URLSearchParams();
   for (const key of ['group', 'pages', 'label', 'drafts']) {
@@ -357,6 +360,7 @@ export default async function CalendarPage({
         group={filter.group}
         visible={filter.visible}
         canManageGroups={canManageSettings(auth.role)}
+        canManageQueue={canManageOthersPosts(auth.role)}
       />
     <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -507,6 +511,7 @@ export default async function CalendarPage({
           newPostLabel={(date: Date) => t('newPostOn', { date: dayLabel.format(date) })}
           weekdayName={weekdayName}
           dayName={(key: string) => awarenessOn(key).map((entry) => tDays(entry.key))}
+          ideaHref={(key: string, name: string) => (key >= todayKey ? ideaHref(key, name) : null)}
         />
       ) : (
       <div className="card overflow-hidden">
@@ -566,7 +571,7 @@ export default async function CalendarPage({
                     {awarenessOn(key).map((entry) => (
                       <li key={entry.key}>
                         <Link
-                          href={key >= todayKey ? newPostHref(key) : '#'}
+                          href={key >= todayKey ? ideaHref(key, tDays(entry.key)) : '#'}
                           className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50"
                           title={tDays(entry.key)}
                         >
