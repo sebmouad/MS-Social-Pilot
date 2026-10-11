@@ -67,8 +67,11 @@ Today: `src/lib/email/send.ts` uses Resend only (`email.apiKey`,
 
 ### 0.2 AI: three providers, live model lists, costs
 Today: `src/lib/ai.ts` is Anthropic-only (`ai.apiKey`, `ai.model` with a
-**hard-coded, now outdated** model list: `claude-opus-5`, `claude-sonnet-5`,
-`claude-haiku-4-5…`). `AiGeneration` rows store input/output tokens;
+**hard-coded, outdated** model list (`claude-opus-5`, `claude-sonnet-5`,
+`claude-haiku-4-5…` in `src/lib/settings/definitions.ts`). **Owner's rule: no
+model list may be written in code — it must be fetched from each provider.**
+Remove the `options` array (and any hard-coded default model id); the default
+is "the provider's recommended/first listed model" picked from the fetched list). `AiGeneration` rows store input/output tokens;
 `usageSummary()` shows 30-day tokens, no money.
 - Settings (group `ai`): `ai.provider` select `anthropic | openai | gemini`;
   keys `ai.anthropicKey` (migrate from `ai.apiKey`), `ai.openaiKey`,

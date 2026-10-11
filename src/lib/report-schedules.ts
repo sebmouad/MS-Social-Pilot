@@ -15,7 +15,7 @@ import { RANGE_PRESETS } from './date-range';
  * the 1st for the month before, to people who may never open the app.
  *
  * Each run is pinned to 08:00 in the workspace's zone, so a client in
- * Casablanca reads last week's figures with Monday's coffee rather than at
+ * Toronto reads last week's figures with Monday's coffee rather than at
  * whatever hour UTC's Monday happens to start for them.
  */
 

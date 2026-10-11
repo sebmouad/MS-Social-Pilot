@@ -5,7 +5,7 @@ import { formatInZone, localInputToUtc } from './time';
  * scheduling tools offer them: named periods first, then any two dates.
  *
  * Every boundary is a midnight in the workspace's own zone, not UTC's, so
- * "yesterday" for a client in Casablanca is their yesterday. A range runs from
+ * "yesterday" for a client in Toronto is their yesterday. A range runs from
  * `from` (inclusive) to `to` (exclusive, or "now" for a period still running).
  */
 export const RANGE_PRESETS = [

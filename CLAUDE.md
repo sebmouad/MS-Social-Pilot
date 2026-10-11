@@ -53,6 +53,8 @@ translations, migrations, new network connector, release).
    categories and templates are defined by each user (audience per Page, NEXT_PHASES
    H0). Use neutral examples ("Client A", "Product launch"), never the owner's
    Pages or sites.
-10. Client components must not import server modules (anything that reaches
+10. **AI model lists are never written in code**: they are fetched from each
+    provider's API (NEXT_PHASES 0.2).
+11. Client components must not import server modules (anything that reaches
    `@/lib/prisma`). Shared constants go in plain modules (`src/lib/palette.ts`,
    `src/lib/network-rules.ts`, `src/lib/report-sections.ts`).
