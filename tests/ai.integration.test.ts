@@ -20,6 +20,13 @@ let reply = 'A cheerful post about the spring sale.';
 
 vi.mock('@anthropic-ai/sdk', () => {
   class Anthropic {
+    // The provider's own model list, newest first: the app picks from it when
+    // no model is configured (src/lib/ai-models.ts).
+    models = {
+      list: async function* () {
+        yield { id: 'test-model-newest', display_name: 'Test newest', created_at: '2026-01-01T00:00:00Z' };
+      },
+    };
     messages = {
       create: async (request: {
         model: string;

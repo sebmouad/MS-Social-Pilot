@@ -50,6 +50,8 @@ TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/social_pilot_te
 ## 3. Browser walk (Playwright, ~4.5 min, 251 tests)
 
 ```bash
+# Playwright is not in package.json: install it after every npm ci
+npm i --no-save @playwright/test
 PATH="$PWD/scripts/dev/bin:$PATH" \
 E2E_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/social_pilot_test \
 npx playwright test --reporter=line

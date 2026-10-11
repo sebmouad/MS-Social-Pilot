@@ -115,7 +115,7 @@ describe('validation', () => {
   });
 
   it('refuses an option outside the list', async () => {
-    await expect(settings.writeSetting('ai.model', 'gpt-4', null)).rejects.toThrow(/one of/);
+    await expect(settings.writeSetting('i18n.defaultLocale', 'xx', null)).rejects.toThrow(/one of/);
   });
 
   it('refuses a saved sign-in filled into the Facebook app fields', async () => {
@@ -175,7 +175,7 @@ describe('secrets', () => {
 
 describe('describeSettings', () => {
   it('reports where each value came from', async () => {
-    process.env.AI_MODEL = 'claude-opus-5';
+    process.env.AI_MODEL = 'model-from-env';
     await settings.writeSetting('scheduler.pollSeconds', 90, null);
 
     const described = await settings.describeSettings();

@@ -601,16 +601,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     key: 'ai.model',
     group: 'ai',
-    type: 'select',
+    type: 'string',
     label: 'Model',
-    description: 'Which Claude model writes captions.',
-    default: 'claude-sonnet-5',
+    // No list in the code: the choices are fetched from the provider with the
+    // key above (src/lib/ai-models.ts). Blank means the newest model listed.
+    description: 'Which model writes captions. Blank uses the newest model your key can use.',
+    default: '',
     env: 'AI_MODEL',
-    options: [
-      { value: 'claude-opus-5', label: 'Opus — highest quality, highest cost' },
-      { value: 'claude-sonnet-5', label: 'Sonnet — balanced' },
-      { value: 'claude-haiku-4-5-20251001', label: 'Haiku — fastest, cheapest' },
-    ],
   },
   {
     key: 'ai.rateLimitPerHour',

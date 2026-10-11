@@ -560,7 +560,15 @@
       "database": "Set here",
       "environment": "From environment",
       "default": "Default"
-    }
+    },
+    "aiModelNewest": "Newest model (recommended)",
+    "aiModelNotListed": "{id} — not offered by your key any more",
+    "aiModelRefresh": "Refresh the model list",
+    "aiModelLoading": "Fetching the models your key can use…",
+    "aiModelKeyRejected": "The provider rejected the API key. Check the key above, save, then refresh.",
+    "aiModelUnreachable": "Couldn't reach the provider to list models. Try refreshing in a minute.",
+    "aiModelNoKey": "Add an API key above and save to see the models it can use.",
+    "aiModelCount": "{count, plural, one {# model fetched from the provider} other {# models fetched from the provider}}"
   },
   "connections": {
     "active": "Active",

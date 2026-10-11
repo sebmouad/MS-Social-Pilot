@@ -560,7 +560,15 @@
       "database": "Défini ici",
       "environment": "Depuis l’environnement",
       "default": "Par défaut"
-    }
+    },
+    "aiModelNewest": "Modèle le plus récent (recommandé)",
+    "aiModelNotListed": "{id} — plus proposé pour votre clé",
+    "aiModelRefresh": "Actualiser la liste des modèles",
+    "aiModelLoading": "Récupération des modèles disponibles pour votre clé…",
+    "aiModelKeyRejected": "Le fournisseur a refusé la clé API. Vérifiez la clé ci-dessus, enregistrez, puis actualisez.",
+    "aiModelUnreachable": "Impossible de joindre le fournisseur pour lister les modèles. Réessayez dans une minute.",
+    "aiModelNoKey": "Ajoutez une clé API ci-dessus et enregistrez pour voir les modèles disponibles.",
+    "aiModelCount": "{count, plural, one {# modèle récupéré chez le fournisseur} other {# modèles récupérés chez le fournisseur}}"
   },
   "connections": {
     "active": "Actif",

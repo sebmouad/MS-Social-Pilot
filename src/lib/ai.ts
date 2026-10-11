@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { AiGenerationKind, Locale } from '@prisma/client';
 
 import { prisma } from './prisma';
+import { resolveAiModel } from './ai-models';
 import { env } from './env';
 import { errors } from './errors';
 
@@ -103,7 +104,7 @@ async function complete(options: {
 }): Promise<GenerationResult> {
   await assertWithinRateLimit(options.workspaceId);
 
-  const model = env.aiModel;
+  const model = await resolveAiModel();
   const response = await anthropic().messages.create({
     model,
     max_tokens: options.maxTokens ?? MAX_OUTPUT_TOKENS,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
@@ -236,6 +236,12 @@ export function ConfigClient({
                         value={asText(editing ? current : entry.value)}
                         onChange={(event) => set(entry.key, event.target.value)}
                       />
+                    ) : entry.key === 'ai.model' ? (
+                      <AiModelPicker
+                        id={entry.key}
+                        value={asText(editing ? current : entry.value)}
+                        onChange={(value) => set(entry.key, value)}
+                      />
                     ) : (
                       <input
                         id={entry.key}
@@ -316,4 +322,81 @@ function groupIcon(group: string) {
     media: 'image',
   };
   return map[group] ?? 'config';
+}
+
+interface AiModelOption {
+  id: string;
+  label: string;
+}
+
+/**
+ * The model field, filled from the provider's own list (never a list in the
+ * code). Blank keeps "the newest model", so a new release is picked up without
+ * anyone editing this screen.
+ */
+function AiModelPicker({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const t = useTranslations('config');
+  const [models, setModels] = useState<AiModelOption[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function load(refresh: boolean) {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/settings/config/ai-models${refresh ? '?refresh=1' : ''}`);
+      const body = (await response.json()) as { models?: AiModelOption[]; error?: string | null };
+      setModels(body.models ?? []);
+      setError(response.ok ? (body.error ?? null) : 'unreachable');
+    } catch {
+      setModels([]);
+      setError('unreachable');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void load(false);
+  }, []);
+
+  const known = models?.some((model) => model.id === value) ?? true;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex gap-1">
+        <select id={id} className="input" value={value} onChange={(event) => onChange(event.target.value)}>
+          <option value="">{t('aiModelNewest')}</option>
+          {value && !known && <option value={value}>{t('aiModelNotListed', { id: value })}</option>}
+          {models?.map((model) => (
+            <option key={model.id} value={model.id}>
+              {model.label} ({model.id})
+            </option>
+          ))}
+        </select>
+        <button type="button" className="btn-ghost" disabled={loading} onClick={() => void load(true)}>
+          <span className="sr-only">{t('aiModelRefresh')}</span>
+          <Icon name="refresh" />
+        </button>
+      </div>
+      <p className="hint" aria-live="polite">
+        {loading
+          ? t('aiModelLoading')
+          : error === 'keyRejected'
+            ? t('aiModelKeyRejected')
+            : error
+              ? t('aiModelUnreachable')
+              : models && models.length === 0
+                ? t('aiModelNoKey')
+                : t('aiModelCount', { count: models?.length ?? 0 })}
+      </p>
+    </div>
+  );
 }
