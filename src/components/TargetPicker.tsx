@@ -1,5 +1,6 @@
 'use client';
 
+import { NetworkMark } from './NetworkMark';
 import { useTranslations } from 'next-intl';
 
 import { targetTypeKey } from '@/lib/constants';
@@ -139,14 +140,18 @@ export function TargetPicker({ targets, selected, onChange, groups = [] }: Props
                 disabled={locked}
                 onChange={() => toggle(target)}
               />
-              {target.pictureUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={target.pictureUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
-              ) : (
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
-                  {target.name.slice(0, 2).toUpperCase()}
-                </span>
-              )}
+              <span className="relative shrink-0">
+                {target.pictureUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={target.pictureUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
+                    {target.name.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+                {/* Which network, at a glance, once there is more than Facebook. */}
+                <NetworkMark network={target.type} size={14} className="absolute -bottom-0.5 -right-0.5 ring-2 ring-white" />
+              </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-slate-900">{target.name}</span>
                 <span className="block truncate text-xs text-slate-500">

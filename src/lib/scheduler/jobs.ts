@@ -86,6 +86,8 @@ export async function runTokenExpiryCheck(context: JobContext): Promise<string |
   const accounts = await prisma.socialAccount.findMany({
     where: {
       invalidatedAt: null,
+      // Facebook's tokens: the other networks' refresh themselves on publishing.
+      provider: 'facebook',
       tokenExpiresAt: { not: null, lte: horizon, gt: context.now },
       // Warn once per token, not daily until it dies.
       expiryWarningSentAt: null,

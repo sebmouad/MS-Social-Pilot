@@ -4,7 +4,7 @@ import { prisma } from '../prisma';
 import type { ActivityAction } from '../activity';
 import { env } from '../env';
 import { decryptSecret } from '../crypto';
-import { parseMedia, toJsonOrNull } from '../json';
+import { parseLinkPreview, parseMedia, toJsonOrNull } from '../json';
 import { resolveMediaForInstagram, resolveMediaForPublish } from '../media';
 import { asGraphError, GraphError } from '../facebook/graph';
 import { publishPost } from '../facebook/publish';
@@ -12,6 +12,7 @@ import { publishToInstagram } from '../facebook/instagram-publish';
 import { decideRetry } from './backoff';
 import { notifyConnectionExpired, notifyPublishFailure } from '../email/notify';
 import { prepareLinks } from '../links';
+import { isNetworkKey, publishToNetwork } from '../networks';
 import { postFirstComment } from '../first-comment';
 import type { PostFormat } from '../facebook/publish';
 import {
@@ -365,7 +366,25 @@ async function publishClaimed(
       targetName: target.name,
     });
 
-    const result = isInstagram
+    const network = isNetworkKey(target.type) ? target.type : null;
+    if (network && !target.socialAccount) {
+      throw new GraphError({ message: 'This account is no longer connected. Reconnect it.', kind: 'auth' });
+    }
+    const result = network
+      ? await publishToNetwork({
+          key: network,
+          target: { providerId: target.providerId, name: target.name },
+          account: target.socialAccount!,
+          text: prepared.message,
+          link: prepared.link,
+          media: attachments,
+          linkPreview: (() => {
+            const card = parseLinkPreview(post.linkPreview);
+            return card ? { title: card.title, description: card.description, image: card.imageUrl } : null;
+          })(),
+          idempotencyKey: postTargetId,
+        })
+      : isInstagram
       ? await publishToInstagram({
           igUserId: target.providerId,
           accessToken: decryptSecret(encryptedToken),
@@ -423,7 +442,8 @@ async function publishClaimed(
     // comment is noted on the destination for a retry, and the post stays
     // published rather than coming back here to be sent a second time.
     // A Story takes no comments, so there is nothing to put under it.
-    if (post.firstComment?.trim() && post.format !== 'story') {
+    // Other networks have no "comment as the Page": the first comment is Facebook's.
+    if (post.firstComment?.trim() && post.format !== 'story' && !network) {
       const comment = await postFirstComment(postTargetId, options.now);
       if (comment === 'failed') {
         options.logger?.(`Published post ${post.id} to ${target.name}, but its first comment was refused.`);

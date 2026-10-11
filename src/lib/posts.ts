@@ -1,3 +1,4 @@
+import { NETWORK_LABELS, networkProblems } from './networks';
 import { ownLabels } from './page-groups';
 import { prisma } from './prisma';
 import { env } from './env';
@@ -287,6 +288,7 @@ export async function createPost(
   if (!input.saveAsDraft) {
     assertInstagramHasMedia(targets, input.media?.length ?? 0);
     assertFormatFits(input.format ?? 'post', targets, input.media ?? [], input.publishMode);
+    assertNetworksFit(targets, { message: input.message, link: input.link ?? null, media: input.media ?? [] });
   }
 
   // Cache the link's Open Graph card so the composer preview and the post list
@@ -663,6 +665,21 @@ function assertNativeSupported(targets: Array<{ type: string; name: string }>): 
  * holds neither for later. Said when the post is saved rather than when the
  * worker reaches it hours later.
  */
+/** A post that one of its networks would refuse is refused here, saying which and why. */
+function assertNetworksFit(
+  targets: Array<{ type: string; name: string }>,
+  post: { message: string; link: string | null; media: Array<{ kind: string }> },
+): void {
+  const problem = networkProblems(targets, post)[0];
+  if (!problem) return;
+  throw new AppError({
+    key: `errors.network_${problem.key}`,
+    fallback: `${problem.target} (${NETWORK_LABELS[problem.network]}) cannot take this post.`,
+    params: { target: problem.target, network: NETWORK_LABELS[problem.network], ...problem.params },
+    status: 422,
+  });
+}
+
 function assertFormatFits(
   format: string,
   targets: Array<{ type: string; name: string }>,
@@ -1003,6 +1020,11 @@ export async function updatePost(
       input.media ?? parseMedia(post.media),
       nextMode,
     );
+    assertNetworksFit(nextTargets, {
+      message: input.message ?? post.message,
+      link: input.link === undefined ? post.link : input.link,
+      media: input.media ?? parseMedia(post.media),
+    });
   }
 
   await prisma.$transaction(async (tx) => {

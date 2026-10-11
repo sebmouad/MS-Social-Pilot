@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { FeedAvatar } from './FeedPost';
 import { Icon } from './Icon';
 import { PageMenu } from './PageMenu';
+import { NetworkMark } from './NetworkMark';
 import { paletteOf } from '@/lib/palette';
 import type { PageGroupView } from '@/lib/page-groups';
 import type { SidebarPage } from '@/lib/page-filter';
@@ -203,7 +204,12 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
                 aria-pressed={alone}
                 onClick={() => solo(page.id)}
               >
-                <FeedAvatar name={page.name} pictureUrl={page.pictureUrl} size="sm" />
+                <span className="relative shrink-0">
+                  <FeedAvatar name={page.name} pictureUrl={page.pictureUrl} size="sm" />
+                  {page.type !== 'page' && (
+                    <NetworkMark network={page.type} size={13} className="absolute -bottom-0.5 -right-0.5 ring-2 ring-white" />
+                  )}
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className={`block truncate text-sm font-semibold ${alone ? 'text-brand-700' : 'text-slate-900'}`}>
                     {page.name}

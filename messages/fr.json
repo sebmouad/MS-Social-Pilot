@@ -932,7 +932,12 @@
     "tooManyRequests": "Trop de requêtes. Patientez quelques minutes puis réessayez.",
     "commentRequired": "Écrivez d’abord un commentaire.",
     "commentsOff": "Les commentaires sont désactivés pour ce lien.",
-    "aiPlanEmpty": "L’IA n’a pas renvoyé de plan exploitable. Réessayez ou précisez la semaine."
+    "aiPlanEmpty": "L’IA n’a pas renvoyé de plan exploitable. Réessayez ou précisez la semaine.",
+    "blueskySignIn": "Bluesky n’a pas accepté cet identifiant et ce mot de passe d’application. Vérifiez-les, et que le mot de passe n’a pas été révoqué.",
+    "network_tooLong": "{target} ({network}) accepte {limit} caractères ; cette publication en a {length}.",
+    "network_tooManyImages": "{target} ({network}) accepte jusqu’à {max} images.",
+    "network_noVideo": "{target} ({network}) ne peut pas recevoir de vidéo d’ici. Utilisez des photos, ou retirez-le de cette publication.",
+    "network_needsImage": "{target} ({network}) a besoin d’une image : ajoutez-en une, ou retirez-le de cette publication."
   },
   "feeds": {
     "title": "Flux RSS",
@@ -1742,7 +1747,13 @@
     "selectAll": "Tout sélectionner",
     "selectedOf": "{selected} sur {total} sélectionnées",
     "toStart": "pour commencer à planifier.",
-    "groups": "Choisir un groupe de Pages"
+    "groups": "Choisir un groupe de Pages",
+    "bluesky": "Bluesky",
+    "mastodon": "Mastodon",
+    "linkedin": "LinkedIn",
+    "threads": "Threads",
+    "x": "X",
+    "pinterest": "Tableau Pinterest"
   },
   "team": {
     "title": "Équipe",
@@ -1874,7 +1885,13 @@
     "type": {
       "page": "Page Facebook",
       "group": "Groupe Facebook",
-      "instagram": "Instagram"
+      "instagram": "Instagram",
+      "bluesky": "Bluesky",
+      "mastodon": "Mastodon",
+      "linkedin": "LinkedIn",
+      "threads": "Threads",
+      "x": "X",
+      "pinterest": "Tableau Pinterest"
     },
     "hide": "Masquer {page}",
     "show": "Afficher {page}",
@@ -2076,5 +2093,37 @@
     "mcpTools": "Outils : list_pages, list_posts, create_post, get_page_analytics.",
     "restTitle": "API REST",
     "restHint": "JSON sur HTTPS, avec la clé dans l’en-tête Authorization."
+  },
+  "networks": {
+    "title": "Autres réseaux",
+    "subtitle": "Publiez la même publication sur Bluesky, Mastodon, LinkedIn, Threads, X et Pinterest depuis le composeur, la file et le calendrier.",
+    "hint_bluesky": "Connexion par mot de passe d’application. Aucune configuration.",
+    "hint_mastodon": "N’importe quel serveur Mastodon. Aucune configuration.",
+    "hint_linkedin": "Votre profil et les Pages entreprise que vous administrez.",
+    "hint_threads": "Votre profil Threads.",
+    "hint_x": "Votre compte X.",
+    "hint_pinterest": "Chaque tableau devient une destination. Les épingles ont besoin d’une image.",
+    "connect": "Connecter {network}",
+    "connectAnother": "En connecter un autre",
+    "disconnect": "Déconnecter",
+    "disconnectTitle": "Déconnecter {name} ?",
+    "disconnectHint": "Ses destinations ne reçoivent plus de publications. Celles déjà publiées restent en place.",
+    "useTarget": "Publier sur {name}",
+    "needsApp": "{network} nécessite une application développeur sur ce serveur.",
+    "needsAppAskOwner": "{network} n’est pas encore configuré sur ce serveur. Demandez au propriétaire d’ajouter les clés de son application.",
+    "openConfig": "Ajouter les clés dans Configuration",
+    "linkedinPages": "+ Pages entreprise",
+    "linkedinPagesHint": "Demande aussi les Pages entreprise que vous administrez. Nécessite la Community Management API de LinkedIn.",
+    "connectFailed": "{network} n’a pas pu se connecter : {error}",
+    "connectedNotice": "{count, plural, =0 {{network} est connecté.} one {{network} est connecté : 1 destination ajoutée.} other {{network} est connecté : # destinations ajoutées.}}",
+    "blueskyTitle": "Connecter Bluesky",
+    "blueskyHint": "Créez un mot de passe d’application dans Bluesky → Paramètres → Confidentialité et sécurité → Mots de passe d’application, puis collez-le ici. N’utilisez jamais votre mot de passe principal.",
+    "blueskyHandle": "Identifiant",
+    "blueskyAppPassword": "Mot de passe d’application",
+    "blueskyAppPasswordHint": "Quatre groupes de quatre caractères. Révocable à tout moment dans Bluesky.",
+    "mastodonTitle": "Connecter Mastodon",
+    "mastodonHint": "Indiquez le serveur de votre compte. Vous vous y connecterez puis reviendrez ici.",
+    "mastodonServer": "Serveur",
+    "mastodonContinue": "Continuer vers la connexion"
   }
 }

@@ -31,6 +31,13 @@ enum TargetType {
   group
   /// An Instagram Business account, published through the Page it is linked to.
   instagram
+  /// Other networks, each published through `src/lib/networks`.
+  bluesky
+  mastodon
+  linkedin
+  threads
+  x
+  pinterest
 }
 
 enum PostStatus {
@@ -268,8 +275,12 @@ model SocialAccount {
   name                String
   pictureUrl          String?
   accessToken         String
+  /// Encrypted, for networks whose access tokens expire within hours.
+  refreshToken        String?
   tokenExpiresAt      DateTime?
   scopes              String    @default("")
+  /// Per-network detail: a Mastodon server and its app keys, a Bluesky PDS.
+  meta                Json?
   invalidatedAt       DateTime?
   invalidReason       String?
   lastSyncedAt        DateTime?

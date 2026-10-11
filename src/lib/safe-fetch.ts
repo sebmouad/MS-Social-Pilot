@@ -143,7 +143,7 @@ export function setResolverForTests(replacement: Resolver | null): void {
   resolver = replacement ?? systemResolver;
 }
 
-async function assertResolvesPublicly(hostname: string): Promise<void> {
+export async function assertResolvesPublicly(hostname: string): Promise<void> {
   const host = hostname.replace(/^\[|\]$/g, '');
   // A literal was already judged by `isBlockedHost`; there is nothing to look up.
   if (isIP(host)) return;

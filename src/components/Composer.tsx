@@ -8,6 +8,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { TargetPicker, type TargetOption } from './TargetPicker';
 import { ExternalLink } from './ExternalLink';
 import { AiAssist } from './AiAssist';
+import { NETWORK_RULES, networkProblems } from '@/lib/network-rules';
 import { Icon } from './Icon';
 import { PostPreview } from './PostPreview';
 import { LabelPicker, type LabelOption } from './LabelPicker';
@@ -104,6 +105,7 @@ export function Composer({
   canEditLabels = false,
 }: Props) {
   const t = useTranslations('compose');
+  const tErrors = useTranslations('errors');
   // Passed explicitly: this runs in the browser, outside the server request
   // that sets the date language for everything else.
   const locale = useLocale();
@@ -483,8 +485,17 @@ export function Composer({
           : format === 'story' && media.length !== 1
             ? t('storyNeedsMedia')
             : null;
+  // Each other network's own limits, checked as the post is written.
+  const networkProblem = networkProblems(selectedTargets, { message, link: link.trim() || null, media })[0] ?? null;
+  const networkMessage = networkProblem
+    ? tErrors(`network_${networkProblem.key}`, {
+        target: networkProblem.target,
+        network: NETWORK_RULES[networkProblem.network].label,
+        ...networkProblem.params,
+      })
+    : null;
   const canSubmit =
-    !pending && !uploading && selected.length > 0 && hasContent && !instagramNeedsMedia && !formatProblem;
+    !pending && !uploading && selected.length > 0 && hasContent && !instagramNeedsMedia && !formatProblem && !networkProblem;
 
   const timingOptions: Array<{ value: Timing; short: string; label: string; description: string; disabled?: boolean; reason?: string }> = [
     { value: 'schedule', short: t('timingSchedule'), label: t('scheduleForTime'), description: t('scheduleDescription') },
@@ -513,7 +524,7 @@ export function Composer({
             ? t('blockedNoContent')
             : instagramNeedsMedia
               ? t('blockedInstagramMedia')
-              : formatProblem;
+              : formatProblem ?? networkMessage;
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">

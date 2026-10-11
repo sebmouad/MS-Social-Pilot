@@ -932,7 +932,12 @@
     "tooManyRequests": "Too many requests. Wait a few minutes and try again.",
     "commentRequired": "Write a comment first.",
     "commentsOff": "Comments are turned off for this link.",
-    "aiPlanEmpty": "The AI did not come back with a usable plan. Try again, or say a little more about the week."
+    "aiPlanEmpty": "The AI did not come back with a usable plan. Try again, or say a little more about the week.",
+    "blueskySignIn": "Bluesky did not accept that handle and app password. Check both, and that the app password has not been revoked.",
+    "network_tooLong": "{target} ({network}) takes {limit} characters; this post has {length}.",
+    "network_tooManyImages": "{target} ({network}) takes up to {max} pictures.",
+    "network_noVideo": "{target} ({network}) cannot take a video from here. Use photos, or leave it out of this post.",
+    "network_needsImage": "{target} ({network}) needs a picture: add one, or leave it out of this post."
   },
   "feeds": {
     "title": "RSS feeds",
@@ -1742,7 +1747,13 @@
     "selectAll": "Select all",
     "selectedOf": "{selected} of {total} selected",
     "toStart": "to start scheduling.",
-    "groups": "Pick a group of Pages"
+    "groups": "Pick a group of Pages",
+    "bluesky": "Bluesky",
+    "mastodon": "Mastodon",
+    "linkedin": "LinkedIn",
+    "threads": "Threads",
+    "x": "X",
+    "pinterest": "Pinterest board"
   },
   "team": {
     "title": "Team",
@@ -1874,7 +1885,13 @@
     "type": {
       "page": "Facebook Page",
       "group": "Facebook group",
-      "instagram": "Instagram"
+      "instagram": "Instagram",
+      "bluesky": "Bluesky",
+      "mastodon": "Mastodon",
+      "linkedin": "LinkedIn",
+      "threads": "Threads",
+      "x": "X",
+      "pinterest": "Pinterest board"
     },
     "hide": "Hide {page}",
     "show": "Show {page}",
@@ -2076,5 +2093,37 @@
     "mcpTools": "Tools: list_pages, list_posts, create_post, get_page_analytics.",
     "restTitle": "REST API",
     "restHint": "JSON over HTTPS, with the key in the Authorization header."
+  },
+  "networks": {
+    "title": "Other networks",
+    "subtitle": "Publish the same post to Bluesky, Mastodon, LinkedIn, Threads, X and Pinterest from the composer, queue and calendar.",
+    "hint_bluesky": "Connect with an app password. No setup needed.",
+    "hint_mastodon": "Any Mastodon server. No setup needed.",
+    "hint_linkedin": "Your profile, and company Pages you administer.",
+    "hint_threads": "Your Threads profile.",
+    "hint_x": "Your X account.",
+    "hint_pinterest": "Each board becomes a destination. Pins need a picture.",
+    "connect": "Connect {network}",
+    "connectAnother": "Connect another",
+    "disconnect": "Disconnect",
+    "disconnectTitle": "Disconnect {name}?",
+    "disconnectHint": "Its destinations stop receiving posts. Posts already published stay where they are.",
+    "useTarget": "Publish to {name}",
+    "needsApp": "{network} needs a developer app for this server.",
+    "needsAppAskOwner": "{network} is not set up on this server yet. Ask the owner to add its developer app keys.",
+    "openConfig": "Add its keys in Configuration",
+    "linkedinPages": "+ Company Pages",
+    "linkedinPagesHint": "Also ask for the company Pages you administer. Needs LinkedIn’s Community Management API on the developer app.",
+    "connectFailed": "{network} did not connect: {error}",
+    "connectedNotice": "{count, plural, =0 {{network} is connected.} one {{network} is connected: 1 destination added.} other {{network} is connected: # destinations added.}}",
+    "blueskyTitle": "Connect Bluesky",
+    "blueskyHint": "Make an app password in Bluesky → Settings → Privacy and security → App passwords, then paste it here. Never use your main password.",
+    "blueskyHandle": "Handle",
+    "blueskyAppPassword": "App password",
+    "blueskyAppPasswordHint": "Four groups of four letters. You can revoke it in Bluesky at any time.",
+    "mastodonTitle": "Connect Mastodon",
+    "mastodonHint": "Type the server your account is on. You will sign in there and come straight back.",
+    "mastodonServer": "Server",
+    "mastodonContinue": "Continue to sign in"
   }
 }

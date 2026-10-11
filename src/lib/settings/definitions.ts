@@ -23,6 +23,7 @@ export type SettingType = 'string' | 'secret' | 'number' | 'boolean' | 'select' 
 export type SettingGroup =
   | 'general'
   | 'facebook'
+  | 'networks'
   | 'features'
   | 'scheduler'
   | 'analytics'
@@ -511,6 +512,82 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     max: 60,
   },
 
+
+  // --- Other networks ---------------------------------------------------------
+  // Bluesky and Mastodon need nothing here: Bluesky signs in with an app
+  // password, and each Mastodon server registers the app on the fly.
+  {
+    key: 'linkedin.clientId',
+    group: 'networks',
+    type: 'string',
+    label: 'LinkedIn Client ID',
+    description: 'From a LinkedIn developer app with "Share on LinkedIn" (and, for company Pages, the Community Management API). Blank hides LinkedIn from Connections.',
+    default: '',
+    env: 'LINKEDIN_CLIENT_ID',
+  },
+  {
+    key: 'linkedin.clientSecret',
+    group: 'networks',
+    type: 'secret',
+    label: 'LinkedIn Client secret',
+    description: 'Kept encrypted. Shown once when saved.',
+    default: '',
+    env: 'LINKEDIN_CLIENT_SECRET',
+  },
+  {
+    key: 'threads.clientId',
+    group: 'networks',
+    type: 'string',
+    label: 'Threads App ID',
+    description: 'The Threads use case of a Meta app (it can be the same app as Facebook). Blank hides Threads from Connections.',
+    default: '',
+    env: 'THREADS_CLIENT_ID',
+  },
+  {
+    key: 'threads.clientSecret',
+    group: 'networks',
+    type: 'secret',
+    label: 'Threads App secret',
+    description: 'Kept encrypted. Shown once when saved.',
+    default: '',
+    env: 'THREADS_CLIENT_SECRET',
+  },
+  {
+    key: 'x.clientId',
+    group: 'networks',
+    type: 'string',
+    label: 'X (Twitter) Client ID',
+    description: 'OAuth 2.0 credentials of an X developer app with read and write permission. Blank hides X (Twitter) from Connections.',
+    default: '',
+    env: 'X_CLIENT_ID',
+  },
+  {
+    key: 'x.clientSecret',
+    group: 'networks',
+    type: 'secret',
+    label: 'X (Twitter) Client secret',
+    description: 'Kept encrypted. Shown once when saved.',
+    default: '',
+    env: 'X_CLIENT_SECRET',
+  },
+  {
+    key: 'pinterest.clientId',
+    group: 'networks',
+    type: 'string',
+    label: 'Pinterest App ID',
+    description: 'A Pinterest developer app with boards:read and pins:write. Blank hides Pinterest from Connections.',
+    default: '',
+    env: 'PINTEREST_CLIENT_ID',
+  },
+  {
+    key: 'pinterest.clientSecret',
+    group: 'networks',
+    type: 'secret',
+    label: 'Pinterest App secret',
+    description: 'Kept encrypted. Shown once when saved.',
+    default: '',
+    env: 'PINTEREST_CLIENT_SECRET',
+  },
   // --- AI --------------------------------------------------------------------
   {
     key: 'ai.apiKey',
@@ -687,6 +764,7 @@ export const SETTINGS_BY_KEY = new Map(SETTING_DEFINITIONS.map((entry) => [entry
 export const GROUP_LABELS: Record<SettingGroup, string> = {
   general: 'General',
   facebook: 'Facebook connection',
+  networks: 'Other social networks',
   features: 'Feature switches',
   scheduler: 'Publishing',
   analytics: 'Analytics',
@@ -701,6 +779,7 @@ export const GROUP_LABELS: Record<SettingGroup, string> = {
 export const GROUP_ORDER: SettingGroup[] = [
   'general',
   'facebook',
+  'networks',
   'features',
   'scheduler',
   'analytics',

@@ -63,7 +63,7 @@ export async function discoverAdAccounts(workspaceId: string): Promise<{
   errors: string[];
 }> {
   const accounts = await prisma.socialAccount.findMany({
-    where: { workspaceId, invalidatedAt: null },
+    where: { workspaceId, invalidatedAt: null, provider: 'facebook' },
   });
 
   let found = 0;

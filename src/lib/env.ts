@@ -177,6 +177,31 @@ export const env = {
   },
 
   // --- Email (Resend) ---
+  // --- Other networks ---
+  get linkedinClientId(): string {
+    return settingString('linkedin.clientId');
+  },
+  get linkedinClientSecret(): string {
+    return settingString('linkedin.clientSecret');
+  },
+  get threadsClientId(): string {
+    return settingString('threads.clientId');
+  },
+  get threadsClientSecret(): string {
+    return settingString('threads.clientSecret');
+  },
+  get xClientId(): string {
+    return settingString('x.clientId');
+  },
+  get xClientSecret(): string {
+    return settingString('x.clientSecret');
+  },
+  get pinterestClientId(): string {
+    return settingString('pinterest.clientId');
+  },
+  get pinterestClientSecret(): string {
+    return settingString('pinterest.clientSecret');
+  },
   get resendApiKey(): string | null {
     return settingString('email.apiKey') || null;
   },

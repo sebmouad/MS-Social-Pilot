@@ -54,6 +54,7 @@ const VALID_BODY: Record<string, unknown> = {
   queue: { action: 'shuffle' },
   'report-templates': { name: 'Monthly', sections: ['analysis'] },
   'targets/[id]/profile': { brandVoice: 'Warm' },
+  'networks/bluesky': { identifier: 'me.bsky.social', appPassword: 'abcd-efgh-ijkl-mnop' },
   'chat-channels': { kind: 'slack', name: 'x', url: 'https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXXXXXXXXXX', events: ['publishFailure'] },
   'chat-channels/[id]': { enabled: false },
   'report-schedules': { targetId: 'x', frequency: 'weekly', recipients: ['a@example.test'] },
@@ -222,6 +223,8 @@ const CONTRIBUTOR_MUST_NOT: Array<[Method, string]> = [
   // Opening the workspace to people with no account.
   ['GET', 'share-links'],
   ['POST', 'report-templates'],
+  ['POST', 'networks/bluesky'],
+  ['GET', 'networks/[network]/connect'],
   ['PATCH', 'targets/[id]/profile'],
   ['GET', 'chat-channels'],
   ['POST', 'chat-channels'],

@@ -14,7 +14,7 @@ type Action = 'shuffle' | 'clear' | 'clearDrafts';
  * The ⋮ beside a Page wherever it is listed: the things done to one Page
  * without hunting for the screen they live on.
  */
-export function PageMenu({ page, canManageQueue, canSettings }: { page: { id: string; name: string }; canManageQueue: boolean; canSettings: boolean }) {
+export function PageMenu({ page, canManageQueue, canSettings }: { page: { id: string; name: string; type?: string }; canManageQueue: boolean; canSettings: boolean }) {
   const t = useTranslations('pagesSidebar');
   const tCommon = useTranslations('common');
   const router = useRouter();
@@ -62,8 +62,13 @@ export function PageMenu({ page, canManageQueue, canSettings }: { page: { id: st
   const links: Array<{ href: string; icon: IconName; label: string }> = [
     { href: `/compose?to=${page.id}`, icon: 'plus', label: t('menuNewPost') },
     { href: `/calendar?view=feed&pages=${page.id}`, icon: 'calendar', label: t('menuFeed') },
-    { href: `/analytics?view=analysis&target=${page.id}`, icon: 'analytics', label: t('menuAnalysis') },
-    ...(canSettings ? [{ href: '/settings/pages', icon: 'settings' as IconName, label: t('menuVoice') }] : []),
+    // Analysis and voice are the Facebook Page's; other networks are published to only.
+    ...(!page.type || page.type === 'page'
+      ? [
+          { href: `/analytics?view=analysis&target=${page.id}`, icon: 'analytics' as IconName, label: t('menuAnalysis') },
+          ...(canSettings ? [{ href: '/settings/pages', icon: 'settings' as IconName, label: t('menuVoice') }] : []),
+        ]
+      : []),
   ];
   const actions: Array<{ action: Action; icon: IconName; danger?: boolean }> = canManageQueue
     ? [

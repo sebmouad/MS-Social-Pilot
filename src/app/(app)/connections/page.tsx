@@ -5,6 +5,8 @@ import { metaAppSettings } from '@/lib/meta-app';
 import { ConnectionHealth } from '@/components/ConnectionHealth';
 import { ConnectionsClient } from '@/components/ConnectionsClient';
 import { Icon } from '@/components/Icon';
+import { OtherNetworks } from '@/components/OtherNetworks';
+import { NETWORK_KEYS, NETWORK_LABELS, isNetworkKey, networkAvailable, type NetworkKey } from '@/lib/networks';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { canManageAccounts } from '@/lib/constants';
@@ -43,7 +45,7 @@ export default async function ConnectionsPage({
 
   const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
-  const [accounts, instagram, ads] = await Promise.all([
+  const [allAccounts, instagram, ads] = await Promise.all([
     prisma.socialAccount.findMany({
       where: { workspaceId: auth.workspace.id },
       include: {
@@ -65,6 +67,9 @@ export default async function ConnectionsPage({
   ]);
 
   const canManage = canManageAccounts(auth.role);
+  const accounts = allAccounts.filter((account) => account.provider === 'facebook');
+  const networkAccounts = allAccounts.filter((account) => isNetworkKey(account.provider));
+  const networkNotice = first(params.network);
 
   return (
     <div className="space-y-6">
@@ -84,7 +89,8 @@ export default async function ConnectionsPage({
 
       {(['connected', 'warning', 'error'] as const).map((kind) => {
         const value = first(params[kind]);
-        if (!value) return null;
+        // Another network's answer is shown in its own section below.
+        if (!value || networkNotice) return null;
         const tone =
           kind === 'connected'
             ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
@@ -184,6 +190,25 @@ export default async function ConnectionsPage({
         />
         </>
       )}
+
+      <OtherNetworks
+        canManage={canManage}
+        isOwner={auth.role === 'owner'}
+        notice={
+          networkNotice && isNetworkKey(networkNotice)
+            ? { network: networkNotice, error: first(params.error) ?? null, connected: first(params.connected) ?? null }
+            : null
+        }
+        networks={NETWORK_KEYS.map((key) => ({ key, label: NETWORK_LABELS[key], available: networkAvailable(key) }))}
+        accounts={networkAccounts.map((account) => ({
+          id: account.id,
+          network: account.provider as NetworkKey,
+          name: account.name,
+          pictureUrl: account.pictureUrl,
+          invalidReason: account.invalidatedAt ? account.invalidReason ?? t('reconnectRequired') : null,
+          targets: account.targets.map((target) => ({ id: target.id, name: target.name, category: target.category, enabled: target.enabled })),
+        }))}
+      />
 
       {!env.groupsEnabled && (
         <p className="flex items-start gap-2 text-xs text-slate-500">

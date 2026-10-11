@@ -318,7 +318,8 @@ export async function checkWorkspace(
   const app = await checkApp();
 
   const accounts = await prisma.socialAccount.findMany({
-    where: { workspaceId },
+    // Facebook's checks: the other networks have their own sign-ins.
+    where: { workspaceId, provider: 'facebook' },
     select: { id: true },
     orderBy: { createdAt: 'asc' },
   });
