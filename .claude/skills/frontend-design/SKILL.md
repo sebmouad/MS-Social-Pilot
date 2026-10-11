@@ -37,6 +37,11 @@ Read `docs/ai/DESIGN.md` first (tokens, component classes, UX rules). Then:
 10. **Verify**: add the route to `e2e/helpers.ts → SIGNED_IN_SCREENS`, run the
     browser walk, deploy, then screenshot it live at 1440 px and phone width in the
     owner's Chrome with real data. Fix anything clipped, truncated or ambiguous.
+11. **Review before committing**: run the `web-design-guidelines` skill on the
+    changed components (sentence case and our copy rules win over its Title
+    Case). Client components with state or effects: check
+    `vercel-react-best-practices`; a component growing boolean props:
+    `vercel-composition-patterns`. Copy: `ux-copy-house`.
 
 Quality bar: "as good as Simplified or better". If a screen shows raw API names,
 silent buttons, dead links or empty tabs that cannot fill, it is not done.

@@ -13,6 +13,11 @@ npx tsc --noEmit
 TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/social_pilot_test npx vitest run
 PATH="$PWD/scripts/dev/bin:$PATH" E2E_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/social_pilot_test npx playwright test --reporter=line
 ```
+- **No Docker (cloud sessions)**: use the machine's Postgres instead of the
+  container — see TESTING.md "Without Docker". Then run Playwright without the
+  psql shim and with `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium`.
+- Writing or fixing e2e specs: `playwright-expert` skill, but keep this repo's
+  helpers and role/label selectors (no page objects, no test ids).
 - Long runs: start in the background and wait for completion; don't edit code
   while Playwright runs (the dev server serves the working tree).
 - Expected: 1 known unit failure (daylight-saving test), all Playwright tests pass.

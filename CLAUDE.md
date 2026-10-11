@@ -21,7 +21,9 @@ conventions, commands. Then the file for your task:
 
 Project skills live in [.claude/skills/](.claude/skills/) — load the one that
 matches the task (frontend design, profile selection, analytics, Meta API, app review, live Facebook tests,
-translations, migrations, new network connector, release).
+translations, migrations, new network connector, release). Reviewed third-party
+skills sit next to them (UI review, React performance, composition, Playwright,
+secure code); SKILLS.md says when to use each and where this repo's rules win.
 
 ## Rules that are not negotiable
 

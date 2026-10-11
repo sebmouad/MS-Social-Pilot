@@ -1,5 +1,9 @@
 # Testing
 
+When to run what (owner, 2026-10-11): small edits → `npx tsc --noEmit` + the
+test files they touch (`npx vitest run tests/x.test.ts`, `npx playwright test
+e2e/x.spec.ts -g …`). Full suites only after a big change or before a deploy.
+
 Three layers, all required before a deploy: **typecheck → unit/integration →
 browser walk**, then a **live check on production with real data**.
 
@@ -11,6 +15,24 @@ npm install --no-save @playwright/test && npx playwright install chromium   # br
 open -a Docker                       # macOS: Docker Desktop must run
 scripts/dev/test-db.sh               # Postgres for tests on 127.0.0.1:55432
 ```
+
+### Without Docker (cloud sessions)
+
+Use a local PostgreSQL (16 is fine; production is 15) on the same port:
+
+```bash
+D=/var/tmp/msp-pg; mkdir -p $D && chown postgres $D
+su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $D/data -U postgres --auth=trust"
+su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $D/data -o '-p 55432 -k /tmp -c listen_addresses=127.0.0.1' -l $D/log start"
+psql -h 127.0.0.1 -p 55432 -U postgres -c "alter user postgres password 'postgres'" -c "create database social_pilot_test"
+```
+- Playwright: real `psql` is installed, so leave `scripts/dev/bin` off `PATH`;
+  set `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium` (never
+  `playwright install`).
+- A fresh cluster reports its time zone as `Etc/UTC`, which fails
+  `setup.integration.test.ts > requires the database to run in UTC`. Start it
+  with `-c timezone=UTC` in the `-o` options to avoid that environment-only
+  failure.
 
 ## 1. Typecheck
 
