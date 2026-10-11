@@ -306,7 +306,9 @@ day (month) or hour (week) — `CalendarDrag`, a PATCH like any edit; past days
 do not take a drop. Posts: tick posts (or a whole day) and move them by N
 days, add/remove a label or cancel them (`POST /api/posts/actions`,
 `src/lib/post-bulk.ts`; each post keeps its own rules, refusals are listed).
-E2e for drag and bulk is due at the next browser checkpoint.
+Compose starts on the narrowed selection (never on every Page by default); the
+preview already shows the first comment and post cards a status per
+destination. E2e for drag and bulk is due at the next browser checkpoint.
 - Calendar: profile colour dots on chips, filter by status (planned / posted /
   failed / draft / review) as pills next to the bar, drag-and-drop rescheduling,
   collapse the Pages column (ROADMAP UX backlog), day hover actions (ref 40).

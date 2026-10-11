@@ -7,6 +7,7 @@ import { requirePage } from '@/lib/auth';
 import { assertPagesAllowed, targetScope } from '@/lib/page-access';
 import { listLabels, listPageGroups } from '@/lib/page-groups';
 import { screenMetadata } from '@/lib/metadata';
+import { loadSelection } from '@/lib/page-filter';
 import { prisma } from '@/lib/prisma';
 import { parseMedia } from '@/lib/json';
 import { localInputToUtc, utcToLocalInput } from '@/lib/time';
@@ -112,9 +113,10 @@ export default async function ComposePage({
     listLabels(auth.workspace.id),
   ]);
 
-  const [editing, goodTimes] = await Promise.all([
+  const [editing, goodTimes, selection] = await Promise.all([
     postId ? loadForEditing(postId, auth) : null,
     loadGoodTimes(auth.workspace.id, auth.workspace.timezone, auth.pageScope),
+    loadSelection(auth, params),
   ]);
   // A link to a post that is gone, belongs to another client, or has already
   // been published is a 404 rather than a blank composer — silently opening an
@@ -150,8 +152,14 @@ export default async function ComposePage({
         requiresApproval={auth.workspace.requiresApproval}
         canPublishDirectly={canPublishWithoutApproval(auth.role)}
         {...(editing ? { editing } : {})}
-        // `?to=` from a Page's card: start with that Page ticked.
-        initialTargetIds={editing ? undefined : requestedTargets(params.to, targets)}
+        // `?to=` from a Page's card: start with that Page ticked. Otherwise the
+        // profiles narrowed to elsewhere in the app; never every Page by default.
+        initialTargetIds={
+          editing
+            ? undefined
+            : (requestedTargets(params.to, targets) ??
+              (selection.narrowed ? requestedTargets(selection.ids.join(','), targets) : undefined))
+        }
         {...(editing ? {} : sharedIn(params))}
         targets={targets.map((target) => ({
           id: target.id,
