@@ -157,6 +157,23 @@ Skills: `frontend-design`, `profile-selection`.
 - Compose: default destinations = current selection; first comment shown in the
   Facebook preview.
 
+## Phase C2 — From the full Simplified crawl (docs/inspiration/simplified/CRAWL-2026-10-11.md)
+Each verified missing in our code on 2026-10-11:
+- **Dashboard** leads with the upcoming queue for the current selection
+  (+ "New post", "Plan with AI", connected-profile avatars) and a shortcuts
+  column with counts (unread inbox, waiting approvals, failed posts).
+- **Inbox stream**: one merged, chronological view of comments + messages for
+  the selection, type filter, and a **resolved / unresolved** state (no such
+  field today — needs a migration).
+- **Notifications matrix** per member × Page × event (publish failed, account
+  disconnected, new message, queue empty, draft updated, weekly summary).
+  Today `NotificationSetting` has 4 workspace-wide booleans only.
+- **First day of week** workspace setting (calendar, week view, reports). None
+  today.
+- **AI weekly recap** on scheduled reports: plain-language "what changed and
+  why" at the top (needs the Anthropic key).
+- MCP setup page: step-by-step per assistant (Claude, others) with copy buttons.
+
 ## Phase D — Design system pass
 
 Skills: `frontend-design`, `design:design-critique`,

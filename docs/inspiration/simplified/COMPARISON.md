@@ -2,7 +2,9 @@
 
 10 October 2026. Simplified explored end to end (every menu, tab, dialog and
 setting reachable on the trial; nothing created or changed). MS Social Pilot
-column checked against the code on `main`.
+column checked against the code on `main` **on 10 Oct — most P1–P3 rows were
+built since; current state is `docs/ai/FEATURES.md`.** The rest of the app was
+crawled on 11 Oct: `CRAWL-2026-10-11.md`.
 
 Legend: ✅ have · 🟡 partial · ❌ missing · ⛔ not worth adding.
 Priority for "to add": **P1** next · **P2** soon · **P3** later.

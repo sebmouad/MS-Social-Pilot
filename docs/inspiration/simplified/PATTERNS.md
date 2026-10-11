@@ -1,6 +1,8 @@
 # Simplified → MS Social Pilot: patterns to copy (and not copy)
 
-Distilled from `README.md`, `AUDIT.md`, `COMPARISON.md` and `screens/`. Use this
+Distilled from `README.md`, `AUDIT.md`, `COMPARISON.md`, `CRAWL-2026-10-11.md`
+(every non-social route, inbox stream, notification matrix, home, Riley) and
+`screens/`. Use this
 as the checklist when building a screen. Structure from Simplified, look from
 Facebook (`docs/ai/DESIGN.md`). Navigation stays the left sidebar.
 
