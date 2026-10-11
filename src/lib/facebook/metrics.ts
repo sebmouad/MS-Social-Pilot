@@ -107,7 +107,9 @@ export const PAGE_METRICS: MetricDefinition[] = [
     ['page_media_view', 'Times the Page’s content was played or displayed (views).'],
     ['page_total_media_view_unique', 'People who viewed the Page’s content (viewers — Meta’s replacement for reach).'],
   ]),
-  ...group({ level: 'page', category: 'demographics', periods: LIFETIME, breakdown: true }, [
+  // Asked for by day: Meta answers these with daily snapshots of the whole
+  // follower base, and `lifetime` comes back with no data at all.
+  ...group({ level: 'page', category: 'demographics', periods: DAY_ONLY, breakdown: true }, [
     ['page_follows_country', 'Followers by country.'],
     ['page_follows_city', 'Followers by city.'],
     ['page_follows_locale', 'Followers by language.'],
