@@ -176,7 +176,7 @@ export const env = {
     return settingNumber('scheduler.bulkRowLimit');
   },
 
-  // --- Email (Resend) ---
+  // --- Email (SMTP or Resend) ---
   // --- Other networks ---
   get linkedinClientId(): string {
     return settingString('linkedin.clientId');
@@ -207,6 +207,21 @@ export const env = {
   },
   get emailFrom(): string {
     return settingString('email.from');
+  },
+  get emailProvider(): string {
+    return settingString('email.provider');
+  },
+  get smtpHost(): string {
+    return settingString('email.smtpHost');
+  },
+  get smtpPort(): number {
+    return settingNumber('email.smtpPort');
+  },
+  get smtpUser(): string {
+    return settingString('email.smtpUser');
+  },
+  get smtpPassword(): string | null {
+    return settingString('email.smtpPassword') || null;
   },
 
   // --- AI (Claude) ---

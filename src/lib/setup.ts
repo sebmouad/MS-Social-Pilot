@@ -4,6 +4,7 @@ import { prisma } from './prisma';
 import { canManageInstance } from './constants';
 import { env } from './env';
 import { settingString } from './settings';
+import { emailEnabled } from './email/send';
 
 /**
  * What still needs doing before this installation can publish anything.
@@ -261,7 +262,7 @@ export async function readSetupState(workspaceId: string | null): Promise<SetupS
     { id: 'destination', done: destinations > 0, optional: false },
     // Publishing works without it; nobody hears about a failure without it,
     // which is why it is on this list at all rather than left to be discovered.
-    { id: 'email', done: Boolean(settingString('email.apiKey').trim()), optional: true },
+    { id: 'email', done: emailEnabled(), optional: true },
   ];
 
   const outstanding = steps.filter((step) => !step.optional && !step.done);

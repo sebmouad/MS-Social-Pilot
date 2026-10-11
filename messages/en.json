@@ -568,7 +568,13 @@
     "aiModelKeyRejected": "The provider rejected the API key. Check the key above, save, then refresh.",
     "aiModelUnreachable": "Couldn't reach the provider to list models. Try refreshing in a minute.",
     "aiModelNoKey": "Add an API key above and save to see the models it can use.",
-    "aiModelCount": "{count, plural, one {# model fetched from the provider} other {# models fetched from the provider}}"
+    "aiModelCount": "{count, plural, one {# model fetched from the provider} other {# models fetched from the provider}}",
+    "testEmail": "Send test email",
+    "testEmailSending": "Sending…",
+    "testEmailHint": "Uses the saved settings. Save your changes first.",
+    "testEmailSent": "Test email sent to {to}. Check the inbox (and spam).",
+    "testEmailNoProvider": "Nothing sent: no email provider is configured. Fill in the SMTP fields (or a Resend key) and save.",
+    "testEmailFailed": "The test email failed. {reason}"
   },
   "connections": {
     "active": "Active",
@@ -1054,7 +1060,7 @@
     "failuresBanner": "{count, plural, one {# email failed} other {# emails failed}} in the last week. Nobody was told what it was about.",
     "keptFor": "Kept for {days, plural, one {# day} other {# days}}, then deleted. Change this in Configuration.",
     "ownerOnly": "Only workspace owners and admins can see the history.",
-    "skippedHint": "No email provider is configured, so nothing was sent. Set RESEND_API_KEY to turn these on.",
+    "skippedHint": "No email provider is configured, so nothing was sent. Root can set up Gmail (SMTP) or Resend on the Configuration screen.",
     "statusFailed": "Failed",
     "statusSent": "Sent",
     "statusSkipped": "Not sent",
@@ -1195,7 +1201,7 @@
     "onApprovalRequest": "Someone submits a post for approval",
     "onApprovalDecision": "My post is approved or rejected",
     "saved": "Notification settings saved.",
-    "noEmailProvider": "No email provider is configured on this server, so nothing will actually be sent. An owner can add a Resend API key on the Configuration screen.",
+    "noEmailProvider": "No email provider is configured on this server, so nothing will actually be sent. Root can set up Gmail (SMTP) or Resend on the Configuration screen.",
     "saveFailed": "Your notification settings could not be saved. Please try again.",
     "networkError": "Could not reach the server. Check your connection and try again.",
     "chatTitle": "Slack and Telegram",

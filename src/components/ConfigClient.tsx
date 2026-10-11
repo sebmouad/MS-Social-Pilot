@@ -277,6 +277,7 @@ export function ConfigClient({
               );
             })}
           </div>
+          {group === 'email' && <TestEmailButton />}
         </section>
       ))}
 
@@ -397,6 +398,49 @@ function AiModelPicker({
                 ? t('aiModelNoKey')
                 : t('aiModelCount', { count: models?.length ?? 0 })}
       </p>
+    </div>
+  );
+}
+
+/**
+ * Sends one message with the saved settings and reports the server's answer,
+ * so a wrong app password shows up here rather than as a missing alert later.
+ */
+function TestEmailButton() {
+  const t = useTranslations('config');
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function send() {
+    setSending(true);
+    setResult(null);
+    try {
+      const response = await fetch('/api/settings/config/test-email', { method: 'POST' });
+      const body = (await response.json()) as { status?: string; error?: string | null; to?: string };
+      if (body.status === 'sent') setResult({ ok: true, text: t('testEmailSent', { to: body.to ?? '' }) });
+      else if (body.status === 'skipped') setResult({ ok: false, text: t('testEmailNoProvider') });
+      else setResult({ ok: false, text: t('testEmailFailed', { reason: body.error ?? '' }) });
+    } catch {
+      setResult({ ok: false, text: t('testEmailFailed', { reason: '' }) });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
+      <button type="button" className="btn-secondary" disabled={sending} onClick={() => void send()}>
+        <Icon name="mail" size={14} /> {sending ? t('testEmailSending') : t('testEmail')}
+      </button>
+      <p className="hint">{t('testEmailHint')}</p>
+      {result && (
+        <p
+          role="status"
+          className={`w-full text-sm ${result.ok ? 'text-emerald-700' : 'text-rose-700'}`}
+        >
+          {result.text}
+        </p>
+      )}
     </div>
   );
 }

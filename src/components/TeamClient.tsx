@@ -51,7 +51,7 @@ interface Props {
   canManage: boolean;
   /** The viewer's own role. Nobody is offered a role above it. */
   viewerRole: string;
-  /** False when RESEND_API_KEY is unset — the link is shown instead. */
+  /** False when no email provider is configured — the link is shown instead. */
   emailConfigured: boolean;
   /** The workspace's Pages and groups, for limiting a member to some. */
   pages?: PageOption[];

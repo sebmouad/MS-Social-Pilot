@@ -623,6 +623,58 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
   // --- Email -----------------------------------------------------------------
   {
+    key: 'email.provider',
+    group: 'email',
+    type: 'select',
+    label: 'Send email with',
+    description: 'Automatic uses SMTP (e.g. Gmail) when an SMTP password is set, otherwise Resend.',
+    default: 'auto',
+    env: 'EMAIL_PROVIDER',
+    options: [
+      { value: 'auto', label: 'Automatic' },
+      { value: 'smtp', label: 'SMTP (Gmail, Outlook, any mail server)' },
+      { value: 'resend', label: 'Resend' },
+    ],
+  },
+  {
+    key: 'email.smtpHost',
+    group: 'email',
+    type: 'string',
+    label: 'SMTP server',
+    description: 'Gmail: smtp.gmail.com.',
+    default: 'smtp.gmail.com',
+    env: 'SMTP_HOST',
+  },
+  {
+    key: 'email.smtpPort',
+    group: 'email',
+    type: 'number',
+    label: 'SMTP port',
+    description: '465 uses SSL (Gmail). 587 uses STARTTLS.',
+    default: 465,
+    env: 'SMTP_PORT',
+    min: 1,
+    max: 65535,
+  },
+  {
+    key: 'email.smtpUser',
+    group: 'email',
+    type: 'string',
+    label: 'SMTP user',
+    description: 'For Gmail, your full Gmail address.',
+    default: '',
+    env: 'SMTP_USER',
+  },
+  {
+    key: 'email.smtpPassword',
+    group: 'email',
+    type: 'secret',
+    label: 'SMTP password',
+    description: 'Kept encrypted. For Gmail, an app password (Google account → Security → App passwords; needs 2-Step Verification), not your Google password.',
+    default: '',
+    env: 'SMTP_PASSWORD',
+  },
+  {
     key: 'email.apiKey',
     group: 'email',
     type: 'secret',
@@ -639,7 +691,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     description: 'The sender on every invitation and alert.',
     default: 'MS Social Pilot <onboarding@resend.dev>',
     env: 'EMAIL_FROM',
-    hint: 'Resend will not send to arbitrary addresses until the sending domain is verified.',
+    hint: 'With Gmail, use your Gmail address (or a "Send mail as" alias): Gmail replaces any other sender. Resend sends only from a verified domain.',
   },
 
   // --- Links -----------------------------------------------------------------

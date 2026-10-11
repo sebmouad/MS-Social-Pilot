@@ -568,7 +568,13 @@
     "aiModelKeyRejected": "Le fournisseur a refusé la clé API. Vérifiez la clé ci-dessus, enregistrez, puis actualisez.",
     "aiModelUnreachable": "Impossible de joindre le fournisseur pour lister les modèles. Réessayez dans une minute.",
     "aiModelNoKey": "Ajoutez une clé API ci-dessus et enregistrez pour voir les modèles disponibles.",
-    "aiModelCount": "{count, plural, one {# modèle récupéré chez le fournisseur} other {# modèles récupérés chez le fournisseur}}"
+    "aiModelCount": "{count, plural, one {# modèle récupéré chez le fournisseur} other {# modèles récupérés chez le fournisseur}}",
+    "testEmail": "Envoyer un e-mail de test",
+    "testEmailSending": "Envoi…",
+    "testEmailHint": "Utilise les réglages enregistrés. Enregistrez d’abord vos modifications.",
+    "testEmailSent": "E-mail de test envoyé à {to}. Vérifiez la boîte de réception (et les spams).",
+    "testEmailNoProvider": "Rien n’a été envoyé : aucun fournisseur d’e-mail n’est configuré. Remplissez les champs SMTP (ou une clé Resend) et enregistrez.",
+    "testEmailFailed": "L’e-mail de test a échoué. {reason}"
   },
   "connections": {
     "active": "Actif",
@@ -1054,7 +1060,7 @@
     "failuresBanner": "{count, plural, one {# e-mail a échoué} other {# e-mails ont échoué}} la semaine dernière. Personne n’a été prévenu.",
     "keptFor": "Conservé {days, plural, one {# jour} other {# jours}}, puis supprimé. Modifiable dans la configuration.",
     "ownerOnly": "Seuls les propriétaires et administrateurs peuvent voir l’historique.",
-    "skippedHint": "Aucun fournisseur d’e-mail n’est configuré : rien n’a été envoyé. Définissez RESEND_API_KEY pour les activer.",
+    "skippedHint": "Aucun fournisseur d’e-mail n’est configuré : rien n’a été envoyé. Root peut configurer Gmail (SMTP) ou Resend dans l’écran Configuration.",
     "statusFailed": "Échec",
     "statusSent": "Envoyé",
     "statusSkipped": "Non envoyé",
@@ -1195,7 +1201,7 @@
     "onApprovalRequest": "Quelqu'un soumet une publication à validation",
     "onApprovalDecision": "Ma publication est validée ou refusée",
     "saved": "Préférences enregistrées.",
-    "noEmailProvider": "Aucun fournisseur d’e-mail n’est configuré sur ce serveur : rien ne sera réellement envoyé. Un propriétaire peut ajouter une clé API Resend dans l’écran Configuration.",
+    "noEmailProvider": "Aucun fournisseur d’e-mail n’est configuré sur ce serveur : rien ne sera réellement envoyé. Root peut configurer Gmail (SMTP) ou Resend dans l’écran Configuration.",
     "saveFailed": "Vos préférences de notification n’ont pas pu être enregistrées. Veuillez réessayer.",
     "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
     "chatTitle": "Slack et Telegram",

@@ -45,6 +45,13 @@ Skills: `frontend-design`, `ux-copy-house`, `run-tests`, `claude-api`
 (Anthropic SDK usage), `security-review` (secrets).
 
 ### 0.1 Email: Gmail (SMTP) as a second provider
+**Done 2026-10-11:** settings `email.provider` (auto | smtp | resend),
+`email.smtpHost/Port/User/Password` (password encrypted); `src/lib/email/send.ts`
+sends with nodemailer (SSL on 465) and explains refusals ("use an app
+password"); `POST /api/settings/config/test-email` (root) + "Send test email"
+button in Configuration → Email; setup checklist counts either provider.
+Remaining: owner enters the Gmail address + app password and presses the test
+button; Gmail daily-limit hint. The original spec follows.
 Today: `src/lib/email/send.ts` uses Resend only (`email.apiKey`,
 `email.from` in `src/lib/settings/definitions.ts`; blank = log only).
 - New settings (group `email`): `email.provider` select `resend | smtp`

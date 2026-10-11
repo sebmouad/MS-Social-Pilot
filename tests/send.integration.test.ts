@@ -93,7 +93,7 @@ describe('with no provider configured', () => {
 
     const log = await prisma.emailLog.findFirstOrThrow();
     expect(log.status).toBe(EmailStatus.skipped);
-    expect(log.error).toMatch(/RESEND_API_KEY/);
+    expect(log.error).toMatch(/No email provider/);
   });
 
   it('reports that email is not available', async () => {

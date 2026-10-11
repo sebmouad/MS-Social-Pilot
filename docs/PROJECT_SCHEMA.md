@@ -347,6 +347,11 @@ INSTAGRAM_SYNC_HOURS=12
 ADS_SYNC_HOURS=12
 
 # Email (Resend)
+EMAIL_PROVIDER=auto              # auto | smtp | resend
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=
+SMTP_PASSWORD=                   # Gmail: an app password
 RESEND_API_KEY=
 EMAIL_FROM="MS Social Pilot <noreply@yourdomain.com>"
 
