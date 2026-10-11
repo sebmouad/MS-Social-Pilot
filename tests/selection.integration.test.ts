@@ -88,3 +88,44 @@ describe('the profile selection', () => {
     expect((await filter.loadSelection(limited, { pages: `${ids.one},${ids.two}` })).ids).toEqual([ids.one]);
   });
 });
+
+describe('the CSV export', () => {
+  it('covers only the Pages a limited member may see, and refuses workspace-wide files', async () => {
+    jar.clear();
+    const authLib = await import('../src/lib/auth');
+    const route = await import('../src/app/api/analytics/export/route');
+    const author = await prisma.user.findUniqueOrThrow({ where: { email: 's@example.test' } });
+    for (const key of ['one', 'two'] as const) {
+      await prisma.post.create({
+        data: {
+          workspaceId: auth.workspace.id,
+          authorId: author.id,
+          message: `post on ${key}`,
+          status: 'published',
+          targets: { create: { targetId: ids[key]!, status: 'published', publishedAt: new Date() } },
+        },
+      });
+    }
+    const editor = await prisma.user.create({ data: { email: 'limited@example.test', name: 'L', passwordHash: 'x' } });
+    await prisma.membership.create({
+      data: {
+        userId: editor.id,
+        workspaceId: auth.workspace.id,
+        role: WorkspaceRole.editor,
+        allPages: false,
+        pages: { create: { targetId: ids.one! } },
+      },
+    });
+    jar.set('msp_session', await authLib.createSession(editor.id));
+
+    const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+    const range = `from=${day(-7)}&to=${day(1)}`;
+    const posts = await route.GET(new Request(`http://test/api/analytics/export?kind=posts&${range}`));
+    expect(posts.status).toBe(200);
+    const csv = await posts.text();
+    expect(csv).toContain('post on one');
+    expect(csv).not.toContain('post on two');
+
+    expect((await route.GET(new Request(`http://test/api/analytics/export?kind=ads&${range}`))).status).toBe(403);
+  });
+});

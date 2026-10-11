@@ -1008,7 +1008,8 @@
     "moduleOff": "This part of the app is not switched on for you.",
     "rootNoSuchUser": "Nobody has an account with that email. Invite them from Registration instead.",
     "rootAlreadyMember": "That person is already a member of this workspace.",
-    "rootLastOwner": "A workspace needs an owner. Make someone else owner first."
+    "rootLastOwner": "A workspace needs an owner. Make someone else owner first.",
+    "exportNeedsAllPages": "This export covers the whole workspace. Ask an admin for access to every profile."
   },
   "feeds": {
     "title": "RSS feeds",

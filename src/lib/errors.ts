@@ -42,6 +42,8 @@ export class AppError extends Error {
 
 /** Shorthands for the errors thrown from more than one place. */
 export const errors = {
+  exportNeedsAllPages: () =>
+    new AppError({ key: 'errors.exportNeedsAllPages', fallback: 'This export covers the whole workspace. Ask an admin for access to every profile.', status: 403 }),
   rootNoSuchUser: () =>
     new AppError({ key: 'errors.rootNoSuchUser', fallback: 'Nobody has an account with that email. Invite them from Registration instead.', status: 404 }),
   rootAlreadyMember: () =>

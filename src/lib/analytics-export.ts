@@ -38,11 +38,22 @@ function day(value: Date | null): string {
   return value ? value.toISOString().slice(0, 19).replace('T', ' ') : '';
 }
 
+/** Run a one-Page reader for each selected Page (or once for all of them) and join the rows. */
+async function perTarget<T>(options: Window, read: (targetId: string | undefined) => Promise<T[]>): Promise<T[]> {
+  if (!options.targetIds) return read(undefined);
+  const parts = await Promise.all(options.targetIds.map((targetId) => read(targetId)));
+  return parts.flat();
+}
+
 interface Window {
   workspaceId: string;
   from: Date;
   to: Date;
-  targetId?: string;
+  /**
+   * The Pages to cover, already checked against the caller's workspace and
+   * Page scope; absent means every Page in the workspace.
+   */
+  targetIds?: string[];
   /** Ads only: one ad account, already checked against the workspace. */
   adAccountId?: string;
 }
@@ -60,7 +71,7 @@ export async function postMetricsCsv(options: Window): Promise<string> {
       status: 'published',
       publishedAt: { gte: options.from, lte: options.to },
       post: { workspaceId: options.workspaceId },
-      ...(options.targetId ? { targetId: options.targetId } : {}),
+      ...(options.targetIds ? { targetId: { in: options.targetIds } } : {}),
     },
     include: {
       target: { select: { name: true } },
@@ -113,7 +124,7 @@ export async function pageInsightsCsv(options: Window): Promise<string> {
       endTime: { gte: options.from, lte: options.to },
       target: {
         workspaceId: options.workspaceId,
-        ...(options.targetId ? { id: options.targetId } : {}),
+        ...(options.targetIds ? { id: { in: options.targetIds } } : {}),
       },
     },
     include: { target: { select: { name: true } } },
@@ -136,7 +147,9 @@ export async function pageInsightsCsv(options: Window): Promise<string> {
 
 /** Posts that reached a Page without going through this app. */
 export async function externalPostsCsv(options: Window): Promise<string> {
-  const posts = await readExternalPosts({ ...options, limit: 2000 });
+  const posts = (
+    await perTarget(options, (targetId) => readExternalPosts({ ...options, targetId, limit: 2000 }))
+  ).sort((a, b) => b.createdTime.getTime() - a.createdTime.getTime());
 
   return toCsv(
     [
@@ -171,11 +184,9 @@ export async function externalPostsCsv(options: Window): Promise<string> {
 }
 
 export async function commentsCsv(options: Window): Promise<string> {
-  const comments = await readComments({
-    workspaceId: options.workspaceId,
-    targetId: options.targetId,
-    limit: 5000,
-  });
+  const comments = await perTarget(options, (targetId) =>
+    readComments({ workspaceId: options.workspaceId, targetId, limit: 5000 }),
+  );
 
   return toCsv(
     ['created_at', 'destination', 'author', 'comment', 'likes', 'replies', 'is_reply', 'hidden', 'on_post'],
@@ -194,11 +205,11 @@ export async function commentsCsv(options: Window): Promise<string> {
 }
 
 export async function reviewsCsv(options: Window): Promise<string> {
-  const reviews = await readReviews({
-    workspaceId: options.workspaceId,
-    targetId: options.targetId,
-    limit: 5000,
-  });
+  const reviews = {
+    recent: await perTarget(options, async (targetId) =>
+      (await readReviews({ workspaceId: options.workspaceId, targetId, limit: 5000 })).recent,
+    ),
+  };
 
   return toCsv(
     ['created_at', 'reviewer', 'rating', 'recommendation', 'review'],
@@ -214,11 +225,9 @@ export async function reviewsCsv(options: Window): Promise<string> {
 
 /** Videos, with the whole video-level catalogue spread across columns. */
 export async function videosCsv(options: Window): Promise<string> {
-  const videos = await readVideos({
-    workspaceId: options.workspaceId,
-    targetId: options.targetId,
-    limit: 500,
-  });
+  const videos = await perTarget(options, (targetId) =>
+    readVideos({ workspaceId: options.workspaceId, targetId, limit: 500 }),
+  );
 
   const metricNames = [...new Set(videos.flatMap((video) => Object.keys(video.metrics)))].sort();
 

@@ -1008,7 +1008,8 @@
     "moduleOff": "Cette partie de l’application n’est pas activée pour vous.",
     "rootNoSuchUser": "Aucun compte n’existe avec cet e-mail. Invitez cette personne depuis Inscription.",
     "rootAlreadyMember": "Cette personne est déjà membre de cet espace de travail.",
-    "rootLastOwner": "Un espace de travail doit avoir un propriétaire. Nommez d’abord quelqu’un d’autre propriétaire."
+    "rootLastOwner": "Un espace de travail doit avoir un propriétaire. Nommez d’abord quelqu’un d’autre propriétaire.",
+    "exportNeedsAllPages": "Cet export couvre tout l’espace de travail. Demandez à un administrateur l’accès à tous les profils."
   },
   "feeds": {
     "title": "Flux RSS",

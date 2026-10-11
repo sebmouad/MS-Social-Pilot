@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 
 import { requireAuth } from '@/lib/auth';
-import { assertPageParam } from '@/lib/page-access';
+import { mayUsePage } from '@/lib/page-access';
 import { prisma } from '@/lib/prisma';
 import { route } from '@/lib/api';
 import { EXPORT_KINDS, buildExport, type ExportKind } from '@/lib/analytics-export';
 import { csvFilename, parseReportRange } from '@/lib/reports';
 import { errors } from '@/lib/errors';
+import { loadSelection } from '@/lib/page-filter';
+
+/** Exports not tied to a Page: only for members who may see every Page. */
+const WORKSPACE_WIDE: ExportKind[] = ['instagram', 'instagram_media', 'ads'];
 
 /**
  * CSV export of any part of the analytics catalogue.
@@ -34,7 +38,7 @@ export const GET = route(async (request: Request) => {
   // A target id arrives from the client, so it is checked against the caller's
   // workspace before it reaches a query.
   const requestedTarget = url.searchParams.get('targetId');
-  assertPageParam(auth.pageScope, requestedTarget);
+  if (requestedTarget && !mayUsePage(auth.pageScope, requestedTarget)) throw errors.targetsUnavailable();
   if (requestedTarget) {
     const owned = await prisma.target.findFirst({
       where: { id: requestedTarget, workspaceId: auth.workspace.id },
@@ -54,11 +58,18 @@ export const GET = route(async (request: Request) => {
     if (!owned) throw errors.adAccountNotFound();
   }
 
+  if (WORKSPACE_WIDE.includes(kind) && !auth.pageScope.all) throw errors.exportNeedsAllPages();
+
+  // The app-wide profile selection (URL, then the remembered one), already
+  // clamped to the member's Pages; one `targetId` narrows it to that Page.
+  const selection = await loadSelection(auth, Object.fromEntries(url.searchParams));
+  const targetIds = requestedTarget ? [requestedTarget] : selection.scope.all ? undefined : selection.scope.ids;
+
   const csv = await buildExport(kind, {
     workspaceId: auth.workspace.id,
     from,
     to,
-    targetId: requestedTarget ?? undefined,
+    targetIds,
     adAccountId: requestedAdAccount ?? undefined,
   });
 
