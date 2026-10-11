@@ -56,7 +56,7 @@ Today: `src/lib/email/send.ts` uses Resend only (`email.apiKey`,
   email"** button (to the signed-in owner) that reports the exact result
   (sent / auth failed "Use an app password, not your Google password" / blocked).
 - `emailEnabled()` true when the chosen provider is configured.
-- **The owner types the app password himself** in the UI; agents never enter or
+- **The owner types the app password themselves** in the UI; agents never enter or
   read it.
 - Tests: unit for provider selection and error mapping (nodemailer mocked); e2e
   that the form saves and the secret is never echoed back.
@@ -101,8 +101,18 @@ Today: `src/lib/ai.ts` is Anthropic-only (`ai.apiKey`, `ai.model` with a
 - Model select shows the price next to each model ("$3 / $15 per 1M tokens").
 - Tests: adapters with mocked fetch (model list parsing, usage parsing, error
   → "key rejected" / "rate limited" / "model not found"), cost maths, budget
-  stop; e2e for the settings screen. Live: owner pastes the keys himself; then
+  stop; e2e for the settings screen. Live: owner pastes the keys themselves; then
   one caption generation per provider, verify the cost line.
+
+### 0.3 Root and separate privileges
+Owner's rule (2026-10-11): the first registered user is root and sets up every
+aspect of the app; other admins and users have separate privileges, which the
+owner will audit. Root already exists (`isInstanceOwner`, first account only;
+Configuration and setup are root-only). Build the rest from
+[PERMISSIONS.md](PERMISSIONS.md) "To build": root console (all workspaces and
+users), root passes every check with actions logged, root transfer + SSH
+recovery script, a read-only privileges screen generated from one capability
+table for the audit. Don't change the role matrix until the owner has audited it.
 
 ## Phase A — One profile selection, everywhere (highest priority)
 

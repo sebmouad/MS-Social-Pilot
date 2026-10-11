@@ -16,6 +16,7 @@ conventions, commands. Then the file for your task:
 | Facebook / Instagram / Graph API work | [docs/ai/META_API_NOTES.md](docs/ai/META_API_NOTES.md) |
 | Shipping (server, scripts, rollback) | [docs/ai/RELEASE.md](docs/ai/RELEASE.md) |
 | Where things stand, decisions, Meta review, gaps | [docs/ai/STATUS.md](docs/ai/STATUS.md) |
+| Root, roles, privileges (owner will audit) | [docs/ai/PERMISSIONS.md](docs/ai/PERMISSIONS.md) |
 | Which skill for which task | [docs/ai/SKILLS.md](docs/ai/SKILLS.md) |
 
 Project skills live in [.claude/skills/](.claude/skills/) — load the one that
@@ -43,6 +44,9 @@ translations, migrations, new network connector, release).
    checks `/api/health` and the three WordPress sites on the same server.
 7. **Never type passwords, tokens or secrets into web pages**, never create
    accounts for the user, and never read production database contents.
-8. Client components must not import server modules (anything that reaches
+8. **The first registered user is root** (`isInstanceOwner`): only root sets up
+   the app (Configuration, setup). Workspace owners/admins are not root. Don't
+   widen or change role privileges without the owner's audit (PERMISSIONS.md).
+9. Client components must not import server modules (anything that reaches
    `@/lib/prisma`). Shared constants go in plain modules (`src/lib/palette.ts`,
    `src/lib/network-rules.ts`, `src/lib/report-sections.ts`).
