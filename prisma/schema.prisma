@@ -1388,3 +1388,18 @@ model Passkey {
   @@index([userId])
   @@map("passkeys")
 }
+
+/// A run of the server's off-site backup or monthly restore test
+/// (scripts/server/), written by the scripts with psql and shown in the root
+/// section. Kinds: offsite | restore_test. Status: ok | failed.
+model BackupRun {
+  id         String   @id
+  kind       String
+  status     String
+  detail     String?
+  startedAt  DateTime
+  finishedAt DateTime @default(now())
+
+  @@index([kind, finishedAt])
+  @@map("backup_runs")
+}

@@ -2214,7 +2214,8 @@
       "privileges": "Privilèges",
       "activity": "Activité root",
       "danger": "Zone sensible",
-      "back": "Retour à l’application"
+      "back": "Retour à l’application",
+      "backups": "Sauvegardes"
     },
     "overview": {
       "title": "Vue d’ensemble de l’installation",
@@ -2348,6 +2349,25 @@
       "body": "Vous perdez immédiatement l’accès à la section root. Vous recevez tous deux un e-mail si l’envoi d’e-mails est configuré.",
       "confirm": "Transférer root",
       "nobody": "Aucun autre compte actif à qui transférer root. Invitez d’abord quelqu’un."
+    },
+    "backups": {
+      "title": "Sauvegardes",
+      "subtitle": "Des copies chiffrées de la base et des médias conservées hors de ce serveur, et la preuve mensuelle qu’une sauvegarde se restaure.",
+      "lastOffsite": "Dernière copie externe",
+      "lastRestore": "Dernier test de restauration",
+      "never": "Jamais",
+      "stale": "Plus ancienne que prévu. Vérifiez le journal de sauvegarde du serveur.",
+      "history": "Exécutions récentes",
+      "ok": "OK",
+      "failed": "Échec",
+      "kindOffsite": "Copie externe",
+      "kindRestore": "Test de restauration",
+      "setupTitle": "Les sauvegardes externes ne sont pas encore configurées",
+      "setupIntro": "Le serveur garde 14 jours de sauvegardes sur son propre disque. Pour en garder des copies ailleurs, sur le serveur :",
+      "setup1": "Installez les outils : apt-get install -y age rclone",
+      "setup2": "Créez le stockage avec votre propre compte (Backblaze B2, S3, Google Drive…) : rclone config",
+      "setup3": "Créez une clé de chiffrement sur votre ordinateur (age-keygen), gardez la clé privée en lieu sûr, et écrivez la clé publique, le stockage et DATABASE_URL dans /etc/ms-social-pilot/offsite.env",
+      "setup4": "Lancez scripts/server/install-offsite.sh. Une copie est faite chaque nuit et une restauration testée chaque mois ; les résultats s’affichent ici."
     }
   },
   "twoStep": {

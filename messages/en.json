@@ -2214,7 +2214,8 @@
       "privileges": "Privileges",
       "activity": "Root activity",
       "danger": "Danger zone",
-      "back": "Back to the app"
+      "back": "Back to the app",
+      "backups": "Backups"
     },
     "overview": {
       "title": "Installation overview",
@@ -2348,6 +2349,25 @@
       "body": "You lose access to the root section straight away. Both of you are emailed if email is set up.",
       "confirm": "Hand root over",
       "nobody": "There is no other active account to hand root to. Invite someone first."
+    },
+    "backups": {
+      "title": "Backups",
+      "subtitle": "Encrypted copies of the database and media kept off this server, and the monthly proof that a backup restores.",
+      "lastOffsite": "Last off-site copy",
+      "lastRestore": "Last restore test",
+      "never": "Never",
+      "stale": "Older than it should be. Check the server's backup log.",
+      "history": "Recent runs",
+      "ok": "OK",
+      "failed": "Failed",
+      "kindOffsite": "Off-site copy",
+      "kindRestore": "Restore test",
+      "setupTitle": "Off-site backups aren't set up yet",
+      "setupIntro": "The server keeps 14 days of backups on its own disk. To keep copies elsewhere, on the server:",
+      "setup1": "Install the tools: apt-get install -y age rclone",
+      "setup2": "Create the storage remote with your own account (Backblaze B2, S3, Google Drive…): rclone config",
+      "setup3": "Create an encryption key on your computer (age-keygen), keep the private key safe, and write the public key, the remote and DATABASE_URL to /etc/ms-social-pilot/offsite.env",
+      "setup4": "Run scripts/server/install-offsite.sh. Copies are made every night and a restore is tested every month; results appear here."
     }
   },
   "twoStep": {

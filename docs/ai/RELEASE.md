@@ -71,6 +71,21 @@ ls -t /var/backups/ms-social-pilot/db-*.dump | head -1
 ```
 Ask the user before restoring a database.
 
+## Off-site backups (G2)
+
+Scripts in `scripts/server/`: `offsite-backup.sh` (encrypts the newest local
+dump, media and env with `age` to the owner's **public** key and copies them
+with `rclone` to `$RCLONE_REMOTE/daily/<date>`, plus `monthly/<yyyy-mm>` on the
+1st; keeps 30 daily + 12 monthly), `restore-test.sh` (monthly: restores the
+newest dump into a scratch database, counts users/workspaces/posts/profiles,
+drops it, checks the newest off-site copy's size) and `install-offsite.sh`
+(installs both under `/usr/local/sbin` with cron 04:45 daily / 05:30 on the
+1st). Config: `/etc/ms-social-pilot/offsite.env` (RCLONE_REMOTE, AGE_RECIPIENT,
+DATABASE_URL). Results go to the `backup_runs` table → Root → Backups.
+The owner creates the storage account, runs `rclone config` and keeps the age
+private key off the server (restoring an off-site copy:
+`age -d -i key.txt db-….dump.age > db.dump`). Not installed on production yet.
+
 ## Root recovery
 
 If root is lost (person gone, password and mailbox unreachable), on the server

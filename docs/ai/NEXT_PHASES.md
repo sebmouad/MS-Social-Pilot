@@ -384,6 +384,8 @@ most time), the rest after Phase D2. S/M/L = effort.
   a scratch database on the server that reports row counts; status shown in the
   root section. Owner creates the storage account and enters its key. Document
   in RELEASE.md.
+  **Built 2026-10-11** (scripts + Root → Backups); waiting on the owner to
+  create the storage account and run `scripts/server/install-offsite.sh`.
 - **G3. Alerts when something breaks (S)** — worker heartbeat missing > 5 min,
   publish failures above a threshold, Page disconnected / token expiring, disk
   > 85 %, backup or restore test failed, Meta usage near the limit. Channels:
