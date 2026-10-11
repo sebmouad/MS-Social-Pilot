@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { TargetType } from '@prisma/client';
+import { TargetType, WorkspaceRole } from '@prisma/client';
 import { getTranslations } from 'next-intl/server';
 
 import { requirePage } from '@/lib/auth';
@@ -10,8 +10,10 @@ import { parseRange } from '@/lib/date-range';
 import { formatInZone, appLocale } from '@/lib/time';
 import { ReportControls } from '@/components/ReportControls';
 import { ReportBuilder } from '@/components/ReportBuilder';
+import { ReportTemplates } from '@/components/ReportTemplates';
+import { ReportSchedules } from '@/components/ReportSchedules';
 import { parseSections } from '@/lib/report-sections';
-import { canManageSettings } from '@/lib/constants';
+import { atLeast, canManageSettings } from '@/lib/constants';
 import { targetScope } from '@/lib/page-access';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { ExternalLink } from '@/components/ExternalLink';
@@ -84,6 +86,31 @@ export default async function ReportsPage({
     select: { name: true, logoUrl: true, reportTitle: true, reportSubtitle: true, reportFooter: true },
   });
   const selected = pages.find((page) => page.id === first(params.target)) ?? pages[0] ?? null;
+  const canEdit = atLeast(auth.role, WorkspaceRole.editor);
+  const [templates, schedules] = await Promise.all([
+    prisma.reportTemplate.findMany({ where: { workspaceId: auth.workspace.id }, orderBy: { name: 'asc' } }),
+    selected && canEdit
+      ? prisma.reportSchedule.findMany({
+          where: { workspaceId: auth.workspace.id, targetId: selected.id },
+          orderBy: { createdAt: 'asc' },
+        })
+      : Promise.resolve([]),
+  ]);
+  const sectionsKey = [...sections].sort().join(',');
+  const templateRows = templates.map((template) => {
+    const chosen = parseSections((template.sections as string[]).join(','));
+    return {
+      id: template.id,
+      name: template.name,
+      href: `/reports?${new URLSearchParams({
+        ...(selected ? { target: selected.id } : {}),
+        range: template.rangeKey,
+        sections: chosen.join(','),
+      }).toString()}`,
+      active: [...chosen].sort().join(',') === sectionsKey && range.key === template.rangeKey,
+    };
+  });
+  const activeTemplate = templateRows.find((row) => row.active) ?? null;
 
   const report = rangeError
     ? null
@@ -124,7 +151,27 @@ export default async function ReportsPage({
           <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ReportControls from={range.fromDay} to={range.toDay} downloadable={!rangeError} />
+          {selected && canEdit && (
+            <ReportSchedules
+              targetId={selected.id}
+              pageName={selected.name}
+              templateId={activeTemplate?.id ?? null}
+              schedules={schedules.map((row) => ({
+                id: row.id,
+                frequency: row.frequency as 'weekly' | 'monthly',
+                recipients: row.recipients,
+                nextLabel: formatInZone(row.nextRunAt, timezone, 'EEE d MMM, HH:mm'),
+                lastLabel: row.lastRunAt ? formatInZone(row.lastRunAt, timezone, 'd MMM, HH:mm') : null,
+                lastError: row.lastError,
+              }))}
+            />
+          )}
+          <ReportControls
+            from={range.fromDay}
+            to={range.toDay}
+            downloadable={!rangeError}
+            pdfName={`${selected?.name ?? branding.name} – ${range.fromDay} – ${range.toDay}`}
+          />
           <ReportBuilder
             sections={sections}
             canBrand={canManageSettings(auth.role)}
@@ -137,6 +184,8 @@ export default async function ReportsPage({
           />
         </div>
       </header>
+
+      <ReportTemplates templates={templateRows} sections={sections} rangeKey={range.key} canSave={canEdit} />
 
       <div className="filter-row print:hidden">
         <DateRangePicker range={range} path="/reports" keep={keep} />

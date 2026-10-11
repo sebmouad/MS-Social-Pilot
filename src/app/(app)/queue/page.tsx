@@ -170,6 +170,7 @@ export default async function QueuePage({
 
       <QueueClient
         canManage={canManageSettings(auth.role)}
+        canMovePosts={canManageOthersPosts(auth.role)}
         scope={scope ? { id: scope.id, name: scope.name } : null}
         scopes={[
           ...(auth.pageScope.all ? [{ id: null, name: t('everyPage'), pictureUrl: null, own: allSlots.filter((slot) => !slot.targetId).length }] : []),

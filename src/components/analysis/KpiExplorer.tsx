@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 
+import { InfoTip } from '@/components/InfoTip';
 import { TimeSeries } from '@/components/charts/TimeSeries';
 import { compact, seriesColor } from '@/lib/viz';
 
@@ -19,6 +20,8 @@ export interface KpiCard {
   series: number[] | null;
   /** Shown under the chart: where the daily figure comes from. */
   note?: string;
+  /** What the figure counts, behind an ⓘ. */
+  definition?: string;
 }
 
 /**
@@ -55,7 +58,10 @@ export function KpiExplorer({ cards, days, vsLabel }: { cards: KpiCard[]; days: 
             card.value === null ? '—' : typeof card.value === 'number' ? compact(card.value, locale) : card.value;
           const body = (
             <>
-              <span className="block text-[13px] font-semibold text-slate-600">{card.label}</span>
+              <span className="flex items-center text-[13px] font-semibold text-slate-600">
+                {card.label}
+                {card.definition && <InfoTip text={card.definition} />}
+              </span>
               <span className="mt-1 flex flex-wrap items-center gap-2">
                 <span className="text-xl font-bold text-slate-900 sm:text-2xl">{display}</span>
                 {card.change !== null && (

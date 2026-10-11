@@ -61,6 +61,7 @@ const ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 export function QueueClient({
   canManage,
+  canMovePosts = false,
   scope,
   scopes,
   slots: initial,
@@ -71,6 +72,8 @@ export function QueueClient({
   pageCount,
 }: {
   canManage: boolean;
+  /** Editors and up may shuffle or clear the coming posts. */
+  canMovePosts?: boolean;
   /** The Page whose timetable is open, or null for the shared one. */
   scope: { id: string; name: string } | null;
   scopes: Scope[];
@@ -134,6 +137,38 @@ export function QueueClient({
 
   const free = upcoming.filter((entry) => !entry.post).length;
 
+  /** Every suggestion not already a slot, added in one save. */
+  async function addAll() {
+    const fresh = suggestions.filter((suggestion) => !slots.some((slot) => same(slot, suggestion)));
+    if (fresh.length === 0) return;
+    await save(
+      [...slots, ...fresh.map(({ dayOfWeek, hour, minute }) => ({ dayOfWeek, hour, minute, own: Boolean(scope) }))],
+      t('addedAll', { count: fresh.length }),
+    );
+  }
+
+  async function act(action: 'shuffle' | 'clear') {
+    if (!window.confirm(action === 'shuffle' ? t('shuffleConfirm') : t('clearConfirm'))) return;
+    setPending(true);
+    setStatus(null);
+    const response = await fetch('/api/queue', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action, targetId: scope?.id ?? null }),
+    }).catch(() => null);
+    setPending(false);
+    const body = (await response?.json().catch(() => ({}))) as { moved?: number; error?: string } | undefined;
+    if (!response?.ok) {
+      setStatus({ kind: 'error', text: body?.error ?? t('saveFailed') });
+      return;
+    }
+    setStatus({
+      kind: 'ok',
+      text: action === 'shuffle' ? t('shuffled', { count: body?.moved ?? 0 }) : t('cleared', { count: body?.moved ?? 0 }),
+    });
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       {/* Whose timetable: the one every Page shares, or one Page's own. */}
@@ -193,7 +228,15 @@ export function QueueClient({
           <Icon name="sparkles" size={16} className="text-brand-600" />
           {t('suggestionsTitle')}
         </h2>
-        <p className="mt-1 text-xs text-slate-500">{t('suggestionsHint', { posts: sample, pages: pageCount })}</p>
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-slate-500">{t('suggestionsHint', { posts: sample, pages: pageCount })}</p>
+          {canManage && suggestions.length > 1 && (
+            <button type="button" className="btn-primary" disabled={pending} onClick={() => void addAll()}>
+              <Icon name="sparkles" size={15} />
+              {t('addAllSuggested', { count: suggestions.length })}
+            </button>
+          )}
+        </div>
 
         {suggestions.length === 0 ? (
           <p className="mt-4 text-sm text-slate-600">
@@ -340,7 +383,21 @@ export function QueueClient({
       <section className="card overflow-hidden">
         <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-4 sm:px-5">
           <h2 className="text-sm font-semibold text-slate-900">{t('upcomingTitle')}</h2>
-          <p className="text-xs text-slate-500">{t('upcomingFree', { free, total: upcoming.length })}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs text-slate-500">{t('upcomingFree', { free, total: upcoming.length })}</p>
+            {canMovePosts && upcoming.some((entry) => entry.post) && (
+              <>
+                <button type="button" className="btn-secondary px-2.5 py-1 text-xs" disabled={pending} onClick={() => void act('shuffle')}>
+                  <Icon name="refresh" size={14} />
+                  {t('shuffle')}
+                </button>
+                <button type="button" className="btn-secondary px-2.5 py-1 text-xs hover:text-red-600" disabled={pending} onClick={() => void act('clear')}>
+                  <Icon name="close" size={14} />
+                  {t('clearQueue')}
+                </button>
+              </>
+            )}
+          </div>
         </div>
         {upcoming.length === 0 ? (
           <p className="px-4 py-6 text-sm text-slate-600 sm:px-5">{t('upcomingNone')}</p>

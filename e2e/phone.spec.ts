@@ -238,7 +238,7 @@ test('the seeded long content actually reaches the screens that are checked', as
   await expect(page.getByText(/halloway_bakery_official/i)).toBeVisible();
 
   await open(page, '/settings/media');
-  await expect(page.getByText(/a-photograph-of-the-bakery/i)).toBeVisible();
+  await expect(page.getByText(/a-photograph-of-the-bakery/i).first()).toBeVisible();
 });
 
 test('the analytics tabs stay usable when there is data behind them', async ({ page }) => {

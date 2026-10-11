@@ -3,7 +3,7 @@ import {
   NATIVE_SCHEDULE_MIN_SECONDS,
   type TargetType,
 } from '../constants';
-import { GraphError, graphRequest, graphUpload } from './graph';
+import { GraphError, graphRequest, graphResumableUpload, graphUpload } from './graph';
 
 /**
  * Turning a composed post into Graph API calls.
@@ -16,6 +16,9 @@ import { GraphError, graphRequest, graphUpload } from './graph';
  *   several photos       → N × POST /{target}/photos (unpublished)
  *                          then POST /{target}/feed with attached_media
  *   video                → POST /{target}/videos
+ *   reel                 → POST /{page}/video_reels (start), upload, (finish)
+ *   story, photo         → POST /{page}/photos (unpublished), /{page}/photo_stories
+ *   story, video         → POST /{page}/video_stories (start), upload, (finish)
  *
  * The routing lives in {@link planPublish}, a pure function, so the decision
  * table is testable without touching the network.
@@ -62,7 +65,12 @@ export interface PublishRequest {
    * (`scheduled_publish_time`). Pages only.
    */
   scheduledPublishTime?: Date | null;
+  /** A feed post (the default), a Reel or a Story. Pages only for the last two. */
+  format?: PostFormat;
 }
+
+export type PostFormat = 'post' | 'reel' | 'story';
+export const POST_FORMATS: PostFormat[] = ['post', 'reel', 'story'];
 
 export interface PublishResult {
   /** Facebook's post id, usually `<targetId>_<postId>`. */
@@ -76,7 +84,10 @@ export type PublishPlan =
   | { strategy: 'feed' }
   | { strategy: 'single_photo' }
   | { strategy: 'multi_photo'; count: number }
-  | { strategy: 'video' };
+  | { strategy: 'video' }
+  | { strategy: 'reel' }
+  | { strategy: 'story_photo' }
+  | { strategy: 'story_video' };
 
 /**
  * Decide which Graph edge to use, and reject combinations Facebook will not
@@ -104,6 +115,28 @@ export function planPublish(request: PublishRequest): PublishPlan {
       message: 'A post needs text, a link, or media.',
       kind: 'invalid_request',
     });
+  }
+  const format = request.format ?? 'post';
+  if (format !== 'post') {
+    if (request.targetType !== 'page') {
+      throw new GraphError({ message: 'Reels and Stories can only go to a Facebook Page.', kind: 'invalid_request' });
+    }
+    if (request.scheduledPublishTime) {
+      throw new GraphError({
+        message: 'Facebook cannot hold a Reel or a Story for later. Let this app publish it at the time instead.',
+        kind: 'invalid_request',
+      });
+    }
+    if (format === 'reel') {
+      if (videos.length !== 1 || images.length > 0) {
+        throw new GraphError({ message: 'A Reel needs exactly one video.', kind: 'invalid_request' });
+      }
+      return { strategy: 'reel' };
+    }
+    if (media.length !== 1) {
+      throw new GraphError({ message: 'A Story needs exactly one photo or one video.', kind: 'invalid_request' });
+    }
+    return { strategy: videos.length === 1 ? 'story_video' : 'story_photo' };
   }
   if (videos.length === 1) return { strategy: 'video' };
   if (images.length === 1) return { strategy: 'single_photo' };
@@ -372,7 +405,83 @@ export async function publishPost(request: PublishRequest): Promise<PublishResul
         scheduled,
       };
     }
+
+    case 'reel': {
+      const video = onlyMedia(request, 'video');
+      const caption = buildMediaCaption(request.message, request.link);
+      const videoId = await uploadThroughPhases(`${request.targetId}/video_reels`, request.accessToken, video);
+      await graphRequest(`${request.targetId}/video_reels`, {
+        method: 'POST',
+        accessToken: request.accessToken,
+        body: {
+          upload_phase: 'finish',
+          video_id: videoId,
+          video_state: 'PUBLISHED',
+          ...(caption ? { description: caption } : {}),
+        },
+      });
+      return { remotePostId: videoId, remoteUrl: `https://www.facebook.com/reel/${videoId}`, scheduled: false };
+    }
+
+    case 'story_photo': {
+      const image = onlyMedia(request, 'image');
+      const photo = await uploadPhoto(request, image, { published: false });
+      const { data } = await graphRequest<{ post_id?: string; id?: string }>(`${request.targetId}/photo_stories`, {
+        method: 'POST',
+        accessToken: request.accessToken,
+        body: { photo_id: photo.id },
+      });
+      const postId = data.post_id ?? data.id ?? photo.id;
+      return { remotePostId: postId, remoteUrl: storyUrl(request.targetId), scheduled: false };
+    }
+
+    case 'story_video': {
+      const video = onlyMedia(request, 'video');
+      const videoId = await uploadThroughPhases(`${request.targetId}/video_stories`, request.accessToken, video);
+      const { data } = await graphRequest<{ post_id?: string }>(`${request.targetId}/video_stories`, {
+        method: 'POST',
+        accessToken: request.accessToken,
+        body: { upload_phase: 'finish', video_id: videoId },
+      });
+      return { remotePostId: data.post_id ?? videoId, remoteUrl: storyUrl(request.targetId), scheduled: false };
+    }
   }
+}
+
+/** The one attachment of the kind a Reel or a Story is made of. */
+function onlyMedia<K extends ResolvedMedia['kind']>(request: PublishRequest, kind: K): Extract<ResolvedMedia, { kind: K }> {
+  return (request.media ?? []).find((item): item is Extract<ResolvedMedia, { kind: K }> => item.kind === kind)!;
+}
+
+/**
+ * Start a resumable video upload on `edge`, send the file to the address it
+ * gives back, and return the video's id for the finish phase.
+ */
+async function uploadThroughPhases(
+  edge: string,
+  accessToken: string,
+  video: Extract<ResolvedMedia, { kind: 'video' }>,
+): Promise<string> {
+  const { data } = await graphRequest<{ video_id: string; upload_url: string }>(edge, {
+    method: 'POST',
+    accessToken,
+    body: { upload_phase: 'start' },
+  });
+  if (video.source.type === 'url') {
+    await graphResumableUpload(data.upload_url, { accessToken, fileUrl: video.source.url });
+  } else {
+    await graphResumableUpload(data.upload_url, {
+      accessToken,
+      data: await video.source.read(),
+      filename: video.source.filename,
+    });
+  }
+  return data.video_id;
+}
+
+/** Stories have no permalink of their own; the Page's stories are where they show. */
+function storyUrl(pageId: string): string {
+  return `https://www.facebook.com/stories/${pageId}`;
 }
 
 /**

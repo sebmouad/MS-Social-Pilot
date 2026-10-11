@@ -52,9 +52,12 @@ export const SIGNED_IN_SCREENS = [
   '/dashboard',
   '/compose',
   '/calendar',
+  '/calendar?view=week',
+  '/calendar?view=feed',
   '/queue',
   '/posts',
   '/approvals',
+  '/approvals?view=board',
   '/connections',
   '/accounts',
   '/feeds',
@@ -62,6 +65,7 @@ export const SIGNED_IN_SCREENS = [
   // Each analytics view is its own server render with its own data, and one of
   // them failed on every visit for as long as nothing here opened it.
   '/analytics?view=compare',
+  '/analytics?view=analysis&compare=year',
   '/analytics?view=overview',
   '/analytics?view=posts',
   '/analytics?view=interactions',
@@ -75,6 +79,8 @@ export const SIGNED_IN_SCREENS = [
   '/settings/account',
   '/settings/media',
   '/settings/history',
+  '/settings/sharing',
+  '/settings/pages',
   '/setup',
 ];
 

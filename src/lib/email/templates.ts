@@ -1,6 +1,7 @@
 import { Locale } from '@prisma/client';
 
 import { env } from '../env';
+import type { Report } from '../reports';
 import enMessages from '../../../messages/en.json';
 import frMessages from '../../../messages/fr.json';
 
@@ -53,6 +54,10 @@ interface Block {
   details?: string[];
   cta?: { label: string; url: string };
   footer?: string;
+  /** Figures drawn as a row of tiles under the body. */
+  stats?: Array<{ label: string; value: string }>;
+  /** A titled list after the figures: the posts that did best, say. */
+  list?: { title: string; items: string[] };
 }
 
 function layout(block: Block): { html: string; text: string } {
@@ -71,6 +76,25 @@ function layout(block: Block): { html: string; text: string } {
           `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#334155;">${escapeHtml(paragraph)}</p>`,
       )
       .join('')}
+    ${
+      block.stats?.length
+        ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:8px 0 6px;border-collapse:separate;border-spacing:6px;"><tr>${block.stats
+            .map(
+              (stat) =>
+                `<td style="background:#f1f5f9;border-radius:10px;padding:12px;vertical-align:top;"><div style="font-size:12px;color:#64748b;">${escapeHtml(
+                  stat.label,
+                )}</div><div style="font-size:20px;font-weight:700;color:#0f172a;margin-top:2px;">${escapeHtml(stat.value)}</div></td>`,
+            )
+            .join('')}</tr></table>`
+        : ''
+    }
+    ${
+      block.list?.items.length
+        ? `<h2 style="margin:18px 0 8px;font-size:15px;color:#0f172a;">${escapeHtml(block.list.title)}</h2><ol style="margin:0;padding-left:20px;">${block.list.items
+            .map((item) => `<li style="margin:0 0 8px;font-size:14px;line-height:1.5;color:#334155;">${escapeHtml(item)}</li>`)
+            .join('')}</ol>`
+        : ''
+    }
     ${
       block.cta
         ? `<p style="margin:22px 0 0;"><a href="${escapeAttribute(block.cta.url)}" style="display:inline-block;background:#3563e9;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;padding:10px 18px;border-radius:8px;">${escapeHtml(
@@ -92,6 +116,8 @@ function layout(block: Block): { html: string; text: string } {
     block.heading,
     '',
     ...paragraphs,
+    ...(block.stats?.length ? ['', ...block.stats.map((stat) => `${stat.label}: ${stat.value}`)] : []),
+    ...(block.list?.items.length ? ['', block.list.title, ...block.list.items.map((item, index) => `${index + 1}. ${item}`)] : []),
     ...(block.cta ? ['', `${block.cta.label}: ${block.cta.url}`] : []),
     ...(block.footer ? ['', block.footer] : []),
   ].join('\n');
@@ -347,6 +373,48 @@ export function approvalDecisionEmail(options: {
     subject: options.approved
       ? t('email.approvalDecision.subjectApproved')
       : t('email.approvalDecision.subjectRejected'),
+    ...block,
+  };
+}
+
+/** The weekly or monthly report, for people who may never open the app. */
+export function scheduledReportEmail(options: {
+  locale: Locale;
+  workspace: string;
+  page: string;
+  frequency: 'weekly' | 'monthly';
+  period: string;
+  followers: number | null;
+  report: Report;
+}): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(options.locale, key, params);
+  const number = (value: number) => new Intl.NumberFormat(options.locale).format(value);
+  const { report } = options;
+
+  const block = layout({
+    heading: t(`email.scheduledReport.heading_${options.frequency}`, { page: options.page }),
+    body: t('email.scheduledReport.body', { page: options.page, period: options.period }),
+    stats: [
+      ...(options.followers !== null ? [{ label: t('email.scheduledReport.followers'), value: number(options.followers) }] : []),
+      { label: t('email.scheduledReport.posts'), value: number(report.postsPublished) },
+      { label: t('email.scheduledReport.reach'), value: number(report.totals.reach) },
+      { label: t('email.scheduledReport.engagement'), value: number(report.totals.engagement) },
+    ],
+    details: report.postsPublished === 0 ? [t('email.scheduledReport.nothing')] : [],
+    list: {
+      title: t('email.scheduledReport.topPosts'),
+      items: report.topPosts.slice(0, 3).map((post) => {
+        const text = post.message.replace(/\s+/g, ' ').trim();
+        const short = text.length > 110 ? `${text.slice(0, 107)}…` : text || '—';
+        return `${short} — ${t('email.scheduledReport.interactions', { total: number(post.engagement) })}`;
+      }),
+    },
+    footer: t('email.scheduledReport.footer', { workspace: options.workspace }),
+  });
+
+  return {
+    subject: t(`email.scheduledReport.subject_${options.frequency}`, { page: options.page, period: options.period }),
     ...block,
   };
 }

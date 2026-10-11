@@ -13,12 +13,13 @@ import { InboxPanel } from '@/components/InboxPanel';
 import { ExportMenu } from '@/components/ExportMenu';
 import { PagePicker } from '@/components/PagePicker';
 import { DateRangePicker } from '@/components/DateRangePicker';
-import { parseRange, rangeQuery } from '@/lib/date-range';
+import { parseCompare, parseRange, rangeQuery } from '@/lib/date-range';
 import { PostAnalyticsTable, type PostRow } from '@/components/PostAnalyticsTable';
 import { StatTile } from '@/components/charts/StatTile';
 import { SyncButton } from '@/components/SyncButton';
 import { requirePage } from '@/lib/auth';
 import { targetScope } from '@/lib/page-access';
+import { listPageGroups } from '@/lib/page-groups';
 import { screenMetadata } from '@/lib/metadata';
 import { canDeleteComments, canModerateComments } from '@/lib/constants';
 import { UNWINDOWED_VIEWS, parseAnalyticsView } from '@/lib/analytics-views';
@@ -110,6 +111,9 @@ export default async function AnalyticsPage({
   );
   const { from, to } = range;
   const window = range.days;
+  const compare = parseCompare(first(params.compare));
+  // The period as links carry it: dates, and the comparison when it is not the default.
+  const periodQuery = `${rangeQuery(range)}${compare === 'year' ? '&compare=year' : ''}`;
 
   // Ads is its own module now; an old bookmark to the tab lands there.
   if (first(params.view) === 'ads') {
@@ -138,13 +142,18 @@ export default async function AnalyticsPage({
           would let two panels disagree about which window they are showing. */}
       <div className="filter-row">
         {!UNWINDOWED_VIEWS.has(view) && (
-          <DateRangePicker range={range} path="/analytics" keep={{ view, target: selected.id }} />
+          <DateRangePicker
+            range={range}
+            path="/analytics"
+            keep={{ view, target: selected.id }}
+            compare={view === 'analysis' || view === 'compare' ? compare : undefined}
+          />
         )}
 
         <PagePicker
           pages={pages.map((page) => ({ id: page.id, name: page.name }))}
           selectedId={selected.id}
-          rangeQuery={rangeQuery(range)}
+          rangeQuery={periodQuery}
           view={view}
         />
 
@@ -163,6 +172,7 @@ export default async function AnalyticsPage({
           to={to}
           days={window}
           timeZone={timezone}
+          compare={compare}
         />
       )}
 
@@ -176,7 +186,11 @@ export default async function AnalyticsPage({
           sort={first(params.sort)}
           order={first(params.order)}
           targetId={selected.id}
-          rangeQuery={rangeQuery(range)}
+          rangeQuery={periodQuery}
+          compare={compare}
+          targetIds={auth.pageScope.all ? undefined : auth.pageScope.ids}
+          groups={await listPageGroups(auth.workspace.id, auth.pageScope)}
+          groupId={first(params.group)}
         />
       )}
 

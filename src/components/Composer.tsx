@@ -13,6 +13,7 @@ import { PostPreview } from './PostPreview';
 import { LabelPicker, type LabelOption } from './LabelPicker';
 import { CommentDelay } from './CommentDelay';
 import { SplitButton } from './SplitButton';
+import { ComposerTools } from './ComposerTools';
 import type { PageGroupView } from '@/lib/page-groups';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 import { LIMITS } from '@/lib/constants';
@@ -58,6 +59,7 @@ export interface EditingPost {
   firstComment: string | null;
   firstCommentDelayMinutes: number;
   labelIds: string[];
+  format: 'post' | 'reel' | 'story';
   link: string | null;
   media: PostMedia[];
   targetIds: string[];
@@ -94,6 +96,7 @@ export function Composer({
   initialTargetIds,
   groups = [],
   labels = [],
+  canEditLabels = false,
 }: Props) {
   const t = useTranslations('compose');
   // Passed explicitly: this runs in the browser, outside the server request
@@ -108,6 +111,7 @@ export function Composer({
   const [firstComment, setFirstComment] = useState(editing?.firstComment ?? '');
   const [commentDelay, setCommentDelay] = useState(editing?.firstCommentDelayMinutes ?? 0);
   const [labelIds, setLabelIds] = useState<string[]>(editing?.labelIds ?? []);
+  const [format, setFormat] = useState<'post' | 'reel' | 'story'>(editing?.format ?? 'post');
   const linkBox = useRef<HTMLInputElement>(null);
 
   const [message, setMessage] = useState(editing?.message ?? '');
@@ -174,6 +178,25 @@ export function Composer({
     if (messageBox.current) messageBox.current.value = text;
   }, []);
 
+  /** Put text where the cursor is in the post box, as typing it would. */
+  const insertAtCursor = useCallback(
+    (text: string) => {
+      const box = messageBox.current;
+      const current = box?.value ?? message;
+      const start = box?.selectionStart ?? current.length;
+      const end = box?.selectionEnd ?? current.length;
+      const spacer = start > 0 && !/\s$/.test(current.slice(0, start)) && text.length > 2 ? ' ' : '';
+      const next = `${current.slice(0, start)}${spacer}${text}${current.slice(end)}`;
+      writeMessage(next.slice(0, LIMITS.messageLength));
+      requestAnimationFrame(() => {
+        const caret = start + spacer.length + text.length;
+        box?.focus();
+        box?.setSelectionRange(caret, caret);
+      });
+    },
+    [message, writeMessage],
+  );
+
   const writeLink = useCallback((text: string) => {
     setLink(text);
     if (linkBox.current) linkBox.current.value = text;
@@ -185,7 +208,7 @@ export function Composer({
   // Facebook's own scheduler holds Page posts only: a Group has no such API
   // and Instagram's publishes on the spot. Rather than let the choice stand
   // and have the server refuse it, the app takes over while either is ticked.
-  const nativeBlocked = hasGroupSelected || hasInstagramSelected;
+  const nativeBlocked = hasGroupSelected || hasInstagramSelected || format !== 'post';
   const effectiveHandler: Handler = nativeBlocked ? 'worker' : handler;
   // Instagram has no text-only post; said now rather than at the scheduled
   // moment. A draft can still be saved while the picture is found.
@@ -206,6 +229,7 @@ export function Composer({
     ? message !== editing.message ||
       firstComment !== (editing.firstComment ?? '') ||
       commentDelay !== editing.firstCommentDelayMinutes ||
+      format !== editing.format ||
       [...labelIds].sort().join() !== [...editing.labelIds].sort().join() ||
       link !== (editing.link ?? '') ||
       mediaKey(media) !== mediaKey(editing.media) ||
@@ -307,6 +331,7 @@ export function Composer({
               firstComment,
               firstCommentDelayMinutes: commentDelay,
               labelIds,
+              format,
               link: link.trim() ? link.trim() : null,
               media,
               targetIds: selected,
@@ -323,6 +348,7 @@ export function Composer({
               firstComment,
               firstCommentDelayMinutes: commentDelay,
               labelIds,
+              format,
               link: link.trim() ? link.trim() : null,
               media,
               targetIds: selected,
@@ -383,6 +409,7 @@ export function Composer({
       setFirstComment('');
       setCommentDelay(0);
       setLabelIds([]);
+      setFormat('post');
       if (commentBox.current) commentBox.current.value = '';
       setPreview(null);
       setMedia([]);
@@ -432,8 +459,20 @@ export function Composer({
   const needsApproval = requiresApproval && !canPublishDirectly;
 
   const hasContent = message.trim().length > 0 || link.trim().length > 0 || media.length > 0;
+  const videoCount = media.filter((item) => item.kind === 'video').length;
+  // Reels and Stories: Facebook Pages only, and one piece of media.
+  const formatProblem =
+    format === 'post'
+      ? null
+      : selectedTargets.some((target) => target.type !== 'page')
+        ? t('formatPagesOnly')
+        : format === 'reel' && (videoCount !== 1 || media.length !== 1)
+          ? t('reelNeedsVideo')
+          : format === 'story' && media.length !== 1
+            ? t('storyNeedsMedia')
+            : null;
   const canSubmit =
-    !pending && !uploading && selected.length > 0 && hasContent && !instagramNeedsMedia;
+    !pending && !uploading && selected.length > 0 && hasContent && !instagramNeedsMedia && !formatProblem;
 
   const timingOptions: Array<{ value: Timing; short: string; label: string; description: string; disabled?: boolean; reason?: string }> = [
     { value: 'schedule', short: t('timingSchedule'), label: t('scheduleForTime'), description: t('scheduleDescription') },
@@ -462,7 +501,7 @@ export function Composer({
             ? t('blockedNoContent')
             : instagramNeedsMedia
               ? t('blockedInstagramMedia')
-              : null;
+              : formatProblem;
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -475,8 +514,25 @@ export function Composer({
           without reducing the width the box asks for. */}
       <div className="min-w-0 space-y-6 lg:col-span-2">
         <section className="card p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="segmented" role="radiogroup" aria-label={t('formatLabel')}>
+              {(['post', 'reel', 'story'] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={format === value}
+                  className={`segmented-item ${format === value ? 'segmented-item-active' : ''}`}
+                  onClick={() => setFormat(value)}
+                >
+                  {t(`format_${value}`)}
+                </button>
+              ))}
+            </div>
+            {format !== 'post' && <p className="text-xs text-slate-500">{t(`formatHint_${format}`)}</p>}
+          </div>
           <label className="label" htmlFor="message">
-            {t('whatToSay')}
+            {format === 'story' ? t('storyNote') : t('whatToSay')}
           </label>
           <textarea
             id="message"
@@ -488,9 +544,9 @@ export function Composer({
             onChange={(event) => setMessage(event.target.value)}
           />
           {/* What a person means by a character: one emoji is one, not two. */}
-          <p className="hint">{t('characters', { count: countCharacters(message) })}</p>
+          <ComposerTools text={message} insert={insertAtCursor} canDelete={canEditLabels} />
 
-          <div className="mt-5">
+          <div className={`mt-5 ${format === 'story' ? 'hidden' : ''}`}>
             <label className="label" htmlFor="first-comment">
               {t('firstComment')} <span className="font-normal text-slate-400">{tAuth('optional')}</span>
             </label>
@@ -675,6 +731,7 @@ export function Composer({
           firstComment={firstComment}
           timing={timing}
           scheduledAt={scheduledAt}
+          format={format}
         />
       </div>
 

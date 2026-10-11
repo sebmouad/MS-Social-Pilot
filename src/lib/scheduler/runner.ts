@@ -13,6 +13,7 @@ import { decideRetry } from './backoff';
 import { notifyConnectionExpired, notifyPublishFailure } from '../email/notify';
 import { prepareLinks } from '../links';
 import { postFirstComment } from '../first-comment';
+import type { PostFormat } from '../facebook/publish';
 import {
   PUBLISHABLE_APPROVAL_STATUSES,
   TERMINAL_TARGET_STATUSES,
@@ -387,6 +388,7 @@ async function publishClaimed(
           // Facebook to hold the post as well — native scheduling is handed
           // over at creation time instead (see src/lib/posts.ts).
           scheduledPublishTime: null,
+          format: post.format as PostFormat,
         });
 
     const kept = await writeIfStillOurs(postTargetId, options.workerId, {
@@ -419,7 +421,8 @@ async function publishClaimed(
     // Only once the publish is recorded, and never able to throw: a refused
     // comment is noted on the destination for a retry, and the post stays
     // published rather than coming back here to be sent a second time.
-    if (post.firstComment?.trim()) {
+    // A Story takes no comments, so there is nothing to put under it.
+    if (post.firstComment?.trim() && post.format !== 'story') {
       const comment = await postFirstComment(postTargetId, options.now);
       if (comment === 'failed') {
         options.logger?.(`Published post ${post.id} to ${target.name}, but its first comment was refused.`);

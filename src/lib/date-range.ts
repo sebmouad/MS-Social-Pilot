@@ -137,3 +137,29 @@ export function rangeParams(range: DateRange): Record<string, string> {
 export function rangeQuery(range: DateRange): string {
   return new URLSearchParams(rangeParams(range)).toString();
 }
+
+/**
+ * What a period is measured against: the stretch just before it, or the same
+ * dates a year earlier — the fair comparison for a seasonal business, whose
+ * December is never going to look like its November.
+ */
+export const COMPARE_MODES = ['previous', 'year'] as const;
+export type CompareMode = (typeof COMPARE_MODES)[number];
+
+export function parseCompare(raw: string | undefined | null): CompareMode {
+  return raw === 'year' ? 'year' : 'previous';
+}
+
+/** The window `from`–`to` is compared with: `[from, to)` before it, or a year back. */
+export function comparisonWindow(from: Date, to: Date, mode: CompareMode): { from: Date; to: Date } {
+  if (mode === 'year') {
+    const back = (date: Date) => {
+      const moved = new Date(date);
+      moved.setUTCFullYear(moved.getUTCFullYear() - 1);
+      return moved;
+    };
+    return { from: back(from), to: back(to) };
+  }
+  const length = to.getTime() - from.getTime();
+  return { from: new Date(from.getTime() - length), to: from };
+}

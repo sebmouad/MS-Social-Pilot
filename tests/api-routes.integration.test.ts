@@ -33,6 +33,7 @@ const PUBLIC: Record<string, string> = {
   'auth/logout': 'Signing out twice is not an error worth a 401.',
   health: 'A load balancer has no cookies.',
   'cron/tick': 'Called by a scheduler, and guarded by its own secret rather than a session.',
+  'share/[token]': 'A client answering a review link has no account; the unguessable token is the authority, and it reaches only its own Pages.',
   'facebook/data-deletion': "Meta calls this, with a signed_request it verifies rather than a cookie.",
   'facebook/deauthorize': 'Meta calls this too, same verification.',
   setup: 'Open only while the database holds no accounts; owner-only from the first registration onwards.',
@@ -50,6 +51,9 @@ const VALID_BODY: Record<string, unknown> = {
   'page-groups': { name: 'Client A' },
   'page-groups/[id]': { name: 'Client B' },
   'labels/[id]': { name: 'Renamed' },
+  queue: { action: 'shuffle' },
+  'report-templates': { name: 'Monthly', sections: ['analysis'] },
+  'report-schedules': { targetId: 'x', frequency: 'weekly', recipients: ['a@example.test'] },
 };
 
 /** Route path → the params a dynamic segment needs, so the handler can run. */
@@ -209,6 +213,18 @@ const CONTRIBUTOR_MUST_NOT: Array<[Method, string]> = [
   // Renaming or deleting a label changes it on everybody's posts.
   ['PATCH', 'labels/[id]'],
   ['DELETE', 'labels/[id]'],
+  ['DELETE', 'snippets/[id]'],
+  // Moves everybody's upcoming posts.
+  ['POST', 'queue'],
+  // Opening the workspace to people with no account.
+  ['GET', 'share-links'],
+  ['POST', 'report-templates'],
+  ['DELETE', 'report-templates/[id]'],
+  ['GET', 'report-schedules'],
+  ['POST', 'report-schedules'],
+  ['DELETE', 'report-schedules/[id]'],
+  ['POST', 'share-links'],
+  ['DELETE', 'share-links/[id]'],
 ];
 
 describe('a signed-in contributor', () => {

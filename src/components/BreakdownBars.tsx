@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { BarList } from '@/components/charts/BarList';
 import { ChartFrame } from '@/components/charts/ChartFrame';
+import { WorldMap } from '@/components/charts/WorldMap';
 
 /**
  * A labelled bar list for a breakdown map, in a chart frame.
@@ -17,7 +18,10 @@ export async function BreakdownBars({
   limit = 8,
   colorIndex = 0,
   formatKey,
+  map,
 }: {
+  /** Draw a world map above the bars: the keys are ISO country codes. */
+  map?: { label: string; locale: string };
   title: string;
   description?: string;
   data: Record<string, number>;
@@ -48,7 +52,19 @@ export async function BreakdownBars({
       description={description}
       table={rows.length > 0 ? { head: [t('category'), t('value')], rows } : undefined}
     >
-      <BarList data={labelled} limit={limit} colorIndex={colorIndex} />
+      {map && rows.length > 0 ? (
+        <div className="grid items-center gap-6 lg:grid-cols-[3fr_2fr]">
+          <WorldMap
+            data={data}
+            label={map.label}
+            nameOf={(code) => (formatKey ? formatKey(code) : code)}
+            formatValue={(value) => value.toLocaleString(map.locale)}
+          />
+          <BarList data={labelled} limit={limit} colorIndex={colorIndex} />
+        </div>
+      ) : (
+        <BarList data={labelled} limit={limit} colorIndex={colorIndex} />
+      )}
     </ChartFrame>
   );
 }

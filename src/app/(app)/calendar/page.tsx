@@ -7,10 +7,14 @@ import { listLabels } from '@/lib/page-groups';
 import { paletteOf } from '@/lib/palette';
 import { PagesSidebar } from '@/components/PagesSidebar';
 import { LabelFilter } from '@/components/LabelFilter';
+import { WeekGrid } from '@/components/CalendarWeek';
+import { PageFeedPreview } from '@/components/PageFeedPreview';
+import { feedLinkOf, feedMediaOf } from '@/lib/feed';
 import { canManageOthersPosts, canManageSettings, postIsEditable } from '@/lib/constants';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
-import { formatInZone, monthGrid } from '@/lib/time';
+import { formatInZone, monthGrid, weekGrid } from '@/lib/time';
+import { awarenessOn } from '@/lib/awareness-days';
 import { StatusBadge } from '@/components/StatusBadge';
 import { parseMedia } from '@/lib/json';
 import { Icon } from '@/components/Icon';
@@ -73,9 +77,17 @@ export default async function CalendarPage({
   const t = await getTranslations('calendar');
   const tDash = await getTranslations('dashboard');
   const tPosts = await getTranslations('posts');
+  const tDays = await getTranslations('calendar.days');
+  const tCommon = await getTranslations('common');
+  const tStatus = await getTranslations('status');
   const params = await searchParams;
   const timezone = auth.workspace.timezone;
 
+  const pick = (key: string) => (Array.isArray(params[key]) ? params[key][0] : params[key]);
+  const view: 'month' | 'week' | 'feed' =
+    pick('view') === 'week' ? 'week' : pick('view') === 'feed' ? 'feed' : 'month';
+  // Drafts sit on the grid with everything else unless switched off.
+  const hideDrafts = pick('drafts') === 'hide';
   const monthParam = Array.isArray(params.month) ? params.month[0] : params.month;
   const today = new Date();
   // `month` is `YYYY-MM` in workspace-local terms.
@@ -94,7 +106,9 @@ export default async function CalendarPage({
     ...(activeLabel ? { labels: { some: { labelId: activeLabel.id } } } : {}),
   };
 
-  const days = monthGrid(safeYear, safeMonth, timezone);
+  const weekParam = pick('week');
+  const anchor = weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam) ? weekParam : formatInZone(today, timezone, 'yyyy-MM-dd');
+  const days = view === 'month' ? monthGrid(safeYear, safeMonth, timezone) : weekGrid(anchor, timezone);
   const gridStart = days[0]!;
   const gridEnd = new Date(days[days.length - 1]!.getTime() + 24 * 60 * 60 * 1000);
 
@@ -103,7 +117,7 @@ export default async function CalendarPage({
       where: {
         workspaceId: auth.workspace.id,
         scheduledAt: { gte: gridStart, lt: gridEnd },
-        status: { not: 'cancelled' },
+        status: hideDrafts ? { notIn: ['cancelled', 'draft'] } : { not: 'cancelled' },
         ...narrowing,
       },
       include: {
@@ -121,6 +135,35 @@ export default async function CalendarPage({
       take: DRAFT_LIMIT,
     }),
   ]);
+
+  // The feed view shows one Page: the one left visible, or the first.
+  const feedPageId = view === 'feed' ? (filter.visible?.length === 1 ? filter.visible[0] : filter.ids[0]) : undefined;
+  const [feedPage, feedUpcoming, feedRecent] = feedPageId
+    ? await Promise.all([
+        prisma.target.findUnique({
+          where: { id: feedPageId },
+          select: { name: true, pictureUrl: true, category: true, followersCount: true, fanCount: true },
+        }),
+        prisma.post.findMany({
+          where: {
+            workspaceId: auth.workspace.id,
+            targets: { some: { targetId: feedPageId } },
+            status: { in: hideDrafts ? ['scheduled', 'pending_approval', 'publishing'] : ['scheduled', 'pending_approval', 'publishing', 'draft'] },
+            OR: [{ scheduledAt: { gte: today } }, { scheduledAt: null }],
+            ...(activeLabel ? { labels: { some: { labelId: activeLabel.id } } } : {}),
+          },
+          include: { targets: { select: { status: true } } },
+          orderBy: [{ scheduledAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
+          take: 30,
+        }),
+        prisma.postTarget.findMany({
+          where: { targetId: feedPageId, status: 'published' },
+          include: { post: { select: { message: true, media: true, link: true, linkPreview: true } } },
+          orderBy: { publishedAt: 'desc' },
+          take: 5,
+        }),
+      ])
+    : [null, [], []];
 
   // Bucket by the local calendar day so a post at 23:00 UTC+2 lands on the
   // right square rather than the previous day.
@@ -165,23 +208,110 @@ export default async function CalendarPage({
   const newPostHref = (key: string) => (key === todayKey ? '/compose' : `/compose?at=${key}T09:00`);
   // Moving through the months keeps the Pages and the label being looked at.
   const keep = new URLSearchParams();
-  for (const key of ['group', 'pages', 'label']) {
+  for (const key of ['group', 'pages', 'label', 'drafts']) {
     const value = Array.isArray(params[key]) ? params[key][0] : params[key];
     if (value) keep.set(key, value);
   }
   const kept = keep.toString();
   const monthHref = (date: Date) =>
     `/calendar?month=${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}${kept ? `&${kept}` : ''}`;
+  const weekKey = (date: Date) => formatInZone(date, timezone, 'yyyy-MM-dd');
+  const weekHref = (key: string) => `/calendar?view=week&week=${key}${kept ? `&${kept}` : ''}`;
+  const shift = (days7: number) => weekKey(new Date(days[0]!.getTime() + days7 * 86_400_000 + 12 * 3_600_000));
+  // A link that keeps everything but one parameter.
+  const linkWith = (changes: Record<string, string | null>) => {
+    const next = new URLSearchParams();
+    for (const [name, raw] of Object.entries(params)) {
+      const v = Array.isArray(raw) ? raw[0] : raw;
+      if (v && !(name in changes)) next.set(name, v);
+    }
+    for (const [name, value] of Object.entries(changes)) if (value) next.set(name, value);
+    const qs = next.toString();
+    return qs ? `/calendar?${qs}` : '/calendar';
+  };
+  const previousHref = view === 'week' ? weekHref(shift(-7)) : monthHref(previous);
+  const nextHref = view === 'week' ? weekHref(shift(7)) : monthHref(next);
+  const title =
+    view === 'week'
+      ? `${formatInZone(days[0]!, timezone, 'd MMM')} – ${formatInZone(days[6]!, timezone, 'd MMM yyyy')}`
+      : monthLabel;
   const labelById = new Map(labels.map((label) => [label.id, label]));
 
   // The month at a glance, above the grid: what is planned and what went out.
-  const inMonthPosts = posts.filter(
-    (post) => post.scheduledAt && Number(formatInZone(post.scheduledAt, timezone, 'M')) - 1 === safeMonth,
-  );
+  const inMonthPosts =
+    view === 'week'
+      ? posts
+      : posts.filter(
+          (post) => post.scheduledAt && Number(formatInZone(post.scheduledAt, timezone, 'M')) - 1 === safeMonth,
+        );
   const summary = LEGEND.map((status) => ({
     status,
     count: inMonthPosts.filter((post) => post.status === status).length,
   })).filter((entry) => entry.count > 0);
+
+  type CalendarPost = (typeof posts)[number];
+  /** One planned post as the grid draws it: Page, time, labels, opening words and picture. */
+  const renderChip = (post: CalendarPost) => (
+        <Link
+          href={postHref(post)}
+          className={`relative block overflow-hidden rounded-md border-l-[3px] bg-white px-2 py-1.5 shadow-surface transition-shadow hover:shadow-md ${
+            STATUS_EDGE[post.status] ?? 'border-l-slate-400'
+          }`}
+          title={post.message || post.link || ''}
+        >
+          <span className="flex items-center gap-1.5">
+            {post.targets[0]?.target.pictureUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={post.targets[0].target.pictureUrl}
+                alt=""
+                className="h-4 w-4 shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <span
+                aria-hidden
+                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[9px] font-bold text-brand-600"
+              >
+                {(post.targets[0]?.target.name ?? '?').charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="text-[11px] font-semibold text-slate-900">
+              {post.scheduledAt ? formatInZone(post.scheduledAt, timezone, 'HH:mm') : ''}
+            </span>
+            <span className="sr-only">{tStatus(`post.${post.status}`)}</span>
+            {post.labels.length > 0 && (
+              <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                {post.labels.slice(0, 3).map((row) => {
+                  const label = labelById.get(row.labelId);
+                  return label ? (
+                    <span
+                      key={row.labelId}
+                      title={label.name}
+                      className={`h-2 w-2 rounded-full ${paletteOf(label.color).dot}`}
+                    />
+                  ) : null;
+                })}
+              </span>
+            )}
+          </span>
+          {/* The planner's chip: the photo beside the opening words,
+              as Meta Business Suite draws a planned post. */}
+          <span className="mt-0.5 flex items-start gap-1.5">
+            <span className="line-clamp-2 block min-w-0 flex-1 [overflow-wrap:anywhere] text-xs leading-tight text-slate-700">
+              {post.message || post.link || tPosts('mediaOnly')}
+            </span>
+            {firstImage(post.media) && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={firstImage(post.media)!}
+                alt=""
+                loading="lazy"
+                className="hidden h-7 w-7 shrink-0 rounded object-cover sm:block"
+              />
+            )}
+          </span>
+        </Link>
+  );
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
@@ -195,39 +325,78 @@ export default async function CalendarPage({
     <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold capitalize text-slate-900">{monthLabel}</h1>
+          <h1 className="text-2xl font-bold capitalize text-slate-900">{title}</h1>
           <p className="mt-1 text-sm text-slate-600">
             {t('title')} · {t('timesShownIn', { timezone })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <nav className="segmented" aria-label={t('viewLabel')}>
+            {(['month', 'week', 'feed'] as const).map((option) => (
+              <Link
+                key={option}
+                href={
+                  option === 'week'
+                    ? linkWith({ view: 'week', week: view === 'week' ? anchor : formatInZone(today, timezone, 'yyyy-MM-dd'), month: null })
+                    : option === 'feed'
+                      ? linkWith({ view: 'feed', week: null, month: null })
+                      : linkWith({ view: null, week: null })
+                }
+                aria-current={view === option ? 'page' : undefined}
+                className={`segmented-item ${view === option ? 'segmented-item-active' : ''}`}
+              >
+                {t(option === 'week' ? 'viewWeek' : option === 'feed' ? 'viewFeed' : 'viewMonth')}
+              </Link>
+            ))}
+          </nav>
+          <Link
+            href={linkWith({ drafts: hideDrafts ? null : 'hide' })}
+            role="switch"
+            aria-checked={!hideDrafts}
+            className="flex h-10 items-center gap-2 rounded-full bg-white px-3 text-sm font-semibold text-slate-700 shadow-surface hover:bg-slate-50"
+          >
+            <span
+              aria-hidden
+              className={`relative h-5 w-9 rounded-full transition-colors ${hideDrafts ? 'bg-slate-300' : 'bg-brand-500'}`}
+            >
+              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${hideDrafts ? 'left-0.5' : 'left-[18px]'}`} />
+            </span>
+            {t('showDrafts')}
+          </Link>
           <LabelFilter labels={labels} active={activeLabel?.id ?? null} />
-          <Link href={kept ? `/calendar?${kept}` : '/calendar'} className="btn-secondary">
+          {view !== 'feed' && (
+          <>
+          <Link
+            href={view === 'week' ? weekHref(formatInZone(today, timezone, 'yyyy-MM-dd')) : kept ? `/calendar?${kept}` : '/calendar'}
+            className="btn-secondary"
+          >
             {t('today')}
           </Link>
           <Link
-            href={monthHref(previous)}
+            href={previousHref}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-900 hover:bg-slate-300"
-            aria-label={t('previousMonth')}
-            title={t('previousMonth')}
+            aria-label={view === 'week' ? t('previousWeek') : t('previousMonth')}
+            title={view === 'week' ? t('previousWeek') : t('previousMonth')}
           >
             <Icon name="chevronLeft" size={18} />
           </Link>
           <Link
-            href={monthHref(next)}
+            href={nextHref}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-900 hover:bg-slate-300"
-            aria-label={t('nextMonth')}
-            title={t('nextMonth')}
+            aria-label={view === 'week' ? t('nextWeek') : t('nextMonth')}
+            title={view === 'week' ? t('nextWeek') : t('nextMonth')}
           >
             <Icon name="chevronRight" size={18} />
           </Link>
+          </>
+          )}
           <Link href="/compose" className="btn-primary">
             {tDash('newPost')}
           </Link>
         </div>
       </header>
 
-      {summary.length > 0 && (
+      {view !== 'feed' && summary.length > 0 && (
         <ul className="flex flex-wrap gap-2" aria-label={t('monthSummary')}>
           {summary.map((entry) => (
             <li
@@ -242,6 +411,61 @@ export default async function CalendarPage({
         </ul>
       )}
 
+      {view === 'feed' ? (
+        feedPage ? (
+          <PageFeedPreview
+            page={{
+              name: feedPage.name,
+              pictureUrl: feedPage.pictureUrl,
+              category: feedPage.category,
+              followers: feedPage.followersCount ?? feedPage.fanCount,
+            }}
+            labels={{
+              followers:
+                (feedPage.followersCount ?? feedPage.fanCount) !== null
+                  ? t('feedFollowers', { count: feedPage.followersCount ?? feedPage.fanCount ?? 0 })
+                  : null,
+              upcoming: t('feedUpcoming', { count: feedUpcoming.length }),
+              upcomingEmpty: t('feedUpcomingEmpty'),
+              recent: t('feedRecent'),
+              noText: tPosts('mediaOnly'),
+              seeMore: tCommon('seeMore'),
+            }}
+            upcoming={feedUpcoming.map((post) => ({
+              id: post.id,
+              message: post.message,
+              meta: post.scheduledAt ? formatInZone(post.scheduledAt, timezone, 'EEEE d MMMM, HH:mm') : t('feedNoTime'),
+              badge: <StatusBadge status={post.status} />,
+              href: postHref(post),
+              media: feedMediaOf(post.media),
+              link: post.link,
+              linkPreview: feedLinkOf(post.linkPreview),
+            }))}
+            recent={feedRecent.map((row) => ({
+              id: row.id,
+              message: row.post.message,
+              meta: row.publishedAt ? formatInZone(row.publishedAt, timezone, 'd MMMM, HH:mm') : '',
+              media: feedMediaOf(row.post.media),
+              link: row.post.link,
+              linkPreview: feedLinkOf(row.post.linkPreview),
+            }))}
+          />
+        ) : (
+          <div className="card p-8 text-center text-sm text-slate-600">{t('feedNoPage')}</div>
+        )
+      ) : view === 'week' ? (
+        <WeekGrid
+          days={days}
+          timeZone={timezone}
+          todayKey={todayKey}
+          nowMs={today.getTime()}
+          postsByDay={byDay}
+          renderChip={renderChip}
+          newPostLabel={(date: Date) => t('newPostOn', { date: dayLabel.format(date) })}
+          weekdayName={weekdayName}
+          dayName={(key: string) => awarenessOn(key).map((entry) => tDays(entry.key))}
+        />
+      ) : (
       <div className="card overflow-hidden">
         <div className="grid grid-cols-7 border-b border-slate-200 bg-white">
           {/* Monday-first, matching monthGrid. */}
@@ -261,7 +485,7 @@ export default async function CalendarPage({
             return (
               <div
                 key={key}
-                className={`min-h-[8rem] border-b border-r border-slate-200 p-2 ${
+                className={`min-h-[8rem] min-w-0 border-b border-r border-slate-200 p-1 sm:p-2 ${
                   key === todayKey ? 'bg-brand-50/60' : inMonth ? (key < todayKey ? 'bg-slate-50' : 'bg-white') : 'bg-slate-100/70'
                 }`}
               >
@@ -294,70 +518,26 @@ export default async function CalendarPage({
                   </span>
                 </div>
 
+                {awarenessOn(key).length > 0 && (
+                  <ul className="mt-1 space-y-0.5">
+                    {awarenessOn(key).map((entry) => (
+                      <li key={entry.key}>
+                        <Link
+                          href={key >= todayKey ? newPostHref(key) : '#'}
+                          className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50"
+                          title={tDays(entry.key)}
+                        >
+                          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                          <span className="truncate">{tDays(entry.key)}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <ul className="mt-1 space-y-1">
                   {dayPosts.slice(0, 3).map((post) => (
                     <li key={post.id}>
-                      <Link
-                        href={postHref(post)}
-                        className={`block rounded-md border-l-[3px] bg-white px-2 py-1.5 shadow-surface transition-shadow hover:shadow-md ${
-                          STATUS_EDGE[post.status] ?? 'border-l-slate-400'
-                        }`}
-                        title={post.message || post.link || ''}
-                      >
-                        <span className="flex items-center gap-1.5">
-                          {post.targets[0]?.target.pictureUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={post.targets[0].target.pictureUrl}
-                              alt=""
-                              className="h-4 w-4 shrink-0 rounded-full object-cover"
-                            />
-                          ) : (
-                            <span
-                              aria-hidden
-                              className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[9px] font-bold text-brand-600"
-                            >
-                              {(post.targets[0]?.target.name ?? '?').charAt(0).toUpperCase()}
-                            </span>
-                          )}
-                          <span className="text-[11px] font-semibold text-slate-900">
-                            {post.scheduledAt ? formatInZone(post.scheduledAt, timezone, 'HH:mm') : ''}
-                          </span>
-                          <span className="sr-only">
-                            <StatusBadge status={post.status} />
-                          </span>
-                          {post.labels.length > 0 && (
-                            <span className="ml-auto flex shrink-0 items-center gap-0.5">
-                              {post.labels.slice(0, 3).map((row) => {
-                                const label = labelById.get(row.labelId);
-                                return label ? (
-                                  <span
-                                    key={row.labelId}
-                                    title={label.name}
-                                    className={`h-2 w-2 rounded-full ${paletteOf(label.color).dot}`}
-                                  />
-                                ) : null;
-                              })}
-                            </span>
-                          )}
-                        </span>
-                        {/* The planner's chip: the photo beside the opening words,
-                            as Meta Business Suite draws a planned post. */}
-                        <span className="mt-0.5 flex items-start gap-1.5">
-                          <span className="line-clamp-2 block min-w-0 flex-1 [overflow-wrap:anywhere] text-xs leading-tight text-slate-700">
-                            {post.message || post.link || tPosts('mediaOnly')}
-                          </span>
-                          {firstImage(post.media) && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={firstImage(post.media)!}
-                              alt=""
-                              loading="lazy"
-                              className="hidden h-7 w-7 shrink-0 rounded object-cover sm:block"
-                            />
-                          )}
-                        </span>
-                      </Link>
+                      {renderChip(post)}
                     </li>
                   ))}
                   {dayPosts.length > 3 && (
@@ -371,6 +551,8 @@ export default async function CalendarPage({
           })}
         </div>
       </div>
+
+      )}
 
       <div className="flex flex-wrap gap-3 text-xs text-slate-600">
         {LEGEND.map((status) => (

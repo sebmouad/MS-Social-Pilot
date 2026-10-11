@@ -42,6 +42,7 @@ export type IconName =
   | 'signOut'
   | 'menu'
   | 'close'
+  | 'mail'
   | 'plus'
   | 'refresh'
   | 'check'
@@ -170,6 +171,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   close: <path d="m6 6 12 12M18 6 6 18" />,
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m4 7 8 6 8-6" />
+    </>
+  ),
   plus: <path d="M12 5v14M5 12h14" />,
   refresh: (
     <>

@@ -31,12 +31,12 @@ export async function AudienceView({
   };
 
   const cards = [
-    { label: t('fans'), value: audience.fans },
-    { label: t('followers'), value: audience.followers },
-    { label: t('talkingAbout'), value: audience.talkingAbout },
-    { label: t('newLikes'), value: audience.adds },
-    { label: t('lostLikes'), value: audience.removes },
-    { label: t('netChange'), value: audience.net },
+    { label: t('fans'), value: audience.fans, definition: t('def.fans') },
+    { label: t('followers'), value: audience.followers, definition: t('def.followers') },
+    { label: t('talkingAbout'), value: audience.talkingAbout, definition: t('def.talkingAbout') },
+    { label: t('newLikes'), value: audience.adds, definition: t('def.newLikes') },
+    { label: t('lostLikes'), value: audience.removes, definition: t('def.lostLikes') },
+    { label: t('netChange'), value: audience.net, definition: t('def.netChange') },
   ];
 
   return (
@@ -49,6 +49,7 @@ export async function AudienceView({
             label={card.label}
             value={card.value}
             upIsGood={card.label !== t('lostLikes')}
+            definition={card.definition}
           />
         ))}
       </section>
@@ -66,11 +67,14 @@ export async function AudienceView({
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <div className={Object.keys(audience.byCountry).length > 0 ? 'lg:col-span-2' : undefined}>
         <BreakdownBars
           title={t('byCountry')}
           data={audience.byCountry}
           formatKey={(code) => countryLabel(code, locale)}
+          map={{ label: t('mapLabel'), locale }}
         />
+        </div>
         <BreakdownBars title={t('byCity')} data={audience.byCity} />
         {/* Meta withdrew both breakdowns from Page insights. A Page synced
             before then still has a snapshot; otherwise an empty card would

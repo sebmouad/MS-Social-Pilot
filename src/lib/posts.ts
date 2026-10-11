@@ -16,7 +16,7 @@ import { resolveMediaForPublish } from './media';
 import { resolveLinkPreview } from './facebook/opengraph';
 import { publishPost } from './facebook/publish';
 import { asGraphError, GraphError } from './facebook/graph';
-import { errors } from './errors';
+import { AppError, errors } from './errors';
 import { logActivity, publishNow, refreshPostStatus } from './scheduler/runner';
 import type { CreatePostInput, UpdatePostInput } from './validation';
 import type { PublishMode, TargetType } from './constants';
@@ -284,7 +284,10 @@ export async function createPost(
   const needsApproval = approvalStatus === ApprovalStatus.pending;
 
   if (input.publishMode === 'native') assertNativeSupported(targets);
-  if (!input.saveAsDraft) assertInstagramHasMedia(targets, input.media?.length ?? 0);
+  if (!input.saveAsDraft) {
+    assertInstagramHasMedia(targets, input.media?.length ?? 0);
+    assertFormatFits(input.format ?? 'post', targets, input.media ?? [], input.publishMode);
+  }
 
   // Cache the link's Open Graph card so the composer preview and the post list
   // do not have to re-scrape on every render.
@@ -324,6 +327,7 @@ export async function createPost(
         message: input.message,
         firstComment: input.firstComment ?? null,
         firstCommentDelayMinutes: input.firstComment ? input.firstCommentDelayMinutes ?? 0 : 0,
+        format: input.format ?? 'post',
         labels: { create: labelIds.map((labelId) => ({ labelId })) },
         link: input.link ?? null,
         linkPreview: toJsonOrNull(linkPreview),
@@ -653,6 +657,39 @@ function assertNativeSupported(targets: Array<{ type: string; name: string }>): 
  * could fix it. Drafts may still be saved without media: they are unfinished
  * by definition.
  */
+/**
+ * A Reel or a Story goes to Facebook Pages only, as one video (a Reel) or one
+ * photo or video (a Story), and this app publishes it at the time: Facebook
+ * holds neither for later. Said when the post is saved rather than when the
+ * worker reaches it hours later.
+ */
+function assertFormatFits(
+  format: string,
+  targets: Array<{ type: string; name: string }>,
+  media: Array<{ kind: string }>,
+  publishMode: string,
+): void {
+  if (format === 'post') return;
+  const others = targets.filter((target) => target.type !== 'page');
+  if (others.length > 0) {
+    throw new AppError({
+      key: 'errors.formatPagesOnly',
+      fallback: `Reels and Stories go to Facebook Pages only. Untick: ${others.map((target) => target.name).join(', ')}.`,
+      params: { names: others.map((target) => target.name).join(', ') },
+    });
+  }
+  if (publishMode === 'native') {
+    throw new AppError({ key: 'errors.formatNotNative', fallback: 'Facebook cannot hold a Reel or a Story for later.' });
+  }
+  const videos = media.filter((item) => item.kind === 'video').length;
+  if (format === 'reel' && (videos !== 1 || media.length !== 1)) {
+    throw new AppError({ key: 'errors.reelNeedsVideo', fallback: 'A Reel needs exactly one video.' });
+  }
+  if (format === 'story' && media.length !== 1) {
+    throw new AppError({ key: 'errors.storyNeedsMedia', fallback: 'A Story needs exactly one photo or one video.' });
+  }
+}
+
 function assertInstagramHasMedia(targets: Array<{ type: string; name: string }>, mediaCount: number): void {
   if (mediaCount > 0) return;
   const instagram = targets.filter((target) => target.type === 'instagram');
@@ -818,6 +855,7 @@ export async function updatePost(
   if (input.message !== undefined) data.message = input.message;
   if (input.firstComment !== undefined) data.firstComment = input.firstComment;
   if (input.firstCommentDelayMinutes !== undefined) data.firstCommentDelayMinutes = input.firstCommentDelayMinutes;
+  if (input.format !== undefined) data.format = input.format;
   const labelIds = input.labelIds ? await ownLabels(context.workspaceId, input.labelIds) : null;
   if (input.media !== undefined) {
     // Both columns or neither: stale keys would let a file in use be swept.
@@ -959,6 +997,12 @@ export async function updatePost(
   const nextStatus = (data.status as PostStatus | undefined) ?? post.status;
   if (nextStatus !== PostStatus.draft && nextStatus !== PostStatus.cancelled) {
     assertInstagramHasMedia(nextTargets, nextMediaCount);
+    assertFormatFits(
+      input.format ?? post.format,
+      nextTargets,
+      input.media ?? parseMedia(post.media),
+      nextMode,
+    );
   }
 
   await prisma.$transaction(async (tx) => {

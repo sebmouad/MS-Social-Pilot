@@ -16,6 +16,7 @@ import { forEachEnabledPage, forEachWorkspace } from './iterate';
 import { fetchRemotePostState } from '../facebook/publish';
 import { asGraphError } from '../facebook/graph';
 import { decryptSecret } from '../crypto';
+import { sendDueReports } from '../report-schedules';
 
 /**
  * The worker's job set.
@@ -38,7 +39,8 @@ export type JobName =
   | 'instagram'
   | 'ads'
   | 'housekeeping'
-  | 'tokens';
+  | 'tokens'
+  | 'reports';
 
 export interface JobContext {
   now: Date;
@@ -578,6 +580,15 @@ export function jobDefinitions(): JobDefinition[] {
       name: 'tokens',
       intervalMs: env.tokenExpiryCheckHours * 60 * 60 * 1000,
       run: runTokenExpiryCheck,
+    },
+    {
+      // Email only: no Graph calls, so it runs outside the budget.
+      name: 'reports',
+      intervalMs: 10 * 60 * 1000,
+      run: async ({ now }) => {
+        const { sent, failed } = await sendDueReports(now);
+        return sent + failed > 0 ? `${sent} report(s) sent, ${failed} failed` : null;
+      },
     },
   ];
 }

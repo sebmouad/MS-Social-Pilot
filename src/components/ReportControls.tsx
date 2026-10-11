@@ -2,6 +2,8 @@
 
 import { useTranslations } from 'next-intl';
 
+import { Icon } from './Icon';
+
 /**
  * Date range picker, CSV download and print.
  *
@@ -13,7 +15,10 @@ export function ReportControls({
   from,
   to,
   downloadable = true,
+  pdfName,
 }: {
+  /** What the saved PDF is called: the browser names it after the tab. */
+  pdfName?: string;
   /** The range the report on screen covers, as calendar days. */
   from: string;
   to: string;
@@ -33,8 +38,18 @@ export function ReportControls({
           {t('downloadCsv')}
         </a>
       )}
-      <button type="button" className="btn-secondary" onClick={() => window.print()}>
-        {t('print')}
+      <button
+        type="button"
+        className="btn-secondary"
+        onClick={() => {
+          const previous = document.title;
+          if (pdfName) document.title = pdfName;
+          window.print();
+          document.title = previous;
+        }}
+      >
+        <Icon name="download" size={16} />
+        {t('downloadPdf')}
       </button>
     </div>
   );

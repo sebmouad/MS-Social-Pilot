@@ -449,3 +449,48 @@ export function pageRatingsAvailable(version: string, now: Date = new Date()): b
 export function isMissingObject(error: unknown): boolean {
   return error instanceof GraphError && error.code === 100 && error.subcode === 33;
 }
+
+/**
+ * Send a video to the upload address a `video_reels` or `video_stories`
+ * start phase handed back (rupload.facebook.com). The file goes as the raw
+ * body, or — for media hosted elsewhere — as a `file_url` header Facebook
+ * fetches itself. One shot from offset zero: the files this app takes fit.
+ */
+export async function graphResumableUpload(
+  uploadUrl: string,
+  options: { accessToken: string; data?: Uint8Array | Buffer; fileUrl?: string; filename?: string },
+): Promise<void> {
+  const headers: Record<string, string> = { Authorization: `OAuth ${options.accessToken}` };
+  let body: BodyInit | undefined;
+  if (options.fileUrl) {
+    headers.file_url = options.fileUrl;
+  } else if (options.data) {
+    headers.offset = '0';
+    headers.file_size = String(options.data.byteLength);
+    body = new Blob([options.data]);
+  }
+
+  let response: Response;
+  try {
+    response = await withTimeout(
+      (signal) => fetch(uploadUrl, { method: 'POST', headers, body, signal }),
+      env.graphUploadTimeoutMs,
+    );
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new GraphError({
+        message: `Uploading ${options.filename ?? 'the video'} did not finish within ${Math.round(env.graphUploadTimeoutMs / 1000)} seconds.`,
+        kind: 'transient',
+      });
+    }
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new GraphError({ message: `Network error uploading media: ${reason}`, kind: 'transient' });
+  }
+
+  const text = await response.text();
+  const parsed = text ? (JSON.parse(text) as unknown) : null;
+  if (!response.ok) {
+    const failure = (parsed as { error?: GraphErrorBody; debug_info?: { message?: string } } | null) ?? null;
+    throw toGraphError(failure?.error ?? null, response.status, failure?.debug_info?.message ?? `Video upload failed (HTTP ${response.status}).`);
+  }
+}

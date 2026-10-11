@@ -1,6 +1,7 @@
 import { useLocale } from 'next-intl';
 
 import { VIZ, compact } from '@/lib/viz';
+import { InfoTip } from '@/components/InfoTip';
 import { Sparkline } from '@/components/Sparkline';
 
 /**
@@ -23,7 +24,10 @@ export function StatTile({
   upIsGood = true,
   trend,
   hero = false,
+  definition,
 }: {
+  /** What the figure counts, behind an ⓘ. */
+  definition?: string;
   label: string;
   value: number | string | null;
   /** Percentage change against a named period. */
@@ -44,7 +48,10 @@ export function StatTile({
 
   return (
     <div className="card p-4">
-      <p className="text-[13px] font-semibold text-slate-600">{label}</p>
+      <p className="flex items-center text-[13px] font-semibold text-slate-600">
+        {label}
+        {definition && <InfoTip text={definition} />}
+      </p>
 
       <p
         className={`mt-1 font-semibold text-slate-900 ${hero ? 'text-4xl sm:text-5xl' : 'text-xl sm:text-2xl'}`}

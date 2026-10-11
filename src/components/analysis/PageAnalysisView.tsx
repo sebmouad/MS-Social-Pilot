@@ -12,6 +12,8 @@ import { ExternalLink } from '@/components/ExternalLink';
 import { FeedPost } from '@/components/FeedPost';
 import { Icon, type IconName } from '@/components/Icon';
 import { analysePage, comparePages, type PageComparisonRow } from '@/lib/page-analysis-data';
+import type { CompareMode } from '@/lib/date-range';
+import { paletteOf, type PaletteKey } from '@/lib/palette';
 import {
   BLOCK_HOURS,
   MIN_POSTS_PER_SLOT,
@@ -231,6 +233,7 @@ export async function PageAnalysisView({
   to,
   days,
   timeZone,
+  compare = 'previous',
 }: {
   workspaceId: string;
   targetId: string;
@@ -238,10 +241,11 @@ export async function PageAnalysisView({
   to: Date;
   days: number;
   timeZone: string;
+  compare?: CompareMode;
 }) {
   const t = await getTranslations('pageAnalysis');
   const locale = await getLocale();
-  const analysis = await analysePage({ workspaceId, targetId, from, to, timeZone });
+  const analysis = await analysePage({ workspaceId, targetId, from, to, timeZone, compare });
 
   const longDays = weekdayNames(locale, 'long');
   const shortDays = weekdayNames(locale, 'short');
@@ -252,7 +256,7 @@ export async function PageAnalysisView({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold text-slate-900">{t('heading', { page: analysis.page.name })}</h2>
-          <p className="mt-0.5 text-sm text-slate-600">{t('period', { days })}</p>
+          <p className="mt-0.5 text-sm text-slate-600">{t(compare === 'year' ? 'periodYear' : 'period', { days })}</p>
           <p className="mt-0.5 text-xs text-slate-500">
             {analysis.lastSyncedAt
               ? t('lastRefreshed', { when: formatInZone(analysis.lastSyncedAt, timeZone, 'd MMM yyyy, HH:mm') })
@@ -277,7 +281,7 @@ export async function PageAnalysisView({
 
           <section>
             <KpiExplorer
-              vsLabel={t('vsPrevious')}
+              vsLabel={t(compare === 'year' ? 'vsYear' : 'vsPrevious')}
               days={analysis.daily.days}
               cards={analysis.kpis.map((kpi) => ({
                 key: kpi.key,
@@ -287,6 +291,7 @@ export async function PageAnalysisView({
                 upIsGood: KPI_UP_IS_GOOD[kpi.key],
                 series: kpi.key === 'netFollows' ? null : analysis.daily[kpi.key],
                 note: kpi.key === 'reach' ? t('reachDailyNote') : undefined,
+                definition: t(`kpiDef.${kpi.key}`),
               }))}
             />
             <p className="mt-2 text-xs text-slate-500">{t('kpiHint')}</p>
@@ -459,12 +464,22 @@ export async function ComparePagesView({
   order,
   targetId,
   rangeQuery,
+  compare = 'previous',
+  targetIds,
+  groups = [],
+  groupId,
 }: {
   workspaceId: string;
   from: Date;
   to: Date;
   days: number;
   timeZone: string;
+  compare?: CompareMode;
+  /** The Pages this member may see; every Page when absent. */
+  targetIds?: string[];
+  /** Groups to narrow the table to, and the one chosen. */
+  groups?: Array<{ id: string; name: string; color: PaletteKey; targetIds: string[] }>;
+  groupId?: string;
   sort?: string;
   order?: string;
   /** The Page picked elsewhere on the screen, kept so sorting here does not reset it. */
@@ -474,7 +489,12 @@ export async function ComparePagesView({
 }) {
   const t = await getTranslations('pageAnalysis');
   const locale = appLocale();
-  const unsorted = await comparePages({ workspaceId, from, to, timeZone });
+  const group = groups.find((entry) => entry.id === groupId) ?? null;
+  const allowed = group
+    ? group.targetIds.filter((id) => !targetIds || targetIds.includes(id))
+    : targetIds;
+  const unsorted = await comparePages({ workspaceId, from, to, timeZone, compare, targetIds: allowed });
+  const groupQuery = group ? `&group=${group.id}` : '';
 
   // Own keys only: `in` would also accept `__proto__` and `toString`.
   const sortKey = sort && Object.hasOwn(COMPARE_SORTS, sort) ? (sort as CompareSort) : null;
@@ -499,7 +519,7 @@ export async function ComparePagesView({
         aria-sort={active ? (ascending ? 'ascending' : 'descending') : undefined}
       >
         <Link
-          href={`/analytics?view=compare${targetId ? `&target=${targetId}` : ''}&${rangeQuery ?? `days=${days}`}&sort=${key}&order=${nextOrder}`}
+          href={`/analytics?view=compare${targetId ? `&target=${targetId}` : ''}&${rangeQuery ?? `days=${days}`}${groupQuery}&sort=${key}&order=${nextOrder}`}
           className={`hover:text-slate-800 ${active ? 'text-brand-700' : ''}`}
           scroll={false}
         >
@@ -510,14 +530,58 @@ export async function ComparePagesView({
     );
   };
 
-  if (rows.length === 0) return <div className="card p-8 text-center text-sm text-slate-600">{t('compare.none')}</div>;
+  const groupChips =
+    groups.length > 0 ? (
+      <nav className="flex flex-wrap items-center gap-2" aria-label={t('compare.groups')}>
+        {[{ id: '', name: t('compare.allPages'), color: null as PaletteKey | null }, ...groups].map((entry) => {
+          const on = (group?.id ?? '') === entry.id;
+          return (
+            <Link
+              key={entry.id || 'all'}
+              href={`/analytics?view=compare${targetId ? `&target=${targetId}` : ''}&${rangeQuery ?? `days=${days}`}${entry.id ? `&group=${entry.id}` : ''}`}
+              aria-current={on ? 'true' : undefined}
+              scroll={false}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold ${
+                on ? 'bg-brand-50 text-brand-600' : 'bg-white text-slate-700 shadow-surface hover:bg-slate-50'
+              }`}
+            >
+              {entry.color && <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${paletteOf(entry.color).dot}`} />}
+              {entry.name}
+            </Link>
+          );
+        })}
+      </nav>
+    ) : null;
+
+  if (rows.length === 0)
+    return (
+      <div className="space-y-4">
+        {groupChips}
+        <div className="card p-8 text-center text-sm text-slate-600">{t('compare.none')}</div>
+      </div>
+    );
+
+  const sum = (pick: (row: PageComparisonRow) => number | null) => {
+    const known = rows.map(pick).filter((value): value is number => value !== null);
+    return known.length ? known.reduce((total, value) => total + value, 0) : null;
+  };
+  const totals = {
+    followers: sum((row) => row.followers),
+    perWeek: Math.round((sum((row) => row.perWeek) ?? 0) * 10) / 10,
+    interactions: sum((row) => row.interactions),
+    posts: sum((row) => row.posts),
+    reach: sum((row) => row.reach),
+    net: sum((row) => row.netFollows),
+  };
 
   const signed = (value: number | null) => (value === null ? '—' : `${value > 0 ? '+' : ''}${value.toLocaleString(locale)}`);
 
   return (
+    <div className="space-y-4">
+    {groupChips}
     <section className="card overflow-hidden">
       <div className="px-4 pt-4 sm:px-5">
-        <h2 className="text-sm font-semibold text-slate-900">{t('compare.title')}</h2>
+        <h2 className="text-sm font-semibold text-slate-900">{group ? t('compare.groupTitle', { group: group.name }) : t('compare.title')}</h2>
         <p className="mt-0.5 text-xs text-slate-500">{t('compare.hint', { days })}</p>
       </div>
       <div className="scroll-x">
@@ -588,9 +652,31 @@ export async function ComparePagesView({
               );
             })}
           </tbody>
+          {rows.length > 1 && (
+            <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-slate-900">
+              <tr>
+                <th scope="row" className="px-4 py-3 text-left">
+                  {t('compare.total', { count: rows.length })}
+                </th>
+                <td className="px-3 py-3" />
+                <td className="nums px-3 py-3 text-right">{totals.followers?.toLocaleString(locale) ?? '—'}</td>
+                <td className="nums px-3 py-3 text-right">{totals.perWeek}</td>
+                <td className="nums px-3 py-3 text-right" title={t('compare.totalAvgHint')}>
+                  {totals.posts && totals.interactions !== null
+                    ? Math.round(totals.interactions / totals.posts).toLocaleString(locale)
+                    : '—'}
+                </td>
+                <td className="px-3 py-3" />
+                <td className="nums px-3 py-3 text-right">{totals.reach !== null ? compact(totals.reach, locale) : '—'}</td>
+                <td className="nums px-3 py-3 text-right">{signed(totals.net)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </section>
+    </div>
   );
 }
 

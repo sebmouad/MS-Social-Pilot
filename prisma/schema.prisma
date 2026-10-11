@@ -189,6 +189,10 @@ model Workspace {
   queueSlots           QueueSlot[]
   pageGroups           PageGroup[]
   labels               Label[]
+  snippets             Snippet[]
+  shareLinks           ShareLink[]
+  reportTemplates      ReportTemplate[]
+  reportSchedules      ReportSchedule[]
   activityLogs         ActivityLog[]
   invitations          Invitation[]
   feedSources          FeedSource[]
@@ -349,6 +353,8 @@ model Post {
   /// Minutes to wait after the post goes out before the first comment does.
   /// Zero posts it straight away.
   firstCommentDelayMinutes Int      @default(0)
+  /// `post` (a feed post), `reel` or `story`. See `src/lib/facebook/publish.ts`.
+  format                   String   @default("post")
   link                     String?
   /// Cached Open Graph metadata for `link`.
   linkPreview              Json?
@@ -391,14 +397,15 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  workspace  Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  author     User         @relation(fields: [authorId], references: [id])
-  submitter  User?        @relation("PostSubmitter", fields: [submittedById], references: [id])
-  reviewer   User?        @relation("PostReviewer", fields: [reviewedById], references: [id])
-  targets    PostTarget[]
-  shortLinks ShortLink[]
-  labels     PostLabel[]
-  feedItem   FeedItem?    @relation(fields: [sourceFeedItemId], references: [id])
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author          User             @relation(fields: [authorId], references: [id])
+  submitter       User?            @relation("PostSubmitter", fields: [submittedById], references: [id])
+  reviewer        User?            @relation("PostReviewer", fields: [reviewedById], references: [id])
+  targets         PostTarget[]
+  shortLinks      ShortLink[]
+  labels          PostLabel[]
+  reviewDecisions ReviewDecision[]
+  feedItem        FeedItem?        @relation(fields: [sourceFeedItemId], references: [id])
 
   @@index([workspaceId, status])
   @@index([mediaKeys], type: Gin)
@@ -1120,4 +1127,105 @@ model ActivityLog {
 
   @@index([workspaceId, createdAt])
   @@map("activity_logs")
+}
+
+/// Text kept for reuse in the composer: a signature, a call to action, a set
+/// of hashtags.
+model Snippet {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  body        String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("snippets")
+}
+
+/// A link a client opens without an account: a review page where they approve,
+/// reject or comment on posts, or a read-only calendar of what is planned.
+/// Only the hash of the token is stored, like session tokens.
+model ShareLink {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  /// `review` or `calendar`.
+  kind          String
+  tokenHash     String    @unique
+  title         String
+  description   String?
+  /// The Pages it shows (ids as a JSON array). Empty means every Page.
+  targetIds     Json      @default("[]")
+  /// Days back and ahead a calendar link shows, counted from the day it is opened.
+  daysBack      Int       @default(7)
+  daysAhead     Int       @default(30)
+  allowComments Boolean   @default(true)
+  revokedAt     DateTime?
+  createdById   String
+  createdAt     DateTime  @default(now())
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  decisions ReviewDecision[]
+
+  @@index([workspaceId])
+  @@map("share_links")
+}
+
+/// What a client said about a post through a review link.
+model ReviewDecision {
+  id          String   @id @default(cuid())
+  shareLinkId String
+  postId      String
+  /// `approved`, `rejected` or `comment`.
+  decision    String
+  comment     String?
+  authorName  String
+  createdAt   DateTime @default(now())
+
+  shareLink ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([shareLinkId])
+  @@map("review_decisions")
+}
+
+/// A report set up once and used again: its sections and its period.
+model ReportTemplate {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  /// ReportSection[] as JSON.
+  sections    Json     @default("[]")
+  /// A preset range key from `src/lib/date-range.ts`.
+  rangeKey    String   @default("30d")
+  createdAt   DateTime @default(now())
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  schedules ReportSchedule[]
+
+  @@unique([workspaceId, name])
+  @@map("report_templates")
+}
+
+/// A report emailed on a rhythm to people outside the app.
+model ReportSchedule {
+  id          String    @id @default(cuid())
+  workspaceId String
+  templateId  String?
+  targetId    String
+  /// `weekly` (Mondays) or `monthly` (the 1st).
+  frequency   String
+  recipients  String[]
+  nextRunAt   DateTime
+  lastRunAt   DateTime?
+  lastError   String?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  template  ReportTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([nextRunAt])
+  @@map("report_schedules")
 }

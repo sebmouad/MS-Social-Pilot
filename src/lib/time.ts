@@ -295,3 +295,19 @@ export function relativeTime(
   }
   return formatter.format(Math.round(value), 'year');
 }
+
+/**
+ * The seven days, Monday first, of the week holding `anchor` (`yyyy-MM-dd`),
+ * each as its first real instant in `timeZone` — the week view's columns.
+ * Calendar arithmetic in UTC, so the server's own zone plays no part.
+ */
+export function weekGrid(anchor: string, timeZone: string): Date[] {
+  const [year, month, day] = anchor.split('-').map(Number) as [number, number, number];
+  const base = Date.UTC(year, month - 1, day);
+  const offset = (new Date(base).getUTCDay() + 6) % 7;
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(base + (index - offset) * 86_400_000);
+    const stamp = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}T00:00`;
+    return firstRealInstant(stamp, timeZone);
+  });
+}

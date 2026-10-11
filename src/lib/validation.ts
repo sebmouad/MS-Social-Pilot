@@ -131,6 +131,9 @@ const firstComment = z
 /** How long the first comment waits after the post: up to a week. */
 const firstCommentDelay = z.number().int().min(0).max(7 * 24 * 60);
 
+/** A feed post, a Reel or a Story. */
+const postFormat = z.enum(['post', 'reel', 'story']);
+
 /** The labels a post carries. Ids are checked against the workspace on save. */
 const labelIds = z.array(z.string().min(1)).max(20);
 
@@ -140,6 +143,7 @@ export const createPostSchema = z
     firstComment: firstComment.nullish(),
     firstCommentDelayMinutes: firstCommentDelay.default(0),
     labelIds: labelIds.default([]),
+    format: postFormat.default('post'),
     link: httpUrl.nullish(),
     media: postMedia.default([]),
     targetIds: postTargetIds,
@@ -172,6 +176,7 @@ export const updatePostSchema = z
     firstComment: firstComment.nullish(),
     firstCommentDelayMinutes: firstCommentDelay.optional(),
     labelIds: labelIds.optional(),
+    format: postFormat.optional(),
     link: httpUrl.nullish(),
     media: postMedia.optional(),
     targetIds: postTargetIds.optional(),
@@ -288,8 +293,8 @@ export const bulkUploadSchema = z.object({
  * The parsed post. The two P1 additions stay optional for callers that build
  * one by hand — the CSV upload, RSS, tests — which have neither to give.
  */
-export type CreatePostInput = Omit<z.infer<typeof createPostSchema>, 'firstCommentDelayMinutes' | 'labelIds'> &
-  Partial<Pick<z.infer<typeof createPostSchema>, 'firstCommentDelayMinutes' | 'labelIds'>>;
+export type CreatePostInput = Omit<z.infer<typeof createPostSchema>, 'firstCommentDelayMinutes' | 'labelIds' | 'format'> &
+  Partial<Pick<z.infer<typeof createPostSchema>, 'firstCommentDelayMinutes' | 'labelIds' | 'format'>>;
 export type UpdatePostInput = z.infer<typeof updatePostSchema>;
 export type BulkUploadInput = z.infer<typeof bulkUploadSchema>;
 

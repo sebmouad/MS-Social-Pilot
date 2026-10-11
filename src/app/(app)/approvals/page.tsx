@@ -1,7 +1,11 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
+import Link from 'next/link';
+
 import { ApprovalsClient } from '@/components/ApprovalsClient';
+import { ApprovalBoard, type BoardCard } from '@/components/ApprovalBoard';
+import { listLabels } from '@/lib/page-groups';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
@@ -19,8 +23,14 @@ export function generateMetadata() {
 }
 
 
-export default async function ApprovalsPage() {
+export default async function ApprovalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const auth = await requirePage();
+  const params = await searchParams;
+  const board = (Array.isArray(params.view) ? params.view[0] : params.view) === 'board';
   // Not an error page: someone without approval rights simply has no business
   // here, so send them somewhere useful.
   if (!canApprove(auth.role)) redirect('/dashboard');
@@ -38,11 +48,92 @@ export default async function ApprovalsPage() {
     orderBy: { submittedAt: 'asc' },
   });
 
+  const tabs = (
+    <nav className="segmented" aria-label={t('viewLabel')}>
+      {[
+        { key: 'review', href: '/approvals', label: t('viewReview') },
+        { key: 'board', href: '/approvals?view=board', label: t('viewBoard') },
+      ].map((tab) => (
+        <Link
+          key={tab.key}
+          href={tab.href}
+          aria-current={(tab.key === 'board') === board ? 'page' : undefined}
+          className={`segmented-item ${(tab.key === 'board') === board ? 'segmented-item-active' : ''}`}
+        >
+          {tab.label}
+        </Link>
+      ))}
+    </nav>
+  );
+
+  if (board) {
+    const labels = await listLabels(auth.workspace.id);
+    const labelById = new Map(labels.map((label) => [label.id, label]));
+    const include = {
+      targets: { include: { target: { select: { name: true, pictureUrl: true } } } },
+      labels: { select: { labelId: true } },
+      reviewDecisions: { select: { decision: true } },
+    } as const;
+    const take = 40;
+    const [drafts, ready, rejected] = await Promise.all([
+      prisma.post.findMany({ where: { workspaceId: auth.workspace.id, status: 'draft' }, include, orderBy: { updatedAt: 'desc' }, take }),
+      prisma.post.findMany({
+        where: { workspaceId: auth.workspace.id, status: 'scheduled', approvalStatus: 'approved', scheduledAt: { gte: new Date() } },
+        include,
+        orderBy: { scheduledAt: 'asc' },
+        take,
+      }),
+      prisma.post.findMany({ where: { workspaceId: auth.workspace.id, status: 'rejected' }, include, orderBy: { updatedAt: 'desc' }, take }),
+    ]);
+    const pending = await prisma.post.findMany({
+      where: { workspaceId: auth.workspace.id, ...IN_APPROVAL_QUEUE },
+      include,
+      orderBy: { submittedAt: 'asc' },
+    });
+    const card = (post: (typeof drafts)[number]): BoardCard => ({
+      id: post.id,
+      message: post.message,
+      pages: post.targets.map((row) => row.target),
+      when: post.scheduledAt ? formatInZone(post.scheduledAt, timezone, 'EEE d MMM, HH:mm') : null,
+      imageUrl: parseMedia(post.media).find((item) => item.kind === 'image')?.url ?? null,
+      href: postIsEditable(post) ? `/compose?post=${post.id}` : '/posts',
+      labels: post.labels.flatMap((row) => (labelById.get(row.labelId) ? [labelById.get(row.labelId)!] : [])),
+      feedback: {
+        approved: post.reviewDecisions.filter((row) => row.decision === 'approved').length,
+        rejected: post.reviewDecisions.filter((row) => row.decision === 'rejected').length,
+        comments: post.reviewDecisions.filter((row) => row.decision === 'comment').length,
+      },
+    });
+    return (
+      <div className="space-y-6">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+            <p className="mt-1 text-sm text-slate-600">{t('boardSubtitle')}</p>
+          </div>
+          {tabs}
+        </header>
+        <ApprovalBoard
+          noText={t('noText')}
+          columns={[
+            { key: 'draft', title: t('colDraft'), hint: t('colDraftHint'), tone: 'bg-slate-400', cards: drafts.map(card), empty: t('colEmpty') },
+            { key: 'pending', title: t('colPending'), hint: t('colPendingHint'), tone: 'bg-violet-500', cards: pending.map(card), empty: t('colEmpty') },
+            { key: 'ready', title: t('colReady'), hint: t('colReadyHint'), tone: 'bg-emerald-500', cards: ready.map(card), empty: t('colEmpty') },
+            { key: 'rejected', title: t('colRejected'), hint: t('colRejectedHint'), tone: 'bg-rose-500', cards: rejected.map(card), empty: t('colEmpty') },
+          ]}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+          <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
+        </div>
+        {tabs}
       </header>
 
       <ApprovalsClient

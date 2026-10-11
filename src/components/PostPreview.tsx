@@ -17,6 +17,8 @@ interface Props {
   timing: 'now' | 'schedule' | 'queue';
   /** `datetime-local` wall time in the workspace's zone. */
   scheduledAt: string;
+  /** A Reel or a Story is drawn full-screen and upright, as the phone shows it. */
+  format?: 'post' | 'reel' | 'story';
 }
 
 /**
@@ -28,9 +30,53 @@ interface Props {
  * Facebook's layout, while it is being written. It is a likeness, not a
  * rendering by Facebook: its actions are drawn, not live.
  */
-export function PostPreview({ page, message, media, link, firstComment, timing, scheduledAt }: Props) {
+export function PostPreview({ page, message, media, link, firstComment, timing, scheduledAt, format = 'post' }: Props) {
   const t = useTranslations('compose');
   const locale = useLocale();
+
+  if (format !== 'post') {
+    const item = media[0];
+    return (
+      <section aria-labelledby="post-preview-title">
+        <h2 id="post-preview-title" className="mb-2 text-sm font-semibold text-slate-600">
+          {t('previewTitle')}
+        </h2>
+        <div className="mx-auto w-[260px] overflow-hidden rounded-[28px] bg-black p-2 shadow-xl ring-1 ring-black/10">
+          <div className="relative aspect-[9/16] overflow-hidden rounded-[22px] bg-slate-900">
+            {item ? (
+              item.kind === 'video' ? (
+                <video src={`${item.url}#t=0.1`} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={item.url} alt={item.altText ?? ''} className="h-full w-full object-cover" />
+              )
+            ) : (
+              <span className="flex h-full items-center justify-center px-6 text-center text-sm text-white/70">
+                {format === 'reel' ? t('reelNeedsVideo') : t('storyNeedsMedia')}
+              </span>
+            )}
+            <div className="absolute inset-x-0 top-0 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent p-3">
+              {format === 'story' && <span className="absolute inset-x-3 top-2 h-0.5 rounded bg-white/80" />}
+              {page?.pictureUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={page.pictureUrl} alt="" className="mt-1 h-8 w-8 rounded-full object-cover ring-2 ring-white" />
+              ) : (
+                <span className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-xs font-bold text-slate-800">
+                  {(page?.name ?? '?').charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="mt-1 truncate text-sm font-semibold text-white">{page?.name ?? t('previewPage')}</span>
+            </div>
+            {format === 'reel' && message.trim() && (
+              <p className="absolute inset-x-0 bottom-0 line-clamp-3 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8 text-[13px] leading-snug text-white">
+                {message}
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   const when =
     timing === 'now'

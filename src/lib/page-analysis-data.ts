@@ -1,5 +1,6 @@
 import { TargetType } from '@prisma/client';
 
+import { comparisonWindow, type CompareMode } from './date-range';
 import { feedLinkOf, feedMediaOf, feedMediaOfPicture } from './feed';
 import { prisma } from './prisma';
 import { errors } from './errors';
@@ -245,23 +246,24 @@ export async function analysePage(options: {
   to: Date;
   timeZone: string;
   now?: Date;
+  compare?: CompareMode;
 }): Promise<PageAnalysisResult> {
   const page = await findPage(options.workspaceId, options.targetId);
   const now = options.now ?? new Date();
 
-  const length = options.to.getTime() - options.from.getTime();
-  const previousFrom = new Date(options.from.getTime() - length);
+  const before = comparisonWindow(options.from, options.to, options.compare ?? 'previous');
+  const previousFrom = before.from;
   const timingFrom = new Date(
     Math.min(options.from.getTime(), options.to.getTime() - TIMING_LOOKBACK_DAYS * DAY_MS),
   );
 
   const [current, previous, timing, totals, syncedAt] = await Promise.all([
     loadPagePosts(page.id, options.from, options.to),
-    loadPagePosts(page.id, previousFrom, new Date(options.from.getTime() - 1)),
+    loadPagePosts(page.id, previousFrom, new Date(before.to.getTime() - 1)),
     loadPagePosts(page.id, timingFrom, options.to),
     loadPageTotals(page.id, [
       { from: options.from, to: options.to },
-      { from: previousFrom, to: options.from },
+      { from: previousFrom, to: before.to },
     ]),
     lastSynced(page.id, page.profileSyncedAt),
   ]);
@@ -313,24 +315,31 @@ export async function comparePages(options: {
   from: Date;
   to: Date;
   timeZone: string;
+  compare?: CompareMode;
+  /** Only these Pages: a member's own, or one group's. */
+  targetIds?: string[];
 }): Promise<PageComparisonRow[]> {
   const pages = await prisma.target.findMany({
-    where: { workspaceId: options.workspaceId, type: TargetType.page },
+    where: {
+      workspaceId: options.workspaceId,
+      type: TargetType.page,
+      ...(options.targetIds ? { id: { in: options.targetIds } } : {}),
+    },
     orderBy: { name: 'asc' },
   });
 
-  const length = options.to.getTime() - options.from.getTime();
-  const previousFrom = new Date(options.from.getTime() - length);
+  const baseline = comparisonWindow(options.from, options.to, options.compare ?? 'previous');
+  const previousFrom = baseline.from;
 
   // One Page at a time: a workspace has a handful, and each is a few queries.
   const rows: PageComparisonRow[] = [];
   for (const page of pages) {
     const [current, previous, totals] = await Promise.all([
       loadPagePosts(page.id, options.from, options.to),
-      loadPagePosts(page.id, previousFrom, new Date(options.from.getTime() - 1)),
+      loadPagePosts(page.id, previousFrom, new Date(baseline.to.getTime() - 1)),
       loadPageTotals(page.id, [
         { from: options.from, to: options.to },
-        { from: previousFrom, to: options.from },
+        { from: previousFrom, to: baseline.to },
       ]),
     ]);
 

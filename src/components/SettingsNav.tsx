@@ -22,6 +22,7 @@ export function SettingsNav({
     { href: '/settings', label: t('settings.workspace'), icon: 'settings' },
     { href: '/settings/team', label: t('team.title'), icon: 'team' },
     { href: '/settings/pages', label: t('groups.title'), icon: 'folders' },
+    { href: '/settings/sharing', label: t('sharing.title'), icon: 'link' },
     { href: '/settings/notifications', label: t('notifications.title'), icon: 'bell' },
     { href: '/settings/account', label: t('account.title'), icon: 'key' },
     { href: '/settings/media', label: t('media.title'), icon: 'image' },
