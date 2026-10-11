@@ -506,7 +506,9 @@
     "snippetName": "Nom, ex. Signature",
     "saveSnippet": "Enregistrer",
     "snippetHint": "Enregistre le contenu de la zone de texte, pour toute l’équipe.",
-    "snippetFailed": "Le texte n’a pas pu être enregistré."
+    "snippetFailed": "Le texte n’a pas pu être enregistré.",
+    "mediaHint_reel": "Une vidéo verticale, de 3 à 90 secondes. Le 9:16 rend le mieux.",
+    "mediaHint_story": "Une photo ou une vidéo. Le 9:16 remplit l’écran."
   },
   "config": {
     "title": "Configuration",

@@ -9,7 +9,7 @@ import { PagesSidebar } from '@/components/PagesSidebar';
 import { LabelFilter } from '@/components/LabelFilter';
 import { WeekGrid } from '@/components/CalendarWeek';
 import { PageFeedPreview } from '@/components/PageFeedPreview';
-import { feedLinkOf, feedMediaOf } from '@/lib/feed';
+import { feedLinkOf, feedMediaOf, feedMediaOfPicture } from '@/lib/feed';
 import { canManageOthersPosts, canManageSettings, postIsEditable } from '@/lib/constants';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
@@ -138,7 +138,7 @@ export default async function CalendarPage({
 
   // The feed view shows one Page: the one left visible, or the first.
   const feedPageId = view === 'feed' ? (filter.visible?.length === 1 ? filter.visible[0] : filter.ids[0]) : undefined;
-  const [feedPage, feedUpcoming, feedRecent] = feedPageId
+  const [feedPage, feedUpcoming, feedOurs, feedFound] = feedPageId
     ? await Promise.all([
         prisma.target.findUnique({
           where: { id: feedPageId },
@@ -162,8 +162,37 @@ export default async function CalendarPage({
           orderBy: { publishedAt: 'desc' },
           take: 5,
         }),
+        // Posted from Facebook itself, or before this app: the feed is the Page's, not ours.
+        prisma.externalPost.findMany({
+          where: { targetId: feedPageId },
+          orderBy: { createdTime: 'desc' },
+          take: 5,
+        }),
       ])
-    : [null, [], []];
+    : [null, [], [], []];
+  const sentFromHere = new Set(feedOurs.map((row) => row.remotePostId).filter(Boolean));
+  const feedRecent = [
+    ...feedOurs.map((row) => ({
+      id: row.id,
+      at: row.publishedAt,
+      message: row.post.message,
+      media: feedMediaOf(row.post.media),
+      link: row.post.link,
+      linkPreview: feedLinkOf(row.post.linkPreview),
+    })),
+    ...feedFound
+      .filter((row) => !sentFromHere.has(row.remoteId))
+      .map((row) => ({
+        id: row.id,
+        at: row.createdTime as Date | null,
+        message: row.message ?? '',
+        media: feedMediaOfPicture(row.pictureUrl, row.statusType === 'added_video'),
+        link: null,
+        linkPreview: null,
+      })),
+  ]
+    .sort((a, b) => (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0))
+    .slice(0, 5);
 
   // Bucket by the local calendar day so a post at 23:00 UTC+2 lands on the
   // right square rather than the previous day.
@@ -297,7 +326,7 @@ export default async function CalendarPage({
           {/* The planner's chip: the photo beside the opening words,
               as Meta Business Suite draws a planned post. */}
           <span className="mt-0.5 flex items-start gap-1.5">
-            <span className="line-clamp-2 block min-w-0 flex-1 [overflow-wrap:anywhere] text-xs leading-tight text-slate-700">
+            <span className="line-clamp-2 min-w-0 flex-1 [overflow-wrap:anywhere] text-xs leading-tight text-slate-700">
               {post.message || post.link || tPosts('mediaOnly')}
             </span>
             {firstImage(post.media) && (
@@ -443,11 +472,11 @@ export default async function CalendarPage({
             }))}
             recent={feedRecent.map((row) => ({
               id: row.id,
-              message: row.post.message,
-              meta: row.publishedAt ? formatInZone(row.publishedAt, timezone, 'd MMMM, HH:mm') : '',
-              media: feedMediaOf(row.post.media),
-              link: row.post.link,
-              linkPreview: feedLinkOf(row.post.linkPreview),
+              message: row.message,
+              meta: row.at ? formatInZone(row.at, timezone, 'd MMMM, HH:mm') : '',
+              media: row.media,
+              link: row.link,
+              linkPreview: row.linkPreview,
             }))}
           />
         ) : (

@@ -94,14 +94,14 @@ export function KpiExplorer({ cards, days, vsLabel }: { cards: KpiCard[]; days: 
               type="button"
               aria-pressed={on}
               onClick={() => setSelected(card.key)}
-              className={`card block p-4 text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+              className={`card relative block p-4 text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
                 on ? 'ring-2 ring-brand-500' : ''
               }`}
             >
               {body}
             </button>
           ) : (
-            <div key={card.key} className="card p-4">
+            <div key={card.key} className="card relative p-4">
               {body}
             </div>
           );

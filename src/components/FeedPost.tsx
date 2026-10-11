@@ -358,12 +358,12 @@ export function LinkCard({ preview, compact = false }: { preview: FeedLinkPrevie
           {preview.siteName || hostOf(preview.url)}
         </span>
         <span
-          className={`line-clamp-2 block font-semibold text-slate-900 ${compact ? 'text-sm leading-5' : 'text-[17px] leading-[1.35rem]'}`}
+          className={`line-clamp-2 font-semibold text-slate-900 ${compact ? 'text-sm leading-5' : 'text-[17px] leading-[1.35rem]'}`}
         >
           {preview.title || preview.url}
         </span>
         {preview.description && !compact && (
-          <span className="mt-0.5 line-clamp-1 block text-[15px] text-slate-600">{preview.description}</span>
+          <span className="mt-0.5 line-clamp-1 text-[15px] text-slate-600">{preview.description}</span>
         )}
       </span>
     </ExternalLink>

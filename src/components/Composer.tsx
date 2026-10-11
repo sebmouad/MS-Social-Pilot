@@ -332,7 +332,7 @@ export function Composer({
               firstCommentDelayMinutes: commentDelay,
               labelIds,
               format,
-              link: link.trim() ? link.trim() : null,
+              link: format === 'post' && link.trim() ? link.trim() : null,
               media,
               targetIds: selected,
               publishMode: effectiveHandler,
@@ -349,7 +349,7 @@ export function Composer({
               firstCommentDelayMinutes: commentDelay,
               labelIds,
               format,
-              link: link.trim() ? link.trim() : null,
+              link: format === 'post' && link.trim() ? link.trim() : null,
               media,
               targetIds: selected,
               publishMode,
@@ -580,7 +580,8 @@ export function Composer({
 
           {aiEnabled && <AiAssist draft={message} onResult={writeMessage} />}
 
-          <div className="mt-5">
+          {/* Reels and Stories carry no link card: Facebook drops it. */}
+          <div className={`mt-5 ${format === 'post' ? '' : 'hidden'}`}>
             <label className="label" htmlFor="link">
               {t('link')} <span className="font-normal text-slate-400">{tAuth('optional')}</span>
             </label>
@@ -675,7 +676,11 @@ export function Composer({
                 <span className="font-medium text-brand-600">{t('mediaChoose')}</span> {t('mediaOrDrop')}
               </span>
             </label>
-            <p className="hint">{uploading ? t('uploading') : t('mediaHint', { max: LIMITS.mediaPerPost })}</p>
+            <p className="hint">{uploading
+                ? t('uploading')
+                : format === 'post'
+                  ? t('mediaHint', { max: LIMITS.mediaPerPost })
+                  : t(`mediaHint_${format}`)}</p>
 
             {media.length > 0 && (
               <ul className="mt-3 flex flex-wrap gap-3">

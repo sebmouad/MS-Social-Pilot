@@ -506,7 +506,9 @@
     "snippetName": "Name, e.g. Signature",
     "saveSnippet": "Save text",
     "snippetHint": "Saves what is in the post box, for the whole team.",
-    "snippetFailed": "The text could not be saved."
+    "snippetFailed": "The text could not be saved.",
+    "mediaHint_reel": "One vertical video, 3 to 90 seconds. 9:16 looks best.",
+    "mediaHint_story": "One photo or one video. 9:16 fills the screen."
   },
   "config": {
     "title": "Configuration",

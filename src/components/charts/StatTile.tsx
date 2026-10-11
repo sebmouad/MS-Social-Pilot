@@ -47,7 +47,7 @@ export function StatTile({
     delta !== null && delta !== undefined && upIsGood !== null ? (delta >= 0) === upIsGood : null;
 
   return (
-    <div className="card p-4">
+    <div className="card relative p-4">
       <p className="flex items-center text-[13px] font-semibold text-slate-600">
         {label}
         {definition && <InfoTip text={definition} />}

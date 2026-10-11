@@ -75,7 +75,16 @@ export async function AudienceView({
           map={{ label: t('mapLabel'), locale }}
         />
         </div>
-        <BreakdownBars title={t('byCity')} data={audience.byCity} />
+        {/* Alone on its row once age and language are gone: take the width. */}
+        <div
+          className={
+            Object.keys(audience.byGenderAge).length === 0 && Object.keys(audience.byLocale).length === 0
+              ? 'lg:col-span-2'
+              : undefined
+          }
+        >
+          <BreakdownBars title={t('byCity')} data={audience.byCity} limit={12} />
+        </div>
         {/* Meta withdrew both breakdowns from Page insights. A Page synced
             before then still has a snapshot; otherwise an empty card would
             read as "nobody", so say what happened instead. */}
