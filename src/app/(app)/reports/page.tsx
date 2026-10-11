@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { TargetType, WorkspaceRole } from '@prisma/client';
 import { getTranslations } from 'next-intl/server';
+import { loadSelection } from '@/lib/page-filter';
+import { SelectionBar } from '@/components/SelectionBar';
 
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
@@ -50,6 +52,9 @@ export default async function ReportsPage({
   // Unscoped, for the `errors.*` key a refused range carries.
   const tAll = await getTranslations();
   const params = await searchParams;
+  // Follows the shared profile selection (src/lib/page-filter.ts).
+  const selection = await loadSelection(auth, params);
+  const pageScope = selection.scope;
   const timezone = auth.workspace.timezone;
 
   const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
@@ -75,7 +80,7 @@ export default async function ReportsPage({
   const { from, to } = range;
 
   const pages = await prisma.target.findMany({
-    where: { workspaceId: auth.workspace.id, type: TargetType.page, ...targetScope(auth.pageScope) },
+    where: { workspaceId: auth.workspace.id, type: TargetType.page, ...targetScope(pageScope) },
     orderBy: { name: 'asc' },
     select: { id: true, name: true, pictureUrl: true, followersCount: true, fanCount: true },
   });
@@ -119,7 +124,7 @@ export default async function ReportsPage({
         timezone,
         from,
         to,
-        ...(auth.pageScope.all ? {} : { targetIds: auth.pageScope.ids }),
+        ...(pageScope.all ? {} : { targetIds: pageScope.ids }),
       });
 
   const cards = report
@@ -151,6 +156,7 @@ export default async function ReportsPage({
           <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <SelectionBar auth={auth} selection={selection} />
           {selected && canEdit && (
             <ReportSchedules
               targetId={selected.id}

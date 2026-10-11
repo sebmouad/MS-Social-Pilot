@@ -9,6 +9,8 @@ import { GettingStarted } from '@/components/GettingStarted';
 import { feedLinkOf, feedMediaOf } from '@/lib/feed';
 import { requirePage } from '@/lib/auth';
 import { postScope, postTargetScope, targetScope } from '@/lib/page-access';
+import { loadSelection } from '@/lib/page-filter';
+import { SelectionBar } from '@/components/SelectionBar';
 import { screenMetadata } from '@/lib/metadata';
 import { summariseConnections } from '@/lib/connections';
 import { prisma } from '@/lib/prisma';
@@ -26,8 +28,15 @@ export function generateMetadata() {
 }
 
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const auth = await requirePage();
+  // Every number here follows the shared profile selection.
+  const selection = await loadSelection(auth, await searchParams);
+  const scope = selection.scope;
   const t = await getTranslations('dashboard');
   const tSetup = await getTranslations('setup');
   const tPosts = await getTranslations('posts');
@@ -35,8 +44,8 @@ export default async function DashboardPage() {
   const workspaceId = auth.workspace.id;
   const now = new Date();
   // A member limited to some Pages sees their Pages' numbers only.
-  const scopeIds = auth.pageScope.all ? undefined : auth.pageScope.ids;
-  const postsIn = postScope(auth.pageScope);
+  const scopeIds = scope.all ? undefined : scope.ids;
+  const postsIn = postScope(scope);
 
   const [upcoming, recent, counts, targetCount, staleAccounts, failures, totals, health] =
     await Promise.all([
@@ -48,12 +57,12 @@ export default async function DashboardPage() {
     }),
     recentOutcomes(workspaceId, 5, scopeIds),
     prisma.post.groupBy({ by: ['status'], where: { workspaceId, ...postsIn }, _count: true }),
-    prisma.target.count({ where: { workspaceId, enabled: true, canPublish: true, ...targetScope(auth.pageScope) } }),
+    prisma.target.count({ where: { workspaceId, enabled: true, canPublish: true, ...targetScope(scope) } }),
     prisma.socialAccount.findMany({
       where: { workspaceId, invalidatedAt: { not: null } },
       select: { id: true, name: true, invalidReason: true },
     }),
-    prisma.postTarget.count({ where: { status: 'failed', post: { workspaceId }, ...postTargetScope(auth.pageScope) } }),
+    prisma.postTarget.count({ where: { status: 'failed', post: { workspaceId }, ...postTargetScope(scope) } }),
       publishedTotals(workspaceId, scopeIds),
       summariseConnections(workspaceId, { now, warnWithinDays: env.tokenWarningDays }),
     ]);
@@ -92,9 +101,12 @@ export default async function DashboardPage() {
             {auth.workspace.timezone}
           </p>
         </div>
-        <Link href="/compose" className="btn-primary">
-          <Icon name="plus" size={16} /> {t('newPost')}
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <SelectionBar auth={auth} selection={selection} />
+          <Link href="/compose" className="btn-primary">
+            <Icon name="plus" size={16} /> {t('newPost')}
+          </Link>
+        </div>
       </header>
 
       {setup && !setup.complete && (
@@ -161,7 +173,7 @@ export default async function DashboardPage() {
         workspaceId={workspaceId}
         timeZone={auth.workspace.timezone}
         canConnect={canManageAccounts(auth.role)}
-        scope={auth.pageScope}
+        scope={scope}
         now={now}
       />
 

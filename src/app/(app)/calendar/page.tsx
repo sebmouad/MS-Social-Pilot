@@ -355,6 +355,7 @@ export default async function CalendarPage({
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
       <PagesSidebar
+        workspaceId={auth.workspace.id}
         pages={filter.pages}
         groups={filter.groups}
         group={filter.group}

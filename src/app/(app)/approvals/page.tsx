@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
+import { loadSelection } from '@/lib/page-filter';
+import { SelectionBar } from '@/components/SelectionBar';
 
 import Link from 'next/link';
 
@@ -30,6 +32,9 @@ export default async function ApprovalsPage({
 }) {
   const auth = await requirePage();
   const params = await searchParams;
+  // Follows the shared profile selection (src/lib/page-filter.ts).
+  const selection = await loadSelection(auth, params);
+  const pageScope = selection.scope;
   const board = (Array.isArray(params.view) ? params.view[0] : params.view) === 'board';
   // Not an error page: someone without approval rights simply has no business
   // here, so send them somewhere useful.
@@ -111,7 +116,10 @@ export default async function ApprovalsPage({
             <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
             <p className="mt-1 text-sm text-slate-600">{t('boardSubtitle')}</p>
           </div>
-          {tabs}
+          <div className="flex flex-wrap items-center gap-2">
+            <SelectionBar auth={auth} selection={selection} />
+            {tabs}
+          </div>
         </header>
         <ApprovalBoard
           noText={t('noText')}
@@ -133,7 +141,10 @@ export default async function ApprovalsPage({
           <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
         </div>
-        {tabs}
+        <div className="flex flex-wrap items-center gap-2">
+          <SelectionBar auth={auth} selection={selection} />
+          {tabs}
+        </div>
       </header>
 
       <ApprovalsClient

@@ -5,6 +5,13 @@ session can continue without the old one.
 
 ## The owner's standing instructions
 
+- **Final goal (2026-10-11): root is an isolated module overseeing everything;
+  the app must be ready for production and for sale.** Root sees and can
+  change all (clients, workspaces, memberships, modules per client and per
+  user, teams); clients see only what root configured, activated and
+  authorised. Beta: clients are invited by root to create their own workspace,
+  or by a workspace admin to join one. Each workspace is isolated.
+
 - "Always push to main"; "deploy it when tests pass".
 - "Final goal is to implement all features that our competitors have, and make
   elegant design and visuals and perfect UX." Inspiration: Simplified

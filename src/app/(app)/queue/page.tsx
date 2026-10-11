@@ -1,5 +1,7 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { TargetType } from '@prisma/client';
+import { loadSelection } from '@/lib/page-filter';
+import { SelectionBar } from '@/components/SelectionBar';
 
 import { QueueClient } from '@/components/QueueClient';
 import { requirePage } from '@/lib/auth';
@@ -46,6 +48,9 @@ export default async function QueuePage({
 }) {
   const auth = await requirePage();
   const params = await searchParams;
+  // Follows the shared profile selection (src/lib/page-filter.ts).
+  const selection = await loadSelection(auth, params);
+  const pageScope = selection.scope;
   const requested = Array.isArray(params.for) ? params.for[0] : params.for;
   const t = await getTranslations('queue');
   const locale = await getLocale();
@@ -53,7 +58,7 @@ export default async function QueuePage({
   const now = new Date();
 
   const pages = await prisma.target.findMany({
-    where: { workspaceId: auth.workspace.id, type: TargetType.page, ...targetScope(auth.pageScope) },
+    where: { workspaceId: auth.workspace.id, type: TargetType.page, ...targetScope(pageScope) },
     select: { id: true, name: true, pictureUrl: true },
     orderBy: { name: 'asc' },
   });
@@ -61,7 +66,7 @@ export default async function QueuePage({
   // shared ones), or the shared one. A member limited to some Pages has no
   // shared view to look at — every time they see is one of their Pages'.
   const scope =
-    pages.find((page) => page.id === requested) ?? (auth.pageScope.all ? null : pages[0] ?? null);
+    pages.find((page) => page.id === requested) ?? (pageScope.all ? null : pages[0] ?? null);
 
   const [allSlots, taken] = await Promise.all([
     prisma.queueSlot.findMany({
@@ -163,9 +168,12 @@ export default async function QueuePage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t('subtitle', { timezone: timeZone })}</p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
+          <p className="mt-1 text-sm text-slate-600">{t('subtitle', { timezone: timeZone })}</p>
+        </div>
+        <SelectionBar auth={auth} selection={selection} />
       </header>
 
       <QueueClient
@@ -173,7 +181,7 @@ export default async function QueuePage({
         canMovePosts={canManageOthersPosts(auth.role)}
         scope={scope ? { id: scope.id, name: scope.name } : null}
         scopes={[
-          ...(auth.pageScope.all ? [{ id: null, name: t('everyPage'), pictureUrl: null, own: allSlots.filter((slot) => !slot.targetId).length }] : []),
+          ...(pageScope.all ? [{ id: null, name: t('everyPage'), pictureUrl: null, own: allSlots.filter((slot) => !slot.targetId).length }] : []),
           ...pages.map((page) => ({ id: page.id, name: page.name, pictureUrl: page.pictureUrl, own: ownCount.get(page.id) ?? 0 })),
         ]}
         slots={slots}

@@ -208,6 +208,7 @@ export default async function PostsPage({
       </nav>
 
       <PagesSidebar
+        workspaceId={auth.workspace.id}
         pages={filter.pages}
         groups={filter.groups}
         group={filter.group}

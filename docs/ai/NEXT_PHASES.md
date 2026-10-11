@@ -161,6 +161,15 @@ Skills: `profile-selection`, `frontend-design`, `ux-copy-house`, `run-tests`.
 **Goal:** a single "which profiles am I looking at" choice that every screen
 obeys, kept as you move around the app.
 
+**Progress 2026-10-11:** A1 done (`src/lib/selection.ts`, `loadSelection()` in
+`page-filter.ts` with `net`, cookie `msp_sel_<workspaceId>`, never empty,
+`scope` drop-in for `auth.pageScope`); A2 bar `ProfileScope` (search, groups,
+networks, Only, Select all/Clear, phone bottom sheet) + `PagesSidebar`
+remembers too; A3 on Dashboard, Calendar, Posts, Queue, Approvals,
+Analytics, Reports. Still: Ads (ad accounts are not linked to Pages in the
+schema), Inbox/Comments/Reviews/Videos screens, exports and API parity,
+headings with counts, e2e A4.
+
 ### A1. Selection model (server)
 - Keep the URL as the source of truth (`?group=<id>&pages=<id,id>`; `pages`
   absent = all of the group / all Pages). Add **persistence**: when a screen is

@@ -2510,5 +2510,34 @@
       "title": "Meta's call limit is close",
       "body": "This app has used {percent}% of its Facebook call allowance. Syncing pauses until it drops."
     }
+  },
+  "profileScope": {
+    "title": "Choose profiles",
+    "all": "{count, plural, one {All profiles (#)} other {All profiles (#)}}",
+    "some": "{count, plural, one {# profile} other {# profiles}}",
+    "search": "Search profiles",
+    "groups": "Groups",
+    "allGroups": "All",
+    "networks": "Networks",
+    "allNetworks": "All networks",
+    "selected": "{count} of {total} selected",
+    "selectAll": "Select all",
+    "clear": "Clear",
+    "profiles": "Profiles",
+    "only": "Only",
+    "noMatch": "No profile matches.",
+    "pickOne": "Pick at least one profile.",
+    "show": "{count, plural, =0 {Show profiles} one {Show # profile} other {Show # profiles}}",
+    "cancel": "Cancel",
+    "network": {
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "bluesky": "Bluesky",
+      "mastodon": "Mastodon",
+      "linkedin": "LinkedIn",
+      "threads": "Threads",
+      "x": "X",
+      "pinterest": "Pinterest"
+    }
   }
 }

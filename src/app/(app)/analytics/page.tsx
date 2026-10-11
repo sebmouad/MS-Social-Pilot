@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { TargetType } from '@prisma/client';
+import { loadSelection } from '@/lib/page-filter';
+import { SelectionBar } from '@/components/SelectionBar';
 
 import { AnalyticsClient } from '@/components/AnalyticsClient';
 import { AnalyticsTabs } from '@/components/AnalyticsTabs';
@@ -74,12 +76,15 @@ export default async function AnalyticsPage({
   const auth = await requirePage();
   const t = await getTranslations('analytics');
   const params = await searchParams;
+  // Follows the shared profile selection (src/lib/page-filter.ts).
+  const selection = await loadSelection(auth, params);
+  const pageScope = selection.scope;
   const timezone = auth.workspace.timezone;
 
 
   // Groups have no insights edge, so they are not offered here at all.
   const pages = await prisma.target.findMany({
-    where: { workspaceId: auth.workspace.id, type: TargetType.page, ...targetScope(auth.pageScope) },
+    where: { workspaceId: auth.workspace.id, type: TargetType.page, ...targetScope(pageScope) },
     orderBy: { name: 'asc' },
   });
 
@@ -129,12 +134,12 @@ export default async function AnalyticsPage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          {t('subtitle')}
-
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
+          <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
+        </div>
+        <SelectionBar auth={auth} selection={selection} />
       </header>
 
       {/* One filter row, above everything it scopes: the date range first,
@@ -189,7 +194,7 @@ export default async function AnalyticsPage({
           targetId={selected.id}
           rangeQuery={periodQuery}
           compare={compare}
-          targetIds={auth.pageScope.all ? undefined : auth.pageScope.ids}
+          targetIds={pageScope.all ? undefined : pageScope.ids}
           groups={await listPageGroups(auth.workspace.id, auth.pageScope)}
           groupId={first(params.group)}
         />

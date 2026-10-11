@@ -2510,5 +2510,34 @@
       "title": "La limite d’appels Meta est proche",
       "body": "Cette application a utilisé {percent} % de son quota d’appels Facebook. La synchronisation est suspendue jusqu’à ce qu’il baisse."
     }
+  },
+  "profileScope": {
+    "title": "Choisir les profils",
+    "all": "{count, plural, one {Tous les profils (#)} other {Tous les profils (#)}}",
+    "some": "{count, plural, one {# profil} other {# profils}}",
+    "search": "Rechercher un profil",
+    "groups": "Groupes",
+    "allGroups": "Tous",
+    "networks": "Réseaux",
+    "allNetworks": "Tous les réseaux",
+    "selected": "{count} sur {total} sélectionnés",
+    "selectAll": "Tout sélectionner",
+    "clear": "Effacer",
+    "profiles": "Profils",
+    "only": "Seulement",
+    "noMatch": "Aucun profil ne correspond.",
+    "pickOne": "Choisissez au moins un profil.",
+    "show": "{count, plural, =0 {Afficher les profils} one {Afficher # profil} other {Afficher # profils}}",
+    "cancel": "Annuler",
+    "network": {
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "bluesky": "Bluesky",
+      "mastodon": "Mastodon",
+      "linkedin": "LinkedIn",
+      "threads": "Threads",
+      "x": "X",
+      "pinterest": "Pinterest"
+    }
   }
 }

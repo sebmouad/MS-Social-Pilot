@@ -12,6 +12,7 @@ import { NetworkMark } from './NetworkMark';
 import { paletteOf } from '@/lib/palette';
 import type { PageGroupView } from '@/lib/page-groups';
 import type { SidebarPage } from '@/lib/page-filter';
+import { rememberSelection, selectionQuery } from '@/lib/selection';
 
 interface Props {
   pages: SidebarPage[];
@@ -25,6 +26,8 @@ interface Props {
   inline?: boolean;
   /** Editors and up: shuffle, clear the queue and drafts from a Page's ⋮. */
   canManageQueue?: boolean;
+  /** Remembers the selection for this workspace (src/lib/selection.ts). */
+  workspaceId?: string;
 }
 
 /**
@@ -39,7 +42,7 @@ interface Props {
  *
  * On a phone the column folds into one line above the screen it filters.
  */
-export function PagesSidebar({ pages, groups, group, visible, canManageGroups, inline = false, canManageQueue = false }: Props) {
+export function PagesSidebar({ pages, groups, group, visible, canManageGroups, inline = false, canManageQueue = false, workspaceId }: Props) {
   const t = useTranslations('pagesSidebar');
   const router = useRouter();
   const pathname = usePathname();
@@ -83,6 +86,8 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
       else params.delete('pages');
     }
     const qs = params.toString();
+    // The same selection the bar above every screen uses: remember it.
+    if (workspaceId) rememberSelection(workspaceId, selectionQuery(params));
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
