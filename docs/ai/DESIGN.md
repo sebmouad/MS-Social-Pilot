@@ -57,6 +57,12 @@ always the left sidebar (`src/components/AppShell.tsx`).
 11. Accessibility: every control has a name (e2e checks), focus visible,
     `aria-current` on active nav, colour never the only signal (arrows on deltas).
 
+## Root section
+Root (first user) has a separate area `/root/*` with its own sidebar, a
+persistent "Root — changes affect the whole installation" banner and a distinct
+accent; its only entry is a "Root" item at the bottom of the main sidebar,
+visible to root alone (PERMISSIONS.md).
+
 ## Before shipping UI
 Screenshot the screen at 1440 px and at phone width in the real browser, on real
 data, compare with the Simplified equivalent in `docs/inspiration/simplified/screens`.

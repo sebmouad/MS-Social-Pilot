@@ -41,8 +41,31 @@ Plus **Page scope** per member: a member sees and acts only on the Pages they
 are given (`auth.pageScope`, applied by `loadPageFilter`). Every action is
 recorded in `ActivityLog` (Settings → History, admins).
 
+## Root has its own section (owner's rule, 2026-10-11)
+Root access lives in **a unique section, separated from the rest of the app**:
+- **Own route prefix `/root/*`** (layout `src/app/(root)/root/layout.tsx`) with
+  its own sidebar: Overview · Configuration · Workspaces · Users · Registration
+  & invitations · Privileges (audit) · Root activity log · Danger zone
+  (transfer root). Not inside workspace Settings, not tied to any workspace.
+- **Move** Settings → Configuration (`/settings/config`, `/api/settings/config`)
+  and the setup wizard/checklist there (`/root/config`, `/api/root/config`,
+  `/root/setup`); old URLs redirect to the new ones for root, 404 for others.
+- **Entry point**: one item at the bottom of the main sidebar, only for root
+  ("Root" with a shield icon, distinct colour); the root section shows a
+  persistent banner "Root — changes affect the whole installation" and a
+  "Back to the app" link. Non-root users never see the link, and every
+  `/root/*` page and `/api/root/*` route returns 404 for them (not 403, so the
+  section isn't advertised).
+- **One guard**: `requireRoot()` in `src/lib/auth.ts`, used by the root layout
+  and every root API route; e2e asserts each `/root/*` and `/api/root/*` path
+  is 404 for admin, editor, contributor and signed-out users.
+- **Separate log**: every root action written to `ActivityLog` with
+  `scope = 'root'`, shown only in the root section.
+- Workspace roles (owner/admin/…) keep using workspace Settings; nothing of the
+  root section appears there.
+
 ## To build (NEXT_PHASES Phase 0.3)
-1. **Root console** (`/settings/root`, root only): all workspaces (create,
+1. **Root console** (inside the `/root` section above): all workspaces (create,
    rename, suspend, open any as root), all users (disable, reset sign-in,
    remove, see memberships), open registration on/off, invitations across the
    app. Today root only sees workspaces it belongs to — verify, then close the
@@ -54,12 +77,11 @@ recorded in `ActivityLog` (Settings → History, admins).
    sides notified) — and a recovery path documented in `RELEASE.md` (server CLI
    script `scripts/admin/set-root.ts <email>`, run over SSH), never a web
    back door.
-4. **Privileges screen for the audit** (`/settings/permissions`, root and
-   admins read-only): the matrix above generated from the code (one source:
+4. **Privileges screen for the audit** (`/root/privileges`; admins get a
+   read-only view of their own workspace at `/settings/permissions`): the matrix above generated from the code (one source:
    a `CAPABILITIES` table in `constants.ts` that the functions read), plus per
    member: role, Page scope, last sign-in, recent actions. Exportable CSV.
 5. **Custom role tweaks** only after the owner's audit — don't change the
    matrix before the owner has reviewed it.
 6. Tests: first sign-up race (two at once → one root); invited "owner" is not
-   root; non-root gets 403 on every `/api/settings/config` and root console
-   route; capability table matches the functions.
+   root; non-root gets 404 on every `/root/*` and `/api/root/*` route; capability table matches the functions.

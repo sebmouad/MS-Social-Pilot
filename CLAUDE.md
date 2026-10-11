@@ -45,7 +45,8 @@ translations, migrations, new network connector, release).
 7. **Never type passwords, tokens or secrets into web pages**, never create
    accounts for the user, and never read production database contents.
 8. **The first registered user is root** (`isInstanceOwner`): only root sets up
-   the app (Configuration, setup). Workspace owners/admins are not root. Don't
+   the app, in its **own separate section** (`/root/*`, planned — today
+   Configuration is at `/settings/config`). Workspace owners/admins are not root. Don't
    widen or change role privileges without the owner's audit (PERMISSIONS.md).
 9. Client components must not import server modules (anything that reaches
    `@/lib/prisma`). Shared constants go in plain modules (`src/lib/palette.ts`,

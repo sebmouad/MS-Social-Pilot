@@ -108,8 +108,10 @@ Today: `src/lib/ai.ts` is Anthropic-only (`ai.apiKey`, `ai.model` with a
 Owner's rule (2026-10-11): the first registered user is root and sets up every
 aspect of the app; other admins and users have separate privileges, which the
 owner will audit. Root already exists (`isInstanceOwner`, first account only;
-Configuration and setup are root-only). Build the rest from
-[PERMISSIONS.md](PERMISSIONS.md) "To build": root console (all workspaces and
+Configuration and setup are root-only). Root gets **its own section, separate from the rest** (`/root/*`, own
+sidebar, own guard `requireRoot()`, 404 for everyone else; Configuration and
+setup move there) — see [PERMISSIONS.md](PERMISSIONS.md) "Root has its own
+section". Then build "To build": root console (all workspaces and
 users), root passes every check with actions logged, root transfer + SSH
 recovery script, a read-only privileges screen generated from one capability
 table for the audit. Don't change the role matrix until the owner has audited it.
