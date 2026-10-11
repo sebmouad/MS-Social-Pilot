@@ -60,6 +60,8 @@ export interface PostView {
     firstCommentError: string | null;
     status: string;
     url: string | null;
+    /** Taken down from Facebook from here, after it was published. */
+    removed?: boolean;
     error: string | null;
     /** Ours or Facebook's; only ours can be said in another language. */
     errorCode: string | null;
@@ -198,6 +200,8 @@ export function PostList({
         // The same rule the API enforces, so the button is never a dead end.
         const canEdit = post.mayAct && postIsEditable(post);
         const canRetry = post.mayAct && post.targets.some((target) => target.status === 'failed');
+        const canRemove =
+          post.mayAct && post.targets.some((target) => target.status === 'published' && target.type === 'page' && target.url && !target.removed);
         const refusedComments = post.targets.filter((target) => target.firstCommentError);
         const canRetryComment = post.mayAct && Boolean(post.firstComment) && refusedComments.length > 0;
         const commentState = !post.firstComment
@@ -274,9 +278,13 @@ export function PostList({
                 {post.targets.map((target) => (
                   <li key={target.id} className="flex flex-wrap items-center gap-2 text-[13px]">
                     <span className="font-semibold text-slate-700">{target.name}</span>
-                    <StatusBadge status={target.status} kind="target" />
-                    {/* A cancelled post was taken off Facebook: its old address leads nowhere. */}
-                    {target.url && target.status !== 'cancelled' && (
+                    {target.removed ? (
+                      <span className="badge bg-slate-100 text-slate-600">{t('removedFromFacebook')}</span>
+                    ) : (
+                      <StatusBadge status={target.status} kind="target" />
+                    )}
+                    {/* A cancelled or removed post was taken off Facebook: its old address leads nowhere. */}
+                    {target.url && target.status !== 'cancelled' && !target.removed && (
                       <ExternalLink href={target.url} className="font-semibold text-brand-600 hover:underline">
                         {t('viewOnFacebook')}
                       </ExternalLink>
@@ -443,6 +451,26 @@ export function PostList({
                 <ActionIcon name="posts" />
                   {tCommon('duplicate')}
               </button>
+              {canRemove && (
+                <button
+                  type="button"
+                  className={`${ACTION} text-red-700 hover:bg-red-50`}
+                  disabled={working}
+                  onClick={() =>
+                    act(post.id, {
+                      path: `/api/posts/${post.id}/remove`,
+                      method: 'POST',
+                      confirmText: t('removeConfirm', { count: post.targets.filter((target) => target.status === 'published' && !target.removed).length }),
+                      confirmLabel: t('removeAction'),
+                      cancelLabel: t('keepPost'),
+                      danger: true,
+                    })
+                  }
+                >
+                  <ActionIcon name="trash" />
+                  {t('removeAction')}
+                </button>
+              )}
               {canCancel && (
                 <button
                   type="button"

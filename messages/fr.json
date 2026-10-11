@@ -1454,7 +1454,10 @@
     "exportCsv": "Exporter en CSV",
     "cancelPost": "Annuler la publication",
     "keepPost": "La garder",
-    "publishNow": "Publier maintenant"
+    "publishNow": "Publier maintenant",
+    "removeAction": "Supprimer de Facebook",
+    "removedFromFacebook": "Retirée de Facebook",
+    "removeConfirm": "{count, plural, one {Supprimer cette publication de Facebook ? Elle disparaît de la Page, avec ses réactions et commentaires. Action définitive.} other {Supprimer cette publication de # Pages sur Facebook ? Elle disparaît de chacune, avec ses réactions et commentaires. Action définitive.}}"
   },
   "queue": {
     "addSlot": "Ajouter un créneau",

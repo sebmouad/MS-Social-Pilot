@@ -1263,3 +1263,48 @@ export function mediaFromInput(media: CreatePostInput['media']): PostMedia[] {
     altText: item.altText,
   }));
 }
+
+/**
+ * Take a published post down from Facebook, on every Page it went to.
+ *
+ * Only Facebook Pages: Instagram's API cannot delete, and the other networks
+ * are removed on their own sites. Each destination taken down is kept, marked
+ * with when, so the record of what went out stays honest.
+ */
+export async function removePublishedPost(
+  context: { workspaceId: string; userId: string; role: WorkspaceRole },
+  postId: string,
+  now: Date = new Date(),
+): Promise<{ removed: number; failures: string[] }> {
+  const post = await prisma.post.findFirst({
+    where: { id: postId, workspaceId: context.workspaceId },
+    include: { targets: { include: { target: { include: { socialAccount: true } } } } },
+  });
+  if (!post) throw errors.postNotFound();
+  assertMayAct(post, context);
+
+  const failures: string[] = [];
+  let removed = 0;
+  const { deleteRemotePost } = await import('./facebook/publish');
+  for (const postTarget of post.targets) {
+    if (postTarget.status !== 'published' || !postTarget.remotePostId || postTarget.removedAt) continue;
+    if (postTarget.target.type !== 'page') {
+      failures.push(`${postTarget.target.name}: remove it on the network itself.`);
+      continue;
+    }
+    const encrypted = postTarget.target.accessToken ?? postTarget.target.socialAccount?.accessToken ?? null;
+    if (!encrypted) {
+      failures.push(`${postTarget.target.name}: no stored token. Reconnect the account and try again.`);
+      continue;
+    }
+    try {
+      await deleteRemotePost(postTarget.remotePostId, decryptSecret(encrypted));
+      await prisma.postTarget.update({ where: { id: postTarget.id }, data: { removedAt: now } });
+      removed += 1;
+    } catch (error) {
+      failures.push(`${postTarget.target.name}: ${asGraphError(error).displayMessage}`);
+    }
+  }
+  await logActivity(context.workspaceId, 'post.cancelled', { postId, removedFromFacebook: removed, action: 'removed' }, context.userId);
+  return { removed, failures };
+}

@@ -469,6 +469,8 @@ model PostTarget {
   errorCode    String?
   errorMessage String?
   publishedAt  DateTime?
+  /// When it was taken down from Facebook from here, after being published.
+  removedAt    DateTime?
 
   /// Last analytics snapshot (PostInsights).
   insights         Json?

@@ -313,6 +313,7 @@ export default async function PostsPage({
             firstCommentError: postTarget.firstCommentError,
             status: postTarget.status,
             url: postTarget.remoteUrl,
+            removed: postTarget.removedAt !== null,
             error: postTarget.errorMessage,
             errorCode: postTarget.errorCode,
             attempts: postTarget.attempts,

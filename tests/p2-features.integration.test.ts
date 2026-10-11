@@ -145,6 +145,38 @@ describe('a Page’s drafts', () => {
   });
 });
 
+describe('taking a published post down', () => {
+  it('deletes it on Facebook and marks each Page with when', async () => {
+    const { owner, workspace, bakery } = await seed();
+    const { encryptSecret } = await import('../src/lib/crypto');
+    await prisma.target.update({ where: { id: bakery.id }, data: { accessToken: encryptSecret('page-token') } });
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        message: 'Live',
+        status: 'published',
+        targets: { create: [{ targetId: bakery.id, status: 'published', remotePostId: '1_2', remoteUrl: 'https://facebook.com/1_2', publishedAt: now }] },
+      },
+    });
+    const calls: Array<{ url: string; method: string }> = [];
+    const { vi } = await import('vitest');
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url: String(url), method: init?.method ?? 'GET' });
+      return new Response(JSON.stringify({ success: true }), { headers: { 'content-type': 'application/json' } });
+    }));
+    const posts = await import('../src/lib/posts');
+    const result = await posts.removePublishedPost({ workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner }, post.id);
+    vi.unstubAllGlobals();
+    expect(result).toEqual({ removed: 1, failures: [] });
+    expect(calls.some((call) => call.method === 'DELETE' && call.url.includes('1_2'))).toBe(true);
+    const row = await prisma.postTarget.findFirstOrThrow({ where: { postId: post.id } });
+    expect(row.removedAt).not.toBeNull();
+    // Twice is harmless: nothing is left to take down.
+    expect(await posts.removePublishedPost({ workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner }, post.id)).toEqual({ removed: 0, failures: [] });
+  });
+});
+
 describe('emailed reports', () => {
   it('go to every recipient when due, then move to the next run', async () => {
     const { workspace, bakery } = await seed();

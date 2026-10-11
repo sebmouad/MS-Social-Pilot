@@ -1454,7 +1454,10 @@
     "exportCsv": "Export CSV",
     "cancelPost": "Cancel post",
     "keepPost": "Keep post",
-    "publishNow": "Publish now"
+    "publishNow": "Publish now",
+    "removeAction": "Delete from Facebook",
+    "removedFromFacebook": "Removed from Facebook",
+    "removeConfirm": "{count, plural, one {Delete this post from Facebook? It disappears from the Page, with its reactions and comments. This cannot be undone.} other {Delete this post from # Pages on Facebook? It disappears from each, with its reactions and comments. This cannot be undone.}}"
   },
   "queue": {
     "addSlot": "Add slot",
