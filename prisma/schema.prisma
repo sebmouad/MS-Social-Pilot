@@ -129,6 +129,13 @@ model User {
   isInstanceOwner       Boolean   @default(false)
   /// Set by root: the account cannot sign in and its sessions are gone.
   disabledAt            DateTime?
+  /// Authenticator app (TOTP) secret, encrypted. Null until set up.
+  totpSecret            String?
+  /// A secret being set up, kept aside until a code proves it was scanned.
+  totpPendingSecret     String?
+  totpEnabledAt         DateTime?
+  /// The last time step accepted, so a code cannot be used twice.
+  totpLastStep          Int?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -143,6 +150,9 @@ model User {
   settingChanges       AppSetting[]
   apiTokens            ApiToken[]
   rootActions          RootActivity[]
+  recoveryCodes        RecoveryCode[]
+  trustedDevices       TrustedDevice[]
+  passkeys             Passkey[]
 
   @@map("users")
 }
@@ -152,6 +162,11 @@ model Session {
   userId    String
   tokenHash String   @unique
   expiresAt DateTime
+  /// Set between the password and the second step: 'verify' or 'enroll'.
+  /// Such a session signs nobody in; only the two-step screens read it.
+  pending   String?
+  /// The WebAuthn challenge being answered by a passkey, if any.
+  challenge String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1324,4 +1339,52 @@ model RootActivity {
 
   @@index([createdAt])
   @@map("root_activities")
+}
+
+/// Single-use codes for when the phone is lost. Only hashes are kept.
+model RecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("recovery_codes")
+}
+
+/// "Remember this device for 30 days": skips the second step on one browser.
+model TrustedDevice {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  label      String?
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("trusted_devices")
+}
+
+/// A WebAuthn credential (passkey, security key) usable as the second step.
+model Passkey {
+  id           String    @id @default(cuid())
+  userId       String
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      Int       @default(0)
+  transports   String[]
+  name         String
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passkeys")
 }

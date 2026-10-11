@@ -98,7 +98,7 @@ describe('disabling an account', () => {
     });
 
     await root.setUserDisabled(theRoot.user.id, target.user.id, false);
-    await expect(auth.authenticate(target.user.email, 'a-long-enough-password')).resolves.toBeTypeOf('string');
+    await expect(auth.authenticate(target.user.email, 'a-long-enough-password')).resolves.toMatchObject({ next: null });
     expect((await root.listRootActivity()).map((entry) => entry.action)).toEqual(['user.enabled', 'user.disabled']);
   });
 

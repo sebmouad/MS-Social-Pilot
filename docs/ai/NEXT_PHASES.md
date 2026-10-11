@@ -369,6 +369,14 @@ most time), the rest after Phase D2. S/M/L = effort.
   root resets it for others; root's own reset only by the SSH recovery script
   (PERMISSIONS.md). Tests: sign-in blocked without the second step.
   Skills: `secure-code-guardian`, `security-review`, `playwright-expert`.
+  **Done 2026-10-11:** `src/lib/totp.ts` (RFC 6238, no library),
+  `src/lib/two-step.ts` (policy `security.twoStep` admins|everyone|off; admins =
+  root + owners/admins of a workspace with a connected profile; pending sessions
+  `Session.pending`; recovery codes; trusted devices 30 days), passkeys
+  (`src/lib/passkeys.ts`, @simplewebauthn), screens `/login/two-step` and
+  `/login/two-step/setup`, Settings → Account section, root "Reset two-step",
+  `scripts/admin/reset-two-step.ts` for root's own. e2e runs with
+  `SECURITY_TWO_STEP=off`; a two-step browser spec is still to write.
 - **G2. Off-site backups (S)** — after the nightly
   `/usr/local/sbin/ms-social-pilot-backup`, push the dump + media archive,
   encrypted (age/gpg, key held by the owner), to Backblaze B2 / S3 / Google

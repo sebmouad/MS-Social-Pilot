@@ -71,6 +71,8 @@ export default defineConfig({
     stderr: 'pipe',
     env: {
       DATABASE_URL: databaseUrl.toString(),
+      // Two-step sign-in has its own spec; everywhere else the walk signs in with a password.
+      SECURITY_TWO_STEP: 'off',
       APP_URL: baseURL,
       SESSION_SECRET: 'e2e-session-secret-not-a-real-one',
       ENCRYPTION_KEY: 'c3aCfAcoo9L+9hMqSB+2x2mSjeyLwAyhNamW5DsCikc=',

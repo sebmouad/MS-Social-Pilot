@@ -231,6 +231,21 @@ export function UsersTable({ users }: { users: RootUser[] }) {
                       >
                         <Icon name="signOut" size={14} /> {t('users.signOut')}
                       </button>
+                      <button
+                        type="button"
+                        className="btn-ghost h-9 whitespace-nowrap"
+                        disabled={busy === user.id}
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: t('users.resetQuestion', { name: user.name }),
+                            body: t('users.resetBody'),
+                            confirmLabel: t('users.reset'),
+                          });
+                          if (ok) await run(user.id, `/api/root/users/${user.id}/reset-two-step`, 'POST', undefined, t('users.resetDone', { name: user.name }));
+                        }}
+                      >
+                        <Icon name="key" size={14} /> {t('users.reset')}
+                      </button>
                       {user.disabled ? (
                         <button
                           type="button"

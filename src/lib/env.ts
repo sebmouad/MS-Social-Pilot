@@ -243,6 +243,10 @@ export const env = {
   get aiRateLimitPerHour(): number {
     return settingNumber('ai.rateLimitPerHour');
   },
+  /** Who must use two-step sign-in: admins (default), everyone, or off. */
+  get twoStepPolicy(): string {
+    return settingString('security.twoStep');
+  },
   get aiMonthlyBudgetUsd(): number {
     return settingNumber('ai.monthlyBudgetUsd');
   },

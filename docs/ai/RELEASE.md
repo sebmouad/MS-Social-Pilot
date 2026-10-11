@@ -82,6 +82,9 @@ npx tsx scripts/admin/set-root.ts someone@example.com
 The previous root stops being root; the change is in the root activity log.
 There is deliberately no web path for this.
 
+Root lost their phone (two-step sign-in): `npx tsx scripts/admin/reset-two-step.ts <root email>`.
+Other people's second step is reset from /root/users.
+
 ## Migrations
 
 - Create: `npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url postgresql://postgres:postgres@127.0.0.1:55432/sp_shadow2 --script > prisma/migrations/<YYYYMMDDHHMMSS>_<name>/migration.sql`

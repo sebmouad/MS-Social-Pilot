@@ -317,6 +317,16 @@ export const errors = {
       fallback: 'That account is disabled. Enable it before handing root to it.',
       status: 409,
     }),
+  twoStepWrongCode: () =>
+    new AppError({ key: 'errors.twoStepWrongCode', fallback: 'That code is not right, or was already used. Try the newest code.', status: 401 }),
+  twoStepNotStarted: () =>
+    new AppError({ key: 'errors.twoStepNotStarted', fallback: 'Start setting up the authenticator app again.', status: 409 }),
+  twoStepRequired: () =>
+    new AppError({ key: 'errors.twoStepRequired', fallback: 'Two-step sign-in is required for your account, so it cannot be turned off.', status: 409 }),
+  twoStepExpired: () =>
+    new AppError({ key: 'errors.twoStepExpired', fallback: 'This sign-in took too long. Enter your email and password again.', status: 401 }),
+  passkeyFailed: () =>
+    new AppError({ key: 'errors.passkeyFailed', fallback: 'The passkey could not be checked. Try again, or use a code.', status: 401 }),
   accountDisabled: () =>
     new AppError({
       key: 'errors.accountDisabled',

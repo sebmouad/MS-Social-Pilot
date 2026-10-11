@@ -1,6 +1,8 @@
 import { getTranslations } from 'next-intl/server';
 
 import { AccountClient } from '@/components/AccountClient';
+import { TwoStepSettings } from '@/components/TwoStepForms';
+import { twoStepStatus } from '@/lib/two-step';
 import { currentSessionTokenHash, requirePage } from '@/lib/auth';
 import { readAccount } from '@/lib/account';
 import { screenMetadata } from '@/lib/metadata';
@@ -17,7 +19,10 @@ export default async function AccountSettingsPage() {
   const auth = await requirePage();
   const t = await getTranslations('account');
 
-  const account = await readAccount(auth.user.id, await currentSessionTokenHash());
+  const [account, twoStep] = await Promise.all([
+    readAccount(auth.user.id, await currentSessionTokenHash()),
+    twoStepStatus(auth.user.id),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -27,6 +32,8 @@ export default async function AccountSettingsPage() {
       </header>
 
       <AccountClient initial={account} locales={SUPPORTED_LOCALES} />
+
+      <TwoStepSettings initial={twoStep} />
     </div>
   );
 }

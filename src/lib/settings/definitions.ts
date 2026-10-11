@@ -590,6 +590,22 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     default: '',
     env: 'PINTEREST_CLIENT_SECRET',
   },
+  // --- Security --------------------------------------------------------------
+  {
+    key: 'security.twoStep',
+    group: 'general',
+    type: 'select',
+    label: 'Two-step sign-in required for',
+    description: 'Admins = root and the owners and admins of workspaces with a connected profile. Everyone else may still turn it on for themselves.',
+    default: 'admins',
+    env: 'SECURITY_TWO_STEP',
+    options: [
+      { value: 'admins', label: 'Root and admins (recommended)' },
+      { value: 'everyone', label: 'Everyone' },
+      { value: 'off', label: 'Nobody (optional for all)' },
+    ],
+    hint: 'Applies from each person’s next sign-in. Someone required to use it sets it up right after their password.',
+  },
   // --- AI --------------------------------------------------------------------
   {
     key: 'ai.provider',

@@ -11,6 +11,7 @@ import { env } from './env';
 import { hashPassword, hashToken, randomToken, verifyPassword } from './crypto';
 import { uniqueSlug } from './slug';
 import { DEFAULT_QUEUE_SLOTS, setDateLocale } from './time';
+import { nextStepAfterPassword, type PendingStep } from './two-step';
 
 /**
  * Sessions, and resolving which workspace the request is acting on.
@@ -28,6 +29,9 @@ import { DEFAULT_QUEUE_SLOTS, setDateLocale } from './time';
 const SESSION_COOKIE = 'msp_session';
 const WORKSPACE_COOKIE = 'msp_workspace';
 const SESSION_TTL_DAYS = 30;
+const TRUSTED_COOKIE = 'msp_trusted';
+/** Time to finish the second step before the password has to be typed again. */
+const PENDING_TTL_MINUTES = 15;
 
 export interface WorkspaceSummary {
   id: string;
@@ -263,7 +267,16 @@ function dummyHash(): string {
   return dummy;
 }
 
-export async function authenticate(email: string, password: string): Promise<string> {
+/**
+ * Check the password and open a session. When the account has (or must set
+ * up) a second step, the session is a pending one: `next` says which screen
+ * comes before the person is signed in.
+ */
+export async function authenticate(
+  email: string,
+  password: string,
+  trustedToken: string | null = null,
+): Promise<{ token: string; next: PendingStep | null }> {
   const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
 
   // Hash regardless of whether the user exists, so response timing does not
@@ -280,14 +293,17 @@ export async function authenticate(email: string, password: string): Promise<str
   }
   // Said only after the right password, so it reveals nothing to a guesser.
   if (user.disabledAt) throw errors.accountDisabled();
-  return createSession(user.id);
+  const next = await nextStepAfterPassword(user.id, trustedToken);
+  return { token: await createSession(user.id, next), next };
 }
 
-export async function createSession(userId: string): Promise<string> {
+export async function createSession(userId: string, pending: PendingStep | null = null): Promise<string> {
   const token = randomToken(32);
-  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(
+    Date.now() + (pending ? PENDING_TTL_MINUTES * 60 * 1000 : SESSION_TTL_DAYS * 24 * 60 * 60 * 1000),
+  );
 
-  await prisma.session.create({ data: { userId, tokenHash: hashToken(token), expiresAt } });
+  await prisma.session.create({ data: { userId, tokenHash: hashToken(token), expiresAt, pending } });
   // Opportunistic cleanup; cheap, and keeps the table from growing unbounded
   // without a dedicated job.
   await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
@@ -304,6 +320,64 @@ export async function setSessionCookie(token: string): Promise<void> {
     secure: env.isProduction,
     path: '/',
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
+  });
+}
+
+/**
+ * The session between the password and the second step, for the two-step
+ * screens only. Null when there is none, it expired, or it is already a full one.
+ */
+export async function getPendingSession() {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const session = await prisma.session.findUnique({
+    where: { tokenHash: hashToken(token) },
+    include: { user: { select: { id: true, email: true, name: true, disabledAt: true, totpEnabledAt: true, _count: { select: { passkeys: true } } } } },
+  });
+  if (!session?.pending || session.expiresAt < new Date() || session.user.disabledAt) return null;
+  return session;
+}
+
+/** The second step passed: the pending session becomes a normal one. */
+export async function completePendingSession(sessionId: string): Promise<void> {
+  await prisma.session.update({
+    where: { id: sessionId },
+    data: { pending: null, challenge: null, expiresAt: new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000) },
+  });
+}
+
+/** The current session row, pending or not, for storing a passkey challenge. */
+export async function currentSessionId(): Promise<string | null> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const session = await prisma.session.findUnique({ where: { tokenHash: hashToken(token) }, select: { id: true } });
+  return session?.id ?? null;
+}
+
+/**
+ * Who is setting up a second step: a signed-in person, or someone between
+ * their password and a second step their account must have ('enroll').
+ */
+export async function requireTwoStepSetupUser(): Promise<{ userId: string; sessionId: string; pending: PendingStep | null }> {
+  const context = await getAuthContext();
+  const sessionId = await currentSessionId();
+  if (context && sessionId) return { userId: context.user.id, sessionId, pending: null };
+  const pending = await getPendingSession();
+  if (pending?.pending === 'enroll') return { userId: pending.userId, sessionId: pending.id, pending: 'enroll' };
+  throw new AuthError('You must be signed in.');
+}
+
+export async function readTrustedDeviceCookie(): Promise<string | null> {
+  return (await cookies()).get(TRUSTED_COOKIE)?.value ?? null;
+}
+
+export async function setTrustedDeviceCookie(token: string, days: number): Promise<void> {
+  (await cookies()).set(TRUSTED_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.isProduction,
+    path: '/',
+    maxAge: days * 24 * 60 * 60,
   });
 }
 
@@ -373,7 +447,8 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
     },
   });
 
-  if (!session || session.expiresAt < new Date()) return null;
+  // A pending session (password typed, second step not yet) signs nobody in.
+  if (!session || session.pending || session.expiresAt < new Date()) return null;
 
   const { user } = session;
   if (user.disabledAt || user.memberships.length === 0) return null;

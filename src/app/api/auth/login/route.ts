@@ -1,4 +1,4 @@
-import { authenticate, setSessionCookie } from '@/lib/auth';
+import { authenticate, readTrustedDeviceCookie, setSessionCookie } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { errors } from '@/lib/errors';
 import { clear, forgive, hit } from '@/lib/rate-limit';
@@ -45,7 +45,7 @@ export const POST = route(async (request: Request) => {
     throw errors.tooManyAttempts(Math.max(1, Math.ceil((blocked.resetAt - Date.now()) / 60_000)));
   }
 
-  const token = await authenticate(email, password);
+  const { token, next } = await authenticate(email, password, await readTrustedDeviceCookie());
 
   // A success clears the address's count, so a person who mistypes their
   // password twice and then gets it right starts from zero.
@@ -63,5 +63,6 @@ export const POST = route(async (request: Request) => {
   }
 
   await setSessionCookie(token);
-  return ok({ ok: true });
+  // `next` sends the browser to the second step, or to setting one up.
+  return ok({ ok: true, next });
 });

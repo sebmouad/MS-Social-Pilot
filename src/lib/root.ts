@@ -5,6 +5,7 @@ import { errors } from './errors';
 import { verifyPassword } from './crypto';
 import { sendEmail } from './email/send';
 import { rootTransferEmail } from './email/templates';
+import { clearSecondFactors } from './two-step';
 
 /**
  * What root can do to the whole installation, from the root section
@@ -22,6 +23,7 @@ export const ROOT_ACTIONS = [
   'user.disabled',
   'user.enabled',
   'user.signedOut',
+  'user.twoStepReset',
   'workspace.renamed',
   'invitation.revoked',
   'root.transferred',
@@ -128,6 +130,20 @@ export async function signOutUser(actorId: string, userId: string): Promise<numb
   const { count } = await prisma.session.deleteMany({ where: { userId } });
   await logRootActivity(actorId, 'user.signedOut', { email: user.email, sessions: count });
   return count;
+}
+
+/**
+ * A lost phone: clear someone's second step and end their sessions. Root's
+ * own is reset only from the server (scripts/admin/reset-two-step.ts), so a
+ * stolen root session cannot strip root's protection.
+ */
+export async function resetTwoStepFor(actorId: string, userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw errors.notFound();
+  if (user.isInstanceOwner) throw errors.rootCannotBeDisabled();
+  await clearSecondFactors(userId);
+  await prisma.session.deleteMany({ where: { userId } });
+  await logRootActivity(actorId, 'user.twoStepReset', { email: user.email });
 }
 
 export async function renameWorkspace(actorId: string, workspaceId: string, name: string): Promise<void> {

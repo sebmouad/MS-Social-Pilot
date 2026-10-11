@@ -94,7 +94,14 @@ export function AuthForm({ mode, inviteToken }: Props) {
     // Pending stays on through the navigation: the session exists now, and a
     // second click would only register the same account again.
     // Server components read the session cookie, so refresh before navigating.
+    const body = (await response.json().catch(() => ({}))) as { next?: 'verify' | 'enroll' | null };
     router.refresh();
+    if (body.next) {
+      // Password right, second step to go (or to set up): the invitation waits.
+      const step = body.next === 'enroll' ? '/login/two-step/setup' : '/login/two-step';
+      router.push(withInviteParam(step, inviteToken));
+      return;
+    }
     router.push(afterAuthPath(inviteToken));
   }
 
