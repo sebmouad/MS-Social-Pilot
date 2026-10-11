@@ -231,6 +231,15 @@ export const env = {
   get aiModel(): string {
     return settingString('ai.model');
   },
+  get aiProvider(): string {
+    return settingString('ai.provider');
+  },
+  get openaiApiKey(): string | null {
+    return settingString('ai.openaiKey') || null;
+  },
+  get geminiApiKey(): string | null {
+    return settingString('ai.geminiKey') || null;
+  },
   get aiRateLimitPerHour(): number {
     return settingNumber('ai.rateLimitPerHour');
   },

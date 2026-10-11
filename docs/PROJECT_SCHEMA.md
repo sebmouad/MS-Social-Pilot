@@ -32,9 +32,8 @@ warning that makes it matter.
 | Media storage | Local disk. S3 was planned and is not built — see the status note above |
 | Delivery | Everything in one delivery |
 
-**[assumption] AI provider:** the Claude API (`claude-sonnet-5` for caption
-generation; `claude-haiku-4-5-20251001` for cheap rewrites). Needs an
-`ANTHROPIC_API_KEY`. Say if you would rather use a different provider.
+**AI provider:** Anthropic, OpenAI or Google Gemini (`AI_PROVIDER`, one API key
+each). The models are fetched from the provider, never listed in the code.
 
 **[assumption] PDF reports** are produced by a print-optimised HTML page rather
 than a headless-browser PDF pipeline. CSV export is native. This avoids putting
@@ -366,7 +365,10 @@ PINTEREST_CLIENT_ID=
 PINTEREST_CLIENT_SECRET=
 
 # AI (Claude)
+AI_PROVIDER=auto                 # auto | anthropic | openai | gemini
 ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+GEMINI_API_KEY=
 AI_MODEL=claude-sonnet-5
 AI_RATE_LIMIT_PER_HOUR=100
 

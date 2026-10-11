@@ -14,6 +14,6 @@ export const GET = route(async (request: Request) => {
     return ok({ models: await listAiModels({ refresh }), error: null });
   } catch (error) {
     const status = (error as { status?: number }).status;
-    return ok({ models: [], error: status === 401 ? 'keyRejected' : 'unreachable' });
+    return ok({ models: [], error: status === 400 || status === 401 || status === 403 ? 'keyRejected' : 'unreachable' });
   }
 });

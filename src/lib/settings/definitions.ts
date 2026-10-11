@@ -590,13 +590,46 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   },
   // --- AI --------------------------------------------------------------------
   {
+    key: 'ai.provider',
+    group: 'ai',
+    type: 'select',
+    label: 'AI provider',
+    description: 'Automatic uses the first provider below that has a key: Anthropic, then OpenAI, then Gemini.',
+    default: 'auto',
+    env: 'AI_PROVIDER',
+    options: [
+      { value: 'auto', label: 'Automatic' },
+      { value: 'anthropic', label: 'Anthropic (Claude)' },
+      { value: 'openai', label: 'OpenAI' },
+      { value: 'gemini', label: 'Google Gemini' },
+    ],
+  },
+  {
     key: 'ai.apiKey',
     group: 'ai',
     type: 'secret',
     label: 'Anthropic API key',
-    description: 'Enables caption generation. Blank turns the feature off.',
+    description: 'Kept encrypted. From console.anthropic.com.',
     default: '',
     env: 'ANTHROPIC_API_KEY',
+  },
+  {
+    key: 'ai.openaiKey',
+    group: 'ai',
+    type: 'secret',
+    label: 'OpenAI API key',
+    description: 'Kept encrypted. From platform.openai.com.',
+    default: '',
+    env: 'OPENAI_API_KEY',
+  },
+  {
+    key: 'ai.geminiKey',
+    group: 'ai',
+    type: 'secret',
+    label: 'Google Gemini API key',
+    description: 'Kept encrypted. From aistudio.google.com.',
+    default: '',
+    env: 'GEMINI_API_KEY',
   },
   {
     key: 'ai.model',
@@ -605,7 +638,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: 'Model',
     // No list in the code: the choices are fetched from the provider with the
     // key above (src/lib/ai-models.ts). Blank means the newest model listed.
-    description: 'Which model writes captions. Blank uses the newest model your key can use.',
+    description: 'Which model writes. Blank uses the first model the provider lists (the newest, where it says so).',
     default: '',
     env: 'AI_MODEL',
   },

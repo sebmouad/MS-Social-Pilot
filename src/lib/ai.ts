@@ -1,8 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { AiGenerationKind, Locale } from '@prisma/client';
 
 import { prisma } from './prisma';
 import { resolveAiModel } from './ai-models';
+import { activeAiProvider, generateWith, providerKey } from './ai-providers';
 import { env } from './env';
 import { errors } from './errors';
 
@@ -29,16 +29,8 @@ export type Tone = 'friendly' | 'professional' | 'playful' | 'urgent' | 'informa
 
 export const TONES: Tone[] = ['friendly', 'professional', 'playful', 'urgent', 'informative'];
 
-let client: Anthropic | null = null;
-
-function anthropic(): Anthropic {
-  if (!env.anthropicApiKey) throw errors.aiNotConfigured();
-  client ??= new Anthropic({ apiKey: env.anthropicApiKey });
-  return client;
-}
-
 export function aiAvailable(): boolean {
-  return Boolean(env.anthropicApiKey);
+  return activeAiProvider() !== null;
 }
 
 /** Refuse once a workspace has burned through its hourly allowance. */
@@ -104,25 +96,24 @@ async function complete(options: {
 }): Promise<GenerationResult> {
   await assertWithinRateLimit(options.workspaceId);
 
-  const model = await resolveAiModel();
-  const response = await anthropic().messages.create({
-    model,
-    max_tokens: options.maxTokens ?? MAX_OUTPUT_TOKENS,
-    system: options.system,
-    messages: [{ role: 'user', content: options.prompt }],
-  });
+  const provider = activeAiProvider();
+  const apiKey = provider ? providerKey(provider) : null;
+  if (!provider || !apiKey) throw errors.aiNotConfigured();
 
-  const text = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map((block) => block.text)
-    .join('')
-    .trim();
+  const model = await resolveAiModel();
+  const generated = await generateWith(provider, apiKey, {
+    model,
+    system: options.system,
+    prompt: options.prompt,
+    maxTokens: options.maxTokens ?? MAX_OUTPUT_TOKENS,
+  });
+  const text = generated.text;
 
   const result: GenerationResult = {
     text,
     model,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
+    inputTokens: generated.inputTokens,
+    outputTokens: generated.outputTokens,
   };
 
   try {

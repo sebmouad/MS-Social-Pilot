@@ -82,8 +82,14 @@ chosen model, else the newest listed), route
 Configuration model field is a picker filled from that list ("Newest model"
 = blank). `ai.model` is now a free `string` setting with no options and a blank
 default.)
-Still to do: OpenAI and Gemini adapters on the same pattern, the DB cache table
-below if needed, prices and costs. `AiGeneration` rows store input/output tokens;
+**OpenAI and Gemini done too (2026-10-11):** `src/lib/ai-providers.ts`
+(`activeAiProvider()`, `listProviderModels()`, `generateWith()`; fetch-based for
+OpenAI `/v1/models` + `/v1/chat/completions` and Gemini `v1beta/models` +
+`:generateContent`); settings `ai.provider` (auto | anthropic | openai | gemini),
+`ai.openaiKey`, `ai.geminiKey`; a chosen model the provider no longer lists falls
+back to the provider's first model.
+Still to do: **prices and costs** (below), optional per-feature model, DB cache
+table only if the 1 h memory cache proves too short. `AiGeneration` rows store input/output tokens;
 `usageSummary()` shows 30-day tokens, no money.
 - Settings (group `ai`): `ai.provider` select `anthropic | openai | gemini`;
   keys `ai.anthropicKey` (migrate from `ai.apiKey`), `ai.openaiKey`,
