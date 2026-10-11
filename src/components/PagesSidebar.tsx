@@ -236,7 +236,7 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
   return (
     <aside
       aria-label={t('label')}
-      className={`min-w-0 ${inline ? '' : 'lg:sticky lg:top-[72px] lg:w-[264px] lg:shrink-0 lg:self-start'}`}
+      className={`min-w-0 ${inline ? '' : 'lg:sticky lg:top-6 lg:w-[264px] lg:shrink-0 lg:self-start'}`}
     >
       {/* One line on a phone, opened when wanted. */}
       <details className="card group/details p-0 lg:hidden">

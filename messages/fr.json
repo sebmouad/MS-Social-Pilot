@@ -1155,7 +1155,15 @@
     "queue": "File d’attente",
     "switchFailed": "Impossible de changer de client. Veuillez réessayer.",
     "signOutFailed": "Déconnexion impossible. Vérifiez votre connexion et réessayez.",
-    "dismiss": "Fermer"
+    "dismiss": "Fermer",
+    "section_publish": "Publication",
+    "section_analyse": "Statistiques",
+    "section_workspace": "Espace",
+    "clientLinks": "Liens clients",
+    "newPost": "Nouvelle publication",
+    "closeMenu": "Fermer le menu",
+    "collapseSidebar": "Réduire la barre latérale",
+    "expandSidebar": "Déplier la barre latérale"
   },
   "notifications": {
     "title": "Notifications",

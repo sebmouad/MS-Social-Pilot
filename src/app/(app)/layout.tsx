@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-import { NavBar } from '@/components/NavBar';
+import { AppShell } from '@/components/AppShell';
 import { getAuthContext } from '@/lib/auth';
 import { canApprove } from '@/lib/constants';
 import { pendingApprovalCount } from '@/lib/approvals';
@@ -13,8 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const pendingApprovals = showApprovals ? await pendingApprovalCount(auth.workspace.id) : 0;
 
   return (
-    <div className="min-h-screen">
-      <NavBar
+    <AppShell
         userName={auth.user.name}
         workspaceId={auth.workspace.id}
         workspaceName={auth.workspace.name}
@@ -26,8 +25,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           name: workspace.name,
           role: workspace.role,
         }))}
-      />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
-    </div>
+    >
+      {children}
+    </AppShell>
   );
 }

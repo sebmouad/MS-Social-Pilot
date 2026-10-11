@@ -255,41 +255,30 @@ test('the analytics tabs stay usable when there is data behind them', async ({ p
   expect(failures).toEqual([]);
 });
 
-test('the three modules are always on screen, and the rest is behind the menu', async ({ page }) => {
+test('on a phone the sidebar is a drawer behind the menu, with the composer one tap away', async ({ page }) => {
   await open(page, '/dashboard');
 
-  // The modules are never hidden: where you are is the one thing that must
-  // always be visible, and three names fit across a phone.
-  for (const name of [/^analytics$/i, /^ads$/i, /^schedule$/i]) {
-    await expect(page.getByRole('banner').getByRole('link', { name })).toBeVisible();
-  }
+  // Writing a post is the one job that never hides behind the menu.
+  await expect(page.getByRole('banner').getByRole('link', { name: /new post/i })).toBeVisible();
 
-  // A module's own screens appear under it once you are in it.
-  await page.getByRole('banner').getByRole('link', { name: /^schedule$/i }).click();
-  await page.waitForURL(/\/calendar/);
-  await expect(page.getByRole('banner').getByRole('link', { name: /^posts$/i })).toBeVisible();
-
-  // Connections, settings and home do not fit beside them, so they live behind
-  // a button. If that button is missing or does nothing, they are unreachable.
-  const menu = page.getByRole('button', { name: /menu/i });
+  const menu = page.getByRole('button', { name: /^menu$/i });
   await expect(menu).toBeVisible();
-
-  // Retry until the button reports itself open. The handler is attached at
-  // hydration, and on a development build that can be a second after the
-  // button is on screen — a single click can land before React is listening.
-  await expect(async () => {
-    await menu.click();
-    await expect(menu).toHaveAttribute('aria-expanded', 'true', { timeout: 1_500 });
-  }).toPass({ timeout: 30_000 });
-
-  const settings = page.locator('#main-menu').getByRole('link', { name: /^settings$/i });
-  await expect(settings).toBeVisible();
-
-  // The button that opens it says what it is and what it did, for somebody who
-  // cannot see that a panel appeared.
   await expect(menu).toHaveAttribute('aria-controls', 'main-menu');
 
-  await settings.click();
+  // Retry until the drawer is open: the handler is attached at hydration, and
+  // on a development build a first click can land before React is listening.
+  await expect(async () => {
+    await menu.click();
+    await expect(page.locator('#main-menu')).toBeVisible({ timeout: 1_500 });
+  }).toPass({ timeout: 30_000 });
+
+  // Every module's screens are in it, grouped, and the drawer fits the phone.
+  const drawer = page.locator('#main-menu');
+  for (const name of [/^calendar$/i, /^queue$/i, /^posts$/i, /^pages$/i, /^reports$/i, /^ads$/i, /^connections$/i, /^settings$/i]) {
+    await expect(drawer.getByRole('link', { name })).toBeVisible();
+  }
+
+  await drawer.getByRole('link', { name: /^settings$/i }).click();
   await page.waitForURL(/\/settings/);
 
   // And it closes on the way, rather than covering the screen it navigated to.

@@ -1155,7 +1155,15 @@
     "queue": "Queue",
     "switchFailed": "Could not switch client. Please try again.",
     "signOutFailed": "Could not sign out. Check your connection and try again.",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "section_publish": "Publishing",
+    "section_analyse": "Analytics",
+    "section_workspace": "Workspace",
+    "clientLinks": "Client links",
+    "newPost": "New post",
+    "closeMenu": "Close menu",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar"
   },
   "notifications": {
     "title": "Notifications",
