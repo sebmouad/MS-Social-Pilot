@@ -5,6 +5,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { StatusBadge } from '@/components/StatusBadge';
 import { FeedPost } from '@/components/FeedPost';
 import { PagesHub } from '@/components/PagesHub';
+import { GettingStarted } from '@/components/GettingStarted';
 import { feedLinkOf, feedMediaOf } from '@/lib/feed';
 import { requirePage } from '@/lib/auth';
 import { postScope, postTargetScope, targetScope } from '@/lib/page-access';
@@ -112,6 +113,8 @@ export default async function DashboardPage() {
           </Link>
         </div>
       )}
+
+      {!(setup && !setup.complete) && <GettingStarted workspaceId={workspaceId} />}
 
       {staleAccounts.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

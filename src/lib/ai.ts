@@ -21,6 +21,8 @@ import { errors } from './errors';
  */
 
 const MAX_OUTPUT_TOKENS = 1024;
+/** A week of posts needs room for seven of them. */
+const PLAN_OUTPUT_TOKENS = 3000;
 
 export type Tone = 'friendly' | 'professional' | 'playful' | 'urgent' | 'informative';
 
@@ -97,13 +99,14 @@ async function complete(options: {
   kind: AiGenerationKind;
   system: string;
   prompt: string;
+  maxTokens?: number;
 }): Promise<GenerationResult> {
   await assertWithinRateLimit(options.workspaceId);
 
   const model = env.aiModel;
   const response = await anthropic().messages.create({
     model,
-    max_tokens: MAX_OUTPUT_TOKENS,
+    max_tokens: options.maxTokens ?? MAX_OUTPUT_TOKENS,
     system: options.system,
     messages: [{ role: 'user', content: options.prompt }],
   });
@@ -189,6 +192,115 @@ export async function improveCaption(options: {
       options.draft,
     ].join('\n'),
   });
+}
+
+/**
+ * Hashtags for a post: a handful that people actually search, not a wall.
+ * Returned for the person to pick from; nothing is added on its own.
+ */
+export async function suggestHashtags(options: {
+  workspaceId: string;
+  userId: string;
+  text: string;
+  brandVoice?: string | null;
+  locale: Locale;
+}): Promise<string[]> {
+  const result = await complete({
+    workspaceId: options.workspaceId,
+    userId: options.userId,
+    kind: AiGenerationKind.hashtags,
+    system: [
+      'You suggest hashtags for Facebook Page posts.',
+      `The audience reads ${options.locale === Locale.fr ? 'French' : 'English'}; use hashtags in that language where natural.`,
+      'Return 8 to 12 hashtags, one per line, each starting with #, no explanations.',
+      'Prefer specific, commonly used tags over invented ones. No spaces or punctuation inside a tag.',
+      options.brandVoice ? `\nAbout the brand:\n${options.brandVoice}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    prompt: options.text,
+  });
+  return parseHashtags(result.text);
+}
+
+/** `#a #b`, one per line or not, de-duplicated, without the junk around them. */
+export function parseHashtags(text: string): string[] {
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  for (const match of text.matchAll(/#[\p{L}\p{N}_]{2,50}/gu)) {
+    const key = match[0].toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tags.push(match[0]);
+  }
+  return tags.slice(0, 15);
+}
+
+export interface PlannedPost {
+  /** 0 = the first day of the plan. */
+  day: number;
+  time: string;
+  text: string;
+}
+
+/**
+ * A week of posts from one brief: varied in angle and format, spread over the
+ * days, each written in the Page's voice. They become drafts — someone still
+ * reads, edits and schedules every one.
+ */
+export async function planWeek(options: {
+  workspaceId: string;
+  userId: string;
+  brief: string;
+  count: number;
+  days: number;
+  pageName: string;
+  bestTimes?: string[];
+  brandVoice?: string | null;
+  tone?: string | null;
+  locale: Locale;
+}): Promise<PlannedPost[]> {
+  const result = await complete({
+    workspaceId: options.workspaceId,
+    userId: options.userId,
+    kind: AiGenerationKind.plan,
+    maxTokens: PLAN_OUTPUT_TOKENS,
+    system: [
+      systemPrompt({ locale: options.locale, tone: options.tone ?? null, brandVoice: options.brandVoice ?? null }),
+      '',
+      `You are planning ${options.count} posts for the Facebook Page "${options.pageName}" over ${options.days} days.`,
+      'Vary the angle: a tip, a question, behind the scenes, an offer, social proof, a story. Never repeat an opening.',
+      options.bestTimes?.length ? `Times that work well for this Page: ${options.bestTimes.join(', ')}.` : 'Spread them between 08:00 and 20:00.',
+      'Answer with JSON only: an array of objects {"day": 0-based day number, "time": "HH:mm", "text": "the post"}.',
+    ].join('\n'),
+    prompt: options.brief,
+  });
+  return parsePlan(result.text, options.days, options.count);
+}
+
+/** The model's JSON, made safe: days in range, real times, non-empty texts. */
+export function parsePlan(text: string, days: number, count: number): PlannedPost[] {
+  const start = text.indexOf('[');
+  const end = text.lastIndexOf(']');
+  if (start < 0 || end <= start) return [];
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry) => entry as { day?: unknown; time?: unknown; text?: unknown })
+    .filter((entry) => typeof entry.text === 'string' && entry.text.trim().length > 0)
+    .map((entry) => {
+      const day = Math.min(days - 1, Math.max(0, Math.round(Number(entry.day) || 0)));
+      const match = /^(\d{1,2}):(\d{2})$/.exec(String(entry.time ?? ''));
+      const hour = match ? Math.min(23, Number(match[1])) : 10;
+      const minute = match ? Math.min(59, Number(match[2])) : 0;
+      return { day, time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`, text: String(entry.text).trim().slice(0, 5000) };
+    })
+    .slice(0, count);
 }
 
 /** Spend over the last 30 days, for the settings screen. */

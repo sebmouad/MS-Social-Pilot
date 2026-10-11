@@ -53,6 +53,9 @@ const VALID_BODY: Record<string, unknown> = {
   'labels/[id]': { name: 'Renamed' },
   queue: { action: 'shuffle' },
   'report-templates': { name: 'Monthly', sections: ['analysis'] },
+  'targets/[id]/profile': { brandVoice: 'Warm' },
+  'chat-channels': { kind: 'slack', name: 'x', url: 'https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXXXXXXXXXX', events: ['publishFailure'] },
+  'chat-channels/[id]': { enabled: false },
   'report-schedules': { targetId: 'x', frequency: 'weekly', recipients: ['a@example.test'] },
 };
 
@@ -219,6 +222,12 @@ const CONTRIBUTOR_MUST_NOT: Array<[Method, string]> = [
   // Opening the workspace to people with no account.
   ['GET', 'share-links'],
   ['POST', 'report-templates'],
+  ['PATCH', 'targets/[id]/profile'],
+  ['GET', 'chat-channels'],
+  ['POST', 'chat-channels'],
+  ['PATCH', 'chat-channels/[id]'],
+  ['DELETE', 'chat-channels/[id]'],
+  ['POST', 'chat-channels/[id]/test'],
   ['DELETE', 'report-templates/[id]'],
   ['GET', 'report-schedules'],
   ['POST', 'report-schedules'],

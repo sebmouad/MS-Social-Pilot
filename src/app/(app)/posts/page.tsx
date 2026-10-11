@@ -159,10 +159,25 @@ export default async function PostsPage({
           <h1 className="text-2xl font-bold text-slate-900">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
         </div>
-        <Link href="/compose" className="btn-primary lg:mt-4 lg:w-full">
-          <Icon name="plus" size={18} />
-          {tDash('newPost')}
-        </Link>
+        <div className="flex gap-2 lg:mt-4 lg:flex-col">
+          <Link href="/compose" className="btn-primary lg:w-full">
+            <Icon name="plus" size={18} />
+            {tDash('newPost')}
+          </Link>
+          {/* What is on screen, filters and all, as a spreadsheet. */}
+          <a
+            href={`/api/posts/export?${new URLSearchParams(
+              Object.entries(params).flatMap(([key, value]) =>
+                key === 'page' || value === undefined ? [] : [[key, Array.isArray(value) ? value[0]! : value]],
+              ),
+            ).toString()}`}
+            className="btn-secondary lg:w-full"
+            download
+          >
+            <Icon name="download" size={16} />
+            {t('exportCsv')}
+          </a>
+        </div>
       </header>
 
       <nav className="flex flex-wrap gap-2 lg:card lg:flex-col lg:gap-0.5 lg:p-2" aria-label={t('statusFilter')}>

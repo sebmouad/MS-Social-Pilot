@@ -24,7 +24,7 @@ const CATALOGUES: Record<Locale, unknown> = {
 };
 
 /** Look up a dotted key, interpolating {placeholders}. */
-function translate(locale: Locale, key: string, params: Record<string, string | number> = {}): string {
+export function translate(locale: Locale, key: string, params: Record<string, string | number> = {}): string {
   const catalogue = CATALOGUES[locale] ?? CATALOGUES[Locale.en];
 
   const raw = key.split('.').reduce<unknown>((node, part) => {

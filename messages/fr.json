@@ -237,7 +237,10 @@
   },
   "app": {
     "name": "MS Social Pilot",
-    "tagline": "Planifiez vos publications Facebook et Instagram depuis un seul endroit."
+    "tagline": "Planifiez vos publications Facebook et Instagram depuis un seul endroit.",
+    "shortcutCompose": "Nouvelle publication",
+    "shortcutCalendar": "Calendrier",
+    "shortcutAnalytics": "Statistiques"
   },
   "approvals": {
     "title": "Validations",
@@ -348,7 +351,19 @@
     "feedUpcomingEmpty": "Rien de prévu pour cette Page.",
     "feedRecent": "Déjà sur la Page",
     "feedNoTime": "Pas d’heure",
-    "feedNoPage": "Connectez une Page pour prévisualiser son fil."
+    "feedNoPage": "Connectez une Page pour prévisualiser son fil.",
+    "aiPlan": "Planifier avec l’IA",
+    "aiPlanTitle": "Planifier une semaine avec l’IA",
+    "aiPlanWorking": "Rédaction de la semaine…",
+    "aiPlanGo": "{count, plural, one {Rédiger 1 brouillon} other {Rédiger # brouillons}}",
+    "aiPlanDone": "{count, plural, one {1 brouillon ajouté au calendrier} other {# brouillons ajoutés au calendrier}}",
+    "aiPlanDoneHint": "Chacun est placé à une heure suggérée, en brouillon. Ouvrez-le, ajustez, puis programmez-le.",
+    "aiPlanHint": "Dites de quoi parle la semaine. L’IA rédige des publications variées dans le ton de la Page et les place en brouillon — rien n’est publié.",
+    "aiPlanPage": "Page",
+    "aiPlanBrief": "Cette semaine…",
+    "aiPlanBriefPlaceholder": "Nouveau menu d’automne dès mardi, soupe de potiron et gâteau aux châtaignes, -10 % pour les étudiants mercredi",
+    "aiPlanCount": "Publications",
+    "aiPlanStart": "Premier jour"
   },
   "common": {
     "all": "Tout",
@@ -508,7 +523,11 @@
     "snippetHint": "Enregistre le contenu de la zone de texte, pour toute l’équipe.",
     "snippetFailed": "Le texte n’a pas pu être enregistré.",
     "mediaHint_reel": "Une vidéo verticale, de 3 à 90 secondes. Le 9:16 rend le mieux.",
-    "mediaHint_story": "Une photo ou une vidéo. Le 9:16 remplit l’écran."
+    "mediaHint_story": "Une photo ou une vidéo. Le 9:16 remplit l’écran.",
+    "aiHashtags": "Hashtags",
+    "aiHashtagsNone": "Aucun nouveau hashtag à suggérer pour cette publication.",
+    "aiHashtagsPick": "Choisissez ceux qui conviennent. Ils s’ajoutent à la fin.",
+    "aiHashtagsAdd": "{count, plural, =0 {Ajouter des hashtags} one {Ajouter 1 hashtag} other {Ajouter # hashtags}}"
   },
   "config": {
     "title": "Configuration",
@@ -645,7 +664,22 @@
     "setupCheckFailing": "La configuration est terminée, mais une vérification de l’installation échoue.",
     "continueSetup": "Continuer la configuration",
     "reconnectRequired": "Reconnexion nécessaire.",
-    "noTimeSet": "Aucune heure définie"
+    "noTimeSet": "Aucune heure définie",
+    "gsTitle": "Bien démarrer",
+    "gsNext": "Prochaine étape : {step}",
+    "gsHide": "Masquer « Bien démarrer »",
+    "gs_connect": "Connecter vos Pages Facebook",
+    "gsHint_connect": "Connectez-vous une fois à Facebook : toutes vos Pages arrivent.",
+    "gs_post": "Programmer une première publication",
+    "gsHint_post": "Écrivez une fois, choisissez les Pages et l’heure.",
+    "gs_queue": "Définir vos horaires",
+    "gsHint_queue": "La file remplit ces créneaux : plus besoin de choisir l’heure.",
+    "gs_team": "Inviter votre équipe",
+    "gsHint_team": "Rédacteurs, validateurs, et qui voit quelles Pages.",
+    "gs_client": "Partager avec un client",
+    "gsHint_client": "Un lien de validation, un calendrier ou un rapport par e-mail.",
+    "gs_claude": "Connecter Claude",
+    "gsHint_claude": "Demandez à Claude de planifier, rédiger et analyser via MCP."
   },
   "email": {
     "invitation": {
@@ -708,6 +742,17 @@
       "topPosts": "Meilleures publications",
       "interactions": "{total} interactions",
       "footer": "Envoyé automatiquement par {workspace} avec MS Social Pilot."
+    },
+    "chat": {
+      "test": "✅ MS Social Pilot est connecté. Les alertes de {workspace} arriveront ici.",
+      "publishFailure": "⚠️ {workspace} : une publication vers {target} n’est pas partie. {reason}",
+      "connectionExpired": "🔌 {workspace} : la connexion Facebook « {account} » doit être renouvelée, sinon les publications s’arrêteront.",
+      "approvalRequest": "📝 {workspace} : {author} a soumis une publication à validation.",
+      "approved": "✅ {workspace} : {reviewer} a approuvé une publication.",
+      "rejected": "↩️ {workspace} : {reviewer} a renvoyé une publication pour modifications.",
+      "review_approved": "👍 {workspace} : {name} a approuvé une publication sur « {link} »{comment}",
+      "review_rejected": "✋ {workspace} : {name} demande des modifications sur « {link} »{comment}",
+      "review_comment": "💬 {workspace} : {name} a commenté sur « {link} »{comment}"
     }
   },
   "engagement": {
@@ -885,7 +930,8 @@
     "storyNeedsMedia": "Une Story demande exactement une photo ou une vidéo.",
     "tooManyRequests": "Trop de requêtes. Patientez quelques minutes puis réessayez.",
     "commentRequired": "Écrivez d’abord un commentaire.",
-    "commentsOff": "Les commentaires sont désactivés pour ce lien."
+    "commentsOff": "Les commentaires sont désactivés pour ce lien.",
+    "aiPlanEmpty": "L’IA n’a pas renvoyé de plan exploitable. Réessayez ou précisez la semaine."
   },
   "feeds": {
     "title": "Flux RSS",
@@ -1120,7 +1166,34 @@
     "saved": "Préférences enregistrées.",
     "noEmailProvider": "Aucun fournisseur d’e-mail n’est configuré sur ce serveur : rien ne sera réellement envoyé. Un propriétaire peut ajouter une clé API Resend dans l’écran Configuration.",
     "saveFailed": "Vos préférences de notification n’ont pas pu être enregistrées. Veuillez réessayer.",
-    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez."
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+    "chatTitle": "Slack et Telegram",
+    "chatHint": "Envoyez les alertes utiles à votre équipe dans un canal de discussion, en plus des e-mails.",
+    "chatAdd": "Ajouter un canal",
+    "chatAddAndTest": "Ajouter et envoyer un test",
+    "chatNone": "Aucun canal pour l’instant.",
+    "chatKind": "Service",
+    "chatKind_slack": "Slack",
+    "chatKind_telegram": "Telegram",
+    "chatName": "Nom",
+    "chatSlackUrl": "URL du webhook entrant",
+    "chatSlackHint": "Dans Slack : Applications → Incoming WebHooks → Ajouter à un canal, puis copiez l’URL.",
+    "chatBotToken": "Jeton du bot",
+    "chatChatId": "Identifiant du chat",
+    "chatTelegramHint": "Créez un bot avec @BotFather, ajoutez-le au groupe, puis utilisez l’identifiant du groupe (il commence par -100).",
+    "chatEvents": "Quoi envoyer",
+    "chatEvent_publishFailure": "Une publication a échoué",
+    "chatEvent_connectionExpired": "Facebook à reconnecter",
+    "chatEvent_approvalRequest": "Publication soumise à validation",
+    "chatEvent_approvalDecision": "Publication approuvée ou renvoyée",
+    "chatEvent_reviewDecision": "Réponse d’un client sur un lien",
+    "chatOn": "Actif",
+    "chatTest": "Envoyer un test",
+    "chatRemove": "Retirer",
+    "chatTestSent": "Message de test envoyé. Vérifiez le canal.",
+    "chatTestFailed": "Le test n’est pas arrivé : {error}",
+    "chatLastSent": "Dernier message {when}",
+    "chatNever": "Rien envoyé pour l’instant"
   },
   "pageAnalysis": {
     "analyseNow": "Analyser maintenant",
@@ -1360,7 +1433,8 @@
       "posted": "Premier commentaire publié",
       "pending": "Premier commentaire : publié avec la publication",
       "refused": "Premier commentaire refusé"
-    }
+    },
+    "exportCsv": "Exporter en CSV"
   },
   "queue": {
     "addSlot": "Ajouter un créneau",
@@ -1718,7 +1792,14 @@
     "accessSomeTitle": "Seulement les Pages choisies",
     "accessSomeHint": "Cette personne ne voit et ne publie que sur ces Pages, partout dans l’application.",
     "accessByGroup": "Ajouter un groupe",
-    "accessCount": "{count, plural, one {# Page choisie sur {total}.} other {# Pages choisies sur {total}.}}"
+    "accessCount": "{count, plural, one {# Page choisie sur {total}.} other {# Pages choisies sur {total}.}}",
+    "rolesTitle": "Ce que chaque rôle peut faire",
+    "roleExtra": {
+      "owner": "Voit toutes les Pages. Décisions majeures, configuration du serveur.",
+      "admin": "Voit toutes les Pages. Connecte Facebook, gère l’équipe, les liens clients et les alertes.",
+      "editor": "Peut être limité à certaines Pages. Valide les publications des autres, gère la file.",
+      "contributor": "Peut être limité à certaines Pages. Ses publications attendent un validateur si la validation est active."
+    }
   },
   "dateRange": {
     "preset": {
@@ -1850,7 +1931,20 @@
       "pink": "Rose",
       "teal": "Turquoise",
       "slate": "Gris"
-    }
+    },
+    "profilesTitle": "Ton et liens de chaque Page",
+    "profilesHint": "Comment chaque Page s’exprime quand l’IA écrit pour elle, et les balises UTM de ses liens.",
+    "voiceInherited": "Utilise le ton de l’espace",
+    "ownTags": "{count, plural, one {1 balise propre} other {# balises propres}}",
+    "editProfile": "Ton et liens",
+    "profileTitle": "{page} : ton et liens",
+    "voiceField": "Comment cette Page s’exprime",
+    "voicePlaceholder": "Chaleureux et de quartier, un peu joueur. On tutoie. Phrases courtes, un emoji maximum. On parle du pain frais, de l’équipe et du quartier.",
+    "voiceHint": "Utilisé par l’écriture IA, les hashtags et les plans de semaine de cette Page. Vide : le ton de l’espace s’applique.",
+    "utmTitle": "Balises de liens (UTM)",
+    "utmHint": "Ajoutées aux liens de cette Page à la publication. Champs vides : réglage de l’espace.",
+    "inherits": "Espace : {value}",
+    "notSet": "Non défini"
   },
   "share": {
     "reviewBadge": "À valider",
@@ -1906,5 +2000,42 @@
     "daysBack": "Jours passés",
     "daysAhead": "Jours à venir",
     "allowComments": "Autoriser les commentaires du client"
+  },
+  "apiKeys": {
+    "title": "API et Claude",
+    "subtitle": "Connectez Claude ou vos outils : lisez vos Pages et statistiques, préparez ou programmez des publications.",
+    "keys": "Clés d’API",
+    "newKey": "Nouvelle clé",
+    "none": "Aucune clé",
+    "noneHint": "Créez une clé pour connecter Claude via MCP, ou appeler l’API depuis vos outils.",
+    "scope_read": "Lecture seule",
+    "scope_write": "Lecture et écriture",
+    "scopeHint_read": "Voir Pages, publications et statistiques. Ne peut rien modifier.",
+    "scopeHint_write": "Peut aussi créer des brouillons et programmer. Ne publie jamais sur-le-champ.",
+    "scopeLabel": "Ce que la clé peut faire",
+    "createdOn": "créée {when}",
+    "lastUsed": "utilisée {when}",
+    "neverUsed": "jamais utilisée",
+    "revoked": "Révoquée",
+    "revoke": "Révoquer",
+    "keep": "La garder",
+    "revokeTitle": "Révoquer « {name} » ?",
+    "revokeHint": "Tout ce qui utilise cette clé cesse de fonctionner immédiatement. Action définitive.",
+    "madeTitle": "Votre clé est prête",
+    "madeHint": "Copiez-la maintenant : par sécurité, elle n’est affichée qu’une fois. Qui la détient agit en votre nom dans cet espace.",
+    "keyLabel": "Clé d’API",
+    "nameField": "Nom",
+    "namePlaceholder": "Claude sur mon ordinateur",
+    "create": "Créer la clé",
+    "copy": "Copier",
+    "copied": "Copié",
+    "actsAsYou": "Une clé agit en votre nom, avec votre rôle et vos Pages. Si vos accès changent, les siens aussi.",
+    "mcpTitle": "Utiliser avec Claude (MCP)",
+    "mcpHint": "Demandez à Claude de lister vos Pages, d’analyser leurs résultats, de préparer ou programmer des publications — les règles de validation s’appliquent.",
+    "mcpCode": "Claude Code",
+    "mcpDesktop": "Claude Desktop et autres clients MCP",
+    "mcpTools": "Outils : list_pages, list_posts, create_post, get_page_analytics.",
+    "restTitle": "API REST",
+    "restHint": "JSON sur HTTPS, avec la clé dans l’en-tête Authorization."
   }
 }

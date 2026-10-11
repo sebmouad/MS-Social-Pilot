@@ -1,3 +1,4 @@
+import { sendChat } from '@/lib/chat';
 import { clientIp } from '@/lib/client-ip';
 import { AppError } from '@/lib/errors';
 import { prisma } from '@/lib/prisma';
@@ -44,6 +45,13 @@ export const POST = route(async (request: Request, context: { params: Promise<{ 
       authorName: input.authorName,
     },
     select: { id: true, decision: true, createdAt: true },
+  });
+  await sendChat({
+    workspaceId: link.workspaceId,
+    event: 'reviewDecision',
+    key: `review_${input.decision}`,
+    params: { name: input.authorName, link: link.title, comment: input.comment ? `: “${input.comment.slice(0, 200)}”` : '' },
+    path: '/approvals?view=board',
   });
   return ok({ decision }, 201);
 });

@@ -98,3 +98,20 @@ describe('the comparison period', () => {
     expect(before.to.toISOString()).toBe('2025-10-11T00:00:00.000Z');
   });
 });
+
+describe('AI output, made safe', () => {
+  it('keeps real hashtags once each', async () => {
+    const { parseHashtags } = await import('../src/lib/ai');
+    expect(parseHashtags('#Paris\n#paris #Café_Lumière, and #x\n- #Brunch')).toEqual(['#Paris', '#Café_Lumière', '#Brunch']);
+  });
+
+  it('reads a plan with days in range and real times, even wrapped in prose', async () => {
+    const { parsePlan } = await import('../src/lib/ai');
+    const text = 'Here you go:\n[{"day":0,"time":"9:30","text":"Hi"},{"day":12,"time":"25:99","text":"Late"},{"day":2,"text":""}]';
+    expect(parsePlan(text, 7, 5)).toEqual([
+      { day: 0, time: '09:30', text: 'Hi' },
+      { day: 6, time: '23:59', text: 'Late' },
+    ]);
+    expect(parsePlan('no json here', 7, 5)).toEqual([]);
+  });
+});

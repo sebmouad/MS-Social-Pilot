@@ -1,6 +1,9 @@
 import { getTranslations } from 'next-intl/server';
 
+import { ChatChannelsClient } from '@/components/ChatChannelsClient';
 import { NotificationsClient } from '@/components/NotificationsClient';
+import { canManageSettings } from '@/lib/constants';
+import { formatInZone } from '@/lib/time';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
@@ -18,9 +21,13 @@ export default async function NotificationsSettingsPage() {
   const auth = await requirePage();
   const t = await getTranslations('notifications');
 
-  const setting = await prisma.notificationSetting.findUnique({
-    where: { userId_workspaceId: { userId: auth.user.id, workspaceId: auth.workspace.id } },
-  });
+  const admin = canManageSettings(auth.role);
+  const [setting, channels] = await Promise.all([
+    prisma.notificationSetting.findUnique({
+      where: { userId_workspaceId: { userId: auth.user.id, workspaceId: auth.workspace.id } },
+    }),
+    admin ? prisma.chatChannel.findMany({ where: { workspaceId: auth.workspace.id }, orderBy: { createdAt: 'asc' } }) : Promise.resolve([]),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -39,6 +46,20 @@ export default async function NotificationsSettingsPage() {
           onApprovalDecision: setting?.onApprovalDecision ?? true,
         }}
       />
+
+      {admin && (
+        <ChatChannelsClient
+          channels={channels.map((channel) => ({
+            id: channel.id,
+            kind: channel.kind as 'slack' | 'telegram',
+            name: channel.name,
+            events: channel.events as never,
+            enabled: channel.enabled,
+            lastError: channel.lastError,
+            lastSent: channel.lastSentAt ? formatInZone(channel.lastSentAt, auth.workspace.timezone, 'd MMM, HH:mm') : null,
+          }))}
+        />
+      )}
     </div>
   );
 }

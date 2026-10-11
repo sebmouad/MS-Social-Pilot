@@ -74,6 +74,22 @@ export default async function TeamPage() {
           expiresLabel: formatInZone(invitation.expiresAt, timezone, 'd MMM yyyy'),
         }))}
       />
+
+      {/* Who can do what, in one line each — the question asked before every invite. */}
+      <section className="card p-5" aria-labelledby="roles-title">
+        <h2 id="roles-title" className="mb-3 text-[15px] font-semibold text-slate-900">
+          {t('rolesTitle')}
+        </h2>
+        <dl className="grid gap-3 sm:grid-cols-2">
+          {(['owner', 'admin', 'editor', 'contributor'] as const).map((role) => (
+            <div key={role} className="rounded-lg bg-slate-50 px-3 py-2.5">
+              <dt className="text-sm font-semibold text-slate-900">{t(`roles.${role}`)}</dt>
+              <dd className="text-xs text-slate-600">{t(`roleHints.${role}`)}</dd>
+              <dd className="mt-1 text-[11px] text-slate-500">{t(`roleExtra.${role}`)}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
     </div>
   );
 }

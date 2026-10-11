@@ -152,6 +152,7 @@ export default async function ComposePage({
         {...(editing ? { editing } : {})}
         // `?to=` from a Page's card: start with that Page ticked.
         initialTargetIds={editing ? undefined : requestedTargets(params.to, targets)}
+        {...(editing ? {} : sharedIn(params))}
         targets={targets.map((target) => ({
           id: target.id,
           name: target.name,
@@ -241,4 +242,27 @@ async function loadForEditing(postId: string, auth: Auth): Promise<EditingPost |
       : null,
     publishMode: post.publishMode,
   };
+}
+
+/**
+ * What the phone's share sheet (the installed app's share target) or the
+ * bookmarklet hands over: `title`, `text` and `url`. The link goes in the link
+ * field, so Facebook draws its card; the words go in the post.
+ */
+function sharedIn(params: Record<string, string | string[] | undefined>): { initialMessage?: string; initialLink?: string } {
+  const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)?.trim().slice(0, 5000);
+  const title = one(params.title);
+  let text = one(params.text);
+  let url = one(params.url);
+  // Android puts the link inside `text` more often than in `url`.
+  if (!url && text) {
+    const found = /https?:\/\/\S+/.exec(text);
+    if (found) {
+      url = found[0];
+      text = text.replace(found[0], '').trim();
+    }
+  }
+  const valid = url && /^https?:\/\//.test(url) ? url : undefined;
+  const message = [title && title !== text ? title : null, text].filter(Boolean).join('\n\n');
+  return { ...(message ? { initialMessage: message } : {}), ...(valid ? { initialLink: valid } : {}) };
 }

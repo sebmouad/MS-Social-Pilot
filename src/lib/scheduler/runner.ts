@@ -356,9 +356,10 @@ async function publishClaimed(
       message: post.message,
       link: post.link,
       settings: {
-        utmSource: post.workspace.utmSource,
-        utmMedium: post.workspace.utmMedium,
-        utmCampaignTemplate: post.workspace.utmCampaignTemplate,
+        // A Page's own tags win over the workspace's, one by one.
+        utmSource: target.utmSource ?? post.workspace.utmSource,
+        utmMedium: target.utmMedium ?? post.workspace.utmMedium,
+        utmCampaignTemplate: target.utmCampaign ?? post.workspace.utmCampaignTemplate,
         shortenerEnabled: post.workspace.shortenerEnabled,
       },
       targetName: target.name,

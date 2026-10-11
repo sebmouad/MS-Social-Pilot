@@ -237,7 +237,10 @@
   },
   "app": {
     "name": "MS Social Pilot",
-    "tagline": "Schedule Facebook Page and Instagram posts from one place."
+    "tagline": "Schedule Facebook Page and Instagram posts from one place.",
+    "shortcutCompose": "New post",
+    "shortcutCalendar": "Calendar",
+    "shortcutAnalytics": "Analytics"
   },
   "approvals": {
     "title": "Approvals",
@@ -348,7 +351,19 @@
     "feedUpcomingEmpty": "Nothing planned for this Page yet.",
     "feedRecent": "Already on the Page",
     "feedNoTime": "No time set",
-    "feedNoPage": "Connect a Page to preview its feed."
+    "feedNoPage": "Connect a Page to preview its feed.",
+    "aiPlan": "Plan with AI",
+    "aiPlanTitle": "Plan a week with AI",
+    "aiPlanWorking": "Writing the week…",
+    "aiPlanGo": "{count, plural, one {Write 1 draft} other {Write # drafts}}",
+    "aiPlanDone": "{count, plural, one {1 draft is on your calendar} other {# drafts are on your calendar}}",
+    "aiPlanDoneHint": "Each one sits at a suggested time as a draft. Open it, adjust, and schedule it when it reads right.",
+    "aiPlanHint": "Say what the week is about. AI writes varied posts in the Page’s voice and puts them on the calendar as drafts — nothing is published.",
+    "aiPlanPage": "Page",
+    "aiPlanBrief": "This week…",
+    "aiPlanBriefPlaceholder": "New autumn menu from Tuesday, pumpkin soup and chestnut cake, 10% off for students on Wednesday",
+    "aiPlanCount": "Posts",
+    "aiPlanStart": "First day"
   },
   "common": {
     "all": "All",
@@ -508,7 +523,11 @@
     "snippetHint": "Saves what is in the post box, for the whole team.",
     "snippetFailed": "The text could not be saved.",
     "mediaHint_reel": "One vertical video, 3 to 90 seconds. 9:16 looks best.",
-    "mediaHint_story": "One photo or one video. 9:16 fills the screen."
+    "mediaHint_story": "One photo or one video. 9:16 fills the screen.",
+    "aiHashtags": "Hashtags",
+    "aiHashtagsNone": "No new hashtags to suggest for this post.",
+    "aiHashtagsPick": "Pick the ones that fit. They go at the end of the post.",
+    "aiHashtagsAdd": "{count, plural, =0 {Add hashtags} one {Add 1 hashtag} other {Add # hashtags}}"
   },
   "config": {
     "title": "Configuration",
@@ -645,7 +664,22 @@
     "setupCheckFailing": "Setup is done, but an installation check is failing.",
     "continueSetup": "Continue setup",
     "reconnectRequired": "Reconnect required.",
-    "noTimeSet": "No time set"
+    "noTimeSet": "No time set",
+    "gsTitle": "Getting started",
+    "gsNext": "Next: {step}",
+    "gsHide": "Hide getting started",
+    "gs_connect": "Connect your Facebook Pages",
+    "gsHint_connect": "Sign in with Facebook once; every Page you manage comes in.",
+    "gs_post": "Schedule your first post",
+    "gsHint_post": "Write once, pick the Pages, choose a time.",
+    "gs_queue": "Set your posting times",
+    "gsHint_queue": "The queue fills these slots so you never pick a time again.",
+    "gs_team": "Invite your team",
+    "gsHint_team": "Editors, reviewers, and who sees which Pages.",
+    "gs_client": "Share with a client",
+    "gsHint_client": "A review link, a calendar, or a report by email.",
+    "gs_claude": "Connect Claude",
+    "gsHint_claude": "Ask Claude to plan, draft and analyse through MCP."
   },
   "email": {
     "invitation": {
@@ -708,6 +742,17 @@
       "topPosts": "Best posts",
       "interactions": "{total} interactions",
       "footer": "Sent automatically by {workspace} with MS Social Pilot."
+    },
+    "chat": {
+      "test": "✅ MS Social Pilot is connected. Alerts for {workspace} will arrive here.",
+      "publishFailure": "⚠️ {workspace}: a post to {target} did not go out. {reason}",
+      "connectionExpired": "🔌 {workspace}: the Facebook connection “{account}” needs reconnecting, or posts will stop going out.",
+      "approvalRequest": "📝 {workspace}: {author} sent a post for review.",
+      "approved": "✅ {workspace}: {reviewer} approved a post.",
+      "rejected": "↩️ {workspace}: {reviewer} sent a post back for changes.",
+      "review_approved": "👍 {workspace}: {name} approved a post on “{link}”{comment}",
+      "review_rejected": "✋ {workspace}: {name} asked for changes on “{link}”{comment}",
+      "review_comment": "💬 {workspace}: {name} commented on “{link}”{comment}"
     }
   },
   "engagement": {
@@ -885,7 +930,8 @@
     "storyNeedsMedia": "A Story needs exactly one photo or one video.",
     "tooManyRequests": "Too many requests. Wait a few minutes and try again.",
     "commentRequired": "Write a comment first.",
-    "commentsOff": "Comments are turned off for this link."
+    "commentsOff": "Comments are turned off for this link.",
+    "aiPlanEmpty": "The AI did not come back with a usable plan. Try again, or say a little more about the week."
   },
   "feeds": {
     "title": "RSS feeds",
@@ -1120,7 +1166,34 @@
     "saved": "Notification settings saved.",
     "noEmailProvider": "No email provider is configured on this server, so nothing will actually be sent. An owner can add a Resend API key on the Configuration screen.",
     "saveFailed": "Your notification settings could not be saved. Please try again.",
-    "networkError": "Could not reach the server. Check your connection and try again."
+    "networkError": "Could not reach the server. Check your connection and try again.",
+    "chatTitle": "Slack and Telegram",
+    "chatHint": "Send the alerts your team acts on to a chat channel, beside the emails.",
+    "chatAdd": "Add a channel",
+    "chatAddAndTest": "Add and send a test",
+    "chatNone": "No chat channels yet.",
+    "chatKind": "Service",
+    "chatKind_slack": "Slack",
+    "chatKind_telegram": "Telegram",
+    "chatName": "Name",
+    "chatSlackUrl": "Incoming webhook URL",
+    "chatSlackHint": "In Slack: Apps → Incoming WebHooks → Add to a channel, then copy the URL.",
+    "chatBotToken": "Bot token",
+    "chatChatId": "Chat id",
+    "chatTelegramHint": "Create a bot with @BotFather, add it to your group, then use the group’s id (it starts with -100).",
+    "chatEvents": "What to send",
+    "chatEvent_publishFailure": "A post failed",
+    "chatEvent_connectionExpired": "Facebook needs reconnecting",
+    "chatEvent_approvalRequest": "Post sent for review",
+    "chatEvent_approvalDecision": "Post approved or sent back",
+    "chatEvent_reviewDecision": "Client answered on a link",
+    "chatOn": "On",
+    "chatTest": "Send test",
+    "chatRemove": "Remove",
+    "chatTestSent": "Test message sent. Check the channel.",
+    "chatTestFailed": "The test did not arrive: {error}",
+    "chatLastSent": "Last message {when}",
+    "chatNever": "Nothing sent yet"
   },
   "pageAnalysis": {
     "analyseNow": "Analyse now",
@@ -1360,7 +1433,8 @@
       "posted": "First comment posted",
       "pending": "First comment: posted with the post",
       "refused": "First comment refused"
-    }
+    },
+    "exportCsv": "Export CSV"
   },
   "queue": {
     "addSlot": "Add slot",
@@ -1718,7 +1792,14 @@
     "accessSomeTitle": "Only the Pages I choose",
     "accessSomeHint": "They see and post to these Pages only, everywhere in the app.",
     "accessByGroup": "Add a group",
-    "accessCount": "{count} of {total} Pages chosen."
+    "accessCount": "{count} of {total} Pages chosen.",
+    "rolesTitle": "What each role can do",
+    "roleExtra": {
+      "owner": "Sees every Page. Billing-level decisions, server configuration.",
+      "admin": "Sees every Page. Connects Facebook, manages the team, client links and alerts.",
+      "editor": "Can be limited to some Pages. Approves others’ posts, edits the queue.",
+      "contributor": "Can be limited to some Pages. Their posts wait for an approver when approval is on."
+    }
   },
   "dateRange": {
     "preset": {
@@ -1850,7 +1931,20 @@
       "pink": "Pink",
       "teal": "Teal",
       "slate": "Grey"
-    }
+    },
+    "profilesTitle": "Each Page’s voice and links",
+    "profilesHint": "How each Page sounds when AI writes for it, and the UTM tags on its links.",
+    "voiceInherited": "Uses the workspace voice",
+    "ownTags": "{count, plural, one {1 own link tag} other {# own link tags}}",
+    "editProfile": "Voice & links",
+    "profileTitle": "{page}: voice and links",
+    "voiceField": "How this Page sounds",
+    "voicePlaceholder": "Warm and neighbourly, a little playful. We say “tu”. Short sentences, one emoji at most. We talk about fresh bread, the team and the neighbourhood.",
+    "voiceHint": "Used by AI writing, hashtags and week plans for this Page. Leave empty to use the workspace’s.",
+    "utmTitle": "Link tags (UTM)",
+    "utmHint": "Added to this Page’s links when they go out. Empty fields use the workspace’s setting.",
+    "inherits": "Workspace: {value}",
+    "notSet": "Not set"
   },
   "share": {
     "reviewBadge": "For your review",
@@ -1906,5 +2000,42 @@
     "daysBack": "Days in the past",
     "daysAhead": "Days ahead",
     "allowComments": "Let the client write comments"
+  },
+  "apiKeys": {
+    "title": "API & Claude",
+    "subtitle": "Connect Claude or your own tools: read your Pages and analytics, and draft or schedule posts.",
+    "keys": "API keys",
+    "newKey": "New key",
+    "none": "No keys yet",
+    "noneHint": "Make a key to connect Claude through MCP, or to call the API from your own tools.",
+    "scope_read": "Read only",
+    "scope_write": "Read and write",
+    "scopeHint_read": "See Pages, posts and analytics. Cannot change anything.",
+    "scopeHint_write": "Also create drafts and schedule posts. Never publishes on the spot.",
+    "scopeLabel": "What the key may do",
+    "createdOn": "made {when}",
+    "lastUsed": "last used {when}",
+    "neverUsed": "never used",
+    "revoked": "Revoked",
+    "revoke": "Revoke",
+    "keep": "Keep it",
+    "revokeTitle": "Revoke “{name}”?",
+    "revokeHint": "Anything using this key stops working straight away. This cannot be undone.",
+    "madeTitle": "Your key is ready",
+    "madeHint": "Copy it now: for safety it is shown only once. Anyone with it can act as you in this workspace.",
+    "keyLabel": "API key",
+    "nameField": "Name",
+    "namePlaceholder": "Claude on my laptop",
+    "create": "Create key",
+    "copy": "Copy",
+    "copied": "Copied",
+    "actsAsYou": "A key acts as you, with your role and your Pages. If your access changes, the key’s does too.",
+    "mcpTitle": "Use with Claude (MCP)",
+    "mcpHint": "Ask Claude to list your Pages, read how they are doing, and draft or schedule posts — the workspace’s approval rules still apply.",
+    "mcpCode": "Claude Code",
+    "mcpDesktop": "Claude Desktop and other MCP clients",
+    "mcpTools": "Tools: list_pages, list_posts, create_post, get_page_analytics.",
+    "restTitle": "REST API",
+    "restHint": "JSON over HTTPS, with the key in the Authorization header."
   }
 }

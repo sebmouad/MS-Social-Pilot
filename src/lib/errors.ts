@@ -346,6 +346,13 @@ export const errors = {
       status: 503,
     }),
 
+  aiPlanEmpty: () =>
+    new AppError({
+      key: 'errors.aiPlanEmpty',
+      fallback: 'The AI did not come back with a usable plan. Try again, or say a little more about the week.',
+      status: 502,
+    }),
+
   publishNeedsReview: () =>
     new AppError({
       key: 'errors.publishNeedsReview',

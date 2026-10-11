@@ -23,12 +23,23 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     background_color: '#ffffff',
     // The same blue as the mark, so the splash and the icon agree.
     theme_color: '#1877f2',
+    // "Share → MS Social Pilot" from any app on the phone opens the composer
+    // with the page's link and title filled in.
+    share_target: {
+      action: '/compose',
+      method: 'GET',
+      params: { title: 'title', text: 'text', url: 'url' },
+    },
+    shortcuts: [
+      { name: t('shortcutCompose'), url: '/compose' },
+      { name: t('shortcutCalendar'), url: '/calendar' },
+      { name: t('shortcutAnalytics'), url: '/analytics' },
+    ],
     icons: [
-      {
-        src: '/icon.svg',
-        sizes: 'any',
-        type: 'image/svg+xml',
-      },
+      { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   };
 }

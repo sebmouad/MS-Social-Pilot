@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 
+import { ServiceWorker } from '@/components/ServiceWorker';
 import { env } from '@/lib/env';
 
 import './globals.css';
@@ -16,6 +17,9 @@ export async function generateMetadata(): Promise<Metadata> {
     // servers and a relative URL means nothing to either.
     metadataBase: new URL(env.appUrl),
     manifest: '/manifest.webmanifest',
+    // Saved to an iPhone's home screen: its own icon, opening full screen.
+    appleWebApp: { capable: true, title: 'Social Pilot', statusBarStyle: 'default' },
+    icons: { icon: '/icon.svg', apple: '/apple-touch-icon.png' },
   };
 }
 
@@ -41,6 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
         </NextIntlClientProvider>
+        <ServiceWorker />
       </body>
     </html>
   );

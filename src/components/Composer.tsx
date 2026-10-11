@@ -46,6 +46,9 @@ interface Props {
   editing?: EditingPost;
   /** Destinations ticked to start with: a Page's card opens the composer for it. */
   initialTargetIds?: string[];
+  /** Text and link handed over by the phone's share sheet, or a bookmarklet. */
+  initialMessage?: string;
+  initialLink?: string;
   /** Page groups, for ticking several Pages in one click. */
   groups?: PageGroupView[];
   /** The workspace's labels. */
@@ -94,6 +97,8 @@ export function Composer({
   canPublishDirectly,
   editing,
   initialTargetIds,
+  initialMessage,
+  initialLink,
   groups = [],
   labels = [],
   canEditLabels = false,
@@ -114,8 +119,8 @@ export function Composer({
   const [format, setFormat] = useState<'post' | 'reel' | 'story'>(editing?.format ?? 'post');
   const linkBox = useRef<HTMLInputElement>(null);
 
-  const [message, setMessage] = useState(editing?.message ?? '');
-  const [link, setLink] = useState(editing?.link ?? '');
+  const [message, setMessage] = useState(editing?.message ?? initialMessage ?? '');
+  const [link, setLink] = useState(editing?.link ?? initialLink ?? '');
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [media, setMedia] = useState<PostMedia[]>(editing?.media ?? []);
@@ -578,7 +583,14 @@ export function Composer({
             </p>
           )}
 
-          {aiEnabled && <AiAssist draft={message} onResult={writeMessage} />}
+          {aiEnabled && (
+            <AiAssist
+              draft={message}
+              onResult={writeMessage}
+              targetIds={selected}
+              onHashtags={(tags) => writeMessage(`${message.trimEnd()}\n\n${tags.join(' ')}`)}
+            />
+          )}
 
           {/* Reels and Stories carry no link card: Facebook drops it. */}
           <div className={`mt-5 ${format === 'post' ? '' : 'hidden'}`}>

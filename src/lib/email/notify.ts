@@ -1,6 +1,7 @@
 import { Locale, WorkspaceRole } from '@prisma/client';
 
 import { prisma } from '../prisma';
+import { sendChat } from '../chat';
 import { canApprove } from '../constants';
 import { sendEmail } from './send';
 import {
@@ -106,6 +107,13 @@ export async function notifyPublishFailure(options: {
       });
     }
   }, 'publish failure');
+  await sendChat({
+    workspaceId: options.workspaceId,
+    event: 'publishFailure',
+    key: 'publishFailure',
+    params: { target: options.targetName, reason: options.reason.slice(0, 300) },
+    path: '/posts?status=failed',
+  });
 }
 
 /** A Facebook connection was revoked or expired. */
@@ -136,6 +144,13 @@ export async function notifyConnectionExpired(options: {
       });
     }
   }, 'connection expired');
+  await sendChat({
+    workspaceId: options.workspaceId,
+    event: 'connectionExpired',
+    key: 'connectionExpired',
+    params: { account: options.accountName },
+    path: '/connections',
+  });
 }
 
 /** A token is approaching expiry — sent before posting breaks, not after. */
@@ -203,6 +218,13 @@ export async function notifyApprovalRequest(options: {
       });
     }
   }, 'approval request');
+  await sendChat({
+    workspaceId: options.workspaceId,
+    event: 'approvalRequest',
+    key: 'approvalRequest',
+    params: { author: options.authorName },
+    path: '/approvals',
+  });
 }
 
 /** A submitted post was approved or sent back. Goes to its author only. */
@@ -243,4 +265,11 @@ export async function notifyApprovalDecision(options: {
       ...rendered,
     });
   }, 'approval decision');
+  await sendChat({
+    workspaceId: options.workspaceId,
+    event: 'approvalDecision',
+    key: options.approved ? 'approved' : 'rejected',
+    params: { reviewer: options.reviewerName },
+    path: '/posts',
+  });
 }

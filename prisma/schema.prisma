@@ -97,6 +97,8 @@ enum EmailStatus {
 enum AiGenerationKind {
   generate
   improve
+  hashtags
+  plan
 }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +132,7 @@ model User {
   notificationSettings NotificationSetting[]
   aiGenerations        AiGeneration[]
   settingChanges       AppSetting[]
+  apiTokens            ApiToken[]
 
   @@map("users")
 }
@@ -193,6 +196,8 @@ model Workspace {
   shareLinks           ShareLink[]
   reportTemplates      ReportTemplate[]
   reportSchedules      ReportSchedule[]
+  apiTokens            ApiToken[]
+  chatChannels         ChatChannel[]
   activityLogs         ActivityLog[]
   invitations          Invitation[]
   feedSources          FeedSource[]
@@ -301,6 +306,13 @@ model Target {
   canPublish      Boolean    @default(true)
   publishBlocker  String?
   lastSyncedAt    DateTime?
+
+  /// How this Page sounds, for AI writing; the workspace's voice when empty.
+  brandVoice  String?
+  /// Per-Page link tagging, each overriding the workspace's when set.
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
 
   // Read straight off the Page object: no insights permission, no date range.
   fanCount          Int?
@@ -1228,4 +1240,50 @@ model ReportSchedule {
 
   @@index([nextRunAt])
   @@map("report_schedules")
+}
+
+/// A key for the public API and the MCP endpoint: a person's access, with a
+/// name, shown once and stored only as a hash.
+model ApiToken {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  name        String
+  /// sha256 of the token; the token itself is never stored.
+  tokenHash   String    @unique
+  /// The first characters, so a list can tell keys apart.
+  prefix      String
+  /// `read` or `write` (write includes read).
+  scope       String    @default("read")
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("api_tokens")
+}
+
+/// Where alerts go besides email: a Slack incoming webhook or a Telegram chat.
+model ChatChannel {
+  id          String    @id @default(cuid())
+  workspaceId String
+  /// `slack` or `telegram`.
+  kind        String
+  name        String
+  /// Encrypted JSON: `{ url }` for Slack, `{ botToken, chatId }` for Telegram.
+  secret      String
+  /// Which alerts: publishFailure, approvalRequest, approvalDecision, published, reviewDecision.
+  events      String[]
+  enabled     Boolean   @default(true)
+  lastError   String?
+  lastSentAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("chat_channels")
 }

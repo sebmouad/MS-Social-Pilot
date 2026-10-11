@@ -3,6 +3,8 @@ import { getLocale, getTranslations } from 'next-intl/server';
 
 import { requirePage } from '@/lib/auth';
 import { loadPageFilter } from '@/lib/page-filter';
+import { aiAvailable } from '@/lib/ai';
+import { AiPlanner } from '@/components/AiPlanner';
 import { listLabels } from '@/lib/page-groups';
 import { paletteOf } from '@/lib/palette';
 import { PagesSidebar } from '@/components/PagesSidebar';
@@ -98,7 +100,12 @@ export default async function CalendarPage({
   const safeYear = Number.isFinite(year) ? year : today.getUTCFullYear();
   const safeMonth = Number.isFinite(monthIndex) && monthIndex >= 0 && monthIndex <= 11 ? monthIndex : today.getUTCMonth();
 
-  const [filter, labels] = await Promise.all([loadPageFilter(auth, params), listLabels(auth.workspace.id)]);
+  const [filter, labels, aiSetting] = await Promise.all([
+    loadPageFilter(auth, params),
+    listLabels(auth.workspace.id),
+    prisma.workspace.findUnique({ where: { id: auth.workspace.id }, select: { aiEnabled: true } }),
+  ]);
+  const aiOn = aiAvailable() && Boolean(aiSetting?.aiEnabled);
   const labelParam = Array.isArray(params.label) ? params.label[0] : params.label;
   const activeLabel = labels.find((label) => label.id === labelParam) ?? null;
   const narrowing = {
@@ -418,6 +425,13 @@ export default async function CalendarPage({
             <Icon name="chevronRight" size={18} />
           </Link>
           </>
+          )}
+          {aiOn && (
+            <AiPlanner
+              pages={filter.pages.map((page) => ({ id: page.id, name: page.name, pictureUrl: page.pictureUrl }))}
+              defaultPageId={feedPageId ?? (filter.visible?.length === 1 ? filter.visible[0]! : null)}
+              tomorrow={formatInZone(new Date(today.getTime() + 24 * 60 * 60 * 1000), timezone, 'yyyy-MM-dd')}
+            />
           )}
           <Link href="/compose" className="btn-primary">
             {tDash('newPost')}
