@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { FeedPost } from '@/components/FeedPost';
 import { ShareReview } from '@/components/ShareReview';
 import { StatusBadge } from '@/components/StatusBadge';
-import { feedLinkOf, feedMediaOf } from '@/lib/feed';
+import { feedLinkOf, feedMediaOf, feedMediaOfPicture } from '@/lib/feed';
 import { prisma } from '@/lib/prisma';
 import { openShareLink, sharedPostWhere } from '@/lib/share-links';
 import { screenMetadata } from '@/lib/metadata';
@@ -53,10 +53,67 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
     take: 100,
   });
 
-  const days = new Map<string, typeof posts>();
-  for (const post of posts) {
-    const key = post.scheduledAt ? formatInZone(post.scheduledAt, timezone, 'EEEE d MMMM') : t('noDate');
-    days.set(key, [...(days.get(key) ?? []), post]);
+  // A calendar shows the Page as it is, so what went out from Facebook itself
+  // belongs on it too — not only what was sent from here.
+  const sentFromHere = new Set(posts.flatMap((post) => post.targets.map((row) => row.remotePostId)).filter(Boolean));
+  const found =
+    link.kind === 'calendar'
+      ? await prisma.externalPost.findMany({
+          where: {
+            target: { workspaceId: link.workspaceId },
+            ...(link.pageIds.length ? { targetId: { in: link.pageIds } } : {}),
+            createdTime: { gte: new Date(now.getTime() - link.daysBack * DAY), lte: now },
+          },
+          include: { target: { select: { name: true, pictureUrl: true } } },
+          orderBy: { createdTime: 'asc' },
+          take: 100,
+        })
+      : [];
+
+  interface Item {
+    id: string;
+    at: Date | null;
+    author: { name: string; pictureUrl: string | null };
+    status: string;
+    message: string;
+    media: ReturnType<typeof feedMediaOf>;
+    link: string | null;
+    linkPreview: ReturnType<typeof feedLinkOf>;
+    post?: (typeof posts)[number];
+  }
+  const items: Item[] = [
+    ...posts.map((post) => ({
+      id: post.id,
+      at: post.scheduledAt,
+      author: {
+        name: post.targets.map((row) => row.target.name).join(', '),
+        pictureUrl: post.targets[0]?.target.pictureUrl ?? null,
+      },
+      status: post.status,
+      message: post.message,
+      media: feedMediaOf(post.media),
+      link: post.link,
+      linkPreview: feedLinkOf(post.linkPreview),
+      post,
+    })),
+    ...found
+      .filter((row) => !sentFromHere.has(row.remoteId))
+      .map((row) => ({
+        id: row.id,
+        at: row.createdTime,
+        author: { name: row.target.name, pictureUrl: row.target.pictureUrl },
+        status: 'published',
+        message: row.message ?? '',
+        media: feedMediaOfPicture(row.pictureUrl, row.statusType === 'added_video'),
+        link: null,
+        linkPreview: null,
+      })),
+  ].sort((a, b) => (a.at?.getTime() ?? Infinity) - (b.at?.getTime() ?? Infinity));
+
+  const days = new Map<string, Item[]>();
+  for (const item of items) {
+    const key = item.at ? formatInZone(item.at, timezone, 'EEEE d MMMM') : t('noDate');
+    days.set(key, [...(days.get(key) ?? []), item]);
   }
 
   return (
@@ -80,38 +137,35 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
           <h1 className="text-2xl font-bold text-slate-900">{link.title}</h1>
           {link.description && <p className="mt-1 text-[15px] text-slate-700">{link.description}</p>}
           <p className="mt-1 text-sm text-slate-500">
-            {link.kind === 'review' ? t('reviewHint', { count: posts.length }) : t('calendarHint', { back: link.daysBack, ahead: link.daysAhead })}
+            {link.kind === 'review' ? t('reviewHint', { count: items.length }) : t('calendarHint', { back: link.daysBack, ahead: link.daysAhead })}
           </p>
         </div>
 
-        {posts.length === 0 && <div className="card p-8 text-center text-sm text-slate-600">{t('empty')}</div>}
+        {items.length === 0 && <div className="card p-8 text-center text-sm text-slate-600">{t('empty')}</div>}
 
         {[...days.entries()].map(([day, list]) => (
           <section key={day} aria-label={day} className="space-y-3">
             <h2 className="px-1 text-[15px] font-semibold text-slate-600 first-letter:uppercase">{day}</h2>
-            {list.map((post) => (
-              <div key={post.id} className="space-y-0">
+            {list.map((item) => (
+              <div key={item.id} className="space-y-0">
                 <FeedPost
-                  author={{
-                    name: post.targets.map((row) => row.target.name).join(', '),
-                    pictureUrl: post.targets[0]?.target.pictureUrl ?? null,
-                  }}
-                  meta={post.scheduledAt ? formatInZone(post.scheduledAt, timezone, 'HH:mm') : t('noDate')}
-                  badge={<StatusBadge status={post.status} />}
-                  message={post.message}
+                  author={item.author}
+                  meta={item.at ? formatInZone(item.at, timezone, 'HH:mm') : t('noDate')}
+                  badge={<StatusBadge status={item.status} />}
+                  message={item.message}
                   emptyText="—"
-                  media={feedMediaOf(post.media)}
-                  link={post.link}
-                  linkPreview={feedLinkOf(post.linkPreview)}
+                  media={item.media}
+                  link={item.link}
+                  linkPreview={item.linkPreview}
                   seeMore={tCommon('seeMore')}
                   clamp
                 />
-                {link.kind === 'review' && (
+                {link.kind === 'review' && item.post && (
                   <ShareReview
                     token={token}
-                    postId={post.id}
+                    postId={item.post.id}
                     allowComments={link.allowComments}
-                    history={(post.reviewDecisions ?? []).map((row) => ({
+                    history={(item.post.reviewDecisions ?? []).map((row) => ({
                       id: row.id,
                       decision: row.decision,
                       comment: row.comment,

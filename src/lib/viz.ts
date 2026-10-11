@@ -90,14 +90,17 @@ export function duration(milliseconds: number | null): string {
  * numbers a reader can hold in their head: 0 / 2,000 / 4,000, never
  * 0 / 1,873 / 3,746.
  */
-export function niceTicks(max: number, count = 4): number[] {
+export function niceTicks(max: number, count = 4, integer = false): number[] {
   if (!Number.isFinite(max) || max <= 0) return [0];
 
   const rough = max / count;
   const magnitude = 10 ** Math.floor(Math.log10(rough));
   const normalized = rough / magnitude;
 
-  const step = (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
+  const nice = (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
+  // Counts of posts or people have no halves: 0, 0.5, 1 … labelled as whole
+  // numbers read 0, 1, 1, 2.
+  const step = integer ? Math.max(1, nice) : nice;
 
   // Run past the maximum, not up to it: the last tick is the top of the plot,
   // so stopping below `max` would draw the peak outside the plot area.

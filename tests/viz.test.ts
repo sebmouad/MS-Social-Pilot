@@ -52,6 +52,11 @@ describe('compact', () => {
 });
 
 describe('niceTicks', () => {
+  it('steps by whole numbers for counts, so no label repeats', () => {
+    expect(niceTicks(2, 4, true)).toEqual([0, 1, 2]);
+    expect(niceTicks(2)).toEqual([0, 0.5, 1, 1.5, 2]);
+  });
+
   it('lands on round numbers a reader can hold in their head', () => {
     expect(niceTicks(3_187)).toEqual([0, 1000, 2000, 3000, 4000]);
   });

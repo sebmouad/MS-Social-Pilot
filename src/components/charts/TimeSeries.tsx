@@ -75,16 +75,16 @@ export function TimeSeries({
   // a gap in one series does not shift the others.
   const length = Math.max(...lines.map((line) => line.points.length), 0);
 
-  const max = useMemo(() => {
+  const [max, whole] = useMemo(() => {
     const values = lines.flatMap((line) => line.points.map((point) => point.y));
-    return values.length > 0 ? Math.max(...values) : 0;
+    return [values.length > 0 ? Math.max(...values) : 0, values.every((value) => Number.isInteger(value))] as const;
   }, [lines]);
 
   if (length < 2) {
     return <div className="py-8 text-center text-xs text-slate-500">—</div>;
   }
 
-  const ticks = niceTicks(max);
+  const ticks = niceTicks(max, 4, whole);
   const top = ticks[ticks.length - 1] || 1;
 
   const plotWidth = width - PAD.left - PAD.right;
