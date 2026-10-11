@@ -6,6 +6,7 @@ import { CadenceChart } from './CadenceChart';
 import { TimeHeatmap } from './TimeHeatmap';
 import { ChartFrame } from '@/components/charts/ChartFrame';
 import { StatTile } from '@/components/charts/StatTile';
+import { CompareChart } from './CompareChart';
 import { KpiExplorer } from './KpiExplorer';
 import type { PostingTips } from '@/lib/page-analysis';
 import { ExternalLink } from '@/components/ExternalLink';
@@ -488,6 +489,7 @@ export async function ComparePagesView({
   rangeQuery?: string;
 }) {
   const t = await getTranslations('pageAnalysis');
+  const tTotal = await getTranslations('totalView');
   const locale = appLocale();
   const group = groups.find((entry) => entry.id === groupId) ?? null;
   const allowed = group
@@ -579,6 +581,16 @@ export async function ComparePagesView({
   return (
     <div className="space-y-4">
     {groupChips}
+    {rows.length > 1 && (
+      <CompareChart
+        days={rows[0]!.daily.days}
+        profiles={rows.map((row) => ({
+          id: row.targetId,
+          name: row.name,
+          daily: { interactions: row.daily.interactions, posts: row.daily.posts, reach: row.daily.reach },
+        }))}
+      />
+    )}
     <section className="card overflow-hidden">
       <div className="px-4 pt-4 sm:px-5">
         <h2 className="text-sm font-semibold text-slate-900">{group ? t('compare.groupTitle', { group: group.name }) : t('compare.title')}</h2>
@@ -667,7 +679,13 @@ export async function ComparePagesView({
                     : '—'}
                 </td>
                 <td className="px-3 py-3" />
-                <td className="nums px-3 py-3 text-right">{totals.reach !== null ? compact(totals.reach, locale) : '—'}</td>
+                {/* Reach counts people, who may follow several of these Pages: the sum is a ceiling. */}
+                <td
+                  className="nums px-3 py-3 text-right"
+                  title={tTotal('reachHelp', { count: rows.filter((row) => row.reach !== null).length })}
+                >
+                  {totals.reach !== null ? tTotal('upTo', { value: compact(totals.reach, locale) }) : '—'}
+                </td>
                 <td className="nums px-3 py-3 text-right">{signed(totals.net)}</td>
                 <td />
               </tr>

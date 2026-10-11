@@ -19,6 +19,8 @@ import {
   healthScore,
   compareKpis,
   cadence,
+  dailySeries,
+  type DailySeries,
 } from './page-analysis';
 
 /**
@@ -304,6 +306,8 @@ export interface PageComparisonRow {
   reach: number | null;
   netFollows: number | null;
   health: Health;
+  /** Day by day over the window, for the chart with one line per Page. */
+  daily: Pick<DailySeries, 'days' | 'posts' | 'interactions' | 'reach'>;
 }
 
 /**
@@ -368,6 +372,7 @@ export async function comparePages(options: {
       reach: kpis.find((kpi) => kpi.key === 'reach')?.current ?? null,
       netFollows: netFollows(totals[0]!),
       health: healthScore({ cadence: rhythm, kpis, followers }),
+      daily: dailySeries(current, options.from, options.to, options.timeZone),
     });
   }
 

@@ -154,7 +154,7 @@ export default async function AnalyticsPage({
             range={range}
             path="/analytics"
             keep={{ view, target: selected.id }}
-            compare={view === 'analysis' || view === 'compare' ? compare : undefined}
+            compare={view === 'analysis' || view === 'compare' || view === 'total' ? compare : undefined}
           />
         )}
 

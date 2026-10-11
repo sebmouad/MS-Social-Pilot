@@ -81,3 +81,30 @@ export function topBy<T>(rows: ReadonlyArray<T>, pick: (row: T) => number | null
     .sort((a, b) => (pick(b) ?? 0) - (pick(a) ?? 0))
     .slice(0, limit);
 }
+
+/** One profile's daily values, for a chart with a line per profile. */
+export interface ProfileSeries {
+  id: string;
+  label: string;
+  values: number[];
+}
+
+/**
+ * At most `limit` lines: the profiles with the largest totals, in their given
+ * order, and every other profile added up day by day into one "others" line
+ * (id `others`). More lines than that can't be told apart by colour.
+ */
+export function topSeries(series: ReadonlyArray<ProfileSeries>, limit: number, othersLabel: string): ProfileSeries[] {
+  if (series.length <= limit) return [...series];
+  const total = (entry: ProfileSeries) => entry.values.reduce((sum, value) => sum + value, 0);
+  const kept = new Set(
+    [...series]
+      .sort((a, b) => total(b) - total(a))
+      .slice(0, limit)
+      .map((entry) => entry.id),
+  );
+  const rest = series.filter((entry) => !kept.has(entry.id));
+  const length = Math.max(...rest.map((entry) => entry.values.length));
+  const others = Array.from({ length }, (_, day) => rest.reduce((sum, entry) => sum + (entry.values[day] ?? 0), 0));
+  return [...series.filter((entry) => kept.has(entry.id)), { id: 'others', label: othersLabel, values: others }];
+}

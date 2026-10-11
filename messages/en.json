@@ -2612,5 +2612,20 @@
     "topInteractions": "Most interactions",
     "topGrowth": "Most new followers",
     "seeTable": "See every profile side by side"
+  },
+  "compareChart": {
+    "title": "Day by day, one line per profile",
+    "hint": "Click a name to hide or show its line. This does not change the profiles selected.",
+    "hintTop": "{count, plural, one {The largest profile, the rest added up as Others.} other {The # largest profiles, the rest added up as Others.}} Click a name to hide or show its line.",
+    "metric": "Figure to plot",
+    "legend": "Profiles on the chart",
+    "others": "Others",
+    "allHidden": "Every line is hidden. Click a name above to show it again.",
+    "reachNote": "Reach of each day's posts, per profile. Lines are not added up: the same person can be reached by several profiles.",
+    "metrics": {
+      "interactions": "Interactions",
+      "posts": "Posts",
+      "reach": "Reach"
+    }
   }
 }

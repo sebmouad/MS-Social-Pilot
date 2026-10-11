@@ -2612,5 +2612,20 @@
     "topInteractions": "Le plus d’interactions",
     "topGrowth": "Le plus de nouveaux abonnés",
     "seeTable": "Voir tous les profils côte à côte"
+  },
+  "compareChart": {
+    "title": "Jour par jour, une ligne par profil",
+    "hint": "Cliquez sur un nom pour masquer ou afficher sa ligne. Les profils choisis ne changent pas.",
+    "hintTop": "{count, plural, one {Le plus grand profil, les autres additionnés dans Autres.} other {Les # plus grands profils, les autres additionnés dans Autres.}} Cliquez sur un nom pour masquer ou afficher sa ligne.",
+    "metric": "Chiffre à tracer",
+    "legend": "Profils sur le graphique",
+    "others": "Autres",
+    "allHidden": "Toutes les lignes sont masquées. Cliquez sur un nom ci-dessus pour en réafficher une.",
+    "reachNote": "Portée des publications de chaque jour, par profil. Les lignes ne s’additionnent pas : une même personne peut être touchée par plusieurs profils.",
+    "metrics": {
+      "interactions": "Interactions",
+      "posts": "Publications",
+      "reach": "Portée"
+    }
   }
 }

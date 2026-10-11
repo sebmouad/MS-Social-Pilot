@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ratio, sumByCurrency, sumKnown, topBy, totalProfiles } from '../src/lib/aggregate';
+import { ratio, sumByCurrency, sumKnown, topBy, topSeries, totalProfiles } from '../src/lib/aggregate';
 
 /** NEXT_PHASES §B2: how figures add up across several profiles. */
 
@@ -53,5 +53,19 @@ describe('rankings', () => {
   it('leave unknown figures out', () => {
     const ranked = topBy([{ v: 1 }, { v: null }, { v: 3 }], (row) => row.v, 5);
     expect(ranked.map((row) => row.v)).toEqual([3, 1]);
+  });
+});
+
+describe('topSeries', () => {
+  const line = (id: string, values: number[]) => ({ id, label: id, values });
+
+  it('keeps every line when there are few', () => {
+    expect(topSeries([line('a', [1]), line('b', [2])], 8, 'Others').map((entry) => entry.id)).toEqual(['a', 'b']);
+  });
+
+  it('keeps the largest in their order and adds the rest up day by day', () => {
+    const result = topSeries([line('a', [1, 1]), line('b', [5, 5]), line('c', [2, 0]), line('d', [3, 3])], 2, 'Others');
+    expect(result.map((entry) => entry.id)).toEqual(['b', 'd', 'others']);
+    expect(result[2]).toEqual({ id: 'others', label: 'Others', values: [3, 1] });
   });
 });

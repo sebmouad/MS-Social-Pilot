@@ -236,8 +236,10 @@ Skills: `analytics-dashboard`, `dataviz`, `meta-api-integration`,
 `TotalProfilesView`) is the default with 2+ profiles: summed KPI tiles
 (reach labelled "up to"), rate recomputed, top profiles by interactions and
 growth, link to Compare. Rules live in `src/lib/aggregate.ts`
-(`tests/aggregate.test.ts`). Still to do: legend toggles, top-8 + Others,
-Table totals row, multi-Page post table.
+(`tests/aggregate.test.ts`). Compare has a chart with one line per profile
+(interactions / posts / reach, top 8 + Others, legend hides lines without
+touching the selection; `CompareChart`) and its totals row says reach "up to".
+Still to do: multi-Page post table, CSV of the compare table.
 - **1 profile selected** → today's deep Page view (all sections).
 - **2+ profiles** → **Aggregate** view by default with a segmented switch
   **Total · Compare · Table**:
