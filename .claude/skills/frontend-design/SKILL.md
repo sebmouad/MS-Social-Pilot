@@ -7,13 +7,17 @@ description: Design and build MS Social Pilot screens and components to a polish
 
 Read `docs/ai/DESIGN.md` first (tokens, component classes, UX rules). Then:
 
-1. **Structure from Simplified, look from Facebook.** Find the matching screen in
+1. **Structure from Simplified, look from Facebook.** Start with the checklist
+   in `docs/inspiration/simplified/PATTERNS.md`, then the matching screen in
    `docs/inspiration/simplified/screens/` and `docs/inspiration/simplified/AUDIT.md`.
    Reuse its information architecture; render it with our tokens (`brand-*`,
    `.card`, `.segmented`, pills, `shadow-surface`).
 2. **Navigation is the left sidebar** (`src/components/AppShell.tsx`). A new
    screen gets a sidebar entry in the right section; never a top tab row for a
    module. In-screen view switchers use `.segmented`.
+2b. **Shared profile selection**: every list, calendar, analytics or export
+   screen obeys and shows the one app-wide selection (`profile-selection` skill,
+   `docs/ai/NEXT_PHASES.md` Phase A). Analytics work: `analytics-dashboard` skill.
 3. **Server component first**; a small client component only for interaction.
    No `@/lib/prisma` imports in client code.
 4. **Reuse components**: `Dialog`, `useConfirm()` (never `window.confirm`),

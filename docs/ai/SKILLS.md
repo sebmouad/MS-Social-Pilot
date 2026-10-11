@@ -5,6 +5,8 @@
 | Skill | Use it when |
 |---|---|
 | `frontend-design` | Any UI: new screen, component, redesign, responsive or empty-state work |
+| `profile-selection` | Any screen, query, export or API that lists Pages' data — obey the shared selection |
+| `analytics-dashboard` | Analytics: KPI cards, multi-profile totals/compare, all Meta metrics |
 | `ux-copy-house` | Writing buttons, errors, empty states, confirmations in EN + FR |
 | `run-tests` | Before and after every change |
 | `deploy-production` | Shipping to social.newsgeet.com, or rolling back |

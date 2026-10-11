@@ -1,5 +1,9 @@
 # Roadmap — what is left
 
+**The ordered build plan is [NEXT_PHASES.md](NEXT_PHASES.md)** (Phase A: one
+profile selection everywhere; B: multi-profile analytics with every Meta metric;
+C: publishing views; D: design pass). This file is the full backlog.
+
 Ordered by value. Check `docs/inspiration/simplified/COMPARISON.md` for the
 competitor baseline. Each item: build → unit + browser tests → deploy → verify
 live in the owner's Chrome.

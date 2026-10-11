@@ -104,6 +104,12 @@ post has been made to them yet — needs the owner to connect an account.
 
 ## Open items / next steps
 
+0. **Next session starts with [NEXT_PHASES.md](NEXT_PHASES.md) Phase A** — the
+   owner asked (2026-10-11) for one shared profile selection (single / multiple /
+   group, show or hide) that planned, posted and analytics all obey; analytics
+   across all selected profiles with every Meta metric; and a better design.
+   Nothing of Phase A–D is built yet. Skills: `profile-selection`,
+   `analytics-dashboard`, `frontend-design`.
 1. Meta: wait for step 1; then step 2; then Live.
 2. Owner configures Resend + Anthropic keys; then test emailed reports and AI
    planner live (needs owner OK to send an email).

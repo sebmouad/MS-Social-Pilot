@@ -10,8 +10,8 @@ conventions, commands. Then the file for your task:
 | Task | Read |
 |---|---|
 | What exists, screen by screen | [docs/ai/FEATURES.md](docs/ai/FEATURES.md) |
-| What to build next | [docs/ai/ROADMAP.md](docs/ai/ROADMAP.md) |
-| Any UI work | [docs/ai/DESIGN.md](docs/ai/DESIGN.md) |
+| **What to build next (start here)** | [docs/ai/NEXT_PHASES.md](docs/ai/NEXT_PHASES.md), then [docs/ai/ROADMAP.md](docs/ai/ROADMAP.md) |
+| Any UI work | [docs/ai/DESIGN.md](docs/ai/DESIGN.md) + [docs/inspiration/simplified/PATTERNS.md](docs/inspiration/simplified/PATTERNS.md) |
 | Tests, before and after every change | [docs/ai/TESTING.md](docs/ai/TESTING.md) |
 | Facebook / Instagram / Graph API work | [docs/ai/META_API_NOTES.md](docs/ai/META_API_NOTES.md) |
 | Shipping (server, scripts, rollback) | [docs/ai/RELEASE.md](docs/ai/RELEASE.md) |
@@ -19,7 +19,7 @@ conventions, commands. Then the file for your task:
 | Which skill for which task | [docs/ai/SKILLS.md](docs/ai/SKILLS.md) |
 
 Project skills live in [.claude/skills/](.claude/skills/) — load the one that
-matches the task (frontend design, Meta API, app review, live Facebook tests,
+matches the task (frontend design, profile selection, analytics, Meta API, app review, live Facebook tests,
 translations, migrations, new network connector, release).
 
 ## Rules that are not negotiable
