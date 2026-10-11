@@ -1,7 +1,7 @@
 /**
  * Runs once when a Next.js server starts.
  *
- * Used for one thing: refusing to boot with an environment that would fail the
+ * Used for two things: watching the worker's heartbeat for alerts, and refusing to boot with an environment that would fail the
  * first request. Without this a missing or too-short `SESSION_SECRET` surfaces
  * as a 500 on whichever page somebody opens first, long after the deploy that
  * caused it looked healthy.
@@ -13,7 +13,8 @@ export async function register(): Promise<void> {
   // pulls in, which the edge compiler cannot resolve. After an early return the
   // import would still be bundled, and the build fails.
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    const { checkEnvAtStartup } = await import('./instrumentation-node');
+    const { checkEnvAtStartup, watchWorkerHeartbeat } = await import('./instrumentation-node');
     await checkEnvAtStartup();
+    watchWorkerHeartbeat();
   }
 }

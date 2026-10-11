@@ -20,3 +20,25 @@ export async function checkEnvAtStartup(): Promise<void> {
     throw error;
   }
 }
+
+/**
+ * The one alert the worker cannot raise: that it has stopped. The web server
+ * checks the worker's heartbeat every minute, in production only, and opens
+ * or closes the "worker stopped" incident (src/lib/system-alerts.ts).
+ */
+export function watchWorkerHeartbeat(): void {
+  if (process.env.NEXT_PHASE === 'phase-production-build' || process.env.NODE_ENV !== 'production') return;
+  const timer = setInterval(() => {
+    void (async () => {
+      try {
+        const { ensureSettings } = await import('./lib/settings');
+        const { applyChecks, checkWorker } = await import('./lib/system-alerts');
+        await ensureSettings();
+        await applyChecks([await checkWorker()]);
+      } catch (error) {
+        console.error('[alerts] heartbeat check failed', error);
+      }
+    })();
+  }, 60_000);
+  timer.unref();
+}

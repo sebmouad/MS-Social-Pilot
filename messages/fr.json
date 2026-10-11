@@ -2215,7 +2215,8 @@
       "activity": "Activité root",
       "danger": "Zone sensible",
       "back": "Retour à l’application",
-      "backups": "Sauvegardes"
+      "backups": "Sauvegardes",
+      "alerts": "Alertes"
     },
     "overview": {
       "title": "Vue d’ensemble de l’installation",
@@ -2368,6 +2369,22 @@
       "setup2": "Créez le stockage avec votre propre compte (Backblaze B2, S3, Google Drive…) : rclone config",
       "setup3": "Créez une clé de chiffrement sur votre ordinateur (age-keygen), gardez la clé privée en lieu sûr, et écrivez la clé publique, le stockage et DATABASE_URL dans /etc/ms-social-pilot/offsite.env",
       "setup4": "Lancez scripts/server/install-offsite.sh. Une copie est faite chaque nuit et une restauration testée chaque mois ; les résultats s’affichent ici."
+    },
+    "alerts": {
+      "title": "Alertes",
+      "subtitle": "Root est prévenu quand quelque chose ne fonctionne plus sur l’installation, une fois au début et une fois quand c’est réparé.",
+      "openNow": "{count, plural, =0 {Rien de cassé pour le moment} one {# problème en cours} other {# problèmes en cours}}",
+      "allClear": "Tout ce qui est vérifié fonctionne.",
+      "since": "Depuis {when}",
+      "whereTitle": "Où vont les alertes",
+      "whereHint": "Par e-mail à root (ou à l’adresse définie dans Configuration → Alertes), et dans une discussion Telegram si elle est configurée.",
+      "whereLink": "Modifier dans Configuration",
+      "test": "Envoyer une alerte de test",
+      "sending": "Envoi…",
+      "testSent": "Alerte de test envoyée. Vérifiez la boîte de réception (et la discussion Telegram).",
+      "testFailed": "L’alerte de test n’a pas pu être envoyée. Vérifiez les réglages e-mail.",
+      "testHint": "Vérifiez que les alertes vous parviennent avant qu’un problème survienne.",
+      "history": "Réparé récemment"
     }
   },
   "twoStep": {
@@ -2434,5 +2451,39 @@
     "turnedOff": "La connexion en deux étapes est désactivée.",
     "password": "Mot de passe",
     "cancel": "Annuler"
+  },
+  "alerts": {
+    "resolvedPrefix": "Réparé : ",
+    "resolvedBody": "Cela fonctionne de nouveau. Rien de plus à faire.",
+    "testTitle": "Alerte de test",
+    "testBody": "Les alertes de cette installation vous parviennent ici.",
+    "worker_down": {
+      "title": "Le processus d’arrière-plan s’est arrêté",
+      "body": "Aucune publication, synchronisation ni e-mail depuis {minutes} minutes. Redémarrez le processus sur le serveur."
+    },
+    "publish_failures": {
+      "title": "Des publications échouent",
+      "body": "Publications échouées dans la dernière heure : {count}. Ouvrez Publications → Échouées pour voir pourquoi."
+    },
+    "accounts_disconnected": {
+      "title": "Des profils sont déconnectés",
+      "body": "Comptes connectés à reconnecter : {count}. Leurs publications ne partiront pas tant que quelqu’un ne les reconnecte pas."
+    },
+    "accounts_expiring": {
+      "title": "L’accès à des profils expire bientôt",
+      "body": "Comptes dont l’accès expire sous 7 jours : {count}. Reconnectez-les dans Connexions."
+    },
+    "disk_full": {
+      "title": "Le disque du serveur est presque plein",
+      "body": "Utilisation du disque : {percent} %. Libérez de la place avant que les envois et sauvegardes échouent."
+    },
+    "backup_failed": {
+      "title": "Une sauvegarde a échoué",
+      "body": "Dernier problème de sauvegarde : {detail}. Voir Root → Sauvegardes."
+    },
+    "meta_usage": {
+      "title": "La limite d’appels Meta est proche",
+      "body": "Cette application a utilisé {percent} % de son quota d’appels Facebook. La synchronisation est suspendue jusqu’à ce qu’il baisse."
+    }
   }
 }

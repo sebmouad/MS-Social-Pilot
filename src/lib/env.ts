@@ -243,6 +243,21 @@ export const env = {
   get aiRateLimitPerHour(): number {
     return settingNumber('ai.rateLimitPerHour');
   },
+  get alertsEmail(): string {
+    return settingString('alerts.email');
+  },
+  get alertsTelegramBotToken(): string | null {
+    return settingString('alerts.telegramBotToken') || null;
+  },
+  get alertsTelegramChatId(): string {
+    return settingString('alerts.telegramChatId');
+  },
+  get alertsPublishFailures(): number {
+    return settingNumber('alerts.publishFailures');
+  },
+  get alertsDiskPercent(): number {
+    return settingNumber('alerts.diskPercent');
+  },
   /** Who must use two-step sign-in: admins (default), everyone, or off. */
   get twoStepPolicy(): string {
     return settingString('security.twoStep');

@@ -1,3 +1,4 @@
+import { runWorkerAlertChecks } from '../system-alerts';
 import { prisma } from '../prisma';
 import { backgroundBudget } from '../facebook/budget';
 import { postDueFirstComments, postFirstComment } from '../first-comment';
@@ -40,7 +41,8 @@ export type JobName =
   | 'ads'
   | 'housekeeping'
   | 'tokens'
-  | 'reports';
+  | 'reports'
+  | 'alerts';
 
 export interface JobContext {
   now: Date;
@@ -582,6 +584,15 @@ export function jobDefinitions(): JobDefinition[] {
       name: 'tokens',
       intervalMs: env.tokenExpiryCheckHours * 60 * 60 * 1000,
       run: runTokenExpiryCheck,
+    },
+    {
+      // Root's alerts: database reads and a disk check, no Graph calls.
+      name: 'alerts',
+      intervalMs: 5 * 60 * 1000,
+      run: async ({ now }) => {
+        const { opened, resolved } = await runWorkerAlertChecks(now.getTime());
+        return opened.length + resolved.length > 0 ? `alerts opened=${opened.join(',')} resolved=${resolved.join(',')}` : null;
+      },
     },
     {
       // Email only: no Graph calls, so it runs outside the budget.

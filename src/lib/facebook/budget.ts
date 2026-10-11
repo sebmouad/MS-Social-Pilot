@@ -40,6 +40,11 @@ export function noteThrottled(now: number = Date.now()): void {
 
 export type BudgetVerdict = { ok: true } | { ok: false; reason: string; retryInMs: number };
 
+/** The newest reading of the app's call allowance used (%), if one is recent. */
+export function currentAppUsage(now: number = Date.now()): number | null {
+  return usage && now - usage.at < HOLD_MS ? usage.percent : null;
+}
+
 /** Whether a background sync may spend calls now. */
 export function backgroundBudget(now: number = Date.now()): BudgetVerdict {
   if (throttledAt !== null && now - throttledAt < THROTTLE_COOLDOWN_MS) {

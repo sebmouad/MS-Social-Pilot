@@ -64,12 +64,17 @@ async function deliver(kind: string, secret: string, text: string): Promise<void
     if (!response.ok) throw new Error(`Slack answered ${response.status}.`);
     return;
   }
-  if (!config.botToken || !TELEGRAM_TOKEN.test(config.botToken)) throw new Error('The Telegram bot token is not valid any more.');
-  const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+  await sendTelegram(config.botToken ?? '', config.chatId ?? '', text);
+}
+
+/** One message to one Telegram chat. Throws with Telegram's own reason. */
+export async function sendTelegram(botToken: string, chatId: string, text: string): Promise<void> {
+  if (!TELEGRAM_TOKEN.test(botToken)) throw new Error('The Telegram bot token is not valid any more.');
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: config.chatId, text, disable_web_page_preview: true }),
-    signal,
+    body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
+    signal: AbortSignal.timeout(8000),
     redirect: 'error',
   });
   if (!response.ok) {

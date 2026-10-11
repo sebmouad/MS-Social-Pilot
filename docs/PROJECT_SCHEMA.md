@@ -375,6 +375,11 @@ OPENAI_API_KEY=
 GEMINI_API_KEY=
 AI_MODEL=claude-sonnet-5
 AI_RATE_LIMIT_PER_HOUR=100
+ALERTS_EMAIL=                    # blank = root's address
+ALERTS_TELEGRAM_BOT_TOKEN=
+ALERTS_TELEGRAM_CHAT_ID=
+ALERTS_PUBLISH_FAILURES=5        # per hour, all workspaces
+ALERTS_DISK_PERCENT=85
 SECURITY_TWO_STEP=admins         # admins | everyone | off
 AI_MONTHLY_BUDGET_USD=0          # whole installation; 0 = no budget
 AI_PRICE_OVERRIDES=              # e.g. my-model=2/10 (USD per 1M tokens in/out)

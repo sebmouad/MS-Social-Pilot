@@ -31,6 +31,7 @@ export type SettingGroup =
   | 'analytics'
   | 'ai'
   | 'email'
+  | 'alerts'
   | 'links'
   | 'media'
   | 'retention';
@@ -694,6 +695,56 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     pattern: { regex: PRICE_OVERRIDE_PATTERN, message: 'Write each price as model=input/output, e.g. my-model=2/10.' },
   },
 
+  // --- Alerts ----------------------------------------------------------------
+  {
+    key: 'alerts.email',
+    group: 'alerts',
+    type: 'string',
+    label: 'Alert email address',
+    description: 'Who is told when the worker stops, publishing fails, a profile disconnects, the disk fills, a backup fails or Meta’s call limit is near. Blank sends to root’s own address.',
+    default: '',
+    env: 'ALERTS_EMAIL',
+  },
+  {
+    key: 'alerts.telegramBotToken',
+    group: 'alerts',
+    type: 'secret',
+    label: 'Telegram bot token',
+    description: 'Optional, with the chat id below: the same alerts in a Telegram chat. Kept encrypted.',
+    default: '',
+    env: 'ALERTS_TELEGRAM_BOT_TOKEN',
+  },
+  {
+    key: 'alerts.telegramChatId',
+    group: 'alerts',
+    type: 'string',
+    label: 'Telegram chat id',
+    description: 'The chat the bot writes to (a number; negative for a group).',
+    default: '',
+    env: 'ALERTS_TELEGRAM_CHAT_ID',
+  },
+  {
+    key: 'alerts.publishFailures',
+    group: 'alerts',
+    type: 'number',
+    label: 'Failed publications per hour',
+    description: 'Alert when at least this many publications fail within an hour, across every workspace.',
+    default: 5,
+    env: 'ALERTS_PUBLISH_FAILURES',
+    min: 1,
+    max: 1000,
+  },
+  {
+    key: 'alerts.diskPercent',
+    group: 'alerts',
+    type: 'number',
+    label: 'Disk use (%)',
+    description: 'Alert when the server’s disk is fuller than this.',
+    default: 85,
+    env: 'ALERTS_DISK_PERCENT',
+    min: 50,
+    max: 99,
+  },
   // --- Email -----------------------------------------------------------------
   {
     key: 'email.provider',
@@ -892,6 +943,7 @@ export const GROUP_LABELS: Record<SettingGroup, string> = {
   analytics: 'Analytics',
   ai: 'AI captions',
   email: 'Email',
+  alerts: 'Alerts when something breaks',
   links: 'Link shortener',
   media: 'Media uploads',
   retention: 'Data retention',
@@ -907,6 +959,7 @@ export const GROUP_ORDER: SettingGroup[] = [
   'analytics',
   'ai',
   'email',
+  'alerts',
   'links',
   'media',
   'retention',

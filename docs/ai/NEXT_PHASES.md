@@ -391,6 +391,10 @@ most time), the rest after Phase D2. S/M/L = effort.
   > 85 %, backup or restore test failed, Meta usage near the limit. Channels:
   email (Phase 0.1) and Telegram (chat channel code exists). One alert per
   incident, a "resolved" message after; settings in the root section.
+  **Done 2026-10-11:** `src/lib/system-alerts.ts` (incidents in `SystemAlert`),
+  worker job `alerts` every 5 min, worker-heartbeat watch in the web server
+  (`instrumentation-node.ts`, production only), settings group Alerts, Root →
+  Alerts with open incidents, history and a test button.
 - **G4. Active sessions (S)** — list of a user's sessions (device, browser,
   IP/country, last seen) with "Sign out" and "Sign out everywhere else"; email
   on sign-in from a new device; root sees all users' sessions.

@@ -2215,7 +2215,8 @@
       "activity": "Root activity",
       "danger": "Danger zone",
       "back": "Back to the app",
-      "backups": "Backups"
+      "backups": "Backups",
+      "alerts": "Alerts"
     },
     "overview": {
       "title": "Installation overview",
@@ -2368,6 +2369,22 @@
       "setup2": "Create the storage remote with your own account (Backblaze B2, S3, Google Drive…): rclone config",
       "setup3": "Create an encryption key on your computer (age-keygen), keep the private key safe, and write the public key, the remote and DATABASE_URL to /etc/ms-social-pilot/offsite.env",
       "setup4": "Run scripts/server/install-offsite.sh. Copies are made every night and a restore is tested every month; results appear here."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "subtitle": "Root is told when something on the installation breaks, once when it starts and once when it is fixed.",
+      "openNow": "{count, plural, =0 {Nothing broken right now} one {# problem now} other {# problems now}}",
+      "allClear": "Everything checked is working.",
+      "since": "Since {when}",
+      "whereTitle": "Where alerts go",
+      "whereHint": "By email to root (or the address set in Configuration → Alerts), and to a Telegram chat if one is set.",
+      "whereLink": "Change in Configuration",
+      "test": "Send a test alert",
+      "sending": "Sending…",
+      "testSent": "Test alert sent. Check the inbox (and the Telegram chat).",
+      "testFailed": "The test alert couldn't be sent. Check the email settings.",
+      "testHint": "Check that alerts reach you before something breaks.",
+      "history": "Recently fixed"
     }
   },
   "twoStep": {
@@ -2434,5 +2451,39 @@
     "turnedOff": "Two-step sign-in is off.",
     "password": "Password",
     "cancel": "Cancel"
+  },
+  "alerts": {
+    "resolvedPrefix": "Fixed: ",
+    "resolvedBody": "This is working again. Nothing more to do.",
+    "testTitle": "Test alert",
+    "testBody": "Alerts from this installation reach you here.",
+    "worker_down": {
+      "title": "The background worker has stopped",
+      "body": "No publishing, syncing or emails for {minutes} minutes. Restart the worker on the server."
+    },
+    "publish_failures": {
+      "title": "Publications are failing",
+      "body": "Failed publications in the last hour: {count}. Open Posts → Failed to see why."
+    },
+    "accounts_disconnected": {
+      "title": "Profiles are disconnected",
+      "body": "Connected accounts that need reconnecting: {count}. Their posts can't go out until someone reconnects them."
+    },
+    "accounts_expiring": {
+      "title": "Access to profiles expires soon",
+      "body": "Accounts whose access expires within 7 days: {count}. Reconnect them in Connections."
+    },
+    "disk_full": {
+      "title": "The server's disk is nearly full",
+      "body": "Disk use: {percent}%. Free space before uploads and backups fail."
+    },
+    "backup_failed": {
+      "title": "A backup failed",
+      "body": "Last backup problem: {detail}. See Root → Backups."
+    },
+    "meta_usage": {
+      "title": "Meta's call limit is close",
+      "body": "This app has used {percent}% of its Facebook call allowance. Syncing pauses until it drops."
+    }
   }
 }
