@@ -38,6 +38,7 @@ and the three WordPress sites answer 200.
 | Health | `curl http://127.0.0.1:3100/api/health` on the server, or https://social.newsgeet.com/api/health → `{"status":"ok","worker":{"status":"ok",...}}` |
 | Logs | `journalctl -u social-pilot -n 100`, `journalctl -u social-pilot-worker -n 100` (worker logs every publish: `[publish] Published post … url: …`) |
 | Server clock | Europe/Paris in logs (CEST); the app works in UTC/workspace time zones |
+| Hardening (2026-10-09 audit) | Applied once by `scripts/server/hardening-20261009.sh` (backups in `/root/audit-fix-20261009`). **Firewall (nftables): ports 80/443 accept only Cloudflare IP ranges** — every site must stay proxied through Cloudflare, and direct-to-origin requests time out; port 25 closed, Postfix loopback-only; SSH (22) open. OpenLiteSpeed trusts Cloudflare's real-IP header. phpMyAdmin limited to Moroccan IPs. WordPress: `DISALLOW_FILE_EDIT`, xmlrpc blocked. If Cloudflare publishes new ranges, update `CLOUDFLARE_V4/V6` in `/etc/nftables.conf`. Don't re-run the script. |
 
 ## What deploy.sh does (scripts/deploy/)
 

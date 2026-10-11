@@ -54,9 +54,10 @@ Full list: `git log --oneline`. Feature inventory: [FEATURES.md](FEATURES.md).
   2026-10-10, 8 permissions — the Pages/insights/business/ads ones described in
   `docs/meta-review/step1-submission.md` (that file also has Inbox and Instagram
   sections; the owner moved those to step 2). Check the exact list with the
-  DevTools MCP: `devtools_app_review status|privileges` for app 699780715171676. Screencasts (207 MB, mp4) are in the
-  build session's scratch folder `app-review/` — **not in the repo**; keep a copy
-  if you need to resubmit.
+  DevTools MCP: `devtools_app_review status|privileges` for app 699780715171676. Screencasts are attached to
+  the GitHub release `meta-review-screencasts-2026-10-10` (not in git):
+  `submitted-*.mp4` are the files uploaded to Meta, `full-*.mp4` the original
+  recordings. Download: `gh release download meta-review-screencasts-2026-10-10 -R sebmouad/MS-Social-Pilot -p 'submitted-*'`.
   Note: the step-1 reviewer instructions say "plug icon, top right" and
   "Schedule → Compose"; since the sidebar these are "Connections" and "New post"
   in the left sidebar.
