@@ -92,6 +92,9 @@ post has been made to them yet — needs the owner to connect an account.
 
 ## Real data facts (useful for checks)
 
+*The owner's own accounts, used only as live-test data — not product
+assumptions. The product stays generic (README.md).*
+
 - Facebook profiles connected: two "Mouad Sebhaoui" users; 12 Pages
   (Cuisine Pleine d'Envie ~3.6k followers, Cuisine Qui Réunit, For Lady's ~6.3k,
   La Cuisine Décontractée/Ensoleillée/Tranquille, Les Recettes Complices, Nos
@@ -106,7 +109,9 @@ post has been made to them yet — needs the owner to connect an account.
 
 0. **Next session starts with [NEXT_PHASES.md](NEXT_PHASES.md) Phase 0** (Gmail
    SMTP email; Anthropic + OpenAI + Gemini with auto-fetched models and costs),
-   **then G1–G3 (2-step sign-in, off-site backups, alerts), then Phase A** — the
+   **then G1–G3 (2-step sign-in, off-site backups, alerts), then Phase A**.
+   The app will be **sold as a service**: keep everything generic (CLAUDE.md
+   rule 9) and see Phase S (legal pages still name Morocco — S1/S2) — the
    owner asked (2026-10-11) for one shared profile selection (single / multiple /
    group, show or hide) that planned, posted and analytics all obey; analytics
    across all selected profiles with every Meta metric; and a better design.

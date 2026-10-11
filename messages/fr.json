@@ -1971,7 +1971,7 @@
     "newGroupTitle": "Nouveau groupe",
     "createGroup": "Créer le groupe",
     "groupName": "Nom",
-    "groupNamePlaceholder": "ex. Restaurants, Client A, Maroc",
+    "groupNamePlaceholder": "ex. Client A, Europe, Restaurants",
     "pagesInGroup": "Pages du groupe",
     "selectedOf": "{selected} sur {total}",
     "searchPages": "Rechercher une Page",

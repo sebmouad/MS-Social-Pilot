@@ -2,9 +2,12 @@
 
 ## Objective
 
-A self-hosted **SocialPilot / Simplified / Metricool-class** tool for an agency
-running many Facebook Pages (the owner runs ~12 French-language recipe and beauty
-Pages). Final goal set by the owner: **every feature competitors have, with
+A **SocialPilot / Simplified / Metricool-class** social media tool, to be
+**hosted and sold as a service** once complete. It is **generic**: any niche,
+any country, any language — users define their own audience, categories,
+calendars and content. Never build anything niche- or country-specific, and
+never use the owner's own Pages or sites as product examples (they are only the
+live-test data, see STATUS.md). Final goal set by the owner: **every feature competitors have, with
 elegant design, Facebook-like visuals and perfect UX** — verified in a real
 browser with real data.
 

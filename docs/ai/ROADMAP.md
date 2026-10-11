@@ -7,7 +7,7 @@ theme, Sheets, cloud media, competitor tracking, referrals). This file is the
 full backlog. Phase G (18 owner-approved additions: security, WordPress
 auto-share, spam guard, moderation, translation, more UI languages, ops) is in
 NEXT_PHASES, then Phase H (20 more: target audience per Page, content mix,
-cultural calendars, recipe posts,
+cultural calendars, structured-data posts,
 undo send, webhooks, calendar feed, goals, agency overview, …). Items the owner decided out on 2026-10-11 are listed at the end of
 NEXT_PHASES Phase D2 — remove them from consideration.
 

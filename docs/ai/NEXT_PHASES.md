@@ -307,6 +307,12 @@ out" below); don't propose it again unless the owner asks.
   Ask the owner for the reward rules before building; no payments handled by
   the app.
 
+### Open decision — selling as a service
+The owner will **host and sell the app as a service** (2026-10-11). That needs
+items marked out above: **billing / plans / usage limits** and probably
+**custom domain** (white-label). Ask the owner before building them; see
+Phase S.
+
 ### Decided out (owner, 2026-10-11)
 AI agent with schedules, AI image/video/voice hub, workspace brand book, agents
 catalogue, link-in-bio, design editor, Facebook coloured text backgrounds,
@@ -342,12 +348,13 @@ most time), the rest after Phase D2. S/M/L = effort.
   on sign-in from a new device; root sees all users' sessions.
 
 ### Facebook growth and safety
-- **G5. WordPress auto-share (M)** — per site: feed URL or WordPress REST API
+- **G5. Website auto-share (M)** — users add their own sites. Per site: RSS/Atom
+  feed or WordPress REST API
   (`/wp-json/wp/v2/posts?_embed`), target Pages, caption template
   (`{title}`, `{excerpt}`, `{link}`, hashtags), featured image, spread rule
   (e.g. one Page every 20 min, Page-specific best times), UTM per Page; new
   articles become scheduled posts (or drafts for review). Builds on the existing
-  RSS feature. Sites: recettes.newsgeet.com, desomemes.com, goltaf.com.
+  RSS feature. Works for any site and niche.
 - **G6. Spam-risk guard (M)** — before scheduling, detect the same link or
   near-identical text going to many Pages within a short window; warn with the
   count and suggest **auto-stagger** (spread over N hours) and **AI caption
@@ -422,25 +429,26 @@ setup from Phase 0.2 (marked AI).
 
 ### Planning and content
 - **H1. Content mix planner (M)** — per Page or group, a weekly mix by category
-  (e.g. 4 recipes · 1 tip · 1 question); the queue fills slots to match from
+  (categories the user creates, e.g. 4 × "Product" · 1 × "Tip" · 1 ×
+  "Question"); the queue fills slots to match from
   drafts, evergreen and WordPress items, and warns when a category runs dry.
   Categories = post labels (exist).
 - **H2. Cultural calendar and seasonal modes (S)** — from the audience (H0):
-  public holidays of each chosen country (e.g. France, United States, Spain —
-  from a holidays dataset/API, not hand-typed) and the cultural calendars the
-  user ticked (e.g. Christmas season, Thanksgiving, Black Friday, Ramadan,
-  Lunar New Year, back-to-school) shown on the calendar with "Make a post"
-  (awareness days exist — add these sets). **Seasonal posting modes** the user
-  can switch on per Page, e.g. Ramadan mode: slots shift relative to daily
-  iftar time for a city the user picks; holiday mode: fewer posts or different
-  times on public holidays. Nothing on by default.
-- **H3. Recipe posts from WordPress (M)** — read recipe structured data
-  (JSON-LD `Recipe`: ingredients, times, steps, image; WP Recipe Maker / Tasty
-  / Yoast schema) from the article; templates: ingredients list post, step-by-
-  step carousel (one image per step when available), "ready in N min" teaser;
-  extends G5.
-- **H4. Post templates by category (S)** — saved structures (recipe, tip, poll,
-  promo) with placeholders, default hashtags and first comment; pick in Compose.
+  public holidays of each country the user chose (from a worldwide holidays
+  dataset/API covering every country, not hand-typed) and any cultural or
+  commercial calendars the user ticks from a worldwide list, plus **custom
+  dates the user adds** (launches, sales, events), shown on the calendar with
+  "Make a post" (awareness days exist — extend to all countries).
+  **Seasonal posting modes** defined by the user per Page: a date range plus a
+  rule (shift slots, fewer/more posts, different times, pause). Nothing on by
+  default; no country or religion favoured.
+- **H3. Posts from structured page data (M)** — read schema.org JSON-LD from
+  the user's linked pages, whatever the niche (`Article`, `Product` with price
+  and offers, `Event` with date/place, `Recipe`, `JobPosting`, `Course`,
+  `LocalBusiness`, …) and offer matching templates: key facts post, carousel
+  from images/steps, countdown for events, price/offer post; extends G5.
+- **H4. Post templates by category (S)** — saved structures the user creates
+  (e.g. tip, poll, promo, announcement) with placeholders, default hashtags and first comment; pick in Compose.
 - **H5. AI alt text and subtitles (M, AI)** — alt text suggested for every photo
   (editable, sent as Facebook alt text — already supported); Reel/video
   transcription to burned-in or SRT captions (speech-to-text provider; OpenAI
@@ -498,6 +506,39 @@ setup from Phase 0.2 (marked AI).
   permission (`pages_manage_metadata` or Page settings fields) and add it behind
   a switch like the other optional scopes; preview the change per Page; log
   and undo.
+
+## Phase S — Ready to sell as a service (owner, 2026-10-11)
+
+The app will be hosted and sold to other users when done. Everything must be
+generic (CLAUDE.md rule 9). Items:
+- **S1. Generic-content sweep** — remove every niche/country leftover from code,
+  copy, defaults and demo data. Known today: Terms and Privacy pages
+  (`src/app/terms/page.tsx`, `src/app/privacy-policy/page.tsx`) name Morocco
+  and Moroccan law and the newsgeet.com URL; code comments using Casablanca as
+  the example time zone (`report-schedules.ts`, `date-range.ts`); demo seed
+  (`prisma/demo.ts`) and test fixtures using recipe/bakery text and Casablanca
+  (fine as test data, but prefer neutral). Add a test that greps `src/` and
+  `messages/` for a blocklist of owner-specific names.
+- **S2. Operator details set by root** — in the root section: company/operator
+  name, country, address, contact email, governing law, data-protection
+  authority, product name and logo, app URL. Terms, Privacy, Data deletion and
+  emails read these; no hard-coded legal text naming a country. The legal
+  wording itself is the owner's responsibility (suggest they have it reviewed).
+- **S3. Self-service sign-up** — open registration (root switch exists), email
+  verification, onboarding wizard that asks the user's niche-free basics
+  (workspace name, time zone, languages, first Pages), trial period.
+- **S4. Plans and billing (open decision — ask the owner)** — plans with limits
+  (Pages, members, scheduled posts, AI spend), payment provider (Stripe or
+  Paddle; the app never stores card data), invoices, plan changes, dunning,
+  usage page. Was "decided out" before the owner said the app will be sold.
+- **S5. Tenant isolation review** — every query scoped by workspace and
+  `pageScope`; e2e that one customer can never read another's data; rate
+  limits per workspace; per-tenant AI keys or shared keys with metering
+  (ties to 0.2 costs).
+- **S6. White-label (optional, ask)** — custom domain per customer for the
+  client portal and share links, custom logo/colours (theme tokens from D2).
+- **S7. Product site and docs** — public landing, pricing, help center, status
+  page (G15), changelog. All copy generic.
 
 ## Phase E — Blocked on owner / Meta (unchanged)
 Meta App Review step 2 → Live mode; owner enters the Gmail app password and the
