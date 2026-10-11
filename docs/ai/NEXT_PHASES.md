@@ -7,6 +7,10 @@ The owner's request for the next sessions, verbatim intent:
 > metrics from the Meta API.** Planned, posted or any information must use **the
 > same selection**. Design must be better.
 
+Work the phases in this order: **0 → G1–G3 → A (+ G5, G6) → B → C → C2 → D →
+D2 → rest of G → H → S (final step: sell as a service)**; E and F whenever the
+outside approvals arrive.
+
 Work the phases in order. Each phase: build → unit + Playwright → deploy
 (`scripts/deploy/deploy.sh`) → verify live in the owner's Chrome with real Pages
 → tick it in this file and in `STATUS.md`. Load the skills named in each phase.
@@ -307,17 +311,16 @@ out" below); don't propose it again unless the owner asks.
   Ask the owner for the reward rules before building; no payments handled by
   the app.
 
-### Open decision — selling as a service
-The owner will **host and sell the app as a service** (2026-10-11). That needs
-items marked out above: **billing / plans / usage limits** and probably
-**custom domain** (white-label). Ask the owner before building them; see
-Phase S.
+### Selling as a service — decided
+The owner will **host and sell the app as a service**. On 2026-10-11 the owner
+moved **billing / plans / usage limits** and **custom domain (white-label)**
+back in, **as the final step** (Phase S4, S6).
 
 ### Decided out (owner, 2026-10-11)
 AI agent with schedules, AI image/video/voice hub, workspace brand book, agents
 catalogue, link-in-bio, design editor, Facebook coloured text backgrounds,
-location tags and @mentions, tasks & workflows, billing/seats/usage, custom
-domain and custom fields, mobile app / Chrome extension.
+location tags and @mentions, tasks & workflows, custom fields, mobile app /
+Chrome extension. (Billing/plans and custom domain moved to Phase S.)
 
 ## Phase G — Owner-approved additions (2026-10-11)
 
@@ -507,7 +510,10 @@ setup from Phase 0.2 (marked AI).
   a switch like the other optional scopes; preview the change per Page; log
   and undo.
 
-## Phase S — Ready to sell as a service (owner, 2026-10-11)
+## Phase S — Ready to sell as a service (FINAL STEP, owner 2026-10-11)
+
+Build last, after every other phase. S1 (generic sweep) and S2 (operator
+details) may be done earlier if a phase touches those files.
 
 The app will be hosted and sold to other users when done. Everything must be
 generic (CLAUDE.md rule 9). Items:
@@ -527,15 +533,15 @@ generic (CLAUDE.md rule 9). Items:
 - **S3. Self-service sign-up** — open registration (root switch exists), email
   verification, onboarding wizard that asks the user's niche-free basics
   (workspace name, time zone, languages, first Pages), trial period.
-- **S4. Plans and billing (open decision — ask the owner)** — plans with limits
+- **S4. Plans and billing (decided: yes, final step)** — plans with limits
   (Pages, members, scheduled posts, AI spend), payment provider (Stripe or
   Paddle; the app never stores card data), invoices, plan changes, dunning,
-  usage page. Was "decided out" before the owner said the app will be sold.
+  usage page. Ask the owner for the plans, prices and limits before building.
 - **S5. Tenant isolation review** — every query scoped by workspace and
   `pageScope`; e2e that one customer can never read another's data; rate
   limits per workspace; per-tenant AI keys or shared keys with metering
   (ties to 0.2 costs).
-- **S6. White-label (optional, ask)** — custom domain per customer for the
+- **S6. White-label (decided: yes, final step)** — custom domain per customer for the
   client portal and share links, custom logo/colours (theme tokens from D2).
 - **S7. Product site and docs** — public landing, pricing, help center, status
   page (G15), changelog. All copy generic.
