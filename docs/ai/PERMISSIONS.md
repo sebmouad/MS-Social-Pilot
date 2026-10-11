@@ -75,6 +75,15 @@ ids in bodies (nothing may end up pointing at them). A new `[id]` route fails
 that test until it is mapped. Root sees all workspaces only in the root
 section (names, counts), never their posts, Pages or tokens.
 
+## Two kinds of invitation (owner, 2026-10-11 — beta before selling)
+- **Join an existing workspace**: a workspace owner/admin invites from
+  Settings → Team (`Invitation`, role chosen there).
+- **Create their own workspace**: root invites a client from Root →
+  Registration & invitations (`ClientInvitation`, 14 days, optional suggested
+  workspace name). Only that address is admitted; registering creates the
+  client's own workspace, isolated like every other, with them as owner. The
+  link is shown to root as well as emailed.
+
 ## Built (2026-10-11)
 - `/root/*` (`src/app/(root)/root/`): Overview · Configuration · Workspaces ·
   Users · Registration & invitations · Privileges · Root activity · Danger zone.

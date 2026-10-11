@@ -802,6 +802,13 @@
       "bodyNew": "{from} made you root of this installation. You can now change its configuration, users and workspaces.",
       "bodyOld": "You handed root of this installation to {to}. You keep your workspaces and roles, but no longer the root section.",
       "cta": "Open the root section"
+    },
+    "clientInvitation": {
+      "subject": "{inviter} invited you to create your workspace",
+      "heading": "Your own workspace is ready to be created",
+      "body": "{inviter} invited you to create an account with a workspace of your own. Your workspace, its profiles, posts and team are yours alone.",
+      "expiry": "The link works until {date}.",
+      "cta": "Create my account"
     }
   },
   "engagement": {
@@ -2335,7 +2342,9 @@
         "workspace_renamed": "Renamed workspace {from} to {to}",
         "invitation_revoked": "Revoked the invitation for {email} ({workspace})",
         "root_transferred": "Root handed from {from} to {to}",
-        "user_twoStepReset": "Reset two-step sign-in for {email}"
+        "user_twoStepReset": "Reset two-step sign-in for {email}",
+        "client_invited": "Invited {email} to create a workspace",
+        "client_invitationRevoked": "Revoked {email}'s invitation to create a workspace"
       }
     },
     "danger": {
@@ -2385,6 +2394,22 @@
       "testFailed": "The test alert couldn't be sent. Check the email settings.",
       "testHint": "Check that alerts reach you before something breaks.",
       "history": "Recently fixed"
+    },
+    "clients": {
+      "title": "Invite a client to create their own workspace",
+      "hint": "They get an account and a workspace of their own, kept apart from every other client. To add someone to an existing workspace, invite them from that workspace's Settings → Team.",
+      "email": "Client's email",
+      "workspace": "Workspace name (optional)",
+      "workspacePlaceholder": "e.g. Client A",
+      "invite": "Send invitation",
+      "sending": "Sending…",
+      "sent": "Invitation emailed. You can also send them this link:",
+      "notEmailed": "Email isn't set up, so nothing was sent. Send them this link yourself:",
+      "networkError": "Couldn't reach the server. Check your connection and try again.",
+      "expires": "Link valid until {date}",
+      "revoke": "Revoke",
+      "revokeQuestion": "Revoke the invitation for {email}?",
+      "revokeBody": "The link stops working. You can invite them again later."
     }
   },
   "twoStep": {

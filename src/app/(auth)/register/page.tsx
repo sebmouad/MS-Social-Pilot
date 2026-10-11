@@ -6,6 +6,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { getAuthContext, mayRegister } from '@/lib/auth';
 import { findInvitation } from '@/lib/team';
+import { findClientInvitation } from '@/lib/root';
 import { afterAuthPath } from '@/lib/invite-path';
 import { screenMetadata } from '@/lib/metadata';
 
@@ -18,9 +19,9 @@ export function generateMetadata() {
 export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ invite?: string }>;
+  searchParams: Promise<{ invite?: string; client?: string }>;
 }) {
-  const { invite } = await searchParams;
+  const { invite, client } = await searchParams;
 
   // Already signed in: go straight to the invitation rather than the dashboard,
   // which is where the accept button is.
@@ -29,11 +30,20 @@ export default async function RegisterPage({
   // Say so here rather than letting someone fill the form in and be refused on
   // submit. The API enforces it; this only saves them the typing.
   const invitation = invite ? await findInvitation(invite) : null;
-  if (!(await mayRegister(invitation?.email ?? ''))) {
+  // Root invited this client to create a workspace of their own.
+  const clientInvitation = client ? await findClientInvitation(client) : null;
+  const email = invitation?.email ?? clientInvitation?.email ?? '';
+  if (!(await mayRegister(email))) {
     return <RegistrationClosed />;
   }
 
-  return <AuthForm mode="register" inviteToken={invite} />;
+  return (
+    <AuthForm
+      mode="register"
+      inviteToken={invite}
+      defaults={clientInvitation ? { email: clientInvitation.email, workspaceName: clientInvitation.workspaceName ?? undefined } : undefined}
+    />
+  );
 }
 
 async function RegistrationClosed() {

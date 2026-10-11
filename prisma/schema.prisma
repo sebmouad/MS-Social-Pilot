@@ -153,6 +153,7 @@ model User {
   recoveryCodes        RecoveryCode[]
   trustedDevices       TrustedDevice[]
   passkeys             Passkey[]
+  clientInvitations    ClientInvitation[]    @relation("ClientInvitationSender")
 
   @@map("users")
 }
@@ -1417,4 +1418,25 @@ model SystemAlert {
   @@index([key, resolvedAt])
   @@index([openedAt])
   @@map("system_alerts")
+}
+
+/// Root inviting a client to create an account with a workspace of their own
+/// (as opposed to `Invitation`, which joins an existing workspace). Token
+/// stored hashed; the email it was sent to is the only one it admits.
+model ClientInvitation {
+  id               String    @id @default(cuid())
+  email            String
+  tokenHash        String    @unique
+  /// Suggested name for the client's workspace; they can change it.
+  workspaceName    String?
+  invitedById      String
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  createdAt        DateTime  @default(now())
+
+  invitedBy User @relation("ClientInvitationSender", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@map("client_invitations")
 }

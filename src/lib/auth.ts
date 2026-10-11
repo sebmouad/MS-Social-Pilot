@@ -165,11 +165,13 @@ async function admission(
   if ((await db.user.count()) === 0) return 'first';
   if (env.openRegistration) return 'admitted';
 
-  const invitation = await db.invitation.findFirst({
-    where: { email, acceptedAt: null, expiresAt: { gt: new Date() } },
-    select: { id: true },
-  });
-  return invitation ? 'admitted' : null;
+  const live = { email, acceptedAt: null, expiresAt: { gt: new Date() } };
+  // Invited to join a workspace, or invited by root to create one of their own.
+  const [invitation, client] = await Promise.all([
+    db.invitation.findFirst({ where: live, select: { id: true } }),
+    db.clientInvitation.findFirst({ where: live, select: { id: true } }),
+  ]);
+  return invitation || client ? 'admitted' : null;
 }
 
 /**
@@ -230,7 +232,7 @@ export async function registerUser(input: {
       throw errors.emailTaken();
     }
 
-    return tx.user.create({
+    const created = await tx.user.create({
       data: {
         email,
         name: input.name.trim(),
@@ -242,11 +244,25 @@ export async function registerUser(input: {
         isInstanceOwner: admitted === 'first',
       },
     });
+
+    // Root invited this client to create their own workspace: the invitation is
+    // used up, and its suggested name is the default for the workspace.
+    const client = await tx.clientInvitation.findFirst({
+      where: { email, acceptedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (client) {
+      await tx.clientInvitation.update({
+        where: { id: client.id },
+        data: { acceptedAt: new Date(), acceptedByUserId: created.id },
+      });
+    }
+    return { ...created, suggestedWorkspace: client?.workspaceName ?? null };
   });
 
   if (!input.skipWorkspace) {
     const workspace = await createWorkspace({
-      name: input.workspaceName?.trim() || `${input.name.trim()}'s workspace`,
+      name: input.workspaceName?.trim() || user.suggestedWorkspace || `${input.name.trim()}'s workspace`,
       ownerId: user.id,
       locale: input.locale,
     });

@@ -190,3 +190,24 @@ describe('the privileges table', () => {
     expect(row?.pages).toBeNull();
   });
 });
+
+describe('inviting a client to create their own workspace', () => {
+  it('admits only that address, once, into a workspace of its own with the suggested name', async () => {
+    const theRoot = await person({ root: true });
+    const settings = await import('../src/lib/settings');
+    await settings.writeSetting('auth.openRegistration', false, null);
+    await settings.ensureSettings();
+
+    const { url } = await root.inviteClient({ actorId: theRoot.user.id, email: 'Client@Example.test', workspaceName: 'Client A' });
+    const token = new URL(url).searchParams.get('client')!;
+    expect(await root.findClientInvitation(token)).not.toBeNull();
+
+    await expect(auth.mayRegister('someone.else@example.test')).resolves.toBe(false);
+    const registered = await auth.registerUser({ email: 'client@example.test', password: 'a-long-enough-password', name: 'Client' });
+
+    const memberships = await prisma.membership.findMany({ where: { userId: registered.userId }, include: { workspace: true } });
+    expect(memberships.map((membership) => [membership.workspace.name, membership.role])).toEqual([['Client A', 'owner']]);
+    expect(await root.findClientInvitation(token)).toBeNull();
+    await settings.clearSetting('auth.openRegistration');
+  });
+});

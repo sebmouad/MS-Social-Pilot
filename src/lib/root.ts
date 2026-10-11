@@ -4,7 +4,9 @@ import { prisma } from './prisma';
 import { errors } from './errors';
 import { verifyPassword } from './crypto';
 import { sendEmail } from './email/send';
-import { rootTransferEmail } from './email/templates';
+import { clientInvitationEmail, rootTransferEmail } from './email/templates';
+import { env } from './env';
+import { hashToken, randomToken } from './crypto';
 import { clearSecondFactors } from './two-step';
 
 /**
@@ -26,6 +28,8 @@ export const ROOT_ACTIONS = [
   'user.twoStepReset',
   'workspace.renamed',
   'invitation.revoked',
+  'client.invited',
+  'client.invitationRevoked',
   'root.transferred',
 ] as const;
 
@@ -266,4 +270,60 @@ export async function privilegesByMember(where: Prisma.MembershipWhereInput = {}
     pages: row.allPages || row.role === WorkspaceRole.owner || row.role === WorkspaceRole.admin ? null : row._count.pages,
     lastSignIn: row.user.sessions[0]?.createdAt.toISOString() ?? null,
   }));
+}
+
+const CLIENT_INVITATION_DAYS = 14;
+
+/**
+ * Invite a client to create an account with a workspace of their own — kept
+ * apart from every other workspace like any client. The link is returned as
+ * well as emailed, so root can send it another way when email is not set up.
+ */
+export async function inviteClient(options: {
+  actorId: string;
+  email: string;
+  workspaceName: string | null;
+}): Promise<{ id: string; url: string; emailed: boolean }> {
+  const email = options.email.trim().toLowerCase();
+  if (await prisma.user.findUnique({ where: { email } })) throw errors.emailTaken();
+
+  const actor = await prisma.user.findUniqueOrThrow({ where: { id: options.actorId } });
+  const token = randomToken(32);
+  const expiresAt = new Date(Date.now() + CLIENT_INVITATION_DAYS * 24 * 60 * 60 * 1000);
+  // A new invitation to the same address replaces the old one.
+  await prisma.clientInvitation.deleteMany({ where: { email, acceptedAt: null } });
+  const invitation = await prisma.clientInvitation.create({
+    data: { email, tokenHash: hashToken(token), workspaceName: options.workspaceName?.trim() || null, invitedById: actor.id, expiresAt },
+  });
+
+  const message = clientInvitationEmail({ locale: actor.locale, inviter: actor.name, token, expiresAt });
+  const sent = await sendEmail({ to: email, template: 'client.invitation', ...message });
+  await logRootActivity(actor.id, 'client.invited', { email });
+  return { id: invitation.id, url: `${env.appUrl}/register?client=${token}`, emailed: sent.status === 'sent' };
+}
+
+export async function findClientInvitation(token: string) {
+  const invitation = await prisma.clientInvitation.findUnique({ where: { tokenHash: hashToken(token) } });
+  if (!invitation || invitation.acceptedAt || invitation.expiresAt < new Date()) return null;
+  return invitation;
+}
+
+export async function listClientInvitations() {
+  const rows = await prisma.clientInvitation.findMany({
+    where: { acceptedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: 'desc' },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    email: row.email,
+    workspaceName: row.workspaceName,
+    expiresAt: row.expiresAt.toISOString(),
+  }));
+}
+
+export async function revokeClientInvitation(actorId: string, id: string): Promise<void> {
+  const invitation = await prisma.clientInvitation.findUnique({ where: { id } });
+  if (!invitation) throw errors.notFound();
+  await prisma.clientInvitation.delete({ where: { id } });
+  await logRootActivity(actorId, 'client.invitationRevoked', { email: invitation.email });
 }

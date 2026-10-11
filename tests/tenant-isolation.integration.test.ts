@@ -43,6 +43,7 @@ const NOT_WORKSPACE_DATA: Record<string, string> = {
   'root/users/[id]/reset-two-step': 'Root section.',
   'root/users/[id]/sign-out': 'Root section.',
   'root/workspaces/[id]': 'Root section.',
+  'root/client-invitations/[id]': 'Root section.',
 };
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;

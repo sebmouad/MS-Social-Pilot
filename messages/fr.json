@@ -802,6 +802,13 @@
       "bodyNew": "{from} vous a nommé root de cette installation. Vous pouvez désormais modifier sa configuration, ses utilisateurs et ses espaces de travail.",
       "bodyOld": "Vous avez transféré root de cette installation à {to}. Vous gardez vos espaces de travail et vos rôles, mais plus la section root.",
       "cta": "Ouvrir la section root"
+    },
+    "clientInvitation": {
+      "subject": "{inviter} vous invite à créer votre espace de travail",
+      "heading": "Votre propre espace de travail vous attend",
+      "body": "{inviter} vous invite à créer un compte avec votre propre espace de travail. Votre espace, ses profils, publications et équipe n’appartiennent qu’à vous.",
+      "expiry": "Le lien fonctionne jusqu’au {date}.",
+      "cta": "Créer mon compte"
     }
   },
   "engagement": {
@@ -2335,7 +2342,9 @@
         "workspace_renamed": "Espace {from} renommé en {to}",
         "invitation_revoked": "Invitation de {email} révoquée ({workspace})",
         "root_transferred": "Root transféré de {from} à {to}",
-        "user_twoStepReset": "Connexion en deux étapes réinitialisée pour {email}"
+        "user_twoStepReset": "Connexion en deux étapes réinitialisée pour {email}",
+        "client_invited": "{email} invité à créer un espace de travail",
+        "client_invitationRevoked": "Invitation de {email} à créer un espace révoquée"
       }
     },
     "danger": {
@@ -2385,6 +2394,22 @@
       "testFailed": "L’alerte de test n’a pas pu être envoyée. Vérifiez les réglages e-mail.",
       "testHint": "Vérifiez que les alertes vous parviennent avant qu’un problème survienne.",
       "history": "Réparé récemment"
+    },
+    "clients": {
+      "title": "Inviter un client à créer son propre espace de travail",
+      "hint": "Il obtient un compte et son propre espace de travail, séparé de tous les autres clients. Pour ajouter quelqu’un à un espace existant, invitez-le depuis Paramètres → Équipe de cet espace.",
+      "email": "E-mail du client",
+      "workspace": "Nom de l’espace (facultatif)",
+      "workspacePlaceholder": "par ex. Client A",
+      "invite": "Envoyer l’invitation",
+      "sending": "Envoi…",
+      "sent": "Invitation envoyée par e-mail. Vous pouvez aussi lui transmettre ce lien :",
+      "notEmailed": "L’e-mail n’est pas configuré : rien n’a été envoyé. Transmettez-lui ce lien vous-même :",
+      "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+      "expires": "Lien valable jusqu’au {date}",
+      "revoke": "Révoquer",
+      "revokeQuestion": "Révoquer l’invitation de {email} ?",
+      "revokeBody": "Le lien ne fonctionne plus. Vous pourrez l’inviter à nouveau plus tard."
     }
   },
   "twoStep": {

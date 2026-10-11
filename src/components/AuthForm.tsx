@@ -18,9 +18,11 @@ interface Props {
    * invitation, and have to go back to the email and click the link again.
    */
   inviteToken?: string;
+  /** Prefilled from a client invitation: the address it was sent to, and a workspace name. */
+  defaults?: { email?: string; workspaceName?: string };
 }
 
-export function AuthForm({ mode, inviteToken }: Props) {
+export function AuthForm({ mode, inviteToken, defaults }: Props) {
   const t = useTranslations('auth');
   const tApp = useTranslations('app');
   const router = useRouter();
@@ -144,6 +146,7 @@ export function AuthForm({ mode, inviteToken }: Props) {
             type="email"
             className="input"
             required
+            defaultValue={defaults?.email}
             autoComplete="email"
             {...fieldState('email')}
           />
@@ -173,7 +176,7 @@ export function AuthForm({ mode, inviteToken }: Props) {
               {t('workspaceName')}{' '}
               <span className="font-normal text-slate-400">{t('optional')}</span>
             </label>
-            <input id="workspaceName" name="workspaceName" className="input" placeholder="Acme Marketing" />
+            <input id="workspaceName" name="workspaceName" className="input" placeholder="Acme Marketing" defaultValue={defaults?.workspaceName} />
           </div>
         )}
 

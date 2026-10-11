@@ -61,6 +61,7 @@ const VALID_BODY: Record<string, unknown> = {
   'root/users/[id]': { disabled: true },
   'root/workspaces/[id]': { name: 'Renamed' },
   'root/transfer': { userId: 'x', password: 'x' },
+  'root/client-invitations': { email: 'client@example.test' },
   'root/config': { values: { 'auth.openRegistration': true } },
   'settings/config': { values: { 'auth.openRegistration': true } },
 };
@@ -223,6 +224,8 @@ const CONTRIBUTOR_MUST_NOT: Array<[Method, string]> = [
   ['DELETE', 'root/invitations/[id]'],
   ['POST', 'root/transfer'],
   ['GET', 'root/privileges'],
+  ['POST', 'root/client-invitations'],
+  ['DELETE', 'root/client-invitations/[id]'],
   ['PUT', 'queue-slots'],
   ['DELETE', 'accounts/[id]'],
   ['POST', 'accounts/[id]/sync'],

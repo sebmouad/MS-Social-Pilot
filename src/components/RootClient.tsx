@@ -444,3 +444,109 @@ export function TransferRoot({ users }: { users: Array<{ id: string; label: stri
     </form>
   );
 }
+
+export interface RootClientInvitation {
+  id: string;
+  email: string;
+  workspaceName: string | null;
+  expiresAt: string;
+}
+
+/**
+ * Invite a client to create an account with a workspace of their own. The
+ * link is shown too, for when email is not set up or lands in spam.
+ */
+export function InviteClient({ invitations }: { invitations: RootClientInvitation[] }) {
+  const t = useTranslations('root.clients');
+  const format = useFormatter();
+  const confirm = useConfirm();
+  const router = useRouter();
+  const { busy, run, messages } = useAction();
+  const [email, setEmail] = useState('');
+  const [workspaceName, setWorkspaceName] = useState('');
+  const [link, setLink] = useState<{ url: string; emailed: boolean } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      <form
+        className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setSending(true);
+          setError(null);
+          setLink(null);
+          try {
+            const response = await fetch('/api/root/client-invitations', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ email, workspaceName: workspaceName || undefined }),
+            });
+            const data = (await response.json().catch(() => ({}))) as { url?: string; emailed?: boolean; error?: string };
+            if (!response.ok) setError(data.error ?? `HTTP ${response.status}`);
+            else {
+              setLink({ url: data.url!, emailed: Boolean(data.emailed) });
+              setEmail('');
+              setWorkspaceName('');
+              router.refresh();
+            }
+          } catch {
+            setError(t('networkError'));
+          }
+          setSending(false);
+        }}
+      >
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-slate-900">{t('email')}</span>
+          <input type="email" className="input" required autoComplete="off" spellCheck={false} value={email} onChange={(event) => setEmail(event.target.value)} />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-slate-900">{t('workspace')}</span>
+          <input className="input" maxLength={100} autoComplete="off" placeholder={t('workspacePlaceholder')} value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} />
+        </label>
+        <button type="submit" className="btn-primary" disabled={sending || !email}>
+          <Icon name="mail" size={14} /> {sending ? t('sending') : t('invite')}
+        </button>
+      </form>
+      {error && (
+        <p role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <Icon name="error" size={14} /> {error}
+        </p>
+      )}
+      {link && (
+        <div role="status" className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <p>{link.emailed ? t('sent') : t('notEmailed')}</p>
+          <code className="block break-all rounded bg-white px-2 py-1 text-xs text-slate-900" translate="no">{link.url}</code>
+        </div>
+      )}
+      {messages}
+      {invitations.length > 0 && (
+        <ul className="divide-y divide-slate-100 text-sm">
+          {invitations.map((invitation) => (
+            <li key={invitation.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <span className="min-w-0">
+                <span className="font-medium text-slate-900">{invitation.email}</span>
+                {invitation.workspaceName && <span className="text-slate-500"> · {invitation.workspaceName}</span>}
+                <span className="block text-xs text-slate-500">
+                  {t('expires', { date: format.dateTime(new Date(invitation.expiresAt), { dateStyle: 'medium' }) })}
+                </span>
+              </span>
+              <button
+                type="button"
+                className="btn-ghost h-9 text-red-700"
+                disabled={busy === invitation.id}
+                onClick={async () => {
+                  const ok = await confirm({ title: t('revokeQuestion', { email: invitation.email }), body: t('revokeBody'), confirmLabel: t('revoke'), danger: true });
+                  if (ok) await run(invitation.id, `/api/root/client-invitations/${invitation.id}`, 'DELETE');
+                }}
+              >
+                {t('revoke')}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

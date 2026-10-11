@@ -439,3 +439,21 @@ export function rootTransferEmail(options: {
   });
   return { subject: t('email.rootTransfer.subject'), ...block };
 }
+
+/** Root inviting a client to create an account with their own workspace. */
+export function clientInvitationEmail(options: {
+  locale: Locale;
+  inviter: string;
+  token: string;
+  expiresAt: Date;
+}): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(options.locale, key, params);
+  const block = layout({
+    heading: t('email.clientInvitation.heading'),
+    body: t('email.clientInvitation.body', { inviter: options.inviter }),
+    details: [t('email.clientInvitation.expiry', { date: formatDate(options.expiresAt, options.locale) })],
+    cta: { label: t('email.clientInvitation.cta'), url: `${env.appUrl}/register?client=${options.token}` },
+  });
+  return { subject: t('email.clientInvitation.subject', { inviter: options.inviter }), ...block };
+}
