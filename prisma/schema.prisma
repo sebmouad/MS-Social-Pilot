@@ -136,6 +136,8 @@ model User {
   totpEnabledAt         DateTime?
   /// The last time step accepted, so a code cannot be used twice.
   totpLastStep          Int?
+  /// Page metrics this person pinned as tiles on the analysis (`metric::period`).
+  pinnedMetrics         String[]  @default([])
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 

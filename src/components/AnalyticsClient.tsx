@@ -64,6 +64,9 @@ interface Props {
     talkingAboutCount: number | null;
     syncedLabel: string | null;
   };
+  /** `metric::period` keys this person has pinned, and those that may be. */
+  pinned?: string[];
+  pinnable?: string[];
 }
 
 /** Turn a breakdown map into a plain record, dropping anything non-numeric. */
@@ -102,6 +105,8 @@ export function AnalyticsClient({
   availability,
   coverage,
   profile,
+  pinned: initialPinned = [],
+  pinnable = [],
 }: Props) {
   const t = useTranslations('analytics');
   const locale = useLocale();
@@ -115,6 +120,26 @@ export function AnalyticsClient({
   const [showUnavailable, setShowUnavailable] = useState(false);
   const [filter, setFilter] = useState('');
   const [featured, setFeatured] = useState<string | null>(null);
+  const [pinned, setPinned] = useState<string[]>(initialPinned);
+  const [pinError, setPinError] = useState<string | null>(null);
+
+  /** Pin or unpin a metric as a tile on the analysis; saved for this person. */
+  async function togglePin(key: string) {
+    const next = pinned.includes(key) ? pinned.filter((entry) => entry !== key) : [...pinned, key];
+    setPinError(null);
+    const response = await fetch('/api/analytics/pinned', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ metrics: next }),
+    });
+    if (!response.ok) {
+      setPinError(t('pinFailed'));
+      return;
+    }
+    const body = (await response.json()) as { pinned: string[] };
+    setPinned(body.pinned);
+    if (!pinned.includes(key) && !body.pinned.includes(key)) setPinError(t('pinLimit'));
+  }
 
   /** Metrics that are a time series — the ones worth plotting. */
   const plottable = useMemo(
@@ -345,6 +370,12 @@ export function AnalyticsClient({
       </div>
       </details>
 
+      {pinError && (
+        <p role="alert" className="text-sm text-rose-700">
+          {pinError}
+        </p>
+      )}
+
       {/* The browsable catalogue. Filter row above the content it scopes. */}
       <div className="filter-row justify-between">
         <input
@@ -428,8 +459,13 @@ export function AnalyticsClient({
                   </div>
                 );
 
+                const canPin = pinnable.includes(key);
+                const isPinned = pinned.includes(key);
+
                 return (
                   <li key={key} className="py-3">
+                    <div className="flex items-start gap-1">
+                    <div className="min-w-0 flex-1">
                     {/* A plottable metric is a button that features itself in
                         the chart above; a breakdown is not, because it has
                         nothing to plot over time. */}
@@ -447,6 +483,22 @@ export function AnalyticsClient({
                         {body}
                       </button>
                     )}
+                    </div>
+                    {canPin && (
+                      <button
+                        type="button"
+                        onClick={() => togglePin(key)}
+                        aria-pressed={isPinned}
+                        aria-label={isPinned ? t('unpin', { metric: entry.label }) : t('pin', { metric: entry.label })}
+                        title={isPinned ? t('unpinHint') : t('pinHint')}
+                        className={`mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+                          isPinned ? 'text-amber-500' : 'text-slate-300'
+                        }`}
+                      >
+                        <span aria-hidden>{isPinned ? '★' : '☆'}</span>
+                      </button>
+                    )}
+                    </div>
 
                     {entry.breakdown && Object.keys(map).length > 0 && (
                       <div className="mt-3">

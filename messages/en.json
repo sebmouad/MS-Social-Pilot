@@ -236,7 +236,13 @@
     },
     "mapLabel": "Map of followers by country",
     "technicalDetails": "Technical details: which metrics Facebook serves this Page",
-    "allSelected": "{count, plural, one {The selected profile} other {All # selected profiles}}"
+    "allSelected": "{count, plural, one {The selected profile} other {All # selected profiles}}",
+    "pin": "Pin {metric} to the analysis",
+    "unpin": "Unpin {metric}",
+    "pinHint": "Show this as a tile on Analysis and All profiles",
+    "unpinHint": "Remove this tile from Analysis and All profiles",
+    "pinFailed": "The pinned metrics could not be saved. Try again.",
+    "pinLimit": "You can pin up to 8 metrics. Unpin one to add another."
   },
   "app": {
     "name": "MS Social Pilot",
@@ -2628,5 +2634,11 @@
       "posts": "Posts",
       "reach": "Reach"
     }
+  },
+  "pinnedTiles": {
+    "title": "Your pinned metrics",
+    "edit": "Change in Overview",
+    "upTo": "up to {value}",
+    "uniqueNote": "{count, plural, one {Counts people.} other {Sum over # profiles: someone reached by several is counted once per profile, so the real number is at most this.}}"
   }
 }

@@ -289,7 +289,7 @@ const PLAIN_NAMES: Record<string, string> = {
   post_reactions_by_type_total: 'Reactions by type',
 };
 
-function humanise(metric: string): string {
+export function humanise(metric: string): string {
   if (PLAIN_NAMES[metric]) return PLAIN_NAMES[metric]!;
   return metric
     .replace(/^page_|^post_/, '')

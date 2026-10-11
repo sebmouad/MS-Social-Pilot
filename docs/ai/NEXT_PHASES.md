@@ -263,6 +263,13 @@ profiles") until one Page is picked. Still to do: CSV of the compare table.
 | Money (ads) | Sum per currency; never mix currencies — group by currency |
 
 ### B3. All metrics from the Meta API
+*Progress (2026-10-11):* the full list already lives in Analytics → Overview
+(every stored Page metric by category, plain name, description, withdrawn ones
+listed with Meta's reason). A star pins a daily Page metric (max 8, saved on
+the user, `User.pinnedMetrics`, `PUT /api/analytics/pinned`); pinned metrics
+show as tiles on Analysis and All profiles (`src/lib/pinned-metrics.ts`:
+counts summed, followers = last value, unique people "up to"). Still to do:
+post / video / Instagram / ads levels in the explorer.
 - **Metric explorer**: a "All metrics" view listing every metric of
   `PAGE_METRICS`/`POST_METRICS`/`VIDEO_METRICS`/`IG_*`/`AD_INSIGHT_FIELDS` by
   `CATEGORY_LABELS`, plain name + ⓘ definition + level + availability

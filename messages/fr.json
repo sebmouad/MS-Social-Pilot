@@ -236,7 +236,13 @@
     },
     "mapLabel": "Carte des abonnés par pays",
     "technicalDetails": "Détails techniques : métriques que Facebook fournit pour cette Page",
-    "allSelected": "{count, plural, one {Le profil choisi} other {Les # profils choisis}}"
+    "allSelected": "{count, plural, one {Le profil choisi} other {Les # profils choisis}}",
+    "pin": "Épingler {metric} à l’analyse",
+    "unpin": "Désépingler {metric}",
+    "pinHint": "Afficher en tuile dans Analyse et Tous les profils",
+    "unpinHint": "Retirer cette tuile d’Analyse et de Tous les profils",
+    "pinFailed": "Les métriques épinglées n’ont pas pu être enregistrées. Réessayez.",
+    "pinLimit": "Vous pouvez épingler jusqu’à 8 métriques. Retirez-en une pour en ajouter une autre."
   },
   "app": {
     "name": "MS Social Pilot",
@@ -2628,5 +2634,11 @@
       "posts": "Publications",
       "reach": "Portée"
     }
+  },
+  "pinnedTiles": {
+    "title": "Vos métriques épinglées",
+    "edit": "Modifier dans Vue d’ensemble",
+    "upTo": "jusqu’à {value}",
+    "uniqueNote": "{count, plural, one {Compte des personnes.} other {Somme sur # profils : une personne touchée par plusieurs est comptée une fois par profil, le nombre réel est donc au plus celui-ci.}}"
   }
 }

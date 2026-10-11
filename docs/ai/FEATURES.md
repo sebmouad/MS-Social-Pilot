@@ -32,11 +32,14 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
 - **RSS feeds** `/feeds`: auto-posting from feeds.
 
 ## Analytics
-- **Pages** `/analytics?view=…`: Analysis (health score, what stands out, best
+- **Pages** `/analytics?view=…`: All profiles (default with 2+ selected: summed
+  tiles, reach "up to", top profiles), Analysis (health score, what stands out, best
   day/frequency, KPI cards with sparklines + ⓘ definitions, day-by-day chart,
   cadence, best-time heatmap, formats/hashtags/captions, top/bottom posts),
-  Compare pages (by group, totals row), Overview (every metric Facebook serves,
-  technical coverage folded), By post, Interaction, Audience (world map, cities,
+  Compare pages (by group, line per profile with legend toggles, totals row),
+  Overview (every metric Facebook serves, technical coverage folded, ★ pins a
+  metric as a tile on Analysis / All profiles), By post (all selected profiles
+  or one), Interaction, Audience (world map, cities,
   followers gained/lost), Video, Comments (pull, reply, hide, delete), Reviews,
   Inbox (after Meta step 2), Other posts (posted outside the app), Instagram (when
   on). Date range presets + custom; compare with previous period or a year earlier.

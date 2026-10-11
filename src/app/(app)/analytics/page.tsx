@@ -25,6 +25,8 @@ import { listPageGroups } from '@/lib/page-groups';
 import { screenMetadata } from '@/lib/metadata';
 import { canDeleteComments, canModerateComments } from '@/lib/constants';
 import { UNWINDOWED_VIEWS, defaultAnalyticsView, parseAnalyticsView } from '@/lib/analytics-views';
+import { isPinnable, readPinnedFigures } from '@/lib/pinned-metrics';
+import { PinnedTiles } from '@/components/analysis/PinnedTiles';
 import { TotalProfilesView } from '@/components/analysis/TotalProfilesView';
 import { Pagination } from '@/components/Pagination';
 import { pageHref, pageNumber, paginate } from '@/lib/paging';
@@ -135,6 +137,11 @@ export default async function AnalyticsPage({
   const askedView = first(params.view);
   const view = askedView || requested ? parseAnalyticsView(askedView) : defaultAnalyticsView(pages.length);
 
+  const overviewSeries = view === 'overview' ? await readStoredAnalytics({ targetId: selected.id, from, to }) : [];
+  // Metrics this person pinned from Overview, shown as tiles on Analysis and All profiles.
+  const pinnedKeys =
+    (await prisma.user.findUnique({ where: { id: auth.user.id }, select: { pinnedMetrics: true } }))?.pinnedMetrics ?? [];
+
   // The post table covers every selected profile until one Page is picked.
   const postsScope = requested ? { targetId: selected.id } : { targetIds: pages.map((page) => page.id) };
 
@@ -176,6 +183,18 @@ export default async function AnalyticsPage({
 
       {/* Instagram stays out of sight until it is switched on; its tab only ever said "nothing here". */}
       <AnalyticsTabs current={view} hidden={env.instagramEnabled ? [] : ['instagram']} />
+
+      {(view === 'total' || view === 'analysis') && (
+        <PinnedTiles
+          overviewHref={`/analytics?view=overview&target=${selected.id}&${periodQuery}`}
+          figures={await readPinnedFigures({
+            keys: pinnedKeys,
+            targetIds: view === 'total' ? pages.map((page) => page.id) : [selected.id],
+            from,
+            to,
+          })}
+        />
+      )}
 
       {view === 'total' && (
         <TotalProfilesView
@@ -361,7 +380,9 @@ export default async function AnalyticsPage({
           targetName={selected.name}
           timeZone={timezone}
           canSync={canRefreshAnalytics(auth.role)}
-          series={await readStoredAnalytics({ targetId: selected.id, from, to })}
+          series={overviewSeries}
+          pinned={pinnedKeys}
+          pinnable={overviewSeries.map((entry) => `${entry.metric}::${entry.period}`).filter(isPinnable)}
           availability={(await readAvailability(selected.id)).map((entry) => ({
             metric: entry.metric,
             label: entry.label,
