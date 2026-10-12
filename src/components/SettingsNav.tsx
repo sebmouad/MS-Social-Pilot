@@ -11,6 +11,7 @@ export function SettingsNav({
   showPermissions = false,
   showHistory = true,
   showExport = false,
+  showWebhooks = false,
 }: {
   /** Admins: the read-only list of who may do what in this workspace. */
   showPermissions?: boolean;
@@ -18,6 +19,8 @@ export function SettingsNav({
   showHistory?: boolean;
   /** Owner only: download everything the workspace holds. */
   showExport?: boolean;
+  /** Owners and admins: outgoing webhooks. */
+  showWebhooks?: boolean;
 }) {
   const t = useTranslations();
   const pathname = usePathname();
@@ -29,6 +32,7 @@ export function SettingsNav({
     { href: '/settings/sharing', label: t('sharing.title'), icon: 'link' },
     { href: '/settings/api', label: t('apiKeys.title'), icon: 'code' },
     { href: '/settings/notifications', label: t('notifications.title'), icon: 'bell' },
+    ...(showWebhooks ? [{ href: '/settings/webhooks', label: t('webhooks.title'), icon: 'share' as IconName }] : []),
     { href: '/settings/account', label: t('account.title'), icon: 'key' },
     { href: '/settings/media', label: t('media.title'), icon: 'image' },
     ...(showHistory

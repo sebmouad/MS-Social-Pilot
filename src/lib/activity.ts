@@ -43,6 +43,8 @@ export const ACTIVITY_ACTIONS = [
   'team.pageAccessChanged',
   'team.removed',
   'team.roleChanged',
+  'webhook.created',
+  'webhook.deleted',
   'workspace.exported',
 ] as const;
 

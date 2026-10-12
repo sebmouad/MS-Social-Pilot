@@ -24,6 +24,7 @@ import {
   PostTargetStatus,
 } from '../constants';
 import { errors } from '../errors';
+import { emitWebhook } from '../webhooks';
 
 /**
  * The scheduler.
@@ -450,6 +451,14 @@ async function publishClaimed(
     }
 
     options.logger?.(`Published post ${post.id} to ${target.name}.`, { url: result.remoteUrl });
+    await emitWebhook(post.workspaceId, 'post.published', {
+      postId: post.id,
+      pageId: target.id,
+      pageName: target.name,
+      network: target.type,
+      url: result.remoteUrl ?? null,
+      publishedAt: options.now.toISOString(),
+    }, options.now);
 
     // Only once the publish is recorded, and never able to throw: a refused
     // comment is noted on the destination for a retry, and the post stays
@@ -505,6 +514,12 @@ async function publishClaimed(
         workspaceId: post.workspaceId,
         accountName: target.socialAccount?.name ?? target.name,
       });
+      await emitWebhook(post.workspaceId, 'page.disconnected', {
+        accountName: target.socialAccount?.name ?? target.name,
+        pageId: target.id,
+        pageName: target.name,
+        reason: graphError.displayMessage,
+      }, options.now);
     }
 
     // Only alert once the post has actually given up. Emailing on every
@@ -518,6 +533,14 @@ async function publishClaimed(
         scheduledAt: post.scheduledAt,
         postId: post.id,
       });
+      await emitWebhook(post.workspaceId, 'post.failed', {
+        postId: post.id,
+        pageId: target.id,
+        pageName: target.name,
+        network: target.type,
+        reason: graphError.displayMessage,
+        scheduledAt: post.scheduledAt?.toISOString() ?? null,
+      }, options.now);
     }
 
     options.logger?.(

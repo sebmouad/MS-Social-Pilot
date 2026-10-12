@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { emitWebhook } from './webhooks';
 import { env } from './env';
 import { settingString } from './settings';
 import { decryptSecret } from './crypto';
@@ -245,6 +246,14 @@ export async function checkAccount(
       where: { id: account.id },
       data: { invalidatedAt: now, invalidReason: 'Facebook reports this connection as expired.' },
     });
+    // Once per loss: an account already marked has already been reported.
+    if (!account.invalidatedAt) {
+      await emitWebhook(workspaceId, 'page.disconnected', {
+        accountName: account.name,
+        pages: account.targets.map((target) => ({ pageId: target.id, pageName: target.name, network: target.type })),
+        reason: 'Facebook reports this connection as expired.',
+      }, now);
+    }
 
     return {
       ...base,

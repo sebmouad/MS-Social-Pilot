@@ -272,6 +272,7 @@ model Workspace {
   reportSchedules      ReportSchedule[]
   apiTokens            ApiToken[]
   chatChannels         ChatChannel[]
+  webhookEndpoints     WebhookEndpoint[]
   activityLogs         ActivityLog[]
   invitations          Invitation[]
   feedSources          FeedSource[]
@@ -1540,6 +1541,54 @@ model ChatChannel {
 
   @@index([workspaceId])
   @@map("chat_channels")
+}
+
+/// Outgoing webhook (NEXT_PHASES H18): events POSTed, signed, to a URL the
+/// workspace's admins chose (Zapier, n8n, Make, their own server).
+model WebhookEndpoint {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  url         String
+  /// Encrypted signing secret; shown once when the endpoint is made.
+  secret      String
+  /// post.scheduled, post.published, post.failed, comment.received, page.disconnected, report.ready.
+  events      String[]
+  enabled     Boolean   @default(true)
+  /// Set when an API key subscribed it (a Zapier-style REST hook).
+  apiTokenId  String?
+  lastError   String?
+  lastSentAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace  Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([workspaceId])
+  @@map("webhook_endpoints")
+}
+
+/// One event for one endpoint, kept for the delivery log and retried with backoff.
+model WebhookDelivery {
+  id             String    @id @default(cuid())
+  endpointId     String
+  workspaceId    String
+  event          String
+  payload        Json
+  /// pending, delivered, failed (gave up).
+  status         String    @default("pending")
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now())
+  responseStatus Int?
+  error          String?
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([endpointId, createdAt])
+  @@map("webhook_deliveries")
 }
 
 /// What root did to the installation (configuration, users, workspaces, root

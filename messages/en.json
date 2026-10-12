@@ -1116,7 +1116,8 @@
     "targetNotFound": "Page not found.",
     "keyDateNotFound": "Key date not found.",
     "seasonNotFound": "Seasonal mode not found.",
-    "undoTooLate": "Too late to undo: the post is already going out."
+    "undoTooLate": "Too late to undo: the post is already going out.",
+    "webhookNotFound": "That webhook does not exist."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -1229,6 +1230,10 @@
       },
       "workspace": {
         "exported": "asked for an export of everything"
+      },
+      "webhook": {
+        "created": "added a webhook",
+        "deleted": "removed a webhook"
       }
     },
     "byDeparted": "Someone no longer in this workspace",
@@ -2749,7 +2754,10 @@
         "inboxDigest": "New comments and messages email",
         "queueEmpty": "Empty queue email",
         "captionTests": "Caption tests: read results",
-        "bestTimes": "Best times: add queue times"
+        "bestTimes": "Best times: add queue times",
+        "webhooks": "Outgoing webhooks",
+        "exports": "Workspace exports",
+        "holidays": "Public holidays"
       }
     },
     "sessions": {
@@ -3354,5 +3362,51 @@
     "rule": "What the queue does",
     "shiftMinutes": "Minutes (negative for earlier)",
     "extraTimes": "Extra times (HH:mm, comma-separated)"
+  },
+  "webhooks": {
+    "title": "Webhooks",
+    "subtitle": "Send what happens in this workspace to Zapier, n8n, Make or your own server, as it happens.",
+    "listTitle": "Your webhooks",
+    "listHint": "Each one receives the events you pick, signed with its own secret.",
+    "add": "Add webhook",
+    "none": "No webhooks yet. Add one to send published posts, failures, new comments and more to another tool.",
+    "name": "Name",
+    "namePlaceholder": "Client A automation",
+    "url": "Address (https)",
+    "urlHint": "A public https:// address. Redirects are not followed.",
+    "events": "Events",
+    "event_post_scheduled": "Post scheduled",
+    "event_post_published": "Post published",
+    "event_post_failed": "Post failed",
+    "event_comment_received": "New comment",
+    "event_page_disconnected": "Page disconnected",
+    "event_report_ready": "Report sent",
+    "on": "On",
+    "test": "Send test",
+    "testing": "Sending a test…",
+    "testSent": "Test delivered: the address answered with success.",
+    "testFailed": "Test not delivered: {error}",
+    "deliveries": "Delivery log",
+    "noDeliveries": "Nothing sent yet.",
+    "colWhen": "When",
+    "colEvent": "Event",
+    "colResult": "Result",
+    "status_delivered": "Delivered",
+    "status_pending": "{attempts, plural, =0 {Not sent yet} one {Failed once, will retry} other {Failed # times, will retry}}",
+    "status_failed": "{attempts, plural, one {Not delivered} other {Not delivered after # tries}}",
+    "redeliver": "Send again",
+    "remove": "Remove",
+    "removeConfirm": "Remove “{name}”?",
+    "removeConfirmBody": "It stops receiving events at once and its delivery log is deleted.",
+    "lastSent": "Last delivered {when}",
+    "never": "Nothing delivered yet",
+    "viaApi": "Added through the API",
+    "secretTitle": "Copy the signing secret now",
+    "secretHint": "It is shown only this once. Your receiver uses it to check that each request really comes from this app.",
+    "secretDone": "I have copied it",
+    "howTitle": "How deliveries work",
+    "howBody": "Each event is POSTed as JSON with these headers. Compute the HMAC-SHA256 of the timestamp, a dot and the raw body with your secret, and compare it to the signature; refuse old timestamps.",
+    "howRetries": "An answer other than 2xx is retried after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours, then given up. The delivery id stays the same, so your receiver can ignore repeats.",
+    "howZapier": "Zapier, n8n and Make can also subscribe on their own: POST /api/v1/webhooks with an owner or admin API key that can write, and DELETE /api/v1/webhooks/ID to stop."
   }
 }

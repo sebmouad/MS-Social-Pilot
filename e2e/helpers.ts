@@ -83,6 +83,7 @@ export const SIGNED_IN_SCREENS = [
   '/settings/team',
   '/settings/permissions',
   '/settings/notifications',
+  '/settings/webhooks',
   '/settings/account',
   '/settings/media',
   '/settings/history',

@@ -10,6 +10,7 @@ import { errors } from './errors';
 import { formatInZone, localInputToUtc } from './time';
 import { REPORT_SECTIONS } from './report-sections';
 import { RANGE_PRESETS } from './date-range';
+import { emitWebhook } from './webhooks';
 
 /**
  * Reports that go out on their own: every Monday for the week before, or on
@@ -193,6 +194,16 @@ export async function sendDueReports(now: Date): Promise<{ sent: number; failed:
       );
       const bad = outcomes.find((outcome) => outcome.status === 'failed');
       if (bad) lastError = bad.error ?? 'Sending failed.';
+      else
+        await emitWebhook(schedule.workspaceId, 'report.ready', {
+          reportScheduleId: schedule.id,
+          pageId: target.id,
+          pageName: target.name,
+          frequency,
+          from: period.from.toISOString(),
+          to: period.to.toISOString(),
+          recipients: schedule.recipients.length,
+        }, now);
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
     }

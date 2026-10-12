@@ -112,7 +112,9 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   REST instructions), Notifications (email prefs incl. hourly new-inbox email,
   per-Page × event mutes, Slack/Telegram channels), Account (name, language,
   look: Facebook, Warm or Dark theme, password, signed-in browsers with device, place, last seen and sign-out per row;
-  email on a sign-in from a new browser; two-step), Media library, History (activity log), Export (owner: whole workspace as a ZIP, 7-day link), Configuration
+  email on a sign-in from a new browser; two-step), Webhooks (admins: signed
+  POSTs for post scheduled/published/failed, new comment, Page disconnected,
+  report sent; test, delivery log, send again), Media library, History (activity log), Export (owner: whole workspace as a ZIP, 7-day link), Configuration
   (owner: runtime settings incl. network app keys).
 
 ## Public
@@ -129,10 +131,11 @@ errors grouped, scrubbed, with release; mark resolved), Alerts, Backups, Activit
 publish (every few seconds), native reconcile, RSS, evergreen recycling,
 analytics (post insights), page insights, edges (comments, reviews, inbox,
 external posts, videos), Instagram, ads, housekeeping, token expiry warnings,
-scheduled reports (every 10 min), inbox digest email (hourly), empty-queue email (hourly).
+scheduled reports (every 10 min), outgoing webhooks (every 30 s), inbox digest email (hourly), empty-queue email (hourly).
 
 ## Integrations
-REST `/api/v1/pages`, `/api/v1/pages/:id/analytics`, `/api/v1/posts` (GET with `status`, `from`, `to`, `limit`, `pages=id,id`; POST);
+REST `/api/v1/pages`, `/api/v1/pages/:id/analytics`, `/api/v1/posts` (GET with `status`, `from`, `to`, `limit`, `pages=id,id`; POST),
+`/api/v1/webhooks` (REST-hook subscribe for Zapier / n8n / Make; owner/admin write key);
 MCP `POST /api/mcp` (tools: list_pages, list_posts, create_post,
 get_page_analytics); API keys read or read/write, acting as their owner. PWA
 (manifest, icons, offline page, share target, shortcuts). Slack incoming

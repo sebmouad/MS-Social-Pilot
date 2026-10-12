@@ -757,10 +757,20 @@ setup from Phase 0.2 (marked AI).
   "not available" and stop.
 
 ### Connections
-- **H18. Outgoing webhooks + Zapier / n8n / Make (S)** — events: post
+- **H18. Outgoing webhooks + Zapier / n8n / Make (S)** ✅ — events: post
   scheduled, published, failed; comment received; Page disconnected; report
   ready. Signed payloads (HMAC), retries with backoff, delivery log; uses the
   public API tokens that exist.
+  *Done: Settings › Webhooks (owners/admins): add (https, public address only;
+  secret shown once, stored encrypted), events per endpoint, on/off, Send test
+  (`ping`), delivery log of the last 50 with Send again. Events queue one
+  delivery row per endpoint (`emitWebhook`, never throws); the `webhooks`
+  worker job POSTs them every 30 s with `X-MSP-Event/Delivery/Timestamp/
+  Signature` (HMAC-SHA256 of `<timestamp>.<body>`), retries after 1 m, 5 m,
+  30 m, 2 h, 12 h, then gives up; private addresses refused, redirects not
+  followed; deliveries kept 30 days. Comments only when under 48 h old and not
+  the Page's own. REST hooks: `GET/POST /api/v1/webhooks`, `DELETE
+  /api/v1/webhooks/:id` with an owner/admin write key.*
 - **H19. Calendar feed (S)** — private ICS URL per member (selection-aware:
   pages/group in the token), revocable; Google Calendar / Outlook subscribe.
 - **H20. Bulk Page info editing (M, check permission)** — edit hours,

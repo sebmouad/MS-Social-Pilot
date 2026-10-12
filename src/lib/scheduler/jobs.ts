@@ -24,6 +24,7 @@ import { asGraphError } from '../facebook/graph';
 import { decryptSecret } from '../crypto';
 import { sendDueReports } from '../report-schedules';
 import { applyBestTimes } from '../best-times';
+import { deliverDueWebhooks } from '../webhooks';
 
 /**
  * The worker's job set.
@@ -56,7 +57,8 @@ export type JobName =
   | 'bestTimes'
   | 'alerts'
   | 'exports'
-  | 'holidays';
+  | 'holidays'
+  | 'webhooks';
 
 export interface JobContext {
   now: Date;
@@ -749,6 +751,15 @@ export function jobDefinitions(): JobDefinition[] {
       run: async ({ now }) => {
         const added = await applyBestTimes(now);
         return added.length > 0 ? `queue times added for ${added.length} Page(s)` : null;
+      },
+    },
+    {
+      // Outgoing webhooks (H18): POSTs to the workspace's own receivers, no Graph calls.
+      name: 'webhooks',
+      intervalMs: 30 * 1000,
+      run: async ({ now }) => {
+        const { delivered, failed } = await deliverDueWebhooks(now);
+        return delivered + failed > 0 ? `webhooks delivered=${delivered} failed=${failed}` : null;
       },
     },
   ];

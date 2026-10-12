@@ -9,6 +9,7 @@ import { asGraphError, isMissingObject, pageRatingsAvailable } from './facebook/
 import { fetchInsights } from './facebook/analytics';
 import { logActivity } from './scheduler/runner';
 import { applyModerationRules } from './moderation';
+import { emitWebhook } from './webhooks';
 import { syncExternalPostInsights } from './analytics';
 import {
   deleteComment,
@@ -110,6 +111,9 @@ export async function markRemoteMissing(postTargetId: string, now: Date = new Da
   });
 }
 
+/** How old a newly read comment can be and still be sent to webhooks. */
+const COMMENT_WEBHOOK_MAX_AGE_MS = 48 * 3_600_000;
+
 export async function syncCommentsFor(postTargetId: string): Promise<number> {
   const row = await prisma.postTarget.findUniqueOrThrow({
     where: { id: postTargetId },
@@ -172,6 +176,22 @@ export async function syncCommentsFor(postTargetId: string): Promise<number> {
     });
     // New comments, once each, through the workspace's moderation rules (G7).
     await applyModerationRules(postTargetId, fresh);
+    // People's comments only, and only recent ones: a Page's first sync reads
+    // its history, which is not news to anyone's Zap.
+    const now = Date.now();
+    for (const comment of fresh) {
+      if (comment.fromId === row.target.providerId || now - comment.createdTime.getTime() > COMMENT_WEBHOOK_MAX_AGE_MS) continue;
+      await emitWebhook(row.target.workspaceId, 'comment.received', {
+        commentId: comment.remoteId,
+        parentCommentId: comment.parentRemoteId ?? null,
+        postId: row.postId,
+        pageId: row.target.id,
+        pageName: row.target.name,
+        from: comment.fromName ?? null,
+        message: comment.message,
+        createdAt: comment.createdTime.toISOString(),
+      });
+    }
   }
 
   // Counts and hidden state change after the fact; the text does not, but

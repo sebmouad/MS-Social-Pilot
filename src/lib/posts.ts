@@ -37,6 +37,7 @@ import { notifyApprovalRequest } from './email/notify';
 import { ApprovalStatus, PostStatus, Prisma, WorkspaceRole } from '@prisma/client';
 import { prepareLinks } from './links';
 import { hasPostContent } from './validation';
+import { emitWebhook } from './webhooks';
 
 /**
  * Post lifecycle: composing, scheduling, editing and cancelling.
@@ -412,6 +413,17 @@ export async function createPost(
   if (schedule.publishMode === 'immediate') {
     await publishNow(post.id);
     return summarise(post.id);
+  }
+
+  // A "publish now" waiting out its undo delay is not news yet: it reports as
+  // published, or not at all if it is taken back.
+  if (undoSeconds === 0 && schedule.scheduledAt) {
+    await emitWebhook(context.workspaceId, 'post.scheduled', {
+      postId: post.id,
+      scheduledAt: schedule.scheduledAt.toISOString(),
+      pages: targets.map((target) => ({ pageId: target.id, pageName: target.name, network: target.type })),
+      message: input.message,
+    });
   }
 
   if (schedule.publishMode === 'native' && schedule.scheduledAt) {

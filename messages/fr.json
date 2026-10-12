@@ -1116,7 +1116,8 @@
     "targetNotFound": "Page introuvable.",
     "keyDateNotFound": "Date clé introuvable.",
     "seasonNotFound": "Mode saisonnier introuvable.",
-    "undoTooLate": "Trop tard pour annuler : la publication est déjà en cours d’envoi."
+    "undoTooLate": "Trop tard pour annuler : la publication est déjà en cours d’envoi.",
+    "webhookNotFound": "Ce webhook n’existe pas."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -1229,6 +1230,10 @@
       },
       "workspace": {
         "exported": "a demandé un export complet"
+      },
+      "webhook": {
+        "created": "a ajouté un webhook",
+        "deleted": "a supprimé un webhook"
       }
     },
     "byDeparted": "Une personne qui n’est plus dans cet espace",
@@ -2749,7 +2754,10 @@
         "inboxDigest": "E-mail des nouveaux commentaires et messages",
         "queueEmpty": "E-mail de file vide",
         "captionTests": "Tests de légendes : lecture des résultats",
-        "bestTimes": "Meilleurs moments : ajout d’horaires"
+        "bestTimes": "Meilleurs moments : ajout d’horaires",
+        "webhooks": "Webhooks sortants",
+        "exports": "Exports d’espace",
+        "holidays": "Jours fériés"
       }
     },
     "sessions": {
@@ -3354,5 +3362,51 @@
     "rule": "Ce que fait la file",
     "shiftMinutes": "Minutes (négatif pour plus tôt)",
     "extraTimes": "Horaires en plus (HH:mm, séparés par des virgules)"
+  },
+  "webhooks": {
+    "title": "Webhooks",
+    "subtitle": "Envoyez ce qui se passe dans cet espace vers Zapier, n8n, Make ou votre propre serveur, au fil de l’eau.",
+    "listTitle": "Vos webhooks",
+    "listHint": "Chacun reçoit les événements choisis, signés avec son propre secret.",
+    "add": "Ajouter un webhook",
+    "none": "Aucun webhook pour l’instant. Ajoutez-en un pour envoyer les publications, les échecs, les nouveaux commentaires et plus encore vers un autre outil.",
+    "name": "Nom",
+    "namePlaceholder": "Automatisation Client A",
+    "url": "Adresse (https)",
+    "urlHint": "Une adresse https:// publique. Les redirections ne sont pas suivies.",
+    "events": "Événements",
+    "event_post_scheduled": "Publication programmée",
+    "event_post_published": "Publication publiée",
+    "event_post_failed": "Publication en échec",
+    "event_comment_received": "Nouveau commentaire",
+    "event_page_disconnected": "Page déconnectée",
+    "event_report_ready": "Rapport envoyé",
+    "on": "Activé",
+    "test": "Envoyer un test",
+    "testing": "Envoi du test…",
+    "testSent": "Test livré : l’adresse a répondu avec succès.",
+    "testFailed": "Test non livré : {error}",
+    "deliveries": "Journal des envois",
+    "noDeliveries": "Rien n’a encore été envoyé.",
+    "colWhen": "Quand",
+    "colEvent": "Événement",
+    "colResult": "Résultat",
+    "status_delivered": "Livré",
+    "status_pending": "{attempts, plural, =0 {Pas encore envoyé} one {Un échec, nouvel essai prévu} other {# échecs, nouvel essai prévu}}",
+    "status_failed": "{attempts, plural, one {Non livré} other {Non livré après # essais}}",
+    "redeliver": "Renvoyer",
+    "remove": "Supprimer",
+    "removeConfirm": "Supprimer « {name} » ?",
+    "removeConfirmBody": "Il ne reçoit plus aucun événement et son journal des envois est effacé.",
+    "lastSent": "Dernier envoi livré {when}",
+    "never": "Rien de livré pour l’instant",
+    "viaApi": "Ajouté par l’API",
+    "secretTitle": "Copiez le secret de signature maintenant",
+    "secretHint": "Il n’est affiché qu’une seule fois. Votre récepteur s’en sert pour vérifier que chaque requête vient bien de cette application.",
+    "secretDone": "Je l’ai copié",
+    "howTitle": "Comment fonctionnent les envois",
+    "howBody": "Chaque événement est envoyé en POST, en JSON, avec ces en-têtes. Calculez le HMAC-SHA256 de l’horodatage, d’un point et du corps brut avec votre secret, comparez-le à la signature et refusez les horodatages trop anciens.",
+    "howRetries": "Une réponse autre que 2xx est retentée après 1 minute, 5 minutes, 30 minutes, 2 heures et 12 heures, puis abandonnée. L’identifiant de l’envoi reste le même, votre récepteur peut donc ignorer les doublons.",
+    "howZapier": "Zapier, n8n et Make peuvent aussi s’abonner eux-mêmes : POST /api/v1/webhooks avec une clé API d’un propriétaire ou d’un admin autorisée à écrire, et DELETE /api/v1/webhooks/ID pour arrêter."
   }
 }
