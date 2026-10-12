@@ -49,6 +49,9 @@ export default async function SettingsPage() {
         options={{
           requiresApproval: workspace.requiresApproval,
           weekStartsOn: workspace.weekStartsOn,
+          businessDays: workspace.businessDays,
+          businessStart: workspace.businessStart,
+          businessEnd: workspace.businessEnd,
           utmSource: workspace.utmSource ?? '',
           utmMedium: workspace.utmMedium ?? '',
           utmCampaignTemplate: workspace.utmCampaignTemplate ?? '',

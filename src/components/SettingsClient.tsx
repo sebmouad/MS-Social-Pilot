@@ -14,6 +14,10 @@ export interface WorkspaceOptions {
   requiresApproval: boolean;
   /** 0 Sunday … 6 Saturday. */
   weekStartsOn: number;
+  /** Inbox response time counts only these days and hours; no days = all the time. */
+  businessDays: number[];
+  businessStart: number;
+  businessEnd: number;
   utmSource: string;
   utmMedium: string;
   utmCampaignTemplate: string;
@@ -184,6 +188,57 @@ export function SettingsClient({
             <p className="hint">{t('weekStartsOnHint')}</p>
           </div>
         </div>
+        <fieldset className="mt-4">
+          <legend className="label">{t('businessHours')}</legend>
+          <div className="flex flex-wrap gap-2">
+            {[1, 2, 3, 4, 5, 6, 0].map((day) => {
+              const on = settings.businessDays.includes(day);
+              return (
+                <label key={day} className={`cursor-pointer rounded-full px-3 py-1.5 text-sm font-semibold ${on ? 'bg-brand-50 text-brand-600' : 'bg-white text-slate-700 shadow-surface'}`}>
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={on}
+                    onChange={() =>
+                      setSettings({
+                        ...settings,
+                        businessDays: on ? settings.businessDays.filter((d) => d !== day) : [...settings.businessDays, day].sort(),
+                      })
+                    }
+                  />
+                  {new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2024, 0, 7 + day)))}
+                </label>
+              );
+            })}
+          </div>
+          {settings.businessDays.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+              <label htmlFor="businessStart">{t('businessFrom')}</label>
+              <select
+                id="businessStart"
+                className="input w-auto"
+                value={settings.businessStart}
+                onChange={(event) => setSettings({ ...settings, businessStart: Number(event.target.value) })}
+              >
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <option key={hour} value={hour}>{`${String(hour).padStart(2, '0')}:00`}</option>
+                ))}
+              </select>
+              <label htmlFor="businessEnd">{t('businessTo')}</label>
+              <select
+                id="businessEnd"
+                className="input w-auto"
+                value={settings.businessEnd}
+                onChange={(event) => setSettings({ ...settings, businessEnd: Number(event.target.value) })}
+              >
+                {Array.from({ length: 24 }, (_, index) => index + 1).map((hour) => (
+                  <option key={hour} value={hour}>{`${String(hour % 24).padStart(2, '0')}:00`}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <p className="hint">{t('businessHoursHint')}</p>
+        </fieldset>
         <div className="mt-4 sm:max-w-xs">
           <label className="label" htmlFor="spamGapMinutes">
             {t('spamGap')}

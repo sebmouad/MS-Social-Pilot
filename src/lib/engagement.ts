@@ -595,8 +595,9 @@ export async function replyToCommentAs(options: {
       fromName: found.comment.postTarget.target.name,
       fromId: found.comment.postTarget.target.providerId,
       createdTime: new Date(),
+      sentById: options.userId,
     },
-    update: { message: options.message },
+    update: { message: options.message, sentById: options.userId },
   });
 
   return { outcome: 'ok', remoteId };
@@ -1410,8 +1411,9 @@ export async function replyToConversationAs(options: {
         fromId: pageId,
         message: options.message,
         createdTime: now,
+        sentById: options.userId,
       },
-      update: {},
+      update: { sentById: options.userId },
     });
 
     await tx.conversation.update({

@@ -141,7 +141,8 @@
       "ads": "Ads",
       "analysis": "Analysis",
       "compare": "Compare pages",
-      "total": "All profiles"
+      "total": "All profiles",
+      "responseTime": "Response time"
     },
     "byPost": "Impressions and interaction per post",
     "byPostHint": "One row per post per destination — the same post can perform very differently on two pages, and averaging that away hides the signal.",
@@ -1873,7 +1874,9 @@
     "scheduleAiRecapHint": "What went up or down against the period before, and why, from these figures only. Counts towards your AI allowance.",
     "scheduleAiRecapBadge": "AI summary",
     "section_goals": "Goals",
-    "sectionHint_goals": "Monthly targets and the pace towards them"
+    "sectionHint_goals": "Monthly targets and the pace towards them",
+    "section_responseTime": "Response time",
+    "sectionHint_responseTime": "How fast comments and messages were answered"
   },
   "settings": {
     "addTime": "Add time",
@@ -1948,7 +1951,11 @@
     "undoSend": "Undo send",
     "undoSendOff": "Off — publish straight away",
     "undoSendSeconds": "{seconds, plural, one {# second} other {# seconds}}",
-    "undoSendHint": "“Publish now” waits this long, with an Undo button, before the post goes out. Undone, it becomes a draft."
+    "undoSendHint": "“Publish now” waits this long, with an Undo button, before the post goes out. Undone, it becomes a draft.",
+    "businessHours": "Business hours",
+    "businessFrom": "From",
+    "businessTo": "to",
+    "businessHoursHint": "Response times count only these days and hours, on the workspace's clock. Pick no day to count every hour."
   },
   "setup": {
     "title": "Set up MS Social Pilot",
@@ -3711,5 +3718,29 @@
     "removeConfirm": "Remove this note?",
     "saveFailed": "Couldn’t add the note. Check the day is inside the period and try again.",
     "removeFailed": "Couldn’t remove the note. Try again."
+  },
+  "responseTime": {
+    "emptyTitle": "Nobody wrote to these Pages in this period",
+    "emptyBody": "Comments and messages from people appear here once the sync has read them. Try a longer period.",
+    "businessHoursOn": "Times count business hours only, as set in Settings.",
+    "businessHoursOff": "Times count every hour. Set business hours in Settings to leave nights and days off out.",
+    "byPage": "By Page",
+    "byMember": "Who answered",
+    "byMemberHint": "First answers only. Answers written on Facebook itself are counted together.",
+    "page": "Page",
+    "member": "Member",
+    "waiting": "Waiting",
+    "answered": "First answers",
+    "answeredShare": "Answered",
+    "medianFirst": "Median first answer",
+    "slowestFirst": "Slowest first answer",
+    "medianResolve": "Median until done",
+    "comments": "{page} · comments",
+    "messages": "{page} · messages",
+    "onFacebook": "On Facebook",
+    "formerMember": "Former member",
+    "duration_minutes": "{major, plural, one {# min} other {# min}}",
+    "duration_hours": "{major} h {minor} min",
+    "duration_days": "{major, plural, one {# day} other {# days}} {minor} h"
   }
 }

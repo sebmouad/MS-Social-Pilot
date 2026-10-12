@@ -1,5 +1,5 @@
 /** The parts a report can be made of, in the order they print. */
-export const REPORT_SECTIONS = ['analysis', 'goals', 'audience', 'published', 'destinations', 'topPosts'] as const;
+export const REPORT_SECTIONS = ['analysis', 'goals', 'responseTime', 'audience', 'published', 'destinations', 'topPosts'] as const;
 export type ReportSection = (typeof REPORT_SECTIONS)[number];
 
 /** `?sections=a,b` to the sections it names; all of them when absent or empty. */

@@ -14,6 +14,7 @@ import { ReportControls } from '@/components/ReportControls';
 import { ReportBuilder } from '@/components/ReportBuilder';
 import { GoalsView } from '@/components/GoalsView';
 import { readGoals } from '@/lib/page-goals';
+import { ResponseTimeView } from '@/components/analysis/ResponseTimeView';
 import { ReportTemplates } from '@/components/ReportTemplates';
 import { ReportSchedules } from '@/components/ReportSchedules';
 import { parseSections } from '@/lib/report-sections';
@@ -292,6 +293,15 @@ export default async function ReportsPage({
                   <div className="card p-5">
                     <GoalsView pages={goals} showNames={false} />
                   </div>
+                </section>
+              )}
+
+              {has('responseTime') && selected && (
+                <section aria-labelledby="report-response-time" className="space-y-4">
+                  <h2 id="report-response-time" className="text-[17px] font-bold text-slate-900">
+                    {t('section_responseTime')}
+                  </h2>
+                  <ResponseTimeView workspaceId={auth.workspace.id} targetIds={[selected.id]} from={from} to={to} timeZone={timezone} nested />
                 </section>
               )}
 

@@ -274,6 +274,10 @@ export const workspaceSettingsSchema = z.object({
   timezone: timezone.optional(),
   defaultLocale: z.nativeEnum(Locale).optional(),
   weekStartsOn: z.number().int().min(0).max(6).optional(),
+  // Business hours for the inbox response time (H11); no days means every hour counts.
+  businessDays: z.array(z.number().int().min(0).max(6)).max(7).transform((days) => [...new Set(days)].sort()).optional(),
+  businessStart: z.number().int().min(0).max(23).optional(),
+  businessEnd: z.number().int().min(1).max(24).optional(),
   requiresApproval: z.boolean().optional(),
 
   // Link tagging. Empty string means "clear it", so these are nullable rather

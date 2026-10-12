@@ -769,9 +769,17 @@ setup from Phase 0.2 (marked AI).
   Refused once the time is up so it never races the worker. Not applied to
   staggered sends (one Undo cannot take back the later Pages), caption tests,
   translations, the public API or "Post now" on an existing post.*
-- **H11. Inbox response time (S)** — first-response and resolution time per
+- **H11. Inbox response time (S)** ✅ — first-response and resolution time per
   Page and per member (median, slowest), business hours aware; in analytics
   and reports.
+  *Done 2026-10-12: Analytics › Response time and a "Response time" report
+  section, read from stored comments and messages (no Graph calls). A wait
+  starts at someone else's top-level comment or the first of a run of
+  messages, ends at the Page's first answer; "until done" is the inbox's
+  done mark. Replies and messages sent from the app record the member
+  (`sent_by_id`); answers written on Facebook count as "On Facebook".
+  Workspace business hours (days + hours, workspace clock) in Settings; no
+  days means every hour counts.*
 - **H12. Goals per Page (S)** ✅ — monthly targets (followers, views, engagement,
   posts) with progress bars and pace ("on track / behind"), in the dashboard
   and reports.

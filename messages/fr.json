@@ -141,7 +141,8 @@
       "ads": "Publicités",
       "analysis": "Analyse",
       "compare": "Comparer les pages",
-      "total": "Tous les profils"
+      "total": "Tous les profils",
+      "responseTime": "Temps de réponse"
     },
     "byPost": "Impressions et interactions par publication",
     "byPostHint": "Une ligne par publication et par destination : une même publication peut réagir très différemment sur deux pages, et faire la moyenne masquerait l'information utile.",
@@ -1873,7 +1874,9 @@
     "scheduleAiRecapHint": "Ce qui a augmenté ou baissé par rapport à la période précédente, et pourquoi, uniquement à partir de ces chiffres. Compte dans votre quota d’IA.",
     "scheduleAiRecapBadge": "Résumé IA",
     "section_goals": "Objectifs",
-    "sectionHint_goals": "Objectifs mensuels et rythme pour les atteindre"
+    "sectionHint_goals": "Objectifs mensuels et rythme pour les atteindre",
+    "section_responseTime": "Temps de réponse",
+    "sectionHint_responseTime": "La rapidité des réponses aux commentaires et aux messages"
   },
   "settings": {
     "addTime": "Ajouter un créneau",
@@ -1948,7 +1951,11 @@
     "undoSend": "Annulation de l’envoi",
     "undoSendOff": "Désactivée — publier tout de suite",
     "undoSendSeconds": "{seconds, plural, one {# seconde} other {# secondes}}",
-    "undoSendHint": "« Publier maintenant » attend ce délai, avec un bouton Annuler, avant que la publication parte. Annulée, elle devient un brouillon."
+    "undoSendHint": "« Publier maintenant » attend ce délai, avec un bouton Annuler, avant que la publication parte. Annulée, elle devient un brouillon.",
+    "businessHours": "Heures d’ouverture",
+    "businessFrom": "De",
+    "businessTo": "à",
+    "businessHoursHint": "Les temps de réponse ne comptent que ces jours et ces heures, à l’heure de l’espace de travail. Ne cochez aucun jour pour compter toutes les heures."
   },
   "setup": {
     "title": "Configurer MS Social Pilot",
@@ -3711,5 +3718,29 @@
     "removeConfirm": "Retirer cette note ?",
     "saveFailed": "Impossible d’ajouter la note. Vérifiez que le jour est dans la période et réessayez.",
     "removeFailed": "Impossible de retirer la note. Réessayez."
+  },
+  "responseTime": {
+    "emptyTitle": "Personne n’a écrit à ces Pages sur cette période",
+    "emptyBody": "Les commentaires et messages apparaissent ici une fois lus par la synchronisation. Essayez une période plus longue.",
+    "businessHoursOn": "Les temps ne comptent que les heures d’ouverture définies dans les Paramètres.",
+    "businessHoursOff": "Les temps comptent toutes les heures. Définissez des heures d’ouverture dans les Paramètres pour exclure les nuits et jours de repos.",
+    "byPage": "Par Page",
+    "byMember": "Qui a répondu",
+    "byMemberHint": "Premières réponses seulement. Les réponses écrites directement sur Facebook sont regroupées.",
+    "page": "Page",
+    "member": "Membre",
+    "waiting": "En attente",
+    "answered": "Premières réponses",
+    "answeredShare": "Répondu",
+    "medianFirst": "Première réponse (médiane)",
+    "slowestFirst": "Première réponse la plus lente",
+    "medianResolve": "Jusqu’à « traité » (médiane)",
+    "comments": "{page} · commentaires",
+    "messages": "{page} · messages",
+    "onFacebook": "Sur Facebook",
+    "formerMember": "Ancien membre",
+    "duration_minutes": "{major, plural, one {# min} other {# min}}",
+    "duration_hours": "{major} h {minor} min",
+    "duration_days": "{major, plural, one {# jour} other {# jours}} {minor} h"
   }
 }

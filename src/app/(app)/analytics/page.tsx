@@ -28,6 +28,7 @@ import { UNWINDOWED_VIEWS, defaultAnalyticsView, parseAnalyticsView } from '@/li
 import { isPinnable, readPinnedFigures } from '@/lib/pinned-metrics';
 import { PinnedTiles } from '@/components/analysis/PinnedTiles';
 import { TotalProfilesView } from '@/components/analysis/TotalProfilesView';
+import { ResponseTimeView } from '@/components/analysis/ResponseTimeView';
 import { Pagination } from '@/components/Pagination';
 import { pageHref, pageNumber, paginate } from '@/lib/paging';
 import { prisma } from '@/lib/prisma';
@@ -351,6 +352,16 @@ export default async function AnalyticsPage({
           firstReadPending={!selected.firstReadAt}
           params={params}
           pageName={selected.name}
+        />
+      )}
+
+      {view === 'responseTime' && (
+        <ResponseTimeView
+          workspaceId={auth.workspace.id}
+          targetIds={pages.map((page) => page.id)}
+          from={from}
+          to={to}
+          timeZone={timezone}
         />
       )}
 

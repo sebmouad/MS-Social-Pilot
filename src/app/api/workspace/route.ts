@@ -26,6 +26,9 @@ export const PATCH = route(async (request: Request) => {
   assign('timezone', input.timezone);
   assign('defaultLocale', input.defaultLocale);
   assign('weekStartsOn', input.weekStartsOn);
+  assign('businessDays', input.businessDays);
+  assign('businessStart', input.businessStart);
+  assign('businessEnd', input.businessEnd);
   assign('requiresApproval', input.requiresApproval);
   assign('utmSource', input.utmSource);
   assign('utmMedium', input.utmMedium);

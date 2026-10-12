@@ -87,7 +87,10 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
   Compare pages (by group, line per profile with legend toggles, totals row),
   Overview (every metric Facebook serves, technical coverage folded, ★ pins a
   metric as a tile on Analysis / All profiles), By post (all selected profiles
-  or one), Interaction, Audience (world map, cities,
+  or one), Response time (H11: per Page, comments and messages, waiting /
+  answered share / median and slowest first answer / median until done; per
+  member who answered, Facebook-side answers grouped; business hours from
+  Settings; also a report section), Interaction, Audience (world map, cities,
   followers gained/lost), Video, Comments (pull, reply, hide, delete), Reviews,
   Inbox (after Meta step 2), Other posts (posted outside the app), Instagram (when
   on). Date range presets + custom; compare with previous period or a year earlier.
@@ -131,7 +134,7 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
 - **Client links** `/settings/sharing`: portal (to review + calendar + results),
   review link (approve / request changes / comment, no account), calendar link
   (read-only, includes Facebook-side posts); revocable; shown once.
-- **Settings**: Workspace (timezone, approvals, UTM, shortener, undo send, AI voice, report
+- **Settings**: Workspace (timezone, business hours, approvals, UTM, shortener, undo send, AI voice, report
   branding), Team (roles owner/admin/editor/contributor, per-Page access, roles
   guide), Pages & groups (per-Page voice, audience, watermark & UTM, groups, labels; audience =
   countries, languages, time zone, cultural calendars, with workspace defaults

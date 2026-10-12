@@ -18,6 +18,7 @@ export const ANALYTICS_VIEWS = [
   'comments',
   'reviews',
   'inbox',
+  'responseTime',
   'external',
   'instagram',
 ] as const;

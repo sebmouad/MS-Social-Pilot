@@ -210,6 +210,11 @@ model Workspace {
   defaultLocale Locale @default(en)
   /// First column of the calendar and first day of a reporting week: 0 Sunday … 6 Saturday.
   weekStartsOn  Int    @default(1)
+  /// Business hours (NEXT_PHASES H11): inbox response times count only these.
+  /// Days 0 Sunday … 6 Saturday; empty counts every hour.
+  businessDays  Int[]  @default([])
+  businessStart Int    @default(9)
+  businessEnd   Int    @default(18)
 
   /// Turns the approval workflow on for this client.
   requiresApproval Boolean @default(false)
@@ -1128,6 +1133,8 @@ model PostComment {
   firstSeenAt    DateTime  @default(now())
   /// Marked done in the inbox; null while it waits on someone.
   resolvedAt     DateTime?
+  /// The member who wrote this reply from the app (H11); null otherwise.
+  sentById       String?
 
   postTarget PostTarget @relation(fields: [postTargetId], references: [id], onDelete: Cascade)
 
@@ -1189,6 +1196,8 @@ model ConversationMessage {
   createdTime    DateTime
   /// When the sync first stored it; never moves (the inbox email counts by it).
   firstSeenAt    DateTime @default(now())
+  /// The member who sent this message from the app (H11); null otherwise.
+  sentById       String?
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 

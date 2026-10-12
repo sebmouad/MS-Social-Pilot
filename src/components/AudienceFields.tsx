@@ -31,9 +31,9 @@ function Chips({ items, label, onRemove, removeLabel }: { items: string[]; label
   return (
     <ul className="mb-2 flex flex-wrap gap-1.5">
       {items.map((item) => (
-        <li key={item} className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-0.5 ps-2.5 pe-1 text-sm text-brand-800">
+        <li key={item} className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-0.5 ps-2.5 pe-1 text-sm text-brand-800" suppressHydrationWarning>
           {label(item)}
-          <button type="button" className="rounded-full p-1 hover:bg-brand-100" aria-label={removeLabel(label(item))} onClick={() => onRemove(item)}>
+          <button type="button" className="rounded-full p-1 hover:bg-brand-100" suppressHydrationWarning aria-label={removeLabel(label(item))} onClick={() => onRemove(item)}>
             <Icon name="close" size={12} />
           </button>
         </li>
@@ -130,7 +130,8 @@ export function AudienceFields({
         >
           <option value="">{t('addCountry')}</option>
           {countries.map((country) => (
-            <option key={country.code} value={country.code}>
+            // Node and the browser carry different ICU data, so a name can differ by a word.
+            <option key={country.code} value={country.code} suppressHydrationWarning>
               {country.name}
             </option>
           ))}
