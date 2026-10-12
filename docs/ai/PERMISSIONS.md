@@ -40,6 +40,12 @@ Order: owner 4 > admin 3 > editor 2 > contributor 1. A workspace owner is
 Marking an inbox comment or conversation done / not done (`POST /api/inbox`)
 needs no role: any member who can see the Page may do it, like reading it.
 It changes only the team's shared state in this app, never Facebook.
+
+Moderation rules (`/inbox/rules`, `/api/moderation/*`) use the existing
+`canModerateComments` (editor+): a rule only hides, replies or alerts, which an
+editor may already do by hand, and undoing one is the same right. A member
+limited to some Pages sees and edits only rules that name only their Pages,
+and cannot write an "every Page" rule. **For the owner's audit (2026-10-12).**
 **For the owner's audit (2026-10-12).**
 
 Notifications about one Page (failed post, hourly inbox email) go only to

@@ -263,6 +263,8 @@ model Workspace {
   emailLogs            EmailLog[]
   instagramAccounts    InstagramAccount[]
   adAccounts           AdAccount[]
+  moderationRules      ModerationRule[]
+  moderationActions    ModerationAction[]
 
   @@map("workspaces")
 }
@@ -821,6 +823,8 @@ model NotificationSetting {
   onQueueEmpty       Boolean   @default(true)
   /// Somebody else changed a post I wrote that was not out yet.
   onDraftUpdated     Boolean   @default(true)
+  /// A comment matched a moderation rule set to alert.
+  onModerationAlert  Boolean   @default(true)
   /// Up to when the inbox email has already counted (the next one starts here).
   inboxDigestAt      DateTime?
 
@@ -1549,4 +1553,64 @@ model ClientInvitation {
 
   @@index([email])
   @@map("client_invitations")
+}
+
+/// Comment moderation rule (NEXT_PHASES G7): what to look for in new comments
+/// on a workspace's Facebook Pages, and what the worker does when it finds it.
+model ModerationRule {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  enabled     Boolean  @default(true)
+  /// Pages it watches; empty means every Page of the workspace.
+  targetIds   String[] @default([])
+  /// `links`, `phones` or `keywords` (src/lib/moderation.ts).
+  match       String
+  keywords    String[] @default([])
+  /// `hide`, `alert` or `reply`.
+  action      String
+  replyText   String?
+  /// At most this many automatic actions in any 24 hours.
+  dailyCap    Int      @default(20)
+  /// A reply rule answers each person once, however often they comment.
+  oncePerUser Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actions   ModerationAction[]
+
+  @@index([workspaceId])
+  @@map("moderation_rules")
+}
+
+/// What a moderation rule did, kept so it can be read and undone.
+model ModerationAction {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  ruleId          String?
+  /// The rule's name at the time, kept when the rule is deleted.
+  ruleName        String
+  targetId        String
+  remoteCommentId String
+  authorId        String?
+  authorName      String?
+  /// The comment's text at the time (first 500 characters).
+  message         String
+  action          String
+  /// The Page's reply, for a reply rule: what an undo deletes.
+  replyRemoteId   String?
+  /// Why Facebook refused, when it did; nothing was changed then.
+  error           String?
+  undoneAt        DateTime?
+  undoneById      String?
+  createdAt       DateTime  @default(now())
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  rule      ModerationRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@unique([ruleId, remoteCommentId])
+  @@index([workspaceId, createdAt])
+  @@index([ruleId, createdAt])
+  @@map("moderation_actions")
 }

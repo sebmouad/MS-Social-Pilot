@@ -523,12 +523,15 @@ most time), the rest after Phase D2. S/M/L = effort.
   count and suggest **auto-stagger** (spread over N hours) and **AI caption
   variants** per Page; workspace setting for the minimum gap. Never block —
   explain and offer the fix.
-- **G7. Comment moderation rules (M)** — rules per Page or group: hide comments
+- **G7. Comment moderation rules (M)** ✅ — rules per Page or group: hide comments
   with links / phone numbers / keywords, alert on keywords, auto-reply to
   matching questions (with a daily cap and "only once per user"); log every
   automatic action, undo from the log. Reminder: a Page cannot hide its own
   comments (META_API_NOTES). Uses `pages_manage_engagement` (already
   requested); comment webhooks make it real time (`webhook-setup` skill).
+  *Done: `/inbox/rules`, applied by the comment sync (`src/lib/moderation.ts`);
+  per Page or all Pages (groups: pick their Pages); real time waits for comment
+  webhooks.*
 - **G8. Saved replies (S)** — reusable answers with variables (`{first_name}`,
   `{page}`) for comments and Messenger; shortcut `/` in the reply box; shared
   per workspace.

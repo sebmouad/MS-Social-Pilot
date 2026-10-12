@@ -19,6 +19,8 @@ export const ACTIVITY_ACTIONS = [
   'comment.unhidden',
   'conversation.replied',
   'instagram.discovered',
+  'moderation.ruleChanged',
+  'moderation.undone',
   'post.approved',
   'post.bulkAction',
   'post.bulkUploaded',

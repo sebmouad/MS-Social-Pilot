@@ -160,6 +160,13 @@ export const errors = {
   previewHostBlocked: () =>
     new AppError({ key: 'errors.previewHostBlocked', fallback: 'That host is not reachable for link previews.', status: 400 }),
 
+  ruleNeedsKeywords: () =>
+    new AppError({ key: 'errors.ruleNeedsKeywords', fallback: 'Add at least one word to look for.', status: 400 }),
+  ruleNeedsReply: () =>
+    new AppError({ key: 'errors.ruleNeedsReply', fallback: 'Write the reply the Page should post.', status: 400 }),
+  undoFailed: (reason: string) =>
+    new AppError({ key: 'errors.undoFailed', fallback: `This could not be undone: ${reason}`, params: { reason }, status: 502 }),
+
   notFound: (what = 'errors.notFound') => new AppError({ key: what, fallback: 'Not found.', status: 404 }),
 
   noScheduledTime: () =>

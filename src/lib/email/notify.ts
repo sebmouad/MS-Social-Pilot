@@ -11,6 +11,7 @@ import {
   connectionExpiredEmail,
   draftUpdatedEmail,
   inboxDigestEmail,
+  moderationAlertEmail,
   publishFailureEmail,
   queueEmptyEmail,
   tokenExpiringEmail,
@@ -28,7 +29,14 @@ import {
  * problem must not undo either.
  */
 
-type Preference = 'onPublishFailure' | 'onTokenExpiry' | 'onApprovalRequest' | 'onApprovalDecision' | 'onQueueEmpty' | 'onDraftUpdated';
+type Preference =
+  | 'onPublishFailure'
+  | 'onTokenExpiry'
+  | 'onApprovalRequest'
+  | 'onApprovalDecision'
+  | 'onQueueEmpty'
+  | 'onDraftUpdated'
+  | 'onModerationAlert';
 
 /** Events a member can switch off for one Page (`NotificationMute.event`). */
 export const PAGE_EVENTS = ['publishFailure', 'newInbox', 'queueEmpty'] as const;
@@ -434,6 +442,29 @@ export async function notifyEmptyQueues(now: Date = new Date()): Promise<number>
     }, 'queue empty');
   }
   return told;
+}
+
+/** A new comment matched a moderation rule set to alert. Members who may moderate and see the Page. */
+export async function notifyModerationAlert(options: {
+  workspaceId: string;
+  targetId: string;
+  page: string;
+  rule: string;
+  author: string | null;
+  message: string;
+}): Promise<void> {
+  await safely(async () => {
+    const workspace = await prisma.workspace.findUnique({ where: { id: options.workspaceId }, select: { name: true } });
+    if (!workspace) return;
+    const recipients = await recipientsFor(options.workspaceId, 'onModerationAlert', {
+      roles: [WorkspaceRole.owner, WorkspaceRole.admin, WorkspaceRole.editor],
+      page: { targetId: options.targetId, event: 'newInbox' },
+    });
+    for (const recipient of recipients) {
+      const rendered = moderationAlertEmail({ locale: recipient.locale, workspace: workspace.name, ...options });
+      await sendEmail({ to: recipient.email, template: 'moderationAlert', workspaceId: options.workspaceId, ...rendered });
+    }
+  }, 'moderation alert');
 }
 
 /** Statuses of a post that is still being worked on. */

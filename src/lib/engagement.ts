@@ -8,6 +8,7 @@ import { parseInsights, toJson, toJsonOrNull } from './json';
 import { asGraphError, isMissingObject, pageRatingsAvailable } from './facebook/graph';
 import { fetchInsights } from './facebook/analytics';
 import { logActivity } from './scheduler/runner';
+import { applyModerationRules } from './moderation';
 import { syncExternalPostInsights } from './analytics';
 import {
   deleteComment,
@@ -36,7 +37,7 @@ import {
  * the pass.
  */
 
-function tokenFor(target: {
+export function tokenFor(target: {
   accessToken: string | null;
   socialAccount: { accessToken: string } | null;
 }): string | null {
@@ -169,6 +170,8 @@ export async function syncCommentsFor(postTargetId: string): Promise<number> {
       // Facebook can list a comment twice across two pages of one walk.
       skipDuplicates: true,
     });
+    // New comments, once each, through the workspace's moderation rules (G7).
+    await applyModerationRules(postTargetId, fresh);
   }
 
   // Counts and hidden state change after the fact; the text does not, but

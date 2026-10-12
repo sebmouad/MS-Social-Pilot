@@ -276,6 +276,31 @@ export function queueEmptyEmail(options: {
   return { subject: t('email.queueEmpty.subject', { page: options.page }), ...block };
 }
 
+/** A new comment matched a moderation rule set to alert (NEXT_PHASES G7). */
+export function moderationAlertEmail(options: {
+  locale: Locale;
+  workspace: string;
+  page: string;
+  rule: string;
+  author: string | null;
+  message: string;
+}): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) => translate(options.locale, key, params);
+
+  const block = layout({
+    heading: t('email.moderationAlert.heading', { rule: options.rule }),
+    body: t('email.moderationAlert.body', {
+      page: options.page,
+      author: options.author ?? t('email.moderationAlert.someone'),
+      message: options.message.slice(0, 500),
+    }),
+    cta: { label: t('email.moderationAlert.cta'), url: `${env.appUrl}/inbox` },
+    footer: t('email.footer', { workspace: options.workspace }),
+  });
+
+  return { subject: t('email.moderationAlert.subject', { page: options.page, rule: options.rule }), ...block };
+}
+
 export function tokenExpiringEmail(options: {
   locale: Locale;
   workspace: string;

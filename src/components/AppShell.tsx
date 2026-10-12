@@ -206,7 +206,7 @@ export function AppShell({
         { href: '/feeds', label: t('feeds'), icon: 'feeds' },
       ],
     },
-    { key: 'inbox', label: t('inbox'), rail: t('rail_inbox'), icon: 'inbox', items: [{ href: '/inbox', label: t('inbox'), icon: 'inbox' }] },
+    { key: 'inbox', label: t('inbox'), rail: t('rail_inbox'), icon: 'inbox', items: [{ href: '/inbox', label: t('inbox'), icon: 'inbox' }, { href: '/inbox/rules', label: t('moderation'), icon: 'shield' }] },
     {
       key: 'analyse',
       label: t('section_analyse'),

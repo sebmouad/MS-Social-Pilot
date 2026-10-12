@@ -888,6 +888,13 @@
       "body": "Quelqu’un s’est connecté à votre compte depuis {device} ({place}) le {when}. Si c’était vous, rien à faire. Sinon, déconnectez ce navigateur et changez votre mot de passe.",
       "bodyNoPlace": "Quelqu’un s’est connecté à votre compte depuis {device} le {when}. Si c’était vous, rien à faire. Sinon, déconnectez ce navigateur et changez votre mot de passe.",
       "cta": "Voir les navigateurs connectés"
+    },
+    "moderationAlert": {
+      "subject": "{page} : un commentaire correspond à « {rule} »",
+      "heading": "Un commentaire correspond à « {rule} »",
+      "body": "{author} a écrit sur {page} : « {message} ». Ouvrez la boîte de réception pour répondre, masquer ou supprimer le commentaire.",
+      "someone": "Quelqu’un",
+      "cta": "Ouvrir la boîte de réception"
     }
   },
   "engagement": {
@@ -1089,7 +1096,10 @@
     "rootAlreadyMember": "Cette personne est déjà membre de cet espace de travail.",
     "rootLastOwner": "Un espace de travail doit avoir un propriétaire. Nommez d’abord quelqu’un d’autre propriétaire.",
     "exportNeedsAllPages": "Cet export couvre tout l’espace de travail. Demandez à un administrateur l’accès à tous les profils.",
-    "noScheduledTime": "Cette publication n’a pas de date à déplacer. Ouvrez-la pour en choisir une."
+    "noScheduledTime": "Cette publication n’a pas de date à déplacer. Ouvrez-la pour en choisir une.",
+    "ruleNeedsKeywords": "Ajoutez au moins un mot à rechercher.",
+    "ruleNeedsReply": "Écrivez la réponse que la Page doit publier.",
+    "undoFailed": "Impossible d’annuler : {reason}"
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -1188,6 +1198,10 @@
         "removed": "a retiré quelqu’un de l’espace de travail",
         "roleChanged": "a changé le rôle d’une personne",
         "pageAccessChanged": "a changé les Pages accessibles à une personne"
+      },
+      "moderation": {
+        "ruleChanged": "a modifié une règle de modération",
+        "undone": "a annulé une action de modération automatique"
       }
     },
     "byDeparted": "Une personne qui n’est plus dans cet espace",
@@ -1349,7 +1363,8 @@
     "breadcrumb": "Vous êtes ici",
     "workspaceSettings": "Réglages de l’espace",
     "accountMenu": "Menu de votre compte",
-    "yourAccount": "Votre compte"
+    "yourAccount": "Votre compte",
+    "moderation": "Règles de modération"
   },
   "notifications": {
     "title": "Notifications",
@@ -1398,7 +1413,8 @@
     "perPageToggle": "{event} pour {page}",
     "onQueueEmpty": "Une Page n’a plus de publication programmée",
     "pageEvent_queueEmpty": "Plus rien de programmé",
-    "onDraftUpdated": "Quelqu’un modifie une publication que j’ai écrite avant sa sortie (un e-mail par heure au plus)"
+    "onDraftUpdated": "Quelqu’un modifie une publication que j’ai écrite avant sa sortie (un e-mail par heure au plus)",
+    "onModerationAlert": "Une règle de modération signale un commentaire sur l’une de mes Pages"
   },
   "pageAnalysis": {
     "analyseNow": "Analyser maintenant",
@@ -2920,5 +2936,71 @@
     "aiVariants": "Reformuler le texte pour chaque Page avec l’IA",
     "aiVariantsHint": "La première Page reçoit votre texte ; les autres une reformulation dans leur propre ton. Vous pourrez modifier chaque publication ensuite.",
     "pickAnotherTime": "Choisissez une heure plus éloignée des autres publications, ou changez le texte, pour réduire le risque. Vous pouvez aussi l’envoyer tel quel."
+  },
+  "moderation": {
+    "title": "Règles de modération",
+    "intro": "Les nouveaux commentaires sur vos Pages Facebook sont vérifiés avec ces règles dès que l’application les lit. Une règle peut masquer un commentaire, alerter l’équipe ou répondre au nom de la Page. Tout ce qu’une règle fait est noté ci-dessous et peut être annulé.",
+    "noAccessTitle": "Seuls les éditeurs peuvent gérer les règles de modération",
+    "noAccessHint": "Demandez à un éditeur, administrateur ou propriétaire de cet espace de changer votre rôle si besoin.",
+    "rulesHeading": "Règles",
+    "addRule": "Ajouter une règle",
+    "emptyTitle": "Aucune règle de modération",
+    "emptyHint": "Ajoutez une règle pour masquer les liens indésirables, les numéros de téléphone ou les mots dont vous ne voulez pas sous vos publications, sans surveiller chaque commentaire.",
+    "noPagesHint": "Connectez d’abord une Page Facebook : les règles s’appliquent aux commentaires des Pages Facebook.",
+    "paused": "En pause",
+    "pause": "Mettre en pause",
+    "resume": "Activer",
+    "summary": "{action} quand un commentaire contient {match} · {pages} · jusqu’à {cap, plural, one {# action} other {# actions}} par jour",
+    "allPages": "Toutes les Pages Facebook",
+    "pageCount": "{count, plural, one {# Page} other {# Pages}}",
+    "match": {
+      "links": "un lien",
+      "phones": "un numéro de téléphone",
+      "keywords": "l’un de ces mots"
+    },
+    "action": {
+      "hide": "Le masquer",
+      "alert": "Alerter l’équipe",
+      "reply": "Répondre au nom de la Page"
+    },
+    "done": {
+      "hide": "Masqué",
+      "alert": "Alerte envoyée",
+      "reply": "Répondu"
+    },
+    "deleteConfirm": "Supprimer la règle « {name} » ?",
+    "deleteConfirmBody": "Les nouveaux commentaires ne sont plus vérifiés avec elle. Ce qu’elle a déjà fait reste tel quel, et reste dans le journal.",
+    "saved": "Règle enregistrée. Elle s’applique aux nouveaux commentaires à partir de maintenant.",
+    "formLabel": "Règle de modération",
+    "name": "Nom de la règle",
+    "namePlaceholder": "Par exemple : Masquer les liens indésirables",
+    "when": "Quand un commentaire contient",
+    "then": "Alors",
+    "keywords": "Mots à rechercher",
+    "keywordsPlaceholder": "concours, abonnés gratuits",
+    "keywordsHint": "Séparez-les par des virgules. Majuscules et accents ne comptent pas.",
+    "replyText": "Réponse",
+    "replyHint": "Utilisez '{first_name}' pour le prénom de la personne et '{page}' pour le nom de la Page.",
+    "oncePerUser": "Ne répondre qu’une fois à chaque personne",
+    "pages": "Pages",
+    "allPagesOption": "Toutes les Pages Facebook, y compris celles connectées plus tard",
+    "dailyCap": "Nombre maximal d’actions par jour",
+    "dailyCapHint": "La règle s’arrête après ce nombre d’actions en 24 heures, pour qu’une vague de commentaires n’épuise pas votre quota Facebook.",
+    "saveRule": "Enregistrer la règle",
+    "logHeading": "Ce que les règles ont fait",
+    "logHint": "Les dernières actions automatiques, les plus récentes d’abord.",
+    "logEmptyTitle": "Rien pour l’instant",
+    "logEmptyHint": "Quand une règle agit sur un commentaire, l’action s’affiche ici avec un moyen de l’annuler.",
+    "byRule": "règle « {rule} »",
+    "undone": "Annulé",
+    "someone": "Quelqu’un",
+    "failed": "Facebook a refusé : {reason}",
+    "undoHide": "Réafficher le commentaire",
+    "undoReply": "Supprimer la réponse",
+    "undoHideConfirm": "Réafficher ce commentaire ?",
+    "undoHideBody": "Il redevient visible par tout le monde sur la Page.",
+    "undoReplyConfirm": "Supprimer la réponse de la Page ?",
+    "undoReplyBody": "La réponse est retirée de Facebook. Cette action est définitive.",
+    "undoneOk": "C’est fait. Le journal l’indique comme annulé."
   }
 }

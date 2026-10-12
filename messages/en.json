@@ -888,6 +888,13 @@
       "body": "Someone signed in to your account from {device} ({place}) on {when}. If it was you, there is nothing to do. If not, sign that browser out and change your password.",
       "bodyNoPlace": "Someone signed in to your account from {device} on {when}. If it was you, there is nothing to do. If not, sign that browser out and change your password.",
       "cta": "Review signed-in browsers"
+    },
+    "moderationAlert": {
+      "subject": "{page}: a comment matched “{rule}”",
+      "heading": "A comment matched “{rule}”",
+      "body": "{author} wrote on {page}: “{message}”. Open the inbox to answer, hide or delete it.",
+      "someone": "Someone",
+      "cta": "Open the inbox"
     }
   },
   "engagement": {
@@ -1089,7 +1096,10 @@
     "rootAlreadyMember": "That person is already a member of this workspace.",
     "rootLastOwner": "A workspace needs an owner. Make someone else owner first.",
     "exportNeedsAllPages": "This export covers the whole workspace. Ask an admin for access to every profile.",
-    "noScheduledTime": "This post has no date to move. Open it and set one."
+    "noScheduledTime": "This post has no date to move. Open it and set one.",
+    "ruleNeedsKeywords": "Add at least one word to look for.",
+    "ruleNeedsReply": "Write the reply the Page should post.",
+    "undoFailed": "This could not be undone: {reason}"
   },
   "feeds": {
     "title": "Website auto-share",
@@ -1188,6 +1198,10 @@
         "removed": "removed someone from the workspace",
         "roleChanged": "changed someone’s role",
         "pageAccessChanged": "changed which Pages someone can use"
+      },
+      "moderation": {
+        "ruleChanged": "changed a moderation rule",
+        "undone": "undid an automatic moderation action"
       }
     },
     "byDeparted": "Someone no longer in this workspace",
@@ -1349,7 +1363,8 @@
     "breadcrumb": "You are here",
     "workspaceSettings": "Workspace settings",
     "accountMenu": "Your account menu",
-    "yourAccount": "Your account"
+    "yourAccount": "Your account",
+    "moderation": "Moderation rules"
   },
   "notifications": {
     "title": "Notifications",
@@ -1398,7 +1413,8 @@
     "perPageToggle": "{event} for {page}",
     "onQueueEmpty": "A Page runs out of scheduled posts",
     "pageEvent_queueEmpty": "Nothing scheduled",
-    "onDraftUpdated": "Someone changes a post I wrote before it goes out (one email an hour at most)"
+    "onDraftUpdated": "Someone changes a post I wrote before it goes out (one email an hour at most)",
+    "onModerationAlert": "A moderation rule flags a comment on one of my Pages"
   },
   "pageAnalysis": {
     "analyseNow": "Analyse now",
@@ -2920,5 +2936,71 @@
     "aiVariants": "Reword the caption for each Page with AI",
     "aiVariantsHint": "The first Page gets your words; the others get a rewording in their own voice. You can edit each post afterwards.",
     "pickAnotherTime": "Pick a time further from the other posts, or change the text, to lower the risk. You can also send it as it is."
+  },
+  "moderation": {
+    "title": "Moderation rules",
+    "intro": "New comments on your Facebook Pages are checked against these rules as soon as the app reads them. A rule can hide a comment, alert the team or reply as the Page. Everything a rule does is logged below and can be undone.",
+    "noAccessTitle": "Only editors can manage moderation rules",
+    "noAccessHint": "Ask an editor, admin or owner of this workspace to change your role if you need to.",
+    "rulesHeading": "Rules",
+    "addRule": "Add a rule",
+    "emptyTitle": "No moderation rules yet",
+    "emptyHint": "Add a rule to hide spam links, phone numbers or words you don’t want under your posts, without watching every comment.",
+    "noPagesHint": "Connect a Facebook Page first: rules apply to comments on Facebook Pages.",
+    "paused": "Paused",
+    "pause": "Pause",
+    "resume": "Turn on",
+    "summary": "{action} when a comment contains {match} · {pages} · up to {cap, plural, one {# action} other {# actions}} a day",
+    "allPages": "All Facebook Pages",
+    "pageCount": "{count, plural, one {# Page} other {# Pages}}",
+    "match": {
+      "links": "a link",
+      "phones": "a phone number",
+      "keywords": "one of these words"
+    },
+    "action": {
+      "hide": "Hide it",
+      "alert": "Alert the team",
+      "reply": "Reply as the Page"
+    },
+    "done": {
+      "hide": "Hidden",
+      "alert": "Alert sent",
+      "reply": "Replied"
+    },
+    "deleteConfirm": "Delete the rule “{name}”?",
+    "deleteConfirmBody": "New comments are no longer checked against it. What it already did stays as it is, and stays in the log.",
+    "saved": "Rule saved. It applies to new comments from now on.",
+    "formLabel": "Moderation rule",
+    "name": "Rule name",
+    "namePlaceholder": "For example: Hide spam links",
+    "when": "When a comment contains",
+    "then": "Then",
+    "keywords": "Words to look for",
+    "keywordsPlaceholder": "giveaway, free followers",
+    "keywordsHint": "Separate them with commas. Capitals and accents are ignored.",
+    "replyText": "Reply",
+    "replyHint": "Use '{first_name}' for the commenter’s first name and '{page}' for the Page name.",
+    "oncePerUser": "Reply to each person only once",
+    "pages": "Pages",
+    "allPagesOption": "Every Facebook Page, including ones connected later",
+    "dailyCap": "Most actions a day",
+    "dailyCapHint": "Stops the rule after this many actions in 24 hours, so a wave of comments cannot use up your Facebook allowance.",
+    "saveRule": "Save rule",
+    "logHeading": "What the rules did",
+    "logHint": "The latest automatic actions, newest first.",
+    "logEmptyTitle": "Nothing yet",
+    "logEmptyHint": "When a rule acts on a comment, it is listed here with a way to undo it.",
+    "byRule": "rule “{rule}”",
+    "undone": "Undone",
+    "someone": "Someone",
+    "failed": "Facebook refused: {reason}",
+    "undoHide": "Show comment again",
+    "undoReply": "Delete reply",
+    "undoHideConfirm": "Show this comment again?",
+    "undoHideBody": "It becomes visible to everyone on the Page again.",
+    "undoReplyConfirm": "Delete the Page’s reply?",
+    "undoReplyBody": "The reply is removed from Facebook. This cannot be undone.",
+    "undoneOk": "Done. The log shows it as undone."
   }
 }
