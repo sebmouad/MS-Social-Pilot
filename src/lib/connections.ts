@@ -2,7 +2,7 @@ import { WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
 import { canManageAccounts } from './constants';
-import { disconnectAccount } from './accounts';
+import { disconnectAccount, removeTarget as forgetTarget } from './accounts';
 
 /**
  * Managing what this workspace is connected to.
@@ -84,6 +84,29 @@ export async function setTargetEnabled(options: {
   }
 
   return OK;
+}
+
+/**
+ * Remove one destination from the workspace, for good.
+ *
+ * The same right as disconnecting an account: admin and above. Scoped by
+ * workspace, so another tenant's id answers "not found".
+ */
+export async function removeTarget(options: {
+  workspaceId: string;
+  role: WorkspaceRole;
+  targetId: string;
+  actorId?: string;
+}): Promise<ConnectionResult> {
+  if (!canManageAccounts(options.role)) return { outcome: 'forbidden' };
+
+  const { removed, stillScheduledOnFacebook } = await forgetTarget(
+    options.workspaceId,
+    options.targetId,
+    options.actorId,
+  );
+  if (!removed) return { outcome: 'not_found' };
+  return stillScheduledOnFacebook > 0 ? { outcome: 'ok', stillScheduledOnFacebook } : OK;
 }
 
 /** The two providers that hang off a connected Facebook user. */

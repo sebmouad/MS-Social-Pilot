@@ -734,7 +734,15 @@
     "jump_instagram": "Instagram",
     "jump_ads": "Ad accounts",
     "jump_networks": "Other networks",
-    "jump_metaApp": "Meta app settings"
+    "jump_metaApp": "Meta app settings",
+    "removeTarget": "Remove",
+    "removeTargetNamed": "Remove {name}",
+    "removeTargetConfirm": "Remove {name} from this workspace?",
+    "removeTargetBody": "Its posts, analytics and comments in this app are deleted, and posts scheduled to it are cancelled. Nothing changes on Facebook itself. If the account that reaches it is reconnected with this Page selected, it comes back.",
+    "targetRemoved": "{name} was removed.",
+    "stillScheduledRemoved": "{count, plural, =1 {Removed. One post could not be deleted from Facebook and will still publish.} other {Removed. # posts could not be deleted from Facebook and will still publish.}}",
+    "orphansTitle": "Pages no longer connected",
+    "orphansHint": "The account that reached these was disconnected. They cannot be published to; remove them, or reconnect the account to bring them back."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1283,6 +1291,9 @@
       "webhook": {
         "created": "added a webhook",
         "deleted": "removed a webhook"
+      },
+      "target": {
+        "removed": "removed a Page from the workspace"
       }
     },
     "byDeparted": "Someone no longer in this workspace",

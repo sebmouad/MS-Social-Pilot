@@ -45,7 +45,7 @@ export default async function ConnectionsPage({
 
   const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
-  const [allAccounts, instagram, ads] = await Promise.all([
+  const [allAccounts, instagram, ads, orphans] = await Promise.all([
     prisma.socialAccount.findMany({
       where: { workspaceId: auth.workspace.id },
       include: {
@@ -64,7 +64,26 @@ export default async function ConnectionsPage({
       where: { workspaceId: auth.workspace.id },
       orderBy: { name: 'asc' },
     }),
+    // Left behind when their account was disconnected: shown so they can be removed.
+    prisma.target.findMany({
+      where: { workspaceId: auth.workspace.id, socialAccountId: null },
+      orderBy: [{ type: 'asc' }, { name: 'asc' }],
+    }),
   ]);
+
+  const targetView = (target: (typeof orphans)[number]) => ({
+    id: target.id,
+    name: target.name,
+    type: target.type,
+    pictureUrl: target.pictureUrl,
+    enabled: target.enabled,
+    canPublish: target.canPublish,
+    publishBlocker: target.publishBlocker,
+    publishBlockerCode: target.publishBlockerCode,
+    hasOwnToken: target.accessToken !== null,
+    followers: target.followersCount ?? target.fanCount,
+    lastSyncedLabel: target.lastSyncedAt ? formatInZone(target.lastSyncedAt, timezone) : null,
+  });
 
   const canManage = canManageAccounts(auth.role);
   const accounts = allAccounts.filter((account) => account.provider === 'facebook');
@@ -138,7 +157,7 @@ export default async function ConnectionsPage({
         </div>
       )}
 
-      {accounts.length === 0 ? (
+      {accounts.length === 0 && orphans.length === 0 ? (
         <div className="card flex flex-col items-center gap-3 p-8 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
             <Icon name="connections" size={24} />
@@ -155,14 +174,17 @@ export default async function ConnectionsPage({
         <>
         {/* Above the list: the answer to "is it working" comes before the
             inventory of what is connected. */}
-        <div id="health" className="scroll-mt-20">
-          <ConnectionHealth canManage={canManage} />
-        </div>
+        {accounts.length > 0 && (
+          <div id="health" className="scroll-mt-20">
+            <ConnectionHealth canManage={canManage} />
+          </div>
+        )}
 
         <ConnectionsClient
           canManage={canManage}
           instagramEnabled={env.instagramEnabled}
           adsEnabled={env.adsEnabled}
+          orphans={orphans.map(targetView)}
           connections={accounts.map((account) => ({
             id: account.id,
             name: account.name,
@@ -181,21 +203,7 @@ export default async function ConnectionsPage({
             lastSyncedLabel: account.lastSyncedAt
               ? formatInZone(account.lastSyncedAt, timezone)
               : null,
-            targets: account.targets.map((target) => ({
-              id: target.id,
-              name: target.name,
-              type: target.type,
-              pictureUrl: target.pictureUrl,
-              enabled: target.enabled,
-              canPublish: target.canPublish,
-              publishBlocker: target.publishBlocker,
-              publishBlockerCode: target.publishBlockerCode,
-              hasOwnToken: target.accessToken !== null,
-              followers: target.followersCount ?? target.fanCount,
-              lastSyncedLabel: target.lastSyncedAt
-                ? formatInZone(target.lastSyncedAt, timezone)
-                : null,
-            })),
+            targets: account.targets.map(targetView),
           }))}
           instagram={instagram.map((account) => ({
             id: account.id,

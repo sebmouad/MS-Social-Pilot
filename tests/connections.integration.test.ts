@@ -426,6 +426,101 @@ describe('disconnect', () => {
   });
 });
 
+describe('removeTarget', () => {
+  // The bug: a Page added by mistake could only be switched off, and a Page
+  // left behind by a disconnected account was shown nowhere at all.
+  it('deletes the destination and what was captured for it', async () => {
+    const { workspace, page, user } = await seed();
+    await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: user.id,
+        message: 'Queued',
+        status: 'scheduled',
+        targets: { create: { targetId: page.id, status: 'pending' } },
+      },
+    });
+
+    const result = await connections.removeTarget({
+      workspaceId: workspace.id,
+      role: WorkspaceRole.admin,
+      targetId: page.id,
+      actorId: user.id,
+    });
+
+    expect(result.outcome).toBe('ok');
+    expect(await prisma.target.count({ where: { id: page.id } })).toBe(0);
+    expect(await prisma.postTarget.count()).toBe(0);
+    expect(await prisma.activityLog.count({ where: { action: 'target.removed' } })).toBe(1);
+  });
+
+  it('removes a Page whose account was already disconnected', async () => {
+    const { workspace, account, page } = await seed();
+    await connections.disconnect({ workspaceId: workspace.id, role: WorkspaceRole.owner, socialAccountId: account.id });
+
+    const result = await connections.removeTarget({ workspaceId: workspace.id, role: WorkspaceRole.owner, targetId: page.id });
+    expect(result.outcome).toBe('ok');
+    expect(await prisma.target.count()).toBe(0);
+  });
+
+  it('deletes posts Facebook holds for it before forgetting the token', async () => {
+    const { workspace, page, user } = await seed();
+    await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: user.id,
+        message: 'Facebook has this one',
+        status: 'scheduled',
+        publishMode: 'native',
+        targets: { create: { targetId: page.id, status: 'scheduled_remote', remotePostId: '1000_5151' } },
+      },
+    });
+    denied = [];
+
+    const result = await connections.removeTarget({ workspaceId: workspace.id, role: WorkspaceRole.owner, targetId: page.id });
+    expect(result).toEqual({ outcome: 'ok' });
+    expect(received.some((call) => call.method === 'DELETE' && call.path.includes('1000_5151'))).toBe(true);
+  });
+
+  it('says how many Facebook would not drop', async () => {
+    const { workspace, page, user } = await seed();
+    await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: user.id,
+        message: 'Facebook keeps this one',
+        status: 'scheduled',
+        publishMode: 'native',
+        targets: { create: { targetId: page.id, status: 'scheduled_remote', remotePostId: '1000_6161' } },
+      },
+    });
+    denied = ['1000_6161'];
+
+    const result = await connections.removeTarget({ workspaceId: workspace.id, role: WorkspaceRole.owner, targetId: page.id });
+    expect(result).toEqual({ outcome: 'ok', stillScheduledOnFacebook: 1 });
+  });
+
+  it('reports not found for another workspace’s Page and leaves it alone', async () => {
+    const mine = await seed('mine');
+    const theirs = await seed('theirs');
+
+    const result = await connections.removeTarget({
+      workspaceId: mine.workspace.id,
+      role: WorkspaceRole.owner,
+      targetId: theirs.page.id,
+    });
+    expect(result.outcome).toBe('not_found');
+    expect(await prisma.target.count({ where: { id: theirs.page.id } })).toBe(1);
+  });
+
+  it('refuses an editor', async () => {
+    const { workspace, page } = await seed();
+    const result = await connections.removeTarget({ workspaceId: workspace.id, role: WorkspaceRole.editor, targetId: page.id });
+    expect(result.outcome).toBe('forbidden');
+    expect(await prisma.target.count()).toBe(1);
+  });
+});
+
 describe('checkAccountHealth', () => {
   it('will not read another workspace’s token', async () => {
     // It reads a token and can mark an account dead. Being safe only because
@@ -828,9 +923,10 @@ describe('reporting what Facebook will still publish', () => {
   });
 
   it('goes through the toggle helper on every destination list', () => {
-    // Pages, Groups and Instagram each render their own list, and one wired
-    // straight to `call` would silently drop the warning for that kind.
-    expect(client.match(/onToggle=\{\(id, enabled\) => toggleTarget\(id, enabled\)\}/g)).toHaveLength(3);
+    // Pages, Groups, Instagram and Pages left by a disconnected account each
+    // render their own list, and one wired straight to `call` would silently
+    // drop the warning for that kind.
+    expect(client.match(/onToggle=\{\(id, enabled\) => toggleTarget\(id, enabled\)\}/g)).toHaveLength(4);
     const lists = client.slice(client.indexOf('<TargetList'));
     expect(lists).not.toMatch(/onToggle=\{\(id, enabled\) =>\s*call\(/);
   });

@@ -284,32 +284,7 @@ export async function disconnectAccount(
     select: { accessToken: true },
   });
 
-  const handedOff = await prisma.postTarget.findMany({
-    where: { targetId: { in: targetIds }, status: 'scheduled_remote', remotePostId: { not: null } },
-    select: { id: true, remotePostId: true, targetId: true },
-  });
-
-  const tokenByTarget = new Map(targets.map((target) => [target.id, target.accessToken]));
-  const stopped: string[] = [];
-  let stillScheduledOnFacebook = 0;
-
-  for (const row of handedOff) {
-    const encrypted = tokenByTarget.get(row.targetId) ?? account?.accessToken ?? null;
-    if (!encrypted || !row.remotePostId) {
-      stillScheduledOnFacebook += 1;
-      continue;
-    }
-
-    try {
-      const { deleteRemotePost } = await import('./facebook/publish');
-      await deleteRemotePost(row.remotePostId, decryptSecret(encrypted));
-      stopped.push(row.id);
-    } catch {
-      // Reported rather than swallowed: the post is still going to publish,
-      // and after this call nobody has the credentials to try again.
-      stillScheduledOnFacebook += 1;
-    }
-  }
+  const { stopped, stillScheduledOnFacebook } = await stopHandedOffPosts(targets, account?.accessToken ?? null);
 
   await prisma.$transaction([
     prisma.target.updateMany({
@@ -353,4 +328,89 @@ export async function disconnectAccount(
   });
 
   return { stillScheduledOnFacebook };
+}
+
+/**
+ * Ask Facebook to drop the posts it is holding for these destinations.
+ *
+ * Shared by disconnecting an account and removing a single Page: both are the
+ * last moment anything can be done about those posts, because the tokens that
+ * could delete them go with the rows. Returns the post targets Facebook
+ * confirmed it dropped, and a count of the ones it will still publish.
+ */
+async function stopHandedOffPosts(
+  targets: Array<{ id: string; accessToken: string | null }>,
+  fallbackToken: string | null,
+): Promise<{ stopped: string[]; stillScheduledOnFacebook: number }> {
+  const handedOff = await prisma.postTarget.findMany({
+    where: {
+      targetId: { in: targets.map((target) => target.id) },
+      status: 'scheduled_remote',
+      remotePostId: { not: null },
+    },
+    select: { id: true, remotePostId: true, targetId: true },
+  });
+
+  const tokenByTarget = new Map(targets.map((target) => [target.id, target.accessToken]));
+  const stopped: string[] = [];
+  let stillScheduledOnFacebook = 0;
+
+  for (const row of handedOff) {
+    const encrypted = tokenByTarget.get(row.targetId) ?? fallbackToken;
+    if (!encrypted || !row.remotePostId) {
+      stillScheduledOnFacebook += 1;
+      continue;
+    }
+
+    try {
+      const { deleteRemotePost } = await import('./facebook/publish');
+      await deleteRemotePost(row.remotePostId, decryptSecret(encrypted));
+      stopped.push(row.id);
+    } catch {
+      // Reported rather than swallowed: the post is still going to publish,
+      // and after this call nobody has the credentials to try again.
+      stillScheduledOnFacebook += 1;
+    }
+  }
+
+  return { stopped, stillScheduledOnFacebook };
+}
+
+/**
+ * Remove one Page, Group or profile from the workspace.
+ *
+ * A delete, not a flag: somebody who added a Page by mistake wants it gone,
+ * and switching it off already exists for keeping it. Everything captured for
+ * it here (its posts' delivery rows, analytics, comments) goes with it through
+ * the schema's cascades; nothing changes on Facebook except the posts it was
+ * holding for this Page, which are deleted there first so they do not publish
+ * to a Page nobody can see any more. If the Page is still granted to a
+ * connected account, reconnecting brings it back.
+ */
+export async function removeTarget(
+  workspaceId: string,
+  targetId: string,
+  actorId?: string,
+): Promise<{ removed: boolean; stillScheduledOnFacebook: number }> {
+  const target = await prisma.target.findFirst({
+    where: { id: targetId, workspaceId },
+    select: { id: true, name: true, type: true, accessToken: true, socialAccount: { select: { accessToken: true } } },
+  });
+  if (!target) return { removed: false, stillScheduledOnFacebook: 0 };
+
+  const { stillScheduledOnFacebook } = await stopHandedOffPosts(
+    [target],
+    target.socialAccount?.accessToken ?? null,
+  );
+
+  await prisma.target.deleteMany({ where: { id: target.id, workspaceId } });
+
+  await logActivity(
+    workspaceId,
+    'target.removed',
+    { name: target.name, type: target.type, stillScheduledOnFacebook },
+    actorId,
+  );
+
+  return { removed: true, stillScheduledOnFacebook };
 }

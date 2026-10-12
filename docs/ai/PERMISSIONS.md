@@ -26,7 +26,7 @@ Order: owner 4 > admin 3 > editor 2 > contributor 1. A workspace owner is
 
 | Capability (function) | Minimum role |
 |---|---|
-| Connect/remove Pages and accounts (`canManageAccounts`) | admin |
+| Connect/remove Pages and accounts (`canManageAccounts`; includes removing one Page, `DELETE /api/targets/:id`) | admin |
 | Invite, change roles, Page access per member (`canManageTeam`) | admin |
 | Workspace settings (`canManageSettings`), incl. key dates, seasonal modes, content mix and outgoing webhooks (also through an owner/admin write API key) | admin |
 | Approve / reject posts (`canApprove`) | admin |

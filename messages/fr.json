@@ -734,7 +734,15 @@
     "jump_instagram": "Instagram",
     "jump_ads": "Comptes publicitaires",
     "jump_networks": "Autres réseaux",
-    "jump_metaApp": "Réglages de l’app Meta"
+    "jump_metaApp": "Réglages de l’app Meta",
+    "removeTarget": "Retirer",
+    "removeTargetNamed": "Retirer {name}",
+    "removeTargetConfirm": "Retirer {name} de cet espace de travail ?",
+    "removeTargetBody": "Ses publications, statistiques et commentaires dans l’application sont supprimés, et les publications programmées pour elle sont annulées. Rien ne change sur Facebook. Si le compte qui y donne accès est reconnecté avec cette Page sélectionnée, elle revient.",
+    "targetRemoved": "{name} a été retirée.",
+    "stillScheduledRemoved": "{count, plural, =1 {Retirée. Une publication n’a pas pu être supprimée de Facebook et sera quand même publiée.} other {Retirée. # publications n’ont pas pu être supprimées de Facebook et seront quand même publiées.}}",
+    "orphansTitle": "Pages qui ne sont plus connectées",
+    "orphansHint": "Le compte qui y donnait accès a été déconnecté. Impossible d’y publier : retirez-les, ou reconnectez le compte pour les retrouver."
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -1283,6 +1291,9 @@
       "webhook": {
         "created": "a ajouté un webhook",
         "deleted": "a supprimé un webhook"
+      },
+      "target": {
+        "removed": "a retiré une Page de l’espace de travail"
       }
     },
     "byDeparted": "Une personne qui n’est plus dans cet espace",
@@ -2124,7 +2135,7 @@
     "members": "Membres",
     "you": "vous",
     "removeMember": "Retirer",
-    "removeConfirm": "Retirer {name} de cet espace de travail ?",
+    "removeConfirm": "Retirer {name} de cet espace de travail ?",
     "expires": "expire {when}",
     "roles": {
       "owner": "Propriétaire",

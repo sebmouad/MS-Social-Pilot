@@ -39,6 +39,7 @@ export const ACTIVITY_ACTIONS = [
   'queue.mixScheduled',
   'queue.mixUpdated',
   'settings.changed',
+  'target.removed',
   'team.invitationRevoked',
   'team.invited',
   'team.joined',

@@ -61,8 +61,11 @@ export function ConnectionsClient({
   instagramEnabled,
   adsEnabled,
   canManage,
+  orphans = [],
 }: {
   connections: ConnectionView[];
+  /** Pages left behind by a disconnected account: no longer reachable, only removable. */
+  orphans?: TargetView[];
   instagram: LinkedAccountView[];
   ads: LinkedAccountView[];
   instagramEnabled: boolean;
@@ -134,6 +137,23 @@ export function ConnectionsClient({
     } | null;
     const waiting = body?.stillScheduledOnFacebook ?? 0;
     if (waiting > 0) setNotice(t('stillScheduledOff', { count: waiting }));
+  }
+
+  async function removeTarget(target: TargetView) {
+    const ok = await confirm({
+      title: t('removeTargetConfirm', { name: target.name }),
+      body: t('removeTargetBody'),
+      danger: true,
+      confirmLabel: t('removeTarget'),
+    });
+    if (!ok) return;
+    const body = (await call(target.id, `/api/targets/${target.id}`, 'DELETE')) as {
+      stillScheduledOnFacebook?: number;
+    } | null;
+    if (!body) return;
+    const stranded = body.stillScheduledOnFacebook ?? 0;
+    if (stranded > 0) setError(t('stillScheduledRemoved', { count: stranded }));
+    else setNotice(t('targetRemoved', { name: target.name }));
   }
 
   async function check(accountId: string) {
@@ -290,6 +310,7 @@ export function ConnectionsClient({
               canManage={canManage}
               busy={busy}
               onToggle={(id, enabled) => toggleTarget(id, enabled)}
+              onRemove={removeTarget}
             />
 
             <TargetList
@@ -300,6 +321,7 @@ export function ConnectionsClient({
               canManage={canManage}
               busy={busy}
               onToggle={(id, enabled) => toggleTarget(id, enabled)}
+              onRemove={removeTarget}
             />
 
             {/* Only once there is one: a workspace with no linked Instagram
@@ -314,12 +336,33 @@ export function ConnectionsClient({
                 canManage={canManage}
                 busy={busy}
                 onToggle={(id, enabled) => toggleTarget(id, enabled)}
+              onRemove={removeTarget}
               />
             )}
           </section>
         );
       })}
 
+      {orphans.length > 0 && (
+        <section className="card p-4 sm:p-5">
+          <h2 className="text-sm font-semibold text-slate-900">{t('orphansTitle')}</h2>
+          <p className="mt-0.5 text-xs text-slate-500">{t('orphansHint')}</p>
+          <TargetList
+            title={t('pages')}
+            icon="facebook"
+            targets={orphans}
+            empty={t('noPages')}
+            canManage={canManage}
+            busy={busy}
+            onToggle={(id, enabled) => toggleTarget(id, enabled)}
+            onRemove={removeTarget}
+          />
+        </section>
+      )}
+
+      {/* Only orphans left: nothing reaches Instagram or ads any more. */}
+      {connections.length > 0 && (
+        <>
       <LinkedAccounts
         anchor="instagram"
         title={t('instagramTitle')}
@@ -349,6 +392,8 @@ export function ConnectionsClient({
         busy={busy}
         call={call}
       />
+        </>
+      )}
     </div>
   );
 }
@@ -361,6 +406,7 @@ function TargetList({
   canManage,
   busy,
   onToggle,
+  onRemove,
 }: {
   title: string;
   icon: IconName;
@@ -369,6 +415,7 @@ function TargetList({
   canManage: boolean;
   busy: string | null;
   onToggle: (id: string, enabled: boolean) => void;
+  onRemove: (target: TargetView) => void;
 }) {
   const t = useTranslations('connections');
 
@@ -419,6 +466,7 @@ function TargetList({
                 </div>
               </div>
 
+              <div className="flex shrink-0 items-center gap-2">
               <label className="flex shrink-0 items-center gap-2 text-xs text-slate-600">
                 <input
                   type="checkbox"
@@ -430,6 +478,18 @@ function TargetList({
                 />
                 {target.enabled ? t('active') : t('paused')}
               </label>
+              {canManage && (
+                <button
+                  type="button"
+                  className="btn-ghost shrink-0 text-xs text-red-700"
+                  disabled={busy === target.id}
+                  aria-label={t('removeTargetNamed', { name: target.name })}
+                  onClick={() => onRemove(target)}
+                >
+                  <Icon name="trash" size={14} /> {t('removeTarget')}
+                </button>
+              )}
+              </div>
             </li>
             );
           })}
