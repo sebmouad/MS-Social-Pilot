@@ -153,7 +153,9 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
 `/login`, `/register` (first account / open registration), `/invite/<token>`.
 
 ## Root — `/root/*`
-Overview, Status (app, database, worker, last publish, last off-site backup,
+Overview, Agency overview (H14: every workspace's Pages, disconnected Pages,
+scheduled, failed in 30 days, follower change, engagement, AI spend; sortable,
+each row opens the workspace), Status (app, database, worker, last publish, last off-site backup,
 90-day uptime bars), Configuration, Workspaces, Users, Sessions, Registration,
 Privileges, Worker (jobs and Meta usage: app share, per-Page share, and
 the last hour's calls per Page and per job, H16), Errors (server, worker and browser

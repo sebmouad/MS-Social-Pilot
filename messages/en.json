@@ -2497,7 +2497,8 @@
       "worker": "Worker & Meta usage",
       "sessions": "Sessions",
       "status": "Status",
-      "errors": "Errors"
+      "errors": "Errors",
+      "agency": "Agency overview"
     },
     "overview": {
       "title": "Installation overview",
@@ -2848,6 +2849,23 @@
       "resolve": "Mark resolved",
       "resolveFailed": "Could not save. Try again.",
       "resolvedAt": "Resolved {when}"
+    },
+    "agency": {
+      "title": "Agency overview",
+      "subtitle": "Every workspace side by side, over the last {days} days. Select a column to sort, a name to open the workspace.",
+      "empty": "No workspace yet.",
+      "suspended": "Suspended",
+      "footnote": "Followers and engagement come from the insights already synced for each Page, over the last {days} days; — means none were stored. Disconnected counts switched-on Pages that cannot publish. AI spend counts only priced calls.",
+      "column": {
+        "name": "Workspace",
+        "pages": "Pages",
+        "disconnected": "Disconnected",
+        "scheduled": "Scheduled",
+        "failed": "Failed",
+        "followers": "Followers",
+        "engagements": "Engagement",
+        "aiSpend": "AI spend"
+      }
     }
   },
   "twoStep": {

@@ -37,6 +37,24 @@ Graph version pinned by `FACEBOOK_GRAPH_VERSION` (v26 era). Ratings use
   clickable link; needs an https media URL (signed media links from
   `media-links.ts`).
 
+## Earnings (H17, checked 2026-10-12 against the docs, not yet live)
+The Page Insights reference still lists earnings metrics, all estimates
+("the final amount may differ") and only for Pages enrolled in Meta's
+monetisation programmes; the token holder must be able to see the Page's
+monetisation insights:
+- Page: `monetization_approximate_earnings` (day/week/days_28/month,
+  breakdown `monetization_tool`), `content_monetization_earnings` (day/week/
+  days_28, breakdown `earning_source`; marked "in development", added v23),
+  `page_daily_video_ad_break_earnings_by_crosspost_status` (+ `_cpm_`,
+  `_ad_impressions_`).
+- Post: `monetization_approximate_earnings`, `content_monetization_earnings`,
+  `post_video_ad_break_earnings`, `post_video_ad_break_ad_cpm`,
+  `post_video_ad_break_ad_impressions`, `creator_monetization_qualified_views`.
+The app lists them in the catalogue (`metrics.ts`, category monetisation);
+the probe decides per Page whether Meta serves them. A Page not enrolled gets
+no rows, and the screens say nothing rather than showing 0. Confirm on a
+monetised Page before promising the figure to anyone.
+
 ## Permissions (see `src/lib/facebook/permissions.ts`, `env.facebookScopes`)
 Base: pages_show_list, pages_manage_posts, pages_read_engagement,
 pages_manage_engagement, read_insights, business_management (+ ads_read when ads

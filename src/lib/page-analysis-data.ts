@@ -188,28 +188,37 @@ export async function loadPageTotals(
     select: { metric: true, endTime: true, numeric: true },
   });
 
-  return windows.map((window) => {
-    const inside = rows.filter(
-      (row) => row.endTime.getTime() > window.from.getTime() && row.endTime.getTime() <= window.to.getTime(),
-    );
-
-    const totals = {} as PageTotals;
-    for (const key of Object.keys(PAGE_METRICS) as Array<keyof PageTotals>) {
-      const names = PAGE_METRICS[key];
-      const byDay = new Map<string, { rank: number; value: number }>();
-      for (const row of inside) {
-        const rank = names.indexOf(row.metric);
-        if (rank === -1 || row.numeric === null) continue;
-        const day = row.endTime.toISOString().slice(0, 10);
-        const held = byDay.get(day);
-        if (!held || rank < held.rank) byDay.set(day, { rank, value: row.numeric });
-      }
-      totals[key] =
-        byDay.size === 0 ? null : Math.round([...byDay.values()].reduce((sum, day) => sum + day.value, 0));
-    }
-    return totals;
-  });
+  return windows.map((window) => totalsOf(rows, window));
 }
+
+/** Totals over one window from stored daily rows; per day, the first metric name Meta still serves wins. */
+export function totalsOf(
+  rows: Array<{ metric: string; endTime: Date; numeric: number | null }>,
+  window: { from: Date; to: Date },
+): PageTotals {
+  const inside = rows.filter(
+    (row) => row.endTime.getTime() > window.from.getTime() && row.endTime.getTime() <= window.to.getTime(),
+  );
+
+  const totals = {} as PageTotals;
+  for (const key of Object.keys(PAGE_METRICS) as Array<keyof PageTotals>) {
+    const names = PAGE_METRICS[key];
+    const byDay = new Map<string, { rank: number; value: number }>();
+    for (const row of inside) {
+      const rank = names.indexOf(row.metric);
+      if (rank === -1 || row.numeric === null) continue;
+      const day = row.endTime.toISOString().slice(0, 10);
+      const held = byDay.get(day);
+      if (!held || rank < held.rank) byDay.set(day, { rank, value: row.numeric });
+    }
+    totals[key] =
+      byDay.size === 0 ? null : Math.round([...byDay.values()].reduce((sum, day) => sum + day.value, 0));
+  }
+  return totals;
+}
+
+/** Every metric name the totals read, for a query that loads many Pages at once. */
+export const PAGE_TOTAL_METRICS = Object.values(PAGE_METRICS).flat();
 
 async function findPage(workspaceId: string, targetId: string) {
   const page = await prisma.target.findFirst({

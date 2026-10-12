@@ -2497,7 +2497,8 @@
       "worker": "Worker et quotas Meta",
       "sessions": "Sessions",
       "status": "État",
-      "errors": "Erreurs"
+      "errors": "Erreurs",
+      "agency": "Vue d’agence"
     },
     "overview": {
       "title": "Vue d’ensemble de l’installation",
@@ -2848,6 +2849,23 @@
       "resolve": "Marquer comme résolue",
       "resolveFailed": "Enregistrement impossible. Réessayez.",
       "resolvedAt": "Résolue {when}"
+    },
+    "agency": {
+      "title": "Vue d’agence",
+      "subtitle": "Tous les espaces de travail côte à côte, sur les {days} derniers jours. Choisissez une colonne pour trier, un nom pour ouvrir l’espace.",
+      "empty": "Aucun espace de travail pour l’instant.",
+      "suspended": "Suspendu",
+      "footnote": "Les abonnés et l’engagement viennent des statistiques déjà synchronisées pour chaque Page, sur les {days} derniers jours ; — signifie qu’aucune n’est enregistrée. « Déconnectées » compte les Pages activées qui ne peuvent pas publier. Les dépenses IA ne comptent que les appels tarifés.",
+      "column": {
+        "name": "Espace de travail",
+        "pages": "Pages",
+        "disconnected": "Déconnectées",
+        "scheduled": "Programmées",
+        "failed": "Échouées",
+        "followers": "Abonnés",
+        "engagements": "Engagement",
+        "aiSpend": "Dépenses IA"
+      }
     }
   },
   "twoStep": {

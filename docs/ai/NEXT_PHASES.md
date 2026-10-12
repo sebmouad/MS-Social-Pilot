@@ -795,9 +795,13 @@ setup from Phase 0.2 (marked AI).
   day-by-day chart with the label in its readout, and a list under it (add,
   remove). A note is for one Page or every Page. Reports show them read-only.
   Editors and up.*
-- **H14. Agency overview for root (M)** — in the root section: KPIs for every
+- **H14. Agency overview for root (M)** ✅ — in the root section: KPIs for every
   workspace (Pages, posts scheduled/failed, followers change, engagement,
   disconnected Pages, AI spend), sortable, drill-down.
+  *Done 2026-10-12: `/root/agency`, last 30 days, read from stored insights,
+  posts and AI calls (no Graph calls). "Disconnected" = switched-on Pages
+  without a token or refused publishing. Sort by any column (unknown
+  figures last); the name opens `/root/workspaces/[id]`.*
 
 ### Monitoring
 - **H15. Negative-comment alert (M, AI)** — sentiment on new comments (batch,

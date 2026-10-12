@@ -116,7 +116,7 @@ and may open one as its owner (logged visit, see below).
   link is shown to root as well as emailed.
 
 ## Built (2026-10-11)
-- `/root/*` (`src/app/(root)/root/`): Overview · Configuration · Workspaces ·
+- `/root/*` (`src/app/(root)/root/`): Overview · Agency overview · Configuration · Workspaces ·
   Users · Registration & invitations · Privileges · Worker & Meta usage ·
   Alerts · Backups · Root activity · Danger zone.
   Guard `requireRoot()` (pages) / `requireRootApi()` (`/api/root/*`): 404 for

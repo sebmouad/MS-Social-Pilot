@@ -29,3 +29,17 @@ test('root sees calls per Page and per job from the worker’s saved usage', asy
   await expect(jobs.getByRole('row')).toHaveCount(3);
   expect(failures).toEqual([]);
 });
+
+test('root sorts the agency overview and opens a workspace from it', async ({ page }) => {
+  const failures = collectFailures(page);
+  await connectPretendPage(OWNER.workspace);
+  await open(page, '/root/agency');
+  const table = page.getByRole('table', { name: 'Agency overview' });
+  await expect(table.getByRole('rowheader', { name: new RegExp(OWNER.workspace) })).toBeVisible();
+  await table.getByRole('link', { name: 'Pages' }).click();
+  await expect(page).toHaveURL(/sort=pages&order=desc/);
+  await expect(table.getByRole('columnheader', { name: /Pages/ })).toHaveAttribute('aria-sort', 'descending');
+  await table.getByRole('link', { name: OWNER.workspace }).click();
+  await expect(page).toHaveURL(/\/root\/workspaces\/[^/]+$/);
+  expect(failures).toEqual([]);
+});
