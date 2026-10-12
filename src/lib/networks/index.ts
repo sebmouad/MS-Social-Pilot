@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { decryptSecret, encryptSecret } from '../crypto';
 import { env } from '../env';
+import { settingBoolean } from '../settings';
 import { readStoredFile } from '../media';
 import type { PostMedia } from '../json';
 import { bluesky } from './bluesky';
@@ -27,6 +28,7 @@ export const CONNECTORS: Record<NetworkKey, NetworkConnector> = { bluesky, masto
 
 /** Networks that sign in through an app this installation registered, and whether its keys are set. */
 export function networkAvailable(key: NetworkKey): boolean {
+  if (!settingBoolean(`networks.${key}`)) return false;
   switch (key) {
     case 'bluesky':
     case 'mastodon':
