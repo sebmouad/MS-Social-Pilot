@@ -66,7 +66,7 @@ export default async function LinkClicksPage({
   const keep = Object.fromEntries(new URLSearchParams(selection.query));
 
   return (
-    <ChannelsLayout auth={auth} selection={selection}>
+    <ChannelsLayout auth={auth} selection={selection} tools={<></>}>
     <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { FeedAvatar } from './FeedPost';
@@ -32,6 +32,8 @@ interface Props {
   /** The network the column is narrowed to, and those on offer. */
   net?: SelectionNetwork | null;
   networks?: SelectionNetwork[];
+  /** The screen's own filters and actions, shown above the channels. */
+  tools?: ReactNode;
 }
 
 /**
@@ -48,7 +50,7 @@ interface Props {
  */
 const FOLD_KEY = 'msp_pages_column_folded';
 
-export function PagesSidebar({ pages, groups, group, visible, canManageGroups, inline = false, canManageQueue = false, workspaceId, net = null, networks = [] }: Props) {
+export function PagesSidebar({ pages, groups, group, visible, canManageGroups, inline = false, canManageQueue = false, workspaceId, net = null, networks = [], tools }: Props) {
   const t = useTranslations('pagesSidebar');
   const tScope = useTranslations('profileScope');
   const router = useRouter();
@@ -310,7 +312,8 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
     </div>
   );
 
-  const collapsible = !inline;
+  // A column carrying the screen's filters stays open: folding would hide them.
+  const collapsible = !inline && !tools;
   const isFolded = collapsible && folded;
 
   return (
@@ -318,6 +321,7 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
       aria-label={t('label')}
       className={`min-w-0 ${inline ? '' : `lg:sticky lg:top-20 lg:shrink-0 lg:self-start ${isFolded ? 'lg:w-14' : 'lg:w-[264px]'}`}`}
     >
+      {tools && <div className="card mb-3 space-y-3 p-3">{tools}</div>}
       {/* One line on a phone, opened when wanted. */}
       <details className="card group/details p-0 lg:hidden">
         <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-900 [&::-webkit-details-marker]:hidden">

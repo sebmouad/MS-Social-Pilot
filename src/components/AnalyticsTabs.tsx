@@ -53,23 +53,26 @@ export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidde
         </select>
       </label>
 
-      <nav className="hidden flex-wrap items-center gap-2 sm:flex" aria-label={t('chooseView')}>
-        <div className="segmented">
+      <nav className="hidden space-y-1 sm:block" aria-label={t('chooseView')}>
+        <ul className="space-y-0.5">
           {PRIMARY_ANALYTICS_VIEWS.map((view) => (
-            <Link
-              key={view}
-              href={hrefFor(view)}
-              aria-current={view === current ? 'page' : undefined}
-              className={`segmented-item ${view === current ? 'segmented-item-active' : ''}`}
-            >
-              {t(`view.${view}`)}
-            </Link>
+            <li key={view}>
+              <Link
+                href={hrefFor(view)}
+                aria-current={view === current ? 'page' : undefined}
+                className={`block rounded-lg px-3 py-2 text-sm font-semibold ${
+                  view === current ? 'bg-brand-50 text-brand-700' : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                {t(`view.${view}`)}
+              </Link>
+            </li>
           ))}
-        </div>
-        <label>
+        </ul>
+        <label className="block">
           <span className="sr-only">{t('moreViews')}</span>
           <select
-            className={`input w-auto ${PRIMARY_ANALYTICS_VIEWS.includes(current as never) ? '' : 'border-brand-500 text-brand-600'}`}
+            className={`input w-full ${PRIMARY_ANALYTICS_VIEWS.includes(current as never) ? '' : 'border-brand-500 text-brand-600'}`}
             value={PRIMARY_ANALYTICS_VIEWS.includes(current as never) ? '' : current}
             onChange={(event) => event.target.value && router.push(hrefFor(event.target.value))}
           >

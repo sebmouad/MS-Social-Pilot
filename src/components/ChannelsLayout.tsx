@@ -10,7 +10,7 @@ import { PagesSidebar } from './PagesSidebar';
  * A screen with the channel column on its left: the one way to choose which
  * channels every screen shows (the shared selection, NEXT_PHASES Phase A).
  */
-export function ChannelsLayout({ auth, selection, children }: { auth: AuthContext; selection: PageFilter; children: ReactNode }) {
+export function ChannelsLayout({ auth, selection, tools, children }: { auth: AuthContext; selection: PageFilter; tools?: ReactNode; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
       <PagesSidebar
@@ -23,6 +23,7 @@ export function ChannelsLayout({ auth, selection, children }: { auth: AuthContex
         networks={selection.networks}
         canManageGroups={canManageSettings(auth.role)}
         canManageQueue={canManageOthersPosts(auth.role)}
+        tools={tools}
       />
       {children}
     </div>

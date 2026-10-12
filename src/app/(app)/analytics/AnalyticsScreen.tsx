@@ -145,7 +145,25 @@ export async function AnalyticsScreen({
   const postsScope = requested ? { targetId: selected.id } : { targetIds: pages.map((page) => page.id) };
 
   return (
-    <ChannelsLayout auth={auth} selection={selection}>
+    <ChannelsLayout
+      auth={auth}
+      selection={selection}
+      tools={
+        <>
+          {/* The view, then the window and the export: every control that scopes the screen, in the column. */}
+          {!only && <AnalyticsTabs current={view} hidden={env.instagramEnabled ? [] : ['instagram']} />}
+          {!UNWINDOWED_VIEWS.has(view) && (
+            <DateRangePicker
+              range={range}
+              path={only ? INBOX_VIEW_PATHS[only]! : '/analytics'}
+              keep={{ view, target: selected.id }}
+              compare={view === 'analysis' || view === 'compare' || view === 'total' ? compare : undefined}
+            />
+          )}
+          <ExportMenu targetId={selected.id} from={from.toISOString()} to={to.toISOString()} />
+        </>
+      }
+    >
     <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -153,28 +171,6 @@ export async function AnalyticsScreen({
           {!only && <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>}
         </div>
       </header>
-
-      {/* One filter row, above everything it scopes: the date range first,
-          because it is the control every reader reaches for. Per-view filters
-          would let two panels disagree about which window they are showing. */}
-      <div className="filter-row">
-        {!UNWINDOWED_VIEWS.has(view) && (
-          <DateRangePicker
-            range={range}
-            path={only ? INBOX_VIEW_PATHS[only]! : '/analytics'}
-            keep={{ view, target: selected.id }}
-            compare={view === 'analysis' || view === 'compare' || view === 'total' ? compare : undefined}
-          />
-        )}
-
-
-        <div className="ms-auto">
-          <ExportMenu targetId={selected.id} from={from.toISOString()} to={to.toISOString()} />
-        </div>
-      </div>
-
-      {/* Instagram stays out of sight until it is switched on; its tab only ever said "nothing here". */}
-      {!only && <AnalyticsTabs current={view} hidden={env.instagramEnabled ? [] : ['instagram']} />}
 
       {pages.length > 1 && !requested && !['total', 'compare', 'posts', 'responseTime', 'instagram'].includes(view) && (
         <p className="rounded-xl bg-brand-50 px-4 py-2 text-sm text-brand-800">{t('oneChannelHint', { name: selected.name })}</p>

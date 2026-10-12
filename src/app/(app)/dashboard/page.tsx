@@ -125,18 +125,7 @@ export default async function DashboardPage({
   ];
 
   return (
-    <ChannelsLayout auth={auth} selection={selection}>
-    <div className="min-w-0 flex-1 space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {formatInZone(now, auth.workspace.timezone, 'EEEE d MMMM yyyy, HH:mm')} ·{' '}
-            {auth.workspace.timezone}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {aiOn && (
+    <ChannelsLayout auth={auth} selection={selection} tools={<div className="flex flex-col gap-2">{aiOn && (
             <AiPlanner
               pages={visiblePages.map((page) => ({ id: page.id, name: page.name, pictureUrl: page.pictureUrl }))}
               defaultPageId={visiblePages.length === 1 ? visiblePages[0]!.id : null}
@@ -145,7 +134,15 @@ export default async function DashboardPage({
           )}
           <Link href="/compose" className="btn-primary">
             <Icon name="plus" size={16} /> {t('newPost')}
-          </Link>
+          </Link></div>}>
+    <div className="min-w-0 flex-1 space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            {formatInZone(now, auth.workspace.timezone, 'EEEE d MMMM yyyy, HH:mm')} ·{' '}
+            {auth.workspace.timezone}
+          </p>
         </div>
       </header>
 
