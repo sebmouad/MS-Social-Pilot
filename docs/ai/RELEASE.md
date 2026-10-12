@@ -13,6 +13,20 @@ npm run deploy:rollback   # if something is wrong
 npm run deploy:status     # live/previous release, services, newest backup, sites
 ```
 
+From the server instead (pulls main from GitHub with a read-only deploy key):
+
+```bash
+ssh -i ~/.ssh/SebMouadSSH root@213.246.45.75
+socialpilot-deploy               # or: socialpilot-deploy <branch|tag|commit>
+socialpilot-deploy --status
+socialpilot-deploy --rollback
+```
+
+`socialpilot-deploy` is `scripts/deploy/server-deploy.sh`, reinstalled to
+`/usr/local/sbin` by every server deploy. It keeps a bare clone in
+`/root/ms-social-pilot.git` and runs the same stage/swap scripts as `deploy.sh`.
+Run it inside `tmux` so a dropped SSH connection can't stop it mid-swap.
+
 `deploy.sh` refuses to run off `main` or with uncommitted changes (only the committed tree is
 shipped, via `git archive HEAD`). It ends with `DEPLOY_OK <hash>` when the app
 and the three WordPress sites answer 200.
