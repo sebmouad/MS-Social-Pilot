@@ -394,6 +394,25 @@ export const errors = {
       fallback: 'This month\'s AI budget has been reached. AI help is back next month, or sooner if the administrator raises the budget.',
       status: 429,
     }),
+  resetLinkInvalid: () =>
+    new AppError({
+      key: 'errors.resetLinkInvalid',
+      fallback: 'This link has expired or was already used. Ask for a new one.',
+      status: 400,
+    }),
+  tooManyEmails: (minutes: number) =>
+    new AppError({
+      key: 'errors.tooManyEmails',
+      fallback: `Too many emails asked for. Try again in ${minutes} minute(s).`,
+      params: { minutes },
+      status: 429,
+    }),
+  emailNotVerified: () =>
+    new AppError({
+      key: 'errors.emailNotVerified',
+      fallback: 'Confirm your email address first: open the link we sent you.',
+      status: 403,
+    }),
   aiNotConfigured: () =>
     new AppError({
       key: 'errors.aiNotConfigured',

@@ -159,7 +159,7 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
 
 ## Public
 `/share/<token>` client view, `/privacy-policy`, `/terms`, `/data-deletion`, Terms and Privacy read the operator details root sets in Configuration › "Operator and legal pages".
-`/login`, `/register` (first account / open registration), `/invite/<token>`.
+`/login` (with "Forgot your password?" → `/forgot-password`, `/reset-password`), `/register` (first account / open registration; a self-service sign-up confirms its address at `/verify-email` first), `/invite/<token>`.
 
 ## Root — `/root/*`
 Overview, Agency overview (H14: every workspace's Pages, disconnected Pages,

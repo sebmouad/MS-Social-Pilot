@@ -151,6 +151,9 @@ model User {
   knownDevices          String[]  @default([])
   /// The look picked in Settings → Account (`src/lib/themes.ts`).
   theme                 String    @default("facebook")
+  /// When the address was proven (S3): a link opened, an invitation used, or
+  /// root's own. Null only for a self-service sign-up that has not clicked yet.
+  emailVerifiedAt       DateTime?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -174,8 +177,27 @@ model User {
   trustedDevices       TrustedDevice[]
   passkeys             Passkey[]
   clientInvitations    ClientInvitation[]    @relation("ClientInvitationSender")
+  emailTokens          EmailToken[]
 
   @@map("users")
+}
+
+/// A one-time link sent by email (S3): prove the address, or choose a new
+/// password. Only the sha256 is kept; used or expired links do nothing.
+model EmailToken {
+  id        String    @id @default(cuid())
+  userId    String
+  /// `verify` or `reset`.
+  purpose   String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("email_tokens")
 }
 
 model Session {

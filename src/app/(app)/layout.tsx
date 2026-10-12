@@ -11,6 +11,7 @@ import { pendingApprovalCount } from '@/lib/approvals';
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const auth = await getAuthContext();
   if (!auth) redirect('/login');
+  if (!auth.user.emailVerified) redirect('/verify-email');
 
   // Root's switches: a module switched off is not there; a suspended workspace
   // shows why instead of the screen.

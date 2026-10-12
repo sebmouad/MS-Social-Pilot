@@ -7,6 +7,7 @@ import { ok, readJson, route } from '@/lib/api';
 import { clientIp } from '@/lib/client-ip';
 import { errors } from '@/lib/errors';
 import { hit } from '@/lib/rate-limit';
+import { sendVerificationEmail } from '@/lib/email-tokens';
 
 /**
  * Accounts one client may create per window.
@@ -36,8 +37,10 @@ export const POST = route(async (request: Request) => {
   // The workspace, its default queue slots and the owner's notification
   // preferences are all created by `createWorkspace`. Seeding any of them here
   // as well is what caused a duplicate-key failure on sign-up.
-  const { userId, token } = await registerUser({ ...input, locale });
+  const { userId, token, verified } = await registerUser({ ...input, locale });
+  // A self-service sign-up proves the address before using the app (S3).
+  if (!verified) await sendVerificationEmail(userId).catch((error) => console.error('[register] verification email', error));
 
   await setSessionCookie(token);
-  return ok({ userId }, 201);
+  return ok({ userId, verified }, 201);
 });

@@ -918,9 +918,20 @@ generic (CLAUDE.md rule 9). Items:
   (`operator.*` settings, `src/lib/operator.ts`); Terms and Privacy read them
   and fall back to neutral wording; root overview warns while name, email or
   governing law is empty. **After deploy, root must fill these in.**
-- **S3. Self-service sign-up** — open registration (root switch exists), email
+- **S3. Self-service sign-up** ◐ — open registration (root switch exists), email
   verification, onboarding wizard that asks the user's niche-free basics
   (workspace name, time zone, languages, first Pages), trial period.
+  *Email links done 2026-10-12:* someone who signs up through open
+  registration confirms their address before using the app (`/verify-email`,
+  "send the link again", 5 per hour); root and invited people are confirmed
+  by the invitation, and nobody is asked when the server cannot send email.
+  "Forgot your password?" on the sign-in screen sends a one-hour link
+  (`/forgot-password`, `/reset-password`); the answer is the same whether or
+  not the address has an account, it is rate limited per address and per
+  client, and a reset ends every session. Links are one-time, stored as
+  sha256 (`EmailToken`, `src/lib/email-tokens.ts`). Existing accounts were
+  marked confirmed by the migration. Still open: the onboarding wizard and
+  the trial period (the trial waits on S4's plans).
 - **S4. Plans and billing (decided: yes, final step)** — plans with limits
   (Pages, members, scheduled posts, AI spend), payment provider (Stripe or
   Paddle; the app never stores card data), invoices, plan changes, dunning,

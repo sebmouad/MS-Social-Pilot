@@ -296,7 +296,7 @@ test('on a phone the sidebar is a drawer behind the menu, with the composer one 
 test.describe('before signing in', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  const PUBLIC_SCREENS = ['/login', '/register', '/data-deletion', '/terms', '/privacy-policy', '/invite/not-a-real-token'];
+  const PUBLIC_SCREENS = ['/login', '/register', '/forgot-password', '/reset-password?token=x', '/data-deletion', '/terms', '/privacy-policy', '/invite/not-a-real-token'];
 
   for (const path of PUBLIC_SCREENS) {
     test(`${path} fits on a phone`, async ({ page }) => {

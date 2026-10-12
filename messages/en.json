@@ -307,7 +307,8 @@
     "somethingWrong": "Something went wrong.",
     "registrationClosedTitle": "Registration is closed",
     "registrationClosedBody": "This server only accepts people who have been invited. Ask an administrator to send you an invitation.",
-    "networkError": "Could not reach the server. Check your connection and try again."
+    "networkError": "Could not reach the server. Check your connection and try again.",
+    "forgotPassword": "Forgot your password?"
   },
   "calendar": {
     "title": "Calendar",
@@ -934,6 +935,20 @@
         "one": "{n} comment",
         "other": "{n} comments"
       }
+    },
+    "verifyEmail": {
+      "subject": "Confirm your email address",
+      "heading": "Welcome, {name}",
+      "body": "Confirm this is your email address to start using your workspace.",
+      "cta": "Confirm my address",
+      "footer": "The link works for 3 days. If you did not create an account, ignore this email."
+    },
+    "passwordReset": {
+      "subject": "Choose a new password",
+      "heading": "Choose a new password",
+      "body": "Someone asked to reset the password of the account using this address. Open the link to choose a new one.",
+      "cta": "Choose a new password",
+      "footer": "The link works for one hour. If you did not ask for it, ignore this email: your password stays as it is."
     }
   },
   "engagement": {
@@ -1145,7 +1160,10 @@
     "undoTooLate": "Too late to undo: the post is already going out.",
     "webhookNotFound": "That webhook does not exist.",
     "mixScopeNotFound": "That Page, group or label is not in this workspace.",
-    "templateNameTaken": "A template with this name already exists. Choose another name."
+    "templateNameTaken": "A template with this name already exists. Choose another name.",
+    "emailNotVerified": "Confirm your email address first: open the link we sent you.",
+    "resetLinkInvalid": "This link has expired or was already used. Ask for a new one.",
+    "tooManyEmails": "Too many emails asked for. Try again in {minutes, plural, one {# minute} other {# minutes}}."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -3839,5 +3857,35 @@
     "suggesting": "Describing…",
     "suggestFor": "Suggest a description for photo {number}",
     "failed": "The AI could not describe this photo. Write the description yourself, or try again."
+  },
+  "accountEmail": {
+    "email": "Email",
+    "sending": "Sending…",
+    "saving": "Saving…",
+    "failed": "That did not work. Check your connection and try again.",
+    "forgotTitle": "Forgot your password?",
+    "forgotBody": "Enter your email address and we’ll send you a link to choose a new password.",
+    "noEmail": "This server cannot send email yet, so ask the person who runs it to reset your password.",
+    "sendResetLink": "Send the link",
+    "resetSent": "If an account uses that address, a link is on its way. It works for one hour. Check your spam folder if it does not arrive.",
+    "backToSignIn": "Back to sign in",
+    "resetTitle": "Choose a new password",
+    "resetBody": "After this you’ll be signed out everywhere and can sign in with the new password.",
+    "noToken": "This page needs the link from the email.",
+    "askAgain": "Ask for a new link",
+    "newPassword": "New password",
+    "confirmPassword": "Type it again",
+    "passwordHint": "At least 10 characters.",
+    "mismatch": "The two passwords are different.",
+    "setPassword": "Save the new password",
+    "resetDone": "Your password is changed. Sign in with it now.",
+    "signIn": "Sign in",
+    "verifyTitle": "Confirm your email address",
+    "verifyBody": "We sent a link to {email}. Open it to start using the app. Check your spam folder if it does not arrive.",
+    "verifyFailed": "That link has expired or was already used. Send a new one.",
+    "verifySignedOut": "Sign in to send a new link.",
+    "resend": "Send the link again",
+    "resent": "A new link is on its way.",
+    "signOut": "Sign out"
   }
 }

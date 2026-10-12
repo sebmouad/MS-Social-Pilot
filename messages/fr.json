@@ -307,7 +307,8 @@
     "somethingWrong": "Une erreur est survenue.",
     "registrationClosedTitle": "Les inscriptions sont fermées",
     "registrationClosedBody": "Ce serveur n’accepte que les personnes invitées. Demandez à un administrateur de vous envoyer une invitation.",
-    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez."
+    "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+    "forgotPassword": "Mot de passe oublié ?"
   },
   "calendar": {
     "title": "Calendrier",
@@ -934,6 +935,20 @@
         "one": "{n} commentaire",
         "other": "{n} commentaires"
       }
+    },
+    "verifyEmail": {
+      "subject": "Confirmez votre adresse e-mail",
+      "heading": "Bienvenue, {name}",
+      "body": "Confirmez que cette adresse est bien la vôtre pour commencer à utiliser votre espace.",
+      "cta": "Confirmer mon adresse",
+      "footer": "Le lien est valable 3 jours. Si vous n’avez pas créé de compte, ignorez cet e-mail."
+    },
+    "passwordReset": {
+      "subject": "Choisir un nouveau mot de passe",
+      "heading": "Choisir un nouveau mot de passe",
+      "body": "Quelqu’un a demandé à réinitialiser le mot de passe du compte qui utilise cette adresse. Ouvrez le lien pour en choisir un nouveau.",
+      "cta": "Choisir un nouveau mot de passe",
+      "footer": "Le lien est valable une heure. Si vous ne l’avez pas demandé, ignorez cet e-mail : votre mot de passe ne change pas."
     }
   },
   "engagement": {
@@ -1145,7 +1160,10 @@
     "undoTooLate": "Trop tard pour annuler : la publication est déjà en cours d’envoi.",
     "webhookNotFound": "Ce webhook n’existe pas.",
     "mixScopeNotFound": "Cette Page, ce groupe ou cette étiquette n’appartient pas à cet espace.",
-    "templateNameTaken": "Un modèle porte déjà ce nom. Choisissez-en un autre."
+    "templateNameTaken": "Un modèle porte déjà ce nom. Choisissez-en un autre.",
+    "emailNotVerified": "Confirmez d’abord votre adresse e-mail : ouvrez le lien que nous vous avons envoyé.",
+    "resetLinkInvalid": "Ce lien a expiré ou a déjà servi. Demandez-en un nouveau.",
+    "tooManyEmails": "Trop d’e-mails demandés. Réessayez dans {minutes, plural, one {# minute} other {# minutes}}."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -3839,5 +3857,35 @@
     "suggesting": "Description en cours…",
     "suggestFor": "Suggérer une description pour la photo {number}",
     "failed": "L’IA n’a pas pu décrire cette photo. Écrivez la description vous-même, ou réessayez."
+  },
+  "accountEmail": {
+    "email": "E-mail",
+    "sending": "Envoi…",
+    "saving": "Enregistrement…",
+    "failed": "Cela n’a pas marché. Vérifiez votre connexion et réessayez.",
+    "forgotTitle": "Mot de passe oublié ?",
+    "forgotBody": "Saisissez votre adresse e-mail et nous vous enverrons un lien pour choisir un nouveau mot de passe.",
+    "noEmail": "Ce serveur ne peut pas encore envoyer d’e-mails : demandez à la personne qui l’administre de réinitialiser votre mot de passe.",
+    "sendResetLink": "Envoyer le lien",
+    "resetSent": "Si un compte utilise cette adresse, un lien est en route. Il est valable une heure. Regardez dans vos indésirables s’il n’arrive pas.",
+    "backToSignIn": "Retour à la connexion",
+    "resetTitle": "Choisir un nouveau mot de passe",
+    "resetBody": "Ensuite, vous serez déconnecté partout et pourrez vous connecter avec le nouveau mot de passe.",
+    "noToken": "Cette page a besoin du lien reçu par e-mail.",
+    "askAgain": "Demander un nouveau lien",
+    "newPassword": "Nouveau mot de passe",
+    "confirmPassword": "Saisissez-le à nouveau",
+    "passwordHint": "Au moins 10 caractères.",
+    "mismatch": "Les deux mots de passe sont différents.",
+    "setPassword": "Enregistrer le nouveau mot de passe",
+    "resetDone": "Votre mot de passe a changé. Connectez-vous avec maintenant.",
+    "signIn": "Se connecter",
+    "verifyTitle": "Confirmez votre adresse e-mail",
+    "verifyBody": "Nous avons envoyé un lien à {email}. Ouvrez-le pour commencer à utiliser l’application. Regardez dans vos indésirables s’il n’arrive pas.",
+    "verifyFailed": "Ce lien a expiré ou a déjà servi. Envoyez-en un nouveau.",
+    "verifySignedOut": "Connectez-vous pour envoyer un nouveau lien.",
+    "resend": "Renvoyer le lien",
+    "resent": "Un nouveau lien est en route.",
+    "signOut": "Se déconnecter"
   }
 }

@@ -122,3 +122,21 @@ test('the privacy policy is readable without an account', async ({ page }) => {
 
   expect(failures).toEqual([]);
 });
+
+test('a forgotten password starts from the sign-in screen (S3)', async ({ page }) => {
+  const failures = collectFailures(page);
+
+  await open(page, '/login');
+  await page.getByRole('link', { name: 'Forgot your password?' }).click();
+  await expect(page).toHaveURL(/\/forgot-password$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Forgot your password?' })).toBeVisible();
+
+  // A stale or made-up link is refused, and says how to get a new one.
+  await open(page, '/reset-password?token=not-a-real-token');
+  await page.getByLabel('New password').fill('a-brand-new-password');
+  await page.getByLabel('Type it again').fill('a-brand-new-password');
+  await page.getByRole('button', { name: 'Save the new password' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'expired or was already used' })).toBeVisible();
+
+  expect(failures.filter((failure) => !failure.includes('400'))).toEqual([]);
+});

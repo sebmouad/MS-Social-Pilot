@@ -638,3 +638,27 @@ export function negativeSpikeEmail(options: {
 
   return { subject: t('email.negativeSpike.subject', { page: options.page }), ...block };
 }
+
+/** Prove the address after a self-service sign-up (S3). */
+export function verifyEmailEmail(options: { locale: Locale; name: string; token: string }): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) => translate(options.locale, key, params);
+  const block = layout({
+    heading: t('email.verifyEmail.heading', { name: options.name }),
+    body: t('email.verifyEmail.body'),
+    cta: { label: t('email.verifyEmail.cta'), url: `${env.appUrl}/api/auth/verify-email?token=${encodeURIComponent(options.token)}` },
+    footer: t('email.verifyEmail.footer'),
+  });
+  return { subject: t('email.verifyEmail.subject'), ...block };
+}
+
+/** A link to choose a new password (S3). */
+export function passwordResetEmail(options: { locale: Locale; token: string }): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) => translate(options.locale, key, params);
+  const block = layout({
+    heading: t('email.passwordReset.heading'),
+    body: t('email.passwordReset.body'),
+    cta: { label: t('email.passwordReset.cta'), url: `${env.appUrl}/reset-password?token=${encodeURIComponent(options.token)}` },
+    footer: t('email.passwordReset.footer'),
+  });
+  return { subject: t('email.passwordReset.subject'), ...block };
+}

@@ -150,7 +150,7 @@ test('focus is visible when it lands somewhere', async ({ page }) => {
 test.describe('before signing in', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  for (const path of ['/login', '/register', '/data-deletion', '/terms', '/privacy-policy', '/invite/not-a-real-token']) {
+  for (const path of ['/login', '/register', '/forgot-password', '/reset-password?token=x', '/data-deletion', '/terms', '/privacy-policy', '/invite/not-a-real-token']) {
     test(`${path} announces every control it shows`, async ({ page }) => {
       await open(page, path);
       await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();

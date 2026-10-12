@@ -15,6 +15,7 @@ import { nextStepAfterPassword, type PendingStep } from './two-step';
 import { enabledModules, moduleOfPath, PATHNAME_HEADER, type ModuleKey } from './modules';
 import { DEFAULT_THEME, isTheme, type Theme } from './themes';
 import { noteSignIn, requestDevice, touchSession } from './sessions';
+import { emailEnabled } from './email/send';
 
 /**
  * Sessions, and resolving which workspace the request is acting on.
@@ -48,7 +49,7 @@ export interface WorkspaceSummary {
 }
 
 export interface AuthContext {
-  user: { id: string; email: string; name: string; locale: Locale; theme: Theme };
+  user: { id: string; email: string; name: string; locale: Locale; theme: Theme; emailVerified: boolean };
   workspace: {
     id: string;
     name: string;
@@ -175,17 +176,19 @@ export async function mayRegister(email: string): Promise<boolean> {
 async function admission(
   db: Prisma.TransactionClient,
   email: string,
-): Promise<'first' | 'admitted' | null> {
+): Promise<'first' | 'invited' | 'open' | null> {
   if ((await db.user.count()) === 0) return 'first';
-  if (env.openRegistration) return 'admitted';
 
   const live = { email, acceptedAt: null, expiresAt: { gt: new Date() } };
   // Invited to join a workspace, or invited by root to create one of their own.
+  // Asked before open registration: the invitation went to this address, so
+  // it also proves the address (S3).
   const [invitation, client] = await Promise.all([
     db.invitation.findFirst({ where: live, select: { id: true } }),
     db.clientInvitation.findFirst({ where: live, select: { id: true } }),
   ]);
-  return invitation || client ? 'admitted' : null;
+  if (invitation || client) return 'invited';
+  return env.openRegistration ? 'open' : null;
 }
 
 /**
@@ -218,7 +221,7 @@ export async function registerUser(input: {
    * an account they cannot use.
    */
   skipWorkspace?: boolean;
-}): Promise<{ userId: string; token: string }> {
+}): Promise<{ userId: string; token: string; verified: boolean }> {
   const email = input.email.trim().toLowerCase();
 
   // Turn a closed door away before the slow hash, so refusals stay cheap. Not
@@ -256,6 +259,9 @@ export async function registerUser(input: {
         // workspace of their own to own below — which is exactly why owning a
         // workspace can never be what admits someone to instance settings.
         isInstanceOwner: admitted === 'first',
+        // A stranger through open registration proves the address by email
+        // (S3) — unless the server cannot send one, which would lock them out.
+        emailVerifiedAt: admitted !== 'open' || !emailEnabled() ? new Date() : null,
       },
     });
 
@@ -286,7 +292,7 @@ export async function registerUser(input: {
     });
   }
 
-  return { userId: user.id, token: await createSession(user.id) };
+  return { userId: user.id, token: await createSession(user.id), verified: user.emailVerifiedAt !== null };
 }
 
 let dummy: string | null = null;
@@ -530,7 +536,14 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
         .find((entry) => entry !== undefined) ?? user.memberships[0]!);
 
   return {
-    user: { id: user.id, email: user.email, name: user.name, locale: user.locale, theme: isTheme(user.theme) ? user.theme : DEFAULT_THEME },
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      locale: user.locale,
+      theme: isTheme(user.theme) ? user.theme : DEFAULT_THEME,
+      emailVerified: user.emailVerifiedAt !== null,
+    },
     workspace: {
       id: membership.workspace.id,
       name: membership.workspace.name,
@@ -567,6 +580,7 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
 export async function requirePage(requestedWorkspaceId?: string): Promise<AuthContext> {
   const context = await getAuthContext(requestedWorkspaceId);
   if (!context) redirect('/login');
+  if (!context.user.emailVerified) redirect('/verify-email');
   // The (app) layout shows the suspended notice; a switched-off module is not there.
   if ((await accessRefusal(context)) === 'module') notFound();
   return context;
@@ -606,6 +620,7 @@ export async function accessRefusal(context: AuthContext): Promise<'suspended' |
 export async function requireAuth(requestedWorkspaceId?: string): Promise<AuthContext> {
   const context = await getAuthContext(requestedWorkspaceId);
   if (!context) throw new AuthError('You must be signed in.');
+  if (!context.user.emailVerified) throw errors.emailNotVerified();
   const refusal = await accessRefusal(context);
   if (refusal === 'suspended') throw errors.workspaceSuspended();
   if (refusal === 'module') throw errors.moduleOff();

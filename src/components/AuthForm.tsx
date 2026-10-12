@@ -167,6 +167,13 @@ export function AuthForm({ mode, inviteToken, defaults }: Props) {
             {...fieldState('password')}
           />
           {isRegister && <p className="hint">{t('passwordHint')}</p>}
+          {!isRegister && (
+            <p className="mt-1 text-end text-xs">
+              <Link href="/forgot-password" className="font-medium text-brand-600 hover:underline">
+                {t('forgotPassword')}
+              </Link>
+            </p>
+          )}
           {fields.password && <p id="password-error" className="error-text">{fields.password}</p>}
         </div>
 
