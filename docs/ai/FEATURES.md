@@ -1,7 +1,7 @@
 # Feature inventory (screen by screen)
 
 App shell (like Simplified): a narrow **icon rail** on the far left with the
-main areas — **Home** · **Publish** (Calendar, Queue, Content mix, Posts, Approvals, Website
+main areas — **Home** · **Publish** (Calendar, Queue, Content mix, Templates, Posts, Approvals, Website
 auto-share; also the composer) · **Inbox** · **Analytics** (Pages, Reports, Caption tests, Link clicks) ·
 **Ads** · **Workspace** (Connections, Client links, Settings), Root at the
 bottom for root. Beside it the **sidebar** with the area's pages, the client
@@ -43,6 +43,9 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   results, add-all-suggested, shuffle, clear (back to drafts). With Settings ›
   "Best times per Page" set to add, a weekly job adds each Page's best new
   times as its own (two a week, 14 at most) and the screen lists what it added.
+- **Templates** `/templates`: saved post structures by category (text with
+  `{blanks}`, hashtags, first comment, label); picked from Compose ›
+  Templates, which asks for each blank. Editors and up manage them.
 - **Content mix** `/queue/mix`: per Page or group, how many posts of each
   label the coming 7 days should hold; a table of planned vs target with
   ready drafts per Page (selection-aware). Admins edit; with "Fill gaps from

@@ -1124,7 +1124,8 @@
     "seasonNotFound": "Seasonal mode not found.",
     "undoTooLate": "Too late to undo: the post is already going out.",
     "webhookNotFound": "That webhook does not exist.",
-    "mixScopeNotFound": "That Page, group or label is not in this workspace."
+    "mixScopeNotFound": "That Page, group or label is not in this workspace.",
+    "templateNameTaken": "A template with this name already exists. Choose another name."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -1410,7 +1411,8 @@
     "captionTests": "Caption tests",
     "linkClicks": "Link clicks",
     "keyDates": "Key dates & seasons",
-    "contentMix": "Content mix"
+    "contentMix": "Content mix",
+    "templates": "Templates"
   },
   "notifications": {
     "title": "Notifications",
@@ -2580,7 +2582,8 @@
         "publishWithoutApproval": "Publish without approval",
         "manageOthersPosts": "Edit or delete other people's posts",
         "deleteMedia": "Delete media",
-        "compose": "Write posts and drafts"
+        "compose": "Write posts and drafts",
+        "manageTemplates": "Add, change and remove post templates"
       }
     },
     "activity": {
@@ -3527,5 +3530,50 @@
     "saveFailed": "Could not save the mix. Try again.",
     "autoFill": "Fill gaps from drafts automatically",
     "autoFillHint": "Every hour, when a Page is short of a label this week, its oldest ready draft with that label takes the next free queue time. Drafts that still need approval are never sent on their own."
+  },
+  "templates": {
+    "title": "Post templates",
+    "subtitle": "Saved post structures for the team: a tip, a promo, an announcement. Pick one while writing and fill in the blanks.",
+    "pick": "Templates",
+    "pickTitle": "Start from a template",
+    "loading": "Loading templates…",
+    "loadFailed": "Could not load the templates. Try again.",
+    "none": "No templates yet.",
+    "manage": "Manage templates",
+    "noCategory": "Other",
+    "back": "Back",
+    "use": "Use template",
+    "preview": "Post text",
+    "withFirstComment": "First comment: {comment}",
+    "replaceConfirm": "Replace the text you wrote?",
+    "replaceConfirmBody": "The template’s text takes the place of what is in the post box now.",
+    "replace": "Replace text",
+    "add": "New template",
+    "addTitle": "New template",
+    "editTitle": "Edit template",
+    "edit": "Edit",
+    "editNamed": "Edit {name}",
+    "remove": "Remove",
+    "removeNamed": "Remove {name}",
+    "removeConfirm": "Remove the template “{name}”?",
+    "removeConfirmBody": "It disappears for everyone in the workspace. Posts already written from it are not changed.",
+    "emptyTitle": "No templates yet",
+    "emptyBody": "Templates are saved post structures the team picks while writing. An editor can add the first one.",
+    "emptyBodyEditor": "Save the structure of posts you write often, with blanks to fill in, so anyone can start from it in the composer.",
+    "name": "Name",
+    "category": "Category",
+    "categoryPlaceholder": "For example Tip, Promo, Announcement",
+    "body": "Text",
+    "bodyPlaceholder": "New this week: '{product}', from '{price}'. Come and see it!",
+    "bodyHint": "Write a word in braces, like '{product}', for a blank filled in when the template is picked.",
+    "fieldsFound": "{count, plural, one {Blank to fill in: {fields}} other {Blanks to fill in: {fields}}}",
+    "hashtags": "Hashtags",
+    "hashtagsPlaceholder": "#offer #new",
+    "firstComment": "First comment",
+    "label": "Label",
+    "noLabel": "No label",
+    "saving": "Saving…",
+    "save": "Save template",
+    "saveFailed": "Could not save the template. Try again."
   }
 }

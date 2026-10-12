@@ -720,8 +720,14 @@ setup from Phase 0.2 (marked AI).
   `/api/media/import` within the quota, so a carousel publishes like any
   upload. Website auto-share (G5) still captions from the feed: reading each
   article's page for JSON-LD there is left for later.*
-- **H4. Post templates by category (S)** — saved structures the user creates
+- **H4. Post templates by category (S)** ✅ — saved structures the user creates
   (e.g. tip, poll, promo, announcement) with placeholders, default hashtags and first comment; pick in Compose.
+  *Done 2026-10-12: Publish › Templates (`/templates`); each template has a
+  free-text category, text with `{blanks}`, hashtags (normalised to tags), a
+  first comment and an optional label. Compose › "Templates" lists them by
+  category, asks for each blank, previews, and fills the text (hashtags on
+  their own line), the first comment and the label. Everyone picks; editors
+  and up add, change and remove (`canManageTemplates`).*
 - **H5. AI alt text and subtitles (M, AI)** — alt text suggested for every photo
   (editable, sent as Facebook alt text — already supported); Reel/video
   transcription to burned-in or SRT captions (speech-to-text provider; OpenAI

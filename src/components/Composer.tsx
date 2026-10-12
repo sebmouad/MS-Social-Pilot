@@ -25,6 +25,7 @@ import { formatInZone } from '@/lib/time';
 import { IG_CAPTION_LIMIT } from '@/lib/constants';
 import { CaptionTestFields, NO_CAPTION_TEST, type CaptionTestChoice } from './CaptionTestFields';
 import { SpamGuard, type StaggerChoice } from './SpamGuard';
+import { TemplatePicker } from './TemplatePicker';
 import { TranslationFields, type Translation } from './TranslationFields';
 
 interface Props {
@@ -633,6 +634,21 @@ export function Composer({
               ))}
             </div>
             {format !== 'post' && <p className="text-xs text-slate-500">{t(`formatHint_${format}`)}</p>}
+            <TemplatePicker
+              hasText={message.trim().length > 0}
+              onUse={(template) => {
+                startedNext();
+                writeMessage(template.text.slice(0, LIMITS.messageLength));
+                if (template.firstComment) {
+                  setFirstComment(template.firstComment);
+                  if (commentBox.current) commentBox.current.value = template.firstComment;
+                }
+                const labelId = template.labelId;
+                if (labelId && labels.some((label) => label.id === labelId)) {
+                  setLabelIds((current) => (current.includes(labelId) ? current : [...current, labelId]));
+                }
+              }}
+            />
           </div>
           <label className="label" htmlFor="message">
             {format === 'story' ? t('storyNote') : t('whatToSay')}

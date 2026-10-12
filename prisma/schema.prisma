@@ -268,6 +268,7 @@ model Workspace {
   pageGroups           PageGroup[]
   labels               Label[]
   snippets             Snippet[]
+  postTemplates        PostTemplate[]
   savedReplies         SavedReply[]
   captionTests         CaptionTest[]
   shareLinks           ShareLink[]
@@ -708,6 +709,7 @@ model Label {
   workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   posts           PostLabel[]
   contentMixRules ContentMixRule[]
+  postTemplates   PostTemplate[]
 
   @@unique([workspaceId, name])
   @@map("labels")
@@ -1361,6 +1363,28 @@ model Snippet {
 
   @@index([workspaceId])
   @@map("snippets")
+}
+
+/// A post structure kept for reuse (NEXT_PHASES H4): a category the team
+/// names, text with `{placeholders}` filled when it is picked, hashtags, a
+/// first comment and a label. Shared per workspace.
+model PostTemplate {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  name         String
+  category     String   @default("")
+  body         String
+  hashtags     String   @default("")
+  firstComment String   @default("")
+  labelId      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  label     Label?    @relation(fields: [labelId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, name])
+  @@map("post_templates")
 }
 
 /// A reusable answer for comments and Messenger (NEXT_PHASES G8), with

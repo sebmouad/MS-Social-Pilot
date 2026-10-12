@@ -209,6 +209,7 @@ describe('the privileges table', () => {
       publishWithoutApproval: constants.canPublishWithoutApproval,
       manageOthersPosts: constants.canManageOthersPosts,
       deleteMedia: constants.canDeleteMedia,
+      manageTemplates: constants.canManageTemplates,
       compose: () => constants.canCompose(),
     };
     expect(Object.keys(checks).sort()).toEqual(Object.keys(constants.CAPABILITIES).sort());

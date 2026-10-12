@@ -75,6 +75,7 @@ const BODY: Record<string, unknown> = {
   'feeds/[id]': { enabled: false },
   'moderation/rules/[id]': { enabled: false },
   'saved-replies/[id]': { name: 'Hijacked' },
+  'post-templates/[id]': { name: 'Hijacked', body: 'x' },
   'chat-channels/[id]': { enabled: false },
   'webhooks/[id]': { enabled: false },
   'connections/instagram/[id]': { enabled: false },
@@ -146,6 +147,7 @@ beforeAll(async () => {
   const ads = await prisma.adAccount.create({ data: { workspaceId: w, actId: 'act_a', name: 'A ads' } });
   const captionTest = await prisma.captionTest.create({ data: { workspaceId: w, name: 'A test', status: 'decided', winnerLabel: 'A' } });
   const savedReply = await prisma.savedReply.create({ data: { workspaceId: w, name: 'A reply', body: 'x' } });
+  const postTemplate = await prisma.postTemplate.create({ data: { workspaceId: w, name: 'A template', body: 'x' } });
   const rule = await prisma.moderationRule.create({ data: { workspaceId: w, name: 'A rule', match: 'links', action: 'hide' } });
   const exported = await prisma.workspaceExport.create({
     data: { workspaceId: w, requestedById: ownerA.id, status: 'ready', storageKey: 'exports/a.zip', expiresAt: new Date(Date.now() + 86_400_000) },
@@ -176,6 +178,7 @@ beforeAll(async () => {
     'media/[id]/raw': media.id,
     'moderation/rules/[id]': rule.id,
     'saved-replies/[id]': savedReply.id,
+    'post-templates/[id]': postTemplate.id,
     'seasons/[id]': season.id,
     'moderation/actions/[id]/undo': moderated.id,
     'page-groups/[id]': group.id,
@@ -209,7 +212,7 @@ afterAll(async () => {
 /** Everything A owns, as a fingerprint: counts and the fields a hijack would change. */
 async function snapshot() {
   const w = A.workspace;
-  const [posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries] = await Promise.all([
+  const [posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates] = await Promise.all([
     prisma.post.findMany({ where: { workspaceId: w }, select: { id: true, message: true, status: true } }),
     prisma.target.findMany({ where: { workspaceId: w }, select: { id: true, enabled: true, name: true } }),
     prisma.label.findMany({ where: { workspaceId: w }, select: { id: true, name: true } }),
@@ -229,8 +232,9 @@ async function snapshot() {
     prisma.media.findMany({ where: { workspaceId: w }, select: { id: true } }),
     prisma.webhookEndpoint.findMany({ where: { workspaceId: w }, select: { id: true, enabled: true, events: true } }),
     prisma.webhookDelivery.findMany({ where: { workspaceId: w }, select: { id: true, status: true, attempts: true } }),
+    prisma.postTemplate.findMany({ where: { workspaceId: w }, select: { id: true, name: true, body: true } }),
   ]);
-  return { posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries };
+  return { posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates };
 }
 
 describe("another client's owner", () => {

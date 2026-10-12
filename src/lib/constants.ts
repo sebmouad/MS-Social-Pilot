@@ -133,6 +133,7 @@ export const CAPABILITIES = {
   publishWithoutApproval: WorkspaceRole.editor,
   manageOthersPosts: WorkspaceRole.editor,
   deleteMedia: WorkspaceRole.editor,
+  manageTemplates: WorkspaceRole.editor,
   compose: WorkspaceRole.contributor,
 } as const satisfies Record<string, WorkspaceRole>;
 
@@ -236,6 +237,11 @@ export function canCompose(): boolean {
  */
 export function canDeleteMedia(role: WorkspaceRole): boolean {
   return atLeast(role, CAPABILITIES.deleteMedia);
+}
+
+/** Create, change and remove the workspace's post templates (NEXT_PHASES H4). */
+export function canManageTemplates(role: WorkspaceRole): boolean {
+  return atLeast(role, CAPABILITIES.manageTemplates);
 }
 
 /**

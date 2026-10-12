@@ -1124,7 +1124,8 @@
     "seasonNotFound": "Mode saisonnier introuvable.",
     "undoTooLate": "Trop tard pour annuler : la publication est déjà en cours d’envoi.",
     "webhookNotFound": "Ce webhook n’existe pas.",
-    "mixScopeNotFound": "Cette Page, ce groupe ou cette étiquette n’appartient pas à cet espace."
+    "mixScopeNotFound": "Cette Page, ce groupe ou cette étiquette n’appartient pas à cet espace.",
+    "templateNameTaken": "Un modèle porte déjà ce nom. Choisissez-en un autre."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -1410,7 +1411,8 @@
     "captionTests": "Tests de légendes",
     "linkClicks": "Clics sur les liens",
     "keyDates": "Dates clés et saisons",
-    "contentMix": "Mix de contenu"
+    "contentMix": "Mix de contenu",
+    "templates": "Modèles"
   },
   "notifications": {
     "title": "Notifications",
@@ -2580,7 +2582,8 @@
         "publishWithoutApproval": "Publier sans approbation",
         "manageOthersPosts": "Modifier ou supprimer les publications des autres",
         "deleteMedia": "Supprimer des médias",
-        "compose": "Rédiger des publications et brouillons"
+        "compose": "Rédiger des publications et brouillons",
+        "manageTemplates": "Ajouter, modifier et supprimer des modèles de publication"
       }
     },
     "activity": {
@@ -3527,5 +3530,50 @@
     "saveFailed": "Impossible d’enregistrer le mix. Réessayez.",
     "autoFill": "Combler les manques avec les brouillons automatiquement",
     "autoFillHint": "Toutes les heures, quand une Page manque d’une étiquette cette semaine, son plus ancien brouillon prêt avec cette étiquette prend le prochain horaire libre de la file. Les brouillons qui attendent une validation ne partent jamais seuls."
+  },
+  "templates": {
+    "title": "Modèles de publication",
+    "subtitle": "Des structures de publication enregistrées pour l’équipe : une astuce, une promo, une annonce. Choisissez-en une en rédigeant et complétez les blancs.",
+    "pick": "Modèles",
+    "pickTitle": "Partir d’un modèle",
+    "loading": "Chargement des modèles…",
+    "loadFailed": "Impossible de charger les modèles. Réessayez.",
+    "none": "Aucun modèle pour l’instant.",
+    "manage": "Gérer les modèles",
+    "noCategory": "Autres",
+    "back": "Retour",
+    "use": "Utiliser le modèle",
+    "preview": "Texte de la publication",
+    "withFirstComment": "Premier commentaire : {comment}",
+    "replaceConfirm": "Remplacer le texte que vous avez écrit ?",
+    "replaceConfirmBody": "Le texte du modèle remplace ce qui se trouve dans la zone de publication.",
+    "replace": "Remplacer le texte",
+    "add": "Nouveau modèle",
+    "addTitle": "Nouveau modèle",
+    "editTitle": "Modifier le modèle",
+    "edit": "Modifier",
+    "editNamed": "Modifier {name}",
+    "remove": "Supprimer",
+    "removeNamed": "Supprimer {name}",
+    "removeConfirm": "Supprimer le modèle « {name} » ?",
+    "removeConfirmBody": "Il disparaît pour tout l’espace de travail. Les publications déjà rédigées à partir de lui ne changent pas.",
+    "emptyTitle": "Aucun modèle pour l’instant",
+    "emptyBody": "Les modèles sont des structures de publication que l’équipe choisit en rédigeant. Un éditeur peut ajouter le premier.",
+    "emptyBodyEditor": "Enregistrez la structure des publications que vous écrivez souvent, avec des blancs à compléter, pour que chacun puisse partir de là dans l’éditeur.",
+    "name": "Nom",
+    "category": "Catégorie",
+    "categoryPlaceholder": "Par exemple Astuce, Promo, Annonce",
+    "body": "Texte",
+    "bodyPlaceholder": "Nouveau cette semaine : '{product}', à partir de '{price}'. Venez le découvrir !",
+    "bodyHint": "Écrivez un mot entre accolades, comme '{product}', pour un blanc à compléter quand le modèle est choisi.",
+    "fieldsFound": "{count, plural, one {Blanc à compléter : {fields}} other {Blancs à compléter : {fields}}}",
+    "hashtags": "Hashtags",
+    "hashtagsPlaceholder": "#offre #nouveau",
+    "firstComment": "Premier commentaire",
+    "label": "Étiquette",
+    "noLabel": "Aucune étiquette",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer le modèle",
+    "saveFailed": "Impossible d’enregistrer le modèle. Réessayez."
   }
 }

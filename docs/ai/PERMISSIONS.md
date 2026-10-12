@@ -35,6 +35,7 @@ Order: owner 4 > admin 3 > editor 2 > contributor 1. A workspace owner is
 | Publish without approval (`canPublishWithoutApproval`) | editor |
 | Edit or delete other people's posts (`canManageOthersPosts`) | editor |
 | Delete media (`canDeleteMedia`) | editor |
+| Add, change, remove post templates (`canManageTemplates`, NEXT_PHASES H4; using one needs no role) | editor |
 | Compose drafts (`canCompose`) | contributor (everyone) |
 
 Marking an inbox comment or conversation done / not done (`POST /api/inbox`)
