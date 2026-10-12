@@ -1,7 +1,7 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { TargetType } from '@prisma/client';
 import { loadSelection } from '@/lib/page-filter';
-import { SelectionBar } from '@/components/SelectionBar';
+import { ChannelsLayout } from '@/components/ChannelsLayout';
 
 import { QueueClient } from '@/components/QueueClient';
 import { requirePage } from '@/lib/auth';
@@ -183,13 +183,13 @@ export default async function QueuePage({
     });
 
   return (
-    <div className="space-y-6">
+    <ChannelsLayout auth={auth} selection={selection}>
+    <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">{t('subtitle', { timezone: timeZone })}</p>
         </div>
-        <SelectionBar auth={auth} selection={selection} />
       </header>
 
       {recentlyAdded.length > 0 && (
@@ -232,5 +232,6 @@ export default async function QueuePage({
         pageCount={scope ? 1 : pages.length}
       />
     </div>
+    </ChannelsLayout>
   );
 }

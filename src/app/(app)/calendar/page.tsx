@@ -402,6 +402,8 @@ export default async function CalendarPage({
         groups={filter.groups}
         group={filter.group}
         visible={filter.visible}
+        net={filter.net}
+        networks={filter.networks}
         canManageGroups={canManageSettings(auth.role)}
         canManageQueue={canManageOthersPosts(auth.role)}
       />

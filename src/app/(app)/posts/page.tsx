@@ -213,6 +213,8 @@ export default async function PostsPage({
         groups={filter.groups}
         group={filter.group}
         visible={filter.visible}
+        net={filter.net}
+        networks={filter.networks}
         canManageGroups={canManageSettings(auth.role)}
         canManageQueue={canManageOthersPosts(auth.role)}
         inline

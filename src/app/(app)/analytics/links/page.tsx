@@ -4,7 +4,7 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { EmptyState } from '@/components/EmptyState';
 import { LinkClicksChart } from '@/components/LinkClicksChart';
-import { SelectionBar } from '@/components/SelectionBar';
+import { ChannelsLayout } from '@/components/ChannelsLayout';
 import { StatTile } from '@/components/charts/StatTile';
 import { requirePage } from '@/lib/auth';
 import { parseRange } from '@/lib/date-range';
@@ -66,7 +66,8 @@ export default async function LinkClicksPage({
   const keep = Object.fromEntries(new URLSearchParams(selection.query));
 
   return (
-    <div className="space-y-6">
+    <ChannelsLayout auth={auth} selection={selection}>
+    <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
@@ -74,7 +75,6 @@ export default async function LinkClicksPage({
         </div>
         <DateRangePicker range={range} path="/analytics/links" keep={keep} />
       </header>
-      <SelectionBar auth={auth} selection={selection} />
 
       {report.total === 0 ? (
         <EmptyState
@@ -199,5 +199,6 @@ export default async function LinkClicksPage({
         </>
       )}
     </div>
+    </ChannelsLayout>
   );
 }

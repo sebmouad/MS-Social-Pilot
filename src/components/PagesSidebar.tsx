@@ -13,7 +13,7 @@ import { NetworkMark } from './NetworkMark';
 import { paletteOf } from '@/lib/palette';
 import type { PageGroupView } from '@/lib/page-groups';
 import type { SidebarPage } from '@/lib/page-filter';
-import { rememberSelection, selectionQuery } from '@/lib/selection';
+import { networkOfType, rememberSelection, selectionQuery, type SelectionNetwork } from '@/lib/selection';
 
 interface Props {
   pages: SidebarPage[];
@@ -29,6 +29,9 @@ interface Props {
   canManageQueue?: boolean;
   /** Remembers the selection for this workspace (src/lib/selection.ts). */
   workspaceId?: string;
+  /** The network the column is narrowed to, and those on offer. */
+  net?: SelectionNetwork | null;
+  networks?: SelectionNetwork[];
 }
 
 /**
@@ -45,8 +48,9 @@ interface Props {
  */
 const FOLD_KEY = 'msp_pages_column_folded';
 
-export function PagesSidebar({ pages, groups, group, visible, canManageGroups, inline = false, canManageQueue = false, workspaceId }: Props) {
+export function PagesSidebar({ pages, groups, group, visible, canManageGroups, inline = false, canManageQueue = false, workspaceId, net = null, networks = [] }: Props) {
   const t = useTranslations('pagesSidebar');
+  const tScope = useTranslations('profileScope');
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
@@ -73,8 +77,11 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
 
   const activeGroup = groups.find((entry) => entry.id === group) ?? null;
   const universe = useMemo(
-    () => (activeGroup ? pages.filter((page) => activeGroup.targetIds.includes(page.id)) : pages),
-    [activeGroup, pages],
+    () =>
+      pages.filter(
+        (page) => (!activeGroup || activeGroup.targetIds.includes(page.id)) && (!net || networkOfType(page.type) === net),
+      ),
+    [activeGroup, pages, net],
   );
   const shown = new Set(visible ?? universe.map((page) => page.id));
   const shownCount = universe.filter((page) => shown.has(page.id)).length;
@@ -93,13 +100,17 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
     };
   }, [menuOpen]);
 
-  function navigate(next: { group?: string | null; pages?: string[] | null }) {
+  function navigate(next: { group?: string | null; pages?: string[] | null; net?: SelectionNetwork | null }) {
     const params = new URLSearchParams(search.toString());
     // Paging through a filtered list starts again from its first page.
     params.delete('page');
     if (next.group !== undefined) {
       if (next.group) params.set('group', next.group);
       else params.delete('group');
+    }
+    if (next.net !== undefined) {
+      if (next.net) params.set('net', next.net);
+      else params.delete('net');
     }
     if (next.pages !== undefined) {
       if (next.pages) params.set('pages', next.pages.join(','));
@@ -194,7 +205,7 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
         )}
       </div>
 
-      {universe.length > 6 && (
+      {pages.length > 3 && (
         <label className="relative block">
           <span className="sr-only">{t('search')}</span>
           <Icon name="search" size={15} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -207,13 +218,46 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
         </label>
       )}
 
-      <div className="flex items-center justify-between px-1 text-xs text-slate-500">
+      {networks.length > 1 && (
+        <div className="flex flex-wrap gap-1" role="group" aria-label={t('networks')}>
+          {[null, ...networks].map((network) => (
+            <button
+              key={network ?? 'all'}
+              type="button"
+              aria-pressed={net === network}
+              title={network ? tScope(`network.${network}`) : tScope('allNetworks')}
+              className={`flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-semibold ${
+                net === network ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+              onClick={() => navigate({ net: network, pages: null })}
+            >
+              {network ? <NetworkMark network={network === 'facebook' ? 'page' : network} size={14} /> : tScope('allNetworks')}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 px-1 text-xs text-slate-500">
         <span className="nums">{t('showing', { shown: shownCount, total: universe.length })}</span>
-        {shownCount < universe.length && (
-          <button type="button" className="font-semibold text-brand-600 hover:underline" onClick={() => setShown(universe.map((page) => page.id))}>
-            {t('showAll')}
+        <span className="flex gap-3">
+          <button
+            type="button"
+            className="font-semibold text-brand-600 hover:underline disabled:text-slate-400 disabled:no-underline"
+            disabled={shownCount === universe.length}
+            onClick={() => setShown(universe.map((page) => page.id))}
+          >
+            {t('selectAll')}
           </button>
-        )}
+          <button
+            type="button"
+            className="font-semibold text-slate-600 hover:underline disabled:text-slate-400 disabled:no-underline"
+            disabled={shownCount <= 1}
+            title={t('deselectAllHint')}
+            onClick={() => setShown(universe.slice(0, 1).map((page) => page.id))}
+          >
+            {t('deselectAll')}
+          </button>
+        </span>
       </div>
 
       <div className="-mx-1 max-h-[60vh] overflow-y-auto">

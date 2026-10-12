@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { TargetType, WorkspaceRole } from '@prisma/client';
 import { loadSelection } from '@/lib/page-filter';
-import { SelectionBar } from '@/components/SelectionBar';
+import { ChannelsLayout } from '@/components/ChannelsLayout';
 
 import { AnalyticsClient } from '@/components/AnalyticsClient';
 import { AnalyticsTabs } from '@/components/AnalyticsTabs';
@@ -145,13 +145,13 @@ export async function AnalyticsScreen({
   const postsScope = requested ? { targetId: selected.id } : { targetIds: pages.map((page) => page.id) };
 
   return (
-    <div className="space-y-6">
+    <ChannelsLayout auth={auth} selection={selection}>
+    <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{only ? t(`view.${only}`) : t('title')}</h1>
           {!only && <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>}
         </div>
-        <SelectionBar auth={auth} selection={selection} />
       </header>
 
       {/* One filter row, above everything it scopes: the date range first,
@@ -416,6 +416,7 @@ export async function AnalyticsScreen({
         />
       )}
     </div>
+    </ChannelsLayout>
   );
 }
 

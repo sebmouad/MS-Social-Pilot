@@ -11,7 +11,7 @@ import { requirePage } from '@/lib/auth';
 import { mayUseDeveloperFeatures } from '@/lib/modules';
 import { postScope, postTargetScope, targetScope } from '@/lib/page-access';
 import { loadSelection } from '@/lib/page-filter';
-import { SelectionBar } from '@/components/SelectionBar';
+import { ChannelsLayout } from '@/components/ChannelsLayout';
 import { screenMetadata } from '@/lib/metadata';
 import { summariseConnections } from '@/lib/connections';
 import { countOpenInbox } from '@/lib/inbox';
@@ -125,7 +125,8 @@ export default async function DashboardPage({
   ];
 
   return (
-    <div className="space-y-6">
+    <ChannelsLayout auth={auth} selection={selection}>
+    <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
@@ -135,7 +136,6 @@ export default async function DashboardPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <SelectionBar auth={auth} selection={selection} />
           {aiOn && (
             <AiPlanner
               pages={visiblePages.map((page) => ({ id: page.id, name: page.name, pictureUrl: page.pictureUrl }))}
@@ -370,6 +370,7 @@ export default async function DashboardPage({
         </section>
       </div>
     </div>
+    </ChannelsLayout>
   );
 }
 

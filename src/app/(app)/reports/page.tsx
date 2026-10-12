@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { TargetType, WorkspaceRole } from '@prisma/client';
 import { getTranslations } from 'next-intl/server';
 import { loadSelection } from '@/lib/page-filter';
-import { SelectionBar } from '@/components/SelectionBar';
+import { ChannelsLayout } from '@/components/ChannelsLayout';
 
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
@@ -161,14 +161,14 @@ export default async function ReportsPage({
     }).toString()}`;
 
   return (
-    <div className="space-y-6">
+    <ChannelsLayout auth={auth} selection={selection}>
+    <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
           <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <SelectionBar auth={auth} selection={selection} />
           {selected && canEdit && (
             <ReportSchedules
               targetId={selected.id}
@@ -449,5 +449,6 @@ export default async function ReportsPage({
         {branding.reportFooter && <span>{t('sourceNote')}</span>}
       </footer>
     </div>
+    </ChannelsLayout>
   );
 }

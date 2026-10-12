@@ -2334,7 +2334,11 @@
     "confirmHint_clear": "Every upcoming post sent from here goes back to drafts. Nothing is deleted; posts Facebook holds or that wait for review keep their place.",
     "confirmHint_clearDrafts": "Drafts written for this channel only are deleted for good. Drafts shared with other channels are kept.",
     "collapse": "Fold the channels column",
-    "expand": "Open the channels column"
+    "expand": "Open the channels column",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "deselectAllHint": "One channel always stays selected",
+    "networks": "Networks"
   },
   "labels": {
     "allLabels": "All labels",

@@ -2334,7 +2334,11 @@
     "confirmHint_clear": "Chaque publication à venir envoyée d’ici repasse en brouillon. Rien n’est supprimé ; celles que Facebook détient ou en attente de validation restent en place.",
     "confirmHint_clearDrafts": "Les brouillons écrits pour ce seul canal sont supprimés définitivement. Ceux partagés avec d’autres canaux sont conservés.",
     "collapse": "Replier la colonne des canaux",
-    "expand": "Ouvrir la colonne des canaux"
+    "expand": "Ouvrir la colonne des canaux",
+    "selectAll": "Tout sélectionner",
+    "deselectAll": "Tout désélectionner",
+    "deselectAllHint": "Un canal reste toujours sélectionné",
+    "networks": "Réseaux"
   },
   "labels": {
     "allLabels": "Tous les libellés",

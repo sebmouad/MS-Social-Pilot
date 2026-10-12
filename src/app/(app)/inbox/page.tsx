@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { FeedAvatar } from '@/components/FeedPost';
 import { Icon } from '@/components/Icon';
 import { InboxResolveButton } from '@/components/InboxResolveButton';
-import { SelectionBar } from '@/components/SelectionBar';
+import { ChannelsLayout } from '@/components/ChannelsLayout';
 import { requirePage } from '@/lib/auth';
 import { countOpenInbox, readInbox, type InboxKind, type InboxState } from '@/lib/inbox';
 import { screenMetadata } from '@/lib/metadata';
@@ -72,7 +72,8 @@ export default async function InboxPage({
   );
 
   return (
-    <div className="space-y-6">
+    <ChannelsLayout auth={auth} selection={selection}>
+    <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
@@ -80,7 +81,6 @@ export default async function InboxPage({
             {t('subtitle', { comments: open.comments, messages: open.messages, profiles: selection.ids.length })}
           </p>
         </div>
-        <SelectionBar auth={auth} selection={selection} />
       </header>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -155,5 +155,6 @@ export default async function InboxPage({
         </div>
       )}
     </div>
+    </ChannelsLayout>
   );
 }
