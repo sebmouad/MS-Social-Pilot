@@ -326,7 +326,10 @@ export function timezoneOptions(): string[] {
 
   if (typeof supported === 'function') {
     try {
-      return supported('timeZone');
+      // The runtime's list leaves out "UTC", which is where every workspace
+      // starts: without it a select shows the first zone instead of the saved one.
+      const zones = supported('timeZone');
+      return zones.includes('UTC') ? zones : ['UTC', ...zones];
     } catch {
       // Fall through.
     }

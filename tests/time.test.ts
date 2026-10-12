@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { firstRealInstant, isValidTimeZone, localInputToUtc, monthGrid, nextAvailableSlot, type QueueSlotDefinition, utcToLocalInput, wallClockExists, weekGrid } from '../src/lib/time';
+import { firstRealInstant, isValidTimeZone, localInputToUtc, monthGrid, nextAvailableSlot, type QueueSlotDefinition, utcToLocalInput, wallClockExists, timezoneOptions, weekGrid } from '../src/lib/time';
 
 describe('timezone conversion', () => {
   it('interprets wall-clock input in the given zone', () => {
@@ -323,5 +323,14 @@ describe('dates in the reader’s language', () => {
     const now = new Date('2026-09-29T10:00:00Z');
     expect(relativeTime(new Date('2026-09-29T12:00:00Z'), now, 'fr')).toBe('dans 2 heures');
     expect(relativeTime(new Date('2026-09-29T12:00:00Z'), now)).toBe('in 2 hours');
+  });
+});
+
+describe('timezoneOptions', () => {
+  it('offers UTC, where every workspace starts', () => {
+    // Intl's list omits it, so Settings showed the first zone for a UTC workspace.
+    const zones = timezoneOptions();
+    expect(zones).toContain('UTC');
+    expect(new Set(zones).size).toBe(zones.length);
   });
 });
