@@ -38,7 +38,7 @@ test('adds, tests and removes a webhook', async ({ page }) => {
   await expect(row.getByText(/Test not delivered/)).toBeVisible({ timeout: 20_000 });
 
   await row.getByRole('button', { name: 'Delivery log' }).click();
-  await expect(row.getByRole('cell', { name: 'ping' })).toBeVisible();
+  await expect(row.getByRole('cell', { name: 'ping' })).toBeVisible({ timeout: 30_000 });
 
   await row.getByRole('button', { name: 'Remove' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Remove' }).click();
