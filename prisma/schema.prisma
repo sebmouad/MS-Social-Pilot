@@ -26,6 +26,8 @@ enum WorkspaceRole {
   contributor
   /// Reads everything in its channels, changes nothing (owner approved, 2026-10-12).
   viewer
+  /// The agency's customer: calendar, approvals, and what `clientAccess` opens. Never promoted.
+  client
 }
 
 enum TargetType {
@@ -253,6 +255,8 @@ model Workspace {
   disabledModules String[]  @default([])
   /// Set by root: API keys, MCP and outgoing webhooks, for the workspace owner only.
   developerFeatures Boolean @default(false)
+  /// What members with the client role may open beyond calendar and approvals: analytics, inbox, library, connect.
+  clientAccess      String[] @default(["analytics"])
 
   // Light branding, used on client-facing reports.
   logoUrl        String?

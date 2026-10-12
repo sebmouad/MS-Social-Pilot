@@ -111,6 +111,7 @@ const ROLE_RANK: Record<WorkspaceRole, number> = {
   [WorkspaceRole.editor]: 2,
   [WorkspaceRole.contributor]: 1,
   [WorkspaceRole.viewer]: 0,
+  [WorkspaceRole.client]: 0,
 };
 
 export function atLeast(role: WorkspaceRole, minimum: WorkspaceRole): boolean {
@@ -140,6 +141,18 @@ export const CAPABILITIES = {
 
 export type Capability = keyof typeof CAPABILITIES;
 
+/**
+ * The client role sits beside the ladder, not on it: it has only these, and
+ * is never promoted (owner approved, 2026-10-12).
+ */
+export const CLIENT_CAPABILITIES: readonly Capability[] = ['approve'];
+
+/** Whether a role has a capability: the ladder for staff, the short list for a client. */
+export function allows(role: WorkspaceRole, capability: Capability): boolean {
+  if (role === WorkspaceRole.client) return CLIENT_CAPABILITIES.includes(capability);
+  return atLeast(role, CAPABILITIES[capability]);
+}
+
 /** Highest role first, for tables. */
 export const ROLES_BY_RANK: WorkspaceRole[] = [
   WorkspaceRole.owner,
@@ -147,21 +160,22 @@ export const ROLES_BY_RANK: WorkspaceRole[] = [
   WorkspaceRole.editor,
   WorkspaceRole.contributor,
   WorkspaceRole.viewer,
+  WorkspaceRole.client,
 ];
 
 /** Connect, sync and disconnect Facebook accounts. */
 export function canManageAccounts(role: WorkspaceRole): boolean {
-  return atLeast(role, CAPABILITIES.manageAccounts);
+  return allows(role, 'manageAccounts');
 }
 
 /** Invite, remove and re-role members. */
 export function canManageTeam(role: WorkspaceRole): boolean {
-  return atLeast(role, CAPABILITIES.manageTeam);
+  return allows(role, 'manageTeam');
 }
 
 /** Change workspace settings, queue times, branding, AI and UTM defaults. */
 export function canManageSettings(role: WorkspaceRole): boolean {
-  return atLeast(role, CAPABILITIES.manageSettings);
+  return allows(role, 'manageSettings');
 }
 
 /**
@@ -192,7 +206,7 @@ export function canManageInstance(auth: { isInstanceOwner: boolean }): boolean {
  * is immediately visible on the client's page.
  */
 export function canModerateComments(role: WorkspaceRole): boolean {
-  return atLeast(role, CAPABILITIES.moderateComments);
+  return allows(role, 'moderateComments');
 }
 
 /**
@@ -203,12 +217,12 @@ export function canModerateComments(role: WorkspaceRole): boolean {
  * nothing brings them back.
  */
 export function canDeleteComments(role: WorkspaceRole): boolean {
-  return atLeast(role, CAPABILITIES.deleteComments);
+  return allows(role, 'deleteComments');
 }
 
 /** Approve or reject posts submitted for review. */
 export function canApprove(role: WorkspaceRole): boolean {
-  return atLeast(role, CAPABILITIES.approve);
+  return allows(role, 'approve');
 }
 
 /**
@@ -217,12 +231,12 @@ export function canApprove(role: WorkspaceRole): boolean {
  * always route through the approval queue.
  */
 export function canPublishWithoutApproval(role: WorkspaceRole): boolean {
-  return atLeast(role, CAPABILITIES.publishWithoutApproval);
+  return allows(role, 'publishWithoutApproval');
 }
 
 /** Every member but a viewer may write a post. */
 export function canCompose(role: WorkspaceRole): boolean {
-  return atLeast(role, CAPABILITIES.compose);
+  return allows(role, 'compose');
 }
 
 /**
@@ -238,12 +252,12 @@ export function canCompose(role: WorkspaceRole): boolean {
  * been sent, whoever is asking.
  */
 export function canDeleteMedia(role: WorkspaceRole): boolean {
-  return atLeast(role, CAPABILITIES.deleteMedia);
+  return allows(role, 'deleteMedia');
 }
 
 /** Create, change and remove the workspace's post templates (NEXT_PHASES H4). */
 export function canManageTemplates(role: WorkspaceRole): boolean {
-  return atLeast(role, CAPABILITIES.manageTemplates);
+  return allows(role, 'manageTemplates');
 }
 
 /**
@@ -257,7 +271,7 @@ export function canManageTemplates(role: WorkspaceRole): boolean {
  * authored by the copier, which faces review like anything else they write.
  */
 export function canManageOthersPosts(role: WorkspaceRole): boolean {
-  return atLeast(role, CAPABILITIES.manageOthersPosts);
+  return allows(role, 'manageOthersPosts');
 }
 
 /**

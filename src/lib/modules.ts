@@ -94,18 +94,6 @@ export const PATHNAME_HEADER = 'x-msp-pathname';
 /** The request's method, set beside the path by `src/middleware.ts`. */
 export const METHOD_HEADER = 'x-msp-method';
 
-/**
- * What a viewer may still change: only their own things — their account,
- * sign-in, notifications, calendar feeds and exports of what they can see.
- */
-const VIEWER_WRITABLE = ['/api/account', '/api/auth', '/api/notifications', '/api/calendar-feeds', '/api/exports'];
-
-/** A viewer reads everything in their channels and changes nothing in the workspace. */
-export function isViewerRefused(role: string, method: string | null, pathname: string | null): boolean {
-  if (role !== 'viewer' || !method || !pathname) return false;
-  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return false;
-  return !VIEWER_WRITABLE.some((prefix) => matches(pathname, prefix));
-}
 
 export const MODULE_KEYS: ModuleKey[] = MODULES.map((module) => module.key);
 

@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 
 import { Icon, type IconName } from './Icon';
 import { isPageActive, moduleOfPath, MODULE_KEYS, type ModuleKey } from '@/lib/modules';
+import { mayOpenScreen } from '@/lib/role-access';
 
 export interface WorkspaceOption {
   id: string;
@@ -31,6 +32,9 @@ interface Props {
   rootVisit?: boolean;
   /** The modules this member may use; links to the others are not shown. */
   modules?: ModuleKey[];
+  /** The member's role, and what this workspace opens to its clients: a viewer or client sees a shorter list. */
+  role?: string;
+  clientAccess?: string[];
   children: ReactNode;
 }
 
@@ -75,6 +79,8 @@ export function AppShell({
   canWrite = true,
   rootVisit = false,
   modules = MODULE_KEYS,
+  role = 'owner',
+  clientAccess = [],
   children,
 }: Props) {
   const t = useTranslations('nav');
@@ -187,7 +193,7 @@ export function AppShell({
 
   const usable = (href: string) => {
     const module = moduleOfPath(href);
-    return module === null || modules.includes(module);
+    return (module === null || modules.includes(module)) && mayOpenScreen(role, clientAccess, href);
   };
   const canCompose = canWrite && modules.includes('schedule');
 

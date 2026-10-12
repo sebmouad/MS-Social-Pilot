@@ -77,7 +77,7 @@ describe('the roles the team screen offers', () => {
 
     // Offering it would be an invitation to attempt an escalation the API
     // refuses — and the person clicking it has done nothing wrong.
-    expect(optionsForMember(markup, 'Edie')).toEqual(['admin', 'editor', 'contributor']);
+    expect(optionsForMember(markup, 'Edie')).toEqual(['admin', 'editor', 'contributor', 'viewer']);
     expect(markup).not.toContain('value="owner"');
   });
 
@@ -93,7 +93,13 @@ describe('the roles the team screen offers', () => {
   it('lets an owner hand the role on', async () => {
     const markup = await render('owner', OWNER.userId);
 
-    expect(optionsForMember(markup, 'Adam')).toEqual(['owner', 'admin', 'editor', 'contributor']);
+    expect(optionsForMember(markup, 'Adam')).toEqual(['owner', 'admin', 'editor', 'contributor', 'viewer']);
+  });
+
+  it('never offers the client role to a team member', async () => {
+    const markup = await render('owner', OWNER.userId);
+    // A client is invited as one; a team member is never turned into one.
+    expect(optionsForMember(markup, 'Edie')).not.toContain('client');
   });
 
   it('never offers owner on an invitation, whoever is looking', async () => {

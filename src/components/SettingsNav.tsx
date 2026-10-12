@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import { Icon, type IconName } from './Icon';
+import { mayOpenScreen } from '@/lib/role-access';
 
 /** Sub-navigation shared by every settings screen. */
 export function SettingsNav({
@@ -13,6 +14,8 @@ export function SettingsNav({
   showExport = false,
   showWebhooks = false,
   showApi = false,
+  role = 'owner',
+  clientAccess = [],
 }: {
   /** Admins: the read-only list of who may do what in this workspace. */
   showPermissions?: boolean;
@@ -24,11 +27,14 @@ export function SettingsNav({
   showWebhooks?: boolean;
   /** Owner, once root turned developer features on: API keys. */
   showApi?: boolean;
+  /** A viewer or client gets only the screens their role opens. */
+  role?: string;
+  clientAccess?: string[];
 }) {
   const t = useTranslations();
   const pathname = usePathname();
 
-  const tabs: Array<{ href: string; label: string; icon: IconName }> = [
+  const all: Array<{ href: string; label: string; icon: IconName }> = [
     { href: '/settings', label: t('settings.workspace'), icon: 'settings' },
     { href: '/settings/team', label: t('team.title'), icon: 'team' },
     { href: '/settings/pages', label: t('groups.title'), icon: 'folders' },
@@ -47,6 +53,7 @@ export function SettingsNav({
       ? [{ href: '/settings/permissions', label: t('root.privileges.workspaceTitle'), icon: 'key' as IconName }]
       : []),
   ];
+  const tabs = all.filter((tab) => mayOpenScreen(role, clientAccess, tab.href));
 
   return (
     // Named, because the page already has a main navigation: two unnamed

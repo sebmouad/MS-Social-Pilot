@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { LIMITS, Locale, PublishMode } from './constants';
 import { isValidTimeZone } from './time';
 import { THEMES } from './themes';
+import { CLIENT_SWITCHES } from './role-access';
 import { COUNTRY_CODES, CULTURAL_CALENDARS, canonicalLanguage } from './audience';
 
 /**
@@ -310,6 +311,8 @@ export const workspaceSettingsSchema = z.object({
   reportTitle: z.string().trim().max(120).nullish(),
   reportSubtitle: z.string().trim().max(200).nullish(),
   reportFooter: z.string().trim().max(300).nullish(),
+  // What clients of this workspace may open beyond the calendar and approvals.
+  clientAccess: z.array(z.enum(CLIENT_SWITCHES)).max(CLIENT_SWITCHES.length).optional(),
 });
 
 export const queueSlotsSchema = z.object({

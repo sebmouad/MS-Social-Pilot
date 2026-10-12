@@ -1397,6 +1397,23 @@ describe('invitations', () => {
     ).toBe(2);
   });
 
+  it('keeps a client a client, and never makes a team member one', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
+    const customer = await makeUser('Customer');
+    const editor = await makeUser('Editor');
+    await prisma.membership.createMany({
+      data: [
+        { userId: customer.id, workspaceId: workspace.id, role: WorkspaceRole.client },
+        { userId: editor.id, workspaceId: workspace.id, role: WorkspaceRole.editor },
+      ],
+    });
+
+    await expect(team.changeRole(workspace.id, customer.id, WorkspaceRole.editor, WorkspaceRole.owner)).rejects.toMatchObject({ key: 'errors.clientRoleFixed' });
+    await expect(team.changeRole(workspace.id, editor.id, WorkspaceRole.client, WorkspaceRole.owner)).rejects.toMatchObject({ key: 'errors.clientRoleFixed' });
+    expect((await prisma.membership.findMany({ where: { workspaceId: workspace.id } })).map((row) => row.role).sort()).toEqual(['client', 'editor', 'owner']);
+  });
+
   it('lets an owner hand ownership over and step down', async () => {
     const owner = await makeUser('Owner');
     const { workspace } = await makeWorkspace({ name: 'Client', ownerId: owner.id });

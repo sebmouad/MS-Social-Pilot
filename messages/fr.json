@@ -1184,7 +1184,8 @@
     "tooManyEmails": "Trop d’e-mails demandés. Réessayez dans {minutes, plural, one {# minute} other {# minutes}}.",
     "workspaceBusy": "Cet espace de travail envoie trop de requêtes. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}.",
     "developerFeaturesOff": "Les fonctions développeur ne sont pas activées pour cet espace. Demandez à la personne qui gère cette installation.",
-    "viewerReadOnly": "Un lecteur peut consulter mais ne rien modifier. Demandez un autre rôle à un administrateur de cet espace."
+    "viewerReadOnly": "Un lecteur peut consulter mais ne rien modifier. Demandez un autre rôle à un administrateur de cet espace.",
+    "clientRoleFixed": "Un client reste client, et un membre de l’équipe ne peut pas le devenir. Invitez de nouveau la personne avec le rôle voulu."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -2154,14 +2155,16 @@
       "admin": "Administrateur",
       "editor": "Gestionnaire",
       "contributor": "Créateur",
-      "viewer": "Lecteur"
+      "viewer": "Lecteur",
+      "client": "Client"
     },
     "roleHints": {
       "owner": "Contrôle total, y compris la suppression de l’espace.",
       "admin": "Tout sauf la suppression de l’espace.",
       "editor": "Rédige et planifie sans validation.",
       "contributor": "Rédige et soumet à validation.",
-      "viewer": "Voit le calendrier, les publications, les statistiques et la boîte de réception. Ne change rien."
+      "viewer": "Voit le calendrier, les publications, les statistiques et la boîte de réception. Ne change rien.",
+      "client": "Votre client : voit le calendrier et ses publications, et les valide."
     },
     "acceptTitle": "Rejoindre {workspace}",
     "acceptBody": "Vous êtes invité à rejoindre {workspace} en tant que {role}.",
@@ -2199,9 +2202,22 @@
       "admin": "Voit tous les canaux. Connecte les canaux, gère l’équipe, valide les publications, les liens clients et les alertes.",
       "editor": "Peut être limité à certains canaux. Publie sans validation, répond aux commentaires, modifie la file et les publications des autres.",
       "contributor": "Peut être limité à certains canaux. Ses publications attendent un validateur si la validation est active.",
-      "viewer": "Peut être limité à certains canaux. Y lit tout et ne change rien : ni publication, ni réponse, ni réglage."
+      "viewer": "Peut être limité à certains canaux. Y lit tout et ne change rien : ni publication, ni réponse, ni réglage.",
+      "client": "Peut être limité à ses propres canaux. Ne voit jamais les réglages, l’équipe ni rien de technique. Statistiques, boîte de réception et médiathèque seulement si vous les ouvrez ci-dessous. Reste client : pour donner plus à un collègue, invitez-le avec un autre rôle."
     },
-    "roleChangeAction": "Passer {role}"
+    "roleChangeAction": "Passer {role}",
+    "clientAccess": {
+      "title": "Ce que les clients peuvent ouvrir",
+      "hint": "Les clients voient toujours le calendrier, leurs publications et les validations. Activez ce qu’ils peuvent ouvrir en plus.",
+      "switch_analytics": "Statistiques et rapports",
+      "switch_analyticsHint": "Consulter les statistiques et les rapports de leurs canaux.",
+      "switch_inbox": "Boîte de réception",
+      "switch_inboxHint": "Lire les commentaires et les messages. Les réponses restent à votre équipe.",
+      "switch_library": "Médiathèque",
+      "switch_libraryHint": "Envoyer des photos et des vidéos à votre équipe.",
+      "saved": "Enregistré. Les clients voient le changement à la page suivante.",
+      "failed": "Rien n’a été enregistré. Vérifiez votre connexion et réessayez."
+    }
   },
   "dateRange": {
     "preset": {

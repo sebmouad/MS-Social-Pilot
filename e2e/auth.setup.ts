@@ -61,15 +61,20 @@ setup('the first visitor creates the first account', async ({ page }) => {
   // for this workspace so the walk can reach those screens.
   await open(page, '/root/workspaces');
   await page.getByRole('link', { name: OWNER.workspace }).click();
-  // A click before hydration ticks the box without saving, so retry until it saves.
+  // A click before hydration ticks the box without saving; reloading shows
+  // what was really saved, so click until the saved state is on.
   const developer = page.getByLabel(/^Developer features/);
   await expect(async () => {
-    await developer.setChecked(false);
-    await developer.setChecked(true);
-    await expect(page.getByText('Developer features saved.')).toBeVisible({ timeout: 2_000 });
+    if (!(await developer.isChecked())) {
+      const saved = page
+        .waitForResponse((response) => response.url().includes('/api/root/workspaces/') && response.request().method() === 'PATCH', { timeout: 3_000 })
+        .catch(() => null);
+      await developer.click();
+      await saved;
+    }
+    await page.reload();
+    await expect(developer).toBeChecked({ timeout: 3_000 });
   }).toPass({ timeout: 30_000 });
-  await page.reload();
-  await expect(developer).toBeChecked();
 
   expect(failures).toEqual([]);
 

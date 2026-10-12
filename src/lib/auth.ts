@@ -15,13 +15,13 @@ import { nextStepAfterPassword, type PendingStep } from './two-step';
 import {
   enabledModules,
   isDeveloperPath,
-  isViewerRefused,
   mayUseDeveloperFeatures,
   METHOD_HEADER,
   moduleOfPath,
   PATHNAME_HEADER,
   type ModuleKey,
 } from './modules';
+import { homeFor, mayOpenScreen, mayWrite } from './role-access';
 import { DEFAULT_THEME, isTheme, type Theme } from './themes';
 import { noteSignIn, requestDevice, touchSession } from './sessions';
 import { emailEnabled } from './email/send';
@@ -71,6 +71,8 @@ export interface AuthContext {
     suspended: boolean;
     /** Root turned on API keys, MCP and outgoing webhooks (owner only). */
     developerFeatures: boolean;
+    /** What clients of this workspace may open (`src/lib/role-access.ts`). */
+    clientAccess: string[];
   };
   role: WorkspaceRole;
   /** The modules this member may use here (root's switches, `src/lib/modules.ts`). */
@@ -567,6 +569,7 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
       defaultLocale: membership.workspace.defaultLocale,
       suspended: membership.workspace.suspendedAt !== null,
       developerFeatures: membership.workspace.developerFeatures,
+      clientAccess: membership.workspace.clientAccess,
     },
     role: membership.role,
     modules: enabledModules(membership.workspace.disabledModules, membership.disabledModules),
@@ -597,7 +600,13 @@ export async function requirePage(requestedWorkspaceId?: string): Promise<AuthCo
   if (!context) redirect('/login');
   if (!context.user.emailVerified) redirect('/verify-email');
   // The (app) layout shows the suspended notice; a switched-off module is not there.
-  if ((await accessRefusal(context)) === 'module') notFound();
+  if ((await accessRefusal(context)) === 'module') {
+    // A client sent to a screen that is not theirs (the home link, an old
+    // bookmark) lands on their own home rather than a dead end.
+    const pathname = (await headers()).get(PATHNAME_HEADER);
+    if (pathname && !mayOpenScreen(context.role, context.workspace.clientAccess, pathname)) redirect(homeFor(context.role));
+    notFound();
+  }
   return context;
 }
 
@@ -629,6 +638,7 @@ export async function accessRefusal(context: AuthContext): Promise<'suspended' |
   const module = pathname ? moduleOfPath(pathname) : null;
   if (module && !context.modules.includes(module)) return 'module';
   if (pathname && isDeveloperPath(pathname) && !mayUseDeveloperFeatures(context)) return 'module';
+  if (pathname && !pathname.startsWith('/api/') && !mayOpenScreen(context.role, context.workspace.clientAccess, pathname)) return 'module';
   return null;
 }
 
@@ -641,7 +651,11 @@ export async function requireAuth(requestedWorkspaceId?: string): Promise<AuthCo
   if (refusal === 'suspended') throw errors.workspaceSuspended();
   if (refusal === 'module') throw errors.moduleOff();
   const sent = await headers();
-  if (isViewerRefused(context.role, sent.get(METHOD_HEADER), sent.get(PATHNAME_HEADER))) throw errors.viewerReadOnly();
+  const method = sent.get(METHOD_HEADER);
+  const pathname = sent.get(PATHNAME_HEADER);
+  if (method && pathname && !mayWrite(context.role, context.workspace.clientAccess, method, pathname)) {
+    throw context.role === 'client' ? errors.noPermission() : errors.viewerReadOnly();
+  }
   limitWorkspaceRequests(context.workspace.id);
   return context;
 }

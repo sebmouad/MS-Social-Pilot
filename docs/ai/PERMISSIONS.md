@@ -38,27 +38,50 @@ restores them. Workspaces that already had a live key or a webhook were
 switched on by the migration, so nothing in use stopped.
 
 ## Workspace roles (per workspace) — `src/lib/constants.ts`
-Order: owner 4 > admin 3 > editor 2 > contributor 1 > viewer 0. A workspace
-owner is **not** root.
+Order: owner 4 > admin 3 > editor 2 > contributor 1 > viewer 0 = client 0.
+A workspace owner is **not** root.
 
 Names shown in the app (owner approved, 2026-10-12): owner = **Agency owner**,
 admin = **Admin**, editor = **Manager**, contributor = **Creator**, viewer =
-**Viewer**. The code keeps the enum values.
+**Viewer**, client = **Client**. The code keeps the enum values.
 
 **Viewer** (owner approved, 2026-10-12): reads everything in its channels and
 changes nothing. Every signed-in API write (`POST/PUT/PATCH/DELETE`) is refused
-in `requireAuth` (`isViewerRefused` in `src/lib/modules.ts`, 403
+in `requireAuth` (`mayWrite` in `src/lib/role-access.ts`, 403
 `errors.viewerReadOnly`), except its own things: `/api/account`, `/api/auth`,
 `/api/notifications`, `/api/calendar-feeds`, `/api/exports`. No composer
-(`canCompose` is contributor+; `/compose` sends a viewer to the calendar). Can
-be limited to some channels like any non-admin.
+(`canCompose` is contributor+; `/compose` sends a viewer to the calendar), and
+the screens that only exist to change things are hidden (compose, templates,
+content mix, saved replies, moderation rules, client links). Can be limited to
+some channels like any non-admin.
+
+**Client** (owner approved, 2026-10-12): the agency's customer. The only
+capability is `approve` (`CLIENT_CAPABILITIES` in `src/lib/constants.ts`):
+approve or reject posts and add notes on them. Screens (`mayOpenScreen`, same
+list in the sidebar, the settings menu and `requirePage`): calendar, posts,
+approvals, own account and notifications. Each workspace may open more on
+Settings › Team (`Workspace.clientAccess`, admins via `canManageSettings`):
+`analytics` (analytics and reports, read only), `inbox` (read only; replying
+stays with the team) and `library` (media library, uploads allowed). Default:
+`analytics` only. Never settings, team, connections, API or anything
+technical. API writes (`mayWrite`): own things as for the viewer, plus
+`/api/posts/:id/approve`, `/api/posts/:id/notes`, and `/api/media` with the
+library switch; everything else 403 `errors.noPermission`. A client lands on
+the calendar; a screen that is not theirs redirects there. A client cannot be
+promoted and a team member cannot be made a client (`changeRole`, 409
+`errors.clientRoleFixed`); root can still change any role. Clients get no
+approval emails (`approverRoles` excludes them). Can be limited to some
+channels like any non-admin. **Not built yet:** the "connect own Pages"
+switch — connecting goes through `canManageAccounts` in many routes and would
+also have to add the new channels to the client's access; left for the
+owner's audit.
 
 | Capability (function) | Minimum role |
 |---|---|
 | Connect/remove Pages and accounts (`canManageAccounts`; includes removing one Page, `DELETE /api/targets/:id`) | admin |
 | Invite, change roles, Page access per member (`canManageTeam`) | admin |
 | Workspace settings (`canManageSettings`), incl. key dates, seasonal modes and content mix (outgoing webhooks: owner only, see above) | admin |
-| Approve / reject posts (`canApprove`) | admin |
+| Approve / reject posts (`canApprove`) | admin, or client |
 | Delete comments (`canDeleteComments`) | admin |
 | Reply / hide comments (`canModerateComments`) | editor |
 | Publish without approval (`canPublishWithoutApproval`) | editor |

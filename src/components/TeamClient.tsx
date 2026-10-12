@@ -12,7 +12,7 @@ import { Icon } from './Icon';
 import { paletteOf } from '@/lib/palette';
 
 /** Ordered strongest first, so a position in this list is a rank. */
-const ROLES = ['owner', 'admin', 'editor', 'contributor', 'viewer'] as const;
+const ROLES = ['owner', 'admin', 'editor', 'contributor', 'viewer', 'client'] as const;
 
 export interface Member {
   userId: string;
@@ -378,7 +378,8 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
                     disabled={busy.has(member.userId)}
                     onChange={(event) => changeRole(member, event.target.value)}
                   >
-                    {grantable.map((option) => (
+                    {/* A client stays a client; the team never becomes one. */}
+                    {(member.role === 'client' ? ['client'] : grantable.filter((option) => option !== 'client')).map((option) => (
                       <option key={option} value={option}>
                         {t(`roles.${option}`)}
                       </option>

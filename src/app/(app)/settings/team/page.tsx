@@ -1,10 +1,11 @@
 import { getTranslations } from 'next-intl/server';
 
 
+import { ClientAccess } from '@/components/ClientAccess';
 import { TeamClient } from '@/components/TeamClient';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
-import { canManageTeam } from '@/lib/constants';
+import { canManageSettings, canManageTeam } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { listPageGroups } from '@/lib/page-groups';
 import { ALL_PAGES } from '@/lib/page-access';
@@ -75,13 +76,15 @@ export default async function TeamPage() {
         }))}
       />
 
+      {canManageSettings(auth.role) && <ClientAccess initial={auth.workspace.clientAccess} />}
+
       {/* Who can do what, in one line each — the question asked before every invite. */}
       <section className="card p-5" aria-labelledby="roles-title">
         <h2 id="roles-title" className="mb-3 text-[15px] font-semibold text-slate-900">
           {t('rolesTitle')}
         </h2>
         <dl className="grid gap-3 sm:grid-cols-2">
-          {(['owner', 'admin', 'editor', 'contributor', 'viewer'] as const).map((role) => (
+          {(['owner', 'admin', 'editor', 'contributor', 'viewer', 'client'] as const).map((role) => (
             <div key={role} className="rounded-lg bg-slate-50 px-3 py-2.5">
               <dt className="text-sm font-semibold text-slate-900">{t(`roles.${role}`)}</dt>
               <dd className="text-xs text-slate-600">{t(`roleHints.${role}`)}</dd>

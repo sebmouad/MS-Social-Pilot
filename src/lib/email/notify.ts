@@ -235,7 +235,9 @@ export async function notifyApprovalRequest(options: {
     const workspace = await prisma.workspace.findUnique({ where: { id: options.workspaceId } });
     if (!workspace) return;
 
-    const approverRoles = (Object.values(WorkspaceRole) as WorkspaceRole[]).filter(canApprove);
+    // Clients approve only their own channels' posts, and this email does not
+    // say which channels a post is for, so it goes to the team only.
+    const approverRoles = (Object.values(WorkspaceRole) as WorkspaceRole[]).filter((role) => canApprove(role) && role !== WorkspaceRole.client);
     const recipients = await recipientsFor(options.workspaceId, 'onApprovalRequest', {
       roles: approverRoles,
     });

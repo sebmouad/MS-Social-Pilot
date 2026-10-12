@@ -50,6 +50,7 @@ export const PATCH = route(async (request: Request) => {
   assign('reportTitle', input.reportTitle);
   assign('reportSubtitle', input.reportSubtitle);
   assign('reportFooter', input.reportFooter);
+  if (input.clientAccess !== undefined) data.clientAccess = [...new Set(input.clientAccess)];
 
   const workspace = await prisma.workspace.update({ where: { id: auth.workspace.id }, data });
   if (input.weekStartsOn !== undefined || input.timezone !== undefined) await rescheduleWeeklyReports(workspace.id);

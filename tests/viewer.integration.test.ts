@@ -43,7 +43,7 @@ beforeEach(async () => {
   await settings.ensureSettings();
 });
 
-async function signUpAs(role: 'viewer' | 'contributor') {
+async function signUpAs(role: 'viewer' | 'contributor' | 'client') {
   const { token, userId } = await auth.registerUser({ email: `${role}-${Date.now()}@example.com`, password: 'a-long-enough-password', name: 'Sam' });
   await prisma.membership.updateMany({ where: { userId }, data: { role } });
   cookieJar.set('msp_session', token);
@@ -66,5 +66,25 @@ describe('a viewer', () => {
     await signUpAs('contributor');
     as('POST', '/api/posts');
     await expect(auth.requireAuth()).resolves.toMatchObject({ role: 'contributor' });
+  });
+});
+
+describe('a client', () => {
+  it('approves, and cannot write anything else', async () => {
+    await signUpAs('client');
+    as('POST', '/api/posts/abc/approve');
+    await expect(auth.requireAuth()).resolves.toMatchObject({ role: 'client' });
+    as('POST', '/api/posts');
+    await expect(auth.requireAuth()).rejects.toMatchObject({ status: 403 });
+    as('GET', '/compose');
+    await expect(auth.requireAuth()).rejects.toMatchObject({ status: 403, key: 'errors.moduleOff' });
+  });
+
+  it('gets the media library once the workspace opens it', async () => {
+    await signUpAs('client');
+    as('POST', '/api/media');
+    await expect(auth.requireAuth()).rejects.toMatchObject({ status: 403 });
+    await prisma.workspace.updateMany({ data: { clientAccess: ['analytics', 'library'] } });
+    await expect(auth.requireAuth()).resolves.toMatchObject({ role: 'client' });
   });
 });

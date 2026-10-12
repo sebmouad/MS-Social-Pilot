@@ -1184,7 +1184,8 @@
     "tooManyEmails": "Too many emails asked for. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
     "workspaceBusy": "This workspace is sending too many requests. Try again in {seconds, plural, one {# second} other {# seconds}}.",
     "developerFeaturesOff": "Developer features are not switched on for this workspace. Ask the person who runs this installation.",
-    "viewerReadOnly": "Viewers can look but not change anything. Ask an admin of this workspace for another role."
+    "viewerReadOnly": "Viewers can look but not change anything. Ask an admin of this workspace for another role.",
+    "clientRoleFixed": "A client stays a client, and a team member cannot become one. Invite the person again with the role they need."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -2154,14 +2155,16 @@
       "admin": "Admin",
       "editor": "Manager",
       "contributor": "Creator",
-      "viewer": "Viewer"
+      "viewer": "Viewer",
+      "client": "Client"
     },
     "roleHints": {
       "owner": "Full control, including deleting the workspace.",
       "admin": "Everything except deleting the workspace.",
       "editor": "Compose and schedule without approval.",
       "contributor": "Compose and submit for approval.",
-      "viewer": "Sees the calendar, posts, analytics and inbox. Changes nothing."
+      "viewer": "Sees the calendar, posts, analytics and inbox. Changes nothing.",
+      "client": "Your customer: sees the calendar and their posts, and approves them."
     },
     "acceptTitle": "Join {workspace}",
     "acceptBody": "You have been invited to join {workspace} as {role}.",
@@ -2199,9 +2202,22 @@
       "admin": "Sees every channel. Connects channels, manages the team, approves posts, client links and alerts.",
       "editor": "Can be limited to some channels. Publishes without approval, replies to comments, edits the queue and others’ posts.",
       "contributor": "Can be limited to some channels. Their posts wait for an approver when approval is on.",
-      "viewer": "Can be limited to some channels. Reads everything there and changes nothing: no posts, replies or settings."
+      "viewer": "Can be limited to some channels. Reads everything there and changes nothing: no posts, replies or settings.",
+      "client": "Can be limited to their own channels. Never sees settings, the team or anything technical. Analytics, inbox and media library only if you open them below. Stays a client: to give a colleague more, invite them with another role."
     },
-    "roleChangeAction": "Make {role}"
+    "roleChangeAction": "Make {role}",
+    "clientAccess": {
+      "title": "What clients can open",
+      "hint": "Clients always see the calendar, their posts and approvals. Switch on anything else they may open.",
+      "switch_analytics": "Analytics and reports",
+      "switch_analyticsHint": "Read their channels’ statistics and reports.",
+      "switch_inbox": "Inbox",
+      "switch_inboxHint": "Read comments and messages. Replying stays with your team.",
+      "switch_library": "Media library",
+      "switch_libraryHint": "Upload photos and videos for your team to use.",
+      "saved": "Saved. Clients see the change on their next page.",
+      "failed": "That was not saved. Check your connection and try again."
+    }
   },
   "dateRange": {
     "preset": {

@@ -281,6 +281,12 @@ export async function changeRole(
   assertRankPermits(actorRole, role);
   assertRankPermits(actorRole, membership.role);
 
+  // A client stays a client, and nobody on the team becomes one: invite them
+  // separately (owner approved, 2026-10-12).
+  if ((membership.role === WorkspaceRole.client) !== (role === WorkspaceRole.client)) {
+    throw new AppError({ key: 'errors.clientRoleFixed', fallback: 'A client stays a client. Invite the person again with the other role.', status: 409 });
+  }
+
   // Same guard as removal, by another route: demoting the last owner would
   // leave the workspace unadministrable.
   if (membership.role === WorkspaceRole.owner && role !== WorkspaceRole.owner) {

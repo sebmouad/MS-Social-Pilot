@@ -215,8 +215,9 @@ describe('the privileges table', () => {
     expect(Object.keys(checks).sort()).toEqual(Object.keys(constants.CAPABILITIES).sort());
     for (const [capability, check] of Object.entries(checks)) {
       for (const role of constants.ROLES_BY_RANK) {
+        const key = capability as keyof typeof constants.CAPABILITIES;
         expect(check(role), `${capability} for ${role}`).toBe(
-          constants.atLeast(role, constants.CAPABILITIES[capability as keyof typeof constants.CAPABILITIES]),
+          role === 'client' ? constants.CLIENT_CAPABILITIES.includes(key) : constants.atLeast(role, constants.CAPABILITIES[key]),
         );
       }
     }

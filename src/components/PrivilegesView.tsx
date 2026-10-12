@@ -1,6 +1,6 @@
 import { getFormatter, getTranslations } from 'next-intl/server';
 
-import { CAPABILITIES, ROLES_BY_RANK, atLeast, type Capability } from '@/lib/constants';
+import { CAPABILITIES, ROLES_BY_RANK, allows, type Capability } from '@/lib/constants';
 import type { privilegesByMember } from '@/lib/root';
 
 /**
@@ -39,7 +39,7 @@ export async function PrivilegesView({
                 <tr key={capability}>
                   <td className="py-2 pe-3 text-slate-900">{t(`capabilities.${capability}`)}</td>
                   {ROLES_BY_RANK.map((role) => {
-                    const allowed = atLeast(role, CAPABILITIES[capability]);
+                    const allowed = allows(role, capability);
                     return (
                       <td key={role} className="px-2 py-2 text-center">
                         <span className={allowed ? 'text-emerald-700' : 'text-slate-400'}>{allowed ? '✓' : '—'}</span>
