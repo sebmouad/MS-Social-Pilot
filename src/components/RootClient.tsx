@@ -558,7 +558,7 @@ export function InviteClient({ invitations }: { invitations: RootClientInvitatio
   );
 }
 
-const ROLE_OPTIONS = ['owner', 'admin', 'editor', 'contributor'] as const;
+const ROLE_OPTIONS = ['owner', 'admin', 'editor', 'contributor', 'viewer'] as const;
 
 export interface RootWorkspaceDetail {
   id: string;

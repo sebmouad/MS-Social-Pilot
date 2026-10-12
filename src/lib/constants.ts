@@ -110,6 +110,7 @@ const ROLE_RANK: Record<WorkspaceRole, number> = {
   [WorkspaceRole.admin]: 3,
   [WorkspaceRole.editor]: 2,
   [WorkspaceRole.contributor]: 1,
+  [WorkspaceRole.viewer]: 0,
 };
 
 export function atLeast(role: WorkspaceRole, minimum: WorkspaceRole): boolean {
@@ -145,6 +146,7 @@ export const ROLES_BY_RANK: WorkspaceRole[] = [
   WorkspaceRole.admin,
   WorkspaceRole.editor,
   WorkspaceRole.contributor,
+  WorkspaceRole.viewer,
 ];
 
 /** Connect, sync and disconnect Facebook accounts. */
@@ -218,9 +220,9 @@ export function canPublishWithoutApproval(role: WorkspaceRole): boolean {
   return atLeast(role, CAPABILITIES.publishWithoutApproval);
 }
 
-/** Everyone with a membership may write a post. */
-export function canCompose(): boolean {
-  return true;
+/** Every member but a viewer may write a post. */
+export function canCompose(role: WorkspaceRole): boolean {
+  return atLeast(role, CAPABILITIES.compose);
 }
 
 /**

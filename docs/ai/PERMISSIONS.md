@@ -38,8 +38,20 @@ restores them. Workspaces that already had a live key or a webhook were
 switched on by the migration, so nothing in use stopped.
 
 ## Workspace roles (per workspace) — `src/lib/constants.ts`
-Order: owner 4 > admin 3 > editor 2 > contributor 1. A workspace owner is
-**not** root.
+Order: owner 4 > admin 3 > editor 2 > contributor 1 > viewer 0. A workspace
+owner is **not** root.
+
+Names shown in the app (owner approved, 2026-10-12): owner = **Agency owner**,
+admin = **Admin**, editor = **Manager**, contributor = **Creator**, viewer =
+**Viewer**. The code keeps the enum values.
+
+**Viewer** (owner approved, 2026-10-12): reads everything in its channels and
+changes nothing. Every signed-in API write (`POST/PUT/PATCH/DELETE`) is refused
+in `requireAuth` (`isViewerRefused` in `src/lib/modules.ts`, 403
+`errors.viewerReadOnly`), except its own things: `/api/account`, `/api/auth`,
+`/api/notifications`, `/api/calendar-feeds`, `/api/exports`. No composer
+(`canCompose` is contributor+; `/compose` sends a viewer to the calendar). Can
+be limited to some channels like any non-admin.
 
 | Capability (function) | Minimum role |
 |---|---|

@@ -52,6 +52,8 @@ export const errors = {
     new AppError({ key: 'errors.rootLastOwner', fallback: 'A workspace needs an owner. Make someone else owner first.', status: 422 }),
   workspaceSuspended: () =>
     new AppError({ key: 'errors.workspaceSuspended', fallback: 'This workspace is suspended. Contact the service administrator.', status: 403 }),
+  viewerReadOnly: () =>
+    new AppError({ key: 'errors.viewerReadOnly', fallback: 'Viewers can look but not change anything.', status: 403 }),
   developerFeaturesOff: () =>
     new AppError({ key: 'errors.developerFeaturesOff', fallback: 'Developer features are not switched on for this workspace.', status: 403 }),
   moduleOff: () =>

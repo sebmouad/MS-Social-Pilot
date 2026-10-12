@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { TargetType } from '@prisma/client';
 
@@ -13,7 +13,7 @@ import { parseMedia } from '@/lib/json';
 import { localInputToUtc, utcToLocalInput } from '@/lib/time';
 import { loadPagePosts } from '@/lib/page-analysis-data';
 import { nextGoodTimes, suggestSlots } from '@/lib/queue-suggestions';
-import { postIsEditable, canManageOthersPosts, canPublishWithoutApproval } from '@/lib/constants';
+import { postIsEditable, canCompose, canManageOthersPosts, canPublishWithoutApproval } from '@/lib/constants';
 import { aiAvailable } from '@/lib/ai';
 
 export const dynamic = 'force-dynamic';
@@ -94,6 +94,8 @@ export default async function ComposePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const auth = await requirePage();
+  // A viewer reads posts; the composer is not theirs.
+  if (!canCompose(auth.role)) redirect('/calendar');
   const t = await getTranslations('compose');
   const params = await searchParams;
   const postId = Array.isArray(params.post) ? params.post[0] : params.post;

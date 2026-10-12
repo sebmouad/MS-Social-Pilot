@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { isCrossSiteWrite } from './lib/cross-site';
-import { PATHNAME_HEADER } from './lib/modules';
+import { METHOD_HEADER, PATHNAME_HEADER } from './lib/modules';
 
 /**
  * Refuse API writes another site started. See `src/lib/cross-site.ts`.
@@ -19,6 +19,7 @@ export function middleware(request: NextRequest): NextResponse {
   }
   const headers = new Headers(request.headers);
   headers.set(PATHNAME_HEADER, pathname);
+  headers.set(METHOD_HEADER, request.method);
   return NextResponse.next({ request: { headers } });
 }
 

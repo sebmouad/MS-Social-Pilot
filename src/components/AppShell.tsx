@@ -25,6 +25,8 @@ interface Props {
   pendingApprovals: number;
   /** Root only: the way into the root section. */
   isRoot?: boolean;
+  /** False for a viewer: no composer buttons. */
+  canWrite?: boolean;
   /** Root is looking after this workspace without being a member of it. */
   rootVisit?: boolean;
   /** The modules this member may use; links to the others are not shown. */
@@ -70,6 +72,7 @@ export function AppShell({
   showApprovals,
   pendingApprovals,
   isRoot = false,
+  canWrite = true,
   rootVisit = false,
   modules = MODULE_KEYS,
   children,
@@ -186,7 +189,7 @@ export function AppShell({
     const module = moduleOfPath(href);
     return module === null || modules.includes(module);
   };
-  const canCompose = modules.includes('schedule');
+  const canCompose = canWrite && modules.includes('schedule');
 
   // The main areas, each on the icon rail, each with its own pages in the
   // sidebar beside it — as Simplified lays it out.

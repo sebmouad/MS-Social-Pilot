@@ -1072,7 +1072,7 @@
     "dateRange": "Enter a valid date range.",
     "destinationNotFound": "Destination not found.",
     "destinationBlocked": "This destination cannot be published to right now, so it cannot be turned on.",
-    "editorsOnlyDeleteMedia": "Only editors and above can delete files from the library.",
+    "editorsOnlyDeleteMedia": "Only managers and above can delete files from the library.",
     "emailTaken": "An account with that email already exists. Sign in instead.",
     "emptyPost": "Write something, add a link, or attach media.",
     "errorBody": "The page could not be loaded. It is worth trying again — if it keeps happening, the reference below will tell whoever looks into it where to start.",
@@ -1120,7 +1120,7 @@
     "queueFull": "Every queue slot in the next 90 days is taken. Add more times or pick a date.",
     "quotaFull": "This client has used {used} MB of its {quota} MB media allowance. Delete some files, or raise the limit in Configuration.",
     "reference": "Reference",
-    "refreshNoPermission": "Only editors and above can pull comments and messages from Facebook.",
+    "refreshNoPermission": "Only managers and above can pull comments and messages from Facebook.",
     "refreshTooSoon": "This workspace has just pulled from Facebook. Try again in {seconds, plural, one {# second} other {# seconds}}.",
     "registrationClosed": "This server does not accept new accounts. Ask an administrator to invite you.",
     "replyNoPermission": "You do not have permission to reply to messages.",
@@ -1133,7 +1133,7 @@
     "tooManySignups": "{minutes, plural, one {Too many accounts created from here. Try again in a minute.} other {Too many accounts created from here. Try again in # minutes.}}",
     "tryAgain": "Try again",
     "unknownExport": "Unknown export. Choose one of: {kinds}.",
-    "variantsNeedApproval": "Alternate wordings publish without review, so only editors and above can set them while approval is on.",
+    "variantsNeedApproval": "Alternate wordings publish without review, so only managers and above can set them while approval is on.",
     "dateRangeInverted": "The start of the range comes after its end. Swap the dates.",
     "adAccountNotFound": "Ad account not found.",
     "nameTaken": "That name is already used.",
@@ -1183,7 +1183,8 @@
     "resetLinkInvalid": "This link has expired or was already used. Ask for a new one.",
     "tooManyEmails": "Too many emails asked for. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
     "workspaceBusy": "This workspace is sending too many requests. Try again in {seconds, plural, one {# second} other {# seconds}}.",
-    "developerFeaturesOff": "Developer features are not switched on for this workspace. Ask the person who runs this installation."
+    "developerFeaturesOff": "Developer features are not switched on for this workspace. Ask the person who runs this installation.",
+    "viewerReadOnly": "Viewers can look but not change anything. Ask an admin of this workspace for another role."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -1955,7 +1956,7 @@
     "readOnly": "Only workspace owners and admins can change these settings. You can still upload posts below.",
     "removeSlot": "Remove slot",
     "requireApproval": "Require approval before publishing",
-    "requireApprovalHint": "Contributors submit posts for review instead of scheduling them directly.",
+    "requireApprovalHint": "Creators submit posts for review instead of scheduling them directly.",
     "row": "Row",
     "rowsFailed": ", {count} failed",
     "rowsScheduled": "{scheduled} of {total} rows scheduled",
@@ -2149,16 +2150,18 @@
     "removeConfirm": "Remove {name} from this workspace?",
     "expires": "expires {when}",
     "roles": {
-      "owner": "Owner",
+      "owner": "Agency owner",
       "admin": "Admin",
-      "editor": "Editor",
-      "contributor": "Contributor"
+      "editor": "Manager",
+      "contributor": "Creator",
+      "viewer": "Viewer"
     },
     "roleHints": {
       "owner": "Full control, including deleting the workspace.",
       "admin": "Everything except deleting the workspace.",
       "editor": "Compose and schedule without approval.",
-      "contributor": "Compose and submit for approval."
+      "contributor": "Compose and submit for approval.",
+      "viewer": "Sees the calendar, posts, analytics and inbox. Changes nothing."
     },
     "acceptTitle": "Join {workspace}",
     "acceptBody": "You have been invited to join {workspace} as {role}.",
@@ -2176,8 +2179,8 @@
     "removeMemberNamed": "Remove {name}",
     "revokeNamed": "Revoke the invitation for {email}",
     "roleChangeConfirm": "Change {name} from {from} to {to}?",
-    "roleToOwnerWarning": "Owners have full control, including instance configuration and deleting the workspace, and only another owner can take that back.",
-    "roleFromOwnerWarning": "They will lose owner access to this workspace straight away.",
+    "roleToOwnerWarning": "Agency owners have full control of this workspace, including deleting it, and only another agency owner can take that back.",
+    "roleFromOwnerWarning": "They will lose agency owner access to this workspace straight away.",
     "accessAllSaved": "{name} now works on every channel.",
     "accessSomeSaved": "{count, plural, one {{name} now works on # channel.} other {{name} now works on # channels.}}",
     "accessAll": "All channels",
@@ -2192,10 +2195,11 @@
     "accessCount": "{count} of {total} channels chosen.",
     "rolesTitle": "What each role can do",
     "roleExtra": {
-      "owner": "Sees every channel. Billing-level decisions, server configuration.",
-      "admin": "Sees every channel. Connects Facebook, manages the team, client links and alerts.",
-      "editor": "Can be limited to some channels. Approves others’ posts, edits the queue.",
-      "contributor": "Can be limited to some channels. Their posts wait for an approver when approval is on."
+      "owner": "Sees every channel. Decides who runs the workspace and can delete it.",
+      "admin": "Sees every channel. Connects channels, manages the team, approves posts, client links and alerts.",
+      "editor": "Can be limited to some channels. Publishes without approval, replies to comments, edits the queue and others’ posts.",
+      "contributor": "Can be limited to some channels. Their posts wait for an approver when approval is on.",
+      "viewer": "Can be limited to some channels. Reads everything there and changes nothing: no posts, replies or settings."
     },
     "roleChangeAction": "Make {role}"
   },
@@ -3164,8 +3168,8 @@
   "moderation": {
     "title": "Moderation rules",
     "intro": "New comments on your Facebook Pages are checked against these rules as soon as the app reads them. A rule can hide a comment, alert the team or reply as the channel. Everything a rule does is logged below and can be undone.",
-    "noAccessTitle": "Only editors can manage moderation rules",
-    "noAccessHint": "Ask an editor, admin or owner of this workspace to change your role if you need to.",
+    "noAccessTitle": "Only managers can manage moderation rules",
+    "noAccessHint": "Ask a manager, admin or agency owner of this workspace to change your role if you need to.",
     "rulesHeading": "Rules",
     "addRule": "Add a rule",
     "emptyTitle": "No moderation rules yet",
@@ -3230,7 +3234,7 @@
   "savedReplies": {
     "title": "Saved replies",
     "intro": "Answers your team gives often, ready in every comment and Messenger reply box: type / in the box, or use the Saved replies button. The person’s first name and the channel name are filled in for you.",
-    "noAccessTitle": "Only editors can use saved replies",
+    "noAccessTitle": "Only managers can use saved replies",
     "noAccessHint": "Saved replies are for the people who answer comments and messages. Ask an admin if you need to.",
     "add": "Add a saved reply",
     "emptyTitle": "No saved replies yet",
@@ -3661,7 +3665,7 @@
     "removeConfirm": "Remove the template “{name}”?",
     "removeConfirmBody": "It disappears for everyone in the workspace. Posts already written from it are not changed.",
     "emptyTitle": "No templates yet",
-    "emptyBody": "Templates are saved post structures the team picks while writing. An editor can add the first one.",
+    "emptyBody": "Templates are saved post structures the team picks while writing. A manager can add the first one.",
     "emptyBodyEditor": "Save the structure of posts you write often, with blanks to fill in, so anyone can start from it in the composer.",
     "name": "Name",
     "category": "Category",

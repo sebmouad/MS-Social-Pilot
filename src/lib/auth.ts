@@ -12,7 +12,16 @@ import { hashPassword, hashToken, randomToken, verifyPassword } from './crypto';
 import { uniqueSlug } from './slug';
 import { DEFAULT_QUEUE_SLOTS, setDateLocale } from './time';
 import { nextStepAfterPassword, type PendingStep } from './two-step';
-import { enabledModules, isDeveloperPath, mayUseDeveloperFeatures, moduleOfPath, PATHNAME_HEADER, type ModuleKey } from './modules';
+import {
+  enabledModules,
+  isDeveloperPath,
+  isViewerRefused,
+  mayUseDeveloperFeatures,
+  METHOD_HEADER,
+  moduleOfPath,
+  PATHNAME_HEADER,
+  type ModuleKey,
+} from './modules';
 import { DEFAULT_THEME, isTheme, type Theme } from './themes';
 import { noteSignIn, requestDevice, touchSession } from './sessions';
 import { emailEnabled } from './email/send';
@@ -631,6 +640,8 @@ export async function requireAuth(requestedWorkspaceId?: string): Promise<AuthCo
   const refusal = await accessRefusal(context);
   if (refusal === 'suspended') throw errors.workspaceSuspended();
   if (refusal === 'module') throw errors.moduleOff();
+  const sent = await headers();
+  if (isViewerRefused(context.role, sent.get(METHOD_HEADER), sent.get(PATHNAME_HEADER))) throw errors.viewerReadOnly();
   limitWorkspaceRequests(context.workspace.id);
   return context;
 }

@@ -2,7 +2,7 @@ import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { MODULES, SHARED_LINKS, isDeveloperPath, isPageActive, mayUseDeveloperFeatures, moduleFor } from '../src/lib/modules';
+import { MODULES, SHARED_LINKS, isDeveloperPath, isPageActive, isViewerRefused, mayUseDeveloperFeatures, moduleFor } from '../src/lib/modules';
 
 /**
  * The app is three modules — Analytics, Ads, Schedule — and every screen
@@ -94,5 +94,21 @@ describe('developer features', () => {
     expect(mayUseDeveloperFeatures({ role: 'owner', workspace: { developerFeatures: true } })).toBe(true);
     expect(mayUseDeveloperFeatures({ role: 'admin', workspace: { developerFeatures: true } })).toBe(false);
     expect(mayUseDeveloperFeatures({ role: 'owner', workspace: { developerFeatures: false } })).toBe(false);
+  });
+});
+
+describe('the viewer role', () => {
+  it('reads everything and writes only its own things', () => {
+    expect(isViewerRefused('viewer', 'GET', '/api/posts')).toBe(false);
+    expect(isViewerRefused('viewer', 'POST', '/api/posts')).toBe(true);
+    expect(isViewerRefused('viewer', 'PATCH', '/api/inbox')).toBe(true);
+    expect(isViewerRefused('viewer', 'DELETE', '/api/targets/abc')).toBe(true);
+    expect(isViewerRefused('viewer', 'PATCH', '/api/account')).toBe(false);
+    expect(isViewerRefused('viewer', 'POST', '/api/notifications/read')).toBe(false);
+    expect(isViewerRefused('viewer', 'POST', '/api/accounts')).toBe(true);
+  });
+
+  it('leaves every other role alone', () => {
+    for (const role of ['owner', 'admin', 'editor', 'contributor']) expect(isViewerRefused(role, 'POST', '/api/posts')).toBe(false);
   });
 });

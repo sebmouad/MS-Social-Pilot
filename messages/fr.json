@@ -1072,7 +1072,7 @@
     "dateRange": "Saisissez une plage de dates valide.",
     "destinationNotFound": "Destination introuvable.",
     "destinationBlocked": "Impossible de publier sur cette destination pour le moment : elle ne peut donc pas être activée.",
-    "editorsOnlyDeleteMedia": "Seuls les éditeurs et les rôles supérieurs peuvent supprimer des fichiers de la médiathèque.",
+    "editorsOnlyDeleteMedia": "Seuls les gestionnaires et les rôles supérieurs peuvent supprimer des fichiers de la médiathèque.",
     "emailTaken": "Un compte existe déjà avec cette adresse e-mail. Connectez-vous plutôt.",
     "emptyPost": "Écrivez quelque chose, ajoutez un lien ou joignez un média.",
     "errorBody": "La page n’a pas pu être chargée. Réessayer en vaut la peine — si cela persiste, la référence ci-dessous indiquera par où commencer.",
@@ -1120,7 +1120,7 @@
     "queueFull": "Tous les créneaux des 90 prochains jours sont pris. Ajoutez des créneaux ou choisissez une date.",
     "quotaFull": "Ce client a utilisé {used} Mo de son quota de {quota} Mo. Supprimez des fichiers ou augmentez la limite dans la Configuration.",
     "reference": "Référence",
-    "refreshNoPermission": "Seuls les éditeurs et au-delà peuvent récupérer les commentaires et messages depuis Facebook.",
+    "refreshNoPermission": "Seuls les gestionnaires et au-delà peuvent récupérer les commentaires et messages depuis Facebook.",
     "refreshTooSoon": "Cet espace de travail vient de récupérer les données de Facebook. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}.",
     "registrationClosed": "Ce serveur n’accepte pas de nouveaux comptes. Demandez à un administrateur de vous inviter.",
     "replyNoPermission": "Vous n’avez pas l’autorisation de répondre aux messages.",
@@ -1133,7 +1133,7 @@
     "tooManySignups": "{minutes, plural, one {Trop de comptes créés depuis cet endroit. Réessayez dans une minute.} other {Trop de comptes créés depuis cet endroit. Réessayez dans # minutes.}}",
     "tryAgain": "Réessayer",
     "unknownExport": "Export inconnu. Choisissez parmi : {kinds}.",
-    "variantsNeedApproval": "Les formulations alternatives sont publiées sans validation : seuls les éditeurs et rôles supérieurs peuvent les définir lorsque la validation est activée.",
+    "variantsNeedApproval": "Les formulations alternatives sont publiées sans validation : seuls les gestionnaires et rôles supérieurs peuvent les définir lorsque la validation est activée.",
     "dateRangeInverted": "Le début de la période est après sa fin. Inversez les dates.",
     "adAccountNotFound": "Compte publicitaire introuvable.",
     "nameTaken": "Ce nom est déjà utilisé.",
@@ -1183,7 +1183,8 @@
     "resetLinkInvalid": "Ce lien a expiré ou a déjà servi. Demandez-en un nouveau.",
     "tooManyEmails": "Trop d’e-mails demandés. Réessayez dans {minutes, plural, one {# minute} other {# minutes}}.",
     "workspaceBusy": "Cet espace de travail envoie trop de requêtes. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}.",
-    "developerFeaturesOff": "Les fonctions développeur ne sont pas activées pour cet espace. Demandez à la personne qui gère cette installation."
+    "developerFeaturesOff": "Les fonctions développeur ne sont pas activées pour cet espace. Demandez à la personne qui gère cette installation.",
+    "viewerReadOnly": "Un lecteur peut consulter mais ne rien modifier. Demandez un autre rôle à un administrateur de cet espace."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -1955,7 +1956,7 @@
     "readOnly": "Seuls les propriétaires et les administrateurs de l’espace peuvent modifier ces réglages. Vous pouvez toujours importer des publications ci-dessous.",
     "removeSlot": "Retirer le créneau",
     "requireApproval": "Exiger une validation avant publication",
-    "requireApprovalHint": "Les contributeurs soumettent leurs publications à relecture au lieu de les planifier directement.",
+    "requireApprovalHint": "Les créateurs soumettent leurs publications à relecture au lieu de les planifier directement.",
     "row": "Ligne",
     "rowsFailed": ", {count} en échec",
     "rowsScheduled": "{scheduled} lignes planifiées sur {total}",
@@ -2149,16 +2150,18 @@
     "removeConfirm": "Retirer {name} de cet espace de travail ?",
     "expires": "expire {when}",
     "roles": {
-      "owner": "Propriétaire",
+      "owner": "Propriétaire de l’agence",
       "admin": "Administrateur",
-      "editor": "Éditeur",
-      "contributor": "Contributeur"
+      "editor": "Gestionnaire",
+      "contributor": "Créateur",
+      "viewer": "Lecteur"
     },
     "roleHints": {
-      "owner": "Contrôle total, y compris la suppression de l'espace de travail.",
-      "admin": "Tout sauf la suppression de l'espace de travail.",
+      "owner": "Contrôle total, y compris la suppression de l’espace.",
+      "admin": "Tout sauf la suppression de l’espace.",
       "editor": "Rédige et planifie sans validation.",
-      "contributor": "Rédige et soumet à validation."
+      "contributor": "Rédige et soumet à validation.",
+      "viewer": "Voit le calendrier, les publications, les statistiques et la boîte de réception. Ne change rien."
     },
     "acceptTitle": "Rejoindre {workspace}",
     "acceptBody": "Vous êtes invité à rejoindre {workspace} en tant que {role}.",
@@ -2176,8 +2179,8 @@
     "removeMemberNamed": "Retirer {name}",
     "revokeNamed": "Révoquer l’invitation de {email}",
     "roleChangeConfirm": "Faire passer {name} de {from} à {to} ?",
-    "roleToOwnerWarning": "Les propriétaires ont un contrôle total, y compris la configuration du serveur et la suppression de l’espace de travail, et seul un autre propriétaire peut le leur retirer.",
-    "roleFromOwnerWarning": "Cette personne perdra immédiatement ses droits de propriétaire sur cet espace de travail.",
+    "roleToOwnerWarning": "Les propriétaires de l’agence ont le contrôle total de cet espace, y compris sa suppression, et seul un autre propriétaire peut le leur retirer.",
+    "roleFromOwnerWarning": "Ils perdront immédiatement l’accès propriétaire à cet espace.",
     "accessAllSaved": "{name} travaille maintenant sur tous les canaux.",
     "accessSomeSaved": "{count, plural, one {{name} travaille maintenant sur # canal.} other {{name} travaille maintenant sur # canaux.}}",
     "accessAll": "Tous les canaux",
@@ -2192,10 +2195,11 @@
     "accessCount": "{count, plural, one {# canal choisi sur {total}.} other {# canaux choisis sur {total}.}}",
     "rolesTitle": "Ce que chaque rôle peut faire",
     "roleExtra": {
-      "owner": "Voit tous les canaux. Décisions majeures, configuration du serveur.",
-      "admin": "Voit tous les canaux. Connecte Facebook, gère l’équipe, les liens clients et les alertes.",
-      "editor": "Peut être limité à certains canaux. Valide les publications des autres, gère la file.",
-      "contributor": "Peut être limité à certains canaux. Ses publications attendent un validateur si la validation est active."
+      "owner": "Voit tous les canaux. Décide qui gère l’espace et peut le supprimer.",
+      "admin": "Voit tous les canaux. Connecte les canaux, gère l’équipe, valide les publications, les liens clients et les alertes.",
+      "editor": "Peut être limité à certains canaux. Publie sans validation, répond aux commentaires, modifie la file et les publications des autres.",
+      "contributor": "Peut être limité à certains canaux. Ses publications attendent un validateur si la validation est active.",
+      "viewer": "Peut être limité à certains canaux. Y lit tout et ne change rien : ni publication, ni réponse, ni réglage."
     },
     "roleChangeAction": "Passer {role}"
   },
@@ -3164,8 +3168,8 @@
   "moderation": {
     "title": "Règles de modération",
     "intro": "Les nouveaux commentaires sur vos Pages Facebook sont vérifiés avec ces règles dès que l’application les lit. Une règle peut masquer un commentaire, alerter l’équipe ou répondre au nom du canal. Tout ce qu’une règle fait est noté ci-dessous et peut être annulé.",
-    "noAccessTitle": "Seuls les éditeurs peuvent gérer les règles de modération",
-    "noAccessHint": "Demandez à un éditeur, administrateur ou propriétaire de cet espace de changer votre rôle si besoin.",
+    "noAccessTitle": "Seuls les gestionnaires peuvent gérer les règles de modération",
+    "noAccessHint": "Demandez à un gestionnaire, administrateur ou propriétaire de l’agence de changer votre rôle si besoin.",
     "rulesHeading": "Règles",
     "addRule": "Ajouter une règle",
     "emptyTitle": "Aucune règle de modération",
@@ -3230,7 +3234,7 @@
   "savedReplies": {
     "title": "Réponses enregistrées",
     "intro": "Les réponses que votre équipe donne souvent, prêtes dans chaque zone de réponse aux commentaires et Messenger : tapez / dans la zone, ou utilisez le bouton Réponses enregistrées. Le prénom de la personne et le nom du canal sont remplis pour vous.",
-    "noAccessTitle": "Seuls les éditeurs peuvent utiliser les réponses enregistrées",
+    "noAccessTitle": "Seuls les gestionnaires peuvent utiliser les réponses enregistrées",
     "noAccessHint": "Les réponses enregistrées servent à ceux qui répondent aux commentaires et aux messages. Demandez à un administrateur si besoin.",
     "add": "Ajouter une réponse enregistrée",
     "emptyTitle": "Aucune réponse enregistrée",
@@ -3661,7 +3665,7 @@
     "removeConfirm": "Supprimer le modèle « {name} » ?",
     "removeConfirmBody": "Il disparaît pour tout l’espace de travail. Les publications déjà rédigées à partir de lui ne changent pas.",
     "emptyTitle": "Aucun modèle pour l’instant",
-    "emptyBody": "Les modèles sont des structures de publication que l’équipe choisit en rédigeant. Un éditeur peut ajouter le premier.",
+    "emptyBody": "Les modèles sont des structures de publication que l’équipe choisit en rédigeant. Un gestionnaire peut ajouter le premier.",
     "emptyBodyEditor": "Enregistrez la structure des publications que vous écrivez souvent, avec des blancs à compléter, pour que chacun puisse partir de là dans l’éditeur.",
     "name": "Nom",
     "category": "Catégorie",

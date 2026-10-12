@@ -81,7 +81,7 @@ export default async function TeamPage() {
           {t('rolesTitle')}
         </h2>
         <dl className="grid gap-3 sm:grid-cols-2">
-          {(['owner', 'admin', 'editor', 'contributor'] as const).map((role) => (
+          {(['owner', 'admin', 'editor', 'contributor', 'viewer'] as const).map((role) => (
             <div key={role} className="rounded-lg bg-slate-50 px-3 py-2.5">
               <dt className="text-sm font-semibold text-slate-900">{t(`roles.${role}`)}</dt>
               <dd className="text-xs text-slate-600">{t(`roleHints.${role}`)}</dd>

@@ -5,7 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { ConfirmProvider } from '@/components/ConfirmProvider';
 import { ErrorReporter } from '@/components/ErrorReporter';
 import { accessRefusal, getAuthContext } from '@/lib/auth';
-import { canApprove } from '@/lib/constants';
+import { canApprove, canCompose } from '@/lib/constants';
 import { pendingApprovalCount } from '@/lib/approvals';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         showApprovals={showApprovals}
         pendingApprovals={pendingApprovals}
         isRoot={auth.isInstanceOwner}
+        canWrite={canCompose(auth.role)}
         rootVisit={auth.rootVisit}
         modules={refusal === 'suspended' ? [] : auth.modules}
         workspaces={auth.workspaces.map((workspace) => ({

@@ -210,7 +210,7 @@ describe('the privileges table', () => {
       manageOthersPosts: constants.canManageOthersPosts,
       deleteMedia: constants.canDeleteMedia,
       manageTemplates: constants.canManageTemplates,
-      compose: () => constants.canCompose(),
+      compose: constants.canCompose,
     };
     expect(Object.keys(checks).sort()).toEqual(Object.keys(constants.CAPABILITIES).sort());
     for (const [capability, check] of Object.entries(checks)) {

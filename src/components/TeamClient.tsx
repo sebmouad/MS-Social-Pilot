@@ -12,7 +12,7 @@ import { Icon } from './Icon';
 import { paletteOf } from '@/lib/palette';
 
 /** Ordered strongest first, so a position in this list is a rank. */
-const ROLES = ['owner', 'admin', 'editor', 'contributor'] as const;
+const ROLES = ['owner', 'admin', 'editor', 'contributor', 'viewer'] as const;
 
 export interface Member {
   userId: string;

@@ -24,6 +24,8 @@ enum WorkspaceRole {
   admin
   editor
   contributor
+  /// Reads everything in its channels, changes nothing (owner approved, 2026-10-12).
+  viewer
 }
 
 enum TargetType {
