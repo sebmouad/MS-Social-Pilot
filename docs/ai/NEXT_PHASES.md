@@ -145,7 +145,14 @@ workspaces, invitations, privileges + CSV, root log, transfer + SSH script.
 **Root oversight done 2026-10-11** (PERMISSIONS.md "Root oversight and
 modules"): modules per workspace and per member, suspend/resume, open any
 workspace as root (logged, banner), members managed from
-`/root/workspaces/[id]`. Next: plans/limits per client, delete users.
+`/root/workspaces/[id]`. **Worker status done 2026-10-12**: `/root/worker`
+shows each worker process (alive within 5 min), every job's last attempt,
+outcome (done · nothing to do · waiting for the allowance · failed), duration,
+summary and last error, the Meta call allowance the worker last saved
+(`graph_usage`: app %, calls in the last hour, throttle, per Page and ad
+account), and a root-only "Test the app ID and secret" (`POST
+/api/root/app-check`, one Graph call on request). Next: plans/limits per
+client, delete users.
 Owner's rule (2026-10-11): the first registered user is root and sets up every
 aspect of the app; other admins and users have separate privileges, which the
 owner will audit. Root already exists (`isInstanceOwner`, first account only;

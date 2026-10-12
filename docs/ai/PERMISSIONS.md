@@ -86,7 +86,8 @@ and may open one as its owner (logged visit, see below).
 
 ## Built (2026-10-11)
 - `/root/*` (`src/app/(root)/root/`): Overview · Configuration · Workspaces ·
-  Users · Registration & invitations · Privileges · Root activity · Danger zone.
+  Users · Registration & invitations · Privileges · Worker & Meta usage ·
+  Alerts · Backups · Root activity · Danger zone.
   Guard `requireRoot()` (pages) / `requireRootApi()` (`/api/root/*`): 404 for
   everybody but root, signed out included. Sidebar entry "Root" (amber, shield)
   only for root; banner on every root screen; "Back to the app".

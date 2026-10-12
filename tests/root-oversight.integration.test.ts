@@ -195,3 +195,18 @@ describe('root managing members', () => {
     expect(response.status).toBe(404);
   });
 });
+
+describe('root testing the Facebook app', () => {
+  it('answers 404 for anyone but root, and gives root the verdict', async () => {
+    const check = await import('../src/app/api/root/app-check/route');
+    const client = await person();
+    signIn(client.token);
+    expect((await check.POST(new Request('http://test/', { method: 'POST' }), { params: Promise.resolve({}) })).status).toBe(404);
+
+    const owner = await person({ root: true });
+    signIn(owner.token);
+    const response = await check.POST(new Request('http://test/', { method: 'POST' }), { params: Promise.resolve({}) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ configured: expect.any(Boolean), valid: expect.any(Boolean) });
+  });
+});

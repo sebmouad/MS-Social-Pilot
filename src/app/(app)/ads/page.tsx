@@ -10,7 +10,6 @@ import { AutoSyncNote } from '@/components/AutoSyncNote';
 import { requirePage } from '@/lib/auth';
 import { listAdAccounts, readAdSummary, readCampaigns, syncedSince, type CampaignRow } from '@/lib/ads';
 import { adFindings, adKpis, type AdFinding, type AdKpiKey } from '@/lib/ads-analysis';
-import { canManageAccounts } from '@/lib/constants';
 import { env } from '@/lib/env';
 import { screenMetadata } from '@/lib/metadata';
 import { formatInZone } from '@/lib/time';
