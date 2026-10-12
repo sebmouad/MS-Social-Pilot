@@ -364,6 +364,11 @@ export const PAGE_METRICS: MetricDefinition[] = [
     ['page_daily_video_ad_break_earnings_by_crosspost_status', 'Ad-break earnings, split by crosspost status.'],
     ['page_daily_video_ad_break_cpm_by_crosspost_status', 'Ad-break CPM, split by crosspost status.'],
   ]),
+  // Served only to Pages in Meta's monetisation programmes; the probe finds out.
+  ...group({ level: 'page', category: 'monetisation', periods: DAILY }, [
+    ['monetization_approximate_earnings', 'Approximate earnings from every monetisation tool.'],
+    ['content_monetization_earnings', 'Earnings from content monetisation.'],
+  ]),
 
   // --- Legacy ----------------------------------------------------------------
   // Removed in Graph v4.0. Listed because Pages created before the change

@@ -309,7 +309,8 @@ describe('metric catalogue', () => {
   });
 
   it('scopes Facebook names to their own prefix', () => {
-    expect(PAGE_METRICS.every((metric) => metric.name.startsWith('page_'))).toBe(true);
+    // Meta's earnings metrics (H17) are the one documented exception.
+    expect(PAGE_METRICS.every((metric) => metric.name.startsWith('page_') || metric.category === 'monetisation')).toBe(true);
     expect(POST_METRICS.every((metric) => metric.name.startsWith('post_'))).toBe(true);
     expect(VIDEO_METRICS.every((metric) => metric.name.startsWith('total_video_'))).toBe(true);
   });

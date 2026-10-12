@@ -815,10 +815,19 @@ setup from Phase 0.2 (marked AI).
   worker saves the last hour with its usage snapshot, and Root › Worker
   lists the heaviest Pages and jobs. Calls made by the web app are counted
   in that process only and are not shown.*
-- **H17. Earnings tracking (M, check first)** — verify which monetisation
+- **H17. Earnings tracking (M, check first)** ✅ — verify which monetisation
   metrics the Graph API still returns for these Pages (META_API_NOTES, the
   `search-meta-docs` skill); build only what is available; otherwise document
   "not available" and stop.
+  *Done 2026-10-12, docs only, not yet confirmed live: the Page catalogue
+  adds `monetization_approximate_earnings` and `content_monetization_earnings`
+  next to the existing ad-break metrics (META_API_NOTES › Earnings). The
+  daily Page sync asks for them; the probe records them unavailable for
+  Pages outside Meta's monetisation programmes, and Analytics › Overview
+  shows them only where served. Post-level earnings are left out on
+  purpose: on an unmonetised Page every post sync would spend extra calls
+  isolating the refused names. Add them once a monetised Page confirms the
+  Page-level figures.*
 
 ### Connections
 - **H18. Outgoing webhooks + Zapier / n8n / Make (S)** ✅ — events: post
