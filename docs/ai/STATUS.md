@@ -41,6 +41,7 @@ networks, sidebar, live-test fixes. Highlights, newest first:
 
 | Commit (approx.) | What |
 |---|---|
+| 335137f, d852c7a, d689e13, fc1e52c | Inbox stream with shared done state, notifications matrix (per Page × event mutes, hourly new-inbox email), AI recap on scheduled reports, step-by-step MCP setup |
 | a0d77d1 | Design-review UX: plain metric names, "Technical details" fold, Inbox explains Meta wait, Instagram tab hidden until on, searchable Page picker, Pull buttons report results, "Removed" badge |
 | f7014f5 | Delete a published post from Facebook (`PostTarget.removedAt`) |
 | 8b0c353 | Live-test fixes: reactions edge (all reaction types), no Hide on Page's own comments, no dead link on cancelled posts, confirm dialog wording |
