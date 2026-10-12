@@ -1262,6 +1262,7 @@ export function mediaFromInput(media: CreatePostInput['media']): PostMedia[] {
     storageKey: item.storageKey,
     mimeType: item.mimeType,
     altText: item.altText,
+    ...(item.focus ? { focus: item.focus } : {}),
   }));
 }
 

@@ -8,6 +8,7 @@ import { canManageSettings, canPublishWithoutApproval } from '@/lib/constants';
 import { screenMetadata } from '@/lib/metadata';
 import { targetScope } from '@/lib/page-access';
 import { listLabels, listPageGroups } from '@/lib/page-groups';
+import { parseWatermark } from '@/lib/image-format';
 import { prisma } from '@/lib/prisma';
 import { suggestAudiences } from '@/lib/audience-data';
 import { timezoneOptions } from '@/lib/time';
@@ -44,6 +45,7 @@ export default async function PagesAndGroupsPage() {
         audienceLanguages: true,
         audienceTimezone: true,
         audienceCalendars: true,
+        watermark: true,
       },
       orderBy: { name: 'asc' },
     }),
@@ -63,6 +65,12 @@ export default async function PagesAndGroupsPage() {
       audienceTimezone: true,
       audienceCalendars: true,
     },
+  });
+  const logos = await prisma.media.findMany({
+    where: { workspaceId: auth.workspace.id, kind: 'image', derivedFromId: null, mimeType: { in: ['image/png', 'image/jpeg', 'image/webp'] } },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    select: { id: true, filename: true, url: true },
   });
   const suggestions = await suggestAudiences(pages.filter((page) => page.type === TargetType.page).map((page) => page.id));
 
@@ -84,10 +92,12 @@ export default async function PagesAndGroupsPage() {
         }}
         timezones={timezoneOptions()}
         suggestions={suggestions}
+        logos={logos}
         pages={pages
           .filter((page) => page.type === TargetType.page)
-          .map(({ type: _type, audienceCountries, audienceLanguages, audienceTimezone, audienceCalendars, ...page }) => ({
+          .map(({ type: _type, audienceCountries, audienceLanguages, audienceTimezone, audienceCalendars, watermark, ...page }) => ({
             ...page,
+            watermark: parseWatermark(watermark),
             audience: { countries: audienceCountries, languages: audienceLanguages, timezone: audienceTimezone, calendars: audienceCalendars },
           }))}
       />

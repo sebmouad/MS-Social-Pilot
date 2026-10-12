@@ -299,9 +299,13 @@ export async function deleteMedia(options: {
   });
   if (posts.length > 0) return { outcome: 'in_use', posts };
 
+  // Its publish-time copies (G13) go with it; the rows cascade, the files don't.
+  const variants = await prisma.media.findMany({ where: { derivedFromId: media.id }, select: { storageKey: true } });
+
   // Row first: a stale row pointing at a missing file breaks the library UI,
   // whereas an orphaned file on disk is merely wasted space.
   await prisma.media.delete({ where: { id: media.id } });
+  for (const variant of variants) if (variant.storageKey) await deleteStoredFile(variant.storageKey);
   if (media.storageKey) await deleteStoredFile(media.storageKey);
 
   return { outcome: 'ok' };
@@ -561,13 +565,14 @@ const LIBRARY_PAGE = 200;
  */
 export async function readMediaLibrary(workspaceId: string): Promise<MediaLibrary> {
   const [files, usage, total] = await Promise.all([
+    // Publish-time copies (G13) are not the team's files: they are hidden.
     prisma.media.findMany({
-      where: { workspaceId },
+      where: { workspaceId, derivedFromId: null },
       orderBy: { createdAt: 'desc' },
       take: LIBRARY_PAGE,
     }),
     storageUsage(workspaceId),
-    prisma.media.count({ where: { workspaceId } }),
+    prisma.media.count({ where: { workspaceId, derivedFromId: null } }),
   ]);
 
   const keys = files.flatMap((file) => [file.id, ...(file.storageKey ? [file.storageKey] : [])]);

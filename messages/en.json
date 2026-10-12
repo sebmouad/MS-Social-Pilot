@@ -560,7 +560,8 @@
     "aiHashtagsAdd": "{count, plural, =0 {Add hashtags} one {Add 1 hashtag} other {Add # hashtags}}",
     "staggeredOk": "Scheduled as {count, plural, one {# post} other {# posts}}, one Page at a time.",
     "captionTestOk": "Caption test started: {count, plural, one {# post} other {# posts}} scheduled. The result shows in Analyse › Caption tests.",
-    "translatedOk": "{count, plural, one {Done: one post.} other {Done: # posts, one per language.}}"
+    "translatedOk": "{count, plural, one {Done: one post.} other {Done: # posts, one per language.}}",
+    "focusHint": "Click the subject to keep it in frame when the image is cropped for Instagram or a story"
   },
   "config": {
     "title": "Configuration",
@@ -2254,7 +2255,10 @@
     "inherits": "Workspace: {value}",
     "notSet": "Not set",
     "audienceTitle": "Audience",
-    "audienceHint": "Who this Page speaks to. AI writing uses the languages and countries; anything left empty follows the workspace’s defaults (Settings)."
+    "audienceHint": "Who this Page speaks to. AI writing uses the languages and countries; anything left empty follows the workspace’s defaults (Settings).",
+    "watermarkTitle": "Watermark",
+    "watermarkHint": "Put on this Page's images when they are published. The originals in the media library are not changed.",
+    "hasWatermark": "watermark"
   },
   "share": {
     "reviewBadge": "For your review",
@@ -3232,5 +3236,31 @@
       "failed": "Failed",
       "expired": "Expired"
     }
+  },
+  "watermark": {
+    "kind": "Watermark",
+    "mode": {
+      "none": "None",
+      "text": "Text",
+      "logo": "Logo"
+    },
+    "text": "Text",
+    "textPlaceholder": "e.g. Client A",
+    "logo": "Logo",
+    "pickLogo": "Choose an image",
+    "noLogos": "Upload the logo to the media library first (a PNG with a transparent background works best).",
+    "logoHint": "From the media library. A PNG with a transparent background works best.",
+    "position": "Position",
+    "positions": {
+      "top-start": "Top start",
+      "top-end": "Top end",
+      "center": "Centre",
+      "bottom-start": "Bottom start",
+      "bottom-end": "Bottom end"
+    },
+    "opacity": "Opacity: {value}%",
+    "size": "Size: {value}% of the width",
+    "hint": "Images sent to Instagram or as stories are also cropped to the shape they need, keeping the subject in frame. Videos and GIFs are sent as they are.",
+    "preview": "Preview"
   }
 }

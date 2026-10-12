@@ -63,6 +63,7 @@ export const postMediaSchema = z.object({
   storageKey: z.string().optional(),
   mimeType: z.string().optional(),
   altText: z.string().max(1000).optional(),
+  focus: z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).optional(),
 });
 
 const postMessage = z.string().max(LIMITS.messageLength, 'That message is too long for Facebook.');

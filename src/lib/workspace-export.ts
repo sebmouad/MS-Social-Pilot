@@ -179,7 +179,7 @@ async function writeContents(zip: ZipWriter, workspaceId: string): Promise<{ ski
   let skippedMedia = 0;
   let added = 0;
   const media = await prisma.media.findMany({
-    where: { workspaceId, storageKey: { not: null } },
+    where: { workspaceId, storageKey: { not: null }, derivedFromId: null },
     orderBy: { createdAt: 'asc' },
     select: { id: true, filename: true, size: true, storageKey: true, createdAt: true },
   });

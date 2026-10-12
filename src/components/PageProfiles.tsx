@@ -5,11 +5,13 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import type { Audience } from '@/lib/audience';
+import type { Watermark } from '@/lib/image-format';
 
 import { AudienceFields } from './AudienceFields';
 import { Dialog } from './Dialog';
 import { FeedAvatar } from './FeedPost';
 import { Icon } from './Icon';
+import { WatermarkFields, draftOf, watermarkOf, type WatermarkDraft } from './WatermarkFields';
 
 interface Profile {
   id: string;
@@ -21,7 +23,10 @@ interface Profile {
   utmMedium: string | null;
   utmCampaign: string | null;
   audience: Audience;
+  watermark: Watermark | null;
 }
+
+type Editing = Profile & { mark: WatermarkDraft };
 
 /**
  * Each Page's own voice and link tags. A bakery and a garage in one workspace
@@ -33,6 +38,7 @@ export function PageProfiles({
   workspaceAudience,
   timezones,
   suggestions,
+  logos,
   canEdit,
 }: {
   pages: Profile[];
@@ -42,12 +48,14 @@ export function PageProfiles({
   timezones: string[];
   /** From each Page's own followers, by Page id. */
   suggestions: Record<string, { countries: string[]; languages: string[] }>;
+  /** Library images a watermark can use. */
+  logos: Array<{ id: string; filename: string; url: string }>;
   canEdit: boolean;
 }) {
   const t = useTranslations('groups');
   const tCommon = useTranslations('common');
   const router = useRouter();
-  const [editing, setEditing] = useState<Profile | null>(null);
+  const [editing, setEditing] = useState<Editing | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +75,7 @@ export function PageProfiles({
         audienceLanguages: editing.audience.languages,
         audienceTimezone: editing.audience.timezone,
         audienceCalendars: editing.audience.calendars,
+        watermark: watermarkOf(editing.mark),
       }),
     }).catch(() => null);
     setPending(false);
@@ -111,10 +120,11 @@ export function PageProfiles({
                   {tags > 0 && ` · ${t('ownTags', { count: tags })}`}
                   {page.audience.countries.length + page.audience.languages.length > 0 &&
                     ` · ${[...page.audience.countries, ...page.audience.languages].join(', ')}`}
+                  {page.watermark && ` · ${t('hasWatermark')}`}
                 </span>
               </span>
               {canEdit && (
-                <button type="button" className="btn-secondary px-3 py-1 text-xs" onClick={() => setEditing({ ...page })}>
+                <button type="button" className="btn-secondary px-3 py-1 text-xs" onClick={() => setEditing({ ...page, mark: draftOf(page.watermark) })}>
                   <Icon name="settings" size={14} />
                   {t('editProfile')}
                 </button>
@@ -168,6 +178,16 @@ export function PageProfiles({
                 timezones={timezones}
                 inherited={workspaceAudience}
                 suggestion={suggestions[editing.id]}
+              />
+            </fieldset>
+            <fieldset>
+              <legend className="text-sm font-semibold text-slate-900">{t('watermarkTitle')}</legend>
+              <p className="mb-2 text-xs text-slate-500">{t('watermarkHint')}</p>
+              <WatermarkFields
+                idPrefix="page-watermark"
+                value={editing.mark}
+                onChange={(mark) => setEditing({ ...editing, mark })}
+                logos={logos}
               />
             </fieldset>
             <fieldset>

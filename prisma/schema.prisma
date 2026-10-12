@@ -404,6 +404,9 @@ model Target {
   audienceLanguages String[] @default([])
   audienceTimezone  String?
   audienceCalendars String[] @default([])
+  /// Watermark put on this Page's images when they are published (G13):
+  /// { mediaId?, text?, position, opacity, size }. Null for none.
+  watermark         Json?
 
   // Read straight off the Page object: no insights permission, no date range.
   fanCount          Int?
@@ -602,10 +605,17 @@ model Media {
   url             String
   width           Int?
   height          Int?
+  /// A copy made at publish time (watermark, crop — G13); hidden from the library.
+  derivedFromId   String?
+  /// What was done to the source, as a short hash; one copy per variant.
+  variant         String?
   createdAt       DateTime        @default(now())
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  derivedFrom Media?    @relation("MediaVariants", fields: [derivedFromId], references: [id], onDelete: Cascade)
+  variants    Media[]   @relation("MediaVariants")
 
+  @@unique([derivedFromId, variant])
   @@index([workspaceId])
   @@index([workspaceId, createdAt])
   @@map("media")

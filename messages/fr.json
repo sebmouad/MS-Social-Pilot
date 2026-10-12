@@ -560,7 +560,8 @@
     "aiHashtagsAdd": "{count, plural, =0 {Ajouter des hashtags} one {Ajouter 1 hashtag} other {Ajouter # hashtags}}",
     "staggeredOk": "Programmé en {count, plural, one {# publication} other {# publications}}, une Page à la fois.",
     "captionTestOk": "Test de légendes lancé : {count, plural, one {# publication programmée} other {# publications programmées}}. Le résultat s’affiche dans Analyser › Tests de légendes.",
-    "translatedOk": "{count, plural, one {C’est fait : un post.} other {C’est fait : # posts, un par langue.}}"
+    "translatedOk": "{count, plural, one {C’est fait : un post.} other {C’est fait : # posts, un par langue.}}",
+    "focusHint": "Cliquez sur le sujet pour le garder dans le cadre quand l’image est recadrée pour Instagram ou une story"
   },
   "config": {
     "title": "Configuration",
@@ -2254,7 +2255,10 @@
     "inherits": "Espace : {value}",
     "notSet": "Non défini",
     "audienceTitle": "Audience",
-    "audienceHint": "À qui s’adresse cette Page. La rédaction par IA utilise les langues et les pays ; ce qui reste vide suit les valeurs par défaut de l’espace de travail (Paramètres)."
+    "audienceHint": "À qui s’adresse cette Page. La rédaction par IA utilise les langues et les pays ; ce qui reste vide suit les valeurs par défaut de l’espace de travail (Paramètres).",
+    "watermarkTitle": "Filigrane",
+    "watermarkHint": "Ajouté aux images de cette Page au moment de la publication. Les originaux de la médiathèque ne sont pas modifiés.",
+    "hasWatermark": "filigrane"
   },
   "share": {
     "reviewBadge": "À valider",
@@ -3232,5 +3236,31 @@
       "failed": "Échec",
       "expired": "Expiré"
     }
+  },
+  "watermark": {
+    "kind": "Filigrane",
+    "mode": {
+      "none": "Aucun",
+      "text": "Texte",
+      "logo": "Logo"
+    },
+    "text": "Texte",
+    "textPlaceholder": "ex. Client A",
+    "logo": "Logo",
+    "pickLogo": "Choisir une image",
+    "noLogos": "Ajoutez d’abord le logo à la médiathèque (un PNG à fond transparent donne le meilleur résultat).",
+    "logoHint": "Depuis la médiathèque. Un PNG à fond transparent donne le meilleur résultat.",
+    "position": "Position",
+    "positions": {
+      "top-start": "En haut, au début",
+      "top-end": "En haut, à la fin",
+      "center": "Au centre",
+      "bottom-start": "En bas, au début",
+      "bottom-end": "En bas, à la fin"
+    },
+    "opacity": "Opacité : {value} %",
+    "size": "Taille : {value} % de la largeur",
+    "hint": "Les images envoyées sur Instagram ou en story sont aussi recadrées au format attendu, en gardant le sujet dans le cadre. Les vidéos et GIF sont envoyés tels quels.",
+    "preview": "Aperçu"
   }
 }

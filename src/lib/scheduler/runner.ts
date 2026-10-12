@@ -5,6 +5,8 @@ import type { ActivityAction } from '../activity';
 import { env } from '../env';
 import { decryptSecret } from '../crypto';
 import { parseLinkPreview, parseMedia, toJsonOrNull } from '../json';
+import { aspectRangeFor, parseWatermark } from '../image-format';
+import { prepareImages } from '../image-variants';
 import { resolveMediaForInstagram, resolveMediaForPublish } from '../media';
 import { asGraphError, GraphError } from '../facebook/graph';
 import { publishPost } from '../facebook/publish';
@@ -350,7 +352,14 @@ async function publishClaimed(
     }
 
     const isInstagram = target.type === 'instagram';
-    const attachments = parseMedia(post.media);
+    // Cropped to the shape this destination takes and stamped with the Page's
+    // watermark (G13); the originals stay as they are.
+    const attachments = await prepareImages({
+      workspaceId: post.workspaceId,
+      media: parseMedia(post.media),
+      range: aspectRangeFor(target.type, post.format),
+      watermark: parseWatermark(target.watermark),
+    });
 
     // UTM tags and shortening are applied per destination, so a campaign can
     // be attributed to the Page it actually ran on.

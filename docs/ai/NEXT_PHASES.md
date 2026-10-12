@@ -581,9 +581,20 @@ most time), the rest after Phase D2. S/M/L = effort.
   `messages/<code>.json` with every key, add it to `CATALOGUES` in
   `src/lib/email/templates.ts` (tsc asks for it), and use only logical classes
   in new UI (`ms-`, `pe-`, `start-`, `text-end`).*
-- **G13. Watermark and auto-crop (M)** — per-Page logo/text watermark (position,
+- **G13. Watermark and auto-crop (M)** ✅ — per-Page logo/text watermark (position,
   opacity), applied when the post is published (original kept); crops/resizes
   per network format (feed 4:5, story 9:16, link 1.91:1) with a focal point.
+  *Done 2026-10-12: Settings → Pages & groups → a Page's dialog → Watermark
+  (none / text / library logo; position, opacity, size; live preview). The
+  worker (`src/lib/image-variants.ts`, `sharp`) makes one JPEG copy per image
+  and variant when a destination needs it: Instagram feed images outside
+  4:5–1.91:1 and stories (9:16) are cropped around the focal point, which the
+  author sets by clicking the subject on the composer thumbnail. Copies are
+  hidden Media rows (`derivedFromId`), reused across destinations, swept with
+  unused uploads and deleted with their original. Videos and GIFs are sent as
+  they are. Link images are fetched by Facebook from the article, so there is
+  nothing to crop there. Rules in `src/lib/image-format.ts`. Text watermarks
+  use the server's sans-serif font.*
 - **G14. Short-link click analytics (S)** ✅ — dashboard of clicks per Page, post,
   article and day (data already collected by the shortener), top articles,
   clicks per 1,000 views; obeys the shared selection.
@@ -630,6 +641,9 @@ most time), the rest after Phase D2. S/M/L = effort.
   the Ads view. Needs `ads_management` + Meta review and the owner's OK for each
   spend; build after Meta step 2. Never spend without an explicit confirmation
   showing the amount.
+  *Blocked (2026-10-12): needs `ads_management` granted after Meta review
+  (step 2) and the owner's go-ahead for real spend. Nothing built yet; the Ads
+  view already reads results once boosts exist.*
 
 ## Phase H — More owner-approved additions (2026-10-11)
 

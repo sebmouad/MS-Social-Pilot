@@ -80,7 +80,7 @@ export const GET = route(async () => {
   const auth = await requireAuth();
 
   const media = await prisma.media.findMany({
-    where: { workspaceId: auth.workspace.id },
+    where: { workspaceId: auth.workspace.id, derivedFromId: null },
     orderBy: { createdAt: 'desc' },
     take: 100,
   });

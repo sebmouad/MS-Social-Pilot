@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 
 import { TargetPicker, type TargetOption } from './TargetPicker';
@@ -85,7 +85,20 @@ export interface GoodTime {
 }
 
 /** The parts of an attachment list an author can change, for spotting edits. */
-const mediaKey = (media: PostMedia[]) => media.map((item) => `${item.id}:${item.altText ?? ''}`).join('|');
+const mediaKey = (media: PostMedia[]) =>
+  media.map((item) => `${item.id}:${item.altText ?? ''}:${item.focus ? `${item.focus.x},${item.focus.y}` : ''}`).join('|');
+
+/**
+ * Where a click on an `object-cover` thumbnail lands on the picture itself,
+ * 0–1 each way, and back: the thumbnail shows only part of a picture whose
+ * shape differs from its own.
+ */
+function coverBox(box: { width: number; height: number }, natural: { width: number; height: number }) {
+  const scale = Math.max(box.width / natural.width, box.height / natural.height);
+  const width = natural.width * scale;
+  const height = natural.height * scale;
+  return { width, height, left: (box.width - width) / 2, top: (box.height - height) / 2 };
+}
 
 type Timing = 'now' | 'schedule' | 'queue';
 type Handler = 'worker' | 'native';
@@ -129,6 +142,7 @@ export function Composer({
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [media, setMedia] = useState<PostMedia[]>(editing?.media ?? []);
+  const [naturalSizes, setNaturalSizes] = useState<Record<string, { width: number; height: number }>>({});
   const [selected, setSelected] = useState<string[]>(editing?.targetIds ?? initialTargetIds ?? []);
   const [timing, setTiming] = useState<Timing>('schedule');
   const [handler, setHandler] = useState<Handler>(
@@ -331,6 +345,19 @@ export function Composer({
       setUploading(false);
       if (fileInput.current) fileInput.current.value = '';
     }
+  }
+
+  function setFocus(id: string, event: MouseEvent<HTMLImageElement>) {
+    const image = event.currentTarget;
+    if (!image.naturalWidth) return;
+    const rect = image.getBoundingClientRect();
+    const cover = coverBox(rect, { width: image.naturalWidth, height: image.naturalHeight });
+    const clamp = (value: number) => Math.round(Math.min(1, Math.max(0, value)) * 100) / 100;
+    const focus = {
+      x: clamp((event.clientX - rect.left - cover.left) / cover.width),
+      y: clamp((event.clientY - rect.top - cover.top) / cover.height),
+    };
+    setMedia((current) => current.map((item) => (item.id === id ? { ...item, focus } : item)));
   }
 
   function setAltText(id: string, altText: string) {
@@ -776,11 +803,33 @@ export function Composer({
                     <div className="relative h-28 w-40">
                       {item.kind === 'image' ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={item.url}
-                          alt={item.altText ?? ''}
-                          className="h-28 w-40 rounded-lg border border-slate-200 object-cover"
-                        />
+                        <>
+                          {/* A click marks the subject, kept in frame when the
+                              picture is cropped for Instagram or a story (G13). */}
+                          <img
+                            src={item.url}
+                            alt={item.altText ?? ''}
+                            title={t('focusHint')}
+                            className="h-28 w-40 cursor-crosshair rounded-lg border border-slate-200 object-cover"
+                            onLoad={(event) => {
+                              const image = event.currentTarget;
+                              setNaturalSizes((sizes) => ({ ...sizes, [item.id]: { width: image.naturalWidth, height: image.naturalHeight } }));
+                            }}
+                            onClick={(event) => setFocus(item.id, event)}
+                          />
+                          {item.focus && naturalSizes[item.id] && (() => {
+                            const cover = coverBox({ width: 160, height: 112 }, naturalSizes[item.id]!);
+                            const x = cover.left + item.focus.x * cover.width;
+                            const y = cover.top + item.focus.y * cover.height;
+                            return (
+                              <span
+                                aria-hidden="true"
+                                className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand-600/80 shadow"
+                                style={{ left: Math.min(160, Math.max(0, x)), top: Math.min(112, Math.max(0, y)) }}
+                              />
+                            );
+                          })()}
+                        </>
                       ) : (
                         <span className="flex h-28 w-40 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-xs text-slate-600">
                           {t('video')}

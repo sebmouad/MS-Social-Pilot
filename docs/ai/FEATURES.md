@@ -100,7 +100,7 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   (read-only, includes Facebook-side posts); revocable; shown once.
 - **Settings**: Workspace (timezone, approvals, UTM, shortener, AI voice, report
   branding), Team (roles owner/admin/editor/contributor, per-Page access, roles
-  guide), Pages & groups (per-Page voice, audience & UTM, groups, labels; audience =
+  guide), Pages & groups (per-Page voice, audience, watermark & UTM, groups, labels; audience =
   countries, languages, time zone, cultural calendars, with workspace defaults
   and suggestions from the Page's followers), API & Claude
   (keys, step-by-step MCP setup for Claude Code, Claude Desktop, Cursor and VS Code,

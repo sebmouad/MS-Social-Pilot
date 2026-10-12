@@ -28,6 +28,8 @@ export interface PostMedia {
   storageKey?: string;
   mimeType?: string;
   altText?: string;
+  /** Where the subject is (0–1 from the start and top), kept when cropping (G13). */
+  focus?: { x: number; y: number };
 }
 
 /**
