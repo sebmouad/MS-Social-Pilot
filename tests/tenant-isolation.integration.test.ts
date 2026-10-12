@@ -45,6 +45,8 @@ const NOT_WORKSPACE_DATA: Record<string, string> = {
   'root/users/[id]/reset-two-step': 'Root section.',
   'root/users/[id]/sign-out': 'Root section.',
   'root/sessions/[id]': 'Root section.',
+  'root/plans/[id]': 'Root section.',
+  'root/subscribers/[id]': 'Root section.',
   'root/workspaces/[id]': 'Root section.',
   'root/client-invitations/[id]': 'Root section.',
   'root/members/[id]': 'Root section (root-oversight.integration.test.ts).',
