@@ -368,6 +368,12 @@ model Target {
   talkingAboutCount Int?
   profileSyncedAt   DateTime?
 
+  /// Last time the worker saw a post scheduled ahead for this Page.
+  queueFilledAt        DateTime?
+  /// When members were told the Page has nothing scheduled any more; told
+  /// again only after the queue has filled since.
+  queueEmptyNotifiedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -786,6 +792,8 @@ model NotificationSetting {
   onApprovalDecision Boolean   @default(true)
   /// An hourly email of new comments and messages. Opt-in: no row means off.
   onNewInbox         Boolean   @default(false)
+  /// A Page that had posts scheduled has none left.
+  onQueueEmpty       Boolean   @default(true)
   /// Up to when the inbox email has already counted (the next one starts here).
   inboxDigestAt      DateTime?
 

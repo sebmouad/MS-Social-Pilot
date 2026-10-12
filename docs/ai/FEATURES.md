@@ -77,7 +77,7 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
 publish (every few seconds), native reconcile, RSS, evergreen recycling,
 analytics (post insights), page insights, edges (comments, reviews, inbox,
 external posts, videos), Instagram, ads, housekeeping, token expiry warnings,
-scheduled reports (every 10 min), inbox digest email (hourly).
+scheduled reports (every 10 min), inbox digest email (hourly), empty-queue email (hourly).
 
 ## Integrations
 REST `/api/v1/pages`, `/api/v1/pages/:id/analytics`, `/api/v1/posts` (GET with `status`, `from`, `to`, `limit`, `pages=id,id`; POST);

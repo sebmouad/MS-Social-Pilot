@@ -12,6 +12,7 @@ const schema = z.object({
   onApprovalRequest: z.boolean().optional(),
   onApprovalDecision: z.boolean().optional(),
   onNewInbox: z.boolean().optional(),
+  onQueueEmpty: z.boolean().optional(),
   /** Every Page × event this member does not want to hear about; replaces the list. */
   mutes: z
     .array(z.object({ targetId: z.string().min(1), event: z.enum(PAGE_EVENTS) }))
@@ -35,6 +36,7 @@ export const GET = route(async () => {
       onApprovalRequest: true,
       onApprovalDecision: true,
       onNewInbox: false,
+      onQueueEmpty: true,
     },
   });
 });

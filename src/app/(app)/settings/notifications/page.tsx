@@ -55,6 +55,7 @@ export default async function NotificationsSettingsPage() {
           onApprovalRequest: setting?.onApprovalRequest ?? true,
           onApprovalDecision: setting?.onApprovalDecision ?? true,
           onNewInbox: setting?.onNewInbox ?? false,
+          onQueueEmpty: setting?.onQueueEmpty ?? true,
         }}
         pages={pages}
         initialMutes={mutes.map((mute) => `${mute.targetId}:${mute.event}`)}

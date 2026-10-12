@@ -3,7 +3,7 @@ import { prisma } from '../prisma';
 import { backgroundBudget } from '../facebook/budget';
 import { postDueFirstComments, postFirstComment } from '../first-comment';
 import { env } from '../env';
-import { notifyTokenExpiring, sendInboxDigests } from '../email/notify';
+import { notifyEmptyQueues, notifyTokenExpiring, sendInboxDigests } from '../email/notify';
 import { runEvergreenCycle } from '../evergreen';
 import { pollDueSources } from '../rss/poll';
 import { refreshPostStatus, runSchedulerTick } from './runner';
@@ -46,6 +46,7 @@ export type JobName =
   | 'tokens'
   | 'reports'
   | 'inboxDigest'
+  | 'queueEmpty'
   | 'alerts';
 
 export interface JobContext {
@@ -694,6 +695,15 @@ export function jobDefinitions(): JobDefinition[] {
       run: async ({ now }) => {
         const sent = await sendInboxDigests(now);
         return sent > 0 ? `${sent} inbox email(s) sent` : null;
+      },
+    },
+    {
+      // Database only: no Graph call.
+      name: 'queueEmpty',
+      intervalMs: 60 * 60 * 1000,
+      run: async ({ now }) => {
+        const told = await notifyEmptyQueues(now);
+        return told > 0 ? `${told} Page(s) ran out of scheduled posts` : null;
       },
     },
   ];

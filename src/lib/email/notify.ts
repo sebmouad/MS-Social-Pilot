@@ -11,6 +11,7 @@ import {
   connectionExpiredEmail,
   inboxDigestEmail,
   publishFailureEmail,
+  queueEmptyEmail,
   tokenExpiringEmail,
 } from './templates';
 
@@ -26,10 +27,10 @@ import {
  * problem must not undo either.
  */
 
-type Preference = 'onPublishFailure' | 'onTokenExpiry' | 'onApprovalRequest' | 'onApprovalDecision';
+type Preference = 'onPublishFailure' | 'onTokenExpiry' | 'onApprovalRequest' | 'onApprovalDecision' | 'onQueueEmpty';
 
 /** Events a member can switch off for one Page (`NotificationMute.event`). */
-export const PAGE_EVENTS = ['publishFailure', 'newInbox'] as const;
+export const PAGE_EVENTS = ['publishFailure', 'newInbox', 'queueEmpty'] as const;
 export type PageEvent = (typeof PAGE_EVENTS)[number];
 
 interface Recipient {
@@ -372,4 +373,64 @@ export async function sendInboxDigests(now: Date = new Date()): Promise<number> 
     }, 'inbox digest');
   }
   return sent;
+}
+
+/**
+ * Pages whose queue ran dry: a Page that had a post scheduled ahead the last
+ * time the worker looked, and now has none. Told once per time it runs dry
+ * (filling it again re-arms it), to the members who schedule — owners,
+ * admins and editors — who may see the Page and did not mute it.
+ *
+ * Database only, no Graph calls. Facebook-held posts count: they are
+ * scheduled posts like any other.
+ */
+export async function notifyEmptyQueues(now: Date = new Date()): Promise<number> {
+  const pages = await prisma.target.findMany({
+    where: { enabled: true },
+    select: { id: true, name: true, workspaceId: true, queueFilledAt: true, queueEmptyNotifiedAt: true },
+  });
+  if (pages.length === 0) return 0;
+
+  const ahead = await prisma.postTarget.findMany({
+    where: { targetId: { in: pages.map((page) => page.id) }, post: { status: 'scheduled', scheduledAt: { gt: now } } },
+    select: { targetId: true },
+    distinct: ['targetId'],
+  });
+  const filled = new Set(ahead.map((row) => row.targetId));
+
+  // Seen with posts ahead: remember it, which arms the next notice.
+  if (filled.size > 0) {
+    await prisma.target.updateMany({ where: { id: { in: [...filled] } }, data: { queueFilledAt: now } });
+  }
+
+  let told = 0;
+  for (const page of pages) {
+    if (filled.has(page.id) || !page.queueFilledAt) continue;
+    if (page.queueEmptyNotifiedAt && page.queueEmptyNotifiedAt >= page.queueFilledAt) continue;
+    await safely(async () => {
+      // Claimed first, so two workers never send it twice.
+      const { count } = await prisma.target.updateMany({
+        where: { id: page.id, queueEmptyNotifiedAt: page.queueEmptyNotifiedAt },
+        data: { queueEmptyNotifiedAt: now },
+      });
+      if (count === 0) return;
+      const workspace = await prisma.workspace.findUnique({ where: { id: page.workspaceId }, select: { name: true } });
+      if (!workspace) return;
+      const recipients = await recipientsFor(page.workspaceId, 'onQueueEmpty', {
+        roles: [WorkspaceRole.owner, WorkspaceRole.admin, WorkspaceRole.editor],
+        page: { targetId: page.id, event: 'queueEmpty' },
+      });
+      for (const recipient of recipients) {
+        const rendered = queueEmptyEmail({
+          locale: recipient.locale,
+          workspace: workspace.name,
+          page: page.name,
+          targetId: page.id,
+        });
+        await sendEmail({ to: recipient.email, template: 'queueEmpty', workspaceId: page.workspaceId, ...rendered });
+      }
+      told += 1;
+    }, 'queue empty');
+  }
+  return told;
 }

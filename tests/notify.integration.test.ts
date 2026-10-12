@@ -340,3 +340,55 @@ describe('the hourly inbox email', () => {
     expect(await notify.sendInboxDigests()).toBe(0);
   });
 });
+
+describe('a Page that runs out of scheduled posts', () => {
+  async function schedule(workspaceId: string, authorId: string, targetId: string, at: Date) {
+    return prisma.post.create({
+      data: { workspaceId, authorId, message: 'Next', status: 'scheduled', scheduledAt: at, targets: { create: { targetId } } },
+    });
+  }
+
+  it('tells those who schedule once when it runs dry, and again only after it filled', async () => {
+    const workspace = await seedWorkspace();
+    const owner = await addMember(workspace.id, WorkspaceRole.owner);
+    const editor = await addMember(workspace.id, WorkspaceRole.editor);
+    await addMember(workspace.id, WorkspaceRole.contributor);
+    const { target } = await addPage(workspace.id, owner.id);
+    const never = await addPage(workspace.id, owner.id, 'Never Scheduled');
+
+    const post = await schedule(workspace.id, owner.id, target.id, new Date('2026-08-01T12:00:00Z'));
+    expect(await notify.notifyEmptyQueues(new Date('2026-08-01T10:00:00Z'))).toBe(0);
+
+    // The post went out: nothing ahead any more.
+    await prisma.post.update({ where: { id: post.id }, data: { status: 'published' } });
+    expect(await notify.notifyEmptyQueues(new Date('2026-08-01T13:00:00Z'))).toBe(1);
+    expect(await recipients(workspace.id)).toEqual([editor.email, owner.email].sort());
+    const log = await prisma.emailLog.findFirstOrThrow({ where: { template: 'queueEmpty' } });
+    expect(log.subject).toBe('Client Page has nothing scheduled any more');
+
+    // Still empty an hour later: no second email. The Page never scheduled stays quiet.
+    expect(await notify.notifyEmptyQueues(new Date('2026-08-01T14:00:00Z'))).toBe(0);
+    expect(await prisma.target.findUniqueOrThrow({ where: { id: never.target.id } })).toMatchObject({ queueEmptyNotifiedAt: null });
+
+    // Filled and emptied again: told again.
+    const next = await schedule(workspace.id, owner.id, target.id, new Date('2026-08-02T12:00:00Z'));
+    expect(await notify.notifyEmptyQueues(new Date('2026-08-01T15:00:00Z'))).toBe(0);
+    await prisma.post.update({ where: { id: next.id }, data: { status: 'cancelled' } });
+    expect(await notify.notifyEmptyQueues(new Date('2026-08-01T16:00:00Z'))).toBe(1);
+  });
+
+  it('skips members who muted the Page or switched it off', async () => {
+    const workspace = await seedWorkspace();
+    const owner = await addMember(workspace.id, WorkspaceRole.owner);
+    const admin = await addMember(workspace.id, WorkspaceRole.admin);
+    const { target } = await addPage(workspace.id, owner.id);
+    await prisma.notificationMute.create({ data: { userId: owner.id, targetId: target.id, event: 'queueEmpty' } });
+    await prisma.notificationSetting.create({ data: { userId: admin.id, workspaceId: workspace.id, onQueueEmpty: false } });
+
+    const post = await schedule(workspace.id, owner.id, target.id, new Date('2026-08-01T12:00:00Z'));
+    await notify.notifyEmptyQueues(new Date('2026-08-01T10:00:00Z'));
+    await prisma.post.update({ where: { id: post.id }, data: { status: 'published' } });
+    expect(await notify.notifyEmptyQueues(new Date('2026-08-01T13:00:00Z'))).toBe(1);
+    expect(await recipients(workspace.id)).toEqual([]);
+  });
+});

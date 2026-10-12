@@ -237,6 +237,24 @@ export function connectionExpiredEmail(options: {
   return { subject: t('email.connectionExpired.subject', { account: options.account }), ...block };
 }
 
+export function queueEmptyEmail(options: {
+  locale: Locale;
+  workspace: string;
+  page: string;
+  targetId: string;
+}): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) => translate(options.locale, key, params);
+
+  const block = layout({
+    heading: t('email.queueEmpty.heading'),
+    body: t('email.queueEmpty.body', { page: options.page }),
+    cta: { label: t('email.queueEmpty.cta'), url: `${env.appUrl}/compose?to=${options.targetId}` },
+    footer: t('email.footer', { workspace: options.workspace }),
+  });
+
+  return { subject: t('email.queueEmpty.subject', { page: options.page }), ...block };
+}
+
 export function tokenExpiringEmail(options: {
   locale: Locale;
   workspace: string;

@@ -45,7 +45,9 @@ It changes only the team's shared state in this app, never Facebook.
 Notifications about one Page (failed post, hourly inbox email) go only to
 members who may see that Page and did not mute it there. Before 2026-10-12 a
 failed-post email went to every member of the workspace. Each member sets
-their own mutes; nobody sets them for someone else.
+their own mutes; nobody sets them for someone else. The "nothing scheduled
+any more" email goes only to owners, admins and editors (the roles that
+schedule), under the same Page rules; contributors do not get it.
 
 Plus **Page scope** per member: a member sees and acts only on the Pages they
 are given (`auth.pageScope`, applied by `loadPageFilter`). Every action is

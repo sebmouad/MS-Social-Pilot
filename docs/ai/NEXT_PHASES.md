@@ -363,8 +363,12 @@ Each verified missing in our code on 2026-10-11:
   `firstSeenAt` (when the sync first stored them), skips the Page's own and
   ones already marked done, and is claimed per member so two workers never
   send it twice. Failure emails now also skip members who may not see the
-  Page. Still to do: queue empty, draft updated (weekly summary is the
-  scheduled report).
+  Page. **Queue empty done 2026-10-12:** hourly job `queueEmpty` (database
+  only) emails owners, admins and editors once when a Page that had a post
+  scheduled ahead has none left (`Target.queueFilledAt` /
+  `queueEmptyNotifiedAt`; filling it again re-arms it; a Page never
+  scheduled stays quiet); on by default (`onQueueEmpty`), mutable per Page.
+  Still to do: draft updated (weekly summary is the scheduled report).
 - **First day of week** workspace setting (calendar, week view, reports).
   **Done 2026-10-12:** `Workspace.weekStartsOn` (0 Sunday … 6 Saturday,
   default Monday), chosen in Settings (Monday · Sunday · Saturday); month and
