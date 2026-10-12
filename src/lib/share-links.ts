@@ -27,6 +27,8 @@ export const shareLinkSchema = z.object({
   daysBack: z.number().int().min(0).max(90).default(7),
   daysAhead: z.number().int().min(1).max(120).default(30),
   allowComments: z.boolean().default(true),
+  decides: z.boolean().default(false),
+  publishAnywayHours: z.number().int().min(1).max(168).nullish(),
 });
 
 export const decisionSchema = z.object({
@@ -61,6 +63,8 @@ export async function createShareLink(
       daysBack: input.daysBack,
       daysAhead: input.daysAhead,
       allowComments: input.allowComments,
+      decides: input.decides,
+      publishAnywayHours: input.decides ? (input.publishAnywayHours ?? null) : null,
     },
   });
   return { id: link.id, url: shareUrl(token) };
@@ -83,4 +87,33 @@ export function sharedPostWhere(link: { workspaceId: string; pageIds: string[] }
     workspaceId: link.workspaceId,
     ...(link.pageIds.length ? { targets: { some: { targetId: { in: link.pageIds } } } } : {}),
   };
+}
+
+/** A link that decides may only settle posts that go to its Pages alone. */
+export function coversEveryTarget(link: { pageIds: string[] }, targetIds: string[]): boolean {
+  return link.pageIds.length === 0 || targetIds.every((id) => link.pageIds.includes(id));
+}
+
+/**
+ * "Publish anyway" (NEXT_PHASES A5): posts a deciding link still holds this
+ * many hours before their time are approved, as the agency chose for that
+ * client. Database only; the publish job sends them on time.
+ */
+export async function approveUnanswered(now: Date): Promise<number> {
+  const { approvePost, IN_APPROVAL_QUEUE } = await import('./approvals');
+  const links = await prisma.shareLink.findMany({ where: { decides: true, publishAnywayHours: { not: null }, revokedAt: null } });
+  let approved = 0;
+  for (const row of links) {
+    const link = { ...row, pageIds: parseTargetIds(row.targetIds) };
+    const posts = await prisma.post.findMany({
+      where: { ...sharedPostWhere(link), ...IN_APPROVAL_QUEUE, scheduledAt: { not: null, lte: new Date(now.getTime() + row.publishAnywayHours! * 3_600_000) } },
+      select: { id: true, targets: { select: { targetId: true } } },
+    });
+    for (const post of posts) {
+      if (!coversEveryTarget(link, post.targets.map((target) => target.targetId))) continue;
+      await approvePost({ workspaceId: row.workspaceId, postId: post.id, reviewerId: row.createdById, reviewerRole: 'owner', viaLink: { title: row.title, authorName: 'no answer' } }).catch(() => null);
+      approved++;
+    }
+  }
+  return approved;
 }

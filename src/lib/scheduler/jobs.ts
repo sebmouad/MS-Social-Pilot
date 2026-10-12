@@ -28,6 +28,7 @@ import { deliverDueWebhooks } from '../webhooks';
 import { runContentMix } from '../content-mix';
 import { watchNegativeComments } from '../negative-comments';
 import { refreshTrends } from '../trends';
+import { approveUnanswered } from '../share-links';
 
 /**
  * The worker's job set.
@@ -64,7 +65,8 @@ export type JobName =
   | 'alerts'
   | 'exports'
   | 'holidays'
-  | 'webhooks';
+  | 'webhooks'
+  | 'clientDeadlines';
 
 export interface JobContext {
   now: Date;
@@ -748,6 +750,15 @@ export function jobDefinitions(): JobDefinition[] {
       run: async ({ now }) => {
         const { read, alerted } = await watchNegativeComments(now);
         return read + alerted > 0 ? `${read} comment mood(s) read, ${alerted} alert(s)` : null;
+      },
+    },
+    {
+      // Database only: approves what a client left unanswered, when their link says so (A5).
+      name: 'clientDeadlines',
+      intervalMs: 5 * 60 * 1000,
+      run: async ({ now }) => {
+        const approved = await approveUnanswered(now);
+        return approved > 0 ? `${approved} unanswered post(s) approved` : null;
       },
     },
     {

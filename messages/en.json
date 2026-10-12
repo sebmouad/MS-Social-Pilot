@@ -2460,7 +2460,10 @@
     "daysAhead": "Days ahead",
     "allowComments": "Let the client write comments",
     "kind_portal": "Client portal",
-    "kindHint_portal": "Everything in one link: posts to approve, the calendar, and each channel’s results."
+    "kindHint_portal": "Everything in one link: posts to approve, the calendar, and each channel’s results.",
+    "decides": "The client’s answer decides: approving or rejecting here approves or rejects the post",
+    "publishAnyway": "If the client has not answered, approve the post anyway this many hours before it goes out",
+    "publishAnywayHours": "Hours before"
   },
   "apiKeys": {
     "title": "API & Claude",

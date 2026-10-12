@@ -1629,6 +1629,10 @@ model ShareLink {
   daysBack      Int       @default(7)
   daysAhead     Int       @default(30)
   allowComments Boolean   @default(true)
+  /// The client's answer approves or rejects the post, instead of only advising the team.
+  decides       Boolean   @default(false)
+  /// With `decides`: posts still unanswered this many hours before their time are approved anyway. Null = never.
+  publishAnywayHours Int?
   revokedAt     DateTime?
   createdById   String
   createdAt     DateTime  @default(now())

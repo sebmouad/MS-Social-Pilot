@@ -2460,7 +2460,10 @@
     "daysAhead": "Jours à venir",
     "allowComments": "Autoriser les commentaires du client",
     "kind_portal": "Espace client",
-    "kindHint_portal": "Tout dans un lien : publications à valider, calendrier et résultats de chaque canal."
+    "kindHint_portal": "Tout dans un lien : publications à valider, calendrier et résultats de chaque canal.",
+    "decides": "La réponse du client décide : valider ou refuser ici valide ou refuse la publication",
+    "publishAnyway": "Sans réponse du client, valider quand même la publication ce nombre d’heures avant sa sortie",
+    "publishAnywayHours": "Heures avant"
   },
   "apiKeys": {
     "title": "API et Claude",

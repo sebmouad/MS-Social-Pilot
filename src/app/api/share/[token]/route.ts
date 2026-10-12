@@ -3,7 +3,8 @@ import { clientIp } from '@/lib/client-ip';
 import { AppError } from '@/lib/errors';
 import { prisma } from '@/lib/prisma';
 import { hit } from '@/lib/rate-limit';
-import { decisionSchema, openShareLink, sharedPostWhere } from '@/lib/share-links';
+import { approvePost, rejectPost } from '@/lib/approvals';
+import { coversEveryTarget, decisionSchema, openShareLink, sharedPostWhere } from '@/lib/share-links';
 import { ok, readJson, route } from '@/lib/api';
 
 const LIMIT = { limit: 30, windowMs: 10 * 60 * 1000 };
@@ -33,8 +34,17 @@ export const POST = route(async (request: Request, context: { params: Promise<{ 
   if (!link.allowComments && input.comment) {
     throw new AppError({ key: 'errors.commentsOff', fallback: 'Comments are switched off for this link.', status: 422 });
   }
-  const post = await prisma.post.findFirst({ where: { id: input.postId, ...sharedPostWhere(link) }, select: { id: true } });
+  const post = await prisma.post.findFirst({ where: { id: input.postId, ...sharedPostWhere(link) }, select: { id: true, targets: { select: { targetId: true } } } });
   if (!post) throw new AppError({ key: 'errors.notFound', fallback: 'Not found.', status: 404 });
+
+  // A link that decides settles the post itself, when it covers every Page
+  // the post goes to; otherwise the answer stays advice for the team.
+  if (link.decides && input.decision !== 'comment' && coversEveryTarget(link, post.targets.map((row) => row.targetId))) {
+    const viaLink = { title: link.title, authorName: input.authorName };
+    const settle = { workspaceId: link.workspaceId, postId: post.id, reviewerId: link.createdById, reviewerRole: 'owner' as const, viaLink };
+    if (input.decision === 'approved') await approvePost(settle);
+    else await rejectPost({ ...settle, note: input.comment ?? input.authorName });
+  }
 
   const decision = await prisma.reviewDecision.create({
     data: {

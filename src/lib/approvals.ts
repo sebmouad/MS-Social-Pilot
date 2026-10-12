@@ -175,8 +175,10 @@ export async function approvePost(options: {
   postId: string;
   reviewerId: string;
   reviewerRole: WorkspaceRole;
+  /** Answered by a client through a review link that decides (NEXT_PHASES A5). */
+  viaLink?: { title: string; authorName: string };
 }): Promise<ApproveResult> {
-  if (!canApprove(options.reviewerRole)) throw errors.noPermission();
+  if (!options.viaLink && !canApprove(options.reviewerRole)) throw errors.noPermission();
 
   const post = await prisma.post.findFirst({
     where: { id: options.postId, workspaceId: options.workspaceId },
@@ -195,7 +197,9 @@ export async function approvePost(options: {
     });
   }
 
-  const reviewer = await prisma.user.findUniqueOrThrow({ where: { id: options.reviewerId } });
+  const reviewer = options.viaLink
+    ? { name: options.viaLink.authorName }
+    : await prisma.user.findUniqueOrThrow({ where: { id: options.reviewerId } });
 
   // A post with no time set has nothing for the scheduler to act on, so
   // approving it returns it to draft rather than to a scheduled state it
@@ -239,7 +243,7 @@ export async function approvePost(options: {
   await logActivity(
     options.workspaceId,
     'post.approved',
-    nativeFallback ? { postId: options.postId, nativeFallback } : { postId: options.postId },
+    { postId: options.postId, ...(nativeFallback ? { nativeFallback } : {}), ...(options.viaLink ? { viaLink: options.viaLink.title, by: options.viaLink.authorName } : {}) },
     options.reviewerId,
   );
 
@@ -251,9 +255,11 @@ export async function rejectPost(options: {
   postId: string;
   reviewerId: string;
   reviewerRole: WorkspaceRole;
+  /** Answered by a client through a review link that decides (NEXT_PHASES A5). */
+  viaLink?: { title: string; authorName: string };
   note: string;
 }): Promise<void> {
-  if (!canApprove(options.reviewerRole)) throw errors.noPermission();
+  if (!options.viaLink && !canApprove(options.reviewerRole)) throw errors.noPermission();
 
   const post = await prisma.post.findFirst({
     where: { id: options.postId, workspaceId: options.workspaceId },
@@ -272,7 +278,9 @@ export async function rejectPost(options: {
     });
   }
 
-  const reviewer = await prisma.user.findUniqueOrThrow({ where: { id: options.reviewerId } });
+  const reviewer = options.viaLink
+    ? { name: options.viaLink.authorName }
+    : await prisma.user.findUniqueOrThrow({ where: { id: options.reviewerId } });
 
   await prisma.post.update({
     where: { id: options.postId },
@@ -299,7 +307,7 @@ export async function rejectPost(options: {
   await logActivity(
     options.workspaceId,
     'post.rejected',
-    { postId: options.postId, note: options.note },
+    { postId: options.postId, note: options.note, ...(options.viaLink ? { viaLink: options.viaLink.title, by: options.viaLink.authorName } : {}) },
     options.reviewerId,
   );
 }

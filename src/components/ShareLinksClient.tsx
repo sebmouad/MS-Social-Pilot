@@ -29,9 +29,11 @@ interface Draft {
   daysBack: number;
   daysAhead: number;
   allowComments: boolean;
+  decides: boolean;
+  publishAnywayHours: number | null;
 }
 
-const EMPTY: Draft = { kind: 'portal', title: '', description: '', targetIds: [], daysBack: 7, daysAhead: 30, allowComments: true };
+const EMPTY: Draft = { kind: 'portal', title: '', description: '', targetIds: [], daysBack: 7, daysAhead: 30, allowComments: true, decides: false, publishAnywayHours: null };
 
 export function ShareLinksClient({
   links,
@@ -266,6 +268,31 @@ export function ShareLinksClient({
                     onChange={(event) => setDraft({ ...draft, allowComments: event.target.checked })}
                   />
                   {t('allowComments')}
+                </label>
+              )}
+              {draft.kind !== 'calendar' && (
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                    checked={draft.decides}
+                    onChange={(event) => setDraft({ ...draft, decides: event.target.checked, publishAnywayHours: event.target.checked ? draft.publishAnywayHours : null })}
+                  />
+                  {t('decides')}
+                </label>
+              )}
+              {draft.kind !== 'calendar' && draft.decides && (
+                <label className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                    checked={draft.publishAnywayHours !== null}
+                    onChange={(event) => setDraft({ ...draft, publishAnywayHours: event.target.checked ? 24 : null })}
+                  />
+                  {t('publishAnyway')}
+                  {draft.publishAnywayHours !== null && (
+                    <input type="number" min={1} max={168} aria-label={t('publishAnywayHours')} className="input w-20" value={draft.publishAnywayHours} onChange={(event) => setDraft({ ...draft, publishAnywayHours: Math.min(168, Math.max(1, Number(event.target.value) || 1)) })} />
+                  )}
                 </label>
               )}
             </div>

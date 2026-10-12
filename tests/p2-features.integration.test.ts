@@ -81,6 +81,7 @@ describe('client links', () => {
       daysBack: 7,
       daysAhead: 30,
       allowComments: true,
+      decides: false,
     });
     const token = made.url.split('/share/')[1]!;
     const link = await share.openShareLink(token);
