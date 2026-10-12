@@ -1492,7 +1492,8 @@
     "trends": "Trending",
     "comments": "Comments",
     "reviews": "Reviews",
-    "responseTime": "Response time"
+    "responseTime": "Response time",
+    "agency": "Agency"
   },
   "notifications": {
     "title": "Notifications",
@@ -4042,5 +4043,24 @@
     "back": "Back",
     "finish": "Go to the dashboard",
     "connectPages": "Connect channels"
+  },
+  "agency": {
+    "title": "Agency",
+    "subtitle": "Every client you own, and who on your team works on which.",
+    "ownersOnly": "This screen is for workspace owners. You do not own a workspace.",
+    "clients": "{count, plural, one {# client} other {# clients}}",
+    "channels": "{count, plural, one {# channel} other {# channels}}",
+    "scheduled": "{count, plural, one {# scheduled post} other {# scheduled posts}}",
+    "open": "Open",
+    "current": "Open now",
+    "access": "Team access",
+    "accessHint": "Choose a role for each person in each client, or “No access”. To add someone new, invite them from a client’s Team screen first.",
+    "noTeam": "Nobody else is on your team yet. Invite people from a client’s Team screen, then give them access to other clients here.",
+    "person": "Person",
+    "noAccess": "No access",
+    "roleFor": "{name}’s role in {client}",
+    "granted": "{name} is now {role} in {client}.",
+    "removed": "{name} no longer has access to {client}.",
+    "failed": "That did not work. Try again."
   }
 }

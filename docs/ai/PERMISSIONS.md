@@ -270,3 +270,13 @@ root's own. An account that is the only owner of a workspace cannot be deleted
 until the workspace has another owner or is deleted; its posts stay, credited
 to root. Each action is logged in Root › Activity. Code: `src/lib/root.ts`
 (`createWorkspaceAsRoot`, `deleteWorkspaceAsRoot`, `deleteUserAsRoot`).
+
+## Agency access (owner request A7, 2026-10-12)
+
+Workspace owners get an Agency screen (`/agency`): every workspace they own,
+side by side, and a grid of people × clients. From it an owner can give a
+person who is already on one of their workspaces a role (admin, editor,
+contributor or viewer) in another workspace they own, change it, or remove it.
+It never adds strangers (they are still invited from Team), never touches owner
+or client memberships, and goes through the same `changeRole` / `removeMember`
+rules and plan seat limits as the Team screen.

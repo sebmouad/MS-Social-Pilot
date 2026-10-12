@@ -58,6 +58,7 @@ const VIEWER_HIDDEN: Rule[] = [
   { path: '/inbox/replies' },
   { path: '/inbox/rules' },
   { path: '/settings/sharing' },
+  { path: '/agency' },
 ];
 
 const READS = new Set(['GET', 'HEAD', 'OPTIONS']);

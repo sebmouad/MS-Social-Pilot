@@ -1492,7 +1492,8 @@
     "trends": "Tendances",
     "comments": "Commentaires",
     "reviews": "Avis",
-    "responseTime": "Temps de réponse"
+    "responseTime": "Temps de réponse",
+    "agency": "Agence"
   },
   "notifications": {
     "title": "Notifications",
@@ -4042,5 +4043,24 @@
     "back": "Retour",
     "finish": "Aller au tableau de bord",
     "connectPages": "Connecter des canaux"
+  },
+  "agency": {
+    "title": "Agence",
+    "subtitle": "Tous les clients que vous possédez, et qui dans votre équipe travaille sur lesquels.",
+    "ownersOnly": "Cet écran est réservé aux propriétaires d’espace. Vous ne possédez aucun espace.",
+    "clients": "{count, plural, one {# client} other {# clients}}",
+    "channels": "{count, plural, one {# canal} other {# canaux}}",
+    "scheduled": "{count, plural, one {# publication programmée} other {# publications programmées}}",
+    "open": "Ouvrir",
+    "current": "Ouvert",
+    "access": "Accès de l’équipe",
+    "accessHint": "Choisissez un rôle pour chaque personne dans chaque client, ou « Aucun accès ». Pour ajouter quelqu’un, invitez-le d’abord depuis l’écran Équipe d’un client.",
+    "noTeam": "Personne d’autre n’est encore dans votre équipe. Invitez des personnes depuis l’écran Équipe d’un client, puis donnez-leur accès aux autres clients ici.",
+    "person": "Personne",
+    "noAccess": "Aucun accès",
+    "roleFor": "Rôle de {name} dans {client}",
+    "granted": "{name} est maintenant {role} dans {client}.",
+    "removed": "{name} n’a plus accès à {client}.",
+    "failed": "Cela n’a pas fonctionné. Réessayez."
   }
 }
