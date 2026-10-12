@@ -71,6 +71,7 @@ const BODY: Record<string, unknown> = {
   'snippets/[id]': { name: 'Hijacked', body: 'x' },
   'feeds/[id]': { enabled: false },
   'moderation/rules/[id]': { enabled: false },
+  'saved-replies/[id]': { name: 'Hijacked' },
   'chat-channels/[id]': { enabled: false },
   'connections/instagram/[id]': { enabled: false },
   'connections/ads/[id]': { enabled: false },
@@ -133,6 +134,7 @@ beforeAll(async () => {
   });
   const instagram = await prisma.instagramAccount.create({ data: { workspaceId: w, igUserId: 'ig-a', username: 'a' } });
   const ads = await prisma.adAccount.create({ data: { workspaceId: w, actId: 'act_a', name: 'A ads' } });
+  const savedReply = await prisma.savedReply.create({ data: { workspaceId: w, name: 'A reply', body: 'x' } });
   const rule = await prisma.moderationRule.create({ data: { workspaceId: w, name: 'A rule', match: 'links', action: 'hide' } });
   const moderated = await prisma.moderationAction.create({
     data: { workspaceId: w, ruleId: rule.id, ruleName: 'A rule', targetId: target.id, remoteCommentId: 'c-a', message: 'x', action: 'hide' },
@@ -154,6 +156,7 @@ beforeAll(async () => {
     'media/[id]': media.id,
     'media/[id]/raw': media.id,
     'moderation/rules/[id]': rule.id,
+    'saved-replies/[id]': savedReply.id,
     'moderation/actions/[id]/undo': moderated.id,
     'page-groups/[id]': group.id,
     'report-schedules/[id]': schedule.id,
@@ -182,7 +185,7 @@ afterAll(async () => {
 /** Everything A owns, as a fingerprint: counts and the fields a hijack would change. */
 async function snapshot() {
   const w = A.workspace;
-  const [posts, targets, labels, groups, snippets, feeds, rules, moderated, shares, tokens, chats, templates, schedules, members, media] = await Promise.all([
+  const [posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, shares, tokens, chats, templates, schedules, members, media] = await Promise.all([
     prisma.post.findMany({ where: { workspaceId: w }, select: { id: true, message: true, status: true } }),
     prisma.target.findMany({ where: { workspaceId: w }, select: { id: true, enabled: true, name: true } }),
     prisma.label.findMany({ where: { workspaceId: w }, select: { id: true, name: true } }),
@@ -190,6 +193,7 @@ async function snapshot() {
     prisma.snippet.findMany({ where: { workspaceId: w }, select: { id: true, name: true } }),
     prisma.feedSource.findMany({ where: { workspaceId: w }, select: { id: true, enabled: true } }),
     prisma.moderationRule.findMany({ where: { workspaceId: w }, select: { id: true, enabled: true } }),
+    prisma.savedReply.findMany({ where: { workspaceId: w }, select: { id: true, name: true } }),
     prisma.moderationAction.findMany({ where: { workspaceId: w }, select: { id: true, undoneAt: true } }),
     prisma.shareLink.findMany({ where: { workspaceId: w }, select: { id: true } }),
     prisma.apiToken.findMany({ where: { workspaceId: w }, select: { id: true } }),
@@ -199,7 +203,7 @@ async function snapshot() {
     prisma.membership.findMany({ where: { workspaceId: w }, select: { id: true, role: true } }),
     prisma.media.findMany({ where: { workspaceId: w }, select: { id: true } }),
   ]);
-  return { posts, targets, labels, groups, snippets, feeds, rules, moderated, shares, tokens, chats, templates, schedules, members, media };
+  return { posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, shares, tokens, chats, templates, schedules, members, media };
 }
 
 describe("another client's owner", () => {

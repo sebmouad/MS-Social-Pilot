@@ -9,6 +9,7 @@ import { useConfirm } from './ConfirmProvider';
 import { Icon } from './Icon';
 import { FeedAvatar } from './FeedPost';
 import { EmptyState } from './EmptyState';
+import { useSavedReplies } from './SavedReplies';
 
 export interface CommentView {
   id: string;
@@ -239,29 +240,16 @@ export function CommentsPanel({
                       {canModerate && replyTo === comment.id && (
                         // Facebook's reply box: a rounded field under the
                         // comment, answered as the Page.
-                        <div className="mt-2 flex items-end gap-2">
-                          <textarea
-                            className="input min-h-[40px] flex-1 resize-y rounded-2xl bg-slate-100 py-2"
-                            aria-label={t('replyToLabel', { author: comment.author })}
-                            value={replyText}
-                            onChange={(event) => setReplyText(event.target.value)}
-                            placeholder={t('replyPlaceholder')}
-                            rows={1}
-                          />
-                          <button
-                            type="button"
-                            className="btn-primary rounded-full"
-                            disabled={busy === comment.id || replyText.trim().length === 0}
-                            onClick={() =>
-                              act(
-                                { action: 'reply', commentId: comment.id, message: replyText.trim() },
-                                comment.id,
-                              )
-                            }
-                          >
-                            {busy === comment.id ? tCommon('working') : t('sendReply')}
-                          </button>
-                        </div>
+                        <CommentReplyBox
+                          author={comment.author}
+                          page={comment.targetName}
+                          value={replyText}
+                          setValue={setReplyText}
+                          busy={busy === comment.id}
+                          onSend={() =>
+                            act({ action: 'reply', commentId: comment.id, message: replyText.trim() }, comment.id)
+                          }
+                        />
                       )}
                     </div>
                   </li>
@@ -271,6 +259,48 @@ export function CommentsPanel({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** The reply box under one comment, with saved replies (`/`). */
+function CommentReplyBox({
+  author,
+  page,
+  value,
+  setValue,
+  busy,
+  onSend,
+}: {
+  author: string;
+  page: string;
+  value: string;
+  setValue: (value: string) => void;
+  busy: boolean;
+  onSend: () => void;
+}) {
+  const t = useTranslations('engagement');
+  const tCommon = useTranslations('common');
+  const saved = useSavedReplies({ value, setValue, name: author, page });
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-end gap-2">
+        <textarea
+          className="input min-h-[40px] flex-1 resize-y rounded-2xl bg-slate-100 py-2"
+          aria-label={t('replyToLabel', { author })}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={saved.onKeyDown}
+          placeholder={t('replyPlaceholder')}
+          rows={1}
+        />
+        {saved.button}
+        <button type="button" className="btn-primary rounded-full" disabled={busy || value.trim().length === 0} onClick={onSend}>
+          {busy ? tCommon('working') : t('sendReply')}
+        </button>
+      </div>
+      {saved.panel}
     </div>
   );
 }

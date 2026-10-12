@@ -1364,7 +1364,8 @@
     "workspaceSettings": "Réglages de l’espace",
     "accountMenu": "Menu de votre compte",
     "yourAccount": "Votre compte",
-    "moderation": "Règles de modération"
+    "moderation": "Règles de modération",
+    "savedReplies": "Réponses enregistrées"
   },
   "notifications": {
     "title": "Notifications",
@@ -3002,5 +3003,28 @@
     "undoReplyConfirm": "Supprimer la réponse de la Page ?",
     "undoReplyBody": "La réponse est retirée de Facebook. Cette action est définitive.",
     "undoneOk": "C’est fait. Le journal l’indique comme annulé."
+  },
+  "savedReplies": {
+    "title": "Réponses enregistrées",
+    "intro": "Les réponses que votre équipe donne souvent, prêtes dans chaque zone de réponse aux commentaires et Messenger : tapez / dans la zone, ou utilisez le bouton Réponses enregistrées. Le prénom de la personne et le nom de la Page sont remplis pour vous.",
+    "noAccessTitle": "Seuls les éditeurs peuvent utiliser les réponses enregistrées",
+    "noAccessHint": "Les réponses enregistrées servent à ceux qui répondent aux commentaires et aux messages. Demandez à un administrateur si besoin.",
+    "add": "Ajouter une réponse enregistrée",
+    "emptyTitle": "Aucune réponse enregistrée",
+    "emptyHint": "Enregistrez les réponses que vous écrivez sans cesse (horaires, prix, comment commander) et envoyez-les en deux clics.",
+    "deleteConfirm": "Supprimer la réponse enregistrée « {name} » ?",
+    "formLabel": "Réponse enregistrée",
+    "name": "Nom",
+    "namePlaceholder": "Par exemple : Horaires d’ouverture",
+    "body": "Réponse",
+    "bodyHint": "Utilisez '{first_name}' pour le prénom de la personne et '{page}' pour le nom de la Page.",
+    "save": "Enregistrer la réponse",
+    "button": "Réponses enregistrées",
+    "hint": "Tapez / dans la zone de réponse pour chercher dans vos réponses enregistrées",
+    "loading": "Chargement des réponses enregistrées…",
+    "none": "Aucune réponse enregistrée.",
+    "noMatch": "Aucune réponse enregistrée ne correspond.",
+    "manage": "Gérer les réponses enregistrées",
+    "listLabel": "Réponses enregistrées"
   }
 }

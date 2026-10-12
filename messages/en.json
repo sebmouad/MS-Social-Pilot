@@ -1364,7 +1364,8 @@
     "workspaceSettings": "Workspace settings",
     "accountMenu": "Your account menu",
     "yourAccount": "Your account",
-    "moderation": "Moderation rules"
+    "moderation": "Moderation rules",
+    "savedReplies": "Saved replies"
   },
   "notifications": {
     "title": "Notifications",
@@ -3002,5 +3003,28 @@
     "undoReplyConfirm": "Delete the Page’s reply?",
     "undoReplyBody": "The reply is removed from Facebook. This cannot be undone.",
     "undoneOk": "Done. The log shows it as undone."
+  },
+  "savedReplies": {
+    "title": "Saved replies",
+    "intro": "Answers your team gives often, ready in every comment and Messenger reply box: type / in the box, or use the Saved replies button. The person’s first name and the Page name are filled in for you.",
+    "noAccessTitle": "Only editors can use saved replies",
+    "noAccessHint": "Saved replies are for the people who answer comments and messages. Ask an admin if you need to.",
+    "add": "Add a saved reply",
+    "emptyTitle": "No saved replies yet",
+    "emptyHint": "Save the answers you write again and again (opening hours, prices, how to order) and send them in two clicks.",
+    "deleteConfirm": "Delete the saved reply “{name}”?",
+    "formLabel": "Saved reply",
+    "name": "Name",
+    "namePlaceholder": "For example: Opening hours",
+    "body": "Reply",
+    "bodyHint": "Use '{first_name}' for the person’s first name and '{page}' for the Page name.",
+    "save": "Save reply",
+    "button": "Saved replies",
+    "hint": "Type / in the reply box to search your saved replies",
+    "loading": "Loading saved replies…",
+    "none": "No saved replies yet.",
+    "noMatch": "No saved reply matches.",
+    "manage": "Manage saved replies",
+    "listLabel": "Saved replies"
   }
 }

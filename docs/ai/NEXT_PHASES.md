@@ -532,9 +532,10 @@ most time), the rest after Phase D2. S/M/L = effort.
   *Done: `/inbox/rules`, applied by the comment sync (`src/lib/moderation.ts`);
   per Page or all Pages (groups: pick their Pages); real time waits for comment
   webhooks.*
-- **G8. Saved replies (S)** — reusable answers with variables (`{first_name}`,
+- **G8. Saved replies (S)** ✅ — reusable answers with variables (`{first_name}`,
   `{page}`) for comments and Messenger; shortcut `/` in the reply box; shared
-  per workspace.
+  per workspace. *Done: `/inbox/replies`; `/` or the button in every comment and
+  Messenger reply box; editor+ (`canModerateComments`).*
 - **G9. Caption A/B tests (M)** — two (or more) captions for the same content on
   comparable Pages or times; after N hours compare engagement rate per view;
   declare a winner only with enough views (show "not enough data" otherwise);

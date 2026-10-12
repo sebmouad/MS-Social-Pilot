@@ -45,8 +45,12 @@ test('a rule is created, paused and deleted', async ({ page }) => {
   await expect(page.getByText('Cheap followers at spam.example')).toBeVisible();
   await expect(page.getByText('Alert sent')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Add a rule' }).click();
   const form = page.getByRole('form', { name: 'Moderation rule' });
+  // Clicked again until the page has hydrated and the form opens.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Add a rule' }).click({ timeout: 2000 });
+    await expect(form).toBeVisible({ timeout: 2000 });
+  }).toPass();
   await form.getByLabel('Rule name').fill(RULE);
   await form.getByLabel('When a comment contains').selectOption('keywords');
   await form.getByLabel('Words to look for').fill('giveaway, free followers');

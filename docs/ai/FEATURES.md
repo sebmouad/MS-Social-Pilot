@@ -64,6 +64,10 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   one stream, newest first; filter by type and by open / done / all; "Mark done"
   is shared by the team and a new message from the other person reopens it;
   Reply opens the thread in Analytics. Dashboard shortcut shows the open count.
+- **Saved replies** `/inbox/replies` (editor+): the workspace's reusable answers;
+  in every comment and Messenger reply box, type `/` (filters by name or text,
+  Enter picks the first) or use the button; `{first_name}` and `{page}` are
+  filled in, then the text can be edited before sending.
 - **Moderation rules** `/inbox/rules` (editor+): rules for every Facebook Page or
   chosen Pages that look for links, phone numbers or keywords in new comments
   and hide them, alert the team (email, preference "moderation alert") or reply

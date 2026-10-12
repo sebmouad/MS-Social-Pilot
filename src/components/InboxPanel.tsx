@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import { Icon } from './Icon';
+import { useSavedReplies } from './SavedReplies';
 
 export interface ThreadView {
   id: string;
@@ -43,9 +44,12 @@ export interface ThreadView {
 export function InboxPanel({
   threads,
   canReply,
+  pageName,
 }: {
   threads: ThreadView[];
   canReply: boolean;
+  /** For `{page}` in saved replies. */
+  pageName: string;
 }) {
   const t = useTranslations('engagement');
   const tCommon = useTranslations('common');
@@ -57,6 +61,7 @@ export function InboxPanel({
   const [error, setError] = useState<string | null>(null);
 
   const thread = threads.find((entry) => entry.id === selected) ?? threads[0] ?? null;
+  const saved = useSavedReplies({ value: text, setValue: setText, name: thread?.participants ?? null, page: pageName });
 
   async function send(conversationId: string) {
     setBusy(conversationId);
@@ -185,10 +190,12 @@ export function InboxPanel({
                         aria-describedby={`reply-window-${thread.id}`}
                         value={text}
                         onChange={(event) => setText(event.target.value)}
+                        onKeyDown={saved.onKeyDown}
                         placeholder={t('replyPlaceholder')}
                         maxLength={2000}
                         rows={1}
                       />
+                      {saved.button}
                       <button
                         type="button"
                         className="btn-primary h-10 rounded-full"
@@ -198,6 +205,7 @@ export function InboxPanel({
                         {busy === thread.id ? tCommon('working') : t('sendReply')}
                       </button>
                     </div>
+                    {saved.panel}
                     <p className="hint" id={`reply-window-${thread.id}`}>
                       {t('replyWindowOpen', { until: thread.reply.untilLabel })}
                     </p>

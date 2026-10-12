@@ -59,6 +59,7 @@ export const SIGNED_IN_SCREENS = [
   '/approvals',
   '/inbox',
   '/inbox/rules',
+  '/inbox/replies',
   '/approvals?view=board',
   '/connections',
   '/accounts',

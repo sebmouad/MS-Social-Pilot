@@ -7,6 +7,7 @@ import { asGraphError } from './facebook/graph';
 import { notifyModerationAlert } from './email/notify';
 import { tokenFor } from './engagement';
 import { logActivity } from './scheduler/runner';
+import { fillReply } from './reply-template';
 
 /**
  * Comment moderation rules (NEXT_PHASES G7).
@@ -55,16 +56,7 @@ export function matchesRule(rule: Pick<ModerationRule, 'match' | 'keywords'>, te
   }
 }
 
-/** `{first_name}` and `{page}` in a reply, filled for one commenter. */
-export function fillReply(template: string, values: { name: string | null; page: string }): string {
-  const first = values.name?.trim().split(/\s+/)[0] ?? '';
-  return template
-    .replace(/\{\{?\s*first_name\s*\}?\}/g, first)
-    .replace(/\{\{?\s*page\s*\}?\}/g, values.page)
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\s+([,.!?])/g, '$1')
-    .trim();
-}
+export { fillReply };
 
 export interface IncomingComment {
   remoteId: string;

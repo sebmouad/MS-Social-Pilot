@@ -349,6 +349,7 @@ export default async function AnalyticsPage({
           canReply={canModerateComments(auth.role)}
           firstReadPending={!selected.firstReadAt}
           params={params}
+          pageName={selected.name}
         />
       )}
 
@@ -776,10 +777,12 @@ async function InboxView({
   canReply,
   firstReadPending,
   params,
+  pageName,
 }: {
   workspaceId: string;
   targetId: string;
   timezone: string;
+  pageName: string;
   canReply: boolean;
   firstReadPending: boolean;
   params: Record<string, string | string[] | undefined>;
@@ -814,6 +817,7 @@ async function InboxView({
 
       <InboxPanel
         canReply={canReply}
+        pageName={pageName}
         threads={conversations.map((thread) => ({
           id: thread.id,
           participants: thread.participants.join(', ') || t('unknownParticipant'),

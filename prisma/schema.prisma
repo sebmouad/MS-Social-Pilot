@@ -249,6 +249,7 @@ model Workspace {
   pageGroups           PageGroup[]
   labels               Label[]
   snippets             Snippet[]
+  savedReplies         SavedReply[]
   shareLinks           ShareLink[]
   reportTemplates      ReportTemplate[]
   reportSchedules      ReportSchedule[]
@@ -1302,6 +1303,22 @@ model Snippet {
 
   @@index([workspaceId])
   @@map("snippets")
+}
+
+/// A reusable answer for comments and Messenger (NEXT_PHASES G8), with
+/// `{first_name}` and `{page}` filled when it is picked. Shared per workspace.
+model SavedReply {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  body        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("saved_replies")
 }
 
 /// A link a client opens without an account: a review page where they approve,
