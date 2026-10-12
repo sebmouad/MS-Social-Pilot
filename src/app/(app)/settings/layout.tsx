@@ -17,7 +17,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <aside className="min-w-0 lg:sticky lg:top-6">
+      <aside className="min-w-0 lg:sticky lg:top-20">
         <p className="mb-2 hidden px-2 text-2xl font-bold text-slate-900 lg:block">{t('title')}</p>
         <SettingsNav showPermissions={canManageTeam(auth.role)} showHistory={canManageTeam(auth.role)} />
       </aside>

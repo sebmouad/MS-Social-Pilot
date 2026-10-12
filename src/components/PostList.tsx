@@ -246,7 +246,7 @@ export function PostList({
         <div
           role="toolbar"
           aria-label={tBulk('selected', { count: chosen.length })}
-          className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-lg ring-1 ring-slate-200"
+          className="sticky top-16 z-20 flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 shadow-lg ring-1 ring-slate-200"
           aria-busy={bulkBusy}
         >
           <span className="text-sm font-semibold text-slate-900">{tBulk('selected', { count: chosen.length })}</span>

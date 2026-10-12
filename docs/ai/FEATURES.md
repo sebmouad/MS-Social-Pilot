@@ -1,9 +1,13 @@
 # Feature inventory (screen by screen)
 
-Sidebar groups: **Home** · **Publishing** (Calendar, Queue, Posts, Approvals,
-RSS feeds) · **Analytics** (Pages, Reports, Ads) · **Workspace** (Connections,
-Client links, Settings). "New post" button at the top. Workspace (client)
-switcher at the top. Collapses to icons; drawer on phones.
+App shell (like Simplified): a narrow **icon rail** on the far left with the
+main areas — **Home** · **Publish** (Calendar, Queue, Posts, Approvals, RSS
+feeds; also the composer) · **Inbox** · **Analytics** (Pages, Reports) ·
+**Ads** · **Workspace** (Connections, Client links, Settings), Root at the
+bottom for root. Beside it the **sidebar** with the area's pages, the client
+switcher and "New post". A slim **top bar** holds utilities only: fold the
+sidebar (remembered), breadcrumb, workspace settings, account menu (your
+account, sign out). Phone: one drawer with every page, grouped.
 
 ## Home — `/dashboard`
 Getting-started checklist (connect, first post, queue, team, client link, Claude;

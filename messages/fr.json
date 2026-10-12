@@ -1300,7 +1300,18 @@
     "rootVisit": "Vous gérez {name} en tant que root. Chaque visite est journalisée.",
     "leaveVisit": "Quitter l’espace",
     "leaveVisitFailed": "Impossible de quitter l’espace de travail. Vérifiez votre connexion et réessayez.",
-    "inbox": "Boîte de réception"
+    "inbox": "Boîte de réception",
+    "rail_home": "Accueil",
+    "rail_publish": "Publier",
+    "rail_inbox": "Messages",
+    "rail_analyse": "Analyses",
+    "rail_ads": "Pubs",
+    "rail_workspace": "Espace",
+    "areas": "Rubriques principales",
+    "breadcrumb": "Vous êtes ici",
+    "workspaceSettings": "Réglages de l’espace",
+    "accountMenu": "Menu de votre compte",
+    "yourAccount": "Votre compte"
   },
   "notifications": {
     "title": "Notifications",

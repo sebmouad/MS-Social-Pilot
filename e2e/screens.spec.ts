@@ -138,3 +138,38 @@ test('the export menu closes on Escape and on a click elsewhere', async ({ page 
   await page.getByRole('heading', { level: 1 }).first().click();
   await expect(menu).toBeHidden();
 });
+
+test('the icon rail lists the areas, the sidebar the pages of the one in use', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, '/queue');
+
+  const rail = page.getByRole('navigation', { name: /main areas/i });
+  for (const name of [/^home$/i, /^publish$/i, /^inbox$/i, /^analytics$/i, /^workspace$/i]) {
+    await expect(rail.getByRole('link', { name })).toBeVisible();
+  }
+  await expect(rail.getByRole('link', { name: /^publish$/i })).toHaveAttribute('aria-current', 'true');
+
+  const sidebar = page.getByRole('banner').getByRole('navigation', { name: /^modules$/i });
+  await expect(sidebar.getByRole('link', { name: /^queue$/i })).toHaveAttribute('aria-current', 'page');
+  await expect(sidebar.getByRole('link', { name: /^reports$/i })).toHaveCount(0);
+
+  // The top bar says where you are; it holds utilities, not modules.
+  await expect(page.getByRole('navigation', { name: /you are here/i })).toContainText('Queue');
+
+  // Another area swaps the sidebar's pages.
+  await rail.getByRole('link', { name: /^analytics$/i }).click();
+  await expect(page).toHaveURL(/\/analytics/);
+  await expect(sidebar.getByRole('link', { name: /^reports$/i })).toBeVisible();
+
+  // Folding the sidebar keeps the rail and survives a reload.
+  await expect(async () => {
+    await page.getByRole('button', { name: /collapse sidebar/i }).click();
+    await expect(sidebar).toHaveCount(0, { timeout: 1_500 });
+  }).toPass();
+  await page.reload();
+  await expect(rail).toBeVisible();
+  await expect(page.getByRole('button', { name: /expand sidebar/i })).toBeVisible();
+  await page.getByRole('button', { name: /expand sidebar/i }).click();
+  await expect(sidebar).toBeVisible();
+});

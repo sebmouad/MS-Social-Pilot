@@ -1300,7 +1300,18 @@
     "rootVisit": "You are looking after {name} as root. Every visit is logged.",
     "leaveVisit": "Leave workspace",
     "leaveVisitFailed": "Could not leave the workspace. Check your connection and try again.",
-    "inbox": "Inbox"
+    "inbox": "Inbox",
+    "rail_home": "Home",
+    "rail_publish": "Publish",
+    "rail_inbox": "Inbox",
+    "rail_analyse": "Analytics",
+    "rail_ads": "Ads",
+    "rail_workspace": "Workspace",
+    "areas": "Main areas",
+    "breadcrumb": "You are here",
+    "workspaceSettings": "Workspace settings",
+    "accountMenu": "Your account menu",
+    "yourAccount": "Your account"
   },
   "notifications": {
     "title": "Notifications",

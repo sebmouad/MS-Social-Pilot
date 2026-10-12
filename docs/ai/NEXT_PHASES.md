@@ -410,7 +410,10 @@ The owner reviewed everything skipped after the full crawl and chose to
 out" below); don't propose it again unless the owner asks.
 
 **Design (do with Phase D):**
-- **App shell like Simplified: icon rail + module sidebar + top bar.** Far-left
+- ✅ (2026-10-12: rail Home · Publish · Inbox · Analytics · Ads · Workspace;
+  top bar = fold, breadcrumb, workspace settings, account menu. Search,
+  notifications and help join the top bar when those features exist.)
+  **App shell like Simplified: icon rail + module sidebar + top bar.** Far-left
   narrow icon rail for the main areas (Home, Publishing, Analytics, Inbox,
   Reports, Settings…), next to it the module sidebar with that area's pages, and
   a slim top utility bar (collapse sidebar, breadcrumb, search, notifications,
