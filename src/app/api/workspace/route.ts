@@ -32,6 +32,7 @@ export const PATCH = route(async (request: Request) => {
   assign('utmCampaignTemplate', input.utmCampaignTemplate);
   assign('shortenerEnabled', input.shortenerEnabled);
   assign('spamGapMinutes', input.spamGapMinutes);
+  assign('bestTimeMode', input.bestTimeMode);
   assign('aiEnabled', input.aiEnabled);
   assign('aiTone', input.aiTone);
   assign('aiBrandVoice', input.aiBrandVoice);

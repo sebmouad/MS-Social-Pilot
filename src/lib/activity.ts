@@ -34,6 +34,7 @@ export const ACTIVITY_ACTIONS = [
   'post.submitted',
   'post.updated',
   'post.withdrawn',
+  'queue.bestTimesAdded',
   'settings.changed',
   'team.invitationRevoked',
   'team.invited',

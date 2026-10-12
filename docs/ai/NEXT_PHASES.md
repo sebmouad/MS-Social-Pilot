@@ -544,9 +544,13 @@ most time), the rest after Phase D2. S/M/L = effort.
   fewer Pages each caption goes out a day apart; the `captionTests` worker job
   reads stored insights only (no extra Graph calls); `/analytics/tests`; "Add to
   Page voice" is admin+ (`canManageSettings`, like editing the voice).*
-- **G10. Best time per Page, automatically (S)** — weekly job recalculates each
+- **G10. Best time per Page, automatically (S)** ✅ — weekly job recalculates each
   Page's best hours from its own posts (existing heatmap) and proposes or
   applies queue slots (setting: suggest / apply); shows what changed.
+  *Done: Settings › "Best times per Page" (suggest / add every week); the
+  `bestTimes` job (database only, each workspace once a week via
+  `bestTimesRunAt`) adds up to two of a Page's own times a week, 14 at most;
+  the queue screen lists what was added in the last week; history logs it.*
 
 ### Content
 - **G11. AI translation (S, after 0.2)** — translate a post into each language

@@ -30,7 +30,9 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   awareness days (click → compose with a first line), labels filter, Pages column
   with show/hide/solo + ⋮ Page menu, "Plan with AI" (week of drafts).
 - **Queue** `/queue`: weekly slots (workspace or per Page), suggested times from
-  results, add-all-suggested, shuffle, clear (back to drafts).
+  results, add-all-suggested, shuffle, clear (back to drafts). With Settings ›
+  "Best times per Page" set to add, a weekly job adds each Page's best new
+  times as its own (two a week, 14 at most) and the screen lists what it added.
 - **Posts** `/posts`: status tabs, search, Page/label/group filters, export CSV;
   per post: edit, duplicate, publish now, retry, retry first comment, cancel
   (removes Facebook-held copies), **delete from Facebook** (published).

@@ -19,6 +19,8 @@ export interface WorkspaceOptions {
   shortenerEnabled: boolean;
   /** Spam-risk guard gap between Pages for the same content; 0 is off. */
   spamGapMinutes: number;
+  /** Best time per Page: show good times, or also add them to the queue weekly. */
+  bestTimeMode: 'suggest' | 'apply';
   aiEnabled: boolean;
   aiTone: string;
   aiBrandVoice: string;
@@ -191,6 +193,21 @@ export function SettingsClient({
             ))}
           </select>
           <p className="hint">{t('spamGapHint')}</p>
+        </div>
+        <div className="mt-4 sm:max-w-xs">
+          <label className="label" htmlFor="bestTimeMode">
+            {t('bestTimeMode')}
+          </label>
+          <select
+            id="bestTimeMode"
+            className="input"
+            value={settings.bestTimeMode}
+            onChange={(event) => setSettings({ ...settings, bestTimeMode: event.target.value as WorkspaceOptions['bestTimeMode'] })}
+          >
+            <option value="suggest">{t('bestTimeSuggest')}</option>
+            <option value="apply">{t('bestTimeApply')}</option>
+          </select>
+          <p className="hint">{t('bestTimeModeHint')}</p>
         </div>
         <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
           <input

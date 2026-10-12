@@ -1206,6 +1206,9 @@
       },
       "captionTest": {
         "learned": "added a caption test result to the Page voice"
+      },
+      "queue": {
+        "bestTimesAdded": "added queue times from a Page’s best times"
       }
     },
     "byDeparted": "Someone no longer in this workspace",
@@ -1733,7 +1736,10 @@
     "shuffleConfirm": "Deal the coming posts out among the same times in a new order?",
     "clearConfirm": "Take every coming post off the queue? They go back to drafts; nothing is deleted.",
     "shuffled": "{count, plural, =0 {Nothing to shuffle.} one {# post shuffled.} other {# posts shuffled.}}",
-    "cleared": "{count, plural, =0 {Nothing to clear.} one {# post moved back to drafts.} other {# posts moved back to drafts.}}"
+    "cleared": "{count, plural, =0 {Nothing to clear.} one {# post moved back to drafts.} other {# posts moved back to drafts.}}",
+    "bestTimesAdded": "Added from your Pages’ results this week",
+    "bestTimesSlot": "{day} {time} (×{lift})",
+    "bestTimesAddedHint": "×1.4 means posts at that time did 1.4 times as well as the Page’s typical post. Open a Page to remove a time."
   },
   "reports": {
     "title": "Reports",
@@ -1881,7 +1887,11 @@
     "spamGap": "Gap between Pages for the same content",
     "spamGapOff": "Off — no warning",
     "spamGapMinutes": "{minutes} minutes",
-    "spamGapHint": "The composer warns when the same link or text would reach 3 or more Pages of one network closer together than this, and offers to stagger them."
+    "spamGapHint": "The composer warns when the same link or text would reach 3 or more Pages of one network closer together than this, and offers to stagger them.",
+    "bestTimeMode": "Best times per Page",
+    "bestTimeSuggest": "Suggest them on the queue screen",
+    "bestTimeApply": "Add them to the queue every week",
+    "bestTimeModeHint": "Each week the worker looks at every Page’s own results. With “Add”, up to two new times per Page go into its queue (at most 14 of its own); the queue screen says what was added, and any time can be removed."
   },
   "setup": {
     "title": "Set up MS Social Pilot",
@@ -2703,7 +2713,8 @@
         "reports": "Scheduled reports",
         "inboxDigest": "New comments and messages email",
         "queueEmpty": "Empty queue email",
-        "captionTests": "Caption tests: read results"
+        "captionTests": "Caption tests: read results",
+        "bestTimes": "Best times: add queue times"
       }
     },
     "sessions": {

@@ -20,6 +20,7 @@ import { fetchRemotePostState } from '../facebook/publish';
 import { asGraphError } from '../facebook/graph';
 import { decryptSecret } from '../crypto';
 import { sendDueReports } from '../report-schedules';
+import { applyBestTimes } from '../best-times';
 
 /**
  * The worker's job set.
@@ -49,6 +50,7 @@ export type JobName =
   | 'inboxDigest'
   | 'queueEmpty'
   | 'captionTests'
+  | 'bestTimes'
   | 'alerts';
 
 export interface JobContext {
@@ -715,6 +717,16 @@ export function jobDefinitions(): JobDefinition[] {
       run: async ({ now }) => {
         const finished = await evaluateCaptionTests(now);
         return finished > 0 ? `${finished} caption test(s) finished` : null;
+      },
+    },
+    {
+      // Database only. Each workspace is looked at once a week (stored), so a
+      // worker restart does not add times early.
+      name: 'bestTimes',
+      intervalMs: 6 * 60 * 60 * 1000,
+      run: async ({ now }) => {
+        const added = await applyBestTimes(now);
+        return added.length > 0 ? `queue times added for ${added.length} Page(s)` : null;
       },
     },
   ];

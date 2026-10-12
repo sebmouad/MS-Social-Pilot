@@ -231,6 +231,11 @@ model Workspace {
   /// should not reach several Pages of one network closer together than this.
   /// 0 turns the warning off.
   spamGapMinutes Int @default(20)
+  /// Best time per Page (G10): "suggest" shows good times on the queue screen;
+  /// "apply" also lets a weekly job add them as the Page's own queue times.
+  bestTimeMode   String    @default("suggest")
+  /// When the weekly best-time job last looked at this workspace.
+  bestTimesRunAt DateTime?
 
   // AI caption defaults, fed into the prompt.
   aiEnabled    Boolean @default(true)

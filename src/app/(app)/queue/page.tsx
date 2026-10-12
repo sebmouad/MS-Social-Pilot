@@ -18,6 +18,8 @@ import { prisma } from '@/lib/prisma';
 import { suggestSlots, upcomingOccurrences } from '@/lib/queue-suggestions';
 import { localInputToUtc } from '@/lib/time';
 import { feedLinkOf, feedMediaOf } from '@/lib/feed';
+import type { AddedSlots } from '@/lib/best-times';
+import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +64,18 @@ export default async function QueuePage({
     select: { id: true, name: true, pictureUrl: true },
     orderBy: { name: 'asc' },
   });
+  // What the weekly best-time job added lately (G10), for the Pages on screen.
+  const pageIds = new Set(pages.map((page) => page.id));
+  const recentlyAdded = (
+    await prisma.activityLog.findMany({
+      where: { workspaceId: auth.workspace.id, action: 'queue.bestTimesAdded', createdAt: { gte: new Date(now.getTime() - 8 * DAY_MS) } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, detail: true },
+    })
+  )
+    .map((row) => ({ id: row.id, ...(row.detail as unknown as AddedSlots) }))
+    .filter((entry) => pageIds.has(entry.targetId));
+
   // Whose timetable is on screen: one Page's (its own times on top of the
   // shared ones), or the shared one. A member limited to some Pages has no
   // shared view to look at — every time they see is one of their Pages'.
@@ -175,6 +189,34 @@ export default async function QueuePage({
         </div>
         <SelectionBar auth={auth} selection={selection} />
       </header>
+
+      {recentlyAdded.length > 0 && (
+        <section className="card p-4" aria-labelledby="best-times-added">
+          <h2 id="best-times-added" className="text-sm font-semibold text-slate-900">
+            {t('bestTimesAdded')}
+          </h2>
+          <ul className="mt-2 space-y-1 text-sm text-slate-700">
+            {recentlyAdded.map((entry) => (
+              <li key={entry.id}>
+                <Link className="font-medium text-brand-600 hover:underline" href={`/queue?for=${entry.targetId}`}>
+                  {entry.page}
+                </Link>
+                {' — '}
+                {entry.slots
+                  .map((slot) =>
+                    t('bestTimesSlot', {
+                      day: weekdayNames(locale)[slot.dayOfWeek]!,
+                      time: `${String(slot.hour).padStart(2, '0')}:${String(slot.minute).padStart(2, '0')}`,
+                      lift: slot.lift,
+                    }),
+                  )
+                  .join(', ')}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-slate-500">{t('bestTimesAddedHint')}</p>
+        </section>
+      )}
 
       <QueueClient
         canManage={canManageSettings(auth.role)}
