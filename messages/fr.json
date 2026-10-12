@@ -253,7 +253,6 @@
   },
   "approvals": {
     "title": "Validations",
-    "subtitle": "Publications en attente de relecture avant planification.",
     "none": "Rien n'est en attente de validation.",
     "submittedBy": "Soumise par {name}",
     "approve": "Valider",
@@ -281,7 +280,8 @@
     "colReadyHint": "Approuvées et programmées.",
     "colRejected": "Renvoyées",
     "colRejectedHint": "Le validateur a demandé des modifications.",
-    "colEmpty": "Rien ici"
+    "colEmpty": "Rien ici",
+    "countLine": "{count, plural, =0 {Rien en attente de validation} one {# publication en attente de validation} other {# publications en attente de validation}} · {profiles, plural, one {# profil} other {# profils}}"
   },
   "auth": {
     "signIn": "Se connecter",
@@ -1539,7 +1539,6 @@
   },
   "posts": {
     "title": "Publications",
-    "subtitle": "Tout ce qui est planifié, publié ou en attente.",
     "noPosts": "Aucune publication ici pour le moment.",
     "noText": "(sans texte)",
     "mediaOnly": "(médias uniquement)",
@@ -1614,7 +1613,8 @@
       "keep": "Les garder",
       "done": "{count, plural, one {Fait pour # publication.} other {Fait pour # publications.}}",
       "someFailed": "{count, plural, one {# publication est restée telle quelle :} other {# publications sont restées telles quelles :}}"
-    }
+    },
+    "countLine": "{count, plural, =0 {Aucune publication} one {# publication} other {# publications}} · {profiles, plural, one {# profil} other {# profils}}"
   },
   "queue": {
     "addSlot": "Ajouter un créneau",

@@ -10,6 +10,7 @@ import { ApprovalBoard, type BoardCard } from '@/components/ApprovalBoard';
 import { listLabels } from '@/lib/page-groups';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
+import { postScope } from '@/lib/page-access';
 import { prisma } from '@/lib/prisma';
 import { canApprove, canManageOthersPosts, postIsEditable } from '@/lib/constants';
 import { IN_APPROVAL_QUEUE } from '@/lib/approvals';
@@ -44,7 +45,7 @@ export default async function ApprovalsPage({
   const timezone = auth.workspace.timezone;
 
   const posts = await prisma.post.findMany({
-    where: { workspaceId: auth.workspace.id, ...IN_APPROVAL_QUEUE },
+    where: { workspaceId: auth.workspace.id, ...postScope(pageScope), ...IN_APPROVAL_QUEUE },
     include: {
       targets: { include: { target: { select: { name: true, pictureUrl: true } } } },
       submitter: { select: { name: true } },
@@ -81,17 +82,17 @@ export default async function ApprovalsPage({
     } as const;
     const take = 40;
     const [drafts, ready, rejected] = await Promise.all([
-      prisma.post.findMany({ where: { workspaceId: auth.workspace.id, status: 'draft' }, include, orderBy: { updatedAt: 'desc' }, take }),
+      prisma.post.findMany({ where: { workspaceId: auth.workspace.id, ...postScope(pageScope), status: 'draft' }, include, orderBy: { updatedAt: 'desc' }, take }),
       prisma.post.findMany({
-        where: { workspaceId: auth.workspace.id, status: 'scheduled', approvalStatus: 'approved', scheduledAt: { gte: new Date() } },
+        where: { workspaceId: auth.workspace.id, ...postScope(pageScope), status: 'scheduled', approvalStatus: 'approved', scheduledAt: { gte: new Date() } },
         include,
         orderBy: { scheduledAt: 'asc' },
         take,
       }),
-      prisma.post.findMany({ where: { workspaceId: auth.workspace.id, status: 'rejected' }, include, orderBy: { updatedAt: 'desc' }, take }),
+      prisma.post.findMany({ where: { workspaceId: auth.workspace.id, ...postScope(pageScope), status: 'rejected' }, include, orderBy: { updatedAt: 'desc' }, take }),
     ]);
     const pending = await prisma.post.findMany({
-      where: { workspaceId: auth.workspace.id, ...IN_APPROVAL_QUEUE },
+      where: { workspaceId: auth.workspace.id, ...postScope(pageScope), ...IN_APPROVAL_QUEUE },
       include,
       orderBy: { submittedAt: 'asc' },
     });
@@ -139,7 +140,7 @@ export default async function ApprovalsPage({
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
-          <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
+          <p className="mt-1 text-sm text-slate-600">{t('countLine', { count: posts.length, profiles: selection.ids.length })}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SelectionBar auth={auth} selection={selection} />

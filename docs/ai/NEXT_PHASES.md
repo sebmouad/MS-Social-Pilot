@@ -187,6 +187,11 @@ their Pages, workspace-wide files need every Page); public API
 obey root's switches (suspension, modules, disabled account). Still: Ads (ad
 accounts are not linked to Pages in the schema), Inbox/Comments/Reviews/Videos
 screens (none exist yet as screens), headings with counts, e2e A4.
+**2026-10-12:** Approvals (review list and board) now follow the selection
+and the member's Page access — before, a member limited to some Pages saw
+every Page's posts there (the approve action itself was already scoped).
+Posts and Approvals headings say "N posts · N profiles"; the Inbox screen
+exists and follows the selection. Still: Ads, Reviews/Videos screens.
 
 ### A1. Selection model (server)
 - Keep the URL as the source of truth (`?group=<id>&pages=<id,id>`; `pages`

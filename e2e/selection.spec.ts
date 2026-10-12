@@ -253,3 +253,30 @@ test('posts selected together move a day later, then cancel after a question', a
 
   expect(failures).toEqual([]);
 });
+
+test('approvals follow the selection, and the headings say how many', async ({ page }) => {
+  const failures = collectFailures(page);
+  await prisma.post.create({
+    data: {
+      workspaceId,
+      authorId,
+      timezone,
+      message: `${MARK}: waiting on the second Page`,
+      status: 'pending_approval',
+      approvalStatus: 'pending',
+      submittedAt: new Date(),
+      targets: { create: { targetId: secondId } },
+    },
+  });
+
+  await open(page, `/approvals?pages=${firstId}`);
+  await expect(page.getByText(`${MARK}: waiting on the second Page`)).toHaveCount(0);
+
+  await open(page, `/approvals?pages=${secondId}`);
+  await expect(page.getByText(`${MARK}: waiting on the second Page`).first()).toBeVisible();
+  await expect(page.getByText('1 post waiting for review · 1 profile')).toBeVisible();
+
+  await open(page, `/posts?pages=${secondId}&q=${encodeURIComponent(`${MARK}: waiting`)}`);
+  await expect(page.getByText('1 post · 1 profile')).toBeVisible();
+  expect(failures).toEqual([]);
+});

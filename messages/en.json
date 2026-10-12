@@ -253,7 +253,6 @@
   },
   "approvals": {
     "title": "Approvals",
-    "subtitle": "Posts waiting for review before they can be scheduled.",
     "none": "Nothing is waiting for approval.",
     "submittedBy": "Submitted by {name}",
     "approve": "Approve",
@@ -281,7 +280,8 @@
     "colReadyHint": "Approved and scheduled.",
     "colRejected": "Sent back",
     "colRejectedHint": "The reviewer asked for changes.",
-    "colEmpty": "Nothing here"
+    "colEmpty": "Nothing here",
+    "countLine": "{count, plural, =0 {Nothing waiting for review} one {# post waiting for review} other {# posts waiting for review}} · {profiles, plural, one {# profile} other {# profiles}}"
   },
   "auth": {
     "signIn": "Sign in",
@@ -1539,7 +1539,6 @@
   },
   "posts": {
     "title": "Posts",
-    "subtitle": "Everything scheduled, published or waiting.",
     "noPosts": "No posts here yet.",
     "noText": "(no text)",
     "mediaOnly": "(media only)",
@@ -1614,7 +1613,8 @@
       "keep": "Keep them",
       "done": "{count, plural, one {Done for # post.} other {Done for # posts.}}",
       "someFailed": "{count, plural, one {# post was left as it was:} other {# posts were left as they were:}}"
-    }
+    },
+    "countLine": "{count, plural, =0 {No posts} one {# post} other {# posts}} · {profiles, plural, one {# profile} other {# profiles}}"
   },
   "queue": {
     "addSlot": "Add slot",
