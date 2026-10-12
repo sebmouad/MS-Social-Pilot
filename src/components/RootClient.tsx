@@ -85,14 +85,14 @@ export function WorkspacesTable({ workspaces }: { workspaces: RootWorkspace[] })
     <div className="space-y-3">
       {messages}
       <div className="card scroll-x p-0">
-        <table className="w-full min-w-[40rem] text-left text-sm tabular-nums">
+        <table className="w-full min-w-[40rem] text-start text-sm tabular-nums">
           <thead className="border-b border-slate-200 text-xs text-slate-500">
             <tr>
               <th className="px-4 py-2 font-medium">{t('workspaces.name')}</th>
               <th className="px-4 py-2 font-medium">{t('workspaces.owners')}</th>
-              <th className="px-4 py-2 text-right font-medium">{t('workspaces.members')}</th>
-              <th className="px-4 py-2 text-right font-medium">{t('workspaces.pages')}</th>
-              <th className="px-4 py-2 text-right font-medium">{t('workspaces.posts')}</th>
+              <th className="px-4 py-2 text-end font-medium">{t('workspaces.members')}</th>
+              <th className="px-4 py-2 text-end font-medium">{t('workspaces.pages')}</th>
+              <th className="px-4 py-2 text-end font-medium">{t('workspaces.posts')}</th>
               <th className="px-4 py-2 font-medium">{t('workspaces.created')}</th>
               <th className="px-4 py-2"><span className="sr-only">{t('actions')}</span></th>
             </tr>
@@ -137,11 +137,11 @@ export function WorkspacesTable({ workspaces }: { workspaces: RootWorkspace[] })
                   )}
                 </td>
                 <td className="px-4 py-2 text-slate-600">{workspace.owners.join(', ') || '—'}</td>
-                <td className="px-4 py-2 text-right">{format.number(workspace.members)}</td>
-                <td className="px-4 py-2 text-right">{format.number(workspace.pages)}</td>
-                <td className="px-4 py-2 text-right">{format.number(workspace.posts)}</td>
+                <td className="px-4 py-2 text-end">{format.number(workspace.members)}</td>
+                <td className="px-4 py-2 text-end">{format.number(workspace.pages)}</td>
+                <td className="px-4 py-2 text-end">{format.number(workspace.posts)}</td>
                 <td className="px-4 py-2 text-slate-600">{format.dateTime(new Date(workspace.createdAt), { dateStyle: 'medium' })}</td>
-                <td className="px-4 py-2 text-right">
+                <td className="px-4 py-2 text-end">
                   {editing !== workspace.id && (
                     <button
                       type="button"
@@ -186,7 +186,7 @@ export function UsersTable({ users }: { users: RootUser[] }) {
     <div className="space-y-3">
       {messages}
       <div className="card scroll-x p-0">
-        <table className="w-full min-w-[44rem] text-left text-sm">
+        <table className="w-full min-w-[44rem] text-start text-sm">
           <thead className="border-b border-slate-200 text-xs text-slate-500">
             <tr>
               <th className="px-4 py-2 font-medium">{t('users.person')}</th>
@@ -346,27 +346,27 @@ export function InvitationsTable({ invitations }: { invitations: RootInvitation[
     <div className="space-y-3">
       {messages}
       <div className="scroll-x">
-        <table className="w-full min-w-[36rem] text-left text-sm">
+        <table className="w-full min-w-[36rem] text-start text-sm">
           <thead className="text-xs text-slate-500">
             <tr>
-              <th className="py-2 pr-3 font-medium">{t('registration.email')}</th>
-              <th className="py-2 pr-3 font-medium">{t('registration.workspace')}</th>
-              <th className="py-2 pr-3 font-medium">{t('registration.invitedBy')}</th>
-              <th className="py-2 pr-3 font-medium">{t('registration.expires')}</th>
+              <th className="py-2 pe-3 font-medium">{t('registration.email')}</th>
+              <th className="py-2 pe-3 font-medium">{t('registration.workspace')}</th>
+              <th className="py-2 pe-3 font-medium">{t('registration.invitedBy')}</th>
+              <th className="py-2 pe-3 font-medium">{t('registration.expires')}</th>
               <th className="py-2"><span className="sr-only">{t('actions')}</span></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {invitations.map((invitation) => (
               <tr key={invitation.id}>
-                <td className="py-2 pr-3">
+                <td className="py-2 pe-3">
                   <span className="font-medium text-slate-900">{invitation.email}</span>
-                  <span className="ml-1 text-xs text-slate-500">· {tRoles(invitation.role)}</span>
+                  <span className="ms-1 text-xs text-slate-500">· {tRoles(invitation.role)}</span>
                 </td>
-                <td className="py-2 pr-3 text-slate-600">{invitation.workspace}</td>
-                <td className="py-2 pr-3 text-slate-600">{invitation.invitedBy}</td>
-                <td className="py-2 pr-3 text-slate-600">{format.dateTime(new Date(invitation.expiresAt), { dateStyle: 'medium' })}</td>
-                <td className="py-2 text-right">
+                <td className="py-2 pe-3 text-slate-600">{invitation.workspace}</td>
+                <td className="py-2 pe-3 text-slate-600">{invitation.invitedBy}</td>
+                <td className="py-2 pe-3 text-slate-600">{format.dateTime(new Date(invitation.expiresAt), { dateStyle: 'medium' })}</td>
+                <td className="py-2 text-end">
                   <button
                     type="button"
                     className="btn-ghost h-9 text-red-700"
@@ -699,7 +699,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
           <p className="text-sm text-slate-600">{t('workspace.membersHelp')}</p>
         </div>
         <div className="scroll-x">
-          <table className="w-full min-w-[44rem] text-left text-sm">
+          <table className="w-full min-w-[44rem] text-start text-sm">
             <thead className="border-y border-slate-200 text-xs text-slate-500">
               <tr>
                 <th className="px-4 py-2 font-medium">{t('users.person')}</th>
@@ -715,7 +715,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
                     <p className="font-semibold text-slate-900">{member.name}</p>
                     <p className="text-xs text-slate-500">
                       {member.email}
-                      {member.disabled && <span className="badge ml-2 bg-red-100 text-red-700">{t('users.disabled')}</span>}
+                      {member.disabled && <span className="badge ms-2 bg-red-100 text-red-700">{t('users.disabled')}</span>}
                     </p>
                   </td>
                   <td className="px-4 py-2">
@@ -746,7 +746,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
                       }
                     />
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-end">
                     <button
                       type="button"
                       className="btn-ghost h-9 whitespace-nowrap text-red-700"

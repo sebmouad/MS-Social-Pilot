@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { join } from 'node:path';
 
-import { isSupportedLocale, negotiateLocale } from '../src/i18n/locale';
+import { isSupportedLocale, negotiateLocale, SUPPORTED_LOCALES } from '../src/i18n/locale';
 
 describe('negotiateLocale', () => {
   it('picks an exact match', () => {
@@ -69,15 +69,26 @@ describe('message catalogues', () => {
     );
   }
 
+  /** Every catalogue shipped, English first: each one is checked against English. */
+  const LOCALES = readdirSync(path.join(process.cwd(), 'messages'))
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => file.slice(0, -'.json'.length))
+    .sort((a, b) => (a === 'en' ? -1 : b === 'en' ? 1 : a.localeCompare(b)));
+  const OTHERS = LOCALES.filter((locale) => locale !== 'en');
   const en = flatten(load('en')).sort();
-  const fr = flatten(load('fr')).sort();
 
-  it('defines every English key in French', () => {
-    expect(en.filter((key) => !fr.includes(key))).toEqual([]);
+  it('ships one catalogue per supported language, and no other', () => {
+    expect([...LOCALES].sort()).toEqual([...SUPPORTED_LOCALES].sort());
   });
 
-  it('has no French keys missing from English', () => {
-    expect(fr.filter((key) => !en.includes(key))).toEqual([]);
+  it.each(OTHERS)('defines every English key in %s', (locale) => {
+    const other = new Set(flatten(load(locale)));
+    expect(en.filter((key) => !other.has(key))).toEqual([]);
+  });
+
+  it.each(OTHERS)('has no %s keys missing from English', (locale) => {
+    const english = new Set(en);
+    expect(flatten(load(locale)).filter((key) => !english.has(key))).toEqual([]);
   });
 
   it('has no dot inside a key, which next-intl refuses at run time', () => {
@@ -88,8 +99,7 @@ describe('message catalogues', () => {
             ...(key.includes('.') ? [`${prefix}${key}`] : []),
             ...dotted(child, `${prefix}${key} › `),
           ]);
-    expect(dotted(load('en'))).toEqual([]);
-    expect(dotted(load('fr'))).toEqual([]);
+    expect(LOCALES.flatMap((locale) => dotted(load(locale)))).toEqual([]);
   });
 
   it('covers a meaningful amount of the interface', () => {
@@ -112,15 +122,15 @@ describe('message catalogues', () => {
     );
   }
 
-  it('uses the same placeholders in both languages', () => {
+  it.each(OTHERS)('uses the same placeholders in %s as in English', (locale) => {
     // A French string that forgets {count} renders the sentence without the
     // number, which reads as finished text and is never reported as a bug.
     const enPlaceholders = new Map(placeholders(load('en')).map(([key, , names]) => [key, names]));
-    const frPlaceholders = new Map(placeholders(load('fr')).map(([key, , names]) => [key, names]));
+    const otherPlaceholders = new Map(placeholders(load(locale)).map(([key, , names]) => [key, names]));
 
     const mismatched: string[] = [];
     for (const [key, names] of enPlaceholders) {
-      const other = frPlaceholders.get(key) ?? new Set<string>();
+      const other = otherPlaceholders.get(key) ?? new Set<string>();
       const same = names.size === other.size && [...names].every((name) => other.has(name));
       if (!same) mismatched.push(key);
     }
@@ -134,7 +144,7 @@ describe('message catalogues', () => {
     // go through ICU plural rather than concatenating a number onto a string.
     const offenders: string[] = [];
 
-    for (const locale of ['en', 'fr']) {
+    for (const locale of LOCALES) {
       for (const [key, text, names] of placeholders(load(locale))) {
         if (!names.has('count')) continue;
         if (text.includes('plural')) continue;

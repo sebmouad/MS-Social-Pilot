@@ -80,7 +80,7 @@ export function HistoryClient({
                 {/* The bare number would be read as part of the tab's name ("Email1"). */}
                 <span
                   aria-hidden
-                  className="ml-1.5 rounded-full bg-red-100 px-1.5 text-[10px] font-semibold text-red-700"
+                  className="ms-1.5 rounded-full bg-red-100 px-1.5 text-[10px] font-semibold text-red-700"
                 >
                   {recentFailures}
                 </span>
@@ -115,7 +115,7 @@ export function HistoryClient({
                 {row.detail && (
                   <span className="text-xs text-slate-500">— {row.detail}</span>
                 )}
-                <span className="ml-auto whitespace-nowrap text-xs text-slate-400">
+                <span className="ms-auto whitespace-nowrap text-xs text-slate-400">
                   {row.whenLabel}
                 </span>
               </li>
@@ -132,7 +132,7 @@ export function HistoryClient({
                 <StatusPill status={row.status} />
                 <span className="text-sm text-slate-800">{row.subject}</span>
                 <span className="text-xs text-slate-500">{row.to}</span>
-                <span className="ml-auto whitespace-nowrap text-xs text-slate-400">
+                <span className="ms-auto whitespace-nowrap text-xs text-slate-400">
                   {row.whenLabel}
                 </span>
               </div>
@@ -147,7 +147,7 @@ export function HistoryClient({
       )}
 
       <p className="text-xs text-slate-500">
-        <Icon name="clock" size={13} className="mr-1 inline align-[-2px]" />
+        <Icon name="clock" size={13} className="me-1 inline align-[-2px]" />
         {t('keptFor', { days: retentionDays })}
       </p>
     </div>

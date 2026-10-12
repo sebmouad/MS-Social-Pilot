@@ -313,7 +313,7 @@ export function PostList({
           <button type="button" className="btn-danger" disabled={bulkBusy} onClick={() => void bulk({ kind: 'cancel' })}>
             {tBulk('cancel')}
           </button>
-          <button type="button" className="btn-ghost ml-auto" disabled={bulkBusy} onClick={() => setSelected(new Set())}>
+          <button type="button" className="btn-ghost ms-auto" disabled={bulkBusy} onClick={() => setSelected(new Set())}>
             {tBulk('clear')}
           </button>
         </div>
@@ -658,7 +658,7 @@ export function PostList({
                 </button>
               )}
               {working && (
-                <span className="ml-auto self-center text-xs text-slate-500" role="status">
+                <span className="ms-auto self-center text-xs text-slate-500" role="status">
                   {tCommon('working')}
                 </span>
               )}

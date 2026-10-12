@@ -70,7 +70,7 @@ export function Dialog({
           <button
             type="button"
             data-close
-            className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300"
+            className="absolute end-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300"
             aria-label={closeLabel}
             onClick={onClose}
           >

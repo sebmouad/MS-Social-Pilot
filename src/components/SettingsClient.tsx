@@ -474,7 +474,7 @@ function BulkUpload({
           id="csvFile"
           type="file"
           accept=".csv,text/csv"
-          className="mb-2 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-slate-200"
+          className="mb-2 block w-full text-sm text-slate-600 file:me-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-slate-200"
           onChange={async (event) => {
             const file = event.target.files?.[0];
             if (file) setCsv(await file.text());

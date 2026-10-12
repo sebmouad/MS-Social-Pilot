@@ -264,15 +264,15 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
       <div className="scroll-x mt-3 hidden sm:block">
         <table className="w-full min-w-[56rem] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-[13px] font-semibold text-slate-600">
-              <th scope="col" className="py-2 pr-3 font-medium">
+            <tr className="border-b border-slate-200 text-start text-[13px] font-semibold text-slate-600">
+              <th scope="col" className="py-2 pe-3 font-medium">
                 {t('post')}
               </th>
               {columns.map((column) => (
                 <th
                   key={column.key}
                   scope="col"
-                  className="py-2 pr-3 text-right font-medium"
+                  className="py-2 pe-3 text-end font-medium"
                   aria-sort={
                     sort === column.key ? (descending ? 'descending' : 'ascending') : undefined
                   }
@@ -292,7 +292,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
           <tbody>
             {visible.map((post) => (
               <tr key={post.postTargetId} className="border-b border-slate-100 last:border-0">
-                <td className="max-w-sm py-2 pr-3">
+                <td className="max-w-sm py-2 pe-3">
                   <div className="flex items-start gap-2.5">
                   {post.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -329,7 +329,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
                 {columns.map((column) => {
                   const value = post[column.key];
                   return (
-                    <td key={column.key} className="nums py-2 pr-3 text-right text-slate-600">
+                    <td key={column.key} className="nums py-2 pe-3 text-end text-slate-600">
                       {value === null
                         ? '—'
                         : column.key === 'engagementRate'

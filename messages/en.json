@@ -7,10 +7,6 @@
     "emailHint": "Your email address is how you sign in and cannot be changed here.",
     "failed": "That did not work. Please try again.",
     "language": "Language",
-    "languages": {
-      "en": "English",
-      "fr": "Français"
-    },
     "name": "Name",
     "newPassword": "New password",
     "password": "Password",

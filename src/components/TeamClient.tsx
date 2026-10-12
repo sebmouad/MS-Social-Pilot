@@ -350,7 +350,7 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-slate-900">
                   {member.name}
-                  {member.isSelf && <span className="ml-1 text-xs text-slate-400">({t('you')})</span>}
+                  {member.isSelf && <span className="ms-1 text-xs text-slate-400">({t('you')})</span>}
                 </span>
                 <span className="block truncate text-xs text-slate-500">{member.email}</span>
               </span>

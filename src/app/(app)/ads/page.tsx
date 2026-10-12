@@ -249,7 +249,7 @@ export default async function AdsPage({
           />
         )}
 
-        <div className="ml-auto flex flex-wrap gap-2">
+        <div className="ms-auto flex flex-wrap gap-2">
           {/* One account's rows in its own currency, over the range on screen. */}
           <a className="btn-secondary" href={exportHref}>
             {t('exportCsv')}
@@ -355,17 +355,17 @@ export default async function AdsPage({
         ) : (
           <div className="scroll-x">
             <table className="mt-3 w-full min-w-[760px] text-sm">
-              <thead className="border-y border-slate-200 bg-slate-50 text-left text-[13px] font-semibold text-slate-600">
+              <thead className="border-y border-slate-200 bg-slate-50 text-start text-[13px] font-semibold text-slate-600">
                 <tr>
                   {sortHeader('name', t(`level_${level}`), 'px-4 py-2')}
                   {level !== 'campaign' && sortHeader('campaign', t('level_campaign'), 'px-3 py-2')}
-                  {sortHeader('spend', t('spend'), 'px-3 py-2 text-right')}
+                  {sortHeader('spend', t('spend'), 'px-3 py-2 text-end')}
                   <th scope="col" className="w-32 px-3 py-2">{t('share')}</th>
-                  {sortHeader('impressions', t('impressions'), 'px-3 py-2 text-right')}
-                  {sortHeader('clicks', t('clicks'), 'px-3 py-2 text-right')}
-                  {sortHeader('ctr', t('ctr'), 'px-3 py-2 text-right')}
-                  {sortHeader('cpc', t('cpc'), 'px-3 py-2 text-right')}
-                  {sortHeader('cpm', t('cpm'), 'px-4 py-2 text-right')}
+                  {sortHeader('impressions', t('impressions'), 'px-3 py-2 text-end')}
+                  {sortHeader('clicks', t('clicks'), 'px-3 py-2 text-end')}
+                  {sortHeader('ctr', t('ctr'), 'px-3 py-2 text-end')}
+                  {sortHeader('cpc', t('cpc'), 'px-3 py-2 text-end')}
+                  {sortHeader('cpm', t('cpm'), 'px-4 py-2 text-end')}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -384,7 +384,7 @@ export default async function AdsPage({
                           {row.campaignName ?? '—'}
                         </td>
                       )}
-                      <td className="nums px-3 py-2.5 text-right text-slate-900">{money(row.spend)}</td>
+                      <td className="nums px-3 py-2.5 text-end text-slate-900">{money(row.spend)}</td>
                       <td className="px-3 py-2.5">
                         {/* Share of spend as a bar with its number: which line
                             the budget actually went on, readable at a glance. */}
@@ -400,14 +400,14 @@ export default async function AdsPage({
                               }}
                             />
                           </span>
-                          <span className="nums w-10 text-right text-xs text-slate-600">{percentFormat.format(share / 100)}</span>
+                          <span className="nums w-10 text-end text-xs text-slate-600">{percentFormat.format(share / 100)}</span>
                         </span>
                       </td>
-                      <td className="nums px-3 py-2.5 text-right text-slate-700">{count(row.impressions)}</td>
-                      <td className="nums px-3 py-2.5 text-right text-slate-700">{count(row.clicks)}</td>
-                      <td className="nums px-3 py-2.5 text-right text-slate-700">{percent(row.ctr)}</td>
-                      <td className="nums px-3 py-2.5 text-right text-slate-700">{money(row.cpc)}</td>
-                      <td className="nums px-4 py-2.5 text-right text-slate-700">{money(row.cpm)}</td>
+                      <td className="nums px-3 py-2.5 text-end text-slate-700">{count(row.impressions)}</td>
+                      <td className="nums px-3 py-2.5 text-end text-slate-700">{count(row.clicks)}</td>
+                      <td className="nums px-3 py-2.5 text-end text-slate-700">{percent(row.ctr)}</td>
+                      <td className="nums px-3 py-2.5 text-end text-slate-700">{money(row.cpc)}</td>
+                      <td className="nums px-4 py-2.5 text-end text-slate-700">{money(row.cpm)}</td>
                     </tr>
                   );
                 })}

@@ -335,14 +335,14 @@ export async function PageAnalysisView({
                         <div className="flex items-baseline justify-between gap-3 text-xs">
                           <span className="font-medium text-slate-700">
                             {t(`format.${row.format}`)}
-                            <span className="ml-1.5 font-normal text-slate-500">
+                            <span className="ms-1.5 font-normal text-slate-500">
                               {t('cadence.posts', { count: row.posts })} · {row.share}%
                             </span>
                           </span>
                           <span className="nums font-semibold text-slate-900">
                             {compact(row.avgInteractions)}
                             {row.lift !== null && (
-                              <span className="ml-1.5 font-normal text-slate-500">
+                              <span className="ms-1.5 font-normal text-slate-500">
                                 {row.lift}× {t('formats.lift')}
                               </span>
                             )}
@@ -515,7 +515,7 @@ export async function ComparePagesView({
     return (
       <th
         scope="col"
-        className={`px-3 py-2 ${align === 'right' ? 'text-right' : ''}`}
+        className={`px-3 py-2 ${align === 'right' ? 'text-end' : ''}`}
         aria-sort={active ? (ascending ? 'ascending' : 'descending') : undefined}
       >
         <Link
@@ -596,7 +596,7 @@ export async function ComparePagesView({
       </div>
       <div className="scroll-x">
         <table className="mt-3 w-full min-w-[760px] text-sm">
-          <thead className="border-y border-slate-200 bg-slate-50 text-left text-[13px] font-semibold text-slate-600">
+          <thead className="border-y border-slate-200 bg-slate-50 text-start text-[13px] font-semibold text-slate-600">
             <tr>
               <th scope="col" className="px-4 py-2">{t('compare.page')}</th>
               {header('health', t('compare.health'), 'left')}
@@ -633,13 +633,13 @@ export async function ComparePagesView({
                       </span>
                     )}
                   </td>
-                  <td className="nums px-3 py-3 text-right text-slate-700">{row.followers?.toLocaleString(locale) ?? '—'}</td>
-                  <td className="nums px-3 py-3 text-right text-slate-700">{row.perWeek}</td>
-                  <td className="nums px-3 py-3 text-right text-slate-700">
+                  <td className="nums px-3 py-3 text-end text-slate-700">{row.followers?.toLocaleString(locale) ?? '—'}</td>
+                  <td className="nums px-3 py-3 text-end text-slate-700">{row.perWeek}</td>
+                  <td className="nums px-3 py-3 text-end text-slate-700">
                     {row.avgInteractions?.toLocaleString(locale) ?? '—'}
                     {row.avgInteractionsChange !== null && (
                       <span
-                        className="ml-1 text-xs"
+                        className="ms-1 text-xs"
                         style={{ color: row.avgInteractionsChange >= 0 ? VIZ.goodText : VIZ.critical }}
                       >
                         {row.avgInteractionsChange >= 0 ? '↑' : '↓'}
@@ -647,10 +647,10 @@ export async function ComparePagesView({
                       </span>
                     )}
                   </td>
-                  <td className="nums px-3 py-3 text-right text-slate-700">{row.medianRate !== null ? `${row.medianRate}%` : '—'}</td>
-                  <td className="nums px-3 py-3 text-right text-slate-700">{row.reach !== null ? compact(row.reach, locale) : '—'}</td>
-                  <td className="nums px-3 py-3 text-right text-slate-700">{signed(row.netFollows)}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="nums px-3 py-3 text-end text-slate-700">{row.medianRate !== null ? `${row.medianRate}%` : '—'}</td>
+                  <td className="nums px-3 py-3 text-end text-slate-700">{row.reach !== null ? compact(row.reach, locale) : '—'}</td>
+                  <td className="nums px-3 py-3 text-end text-slate-700">{signed(row.netFollows)}</td>
+                  <td className="px-4 py-3 text-end">
                     <Link
                       href={`/analytics?view=analysis&target=${row.targetId}&${rangeQuery ?? `days=${days}`}`}
                       className="btn-ghost text-xs"
@@ -665,13 +665,13 @@ export async function ComparePagesView({
           {rows.length > 1 && (
             <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-slate-900">
               <tr>
-                <th scope="row" className="px-4 py-3 text-left">
+                <th scope="row" className="px-4 py-3 text-start">
                   {t('compare.total', { count: rows.length })}
                 </th>
                 <td className="px-3 py-3" />
-                <td className="nums px-3 py-3 text-right">{totals.followers?.toLocaleString(locale) ?? '—'}</td>
-                <td className="nums px-3 py-3 text-right">{totals.perWeek}</td>
-                <td className="nums px-3 py-3 text-right" title={t('compare.totalAvgHint')}>
+                <td className="nums px-3 py-3 text-end">{totals.followers?.toLocaleString(locale) ?? '—'}</td>
+                <td className="nums px-3 py-3 text-end">{totals.perWeek}</td>
+                <td className="nums px-3 py-3 text-end" title={t('compare.totalAvgHint')}>
                   {totals.posts && totals.interactions !== null
                     ? Math.round(totals.interactions / totals.posts).toLocaleString(locale)
                     : '—'}
@@ -679,12 +679,12 @@ export async function ComparePagesView({
                 <td className="px-3 py-3" />
                 {/* Reach counts people, who may follow several of these Pages: the sum is a ceiling. */}
                 <td
-                  className="nums px-3 py-3 text-right"
+                  className="nums px-3 py-3 text-end"
                   title={tTotal('reachHelp', { count: rows.filter((row) => row.reach !== null).length })}
                 >
                   {totals.reach !== null ? tTotal('upTo', { value: compact(totals.reach, locale) }) : '—'}
                 </td>
-                <td className="nums px-3 py-3 text-right">{signed(totals.net)}</td>
+                <td className="nums px-3 py-3 text-end">{signed(totals.net)}</td>
                 <td />
               </tr>
             </tfoot>
@@ -739,12 +739,12 @@ function LiftList({
               <div className="flex items-baseline justify-between gap-3 text-xs">
                 <span className="min-w-0 truncate font-semibold text-slate-800">
                   {row.label}
-                  <span className="ml-1.5 font-normal text-slate-500">{row.detail}</span>
+                  <span className="ms-1.5 font-normal text-slate-500">{row.detail}</span>
                 </span>
                 <span className="nums shrink-0 font-semibold text-slate-900">
                   {compact(Math.round(row.value))}
                   {row.lift !== null && (
-                    <span className={`ml-1.5 font-normal ${row.lift >= 1 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    <span className={`ms-1.5 font-normal ${row.lift >= 1 ? 'text-emerald-700' : 'text-slate-500'}`}>
                       {Math.round(row.lift * 10) / 10}× {liftLabel}
                     </span>
                   )}

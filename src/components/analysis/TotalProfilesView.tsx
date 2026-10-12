@@ -54,7 +54,7 @@ export async function TotalProfilesView({
         <ol className="mt-2 divide-y divide-slate-100">
           {ranked.map((row, index) => (
             <li key={row.targetId} className="flex items-center gap-3 py-2 text-sm">
-              <span className="nums w-5 text-right text-slate-400">{index + 1}</span>
+              <span className="nums w-5 text-end text-slate-400">{index + 1}</span>
               <Link
                 href={`/analytics?view=analysis&target=${row.targetId}&${rangeQuery}`}
                 className="min-w-0 flex-1 truncate font-medium text-slate-900 hover:text-brand-700 hover:underline"

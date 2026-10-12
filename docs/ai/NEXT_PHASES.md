@@ -569,6 +569,18 @@ most time), the rest after Phase D2. S/M/L = effort.
   make the layout RTL-ready (`dir`, logical CSS properties) so right-to-left
   languages work; ICU plurals per language; locale tests check every file has
   the same keys and placeholders.
+  *Groundwork done: `<html dir>` from the locale; physical Tailwind classes
+  (ml/mr/pl/pr/left/right/text-left/border-l…) replaced by logical ones
+  (ms/me/ps/pe/start/end/text-start/border-s…) so the whole shell mirrors;
+  arrows and chevrons flip in RTL (`Icon`); language names come from
+  `Intl.DisplayNames` in each language itself (`src/lib/languages.ts`), the
+  config default-language list from the `Locale` enum; tests/locale.test.ts
+  checks every `messages/*.json` against English (keys, placeholders,
+  plurals) and that files and the enum match. **Waiting on the owner to pick
+  the languages.** To add one: add the code to `enum Locale` (migration), add
+  `messages/<code>.json` with every key, add it to `CATALOGUES` in
+  `src/lib/email/templates.ts` (tsc asks for it), and use only logical classes
+  in new UI (`ms-`, `pe-`, `start-`, `text-end`).*
 - **G13. Watermark and auto-crop (M)** — per-Page logo/text watermark (position,
   opacity), applied when the post is published (original kept); crops/resizes
   per network format (feed 4:5, story 9:16, link 1.91:1) with a focal point.

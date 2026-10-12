@@ -83,13 +83,13 @@ export function ReportTemplates({
             row.active ? 'bg-brand-500 text-white' : 'bg-white text-slate-700 shadow-surface hover:bg-slate-50'
           }`}
         >
-          <Link href={row.href} className="py-1.5 pl-3.5 pr-2" aria-current={row.active ? 'true' : undefined}>
+          <Link href={row.href} className="py-1.5 ps-3.5 pe-2" aria-current={row.active ? 'true' : undefined}>
             {row.name}
           </Link>
           {canSave && (
             <button
               type="button"
-              className={`mr-1 flex h-6 w-6 items-center justify-center rounded-full ${
+              className={`me-1 flex h-6 w-6 items-center justify-center rounded-full ${
                 row.active ? 'hover:bg-white/20' : 'text-slate-400 hover:bg-slate-100 hover:text-red-600'
               }`}
               aria-label={t('templateDelete', { name: row.name })}

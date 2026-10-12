@@ -28,15 +28,15 @@ function CopyField({ value, label, copyLabel, copiedLabel, multiline = false }: 
   return (
     <div className="relative">
       {multiline ? (
-        <pre className="scroll-x rounded-lg bg-slate-900 p-3 pr-20 font-mono text-xs leading-relaxed text-slate-100" aria-label={label}>
+        <pre className="scroll-x rounded-lg bg-slate-900 p-3 pe-20 font-mono text-xs leading-relaxed text-slate-100" aria-label={label}>
           {value}
         </pre>
       ) : (
-        <input className="input pr-24 font-mono text-xs" readOnly value={value} aria-label={label} onFocus={(event) => event.target.select()} />
+        <input className="input pe-24 font-mono text-xs" readOnly value={value} aria-label={label} onFocus={(event) => event.target.select()} />
       )}
       <button
         type="button"
-        className={`absolute right-1.5 top-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ${multiline ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-brand-500 text-white hover:bg-brand-600'}`}
+        className={`absolute end-1.5 top-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ${multiline ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-brand-500 text-white hover:bg-brand-600'}`}
         onClick={() => {
           void navigator.clipboard.writeText(value).then(() => setCopied(true)).catch(() => setCopied(false));
         }}
@@ -201,7 +201,7 @@ export function ApiTokensClient({ tokens, baseUrl, showOwner }: { tokens: TokenR
             </button>
           ))}
         </div>
-        <ol className="list-decimal space-y-3 pl-5 text-sm text-slate-700">
+        <ol className="list-decimal space-y-3 ps-5 text-sm text-slate-700">
           <li>{tokens.some((row) => !row.revoked) ? t('mcpStepKeyHave') : t('mcpStepKey')}</li>
           {Array.from({ length: guide.steps - 1 }, (_, index) => (
             <li key={index} className="space-y-1.5">

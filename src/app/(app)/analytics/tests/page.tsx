@@ -104,14 +104,14 @@ export default async function CaptionTestsPage() {
                 </div>
 
                 <div className="scroll-x">
-                  <table className="w-full min-w-[32rem] text-left text-sm">
+                  <table className="w-full min-w-[32rem] text-start text-sm">
                     <thead className="text-xs text-slate-500">
                       <tr>
-                        <th scope="col" className="py-1 pr-3 font-medium">{t('caption')}</th>
-                        <th scope="col" className="py-1 pr-3 font-medium">{t('pages')}</th>
-                        <th scope="col" className="py-1 pr-3 text-right font-medium">{t('views')}</th>
-                        <th scope="col" className="py-1 pr-3 text-right font-medium">{t('engagements')}</th>
-                        <th scope="col" className="py-1 text-right font-medium">{t('rate')}</th>
+                        <th scope="col" className="py-1 pe-3 font-medium">{t('caption')}</th>
+                        <th scope="col" className="py-1 pe-3 font-medium">{t('pages')}</th>
+                        <th scope="col" className="py-1 pe-3 text-end font-medium">{t('views')}</th>
+                        <th scope="col" className="py-1 pe-3 text-end font-medium">{t('engagements')}</th>
+                        <th scope="col" className="py-1 text-end font-medium">{t('rate')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -120,15 +120,15 @@ export default async function CaptionTestsPage() {
                         const won = test.status === 'decided' && post.captionLabel === test.winnerLabel;
                         return (
                           <tr key={post.id} className={won ? 'bg-emerald-50/60' : undefined}>
-                            <td className="max-w-xs py-2 pr-3 align-top">
-                              <span className="mr-1 font-semibold text-slate-900">{post.captionLabel}</span>
+                            <td className="max-w-xs py-2 pe-3 align-top">
+                              <span className="me-1 font-semibold text-slate-900">{post.captionLabel}</span>
                               {won && <span className="sr-only">{t('winnerShort')}</span>}
                               <span className="line-clamp-2 break-words text-slate-700">{post.message}</span>
                             </td>
-                            <td className="py-2 pr-3 align-top text-slate-700">{post.targets.map((target) => target.target.name).join(', ')}</td>
-                            <td className="py-2 pr-3 text-right align-top tabular-nums">{result ? format.number(result.views) : '—'}</td>
-                            <td className="py-2 pr-3 text-right align-top tabular-nums">{result ? format.number(result.engagements) : '—'}</td>
-                            <td className="py-2 text-right align-top tabular-nums">{result ? percent(result.rate) : '—'}</td>
+                            <td className="py-2 pe-3 align-top text-slate-700">{post.targets.map((target) => target.target.name).join(', ')}</td>
+                            <td className="py-2 pe-3 text-end align-top tabular-nums">{result ? format.number(result.views) : '—'}</td>
+                            <td className="py-2 pe-3 text-end align-top tabular-nums">{result ? format.number(result.engagements) : '—'}</td>
+                            <td className="py-2 text-end align-top tabular-nums">{result ? percent(result.rate) : '—'}</td>
                           </tr>
                         );
                       })}

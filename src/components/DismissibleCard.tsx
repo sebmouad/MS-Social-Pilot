@@ -19,7 +19,7 @@ export function DismissibleCard({ storageKey, closeLabel, children }: { storageK
     <section className="card relative overflow-hidden">
       <button
         type="button"
-        className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
+        className="absolute end-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
         aria-label={closeLabel}
         title={closeLabel}
         onClick={() => {

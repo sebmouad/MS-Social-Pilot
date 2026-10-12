@@ -59,7 +59,7 @@ export function WeekGrid<P extends WeekPost>({
               const key = keys[index]!;
               const names = dayName(key);
               return (
-                <div key={key} className="border-l border-slate-200 px-2 py-2 text-center">
+                <div key={key} className="border-s border-slate-200 px-2 py-2 text-center">
                   <p className="text-[13px] font-semibold text-slate-600">{weekdayName((weekStartsOn + index) % 7)}</p>
                   <p
                     className={`mx-auto mt-0.5 flex h-8 w-8 items-center justify-center rounded-full text-lg font-bold ${
@@ -88,7 +88,7 @@ export function WeekGrid<P extends WeekPost>({
 
           {hours.map((hour) => (
             <div key={hour} className="grid grid-cols-[4rem_repeat(7,minmax(0,1fr))] border-b border-slate-100 last:border-b-0">
-              <div className="nums px-2 pt-1.5 text-right text-[11px] font-semibold text-slate-500">
+              <div className="nums px-2 pt-1.5 text-end text-[11px] font-semibold text-slate-500">
                 {String(hour).padStart(2, '0')}:00
               </div>
               {days.map((day, index) => {
@@ -101,7 +101,7 @@ export function WeekGrid<P extends WeekPost>({
                     key={key}
                     data-drop-day={key}
                     data-drop-hour={hour}
-                    className={`group relative min-h-[3.25rem] border-l border-slate-100 p-1 ${
+                    className={`group relative min-h-[3.25rem] border-s border-slate-100 p-1 ${
                       key === todayKey ? 'bg-brand-50/40' : key < todayKey ? 'bg-slate-50/70' : 'bg-white'
                     }`}
                   >
@@ -114,7 +114,7 @@ export function WeekGrid<P extends WeekPost>({
                       <Link
                         href={`/compose?at=${key}T${String(hour).padStart(2, '0')}:00`}
                         aria-label={`${newPostLabel(day)} · ${String(hour).padStart(2, '0')}:00`}
-                        className="absolute right-1 top-1 hidden h-6 w-6 items-center justify-center rounded-full bg-white text-base leading-none text-slate-500 shadow-surface hover:text-brand-600 focus-visible:flex group-hover:flex"
+                        className="absolute end-1 top-1 hidden h-6 w-6 items-center justify-center rounded-full bg-white text-base leading-none text-slate-500 shadow-surface hover:text-brand-600 focus-visible:flex group-hover:flex"
                       >
                         +
                       </Link>

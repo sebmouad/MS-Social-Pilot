@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
+import { languageName } from '@/lib/languages';
 import { THEMES, type Theme } from '@/lib/themes';
 import { SessionList, type SessionRow } from './SessionList';
 
-type Locale = 'en' | 'fr';
+type Locale = string;
 
 interface Status {
   kind: 'ok' | 'error';
@@ -179,7 +180,7 @@ export function AccountClient({ initial, sessions: initialSessions, locales }: P
             >
               {locales.map((option) => (
                 <option key={option} value={option}>
-                  {t(`languages.${option}`)}
+                  {languageName(option)}
                 </option>
               ))}
             </select>

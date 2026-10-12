@@ -56,3 +56,13 @@ describe('translations on a new post', () => {
     ).toThrow();
   });
 });
+
+describe('interface languages', () => {
+  it('names each language in itself and gives its direction', async () => {
+    const { languageName, textDirection } = await import('../src/lib/languages');
+    expect(languageName('en')).toBe('English');
+    expect(languageName('fr')).toBe('Français');
+    expect(textDirection('ar')).toBe('rtl');
+    expect(textDirection('fr')).toBe('ltr');
+  });
+});

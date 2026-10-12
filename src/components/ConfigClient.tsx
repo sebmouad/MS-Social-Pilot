@@ -155,7 +155,7 @@ export function ConfigClient({
   return (
     <div className="space-y-6">
       {fromEnvironment.length > 0 && (
-        <section className="card space-y-3 border-l-4 border-amber-400 p-4 sm:p-5">
+        <section className="card space-y-3 border-s-4 border-amber-400 p-4 sm:p-5">
           <h2 className="text-sm font-semibold text-slate-900">{t('envTitle', { count: fromEnvironment.length })}</h2>
           <p className="text-sm text-slate-600">{t('envHint')}</p>
           <p className="break-words font-mono text-xs text-slate-600">
@@ -552,15 +552,15 @@ function AiSpendPanel({ spend }: { spend: AiSpendView }) {
       ) : (
         <>
           <div className="scroll-x">
-            <table className="w-full min-w-[32rem] text-left text-sm tabular-nums">
+            <table className="w-full min-w-[32rem] text-start text-sm tabular-nums">
               <caption className="sr-only">{t('aiSpendByModel')}</caption>
               <thead className="text-xs text-slate-500">
                 <tr>
-                  <th className="py-1 pr-3 font-medium">{t('aiSpendModel')}</th>
-                  <th className="py-1 pr-3 text-right font-medium">{t('aiSpendGenerationsShort')}</th>
-                  <th className="py-1 pr-3 text-right font-medium">{t('aiSpendTokens')}</th>
-                  <th className="py-1 pr-3 text-right font-medium">{t('aiSpendCost')}</th>
-                  <th className="py-1 text-right font-medium">{t('aiSpendPerGeneration')}</th>
+                  <th className="py-1 pe-3 font-medium">{t('aiSpendModel')}</th>
+                  <th className="py-1 pe-3 text-end font-medium">{t('aiSpendGenerationsShort')}</th>
+                  <th className="py-1 pe-3 text-end font-medium">{t('aiSpendTokens')}</th>
+                  <th className="py-1 pe-3 text-end font-medium">{t('aiSpendCost')}</th>
+                  <th className="py-1 text-end font-medium">{t('aiSpendPerGeneration')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -568,18 +568,18 @@ function AiSpendPanel({ spend }: { spend: AiSpendView }) {
                   const priced = row.generations - row.unpriced;
                   return (
                     <tr key={`${row.provider}:${row.model}`}>
-                      <td className="py-1.5 pr-3">
+                      <td className="py-1.5 pe-3">
                         <span className="font-mono text-xs text-slate-900" translate="no">{row.model}</span>
-                        {row.provider && <span className="ml-1 text-xs text-slate-500">· {row.provider}</span>}
+                        {row.provider && <span className="ms-1 text-xs text-slate-500">· {row.provider}</span>}
                       </td>
-                      <td className="py-1.5 pr-3 text-right">{format.number(row.generations)}</td>
-                      <td className="py-1.5 pr-3 text-right text-slate-600">
+                      <td className="py-1.5 pe-3 text-end">{format.number(row.generations)}</td>
+                      <td className="py-1.5 pe-3 text-end text-slate-600">
                         {format.number(row.inputTokens)} / {format.number(row.outputTokens)}
                       </td>
-                      <td className="py-1.5 pr-3 text-right">
+                      <td className="py-1.5 pe-3 text-end">
                         {priced > 0 ? usd(row.costUsd) : <span className="text-amber-700">{t('aiPriceUnknown')}</span>}
                       </td>
-                      <td className="py-1.5 text-right text-slate-600">{priced > 0 ? usd(row.costUsd / priced) : '—'}</td>
+                      <td className="py-1.5 text-end text-slate-600">{priced > 0 ? usd(row.costUsd / priced) : '—'}</td>
                     </tr>
                   );
                 })}
@@ -588,24 +588,24 @@ function AiSpendPanel({ spend }: { spend: AiSpendView }) {
           </div>
 
           <div className="scroll-x">
-            <table className="w-full min-w-[20rem] text-left text-sm tabular-nums">
+            <table className="w-full min-w-[20rem] text-start text-sm tabular-nums">
               <caption className="sr-only">{t('aiSpendByWorkspace')}</caption>
               <thead className="text-xs text-slate-500">
                 <tr>
-                  <th className="py-1 pr-3 font-medium">{t('aiSpendWorkspace')}</th>
-                  <th className="py-1 pr-3 text-right font-medium">{t('aiSpendGenerationsShort')}</th>
-                  <th className="py-1 text-right font-medium">{t('aiSpendCost')}</th>
+                  <th className="py-1 pe-3 font-medium">{t('aiSpendWorkspace')}</th>
+                  <th className="py-1 pe-3 text-end font-medium">{t('aiSpendGenerationsShort')}</th>
+                  <th className="py-1 text-end font-medium">{t('aiSpendCost')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {spend.byWorkspace.map((row) => (
                   <tr key={row.workspaceId}>
-                    <td className="py-1.5 pr-3 text-slate-900">{row.name}</td>
-                    <td className="py-1.5 pr-3 text-right">{format.number(row.generations)}</td>
-                    <td className="py-1.5 text-right">
+                    <td className="py-1.5 pe-3 text-slate-900">{row.name}</td>
+                    <td className="py-1.5 pe-3 text-end">{format.number(row.generations)}</td>
+                    <td className="py-1.5 text-end">
                       {usd(row.costUsd)}
                       {row.unpriced > 0 && (
-                        <span className="ml-1 text-xs text-amber-700">{t('aiSpendPlusUnpriced', { count: row.unpriced })}</span>
+                        <span className="ms-1 text-xs text-amber-700">{t('aiSpendPlusUnpriced', { count: row.unpriced })}</span>
                       )}
                     </td>
                   </tr>

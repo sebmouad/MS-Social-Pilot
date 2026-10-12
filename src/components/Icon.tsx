@@ -366,6 +366,9 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
 };
 
+/** Icons that point along the reading direction, mirrored in right-to-left languages. */
+const DIRECTIONAL = new Set<IconName>(['chevronLeft', 'chevronRight', 'signOut', 'external']);
+
 export function Icon({
   name,
   size = 18,
@@ -387,7 +390,7 @@ export function Icon({
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={className}
+      className={DIRECTIONAL.has(name) ? `rtl:-scale-x-100 ${className ?? ''}` : className}
       aria-hidden
       focusable="false"
     >

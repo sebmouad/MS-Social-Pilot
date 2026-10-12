@@ -119,8 +119,8 @@ export function NotificationsClient({
           <div className="scroll-x mt-3">
             <table className="w-full min-w-[22rem] text-sm">
               <thead>
-                <tr className="text-left text-xs text-slate-500">
-                  <th scope="col" className="py-2 pr-3 font-medium">{t('perPagePage')}</th>
+                <tr className="text-start text-xs text-slate-500">
+                  <th scope="col" className="py-2 pe-3 font-medium">{t('perPagePage')}</th>
                   {columns.map((column) => (
                     <th key={column.event} scope="col" className="px-3 py-2 text-center font-medium">
                       {column.label}
@@ -131,7 +131,7 @@ export function NotificationsClient({
               <tbody className="divide-y divide-slate-100">
                 {pages.map((page) => (
                   <tr key={page.id}>
-                    <th scope="row" className="py-2 pr-3 text-left font-normal text-slate-800">{page.name}</th>
+                    <th scope="row" className="py-2 pe-3 text-start font-normal text-slate-800">{page.name}</th>
                     {columns.map((column) => {
                       const key = `${page.id}:${column.event}`;
                       return (

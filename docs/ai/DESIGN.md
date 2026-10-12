@@ -74,3 +74,13 @@ visible to root alone (PERMISSIONS.md).
 ## Before shipping UI
 Screenshot the screen at 1440 px and at phone width in the real browser, on real
 data, compare with the Simplified equivalent in `docs/inspiration/simplified/screens`.
+
+## Right-to-left
+
+The layout mirrors when a page is in a right-to-left language (`<html dir>`
+comes from the locale). Use logical classes only: `ms-*`/`me-*`, `ps-*`/`pe-*`,
+`start-*`/`end-*`, `text-start`/`text-end`, `border-s`/`border-e`,
+`rounded-s`/`rounded-e`. Never `ml-`, `pr-`, `left-`, `text-right` and the like.
+Icons that point along the reading direction are listed in `DIRECTIONAL` in
+`src/components/Icon.tsx` and flip on their own.
+

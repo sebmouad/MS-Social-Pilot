@@ -37,7 +37,7 @@ const SECTIONS: LegalSection[] = [
   {
     title: 'The data we process',
     body: (
-      <ul className="list-disc space-y-1 pl-5">
+      <ul className="list-disc space-y-1 ps-5">
         <li>Your account: name, email address and password (stored only as a one-way hash).</li>
         <li>
           What Facebook gives us when you connect your profile with Facebook Login: your Facebook name and ID,

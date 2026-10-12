@@ -318,33 +318,33 @@ export default async function ReportsPage({
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[42rem] text-sm">
                       <thead>
-                        <tr className="border-b border-slate-200 text-left text-[13px] font-semibold text-slate-600">
-                          <th scope="col" className="py-2 pr-3 font-medium">{t('destination')}</th>
+                        <tr className="border-b border-slate-200 text-start text-[13px] font-semibold text-slate-600">
+                          <th scope="col" className="py-2 pe-3 font-medium">{t('destination')}</th>
                           {/* Not the headline figure: that counts posts, this counts
                               the times each destination was posted to, so one post
                               to three Pages is 1 up there and 1+1+1 here. */}
-                          <th scope="col" className="py-2 pr-3 text-right font-medium">{t('postsSent')}</th>
-                          <th scope="col" className="py-2 pr-3 text-right font-medium">{t('impressions')}</th>
-                          <th scope="col" className="py-2 pr-3 text-right font-medium">{t('totalReach')}</th>
-                          <th scope="col" className="py-2 pr-3 text-right font-medium">{t('totalEngagement')}</th>
-                          <th scope="col" className="py-2 text-right font-medium">{t('linkClicksLifetime')}</th>
+                          <th scope="col" className="py-2 pe-3 text-end font-medium">{t('postsSent')}</th>
+                          <th scope="col" className="py-2 pe-3 text-end font-medium">{t('impressions')}</th>
+                          <th scope="col" className="py-2 pe-3 text-end font-medium">{t('totalReach')}</th>
+                          <th scope="col" className="py-2 pe-3 text-end font-medium">{t('totalEngagement')}</th>
+                          <th scope="col" className="py-2 text-end font-medium">{t('linkClicksLifetime')}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {report.destinations.map((row) => (
                           <tr key={row.targetId} className="border-b border-slate-100 last:border-0">
-                            <td className="py-2 pr-3 font-medium text-slate-800">{row.name}</td>
-                            <td className="py-2 pr-3 text-right text-slate-600">{row.posts}</td>
-                            <td className="py-2 pr-3 text-right text-slate-600">
+                            <td className="py-2 pe-3 font-medium text-slate-800">{row.name}</td>
+                            <td className="py-2 pe-3 text-end text-slate-600">{row.posts}</td>
+                            <td className="py-2 pe-3 text-end text-slate-600">
                               {row.impressions.toLocaleString(appLocale())}
                             </td>
-                            <td className="py-2 pr-3 text-right text-slate-600">
+                            <td className="py-2 pe-3 text-end text-slate-600">
                               {row.reach.toLocaleString(appLocale())}
                             </td>
-                            <td className="py-2 pr-3 text-right text-slate-600">
+                            <td className="py-2 pe-3 text-end text-slate-600">
                               {(row.reactions + row.comments + row.shares).toLocaleString(appLocale())}
                             </td>
-                            <td className="py-2 text-right text-slate-600">{row.clicks.toLocaleString(appLocale())}</td>
+                            <td className="py-2 text-end text-slate-600">{row.clicks.toLocaleString(appLocale())}</td>
                           </tr>
                         ))}
                       </tbody>

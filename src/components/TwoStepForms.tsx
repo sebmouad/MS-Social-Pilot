@@ -197,7 +197,7 @@ export function TotpSetup({ onFinished }: { onFinished: (codes: string[]) => voi
 
   return (
     <div className="space-y-4">
-      <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">
+      <ol className="list-decimal space-y-1 ps-5 text-sm text-slate-700">
         <li>{t('setupStep1')}</li>
         <li>{t('setupStep2')}</li>
         <li>{t('setupStep3')}</li>

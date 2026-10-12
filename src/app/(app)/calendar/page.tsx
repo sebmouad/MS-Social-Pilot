@@ -312,7 +312,7 @@ export default async function CalendarPage({
           {...(movable(post) && post.scheduledAt
             ? { draggable: true, 'data-drag-post': post.id, 'data-drag-time': formatInZone(post.scheduledAt, timezone, 'HH:mm') }
             : { draggable: false })}
-          className={`relative block overflow-hidden rounded-md border-l-[3px] bg-white px-2 py-1.5 shadow-surface transition-shadow hover:shadow-md ${
+          className={`relative block overflow-hidden rounded-md border-s-[3px] bg-white px-2 py-1.5 shadow-surface transition-shadow hover:shadow-md ${
             STATUS_EDGE[post.status] ?? 'border-l-slate-400'
           }`}
           title={post.message || post.link || ''}
@@ -338,7 +338,7 @@ export default async function CalendarPage({
             </span>
             <span className="sr-only">{tStatus(`post.${post.status}`)}</span>
             {post.labels.length > 0 && (
-              <span className="ml-auto flex shrink-0 items-center gap-0.5">
+              <span className="ms-auto flex shrink-0 items-center gap-0.5">
                 {post.labels.slice(0, 3).map((row) => {
                   const label = labelById.get(row.labelId);
                   return label ? (
@@ -420,7 +420,7 @@ export default async function CalendarPage({
               aria-hidden
               className={`relative h-5 w-9 rounded-full transition-colors ${hideDrafts ? 'bg-slate-300' : 'bg-brand-500'}`}
             >
-              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${hideDrafts ? 'left-0.5' : 'left-[18px]'}`} />
+              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${hideDrafts ? 'start-0.5' : 'start-[18px]'}`} />
             </span>
             {t('showDrafts')}
           </Link>
@@ -575,7 +575,7 @@ export default async function CalendarPage({
               <div
                 key={key}
                 data-drop-day={key}
-                className={`group/day min-h-[8rem] min-w-0 border-b border-r border-slate-200 p-1 sm:p-2 ${
+                className={`group/day min-h-[8rem] min-w-0 border-b border-e border-slate-200 p-1 sm:p-2 ${
                   key === todayKey ? 'bg-brand-50/60' : inMonth ? (key < todayKey ? 'bg-slate-50' : 'bg-white') : 'bg-slate-100/70'
                 }`}
               >

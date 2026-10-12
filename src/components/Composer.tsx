@@ -789,7 +789,7 @@ export function Composer({
                       <button
                         type="button"
                         aria-label={t('removeAttachment')}
-                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-xs text-white"
+                        className="absolute -end-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-xs text-white"
                         onClick={() => setMedia((current) => current.filter((entry) => entry.id !== item.id))}
                       >
                         ×

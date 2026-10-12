@@ -56,7 +56,7 @@ export default async function RootBackupsPage() {
         <section className="card space-y-2 p-4 text-sm text-slate-700 sm:p-5">
           <h2 className="font-semibold text-slate-900">{t('setupTitle')}</h2>
           <p>{t('setupIntro')}</p>
-          <ol className="list-decimal space-y-1 pl-5">
+          <ol className="list-decimal space-y-1 ps-5">
             <li>{t('setup1')}</li>
             <li>{t('setup2')}</li>
             <li>{t('setup3')}</li>
@@ -70,7 +70,7 @@ export default async function RootBackupsPage() {
             {runs.map((run) => (
               <li key={run.id} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-2 text-sm">
                 <span className="min-w-0">
-                  <span className={`badge mr-2 ${run.status === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  <span className={`badge me-2 ${run.status === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                     {run.status === 'ok' ? t('ok') : t('failed')}
                   </span>
                   <span className="font-medium text-slate-900">{run.kind === 'offsite' ? t('kindOffsite') : t('kindRestore')}</span>

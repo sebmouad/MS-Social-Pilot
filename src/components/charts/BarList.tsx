@@ -83,7 +83,7 @@ export function BarList({
                 this palette's lighter hues need a readable number beside them,
                 and a bar list is short enough that labelling all of it is
                 still calm. */}
-            <span className="nums w-16 text-right text-xs font-medium text-slate-700">
+            <span className="nums w-16 text-end text-xs font-medium text-slate-700">
               {format(row.value)}
             </span>
           </li>

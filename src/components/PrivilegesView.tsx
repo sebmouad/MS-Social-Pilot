@@ -25,10 +25,10 @@ export async function PrivilegesView({
       <section className="card p-0">
         <h2 className="px-4 pt-4 text-sm font-semibold text-slate-900">{t('matrix')}</h2>
         <div className="scroll-x px-4 pb-4">
-          <table className="mt-3 w-full min-w-[32rem] text-left text-sm">
+          <table className="mt-3 w-full min-w-[32rem] text-start text-sm">
             <thead className="text-xs text-slate-500">
               <tr>
-                <th className="py-2 pr-3 font-medium">{t('capability')}</th>
+                <th className="py-2 pe-3 font-medium">{t('capability')}</th>
                 {ROLES_BY_RANK.map((role) => (
                   <th key={role} className="px-2 py-2 text-center font-medium">{tRoles(role)}</th>
                 ))}
@@ -37,7 +37,7 @@ export async function PrivilegesView({
             <tbody className="divide-y divide-slate-100">
               {capabilities.map((capability) => (
                 <tr key={capability}>
-                  <td className="py-2 pr-3 text-slate-900">{t(`capabilities.${capability}`)}</td>
+                  <td className="py-2 pe-3 text-slate-900">{t(`capabilities.${capability}`)}</td>
                   {ROLES_BY_RANK.map((role) => {
                     const allowed = atLeast(role, CAPABILITIES[capability]);
                     return (
@@ -58,30 +58,30 @@ export async function PrivilegesView({
       <section className="card p-0">
         <h2 className="px-4 pt-4 text-sm font-semibold text-slate-900">{t('members', { count: members.length })}</h2>
         <div className="scroll-x px-4 pb-4">
-          <table className="mt-3 w-full min-w-[40rem] text-left text-sm">
+          <table className="mt-3 w-full min-w-[40rem] text-start text-sm">
             <thead className="text-xs text-slate-500">
               <tr>
-                {showWorkspace && <th className="py-2 pr-3 font-medium">{t('workspace')}</th>}
-                <th className="py-2 pr-3 font-medium">{t('person')}</th>
-                <th className="py-2 pr-3 font-medium">{t('role')}</th>
-                <th className="py-2 pr-3 font-medium">{t('pages')}</th>
+                {showWorkspace && <th className="py-2 pe-3 font-medium">{t('workspace')}</th>}
+                <th className="py-2 pe-3 font-medium">{t('person')}</th>
+                <th className="py-2 pe-3 font-medium">{t('role')}</th>
+                <th className="py-2 pe-3 font-medium">{t('pages')}</th>
                 <th className="py-2 font-medium">{t('lastSignIn')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {members.map((member, index) => (
                 <tr key={`${member.workspace}-${member.email}-${index}`}>
-                  {showWorkspace && <td className="py-2 pr-3 text-slate-600">{member.workspace}</td>}
-                  <td className="py-2 pr-3">
+                  {showWorkspace && <td className="py-2 pe-3 text-slate-600">{member.workspace}</td>}
+                  <td className="py-2 pe-3">
                     <span className="font-medium text-slate-900">{member.name}</span>
                     <span className="block text-xs text-slate-500">{member.email}</span>
                   </td>
-                  <td className="py-2 pr-3 text-slate-700">
+                  <td className="py-2 pe-3 text-slate-700">
                     {tRoles(member.role)}
-                    {member.isRoot && <span className="badge ml-1 bg-amber-100 text-amber-800">{t('root')}</span>}
-                    {member.disabled && <span className="badge ml-1 bg-red-100 text-red-700">{t('disabled')}</span>}
+                    {member.isRoot && <span className="badge ms-1 bg-amber-100 text-amber-800">{t('root')}</span>}
+                    {member.disabled && <span className="badge ms-1 bg-red-100 text-red-700">{t('disabled')}</span>}
                   </td>
-                  <td className="py-2 pr-3 text-slate-600">{member.pages === null ? t('allPages') : t('somePages', { count: member.pages })}</td>
+                  <td className="py-2 pe-3 text-slate-600">{member.pages === null ? t('allPages') : t('somePages', { count: member.pages })}</td>
                   <td className="py-2 text-slate-600">
                     {member.lastSignIn ? format.dateTime(new Date(member.lastSignIn), { dateStyle: 'medium' }) : t('never')}
                   </td>

@@ -140,12 +140,12 @@ export default async function RootWorkerPage() {
 
             {objects.length > 0 && (
               <div className="scroll-x">
-                <table className="w-full min-w-[28rem] text-left text-sm">
+                <table className="w-full min-w-[28rem] text-start text-sm">
                   <caption className="sr-only">{t('objectsTitle')}</caption>
                   <thead className="text-xs text-slate-500">
                     <tr>
-                      <th scope="col" className="py-1.5 pr-3 font-medium">{t('object')}</th>
-                      <th scope="col" className="py-1.5 pr-3 font-medium">{t('objectUsage')}</th>
+                      <th scope="col" className="py-1.5 pe-3 font-medium">{t('object')}</th>
+                      <th scope="col" className="py-1.5 pe-3 font-medium">{t('objectUsage')}</th>
                       <th scope="col" className="py-1.5 font-medium">{t('objectState')}</th>
                     </tr>
                   </thead>
@@ -154,10 +154,10 @@ export default async function RootWorkerPage() {
                       const blocked = object.blockedUntil !== null && object.blockedUntil > now;
                       return (
                         <tr key={object.id}>
-                          <td className="py-1.5 pr-3 text-slate-900">
+                          <td className="py-1.5 pe-3 text-slate-900">
                             {names.get(object.id) ?? <span className="font-mono text-xs">{object.id}</span>}
                           </td>
-                          <td className="nums py-1.5 pr-3">{Math.round(object.percent)}%</td>
+                          <td className="nums py-1.5 pe-3">{Math.round(object.percent)}%</td>
                           <td className={`py-1.5 ${blocked ? 'text-red-700' : 'text-slate-600'}`}>
                             {blocked ? t('blockedUntil', { when: when(object.blockedUntil) }) : t('reading')}
                           </td>

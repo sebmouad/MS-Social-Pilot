@@ -69,7 +69,7 @@ export function StatTile({
             {/* The arrow is the second channel: the direction never rests on
                 colour alone. */}
             {delta >= 0 ? '↑' : '↓'} {Math.abs(delta)}%
-            {deltaLabel && <span className="ml-1 font-normal text-slate-500">{deltaLabel}</span>}
+            {deltaLabel && <span className="ms-1 font-normal text-slate-500">{deltaLabel}</span>}
           </p>
         ) : (
           <span />

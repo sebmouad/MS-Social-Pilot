@@ -99,8 +99,14 @@ test('root sees AI spend and can only save prices written as model=input/output'
   await expect(page.getByText(/No AI generations in the last 30 days|Aucune génération IA/)).toBeVisible();
 
   const prices = page.locator('#ai\\.priceOverrides');
-  await prices.fill('my-model=$2');
-  await page.getByRole('button', { name: /^(Save|Enregistrer)$/ }).click();
+  const save = page.getByRole('button', { name: /^(Save|Enregistrer)$/ });
+  // Typed before hydration, the change never reaches React and Save stays off.
+  await expect(async () => {
+    await prices.fill('');
+    await prices.fill('my-model=$2');
+    await expect(save).toBeEnabled({ timeout: 1000 });
+  }).toPass();
+  await save.click();
   await expect(page.getByText(/Write each price as model=input\/output/)).toBeVisible();
 
   await prices.fill('my-model=2/10');

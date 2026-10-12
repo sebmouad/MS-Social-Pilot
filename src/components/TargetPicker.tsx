@@ -166,7 +166,7 @@ export function TargetPicker({ targets, selected, onChange, groups = [] }: Props
                   </span>
                 )}
                 {/* Which network, at a glance, once there is more than Facebook. */}
-                <NetworkMark network={target.type} size={14} className="absolute -bottom-0.5 -right-0.5 ring-2 ring-white" />
+                <NetworkMark network={target.type} size={14} className="absolute -bottom-0.5 -end-0.5 ring-2 ring-white" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-slate-900">{target.name}</span>

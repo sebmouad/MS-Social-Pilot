@@ -209,12 +209,12 @@ export function GroupsAndLabels({
                   {members.length > 0 ? (
                     <ul className="mt-3 flex items-center" aria-label={t('pagesIn', { name: group.name })}>
                       {members.slice(0, 7).map((page, index) => (
-                        <li key={page.id} className={`rounded-full ring-2 ring-white ${index ? '-ml-2' : ''}`} title={page.name}>
+                        <li key={page.id} className={`rounded-full ring-2 ring-white ${index ? '-ms-2' : ''}`} title={page.name}>
                           <FeedAvatar name={page.name} pictureUrl={page.pictureUrl} size="sm" />
                         </li>
                       ))}
                       {members.length > 7 && (
-                        <li className="-ml-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 ring-2 ring-white">
+                        <li className="-ms-2 flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 ring-2 ring-white">
                           +{members.length - 7}
                         </li>
                       )}

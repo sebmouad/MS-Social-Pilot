@@ -108,7 +108,7 @@ export function ExportMenu({
           id={menuId}
           role="menu"
           aria-label={tCommon('export')}
-          className="absolute right-0 z-10 mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+          className="absolute end-0 z-10 mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
         >
           {KINDS.map((kind) => (
             <a

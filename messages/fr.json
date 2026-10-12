@@ -7,10 +7,6 @@
     "emailHint": "Votre adresse e-mail sert à vous connecter et ne peut pas être modifiée ici.",
     "failed": "Cela n’a pas fonctionné. Veuillez réessayer.",
     "language": "Langue",
-    "languages": {
-      "en": "English",
-      "fr": "Français"
-    },
     "name": "Nom",
     "newPassword": "Nouveau mot de passe",
     "password": "Mot de passe",

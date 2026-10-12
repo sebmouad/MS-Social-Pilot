@@ -174,7 +174,7 @@ export default async function AnalyticsPage({
           allLabel={view === 'posts' ? t('allSelected', { count: pages.length }) : undefined}
         />
 
-        <div className="ml-auto">
+        <div className="ms-auto">
           <ExportMenu targetId={selected.id} from={from.toISOString()} to={to.toISOString()} />
         </div>
       </div>
@@ -524,13 +524,13 @@ async function VideosView({
               )}
               <span aria-hidden className="absolute inset-0 flex items-center justify-center">
                 <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-black/50 text-white">
-                  <svg viewBox="0 0 24 24" className="ml-0.5 h-6 w-6" fill="currentColor">
+                  <svg viewBox="0 0 24 24" className="ms-0.5 h-6 w-6" fill="currentColor">
                     <path d="M8 5v14l11-7z" />
                   </svg>
                 </span>
               </span>
               {video.lengthSeconds !== null && (
-                <span className="nums absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-xs font-semibold text-white">
+                <span className="nums absolute bottom-2 end-2 rounded bg-black/70 px-1.5 py-0.5 text-xs font-semibold text-white">
                   {duration(video.lengthSeconds)}
                 </span>
               )}
@@ -1053,12 +1053,12 @@ async function InstagramView({
       ) : (
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[620px] text-sm">
-            <thead className="border-b border-slate-200 text-left text-[13px] font-semibold text-slate-600">
+            <thead className="border-b border-slate-200 text-start text-[13px] font-semibold text-slate-600">
               <tr>
                 <th className="px-4 py-3">{t('metric')}</th>
                 <th className="px-4 py-3">{t('period')}</th>
-                <th className="px-4 py-3 text-right">{t('total')}</th>
-                <th className="px-4 py-3 text-right">{t('points')}</th>
+                <th className="px-4 py-3 text-end">{t('total')}</th>
+                <th className="px-4 py-3 text-end">{t('points')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1071,10 +1071,10 @@ async function InstagramView({
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-slate-500">{entry.period}</td>
-                  <td className="px-4 py-2.5 text-right">
+                  <td className="px-4 py-2.5 text-end">
                     {entry.total === null ? t('breakdown') : entry.total.toLocaleString(appLocale())}
                   </td>
-                  <td className="px-4 py-2.5 text-right text-slate-500">{entry.points.length}</td>
+                  <td className="px-4 py-2.5 text-end text-slate-500">{entry.points.length}</td>
                 </tr>
               ))}
             </tbody>
@@ -1085,14 +1085,14 @@ async function InstagramView({
       {media.length > 0 && (
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="border-b border-slate-200 text-left text-[13px] font-semibold text-slate-600">
+            <thead className="border-b border-slate-200 text-start text-[13px] font-semibold text-slate-600">
               <tr>
                 <th className="px-4 py-3">{t('media')}</th>
-                <th className="px-4 py-3 text-right">{t('reach')}</th>
-                <th className="px-4 py-3 text-right">{t('impressions')}</th>
-                <th className="px-4 py-3 text-right">{t('likes')}</th>
-                <th className="px-4 py-3 text-right">{t('comments')}</th>
-                <th className="px-4 py-3 text-right">{t('saved')}</th>
+                <th className="px-4 py-3 text-end">{t('reach')}</th>
+                <th className="px-4 py-3 text-end">{t('impressions')}</th>
+                <th className="px-4 py-3 text-end">{t('likes')}</th>
+                <th className="px-4 py-3 text-end">{t('comments')}</th>
+                <th className="px-4 py-3 text-end">{t('saved')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1112,11 +1112,11 @@ async function InstagramView({
                       {item.mediaType ?? '—'} · {formatInZone(item.timestamp, timezone)}
                     </p>
                   </td>
-                  <td className="px-4 py-3 text-right">{item.reach?.toLocaleString(appLocale()) ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">{item.impressions?.toLocaleString(appLocale()) ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">{item.likeCount?.toLocaleString(appLocale()) ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">{item.commentsCount?.toLocaleString(appLocale()) ?? '—'}</td>
-                  <td className="px-4 py-3 text-right">{item.saved?.toLocaleString(appLocale()) ?? '—'}</td>
+                  <td className="px-4 py-3 text-end">{item.reach?.toLocaleString(appLocale()) ?? '—'}</td>
+                  <td className="px-4 py-3 text-end">{item.impressions?.toLocaleString(appLocale()) ?? '—'}</td>
+                  <td className="px-4 py-3 text-end">{item.likeCount?.toLocaleString(appLocale()) ?? '—'}</td>
+                  <td className="px-4 py-3 text-end">{item.commentsCount?.toLocaleString(appLocale()) ?? '—'}</td>
+                  <td className="px-4 py-3 text-end">{item.saved?.toLocaleString(appLocale()) ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

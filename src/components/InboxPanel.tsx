@@ -102,7 +102,7 @@ export function InboxPanel({
 
       <div className="card grid overflow-hidden lg:grid-cols-[340px_minmax(0,1fr)]">
         {/* The threads. */}
-        <ul className="max-h-[32rem] overflow-y-auto border-b border-slate-200 p-2 lg:max-h-[40rem] lg:border-b-0 lg:border-r">
+        <ul className="max-h-[32rem] overflow-y-auto border-b border-slate-200 p-2 lg:max-h-[40rem] lg:border-b-0 lg:border-e">
           {threads.map((entry) => {
             const active = entry.id === thread?.id;
             const last = entry.messages[0];
@@ -116,7 +116,7 @@ export function InboxPanel({
                     setError(null);
                   }}
                   aria-current={active ? 'true' : undefined}
-                  className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left ${
+                  className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-start ${
                     active ? 'bg-brand-50' : 'hover:bg-slate-100'
                   }`}
                 >
@@ -164,10 +164,10 @@ export function InboxPanel({
             <ul className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4">
               {[...thread.messages].reverse().map((message) => (
                 <li key={message.id} className={`flex ${message.fromPage ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] ${message.fromPage ? 'text-right' : ''}`}>
+                  <div className={`max-w-[75%] ${message.fromPage ? 'text-end' : ''}`}>
                     {!message.fromPage && <span className="sr-only">{message.from}: </span>}
                     <p
-                      className={`inline-block whitespace-pre-wrap rounded-[18px] px-3 py-2 text-left text-[15px] leading-5 [overflow-wrap:anywhere] ${
+                      className={`inline-block whitespace-pre-wrap rounded-[18px] px-3 py-2 text-start text-[15px] leading-5 [overflow-wrap:anywhere] ${
                         message.fromPage ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-900'
                       }`}
                       title={message.timeLabel}

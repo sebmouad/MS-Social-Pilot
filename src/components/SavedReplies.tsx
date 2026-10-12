@@ -96,7 +96,7 @@ export function useSavedReplies(options: {
       title={t('hint')}
     >
       <Icon name="comment" size={18} />
-      <span className="ml-1 hidden sm:inline">{t('button')}</span>
+      <span className="ms-1 hidden sm:inline">{t('button')}</span>
     </button>
   );
 
@@ -117,7 +117,7 @@ export function useSavedReplies(options: {
             <li key={reply.id}>
               <button
                 type="button"
-                className="w-full rounded-lg px-2 py-1.5 text-left hover:bg-slate-100 focus-visible:bg-slate-100"
+                className="w-full rounded-lg px-2 py-1.5 text-start hover:bg-slate-100 focus-visible:bg-slate-100"
                 onClick={() => pick(reply)}
               >
                 <span className="block text-sm font-semibold text-slate-900">{reply.name}</span>

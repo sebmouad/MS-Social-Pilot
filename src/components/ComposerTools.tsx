@@ -112,14 +112,14 @@ export function ComposerTools({
       >
         <span aria-hidden>😊</span>
       </button>
-      <span className="nums ml-auto flex items-center gap-3 text-xs text-slate-500" aria-live="polite">
+      <span className="nums ms-auto flex items-center gap-3 text-xs text-slate-500" aria-live="polite">
         <span>{t('characters', { count: countCharacters(text) })}</span>
         <span title={t('hashtagCount', { count: hashtags })}># {hashtags}</span>
         <span title={t('mentionCount', { count: mentions })}>@ {mentions}</span>
       </span>
 
       {open === 'emoji' && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+        <div className="absolute start-0 top-full z-30 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
           <div className="grid grid-cols-8 gap-0.5" role="group" aria-label={t('emoji')}>
             {EMOJI.map((emoji) => (
               <button
@@ -137,7 +137,7 @@ export function ComposerTools({
       )}
 
       {open === 'snippets' && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+        <div className="absolute start-0 top-full z-30 mt-1 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
           <ul className="max-h-60 overflow-y-auto py-1">
             {snippets === null && <li className="px-3 py-2 text-xs text-slate-500">{t('loadingSnippets')}</li>}
             {snippets?.length === 0 && <li className="px-3 py-2 text-xs text-slate-500">{t('noSnippets')}</li>}
@@ -145,7 +145,7 @@ export function ComposerTools({
               <li key={snippet.id} className="group flex items-start gap-1 px-1">
                 <button
                   type="button"
-                  className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left hover:bg-slate-50"
+                  className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-start hover:bg-slate-50"
                   onClick={() => {
                     insert(snippet.body);
                     setOpen(null);

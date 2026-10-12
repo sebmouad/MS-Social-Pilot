@@ -5,6 +5,7 @@ import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { ServiceWorker } from '@/components/ServiceWorker';
 import { getAuthContext } from '@/lib/auth';
 import { env } from '@/lib/env';
+import { textDirection } from '@/lib/languages';
 import { DEFAULT_THEME } from '@/lib/themes';
 
 import './globals.css';
@@ -44,7 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const auth = await getAuthContext().catch(() => null);
 
   return (
-    <html lang={locale} data-theme={auth?.user.theme ?? DEFAULT_THEME}>
+    <html lang={locale} dir={textDirection(locale)} data-theme={auth?.user.theme ?? DEFAULT_THEME}>
       <body>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}

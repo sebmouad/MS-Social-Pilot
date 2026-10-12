@@ -91,7 +91,7 @@ export async function DateRangePicker({
         <Icon name="chevronRight" size={16} className="rotate-90 transition-transform group-open:-rotate-90" />
       </summary>
 
-      <div className="absolute left-0 z-30 mt-2 w-[19rem] max-w-[calc(100vw-2rem)] rounded-lg bg-white p-2 shadow-lg ring-1 ring-black/5">
+      <div className="absolute start-0 z-30 mt-2 w-[19rem] max-w-[calc(100vw-2rem)] rounded-lg bg-white p-2 shadow-lg ring-1 ring-black/5">
         <ul className="grid gap-0.5" aria-label={t('presets')}>
           {RANGE_PRESETS.filter((preset) => !maxDays || PRESET_SPAN[preset] <= maxDays).map((preset) => {
             const active = range.key === preset;

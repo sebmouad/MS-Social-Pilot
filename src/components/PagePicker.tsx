@@ -34,7 +34,7 @@ export function PagePicker({
     <label>
       <span className="sr-only">{t('choosePage')}</span>
       <select
-        className="h-10 w-auto max-w-[14rem] cursor-pointer rounded-md border-0 bg-slate-200 py-0 pl-3.5 pr-8 text-[15px] font-semibold text-slate-900 hover:bg-slate-300 focus:ring-2 focus:ring-brand-500"
+        className="h-10 w-auto max-w-[14rem] cursor-pointer rounded-md border-0 bg-slate-200 py-0 ps-3.5 pe-8 text-[15px] font-semibold text-slate-900 hover:bg-slate-300 focus:ring-2 focus:ring-brand-500"
         value={selectedId}
         onChange={(event) =>
           router.push(`/analytics?view=${view}${event.target.value ? `&target=${event.target.value}` : ''}&${rangeQuery}`)

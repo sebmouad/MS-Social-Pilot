@@ -128,7 +128,7 @@ export default async function InboxPage({
                 <p className="mt-1 text-sm font-semibold text-slate-900">{item.author || t('someone')}</p>
                 <p className="mt-0.5 whitespace-pre-line break-words text-sm text-slate-800">{item.text || t('noText')}</p>
                 {item.postMessage && (
-                  <p className="mt-2 line-clamp-2 border-l-2 border-slate-200 pl-2 text-xs text-slate-500">
+                  <p className="mt-2 line-clamp-2 border-s-2 border-slate-200 ps-2 text-xs text-slate-500">
                     {t('onPost', { post: item.postMessage })}
                   </p>
                 )}

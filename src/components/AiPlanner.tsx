@@ -107,7 +107,7 @@ export function AiPlanner({
                     type="button"
                     aria-pressed={pageId === page.id}
                     onClick={() => setPageId(page.id)}
-                    className={`inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-sm font-semibold ${
+                    className={`inline-flex items-center gap-1.5 rounded-full py-1 ps-1 pe-3 text-sm font-semibold ${
                       pageId === page.id ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >

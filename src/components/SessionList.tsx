@@ -73,7 +73,7 @@ export function SessionList({
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-slate-900">
                 {deviceName(row)}
-                {row.current && <span className="badge ml-2 bg-emerald-100 text-emerald-700">{t('thisBrowser')}</span>}
+                {row.current && <span className="badge ms-2 bg-emerald-100 text-emerald-700">{t('thisBrowser')}</span>}
               </p>
               {showUser && row.user && (
                 <p className="truncate text-xs text-slate-600">

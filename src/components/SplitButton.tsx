@@ -59,7 +59,7 @@ export function SplitButton<V extends string>({
     <div ref={box} className="relative flex flex-1">
       <button
         type="button"
-        className="btn-primary flex-1 rounded-r-none"
+        className="btn-primary flex-1 rounded-e-none"
         disabled={disabled}
         aria-describedby={describedBy}
         onClick={onClick}
@@ -73,7 +73,7 @@ export function SplitButton<V extends string>({
           // Still opens while the main button cannot send: changing the mode is
           // allowed before the post is ready. It only looks the same, so the
           // pair reads as one control.
-          className={`btn-primary rounded-l-none border-l border-white/30 px-2.5 ${disabled ? 'opacity-50' : ''}`}
+          className={`btn-primary rounded-s-none border-s border-white/30 px-2.5 ${disabled ? 'opacity-50' : ''}`}
           aria-label={menuLabel}
           aria-haspopup="menu"
           aria-expanded={open}
@@ -86,7 +86,7 @@ export function SplitButton<V extends string>({
         <div
           role="menu"
           aria-label={menuLabel}
-          className="absolute bottom-full right-0 z-30 mb-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+          className="absolute bottom-full end-0 z-30 mb-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
         >
           {options.map((option) => (
             <button
@@ -95,7 +95,7 @@ export function SplitButton<V extends string>({
               role="menuitemradio"
               aria-checked={option.value === value}
               disabled={option.disabled}
-              className={`flex w-full items-start gap-2.5 px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50 ${
+              className={`flex w-full items-start gap-2.5 px-3 py-2 text-start disabled:cursor-not-allowed disabled:opacity-50 ${
                 option.value === value ? 'bg-brand-50' : 'hover:bg-slate-50'
               }`}
               onClick={() => {

@@ -137,7 +137,7 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
       <div ref={menuRef} className="relative">
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-left text-[15px] font-semibold text-slate-900 hover:bg-slate-200"
+          className="flex w-full items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-start text-[15px] font-semibold text-slate-900 hover:bg-slate-200"
           aria-haspopup="listbox"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
@@ -155,7 +155,7 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
           <div
             role="listbox"
             aria-label={t('chooseGroup')}
-            className="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+            className="absolute start-0 end-0 z-30 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
           >
             <GroupOption
               selected={!activeGroup}
@@ -196,9 +196,9 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
       {universe.length > 6 && (
         <label className="relative block">
           <span className="sr-only">{t('search')}</span>
-          <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Icon name="search" size={15} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            className="input rounded-full bg-slate-100 py-1.5 pl-8 text-sm"
+            className="input rounded-full bg-slate-100 py-1.5 ps-8 text-sm"
             placeholder={t('search')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -220,10 +220,10 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
           const on = shown.has(page.id);
           const alone = on && shownCount === 1;
           return (
-            <li key={page.id} className="group flex items-center gap-1 rounded-lg pr-1 hover:bg-slate-100">
+            <li key={page.id} className="group flex items-center gap-1 rounded-lg pe-1 hover:bg-slate-100">
               <button
                 type="button"
-                className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left ${on ? '' : 'opacity-45'}`}
+                className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-start ${on ? '' : 'opacity-45'}`}
                 title={alone ? t('showOthers') : t('onlyThis', { page: page.name })}
                 aria-pressed={alone}
                 onClick={() => solo(page.id)}
@@ -231,7 +231,7 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
                 <span className="relative shrink-0">
                   <FeedAvatar name={page.name} pictureUrl={page.pictureUrl} size="sm" />
                   {page.type !== 'page' && (
-                    <NetworkMark network={page.type} size={13} className="absolute -bottom-0.5 -right-0.5 ring-2 ring-white" />
+                    <NetworkMark network={page.type} size={13} className="absolute -bottom-0.5 -end-0.5 ring-2 ring-white" />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -356,7 +356,7 @@ function GroupOption({
       type="button"
       role="option"
       aria-selected={selected}
-      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm ${
+      className={`flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm ${
         selected ? 'bg-brand-50 font-semibold text-brand-700' : 'text-slate-800 hover:bg-slate-50'
       }`}
       onClick={onSelect}

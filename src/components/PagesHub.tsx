@@ -194,7 +194,7 @@ export async function PagesHub({
                       <Icon name={link.icon} size={18} />
                       <span className="truncate">{link.label}</span>
                       {link.count ? (
-                        <span className="nums absolute right-2 top-0.5 min-w-[18px] rounded-full bg-rose-500 px-1 text-center text-[11px] font-bold leading-[18px] text-white">
+                        <span className="nums absolute end-2 top-0.5 min-w-[18px] rounded-full bg-rose-500 px-1 text-center text-[11px] font-bold leading-[18px] text-white">
                           {link.count > 99 ? '99+' : link.count.toLocaleString(appLocale())}
                         </span>
                       ) : null}

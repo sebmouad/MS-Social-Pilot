@@ -337,7 +337,7 @@ export function AnalyticsClient({
                         <span className="hidden sm:block">
                           <Sparkline values={numeric} />
                         </span>
-                        <span className="text-right">
+                        <span className="text-end">
                           <span className="block text-lg font-semibold text-slate-900">
                             {entry.total !== null ? compact(entry.total, locale) : '—'}
                           </span>
@@ -379,7 +379,7 @@ export function AnalyticsClient({
                         type="button"
                         onClick={() => setFeatured(key)}
                         aria-pressed={Boolean(isFeatured)}
-                        className={`-mx-2 flex w-[calc(100%+1rem)] rounded-lg px-2 py-1 text-left transition-colors hover:bg-slate-50 ${
+                        className={`-mx-2 flex w-[calc(100%+1rem)] rounded-lg px-2 py-1 text-start transition-colors hover:bg-slate-50 ${
                           isFeatured ? 'bg-brand-50/60' : ''
                         }`}
                       >
@@ -422,7 +422,7 @@ export function AnalyticsClient({
         <section className="card-viz">
           <button
             type="button"
-            className="flex w-full items-center justify-between gap-2 text-left"
+            className="flex w-full items-center justify-between gap-2 text-start"
             aria-expanded={showUnavailable}
             onClick={() => setShowUnavailable((value) => !value)}
           >

@@ -1,4 +1,7 @@
+import { Locale } from '@prisma/client';
+
 import { PRICE_OVERRIDE_PATTERN, PRICES_CHECKED } from '../ai-prices';
+import { languageName } from '../languages';
 
 /**
  * The registry of everything an operator can change without a redeploy.
@@ -121,10 +124,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     description: 'The language used before anyone signs in, when the browser asks for neither.',
     default: 'en',
     env: 'DEFAULT_LOCALE',
-    options: [
-      { value: 'en', label: 'English' },
-      { value: 'fr', label: 'Français' },
-    ],
+    options: Object.values(Locale).map((value) => ({ value, label: languageName(value) })),
     hint: 'A signed-in person always sees their own language, and their browser’s preference wins over this. It decides the login and registration screens for a first-time visitor.',
   },
   {

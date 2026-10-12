@@ -140,7 +140,7 @@ export default async function SharePage({
           ) : (
             <span className="text-[15px] font-bold text-slate-900">{link.workspace.name}</span>
           )}
-          <span className="ml-auto rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+          <span className="ms-auto rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
             {link.kind === 'portal' ? t('portalBadge') : link.kind === 'review' ? t('reviewBadge') : t('calendarBadge')}
           </span>
         </div>

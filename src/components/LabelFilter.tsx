@@ -74,7 +74,7 @@ export function LabelFilter({ labels, active }: { labels: LabelOption[]; active:
         <div
           role="listbox"
           aria-label={t('filterBy')}
-          className="absolute right-0 z-30 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+          className="absolute end-0 z-30 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
         >
           {[{ id: null, name: t('allLabels'), color: '' }, ...labels].map((label) => (
             <button
@@ -82,7 +82,7 @@ export function LabelFilter({ labels, active }: { labels: LabelOption[]; active:
               type="button"
               role="option"
               aria-selected={label.id === (current?.id ?? null)}
-              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm ${
+              className={`flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm ${
                 label.id === (current?.id ?? null) ? 'bg-brand-50 font-semibold text-brand-700' : 'text-slate-800 hover:bg-slate-50'
               }`}
               onClick={() => choose(label.id)}

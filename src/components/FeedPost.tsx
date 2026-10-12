@@ -333,7 +333,7 @@ function PlayBadge({ small = false }: { small?: boolean }) {
           small ? 'h-10 w-10' : 'h-16 w-16'
         }`}
       >
-        <svg viewBox="0 0 24 24" className={small ? 'ml-0.5 h-5 w-5' : 'ml-1 h-8 w-8'} fill="currentColor">
+        <svg viewBox="0 0 24 24" className={small ? 'ms-0.5 h-5 w-5' : 'ms-1 h-8 w-8'} fill="currentColor">
           <path d="M8 5v14l11-7z" />
         </svg>
       </span>

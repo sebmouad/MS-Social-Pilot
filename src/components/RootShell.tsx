@@ -53,7 +53,7 @@ export function RootShell({ userName, children }: { userName: string; children: 
 
   return (
     <div className="min-h-screen lg:flex">
-      <header className="border-b border-slate-200 bg-white lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
+      <header className="border-b border-slate-200 bg-white lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-e">
         <div className="flex items-center gap-2.5 px-3 py-3 lg:pt-4">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
             <Icon name="shield" size={20} />
@@ -64,7 +64,7 @@ export function RootShell({ userName, children }: { userName: string; children: 
           </span>
           <button
             type="button"
-            className="ml-auto flex h-10 w-10 items-center justify-center rounded-full text-slate-700 hover:bg-slate-100 lg:hidden"
+            className="ms-auto flex h-10 w-10 items-center justify-center rounded-full text-slate-700 hover:bg-slate-100 lg:hidden"
             aria-expanded={open}
             aria-controls="root-menu"
             onClick={() => setOpen((value) => !value)}

@@ -186,7 +186,7 @@ export function QueueClient({
                   <Link
                     href={entry.id ? `/queue?for=${entry.id}` : '/queue'}
                     aria-current={active ? 'page' : undefined}
-                    className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3.5 text-sm font-semibold ring-1 ring-inset transition-colors ${
+                    className={`flex items-center gap-2 rounded-full py-1 ps-1 pe-3.5 text-sm font-semibold ring-1 ring-inset transition-colors ${
                       active ? 'bg-brand-50 text-brand-700 ring-brand-300' : 'bg-white text-slate-800 ring-slate-200 hover:bg-slate-50'
                     }`}
                   >
@@ -420,7 +420,7 @@ export function QueueClient({
                     <li key={entry.iso} className="flex gap-3">
                       <time
                         dateTime={entry.iso}
-                        className="nums w-12 shrink-0 pt-3 text-right text-sm font-semibold text-slate-900"
+                        className="nums w-12 shrink-0 pt-3 text-end text-sm font-semibold text-slate-900"
                         title={entry.label}
                       >
                         {entry.time}

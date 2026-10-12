@@ -91,7 +91,7 @@ export function TranslationFields({
         <h3 id="translations-title" className="text-sm font-semibold text-slate-900">
           {t('title', { count: value.filter((translation) => translation.language).length })}
         </h3>
-        <button type="button" className="ml-auto text-xs font-medium text-slate-600 hover:underline" onClick={() => onChange(null)}>
+        <button type="button" className="ms-auto text-xs font-medium text-slate-600 hover:underline" onClick={() => onChange(null)}>
           {t('stop')}
         </button>
       </div>

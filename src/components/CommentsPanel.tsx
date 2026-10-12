@@ -136,7 +136,7 @@ export function CommentsPanel({
               </header>
               <ul className="space-y-3 px-4 py-3">
                 {group.comments.map((comment) => (
-                  <li key={comment.id} className={`flex gap-2 ${comment.isReply ? 'ml-10' : ''}`}>
+                  <li key={comment.id} className={`flex gap-2 ${comment.isReply ? 'ms-10' : ''}`}>
                     {comment.fromPage ? (
                       <FeedAvatar
                         name={comment.author}

@@ -91,13 +91,13 @@ export function ChartFrame({
         {showTable && table ? (
           <div id={tableId} className="scroll-x">
             <table className="w-full text-sm">
-              <thead className="text-left text-[13px] font-semibold text-slate-600">
+              <thead className="text-start text-[13px] font-semibold text-slate-600">
                 <tr>
                   {table.head.map((heading, index) => (
                     <th
                       key={heading}
                       scope="col"
-                      className={`pb-2 ${index === 0 ? '' : 'text-right'}`}
+                      className={`pb-2 ${index === 0 ? '' : 'text-end'}`}
                     >
                       {heading}
                     </th>
@@ -111,7 +111,7 @@ export function ChartFrame({
                       <td
                         key={cellIndex}
                         className={`py-1.5 ${
-                          cellIndex === 0 ? 'text-slate-700' : 'nums text-right text-slate-600'
+                          cellIndex === 0 ? 'text-slate-700' : 'nums text-end text-slate-600'
                         }`}
                       >
                         {typeof cell === 'number' ? cell.toLocaleString(locale) : cell}

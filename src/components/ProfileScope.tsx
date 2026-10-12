@@ -116,7 +116,7 @@ export function ProfileScope({ workspaceId, pages, groups, group, ids, net, netw
       <button
         ref={trigger}
         type="button"
-        className="flex h-10 max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white pl-1.5 pr-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+        className="flex h-10 max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white ps-1.5 pe-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
@@ -138,14 +138,14 @@ export function ProfileScope({ workspaceId, pages, groups, group, ids, net, netw
           ref={panel}
           role="dialog"
           aria-label={t('title')}
-          className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-12 sm:max-h-[70vh] sm:w-[24rem] sm:rounded-2xl"
+          className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:start-0 sm:top-12 sm:max-h-[70vh] sm:w-[24rem] sm:rounded-2xl"
         >
           <div className="space-y-3">
             <label className="relative block">
               <span className="sr-only">{t('search')}</span>
-              <Icon name="search" size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Icon name="search" size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
-                className="input pl-9"
+                className="input ps-9"
                 value={query}
                 placeholder={t('search')}
                 autoComplete="off"

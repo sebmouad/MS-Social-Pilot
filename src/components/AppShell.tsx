@@ -265,7 +265,7 @@ export function AppShell({
               <Icon name={item.icon} size={20} className={active ? 'text-brand-600' : 'text-slate-500'} />
               <span className="truncate">{item.label}</span>
               {item.badge ? (
-                <span className="ml-auto rounded-full bg-red-600 px-1.5 text-[11px] font-bold leading-4 text-white">{item.badge}</span>
+                <span className="ms-auto rounded-full bg-red-600 px-1.5 text-[11px] font-bold leading-4 text-white">{item.badge}</span>
               ) : null}
             </Link>
           </li>
@@ -279,7 +279,7 @@ export function AppShell({
       <label className="block">
         <span className="mb-1 block px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('switchWorkspace')}</span>
         <select
-          className="h-10 w-full cursor-pointer truncate rounded-lg border-0 bg-slate-100 py-0 pl-3 pr-8 text-sm font-semibold text-slate-900 hover:bg-slate-200 focus:ring-2 focus:ring-brand-500"
+          className="h-10 w-full cursor-pointer truncate rounded-lg border-0 bg-slate-100 py-0 ps-3 pe-8 text-sm font-semibold text-slate-900 hover:bg-slate-200 focus:ring-2 focus:ring-brand-500"
           value={workspaceId}
           disabled={switching}
           onChange={(event) => void switchTo(event.target.value)}
@@ -323,7 +323,7 @@ export function AppShell({
     <div className="min-h-screen lg:flex">
       <header className="sticky top-0 z-30 bg-white lg:flex lg:h-screen lg:shrink-0">
         {/* Laptop and up: the icon rail with the main areas… */}
-        <div className="rail hidden w-[76px] flex-col items-center border-r py-3 lg:flex">
+        <div className="rail hidden w-[76px] flex-col items-center border-e py-3 lg:flex">
           <Link href="/dashboard" className="mb-3" aria-label={t('home')}>
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-[15px] font-bold text-white shadow-sm">SP</span>
           </Link>
@@ -343,7 +343,7 @@ export function AppShell({
                       <Icon name={area.icon} size={22} />
                       <span className="w-full truncate text-center">{area.rail}</span>
                       {badge > 0 && (
-                        <span className="absolute right-1.5 top-1 rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white">{badge}</span>
+                        <span className="absolute end-1.5 top-1 rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white">{badge}</span>
                       )}
                     </Link>
                   </li>
@@ -365,7 +365,7 @@ export function AppShell({
 
         {/* …and beside it the sidebar with the pages of the area in use. */}
         {!collapsed && activeArea && (
-          <div className="shell-sidebar hidden w-60 flex-col border-r border-slate-200 lg:flex">
+          <div className="shell-sidebar hidden w-60 flex-col border-e border-slate-200 lg:flex">
             <p className="px-5 pb-1 pt-5 text-[17px] font-bold text-slate-900">{activeArea.label}</p>
             <div className="px-3 py-2">{workspacePicker}</div>
             {composeButton && <div className="px-3 pb-2 pt-1">{composeButton}</div>}
@@ -392,7 +392,7 @@ export function AppShell({
             <span className="truncate text-[15px] font-bold text-slate-900">{workspaceName}</span>
           </Link>
           {canCompose && (
-            <Link href="/compose" className="btn-primary ml-auto h-9 px-3" aria-label={t('newPost')}>
+            <Link href="/compose" className="btn-primary ms-auto h-9 px-3" aria-label={t('newPost')}>
               <Icon name="plus" size={18} />
               <span className="hidden sm:inline">{t('newPost')}</span>
             </Link>
@@ -407,14 +407,14 @@ export function AppShell({
               role="dialog"
               aria-modal="true"
               aria-label={t('menu')}
-              className="absolute inset-y-0 left-0 flex w-[17rem] max-w-[85vw] flex-col bg-white shadow-xl"
+              className="absolute inset-y-0 start-0 flex w-[17rem] max-w-[85vw] flex-col bg-white shadow-xl"
             >
               <div className="flex items-center gap-2.5 px-3 pb-2 pt-4">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-[15px] font-bold text-white shadow-sm">SP</span>
                 <span className="text-[15px] font-bold text-slate-900">Social Pilot</span>
                 <button
                   type="button"
-                  className="ml-auto flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
+                  className="ms-auto flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
                   onClick={() => setDrawer(false)}
                 >
                   <Icon name="close" size={18} />
@@ -480,7 +480,7 @@ export function AppShell({
               )}
             </ol>
           </nav>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ms-auto flex items-center gap-1">
             {collapsed && canCompose && (
               <Link href="/compose" className="btn-primary h-9 px-3">
                 <Icon name="plus" size={18} />
@@ -509,7 +509,7 @@ export function AppShell({
                 <span className="sr-only">{t('accountMenu')}</span>
               </button>
               {account && (
-                <div className="absolute right-0 top-11 z-40 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                <div className="absolute end-0 top-11 z-40 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
                   <p className="truncate px-2.5 pb-2 pt-1 text-sm" title={`${userName} · ${timezone}`}>
                     <span className="block truncate font-semibold text-slate-900">{userName}</span>
                     <span className="block truncate text-xs text-slate-500">{timezone}</span>

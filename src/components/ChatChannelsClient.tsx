@@ -144,7 +144,7 @@ export function ChatChannelsClient({ channels }: { channels: Channel[] }) {
                   {notice.text}
                 </p>
               )}
-              <div className="flex flex-wrap gap-1.5 pl-12">
+              <div className="flex flex-wrap gap-1.5 ps-12">
                 {EVENTS.map((event) => {
                   const on = channel.events.includes(event);
                   return (

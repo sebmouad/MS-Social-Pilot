@@ -111,7 +111,7 @@ export function TimeHeatmap({
 
               {order.map((weekday) => (
                 <div key={weekday} className="contents">
-                  <span className="truncate pr-2 text-xs leading-8 text-slate-600">{weekdays[weekday]}</span>
+                  <span className="truncate pe-2 text-xs leading-8 text-slate-600">{weekdays[weekday]}</span>
                   {hours.map((hour) => {
                     const cell = at(weekday, hour)!;
                     const empty = cell.posts === 0 || cell.lift === null;
@@ -142,7 +142,7 @@ export function TimeHeatmap({
           </div>
 
           {active && (
-            <div className="pointer-events-none absolute right-0 top-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
+            <div className="pointer-events-none absolute end-0 top-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
               <p className="font-medium text-slate-500">{label(active)}</p>
               <p className="nums font-semibold text-slate-900">{t('times.cellDetail', { posts: active.posts })}</p>
               {active.avgInteractions !== null && active.lift !== null && (

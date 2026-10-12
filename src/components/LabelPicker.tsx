@@ -89,7 +89,7 @@ export function LabelPicker({
         {chosen.map((label) => (
           <span
             key={label.id}
-            className={`inline-flex items-center gap-1 rounded-full py-0.5 pl-2 pr-1 text-xs font-semibold ring-1 ring-inset ${paletteOf(label.color).chip}`}
+            className={`inline-flex items-center gap-1 rounded-full py-0.5 ps-2 pe-1 text-xs font-semibold ring-1 ring-inset ${paletteOf(label.color).chip}`}
           >
             <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${paletteOf(label.color).dot}`} />
             {label.name}
@@ -116,7 +116,7 @@ export function LabelPicker({
       </div>
 
       {open && (
-        <div className="absolute left-0 z-30 mt-1.5 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+        <div className="absolute start-0 z-30 mt-1.5 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
           <div className="border-b border-slate-100 p-2">
             <input
               ref={input}
@@ -143,7 +143,7 @@ export function LabelPicker({
                     type="button"
                     role="option"
                     aria-selected={on}
-                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-slate-800 hover:bg-slate-50"
+                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-start text-sm text-slate-800 hover:bg-slate-50"
                     onClick={() => toggle(label.id)}
                   >
                     <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${paletteOf(label.color).dot}`} />
@@ -158,7 +158,7 @@ export function LabelPicker({
           {needle && !exact && (
             <button
               type="button"
-              className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-left text-sm font-semibold text-brand-600 hover:bg-brand-50"
+              className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-start text-sm font-semibold text-brand-600 hover:bg-brand-50"
               disabled={busy}
               onClick={() => void create()}
             >
