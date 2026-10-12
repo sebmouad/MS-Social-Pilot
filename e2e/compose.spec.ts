@@ -639,13 +639,15 @@ test('the same post to many Pages at once is flagged, and can go out one Page at
   try {
     await open(page, '/compose');
     await page.getByLabel(/what do you want to say/i).fill(caption);
-    for (const name of [PAGE_NAME, 'Client B', 'Client C']) {
-      const box = page.getByRole('checkbox', { name: new RegExp(name) });
-      await expect(async () => {
+    // A tick before hydration is undone by React, so wait for React's own
+    // count, ticking again whatever it dropped.
+    await expect(async () => {
+      for (const name of [PAGE_NAME, 'Client B', 'Client C']) {
+        const box = page.getByRole('checkbox', { name: new RegExp(name) });
         if (!(await box.isChecked())) await box.click();
-        await expect(box).toBeChecked({ timeout: 1_500 });
-      }).toPass({ timeout: 30_000 });
-    }
+      }
+      await expect(page.getByText(/^3 of 3 selected$/)).toBeVisible({ timeout: 1_500 });
+    }).toPass({ timeout: 30_000 });
 
     await expect(page.getByText(/same content on 3 pages within 20 minutes/i)).toBeVisible({ timeout: 15_000 });
     await page.getByRole('checkbox', { name: /send to one page every 20 minutes/i }).check();

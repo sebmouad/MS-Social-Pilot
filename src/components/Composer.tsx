@@ -16,6 +16,7 @@ import { CommentDelay } from './CommentDelay';
 import { SplitButton } from './SplitButton';
 import { ComposerTools } from './ComposerTools';
 import { UndoSendBar } from './UndoSendBar';
+import { StructuredDataButton } from './StructuredDataButton';
 import type { PageGroupView } from '@/lib/page-groups';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 import { LIMITS } from '@/lib/constants';
@@ -728,6 +729,16 @@ export function Composer({
               >
                 {previewLoading ? t('reading') : t('refreshCard')}
               </button>
+              <StructuredDataButton
+                url={link.trim()}
+                hasText={message.trim().length > 0}
+                mediaRoom={LIMITS.mediaPerPost - media.length}
+                onText={(text) => {
+                  startedNext();
+                  writeMessage(text.slice(0, LIMITS.messageLength));
+                }}
+                onMedia={(added) => setMedia((current) => [...current, ...added].slice(0, LIMITS.mediaPerPost))}
+              />
             </div>
             <p className="hint">{t('linkHint')}</p>
 

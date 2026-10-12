@@ -18,7 +18,10 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
 - **Compose** `/compose` (`Composer.tsx`): Post / Reel / Story; multi-Page and
   multi-network targets with search and groups; text with saved snippets, emoji,
   character/#/@ counters; per-network limit warnings; first comment + delay;
-  link with Open Graph card; photos/video with alt text; labels; Schedule /
+  link with Open Graph card; "Use page details" reads the linked page's
+  schema.org JSON-LD (product, event, recipe, job, course, how-to, place,
+  article) and fills the text from a template (key facts, price and offer,
+  countdown, steps), copying its pictures into the media library; photos/video with alt text; labels; Schedule /
   Queue / Now (Now waits the workspace's undo-send delay with an Undo that
   turns it back into a draft); who holds it (this app or Facebook-native); approval submit for
   contributors; spam-risk guard (same link or near-identical text on 3+ Pages of

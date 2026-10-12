@@ -205,7 +205,12 @@ export async function fetchPublic(
  * must not be able to fill the heap.
  */
 export async function readCapped(response: Response, maxBytes: number): Promise<string> {
-  if (!response.body) return '';
+  return new TextDecoder('utf-8').decode(await readCappedBytes(response, maxBytes));
+}
+
+/** {@link readCapped}, as bytes. */
+export async function readCappedBytes(response: Response, maxBytes: number): Promise<Uint8Array> {
+  if (!response.body) return new Uint8Array();
 
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -229,5 +234,5 @@ export async function readCapped(response: Response, maxBytes: number): Promise<
     merged.set(chunk, offset);
     offset += chunk.length;
   }
-  return new TextDecoder('utf-8').decode(merged);
+  return merged;
 }

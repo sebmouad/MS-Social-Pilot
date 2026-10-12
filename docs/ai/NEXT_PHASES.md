@@ -697,11 +697,21 @@ setup from Phase 0.2 (marked AI).
   custom dates and seasonal modes (pause / move times / fewer / more) that the
   queue allocator applies per day. The old fixed `awareness-days.ts` (with
   country-specific entries) is gone. Admins edit (`canManageSettings`).*
-- **H3. Posts from structured page data (M)** — read schema.org JSON-LD from
+- **H3. Posts from structured page data (M)** ✅ — read schema.org JSON-LD from
   the user's linked pages, whatever the niche (`Article`, `Product` with price
   and offers, `Event` with date/place, `Recipe`, `JobPosting`, `Course`,
   `LocalBusiness`, …) and offer matching templates: key facts post, carousel
   from images/steps, countdown for events, price/offer post; extends G5.
+  *Done 2026-10-12: Compose › link › "Use page details" fetches the page
+  (same private-network checks as link cards) and parses every JSON-LD block
+  (`@graph`, `mainEntity`, subtypes such as `BlogPosting`, `MusicEvent`,
+  `Restaurant`) in `src/lib/structured-data.ts`; templates key facts / price
+  and offer / countdown (future events) / steps (recipes, how-tos); labels,
+  dates (as the page wrote them), money and units come from the UI language.
+  Pictures (and step pictures) are copied into the media library through
+  `/api/media/import` within the quota, so a carousel publishes like any
+  upload. Website auto-share (G5) still captions from the feed: reading each
+  article's page for JSON-LD there is left for later.*
 - **H4. Post templates by category (S)** — saved structures the user creates
   (e.g. tip, poll, promo, announcement) with placeholders, default hashtags and first comment; pick in Compose.
 - **H5. AI alt text and subtitles (M, AI)** — alt text suggested for every photo
