@@ -11,6 +11,7 @@ export interface NotificationPreferences {
   onNewInbox: boolean;
   onQueueEmpty: boolean;
   onDraftUpdated: boolean;
+  onNoteMention: boolean;
   onModerationAlert: boolean;
 }
 
@@ -47,6 +48,7 @@ export function NotificationsClient({
     { key: 'onNewInbox', label: t('onNewInbox') },
     { key: 'onQueueEmpty', label: t('onQueueEmpty') },
     { key: 'onDraftUpdated', label: t('onDraftUpdated') },
+    { key: 'onNoteMention', label: t('onNoteMention') },
     { key: 'onModerationAlert', label: t('onModerationAlert') },
   ];
   const columns: Array<{ event: (typeof PAGE_EVENTS)[number]; label: string; on: boolean }> = [

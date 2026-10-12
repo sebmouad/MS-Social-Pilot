@@ -398,7 +398,8 @@
     "statusFilterOff": "Ne plus filtrer sur ce statut",
     "statusFilterClear": "Afficher tous les statuts",
     "dragHint": "Faites glisser une publication vers un autre jour pour la déplacer.",
-    "openWeekOf": "Voir la semaine du {date}"
+    "openWeekOf": "Voir la semaine du {date}",
+    "notesCount": "{count, plural, one {# note interne} other {# notes internes}}"
   },
   "common": {
     "all": "Tout",
@@ -914,6 +915,12 @@
       "heading": "Une Page manque d’un type de publication",
       "body": "{page} devrait recevoir plus de publications {label} cette semaine, et aucun brouillon avec cette étiquette n’est prêt. Rédigez-en un pour que la Page garde son mix.",
       "cta": "Ouvrir le mix de contenu"
+    },
+    "noteMention": {
+      "subject": "{author} vous a mentionné dans une note",
+      "heading": "Vous avez été mentionné dans une note",
+      "body": "{author} a écrit une note sur une publication : « {note} »",
+      "cta": "Ouvrir la publication"
     }
   },
   "engagement": {
@@ -1462,7 +1469,8 @@
     "onQueueEmpty": "Une Page n’a plus de publication programmée",
     "pageEvent_queueEmpty": "Plus rien de programmé",
     "onDraftUpdated": "Quelqu’un modifie une publication que j’ai écrite avant sa sortie (un e-mail par heure au plus)",
-    "onModerationAlert": "Une règle de modération signale un commentaire sur l’une de mes Pages"
+    "onModerationAlert": "Une règle de modération signale un commentaire sur l’une de mes Pages",
+    "onNoteMention": "Quelqu’un me mentionne dans les notes internes d’une publication"
   },
   "pageAnalysis": {
     "analyseNow": "Analyser maintenant",
@@ -3614,5 +3622,23 @@
       "labels": "libellés",
       "time": "horaire"
     }
+  },
+  "notes": {
+    "open": "Notes",
+    "title": "Notes internes",
+    "hint": "Seule votre équipe voit ces notes. Elles ne sont jamais publiées. Tapez @ pour mentionner quelqu’un ; il reçoit un e-mail.",
+    "loading": "Chargement des notes…",
+    "loadFailed": "Impossible de charger les notes. Fermez et réessayez.",
+    "none": "Aucune note pour l’instant. Laissez-en une pour la prochaine personne qui travaille sur cette publication.",
+    "formerMember": "Ancien membre",
+    "add": "Ajouter une note",
+    "placeholder": "Par exemple : @nom peux-tu vérifier le prix avant vendredi ?",
+    "send": "Ajouter la note",
+    "sendFailed": "Impossible d’ajouter la note. Vérifiez votre connexion et réessayez.",
+    "remove": "Supprimer",
+    "removeConfirm": "Supprimer cette note ?",
+    "removeConfirmBody": "Elle disparaît pour toute l’équipe. Action irréversible.",
+    "removeFailed": "Impossible de supprimer la note. Réessayez.",
+    "mentionList": "Membres à mentionner"
   }
 }

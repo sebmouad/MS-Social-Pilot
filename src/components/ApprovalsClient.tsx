@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 
 import { useConfirm } from './ConfirmProvider';
 import { FeedPost, type FeedLinkPreview } from './FeedPost';
+import { PostNotes } from './PostNotes';
 
 export interface PendingPost {
   id: string;
@@ -202,6 +203,7 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
                   {tCommon('edit')}
                 </Link>
               )}
+              <PostNotes postId={post.id} className="btn-secondary" />
             </div>
           )}
           </div>

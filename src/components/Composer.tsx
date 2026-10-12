@@ -27,6 +27,7 @@ import { CaptionTestFields, NO_CAPTION_TEST, type CaptionTestChoice } from './Ca
 import { SpamGuard, type StaggerChoice } from './SpamGuard';
 import { TemplatePicker } from './TemplatePicker';
 import { VersionHistory } from './VersionHistory';
+import { PostNotes } from './PostNotes';
 import { TranslationFields, type Translation } from './TranslationFields';
 
 interface Props {
@@ -650,6 +651,7 @@ export function Composer({
                 }
               }}
             />
+            {editing && <PostNotes postId={editing.id} />}
             {editing && (
               <VersionHistory
                 postId={editing.id}

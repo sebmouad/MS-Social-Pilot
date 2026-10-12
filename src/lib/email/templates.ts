@@ -598,3 +598,23 @@ export function newSignInEmail(options: {
   });
   return { subject: t('email.newSignIn.subject'), ...block };
 }
+
+/** A teammate @mentioned the reader in a post's internal notes (NEXT_PHASES H8). */
+export function noteMentionEmail(options: {
+  locale: Locale;
+  workspace: string;
+  author: string;
+  note: string;
+  url: string;
+}): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) => translate(options.locale, key, params);
+
+  const block = layout({
+    heading: t('email.noteMention.heading'),
+    body: t('email.noteMention.body', { author: options.author, note: options.note }),
+    cta: { label: t('email.noteMention.cta'), url: options.url },
+    footer: t('email.footer', { workspace: options.workspace }),
+  });
+
+  return { subject: t('email.noteMention.subject', { author: options.author }), ...block };
+}

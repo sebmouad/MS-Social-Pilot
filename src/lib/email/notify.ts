@@ -15,6 +15,7 @@ import {
   publishFailureEmail,
   queueEmptyEmail,
   mixDryEmail,
+  noteMentionEmail,
   tokenExpiringEmail,
 } from './templates';
 
@@ -37,7 +38,8 @@ type Preference =
   | 'onApprovalDecision'
   | 'onQueueEmpty'
   | 'onDraftUpdated'
-  | 'onModerationAlert';
+  | 'onModerationAlert'
+  | 'onNoteMention';
 
 /** Events a member can switch off for one Page (`NotificationMute.event`). */
 export const PAGE_EVENTS = ['publishFailure', 'newInbox', 'queueEmpty'] as const;
@@ -544,4 +546,37 @@ export async function notifyDraftUpdated(options: {
     sent = true;
   }, 'draft updated');
   return sent;
+}
+
+/**
+ * Members @mentioned in a post's internal note (NEXT_PHASES H8). The caller
+ * has already kept only members who may see the post.
+ */
+export async function notifyNoteMention(options: {
+  workspaceId: string;
+  userIds: string[];
+  authorName: string;
+  note: string;
+  url: string;
+}): Promise<void> {
+  if (options.userIds.length === 0) return;
+  await safely(async () => {
+    const [workspace, recipients] = await Promise.all([
+      prisma.workspace.findUnique({ where: { id: options.workspaceId }, select: { name: true } }),
+      recipientsFor(options.workspaceId, 'onNoteMention', {}),
+    ]);
+    if (!workspace) return;
+    const users = await prisma.user.findMany({ where: { id: { in: options.userIds } }, select: { email: true } });
+    const wanted = new Set(users.map((user) => user.email));
+    for (const recipient of recipients.filter((entry) => wanted.has(entry.email))) {
+      const rendered = noteMentionEmail({
+        locale: recipient.locale,
+        workspace: workspace.name,
+        author: options.authorName,
+        note: options.note.slice(0, 280),
+        url: options.url,
+      });
+      await sendEmail({ to: recipient.email, template: 'noteMention', workspaceId: options.workspaceId, ...rendered });
+    }
+  }, 'note mention');
 }

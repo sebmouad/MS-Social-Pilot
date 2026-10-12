@@ -146,6 +146,7 @@ export default async function CalendarPage({
       include: {
         targets: { include: { target: { select: { name: true, pictureUrl: true } } } },
         labels: { select: { labelId: true } },
+        _count: { select: { notes: true } },
       },
       orderBy: { scheduledAt: 'asc' },
     }),
@@ -351,6 +352,13 @@ export default async function CalendarPage({
               {post.scheduledAt ? formatInZone(post.scheduledAt, timezone, 'HH:mm') : ''}
             </span>
             <span className="sr-only">{tStatus(`post.${post.status}`)}</span>
+            {post._count.notes > 0 && (
+              <span className="flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-slate-500" title={t('notesCount', { count: post._count.notes })}>
+                <Icon name="comment" className="h-3 w-3" />
+                <span aria-hidden>{post._count.notes}</span>
+                <span className="sr-only">{t('notesCount', { count: post._count.notes })}</span>
+              </span>
+            )}
             {post.labels.length > 0 && (
               <span className="ms-auto flex shrink-0 items-center gap-0.5">
                 {post.labels.slice(0, 3).map((row) => {

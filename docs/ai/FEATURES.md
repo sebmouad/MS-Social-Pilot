@@ -50,6 +50,10 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   a version (text, first comment, link, media, Pages, labels, time, who; 50
   per post). Lists what each save changed, compares a version's text with the
   form word by word, and loads one back; saving it is a normal save.
+- **Internal notes** (Compose › Notes when editing, Approvals card › Notes;
+  a count on calendar chips): a team-only thread on each post, never
+  published. `@` suggests members who may see the post's Pages; those
+  mentioned are emailed (Settings › Notifications, on by default).
 - **Content mix** `/queue/mix`: per Page or group, how many posts of each
   label the coming 7 days should hold; a table of planned vs target with
   ready drafts per Page (selection-aware). Admins edit; with "Fill gaps from

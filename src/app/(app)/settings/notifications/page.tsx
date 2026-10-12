@@ -57,6 +57,7 @@ export default async function NotificationsSettingsPage() {
           onNewInbox: setting?.onNewInbox ?? false,
           onQueueEmpty: setting?.onQueueEmpty ?? true,
           onDraftUpdated: setting?.onDraftUpdated ?? true,
+          onNoteMention: setting?.onNoteMention ?? true,
           onModerationAlert: setting?.onModerationAlert ?? true,
         }}
         pages={pages}

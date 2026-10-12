@@ -154,6 +154,7 @@ model User {
   sessions             Session[]
   posts                Post[]
   postVersions         PostVersion[]
+  postNotes            PostNote[]
   submittedPosts       Post[]                @relation("PostSubmitter")
   reviewedPosts        Post[]                @relation("PostReviewer")
   sentInvitations      Invitation[]          @relation("InvitationSender")
@@ -540,6 +541,7 @@ model Post {
   feedItem        FeedItem?        @relation(fields: [sourceFeedItemId], references: [id])
   captionTest     CaptionTest?     @relation(fields: [captionTestId], references: [id], onDelete: SetNull)
   versions        PostVersion[]
+  notes           PostNote[]
 
   @@index([workspaceId, status])
   @@index([mediaKeys], type: Gin)
@@ -577,6 +579,24 @@ model PostVersion {
   @@index([postId, createdAt])
   @@index([authorId])
   @@map("post_versions")
+}
+
+/// A team-only note on a post (NEXT_PHASES H8). Never published; members it
+/// @mentions are emailed.
+model PostNote {
+  id         String   @id @default(cuid())
+  postId     String
+  authorId   String?
+  body       String
+  mentionIds String[] @default([])
+  createdAt  DateTime @default(now())
+
+  post   Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@map("post_notes")
 }
 
 /// The unit of work the scheduler claims and publishes: one post, one
@@ -913,6 +933,8 @@ model NotificationSetting {
   onDraftUpdated     Boolean   @default(true)
   /// A comment matched a moderation rule set to alert.
   onModerationAlert  Boolean   @default(true)
+  /// A teammate @mentioned me in a post's internal notes.
+  onNoteMention      Boolean   @default(true)
   /// Up to when the inbox email has already counted (the next one starts here).
   inboxDigestAt      DateTime?
 

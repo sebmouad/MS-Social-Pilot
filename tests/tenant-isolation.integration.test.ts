@@ -65,6 +65,7 @@ function routeFiles(directory: string, prefix = ''): string[] {
 /** Bodies that pass validation, so the refusal tested is about ownership, not shape. */
 const BODY: Record<string, unknown> = {
   'posts/[id]': { message: 'Changed by another client' },
+  'posts/[id]/notes': { body: 'Hijacked' },
   'targets/[id]': { enabled: false },
   'targets/[id]/profile': { brandVoice: 'Hijacked' },
   'labels/[id]': { name: 'Hijacked' },
@@ -148,6 +149,7 @@ beforeAll(async () => {
   const captionTest = await prisma.captionTest.create({ data: { workspaceId: w, name: 'A test', status: 'decided', winnerLabel: 'A' } });
   const savedReply = await prisma.savedReply.create({ data: { workspaceId: w, name: 'A reply', body: 'x' } });
   const postTemplate = await prisma.postTemplate.create({ data: { workspaceId: w, name: 'A template', body: 'x' } });
+  const postNote = await prisma.postNote.create({ data: { postId: post.id, body: 'A note' } });
   const rule = await prisma.moderationRule.create({ data: { workspaceId: w, name: 'A rule', match: 'links', action: 'hide' } });
   const exported = await prisma.workspaceExport.create({
     data: { workspaceId: w, requestedById: ownerA.id, status: 'ready', storageKey: 'exports/a.zip', expiresAt: new Date(Date.now() + 86_400_000) },
@@ -179,6 +181,7 @@ beforeAll(async () => {
     'moderation/rules/[id]': rule.id,
     'saved-replies/[id]': savedReply.id,
     'post-templates/[id]': postTemplate.id,
+    'post-notes/[id]': postNote.id,
     'seasons/[id]': season.id,
     'moderation/actions/[id]/undo': moderated.id,
     'page-groups/[id]': group.id,
@@ -197,7 +200,7 @@ beforeAll(async () => {
     target: target.id,
     post: post.id,
   });
-  for (const action of ['', '/approve', '/duplicate', '/first-comment', '/publish', '/recycle', '/remove', '/retry', '/undo-send', '/versions']) {
+  for (const action of ['', '/approve', '/duplicate', '/first-comment', '/publish', '/recycle', '/remove', '/retry', '/undo-send', '/versions', '/notes']) {
     A[`posts/[id]${action}`] = post.id;
   }
 
@@ -212,7 +215,7 @@ afterAll(async () => {
 /** Everything A owns, as a fingerprint: counts and the fields a hijack would change. */
 async function snapshot() {
   const w = A.workspace;
-  const [posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates] = await Promise.all([
+  const [posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes] = await Promise.all([
     prisma.post.findMany({ where: { workspaceId: w }, select: { id: true, message: true, status: true } }),
     prisma.target.findMany({ where: { workspaceId: w }, select: { id: true, enabled: true, name: true } }),
     prisma.label.findMany({ where: { workspaceId: w }, select: { id: true, name: true } }),
@@ -233,8 +236,9 @@ async function snapshot() {
     prisma.webhookEndpoint.findMany({ where: { workspaceId: w }, select: { id: true, enabled: true, events: true } }),
     prisma.webhookDelivery.findMany({ where: { workspaceId: w }, select: { id: true, status: true, attempts: true } }),
     prisma.postTemplate.findMany({ where: { workspaceId: w }, select: { id: true, name: true, body: true } }),
+    prisma.postNote.findMany({ where: { post: { workspaceId: w } }, select: { id: true, body: true } }),
   ]);
-  return { posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates };
+  return { posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes };
 }
 
 describe("another client's owner", () => {

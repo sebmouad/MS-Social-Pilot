@@ -741,9 +741,15 @@ setup from Phase 0.2 (marked AI).
   post" opens Compose with the topic.
 
 ### Team and clients
-- **H8. Internal notes on posts (S)** — team-only comment thread on each post
+- **H8. Internal notes on posts (S)** ✅ — team-only comment thread on each post
   with @mentions (notifies), never published; shown in Compose, calendar
   popover and approvals.
+  *Done 2026-10-12: `post_notes`; Compose (editing) and each Approvals card
+  have a Notes dialog; calendar chips show the note count (the calendar has
+  no popover: a chip opens the post). `@` suggests members who may see every
+  Page of the post; only those whose `@Name` stays in the text are emailed
+  (`onNoteMention`, never the author). Removing: the note's author or
+  editors+. Routes: `/api/posts/[id]/notes`, `/api/post-notes/[id]`.*
 - **H9. Post version history (S)** ✅ — every save stores a version (text, media,
   targets, time, who); compare and restore.
   *Done 2026-10-12: `post_versions` written after every create and edit

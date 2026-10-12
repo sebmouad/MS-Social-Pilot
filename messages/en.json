@@ -398,7 +398,8 @@
     "statusFilterOff": "Stop filtering on this status",
     "statusFilterClear": "Show every status",
     "dragHint": "Drag a post to another day to move it.",
-    "openWeekOf": "See the week of {date}"
+    "openWeekOf": "See the week of {date}",
+    "notesCount": "{count, plural, one {# internal note} other {# internal notes}}"
   },
   "common": {
     "all": "All",
@@ -914,6 +915,12 @@
       "heading": "A Page is running short of one kind of post",
       "body": "{page} should get more {label} posts this week, and no draft with that label is ready. Write one so the Page keeps its mix.",
       "cta": "Open the content mix"
+    },
+    "noteMention": {
+      "subject": "{author} mentioned you in a note",
+      "heading": "You were mentioned in a note",
+      "body": "{author} wrote a note on a post: “{note}”",
+      "cta": "Open the post"
     }
   },
   "engagement": {
@@ -1462,7 +1469,8 @@
     "onQueueEmpty": "A Page runs out of scheduled posts",
     "pageEvent_queueEmpty": "Nothing scheduled",
     "onDraftUpdated": "Someone changes a post I wrote before it goes out (one email an hour at most)",
-    "onModerationAlert": "A moderation rule flags a comment on one of my Pages"
+    "onModerationAlert": "A moderation rule flags a comment on one of my Pages",
+    "onNoteMention": "Someone mentions me in a post’s internal notes"
   },
   "pageAnalysis": {
     "analyseNow": "Analyse now",
@@ -3614,5 +3622,23 @@
       "labels": "labels",
       "time": "time"
     }
+  },
+  "notes": {
+    "open": "Notes",
+    "title": "Internal notes",
+    "hint": "Only your team sees these notes. They are never published. Type @ to mention someone; they get an email.",
+    "loading": "Loading notes…",
+    "loadFailed": "Couldn’t load the notes. Close this and try again.",
+    "none": "No notes yet. Leave one for whoever works on this post next.",
+    "formerMember": "Former member",
+    "add": "Add a note",
+    "placeholder": "For example: @name can you check the price before Friday?",
+    "send": "Add note",
+    "sendFailed": "Couldn’t add the note. Check your connection and try again.",
+    "remove": "Remove",
+    "removeConfirm": "Remove this note?",
+    "removeConfirmBody": "It disappears for the whole team. This cannot be undone.",
+    "removeFailed": "Couldn’t remove the note. Try again.",
+    "mentionList": "Members to mention"
   }
 }
