@@ -46,7 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       {refusal === 'suspended' ? (
         <div className="card mx-auto mt-10 max-w-lg space-y-2 p-6 text-center" role="alert">
-          <h1 className="text-lg font-semibold text-slate-900">{t('title')}</h1>
+          <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
           <p className="text-sm text-slate-600">{t('body')}</p>
         </div>
       ) : (

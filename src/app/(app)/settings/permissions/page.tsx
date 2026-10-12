@@ -20,7 +20,7 @@ export default async function PermissionsPage() {
     return (
       <div className="space-y-6">
         <header>
-          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('workspaceTitle')}</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl text-slate-900 sm:text-2xl">{t('workspaceTitle')}</h1>
         </header>
         <p className="card p-8 text-center text-sm text-slate-600">{t('adminsOnly')}</p>
       </div>
@@ -31,7 +31,7 @@ export default async function PermissionsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('workspaceTitle')}</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900 sm:text-2xl">{t('workspaceTitle')}</h1>
         <p className="mt-1 text-sm text-slate-600">{t('workspaceSubtitle')}</p>
       </header>
       <PrivilegesView members={members} showWorkspace={false} />

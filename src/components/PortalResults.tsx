@@ -73,7 +73,7 @@ export async function PortalResults({ link }: { link: { workspaceId: string; pag
                     <dd className="mt-0.5 flex items-baseline gap-2">
                       <span className="text-xl font-bold text-slate-900">{kpi?.current === null || kpi?.current === undefined ? '—' : compact(kpi.current, locale)}</span>
                       {kpi?.change !== null && kpi?.change !== undefined && (
-                        <span className={`nums text-xs font-semibold ${good ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        <span className={`nums text-xs font-semibold ${good ? 'text-emerald-700' : 'text-red-700'}`}>
                           {kpi.change >= 0 ? '↑' : '↓'} {Math.abs(kpi.change)}%
                         </span>
                       )}

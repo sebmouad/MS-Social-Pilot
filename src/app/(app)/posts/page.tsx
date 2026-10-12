@@ -156,7 +156,7 @@ export default async function PostsPage({
       <aside className="space-y-4">
       <header className="flex items-center justify-between gap-3 lg:block">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t('title')}</h1>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">{t('countLine', { count: page.total, profiles: filter.ids.length })}</p>
         </div>
         <div className="flex gap-2 lg:mt-4 lg:flex-col">

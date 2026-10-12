@@ -49,7 +49,7 @@ export default async function PostMetricsPage({
           ← {t('backToPosts')}
         </Link>
 
-        <h1 className="text-xl font-semibold text-slate-900">{t('postMetricsTitle')}</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('postMetricsTitle')}</h1>
       </header>
 
       {/* The post itself, as the Page's followers saw it, above its numbers. */}

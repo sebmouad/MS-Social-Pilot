@@ -477,7 +477,7 @@ function TestEmailButton() {
       {result && (
         <p
           role="status"
-          className={`w-full text-sm ${result.ok ? 'text-emerald-700' : 'text-rose-700'}`}
+          className={`w-full text-sm ${result.ok ? 'text-emerald-700' : 'text-red-700'}`}
         >
           {result.text}
         </p>
@@ -525,7 +525,7 @@ function AiSpendPanel({ spend }: { spend: AiSpendView }) {
           {used !== null && (
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200" aria-hidden>
               <div
-                className={`h-full rounded-full ${used >= 100 ? 'bg-rose-500' : used >= 80 ? 'bg-amber-500' : 'bg-brand-600'}`}
+                className={`h-full rounded-full ${used >= 100 ? 'bg-red-500' : used >= 80 ? 'bg-amber-500' : 'bg-brand-600'}`}
                 style={{ width: `${used}%` }}
               />
             </div>

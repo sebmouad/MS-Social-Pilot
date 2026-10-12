@@ -126,7 +126,7 @@ export function ResendVerification() {
         {pending ? t('sending') : t('resend')}
       </button>
       {message && (
-        <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'text-sm text-green-700' : 'text-sm text-red-700'}>
+        <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'text-sm text-emerald-700' : 'text-sm text-red-700'}>
           {message.text}
         </p>
       )}

@@ -8,6 +8,7 @@ import { requirePage } from '@/lib/auth';
 import { audienceOf, effectiveAudience } from '@/lib/audience';
 import { canManageSettings } from '@/lib/constants';
 import { screenMetadata } from '@/lib/metadata';
+import { ChannelsLayout } from '@/components/ChannelsLayout';
 import { loadPageFilter } from '@/lib/page-filter';
 import { prisma } from '@/lib/prisma';
 import { matchesKeywords, trendsFor } from '@/lib/trends';
@@ -58,9 +59,10 @@ export default async function TrendsPage({ searchParams }: { searchParams: Promi
   const hidden = trends.length - shown.length;
 
   return (
-    <div className="space-y-6">
+    <ChannelsLayout auth={auth} selection={filter}>
+    <div className="min-w-0 flex-1 space-y-6">
       <header>
-        <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">{t('intro')}</p>
       </header>
 
@@ -131,6 +133,7 @@ export default async function TrendsPage({ searchParams }: { searchParams: Promi
         </>
       )}
     </div>
+    </ChannelsLayout>
   );
 }
 

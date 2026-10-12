@@ -42,22 +42,22 @@ export async function ResponseTimeView(props: {
 
   const row = (label: string, summary: ResponseSummary) => (
     <tr className="border-t border-slate-100">
-      <th scope="row" className="py-2 pr-3 text-left font-medium text-slate-700">{label}</th>
-      <td className="py-2 pr-3 tabular-nums">{format.number(summary.total)}</td>
-      <td className="py-2 pr-3 tabular-nums">{summary.total ? `${format.number(Math.round((summary.answered / summary.total) * 100))} %` : '—'}</td>
-      <td className="py-2 pr-3 tabular-nums">{duration(summary.medianFirstMs)}</td>
-      <td className="py-2 pr-3 tabular-nums">{duration(summary.slowestFirstMs)}</td>
+      <th scope="row" className="py-2 pe-3 text-start font-medium text-slate-700">{label}</th>
+      <td className="py-2 pe-3 tabular-nums">{format.number(summary.total)}</td>
+      <td className="py-2 pe-3 tabular-nums">{summary.total ? `${format.number(Math.round((summary.answered / summary.total) * 100))} %` : '—'}</td>
+      <td className="py-2 pe-3 tabular-nums">{duration(summary.medianFirstMs)}</td>
+      <td className="py-2 pe-3 tabular-nums">{duration(summary.slowestFirstMs)}</td>
       <td className="py-2 tabular-nums">{duration(summary.medianResolveMs)}</td>
     </tr>
   );
   const head = (first: string) => (
     <thead>
-      <tr className="text-left text-xs font-semibold text-slate-500">
-        <th scope="col" className="pb-2 pr-3">{first}</th>
-        <th scope="col" className="pb-2 pr-3">{t('waiting')}</th>
-        <th scope="col" className="pb-2 pr-3">{t('answeredShare')}</th>
-        <th scope="col" className="pb-2 pr-3">{t('medianFirst')}</th>
-        <th scope="col" className="pb-2 pr-3">{t('slowestFirst')}</th>
+      <tr className="text-start text-xs font-semibold text-slate-500">
+        <th scope="col" className="pb-2 pe-3">{first}</th>
+        <th scope="col" className="pb-2 pe-3">{t('waiting')}</th>
+        <th scope="col" className="pb-2 pe-3">{t('answeredShare')}</th>
+        <th scope="col" className="pb-2 pe-3">{t('medianFirst')}</th>
+        <th scope="col" className="pb-2 pe-3">{t('slowestFirst')}</th>
         <th scope="col" className="pb-2">{t('medianResolve')}</th>
       </tr>
     </thead>
@@ -88,19 +88,19 @@ export async function ResponseTimeView(props: {
         <div className="scroll-x mt-3">
           <table className="w-full min-w-[360px] text-sm">
             <thead>
-              <tr className="text-left text-xs font-semibold text-slate-500">
-                <th scope="col" className="pb-2 pr-3">{t('member')}</th>
-                <th scope="col" className="pb-2 pr-3">{t('answered')}</th>
+              <tr className="text-start text-xs font-semibold text-slate-500">
+                <th scope="col" className="pb-2 pe-3">{t('member')}</th>
+                <th scope="col" className="pb-2 pe-3">{t('answered')}</th>
                 <th scope="col" className="pb-2">{t('medianFirst')}</th>
               </tr>
             </thead>
             <tbody>
               {data.members.map((member) => (
                 <tr key={member.userId ?? 'facebook'} className="border-t border-slate-100">
-                  <th scope="row" className="py-2 pr-3 text-left font-medium text-slate-700">
+                  <th scope="row" className="py-2 pe-3 text-start font-medium text-slate-700">
                     {member.userId ? (member.name ?? t('formerMember')) : t('onFacebook')}
                   </th>
-                  <td className="py-2 pr-3 tabular-nums">{format.number(member.summary.answered)}</td>
+                  <td className="py-2 pe-3 tabular-nums">{format.number(member.summary.answered)}</td>
                   <td className="py-2 tabular-nums">{duration(member.summary.medianFirstMs)}</td>
                 </tr>
               ))}

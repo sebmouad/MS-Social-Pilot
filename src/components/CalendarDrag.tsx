@@ -86,7 +86,7 @@ export function CalendarDrag({ timeZone, todayKey, children }: { timeZone: strin
         <p
           role={message.tone === 'error' ? 'alert' : 'status'}
           className={`mb-3 rounded-lg px-3 py-2 text-sm ${
-            message.tone === 'error' ? 'bg-rose-50 text-rose-800' : 'bg-emerald-50 text-emerald-800'
+            message.tone === 'error' ? 'bg-red-50 text-red-800' : 'bg-emerald-50 text-emerald-800'
           }`}
         >
           {message.text}

@@ -93,7 +93,7 @@ export default async function ConnectionsPage({
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl text-slate-900 sm:text-2xl">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
         </div>
 

@@ -98,7 +98,7 @@ export function VersionHistory({
                       {part.text}
                     </del>
                   ) : (
-                    <ins key={index} className="rounded bg-green-100 text-green-800 no-underline">
+                    <ins key={index} className="rounded bg-emerald-100 text-emerald-800 no-underline">
                       {part.text}
                     </ins>
                   ),

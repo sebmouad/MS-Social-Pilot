@@ -7,7 +7,7 @@ import { aiAvailable } from '@/lib/ai';
 import { AiPlanner } from '@/components/AiPlanner';
 import { listLabels } from '@/lib/page-groups';
 import { paletteOf } from '@/lib/palette';
-import { PagesSidebar } from '@/components/PagesSidebar';
+import { ChannelsLayout } from '@/components/ChannelsLayout';
 import { LabelFilter } from '@/components/LabelFilter';
 import { WeekGrid } from '@/components/CalendarWeek';
 import { CalendarDrag } from '@/components/CalendarDrag';
@@ -33,7 +33,7 @@ export function generateMetadata() {
 /** Dot colours, matching the badge colours StatusBadge gives each status. */
 const STATUS_DOT: Record<string, string> = {
   pending_approval: 'bg-violet-500',
-  rejected: 'bg-rose-500',
+  rejected: 'bg-red-500',
   scheduled: 'bg-blue-500',
   publishing: 'bg-amber-500',
   published: 'bg-emerald-500',
@@ -46,7 +46,7 @@ const STATUS_DOT: Record<string, string> = {
 /** The same colours as the edge of a post on the grid, as Facebook's planner marks them. */
 const STATUS_EDGE: Record<string, string> = {
   pending_approval: 'border-l-violet-500',
-  rejected: 'border-l-rose-500',
+  rejected: 'border-l-red-500',
   scheduled: 'border-l-blue-500',
   publishing: 'border-l-amber-500',
   published: 'border-l-emerald-500',
@@ -454,23 +454,11 @@ export default async function CalendarPage({
   );
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-      <PagesSidebar
-        workspaceId={auth.workspace.id}
-        pages={filter.pages}
-        groups={filter.groups}
-        group={filter.group}
-        visible={filter.visible}
-        net={filter.net}
-        networks={filter.networks}
-        canManageGroups={canManageSettings(auth.role)}
-        canManageQueue={canManageOthersPosts(auth.role)}
-        tools={tools}
-      />
+    <ChannelsLayout auth={auth} selection={filter} tools={tools}>
     <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold capitalize text-slate-900">{title}</h1>
+          <h1 className="text-xl font-semibold capitalize sm:text-2xl text-slate-900">{title}</h1>
           <p className="mt-1 text-sm text-slate-600">
             {t('title')} · {t('timesShownIn', { timezone })}
             {view !== 'feed' && <span className="hidden sm:inline"> · {t('dragHint')}</span>}
@@ -736,7 +724,7 @@ export default async function CalendarPage({
         </section>
       )}
     </div>
-    </div>
+    </ChannelsLayout>
   );
 }
 

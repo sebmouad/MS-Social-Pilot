@@ -21,7 +21,7 @@ export default async function SavedRepliesPage() {
   if (!canModerateComments(auth.role)) {
     return (
       <div className="space-y-6">
-        <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
         <EmptyState icon="comment" title={t('noAccessTitle')} hint={t('noAccessHint')} />
       </div>
     );
@@ -36,7 +36,7 @@ export default async function SavedRepliesPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">{t('intro')}</p>
       </header>
       <SavedRepliesClient replies={replies} />

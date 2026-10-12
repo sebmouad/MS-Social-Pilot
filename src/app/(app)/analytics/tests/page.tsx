@@ -55,7 +55,7 @@ export default async function CaptionTestsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">{t('intro')}</p>
       </header>
 
@@ -86,7 +86,7 @@ export default async function CaptionTestsPage() {
                   </div>
                   <p className="text-sm" role="status">
                     {test.status === 'running' ? (
-                      <span className="rounded-full bg-sky-50 px-2 py-0.5 font-medium text-sky-800">
+                      <span className="rounded-full bg-brand-50 px-2 py-0.5 font-medium text-brand-800">
                         {due ? t('runningUntil', { date: when(due) }) : t('running')}
                       </span>
                     ) : test.status === 'decided' ? (

@@ -225,7 +225,7 @@ export function WebhooksClient({ webhooks }: { webhooks: Webhook[] }) {
                       <p className="px-3 py-3 text-xs text-slate-500">{t('noDeliveries')}</p>
                     ) : (
                       <div className="scroll-x">
-                        <table className="w-full text-left text-xs">
+                        <table className="w-full text-start text-xs">
                           <caption className="sr-only">{t('deliveries')}</caption>
                           <thead className="bg-slate-50 text-slate-500">
                             <tr>
@@ -250,7 +250,7 @@ export function WebhooksClient({ webhooks }: { webhooks: Webhook[] }) {
                                   </span>
                                   {delivery.error && <span className="block text-slate-500">{delivery.error}</span>}
                                 </td>
-                                <td className="px-3 py-2 text-right">
+                                <td className="px-3 py-2 text-end">
                                   <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => void redeliver(webhook.id, delivery.id)}>
                                     {t('redeliver')}
                                   </button>

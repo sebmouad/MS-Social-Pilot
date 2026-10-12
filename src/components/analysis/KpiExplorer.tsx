@@ -87,7 +87,7 @@ export function KpiExplorer({
                         ? 'bg-slate-100 text-slate-700'
                         : good
                           ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-rose-50 text-rose-700'
+                          : 'bg-red-50 text-red-700'
                     }`}
                     title={vsLabel}
                   >

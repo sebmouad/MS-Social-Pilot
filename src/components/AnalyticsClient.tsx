@@ -283,7 +283,7 @@ export function AnalyticsClient({
       </details>
 
       {pinError && (
-        <p role="alert" className="text-sm text-rose-700">
+        <p role="alert" className="text-sm text-red-700">
           {pinError}
         </p>
       )}

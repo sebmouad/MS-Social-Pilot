@@ -78,7 +78,7 @@ export function ApprovalBoard({ columns, noText }: { columns: BoardColumn[]; noT
                       {card.feedback && card.feedback.approved + card.feedback.rejected + card.feedback.comments > 0 && (
                         <span className="nums mt-2 flex gap-2 text-[11px] font-semibold">
                           {card.feedback.approved > 0 && <span className="text-emerald-700">✓ {card.feedback.approved}</span>}
-                          {card.feedback.rejected > 0 && <span className="text-rose-700">✕ {card.feedback.rejected}</span>}
+                          {card.feedback.rejected > 0 && <span className="text-red-700">✕ {card.feedback.rejected}</span>}
                           {card.feedback.comments > 0 && <span className="text-slate-600">💬 {card.feedback.comments}</span>}
                         </span>
                       )}

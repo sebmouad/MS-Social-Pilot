@@ -134,7 +134,7 @@ export function PlansClient({ plans, subscribers }: { plans: PlanRow[]; subscrib
         <div className="scroll-x mt-3">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-slate-500">
+              <tr className="text-start text-xs text-slate-500">
                 <th className="py-2 pe-3 font-medium">{t('subscriber')}</th>
                 <th className="py-2 pe-3 font-medium">{t('plan')}</th>
                 <th className="py-2 pe-3 font-medium">{t('extraChannels')}</th>

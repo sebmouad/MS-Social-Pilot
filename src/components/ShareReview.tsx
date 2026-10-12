@@ -87,7 +87,7 @@ export function ShareReview({
               <span
                 aria-hidden
                 className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] text-white ${
-                  entry.decision === 'approved' ? 'bg-emerald-500' : entry.decision === 'rejected' ? 'bg-rose-500' : 'bg-slate-400'
+                  entry.decision === 'approved' ? 'bg-emerald-500' : entry.decision === 'rejected' ? 'bg-red-500' : 'bg-slate-400'
                 }`}
               >
                 {entry.decision === 'approved' ? '✓' : entry.decision === 'rejected' ? '!' : '…'}
@@ -105,7 +105,7 @@ export function ShareReview({
       )}
 
       {last && (
-        <p className={`mb-3 text-xs font-semibold ${last.decision === 'approved' ? 'text-emerald-700' : 'text-rose-700'}`}>
+        <p className={`mb-3 text-xs font-semibold ${last.decision === 'approved' ? 'text-emerald-700' : 'text-red-700'}`}>
           {last.decision === 'approved' ? t('statusApproved') : t('statusChanges')}
         </p>
       )}

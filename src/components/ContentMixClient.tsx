@@ -139,7 +139,7 @@ export function ContentMixClient({
                         <td className="nums py-2 pe-3 text-end">{line.drafts}</td>
                         <td className="py-2">
                           {short === 0 ? (
-                            <span className="badge bg-green-50 text-green-800">{t('onTrack')}</span>
+                            <span className="badge bg-emerald-50 text-emerald-800">{t('onTrack')}</span>
                           ) : line.drafts === 0 ? (
                             <span className="badge bg-red-50 text-red-800">{t('dry', { count: short })}</span>
                           ) : (
@@ -259,7 +259,7 @@ export function ContentMixClient({
                   {saving ? t('saving') : t('save')}
                 </button>
                 {message && (
-                  <p role="status" className={`text-sm ${message.ok ? 'text-green-700' : 'text-red-700'}`}>
+                  <p role="status" className={`text-sm ${message.ok ? 'text-emerald-700' : 'text-red-700'}`}>
                     {message.text}
                   </p>
                 )}

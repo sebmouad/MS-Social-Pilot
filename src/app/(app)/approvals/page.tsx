@@ -115,7 +115,7 @@ export default async function ApprovalsPage({
       <div className="min-w-0 flex-1 space-y-6">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+            <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
             <p className="mt-1 text-sm text-slate-600">{t('boardSubtitle')}</p>
           </div>
         </header>
@@ -125,7 +125,7 @@ export default async function ApprovalsPage({
             { key: 'draft', title: t('colDraft'), hint: t('colDraftHint'), tone: 'bg-slate-400', cards: drafts.map(card), empty: t('colEmpty') },
             { key: 'pending', title: t('colPending'), hint: t('colPendingHint'), tone: 'bg-violet-500', cards: pending.map(card), empty: t('colEmpty') },
             { key: 'ready', title: t('colReady'), hint: t('colReadyHint'), tone: 'bg-emerald-500', cards: ready.map(card), empty: t('colEmpty') },
-            { key: 'rejected', title: t('colRejected'), hint: t('colRejectedHint'), tone: 'bg-rose-500', cards: rejected.map(card), empty: t('colEmpty') },
+            { key: 'rejected', title: t('colRejected'), hint: t('colRejectedHint'), tone: 'bg-red-500', cards: rejected.map(card), empty: t('colEmpty') },
           ]}
         />
       </div>
@@ -138,7 +138,7 @@ export default async function ApprovalsPage({
     <div className="min-w-0 flex-1 space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">{t('countLine', { count: posts.length, profiles: selection.ids.length })}</p>
         </div>
       </header>

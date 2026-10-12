@@ -7,6 +7,7 @@ import { keyDaysBetween } from '@/lib/calendar-days';
 import { canManageSettings } from '@/lib/constants';
 import { uncoveredCountries } from '@/lib/holidays';
 import { screenMetadata } from '@/lib/metadata';
+import { ChannelsLayout } from '@/components/ChannelsLayout';
 import { loadPageFilter } from '@/lib/page-filter';
 import { prisma } from '@/lib/prisma';
 import { formatInZone } from '@/lib/time';
@@ -72,9 +73,10 @@ export default async function KeyDatesPage({ searchParams }: { searchParams: Pro
   );
 
   return (
-    <div className="space-y-6">
+    <ChannelsLayout auth={auth} selection={filter}>
+    <div className="min-w-0 flex-1 space-y-6">
       <header>
-        <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">{t('intro')}</p>
       </header>
       <KeyDatesClient
@@ -98,5 +100,6 @@ export default async function KeyDatesPage({ searchParams }: { searchParams: Pro
         today={from}
       />
     </div>
+    </ChannelsLayout>
   );
 }

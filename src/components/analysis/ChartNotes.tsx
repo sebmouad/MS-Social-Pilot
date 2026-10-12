@@ -90,7 +90,7 @@ export function ChartNotes({
               {canEdit && (canNoteAllPages || note.pageOnly) && (
                 <button
                   type="button"
-                  className="shrink-0 text-xs font-medium text-slate-500 hover:text-rose-700"
+                  className="shrink-0 text-xs font-medium text-slate-500 hover:text-red-700"
                   aria-label={t('removeNamed', { label: note.label })}
                   onClick={() => void remove(note)}
                 >

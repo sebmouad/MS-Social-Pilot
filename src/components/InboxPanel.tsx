@@ -228,11 +228,11 @@ export function InboxPanel({
 /** A person's initial on a coloured disc; Graph does not give their photo. */
 function Initial({ name }: { name: string }) {
   const palette = [
-    'bg-sky-100 text-sky-700',
+    'bg-brand-100 text-brand-700',
     'bg-violet-100 text-violet-700',
     'bg-emerald-100 text-emerald-700',
     'bg-amber-100 text-amber-800',
-    'bg-rose-100 text-rose-700',
+    'bg-red-100 text-red-700',
   ];
   const tone = palette[[...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length];
   return (

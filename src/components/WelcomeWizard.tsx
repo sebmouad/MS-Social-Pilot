@@ -79,7 +79,7 @@ export function WelcomeWizard({
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <header>
-        <h1 className="text-xl font-semibold text-slate-900">{t('title')}</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
         <p className="mt-2 text-xs font-medium text-slate-500">{t('step', { step, total: 2 })}</p>
       </header>
