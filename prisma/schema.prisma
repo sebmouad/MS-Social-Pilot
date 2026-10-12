@@ -156,6 +156,7 @@ model User {
   postVersions         PostVersion[]
   postNotes            PostNote[]
   calendarFeeds        CalendarFeed[]
+  chartNotes           ChartNote[]
   submittedPosts       Post[]                @relation("PostSubmitter")
   reviewedPosts        Post[]                @relation("PostReviewer")
   sentInvitations      Invitation[]          @relation("InvitationSender")
@@ -273,6 +274,7 @@ model Workspace {
   snippets             Snippet[]
   calendarFeeds   CalendarFeed[]
   pageGoals            PageGoal[]
+  chartNotes           ChartNote[]
   postTemplates        PostTemplate[]
   savedReplies         SavedReply[]
   captionTests         CaptionTest[]
@@ -453,6 +455,7 @@ model Target {
   conversations      Conversation[]
   externalPosts      ExternalPost[]
   goals              PageGoal[]
+  chartNotes         ChartNote[]
   videos             PageVideo[]
   instagramAccounts  InstagramAccount[]
   /// Why publishing is blocked, as a code the interface can translate. The
@@ -625,6 +628,28 @@ model PageGoal {
   @@unique([targetId, metric])
   @@index([workspaceId])
   @@map("page_goals")
+}
+
+/// An annotation on analytics timelines (NEXT_PHASES H13): "Campaign
+/// started", "Page renamed". For one Page, or every Page when targetId is null.
+model ChartNote {
+  id          String   @id @default(cuid())
+  workspaceId String
+  targetId    String?
+  /// The day it marks, yyyy-MM-dd on the workspace's calendar.
+  day         String
+  label       String
+  /// A palette key (src/lib/palette.ts).
+  color       String   @default("blue")
+  authorId    String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  page      Target?   @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  author    User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, day])
+  @@map("chart_notes")
 }
 
 model CalendarFeed {

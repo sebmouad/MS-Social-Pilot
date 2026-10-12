@@ -18,6 +18,15 @@ export interface TimeSeriesLine {
   colorIndex: number;
 }
 
+/** A dated mark on the chart (NEXT_PHASES H13): "Campaign started". */
+export interface TimeSeriesNote {
+  /** yyyy-MM-dd, matched against the start of each point's `x`. */
+  day: string;
+  label: string;
+  /** A plain colour for the mark. */
+  color: string;
+}
+
 const HEIGHT = 220;
 /** Room for the y ticks on the left and the end label on the right. */
 const PAD = { top: 12, right: 56, bottom: 26, left: 44 };
@@ -39,10 +48,12 @@ export function TimeSeries({
   /** One series is often context for another; grey it rather than colour it. */
   emphasis,
   formatX,
+  notes = [],
 }: {
   lines: TimeSeriesLine[];
   emphasis?: number;
   formatX: (iso: string) => string;
+  notes?: TimeSeriesNote[];
 }) {
   const [active, setActive] = useState<number | null>(null);
   // The app's language on the server and in the browser alike, so the axis
@@ -105,6 +116,12 @@ export function TimeSeries({
 
   const reference = lines[0]!;
   const activePoint = active !== null ? reference.points[active] : undefined;
+  // Each note at the position of its day; one outside the window is not drawn.
+  const placed = notes.flatMap((note) => {
+    const index = reference.points.findIndex((point) => point.x.startsWith(note.day));
+    return index === -1 ? [] : [{ ...note, index }];
+  });
+  const activeNotes = placed.filter((note) => note.index === active);
 
   return (
     <div ref={boxRef} className="relative">
@@ -166,6 +183,23 @@ export function TimeSeries({
           >
             {formatX(reference.points[index]?.x ?? '')}
           </text>
+        ))}
+
+        {/* Notes: a thin coloured rule with a flag at the top. Dashed, so it
+            reads as a marker and never as data. */}
+        {placed.map((note, position) => (
+          <g key={`${note.day}-${position}`} aria-hidden>
+            <line
+              x1={xAt(note.index)}
+              x2={xAt(note.index)}
+              y1={PAD.top}
+              y2={PAD.top + plotHeight}
+              stroke={note.color}
+              strokeWidth={1.5}
+              strokeDasharray="3 3"
+            />
+            <circle cx={xAt(note.index)} cy={PAD.top} r={4} fill={note.color} stroke={VIZ.surface} strokeWidth={1.5} />
+          </g>
         ))}
 
         {active !== null && (
@@ -268,6 +302,16 @@ export function TimeSeries({
               </li>
             ))}
           </ul>
+          {activeNotes.length > 0 && (
+            <ul className="mt-1.5 space-y-0.5 border-t border-slate-100 pt-1.5">
+              {activeNotes.map((note, position) => (
+                <li key={position} className="flex items-center gap-2 text-slate-700">
+                  <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: note.color }} />
+                  {note.label}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

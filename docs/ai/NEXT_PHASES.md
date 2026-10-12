@@ -781,8 +781,12 @@ setup from Phase 0.2 (marked AI).
   `page_media_view` (older `page_impressions`), engagement =
   `page_post_engagements`, posts = published (app + Facebook). On track while
   ≥ 90% of the straight-line share. Admins set them (`canManageSettings`).*
-- **H13. Notes on charts (S)** — annotations (date, label, colour) on analytics
+- **H13. Notes on charts (S)** ✅ — annotations (date, label, colour) on analytics
   timelines, per Page or workspace; shown in reports.
+  *Done 2026-10-12: `chart_notes`; dashed coloured markers on the analysis
+  day-by-day chart with the label in its readout, and a list under it (add,
+  remove). A note is for one Page or every Page. Reports show them read-only.
+  Editors and up.*
 - **H14. Agency overview for root (M)** — in the root section: KPIs for every
   workspace (Pages, posts scheduled/failed, followers change, engagement,
   disconnected Pages, AI spend), sortable, drill-down.

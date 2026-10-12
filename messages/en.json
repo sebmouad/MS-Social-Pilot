@@ -3693,5 +3693,23 @@
     "pace_noData": "No data yet",
     "progress": "{actual} of {target}",
     "reportTitle": "Goals for {month}"
+  },
+  "chartNotes": {
+    "title": "Notes on this chart",
+    "add": "Add a note",
+    "empty": "No notes in this period. Mark what happened (a campaign, a Page change) so the curve explains itself.",
+    "day": "Day",
+    "label": "Note",
+    "labelPlaceholder": "Campaign started",
+    "color": "Colour",
+    "allPages": "Show it on every Page’s charts",
+    "allPagesTag": "All Pages",
+    "save": "Add note",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "removeNamed": "Remove note “{label}”",
+    "removeConfirm": "Remove this note?",
+    "saveFailed": "Couldn’t add the note. Check the day is inside the period and try again.",
+    "removeFailed": "Couldn’t remove the note. Try again."
   }
 }

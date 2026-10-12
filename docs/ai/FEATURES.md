@@ -82,7 +82,7 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
 ## Analytics
 - **Pages** `/analytics?view=…`: All profiles (default with 2+ selected: summed
   tiles, reach "up to", top profiles), Analysis (health score, what stands out, best
-  day/frequency, KPI cards with sparklines + ⓘ definitions, day-by-day chart,
+  day/frequency, KPI cards with sparklines + ⓘ definitions, day-by-day chart with dated notes (H13, editors add/remove; shown in reports),
   cadence, best-time heatmap, formats/hashtags/captions, top/bottom posts),
   Compare pages (by group, line per profile with legend toggles, totals row),
   Overview (every metric Facebook serves, technical coverage folded, ★ pins a

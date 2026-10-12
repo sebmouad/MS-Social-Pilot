@@ -5,6 +5,8 @@ import { useLocale, useTranslations } from 'next-intl';
 
 import { InfoTip } from '@/components/InfoTip';
 import { TimeSeries } from '@/components/charts/TimeSeries';
+import { ChartNotes } from './ChartNotes';
+import { NOTE_HEX, type ChartNoteView } from '@/lib/chart-note-colors';
 import { compact, seriesColor } from '@/lib/viz';
 
 export interface KpiCard {
@@ -33,7 +35,21 @@ export interface KpiCard {
  * what turns a chart of posts and impressions into a line of impressions and
  * a flat line at nought, which says nothing about posts at all.
  */
-export function KpiExplorer({ cards, days, vsLabel }: { cards: KpiCard[]; days: string[]; vsLabel: string }) {
+export function KpiExplorer({
+  cards,
+  days,
+  vsLabel,
+  notes = [],
+  notesControl,
+}: {
+  cards: KpiCard[];
+  days: string[];
+  vsLabel: string;
+  /** Dated notes drawn on the chart (H13). */
+  notes?: ChartNoteView[];
+  /** Where notes are listed, and whether this member may add them; absent hides the list. */
+  notesControl?: { targetId: string; canEdit: boolean; canNoteAllPages: boolean };
+}) {
   const t = useTranslations('pageAnalysis');
   const locale = useLocale();
   const plottable = cards.filter((card) => card.series && card.series.length > 1);
@@ -124,9 +140,13 @@ export function KpiExplorer({ cards, days, vsLabel }: { cards: KpiCard[]; days: 
                 },
               ]}
               formatX={(iso) => dayFormat.format(new Date(iso))}
+              notes={notes.map((note) => ({ day: note.day, label: note.label, color: NOTE_HEX[note.color] }))}
             />
           </div>
           {active.note && <p className="mt-2 text-xs text-slate-500">{active.note}</p>}
+          {notesControl && days.length > 0 && (
+            <ChartNotes notes={notes} firstDay={days[0]!} lastDay={days[days.length - 1]!} {...notesControl} />
+          )}
         </div>
       )}
     </section>

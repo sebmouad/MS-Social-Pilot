@@ -152,6 +152,7 @@ beforeAll(async () => {
   const postTemplate = await prisma.postTemplate.create({ data: { workspaceId: w, name: 'A template', body: 'x' } });
   const postNote = await prisma.postNote.create({ data: { postId: post.id, body: 'A note' } });
   const calendarFeed = await prisma.calendarFeed.create({ data: { workspaceId: w, userId: ownerA.id, name: 'A feed', tokenHash: 'feed-a' } });
+  const chartNote = await prisma.chartNote.create({ data: { workspaceId: w, day: '2026-01-01', label: 'A note' } });
   const rule = await prisma.moderationRule.create({ data: { workspaceId: w, name: 'A rule', match: 'links', action: 'hide' } });
   const exported = await prisma.workspaceExport.create({
     data: { workspaceId: w, requestedById: ownerA.id, status: 'ready', storageKey: 'exports/a.zip', expiresAt: new Date(Date.now() + 86_400_000) },
@@ -185,6 +186,7 @@ beforeAll(async () => {
     'post-templates/[id]': postTemplate.id,
     'post-notes/[id]': postNote.id,
     'calendar-feeds/[id]': calendarFeed.id,
+    'chart-notes/[id]': chartNote.id,
     'seasons/[id]': season.id,
     'moderation/actions/[id]/undo': moderated.id,
     'page-groups/[id]': group.id,
@@ -218,7 +220,7 @@ afterAll(async () => {
 /** Everything A owns, as a fingerprint: counts and the fields a hijack would change. */
 async function snapshot() {
   const w = A.workspace;
-  const [posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes, calendarFeeds] = await Promise.all([
+  const [posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes, calendarFeeds, chartNotes] = await Promise.all([
     prisma.post.findMany({ where: { workspaceId: w }, select: { id: true, message: true, status: true } }),
     prisma.target.findMany({ where: { workspaceId: w }, select: { id: true, enabled: true, name: true } }),
     prisma.label.findMany({ where: { workspaceId: w }, select: { id: true, name: true } }),
@@ -241,8 +243,9 @@ async function snapshot() {
     prisma.postTemplate.findMany({ where: { workspaceId: w }, select: { id: true, name: true, body: true } }),
     prisma.postNote.findMany({ where: { post: { workspaceId: w } }, select: { id: true, body: true } }),
     prisma.calendarFeed.findMany({ where: { workspaceId: w }, select: { id: true } }),
+    prisma.chartNote.findMany({ where: { workspaceId: w }, select: { id: true, label: true } }),
   ]);
-  return { posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes, calendarFeeds };
+  return { posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes, calendarFeeds, chartNotes };
 }
 
 describe("another client's owner", () => {

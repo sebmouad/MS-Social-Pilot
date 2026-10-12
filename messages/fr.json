@@ -3693,5 +3693,23 @@
     "pace_noData": "Pas encore de données",
     "progress": "{actual} sur {target}",
     "reportTitle": "Objectifs de {month}"
+  },
+  "chartNotes": {
+    "title": "Notes sur ce graphique",
+    "add": "Ajouter une note",
+    "empty": "Aucune note sur cette période. Indiquez ce qui s’est passé (une campagne, un changement de Page) pour que la courbe s’explique d’elle-même.",
+    "day": "Jour",
+    "label": "Note",
+    "labelPlaceholder": "Début de la campagne",
+    "color": "Couleur",
+    "allPages": "L’afficher sur les graphiques de toutes les Pages",
+    "allPagesTag": "Toutes les Pages",
+    "save": "Ajouter la note",
+    "cancel": "Annuler",
+    "remove": "Retirer",
+    "removeNamed": "Retirer la note « {label} »",
+    "removeConfirm": "Retirer cette note ?",
+    "saveFailed": "Impossible d’ajouter la note. Vérifiez que le jour est dans la période et réessayez.",
+    "removeFailed": "Impossible de retirer la note. Réessayez."
   }
 }

@@ -12,6 +12,7 @@ import { ExternalLink } from '@/components/ExternalLink';
 import { FeedPost } from '@/components/FeedPost';
 import { Icon, type IconName } from '@/components/Icon';
 import { analysePage, comparePages, type PageComparisonRow } from '@/lib/page-analysis-data';
+import { listChartNotes } from '@/lib/chart-notes';
 import type { CompareMode } from '@/lib/date-range';
 import { paletteOf, type PaletteKey } from '@/lib/palette';
 import {
@@ -234,6 +235,7 @@ export async function PageAnalysisView({
   days,
   timeZone,
   compare = 'previous',
+  notesAccess,
 }: {
   workspaceId: string;
   targetId: string;
@@ -242,10 +244,17 @@ export async function PageAnalysisView({
   days: number;
   timeZone: string;
   compare?: CompareMode;
+  /** Who may add chart notes (H13); absent shows them read-only, as in reports. */
+  notesAccess?: { canEdit: boolean; canNoteAllPages: boolean };
 }) {
   const t = await getTranslations('pageAnalysis');
   const locale = await getLocale();
   const analysis = await analysePage({ workspaceId, targetId, from, to, timeZone, compare });
+  const dayList = analysis.daily.days;
+  const chartNotes =
+    dayList.length > 0
+      ? await listChartNotes({ workspaceId, targetId, firstDay: dayList[0]!, lastDay: dayList[dayList.length - 1]! })
+      : [];
 
   const longDays = weekdayNames(locale, 'long');
   const shortDays = weekdayNames(locale, 'short');
@@ -282,6 +291,8 @@ export async function PageAnalysisView({
             <KpiExplorer
               vsLabel={t(compare === 'year' ? 'vsYear' : 'vsPrevious')}
               days={analysis.daily.days}
+              notes={chartNotes}
+              notesControl={{ targetId, canEdit: notesAccess?.canEdit ?? false, canNoteAllPages: notesAccess?.canNoteAllPages ?? false }}
               cards={analysis.kpis.map((kpi) => ({
                 key: kpi.key,
                 label: t(`kpi.${kpi.key}`),

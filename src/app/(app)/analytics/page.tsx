@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { TargetType } from '@prisma/client';
+import { TargetType, WorkspaceRole } from '@prisma/client';
 import { loadSelection } from '@/lib/page-filter';
 import { SelectionBar } from '@/components/SelectionBar';
 
@@ -23,7 +23,7 @@ import { requirePage } from '@/lib/auth';
 import { targetScope } from '@/lib/page-access';
 import { listPageGroups } from '@/lib/page-groups';
 import { screenMetadata } from '@/lib/metadata';
-import { canDeleteComments, canModerateComments } from '@/lib/constants';
+import { atLeast, canDeleteComments, canModerateComments } from '@/lib/constants';
 import { UNWINDOWED_VIEWS, defaultAnalyticsView, parseAnalyticsView } from '@/lib/analytics-views';
 import { isPinnable, readPinnedFigures } from '@/lib/pinned-metrics';
 import { PinnedTiles } from '@/components/analysis/PinnedTiles';
@@ -216,6 +216,7 @@ export default async function AnalyticsPage({
           days={window}
           timeZone={timezone}
           compare={compare}
+          notesAccess={{ canEdit: atLeast(auth.role, WorkspaceRole.editor), canNoteAllPages: auth.pageScope.all }}
         />
       )}
 
