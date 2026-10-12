@@ -131,6 +131,8 @@ test.describe('the invited colleague, in French', () => {
   }
 
   test('cannot reach the installation settings', async ({ browser }) => {
+    // A dozen addresses, each compiled on first visit by the dev server.
+    test.setTimeout(180_000);
     // Registering gave them a workspace of their own to own, which used to be
     // enough to rewrite the Facebook app credentials for every client here.
     const context = await browser.newContext({ storageState: 'e2e/.auth/colleague.json' });

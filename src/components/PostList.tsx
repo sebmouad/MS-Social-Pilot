@@ -693,11 +693,13 @@ function largeText(post: PostView): boolean {
 
 /** Consecutive posts sharing a day, in the order the list already has them. */
 function groupByDay(posts: PostView[]): Array<{ key: string; label: string; posts: PostView[] }> {
-  const groups: Array<{ key: string; label: string; posts: PostView[] }> = [];
+  // By key, not by run: the list is ordered by when a post is planned, and a
+  // published post's day comes from when it went out, so one day can recur.
+  const groups = new Map<string, { key: string; label: string; posts: PostView[] }>();
   for (const post of posts) {
-    const last = groups[groups.length - 1];
-    if (last && last.key === post.day.key) last.posts.push(post);
-    else groups.push({ key: post.day.key, label: post.day.label, posts: [post] });
+    const group = groups.get(post.day.key);
+    if (group) group.posts.push(post);
+    else groups.set(post.day.key, { key: post.day.key, label: post.day.label, posts: [post] });
   }
-  return groups;
+  return [...groups.values()];
 }

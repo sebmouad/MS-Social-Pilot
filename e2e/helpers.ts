@@ -64,6 +64,7 @@ export const SIGNED_IN_SCREENS = [
   '/analytics',
   // Each analytics view is its own server render with its own data, and one of
   // them failed on every visit for as long as nothing here opened it.
+  '/analytics?view=total',
   '/analytics?view=compare',
   '/analytics?view=analysis&compare=year',
   '/analytics?view=overview',

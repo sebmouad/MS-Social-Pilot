@@ -196,9 +196,11 @@
   }
 
   /* Wide content — tables, wide charts — scrolls inside its own box so the
-     page body never scrolls sideways on a phone. */
+     page body never scrolls sideways on a phone. Positioned, so that an
+     absolutely placed child (a screen-reader-only label in a table cell) is
+     clipped with the rest instead of widening the page. */
   .scroll-x {
-    @apply -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0;
+    @apply relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0;
     scrollbar-width: thin;
   }
 
