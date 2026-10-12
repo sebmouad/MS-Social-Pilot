@@ -237,6 +237,12 @@ model Workspace {
   /// When the weekly best-time job last looked at this workspace.
   bestTimesRunAt DateTime?
 
+  /// Default target audience (H0) for Pages that set none of their own.
+  audienceCountries String[] @default([])
+  audienceLanguages String[] @default([])
+  audienceTimezone  String?
+  audienceCalendars String[] @default([])
+
   // AI caption defaults, fed into the prompt.
   aiEnabled    Boolean @default(true)
   aiTone       String?
@@ -388,6 +394,13 @@ model Target {
   utmSource   String?
   utmMedium   String?
   utmCampaign String?
+
+  /// Target audience (H0). Empty lists and null follow the workspace's defaults.
+  audienceCountries String[] @default([])
+  /// BCP-47 tags, e.g. fr-FR, en-US.
+  audienceLanguages String[] @default([])
+  audienceTimezone  String?
+  audienceCalendars String[] @default([])
 
   // Read straight off the Page object: no insights permission, no date range.
   fanCount          Int?

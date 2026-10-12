@@ -311,3 +311,35 @@ export function weekGrid(anchor: string, timeZone: string, weekStartsOn = 1): Da
     return firstRealInstant(stamp, timeZone);
   });
 }
+
+/**
+ * Timezone list. `Intl.supportedValuesOf` gives the full IANA set on modern
+ * Node; the fallback keeps the select usable on runtimes that lack it.
+ */
+export function timezoneOptions(): string[] {
+  const supported = (
+    Intl as unknown as { supportedValuesOf?: (key: string) => string[] }
+  ).supportedValuesOf;
+
+  if (typeof supported === 'function') {
+    try {
+      return supported('timeZone');
+    } catch {
+      // Fall through.
+    }
+  }
+  return [
+    'UTC',
+    'Europe/London',
+    'Europe/Paris',
+    'Europe/Berlin',
+    'Africa/Casablanca',
+    'America/New_York',
+    'America/Chicago',
+    'America/Los_Angeles',
+    'Asia/Dubai',
+    'Asia/Kolkata',
+    'Asia/Singapore',
+    'Australia/Sydney',
+  ];
+}

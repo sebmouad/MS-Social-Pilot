@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import type { Audience } from '@/lib/audience';
+
+import { AudienceFields } from './AudienceFields';
 import { Dialog } from './Dialog';
 import { FeedAvatar } from './FeedPost';
 import { Icon } from './Icon';
@@ -17,6 +20,7 @@ interface Profile {
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
+  audience: Audience;
 }
 
 /**
@@ -26,10 +30,18 @@ interface Profile {
 export function PageProfiles({
   pages,
   workspaceUtm,
+  workspaceAudience,
+  timezones,
+  suggestions,
   canEdit,
 }: {
   pages: Profile[];
   workspaceUtm: { source: string | null; medium: string | null; campaign: string | null };
+  /** What a Page follows for each part of its audience it leaves empty. */
+  workspaceAudience: Audience & { timezone: string };
+  timezones: string[];
+  /** From each Page's own followers, by Page id. */
+  suggestions: Record<string, { countries: string[]; languages: string[] }>;
   canEdit: boolean;
 }) {
   const t = useTranslations('groups');
@@ -51,6 +63,10 @@ export function PageProfiles({
         utmSource: editing.utmSource,
         utmMedium: editing.utmMedium,
         utmCampaign: editing.utmCampaign,
+        audienceCountries: editing.audience.countries,
+        audienceLanguages: editing.audience.languages,
+        audienceTimezone: editing.audience.timezone,
+        audienceCalendars: editing.audience.calendars,
       }),
     }).catch(() => null);
     setPending(false);
@@ -93,6 +109,8 @@ export function PageProfiles({
                 <span className="block truncate text-xs text-slate-500">
                   {page.brandVoice ? page.brandVoice : t('voiceInherited')}
                   {tags > 0 && ` · ${t('ownTags', { count: tags })}`}
+                  {page.audience.countries.length + page.audience.languages.length > 0 &&
+                    ` · ${[...page.audience.countries, ...page.audience.languages].join(', ')}`}
                 </span>
               </span>
               {canEdit && (
@@ -140,6 +158,18 @@ export function PageProfiles({
               />
               <p className="hint">{t('voiceHint')}</p>
             </div>
+            <fieldset>
+              <legend className="text-sm font-semibold text-slate-900">{t('audienceTitle')}</legend>
+              <p className="mb-2 text-xs text-slate-500">{t('audienceHint')}</p>
+              <AudienceFields
+                idPrefix="page-audience"
+                value={editing.audience}
+                onChange={(audience) => setEditing({ ...editing, audience })}
+                timezones={timezones}
+                inherited={workspaceAudience}
+                suggestion={suggestions[editing.id]}
+              />
+            </fieldset>
             <fieldset>
               <legend className="text-sm font-semibold text-slate-900">{t('utmTitle')}</legend>
               <p className="mb-2 text-xs text-slate-500">{t('utmHint')}</p>

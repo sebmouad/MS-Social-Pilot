@@ -131,6 +131,14 @@ describe('what the model is told', () => {
     expect(sent[0]?.system).toMatch(/Write in French/);
   });
 
+  it('writes for the Page\'s audience when it has one (H0)', async () => {
+    const { user, workspace } = await seed();
+    await generate(workspace.id, user.id, { locale: Locale.en, audience: { languages: ['es-MX'], countries: ['MX', 'US'] } });
+
+    expect(sent[0]?.system).toMatch(/Write in Mexican Spanish|Write in Spanish \(Mexico\)/);
+    expect(sent[0]?.system).toMatch(/mainly in: Mexico, United States/);
+  });
+
   it('passes the tone and the brand voice through', async () => {
     const { user, workspace } = await seed();
     await generate(workspace.id, user.id, {

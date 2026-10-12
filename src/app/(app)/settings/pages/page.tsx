@@ -9,6 +9,8 @@ import { screenMetadata } from '@/lib/metadata';
 import { targetScope } from '@/lib/page-access';
 import { listLabels, listPageGroups } from '@/lib/page-groups';
 import { prisma } from '@/lib/prisma';
+import { suggestAudiences } from '@/lib/audience-data';
+import { timezoneOptions } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +40,10 @@ export default async function PagesAndGroupsPage() {
         utmSource: true,
         utmMedium: true,
         utmCampaign: true,
+        audienceCountries: true,
+        audienceLanguages: true,
+        audienceTimezone: true,
+        audienceCalendars: true,
       },
       orderBy: { name: 'asc' },
     }),
@@ -48,8 +54,17 @@ export default async function PagesAndGroupsPage() {
   const used = new Map(usage.map((row) => [row.labelId, row._count]));
   const workspace = await prisma.workspace.findUniqueOrThrow({
     where: { id: auth.workspace.id },
-    select: { utmSource: true, utmMedium: true, utmCampaignTemplate: true },
+    select: {
+      utmSource: true,
+      utmMedium: true,
+      utmCampaignTemplate: true,
+      audienceCountries: true,
+      audienceLanguages: true,
+      audienceTimezone: true,
+      audienceCalendars: true,
+    },
   });
+  const suggestions = await suggestAudiences(pages.filter((page) => page.type === TargetType.page).map((page) => page.id));
 
   return (
     <div className="space-y-6">
@@ -61,9 +76,20 @@ export default async function PagesAndGroupsPage() {
       <PageProfiles
         canEdit={canManageSettings(auth.role)}
         workspaceUtm={{ source: workspace.utmSource, medium: workspace.utmMedium, campaign: workspace.utmCampaignTemplate }}
+        workspaceAudience={{
+          countries: workspace.audienceCountries,
+          languages: workspace.audienceLanguages,
+          timezone: workspace.audienceTimezone ?? auth.workspace.timezone,
+          calendars: workspace.audienceCalendars,
+        }}
+        timezones={timezoneOptions()}
+        suggestions={suggestions}
         pages={pages
           .filter((page) => page.type === TargetType.page)
-          .map(({ type: _type, ...page }) => page)}
+          .map(({ type: _type, audienceCountries, audienceLanguages, audienceTimezone, audienceCalendars, ...page }) => ({
+            ...page,
+            audience: { countries: audienceCountries, languages: audienceLanguages, timezone: audienceTimezone, calendars: audienceCalendars },
+          }))}
       />
 
       <GroupsAndLabels

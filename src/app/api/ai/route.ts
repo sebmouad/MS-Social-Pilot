@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { aiAvailable, generateCaption, improveCaption, planWeek, suggestHashtags, TONES } from '@/lib/ai';
 import { assertPagesAllowed } from '@/lib/page-access';
+import { EMPTY_AUDIENCE, audienceOf, effectiveAudience } from '@/lib/audience';
 import { createPost } from '@/lib/posts';
 import { formatInZone } from '@/lib/time';
 import { errors } from '@/lib/errors';
@@ -49,7 +50,15 @@ export const POST = route(async (request: Request) => {
 
   const workspace = await prisma.workspace.findUniqueOrThrow({
     where: { id: auth.workspace.id },
-    select: { aiEnabled: true, aiTone: true, aiBrandVoice: true },
+    select: {
+      aiEnabled: true,
+      aiTone: true,
+      aiBrandVoice: true,
+      audienceCountries: true,
+      audienceLanguages: true,
+      audienceTimezone: true,
+      audienceCalendars: true,
+    },
   });
   if (!workspace.aiEnabled) throw errors.aiNotConfigured();
 
@@ -61,7 +70,15 @@ export const POST = route(async (request: Request) => {
     pageIds.length === 1
       ? await prisma.target.findFirst({
           where: { id: pageIds[0], workspaceId: auth.workspace.id },
-          select: { id: true, name: true, brandVoice: true },
+          select: {
+            id: true,
+            name: true,
+            brandVoice: true,
+            audienceCountries: true,
+            audienceLanguages: true,
+            audienceTimezone: true,
+            audienceCalendars: true,
+          },
         })
       : null;
   const shared = {
@@ -71,6 +88,8 @@ export const POST = route(async (request: Request) => {
     // language wins over the user's own interface language.
     locale: auth.workspace.defaultLocale,
     brandVoice: page?.brandVoice?.trim() || workspace.aiBrandVoice,
+    // The Page's audience (H0), or the workspace's default when several are picked.
+    audience: effectiveAudience(page ? audienceOf(page) : EMPTY_AUDIENCE, audienceOf(workspace), auth.workspace.timezone),
   };
 
   if (input.action === 'hashtags') {

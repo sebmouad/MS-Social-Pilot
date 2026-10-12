@@ -5,6 +5,7 @@ import { canManageSettings } from '@/lib/constants';
 import { errors } from '@/lib/errors';
 import { prisma } from '@/lib/prisma';
 import { ok, readJson, route } from '@/lib/api';
+import { audienceFields } from '@/lib/validation';
 
 const text = (max: number) =>
   z
@@ -19,9 +20,10 @@ const profileSchema = z.object({
   utmSource: text(100),
   utmMedium: text(100),
   utmCampaign: text(200),
+  ...audienceFields,
 });
 
-/** A Page's own voice for AI writing and its own link tags. Admins, like the workspace's. */
+/** A Page's own voice for AI writing, its own link tags and its audience (H0). Admins, like the workspace's. */
 export const PATCH = route(async (request: Request, context: { params: Promise<{ id: string }> }) => {
   const auth = await requireCapability(canManageSettings);
   const { id } = await context.params;

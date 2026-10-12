@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { LIMITS, Locale, PublishMode } from './constants';
 import { isValidTimeZone } from './time';
 import { THEMES } from './themes';
+import { COUNTRY_CODES, CULTURAL_CALENDARS, canonicalLanguage } from './audience';
 
 /**
  * Request schemas. Every API route parses its input through one of these, so
@@ -226,7 +227,23 @@ export const targetUpdateSchema = z.object({
   enabled: z.boolean().optional(),
 });
 
+/**
+ * Target audience (H0), for a Page or as the workspace's default. Absent
+ * leaves a part as it is; an empty list or null clears it.
+ */
+export const audienceFields = {
+  audienceCountries: z.array(z.string().refine((code) => COUNTRY_CODES.includes(code), 'Unknown country.')).max(50).optional(),
+  audienceLanguages: z
+    .array(z.string().max(35).transform((tag, ctx) => canonicalLanguage(tag) ?? (ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Not a language tag.' }), z.NEVER)))
+    .max(20)
+    .transform((tags) => [...new Set(tags)])
+    .optional(),
+  audienceTimezone: timezone.nullish(),
+  audienceCalendars: z.array(z.enum(CULTURAL_CALENDARS)).max(CULTURAL_CALENDARS.length).optional(),
+};
+
 export const workspaceSettingsSchema = z.object({
+  ...audienceFields,
   name: z.string().trim().min(1).max(120).optional(),
   timezone: timezone.optional(),
   defaultLocale: z.nativeEnum(Locale).optional(),

@@ -33,6 +33,10 @@ export const PATCH = route(async (request: Request) => {
   assign('shortenerEnabled', input.shortenerEnabled);
   assign('spamGapMinutes', input.spamGapMinutes);
   assign('bestTimeMode', input.bestTimeMode);
+  assign('audienceCountries', input.audienceCountries);
+  assign('audienceLanguages', input.audienceLanguages);
+  assign('audienceTimezone', input.audienceTimezone);
+  assign('audienceCalendars', input.audienceCalendars);
   assign('aiEnabled', input.aiEnabled);
   assign('aiTone', input.aiTone);
   assign('aiBrandVoice', input.aiBrandVoice);

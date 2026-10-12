@@ -1891,7 +1891,9 @@
     "bestTimeMode": "Meilleurs moments par Page",
     "bestTimeSuggest": "Les suggérer sur l’écran de la file",
     "bestTimeApply": "Les ajouter à la file chaque semaine",
-    "bestTimeModeHint": "Chaque semaine, le worker examine les résultats propres à chaque Page. Avec « Ajouter », jusqu’à deux nouveaux horaires par Page entrent dans sa file (14 au plus) ; l’écran de la file indique ce qui a été ajouté, et chaque horaire peut être retiré."
+    "bestTimeModeHint": "Chaque semaine, le worker examine les résultats propres à chaque Page. Avec « Ajouter », jusqu’à deux nouveaux horaires par Page entrent dans sa file (14 au plus) ; l’écran de la file indique ce qui a été ajouté, et chaque horaire peut être retiré.",
+    "audienceTitle": "Audience par défaut",
+    "audienceHint": "Les Pages sans audience propre suivent ces valeurs. Rien n’est supposé : laissez vide ce qui ne s’applique pas."
   },
   "setup": {
     "title": "Configurer MS Social Pilot",
@@ -2241,15 +2243,17 @@
     "profilesHint": "Comment chaque Page s’exprime quand l’IA écrit pour elle, et les balises UTM de ses liens.",
     "voiceInherited": "Utilise le ton de l’espace",
     "ownTags": "{count, plural, one {1 balise propre} other {# balises propres}}",
-    "editProfile": "Ton et liens",
-    "profileTitle": "{page} : ton et liens",
+    "editProfile": "Ton, audience et liens",
+    "profileTitle": "{page} : ton, audience et liens",
     "voiceField": "Comment cette Page s’exprime",
     "voicePlaceholder": "Chaleureux et de quartier, un peu joueur. On tutoie. Phrases courtes, un emoji maximum. On parle du pain frais, de l’équipe et du quartier.",
     "voiceHint": "Utilisé par l’écriture IA, les hashtags et les plans de semaine de cette Page. Vide : le ton de l’espace s’applique.",
     "utmTitle": "Balises de liens (UTM)",
     "utmHint": "Ajoutées aux liens de cette Page à la publication. Champs vides : réglage de l’espace.",
     "inherits": "Espace : {value}",
-    "notSet": "Non défini"
+    "notSet": "Non défini",
+    "audienceTitle": "Audience",
+    "audienceHint": "À qui s’adresse cette Page. La rédaction par IA utilise les langues et les pays ; ce qui reste vide suit les valeurs par défaut de l’espace de travail (Paramètres)."
   },
   "share": {
     "reviewBadge": "À valider",
@@ -3084,6 +3088,36 @@
       "hours": "{hours, plural, =24 {1 jour} =48 {2 jours} =72 {3 jours} =168 {1 semaine} other {# heures}}",
       "planSplit": "Les {pages} Pages sont réparties entre les {captions} légendes, toutes publiées en même temps.",
       "planDays": "Chaque Page reçoit chacune des {captions} légendes, une par jour à la même heure."
+    }
+  },
+  "audience": {
+    "countries": "Pays",
+    "addCountry": "Ajouter un pays…",
+    "languages": "Langues",
+    "languagePlaceholder": "ex. fr-FR",
+    "addLanguage": "Ajouter",
+    "languageHint": "Un code de langue, avec la région si elle compte : fr-FR, fr-CA, es-MX, ar.",
+    "languageInvalid": "Ce n’est pas un code de langue. Essayez une forme comme fr-FR ou en.",
+    "timezone": "Fuseau horaire de l’audience",
+    "timezoneWorkspace": "Le fuseau de l’espace de travail",
+    "timezoneFollows": "Suivre l’espace de travail ({zone})",
+    "timezoneHint": "Là où vit la plus grande partie de l’audience.",
+    "calendars": "Calendriers culturels",
+    "calendarsHint": "Les dates à prendre en compte pour cette audience. Aucun n’est suivi sans être coché.",
+    "follows": "Suit l’espace de travail : {value}",
+    "suggested": "D’après les abonnés de cette Page : {value}",
+    "useSuggested": "Les utiliser",
+    "remove": "Retirer {name}",
+    "calendar": {
+      "public_holidays": "Jours fériés des pays",
+      "international_days": "Journées internationales",
+      "christian_western": "Chrétien (occidental)",
+      "christian_orthodox": "Chrétien (orthodoxe)",
+      "islamic": "Islamique",
+      "jewish": "Juif",
+      "hindu": "Hindou",
+      "lunar_new_year": "Nouvel An lunaire",
+      "buddhist": "Bouddhiste"
     }
   }
 }

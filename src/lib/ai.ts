@@ -79,16 +79,43 @@ async function assertWithinBudget(): Promise<void> {
   if (budget > 0 && (await monthSpendUsd(new Date())) >= budget) throw errors.aiBudgetReached();
 }
 
+/** The audience a post is for (H0): BCP-47 languages and ISO country codes. */
+export interface AiAudience {
+  languages: string[];
+  countries: string[];
+}
+
+/** The language to write in: the audience's first, else the workspace's. */
+function writingLanguage(locale: Locale, audience?: AiAudience | null): string {
+  const tag = audience?.languages[0];
+  if (tag) {
+    try {
+      return new Intl.DisplayNames(['en'], { type: 'language' }).of(tag) ?? tag;
+    } catch {
+      return tag;
+    }
+  }
+  return locale === Locale.fr ? 'French' : 'English';
+}
+
+function audienceLine(audience?: AiAudience | null): string {
+  if (!audience?.countries.length) return '';
+  const regions = new Intl.DisplayNames(['en'], { type: 'region' });
+  return `The audience is mainly in: ${audience.countries.map((code) => regions.of(code) ?? code).join(', ')}.`;
+}
+
 function systemPrompt(options: {
   locale: Locale;
   tone: string | null;
   brandVoice: string | null;
+  audience?: AiAudience | null;
 }): string {
-  const language = options.locale === Locale.fr ? 'French' : 'English';
+  const language = writingLanguage(options.locale, options.audience);
 
   return [
     'You write short social media posts for Facebook Pages on behalf of a business.',
     `Write in ${language}.`,
+    audienceLine(options.audience),
     '',
     'Rules:',
     '- Return only the post text. No preamble, no explanation, no surrounding quotes.',
@@ -173,6 +200,7 @@ export async function generateCaption(options: {
   tone?: string | null;
   brandVoice?: string | null;
   locale: Locale;
+  audience?: AiAudience | null;
 }): Promise<GenerationResult> {
   return complete({
     workspaceId: options.workspaceId,
@@ -182,6 +210,7 @@ export async function generateCaption(options: {
       locale: options.locale,
       tone: options.tone ?? null,
       brandVoice: options.brandVoice ?? null,
+      audience: options.audience,
     }),
     prompt: `Write a Facebook post about:\n\n${options.brief}`,
   });
@@ -195,6 +224,7 @@ export async function improveCaption(options: {
   tone?: string | null;
   brandVoice?: string | null;
   locale: Locale;
+  audience?: AiAudience | null;
 }): Promise<GenerationResult> {
   return complete({
     workspaceId: options.workspaceId,
@@ -204,6 +234,7 @@ export async function improveCaption(options: {
       locale: options.locale,
       tone: options.tone ?? null,
       brandVoice: options.brandVoice ?? null,
+      audience: options.audience,
     }),
     prompt: [
       'Rewrite this Facebook post so it reads better.',
@@ -224,6 +255,7 @@ export async function suggestHashtags(options: {
   text: string;
   brandVoice?: string | null;
   locale: Locale;
+  audience?: AiAudience | null;
 }): Promise<string[]> {
   const result = await complete({
     workspaceId: options.workspaceId,
@@ -231,7 +263,8 @@ export async function suggestHashtags(options: {
     kind: AiGenerationKind.hashtags,
     system: [
       'You suggest hashtags for Facebook Page posts.',
-      `The audience reads ${options.locale === Locale.fr ? 'French' : 'English'}; use hashtags in that language where natural.`,
+      `The audience reads ${writingLanguage(options.locale, options.audience)}; use hashtags in that language where natural.`,
+      audienceLine(options.audience),
       'Return 8 to 12 hashtags, one per line, each starting with #, no explanations.',
       'Prefer specific, commonly used tags over invented ones. No spaces or punctuation inside a tag.',
       options.brandVoice ? `\nAbout the brand:\n${options.brandVoice}` : '',
@@ -279,6 +312,7 @@ export async function planWeek(options: {
   brandVoice?: string | null;
   tone?: string | null;
   locale: Locale;
+  audience?: AiAudience | null;
 }): Promise<PlannedPost[]> {
   const result = await complete({
     workspaceId: options.workspaceId,
@@ -286,7 +320,7 @@ export async function planWeek(options: {
     kind: AiGenerationKind.plan,
     maxTokens: PLAN_OUTPUT_TOKENS,
     system: [
-      systemPrompt({ locale: options.locale, tone: options.tone ?? null, brandVoice: options.brandVoice ?? null }),
+      systemPrompt({ locale: options.locale, tone: options.tone ?? null, brandVoice: options.brandVoice ?? null, audience: options.audience }),
       '',
       `You are planning ${options.count} posts for the Facebook Page "${options.pageName}" over ${options.days} days.`,
       'Vary the angle: a tip, a question, behind the scenes, an offer, social proof, a story. Never repeat an opening.',

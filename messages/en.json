@@ -1891,7 +1891,9 @@
     "bestTimeMode": "Best times per Page",
     "bestTimeSuggest": "Suggest them on the queue screen",
     "bestTimeApply": "Add them to the queue every week",
-    "bestTimeModeHint": "Each week the worker looks at every Page’s own results. With “Add”, up to two new times per Page go into its queue (at most 14 of its own); the queue screen says what was added, and any time can be removed."
+    "bestTimeModeHint": "Each week the worker looks at every Page’s own results. With “Add”, up to two new times per Page go into its queue (at most 14 of its own); the queue screen says what was added, and any time can be removed.",
+    "audienceTitle": "Default audience",
+    "audienceHint": "Pages that set no audience of their own follow these. Nothing is assumed: leave empty what does not apply."
   },
   "setup": {
     "title": "Set up MS Social Pilot",
@@ -2241,15 +2243,17 @@
     "profilesHint": "How each Page sounds when AI writes for it, and the UTM tags on its links.",
     "voiceInherited": "Uses the workspace voice",
     "ownTags": "{count, plural, one {1 own link tag} other {# own link tags}}",
-    "editProfile": "Voice & links",
-    "profileTitle": "{page}: voice and links",
+    "editProfile": "Voice, audience & links",
+    "profileTitle": "{page}: voice, audience and links",
     "voiceField": "How this Page sounds",
     "voicePlaceholder": "Warm and neighbourly, a little playful. We say “tu”. Short sentences, one emoji at most. We talk about fresh bread, the team and the neighbourhood.",
     "voiceHint": "Used by AI writing, hashtags and week plans for this Page. Leave empty to use the workspace’s.",
     "utmTitle": "Link tags (UTM)",
     "utmHint": "Added to this Page’s links when they go out. Empty fields use the workspace’s setting.",
     "inherits": "Workspace: {value}",
-    "notSet": "Not set"
+    "notSet": "Not set",
+    "audienceTitle": "Audience",
+    "audienceHint": "Who this Page speaks to. AI writing uses the languages and countries; anything left empty follows the workspace’s defaults (Settings)."
   },
   "share": {
     "reviewBadge": "For your review",
@@ -3084,6 +3088,36 @@
       "hours": "{hours, plural, =24 {1 day} =48 {2 days} =72 {3 days} =168 {1 week} other {# hours}}",
       "planSplit": "The {pages} Pages are shared out between the {captions} captions, all at the same time.",
       "planDays": "Every Page gets each of the {captions} captions, one a day at the same hour."
+    }
+  },
+  "audience": {
+    "countries": "Countries",
+    "addCountry": "Add a country…",
+    "languages": "Languages",
+    "languagePlaceholder": "e.g. en-US",
+    "addLanguage": "Add",
+    "languageHint": "A language code, with the region when it matters: en-US, fr-CA, es-MX, ar.",
+    "languageInvalid": "That is not a language code. Try a form like en-US or fr.",
+    "timezone": "Audience time zone",
+    "timezoneWorkspace": "The workspace’s time zone",
+    "timezoneFollows": "Follow the workspace ({zone})",
+    "timezoneHint": "Where most of the audience lives.",
+    "calendars": "Cultural calendars",
+    "calendarsHint": "Dates worth planning around for this audience. None are followed unless ticked.",
+    "follows": "Following the workspace: {value}",
+    "suggested": "From this Page’s followers: {value}",
+    "useSuggested": "Use these",
+    "remove": "Remove {name}",
+    "calendar": {
+      "public_holidays": "Public holidays of the countries",
+      "international_days": "International days",
+      "christian_western": "Christian (Western)",
+      "christian_orthodox": "Christian (Orthodox)",
+      "islamic": "Islamic",
+      "jewish": "Jewish",
+      "hindu": "Hindu",
+      "lunar_new_year": "Lunar New Year",
+      "buddhist": "Buddhist"
     }
   }
 }

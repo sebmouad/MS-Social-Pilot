@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 import { useLocale, useTranslations } from 'next-intl';
 
+import { AudienceFields } from './AudienceFields';
 import type { TargetOption } from './TargetPicker';
 
 export interface WorkspaceOptions {
@@ -21,6 +22,11 @@ export interface WorkspaceOptions {
   spamGapMinutes: number;
   /** Best time per Page: show good times, or also add them to the queue weekly. */
   bestTimeMode: 'suggest' | 'apply';
+  /** Default target audience (H0) for Pages that set none of their own. */
+  audienceCountries: string[];
+  audienceLanguages: string[];
+  audienceTimezone: string | null;
+  audienceCalendars: string[];
   aiEnabled: boolean;
   aiTone: string;
   aiBrandVoice: string;
@@ -209,6 +215,29 @@ export function SettingsClient({
           </select>
           <p className="hint">{t('bestTimeModeHint')}</p>
         </div>
+        <fieldset className="mt-6">
+          <legend className="text-sm font-semibold text-slate-900">{t('audienceTitle')}</legend>
+          <p className="mb-2 text-xs text-slate-500">{t('audienceHint')}</p>
+          <AudienceFields
+            idPrefix="workspace-audience"
+            value={{
+              countries: settings.audienceCountries,
+              languages: settings.audienceLanguages,
+              timezone: settings.audienceTimezone,
+              calendars: settings.audienceCalendars,
+            }}
+            onChange={(audience) =>
+              setSettings({
+                ...settings,
+                audienceCountries: audience.countries,
+                audienceLanguages: audience.languages,
+                audienceTimezone: audience.timezone,
+                audienceCalendars: audience.calendars,
+              })
+            }
+            timezones={timezones}
+          />
+        </fieldset>
         <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
           <input
             type="checkbox"

@@ -593,13 +593,19 @@ depends on it), then **H2, H3, H10, H18, H1**, then the rest.
 per Page (French, US, Spanish, …) — never hard-code a country, language,
 religion or holiday set.
 
-- **H0. Target audience per Page (S, foundation)** — Page settings → Audience:
+- **H0. Target audience per Page (S, foundation)** ✅ — Page settings → Audience:
   countries (multi), languages (multi, BCP-47: `fr-FR`, `en-US`, `es-ES`, …),
   audience time zone (default: the main country's; used for best times and
   queue slots), and cultural calendars to follow (chosen from a list, none by
   default). Workspace default that new Pages inherit. Suggest values from the
   Page's own follower countries (`page_follows_country`) but the user decides.
-  Used by H2, H7, G10, G11, AI writing (language + tone) and reports. Several need the AI
+  Used by H2, H7, G10, G11, AI writing (language + tone) and reports.
+  *Done: Settings › Pages "Voice, audience & links" dialog (countries, BCP-47
+  languages, time zone, calendars); workspace defaults in Settings, resolved at
+  run time by `effectiveAudience` (`src/lib/audience.ts`), not copied; follower
+  countries/locales suggested from stored insights (no Graph calls); AI writing
+  uses the Page's languages and countries. G11/H2/H7 read `effectiveAudience`;
+  queue slots still use the workspace time zone.* Several need the AI
 setup from Phase 0.2 (marked AI).
 
 ### Planning and content

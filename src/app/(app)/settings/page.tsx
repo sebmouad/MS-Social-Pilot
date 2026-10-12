@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { SettingsClient } from '@/components/SettingsClient';
 import { requirePage } from '@/lib/auth';
+import { timezoneOptions } from '@/lib/time';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { bulkCsvTemplate } from '@/lib/csv';
@@ -16,38 +17,6 @@ export function generateMetadata() {
   return screenMetadata('settings.workspace');
 }
 
-
-/**
- * Timezone list. `Intl.supportedValuesOf` gives the full IANA set on modern
- * Node; the fallback keeps the select usable on runtimes that lack it.
- */
-function timezoneOptions(): string[] {
-  const supported = (
-    Intl as unknown as { supportedValuesOf?: (key: string) => string[] }
-  ).supportedValuesOf;
-
-  if (typeof supported === 'function') {
-    try {
-      return supported('timeZone');
-    } catch {
-      // Fall through.
-    }
-  }
-  return [
-    'UTC',
-    'Europe/London',
-    'Europe/Paris',
-    'Europe/Berlin',
-    'Africa/Casablanca',
-    'America/New_York',
-    'America/Chicago',
-    'America/Los_Angeles',
-    'Asia/Dubai',
-    'Asia/Kolkata',
-    'Asia/Singapore',
-    'Australia/Sydney',
-  ];
-}
 
 export default async function SettingsPage() {
   const auth = await requirePage();
@@ -86,6 +55,10 @@ export default async function SettingsPage() {
           shortenerEnabled: workspace.shortenerEnabled,
           spamGapMinutes: workspace.spamGapMinutes,
           bestTimeMode: workspace.bestTimeMode === 'apply' ? 'apply' : 'suggest',
+          audienceCountries: workspace.audienceCountries,
+          audienceLanguages: workspace.audienceLanguages,
+          audienceTimezone: workspace.audienceTimezone,
+          audienceCalendars: workspace.audienceCalendars,
           aiEnabled: workspace.aiEnabled,
           aiTone: workspace.aiTone ?? '',
           aiBrandVoice: workspace.aiBrandVoice ?? '',
