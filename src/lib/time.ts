@@ -244,12 +244,12 @@ export const WEEKDAY_NAMES = [
 ] as const;
 
 /** Days of a calendar month grid (Monday-first), as UTC day boundaries. */
-export function monthGrid(year: number, month: number, timeZone: string): Date[] {
+export function monthGrid(year: number, month: number, timeZone: string, weekStartsOn = 1): Date[] {
   const first = firstRealInstant(`${year}-${String(month + 1).padStart(2, '0')}-01T00:00`, timeZone);
   const localFirst = toZonedTime(first, timeZone);
 
-  // Monday-first: Sunday (0) becomes the 7th column.
-  const offset = (localFirst.getDay() + 6) % 7;
+  // The workspace's first day of the week is the first column.
+  const offset = (localFirst.getDay() - weekStartsOn + 7) % 7;
   const gridStart = addDays(localFirst, -offset);
 
   return Array.from({ length: 42 }, (_, index) => {
@@ -301,10 +301,10 @@ export function relativeTime(
  * each as its first real instant in `timeZone` — the week view's columns.
  * Calendar arithmetic in UTC, so the server's own zone plays no part.
  */
-export function weekGrid(anchor: string, timeZone: string): Date[] {
+export function weekGrid(anchor: string, timeZone: string, weekStartsOn = 1): Date[] {
   const [year, month, day] = anchor.split('-').map(Number) as [number, number, number];
   const base = Date.UTC(year, month - 1, day);
-  const offset = (new Date(base).getUTCDay() + 6) % 7;
+  const offset = (new Date(base).getUTCDay() - weekStartsOn + 7) % 7;
   return Array.from({ length: 7 }, (_, index) => {
     const date = new Date(base + (index - offset) * 86_400_000);
     const stamp = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}T00:00`;

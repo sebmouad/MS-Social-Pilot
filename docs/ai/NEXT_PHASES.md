@@ -341,8 +341,10 @@ Each verified missing in our code on 2026-10-11:
 - **Notifications matrix** per member × Page × event (publish failed, account
   disconnected, new message, queue empty, draft updated, weekly summary).
   Today `NotificationSetting` has 4 workspace-wide booleans only.
-- **First day of week** workspace setting (calendar, week view, reports). None
-  today.
+- **First day of week** workspace setting (calendar, week view, reports).
+  **Done 2026-10-12:** `Workspace.weekStartsOn` (0 Sunday … 6 Saturday,
+  default Monday), chosen in Settings (Monday · Sunday · Saturday); month and
+  week grids, their headers and weekly scheduled reports follow it.
 - **AI weekly recap** on scheduled reports: plain-language "what changed and
   why" at the top (needs the Anthropic key).
 - MCP setup page: step-by-step per assistant (Claude, others) with copy buttons.

@@ -201,6 +201,7 @@ export const workspaceSettingsSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   timezone: timezone.optional(),
   defaultLocale: z.nativeEnum(Locale).optional(),
+  weekStartsOn: z.number().int().min(0).max(6).optional(),
   requiresApproval: z.boolean().optional(),
 
   // Link tagging. Empty string means "clear it", so these are nullable rather

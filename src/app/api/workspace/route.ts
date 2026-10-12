@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth';
 import { releaseHeldPosts } from '@/lib/approvals';
+import { rescheduleWeeklyReports } from '@/lib/report-schedules';
 import { canManageSettings } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { workspaceSettingsSchema } from '@/lib/validation';
@@ -24,6 +25,7 @@ export const PATCH = route(async (request: Request) => {
   assign('name', input.name);
   assign('timezone', input.timezone);
   assign('defaultLocale', input.defaultLocale);
+  assign('weekStartsOn', input.weekStartsOn);
   assign('requiresApproval', input.requiresApproval);
   assign('utmSource', input.utmSource);
   assign('utmMedium', input.utmMedium);
@@ -38,6 +40,7 @@ export const PATCH = route(async (request: Request) => {
   assign('reportFooter', input.reportFooter);
 
   const workspace = await prisma.workspace.update({ where: { id: auth.workspace.id }, data });
+  if (input.weekStartsOn !== undefined || input.timezone !== undefined) await rescheduleWeeklyReports(workspace.id);
 
   // Turning review off has to free whatever it was holding, or those posts sit
   // in `pending` for ever with the screen that would clear them now hidden.

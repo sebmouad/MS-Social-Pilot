@@ -52,18 +52,21 @@ function shiftDay(day: string, offset: number): string {
   return new Date(Date.UTC(year, month - 1, date + offset)).toISOString().slice(0, 10);
 }
 
-/** Monday = 0 … Sunday = 6, of a calendar day. */
-function weekdayOf(day: string): number {
+/** Days since the start of the week (0 on its first day), of a calendar day. */
+function weekdayOf(day: string, weekStartsOn: number): number {
   const [year, month, date] = day.split('-').map(Number) as [number, number, number];
-  return (new Date(Date.UTC(year, month - 1, date)).getUTCDay() + 6) % 7;
+  return (new Date(Date.UTC(year, month - 1, date)).getUTCDay() - weekStartsOn + 7) % 7;
 }
 
-/** The first run strictly after `after`: next Monday or next 1st, at 08:00 local. */
-export function nextReportRun(frequency: ReportFrequency, after: Date, timeZone: string): Date {
+/**
+ * The first run strictly after `after`: the next first day of the workspace's
+ * week (Monday unless it chose otherwise) or the next 1st, at 08:00 local.
+ */
+export function nextReportRun(frequency: ReportFrequency, after: Date, timeZone: string, weekStartsOn = 1): Date {
   let day = dayIn(after, timeZone);
   for (let guard = 0; guard < 40; guard += 1) {
     const due =
-      frequency === 'weekly' ? weekdayOf(day) === 0 : day.endsWith('-01');
+      frequency === 'weekly' ? weekdayOf(day, weekStartsOn) === 0 : day.endsWith('-01');
     if (due) {
       const at = localInputToUtc(`${day}T${SEND_HOUR}`, timeZone);
       if (at.getTime() > after.getTime()) return at;
@@ -74,19 +77,21 @@ export function nextReportRun(frequency: ReportFrequency, after: Date, timeZone:
 }
 
 /**
- * What a run sent at `runAt` reports on: the whole week (Monday to Sunday) or
- * the whole month before it, midnight to midnight in the workspace's zone.
+ * What a run sent at `runAt` reports on: the whole week (from the workspace's
+ * first day of the week) or the whole month before it, midnight to midnight in
+ * the workspace's zone.
  */
 export function reportPeriod(
   frequency: ReportFrequency,
   runAt: Date,
   timeZone: string,
+  weekStartsOn = 1,
 ): { from: Date; to: Date; fromDay: string; toDay: string } {
   const today = dayIn(runAt, timeZone);
   let fromDay: string;
   let endDay: string;
   if (frequency === 'weekly') {
-    endDay = shiftDay(today, -weekdayOf(today));
+    endDay = shiftDay(today, -weekdayOf(today, weekStartsOn));
     fromDay = shiftDay(endDay, -7);
   } else {
     endDay = `${today.slice(0, 7)}-01`;
@@ -103,7 +108,7 @@ export function reportPeriod(
 
 export async function createReportSchedule(workspaceId: string, input: z.infer<typeof reportScheduleSchema>) {
   const [workspace, target] = await Promise.all([
-    prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { timezone: true } }),
+    prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { timezone: true, weekStartsOn: true } }),
     prisma.target.findFirst({ where: { id: input.targetId, workspaceId, type: TargetType.page } }),
   ]);
   if (!target) throw errors.notFound();
@@ -118,7 +123,7 @@ export async function createReportSchedule(workspaceId: string, input: z.infer<t
       templateId: input.templateId ?? null,
       frequency: input.frequency,
       recipients: input.recipients,
-      nextRunAt: nextReportRun(input.frequency, new Date(), workspace.timezone),
+      nextRunAt: nextReportRun(input.frequency, new Date(), workspace.timezone, workspace.weekStartsOn),
     },
   });
 }
@@ -131,7 +136,7 @@ export async function createReportSchedule(workspaceId: string, input: z.infer<t
 export async function sendDueReports(now: Date): Promise<{ sent: number; failed: number }> {
   const due = await prisma.reportSchedule.findMany({
     where: { nextRunAt: { lte: now } },
-    include: { workspace: { select: { id: true, name: true, timezone: true, defaultLocale: true } } },
+    include: { workspace: { select: { id: true, name: true, timezone: true, defaultLocale: true, weekStartsOn: true } } },
     orderBy: { nextRunAt: 'asc' },
     take: 50,
   });
@@ -148,7 +153,7 @@ export async function sendDueReports(now: Date): Promise<{ sent: number; failed:
         select: { id: true, name: true, followersCount: true, fanCount: true },
       });
       if (!target) throw new Error('The Page is no longer connected.');
-      const period = reportPeriod(frequency, schedule.nextRunAt, timeZone);
+      const period = reportPeriod(frequency, schedule.nextRunAt, timeZone, schedule.workspace.weekStartsOn);
       const report = await buildReport({
         workspaceId: schedule.workspaceId,
         timezone: timeZone,
@@ -181,11 +186,23 @@ export async function sendDueReports(now: Date): Promise<{ sent: number; failed:
       data: {
         lastRunAt: now,
         lastError,
-        nextRunAt: nextReportRun(frequency, now, timeZone),
+        nextRunAt: nextReportRun(frequency, now, timeZone, schedule.workspace.weekStartsOn),
       },
     });
     if (lastError) failed += 1;
     else sent += 1;
   }
   return { sent, failed };
+}
+
+/** After the workspace changes its first day of the week: weekly reports move to it. */
+export async function rescheduleWeeklyReports(workspaceId: string, now: Date = new Date()): Promise<void> {
+  const workspace = await prisma.workspace.findUniqueOrThrow({
+    where: { id: workspaceId },
+    select: { timezone: true, weekStartsOn: true },
+  });
+  await prisma.reportSchedule.updateMany({
+    where: { workspaceId, frequency: 'weekly' },
+    data: { nextRunAt: nextReportRun('weekly', now, workspace.timezone, workspace.weekStartsOn) },
+  });
 }

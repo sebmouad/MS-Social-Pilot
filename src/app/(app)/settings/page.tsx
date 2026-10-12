@@ -79,6 +79,7 @@ export default async function SettingsPage() {
         shortLinkBase={env.shortLinkBase}
         options={{
           requiresApproval: workspace.requiresApproval,
+          weekStartsOn: workspace.weekStartsOn,
           utmSource: workspace.utmSource ?? '',
           utmMedium: workspace.utmMedium ?? '',
           utmCampaignTemplate: workspace.utmCampaignTemplate ?? '',

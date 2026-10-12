@@ -104,7 +104,7 @@ export default async function CalendarPage({
   const [filter, labels, aiSetting] = await Promise.all([
     loadPageFilter(auth, params),
     listLabels(auth.workspace.id),
-    prisma.workspace.findUnique({ where: { id: auth.workspace.id }, select: { aiEnabled: true } }),
+    prisma.workspace.findUnique({ where: { id: auth.workspace.id }, select: { aiEnabled: true, weekStartsOn: true } }),
   ]);
   const aiOn = aiAvailable() && Boolean(aiSetting?.aiEnabled);
   const labelParam = Array.isArray(params.label) ? params.label[0] : params.label;
@@ -116,7 +116,8 @@ export default async function CalendarPage({
 
   const weekParam = pick('week');
   const anchor = weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam) ? weekParam : formatInZone(today, timezone, 'yyyy-MM-dd');
-  const days = view === 'month' ? monthGrid(safeYear, safeMonth, timezone) : weekGrid(anchor, timezone);
+  const weekStartsOn = aiSetting?.weekStartsOn ?? 1;
+  const days = view === 'month' ? monthGrid(safeYear, safeMonth, timezone, weekStartsOn) : weekGrid(anchor, timezone, weekStartsOn);
   const gridStart = days[0]!;
   const gridEnd = new Date(days[days.length - 1]!.getTime() + 24 * 60 * 60 * 1000);
 
@@ -549,14 +550,15 @@ export default async function CalendarPage({
           renderChip={renderChip}
           newPostLabel={(date: Date) => t('newPostOn', { date: dayLabel.format(date) })}
           weekdayName={weekdayName}
+          weekStartsOn={weekStartsOn}
           dayName={(key: string) => awarenessOn(key).map((entry) => tDays(entry.key))}
           ideaHref={(key: string, name: string) => (key >= todayKey ? ideaHref(key, name) : null)}
         />
       ) : (
       <div className="card overflow-hidden">
         <div className="grid grid-cols-7 border-b border-slate-200 bg-white">
-          {/* Monday-first, matching monthGrid. */}
-          {[1, 2, 3, 4, 5, 6, 0].map((day) => (
+          {/* The workspace's first day first, matching monthGrid. */}
+          {[0, 1, 2, 3, 4, 5, 6].map((index) => (weekStartsOn + index) % 7).map((day) => (
             <div key={day} className="px-2 py-2.5 text-center text-[13px] font-semibold text-slate-600">
               {weekdayName(day)}
             </div>

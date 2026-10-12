@@ -1757,7 +1757,9 @@
       "playful": "Playful",
       "urgent": "Urgent",
       "informative": "Informative"
-    }
+    },
+    "weekStartsOn": "First day of the week",
+    "weekStartsOnHint": "The calendar’s first column, for everyone in this workspace."
   },
   "setup": {
     "title": "Set up MS Social Pilot",

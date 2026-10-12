@@ -65,6 +65,14 @@ describe('scheduled reports', () => {
     expect(nextReportRun('weekly', at, 'Africa/Casablanca').toISOString()).toBe('2026-10-12T07:00:00.000Z');
   });
 
+  it('follow the workspace first day of the week', () => {
+    const at = new Date('2026-10-11T12:00:00Z'); // a Sunday
+    expect(nextReportRun('weekly', at, 'UTC', 0).toISOString()).toBe('2026-10-18T08:00:00.000Z');
+    expect(nextReportRun('weekly', at, 'UTC', 6).toISOString()).toBe('2026-10-17T08:00:00.000Z');
+    const week = reportPeriod('weekly', new Date('2026-10-18T08:00:00Z'), 'UTC', 0);
+    expect([week.fromDay, week.toDay]).toEqual(['2026-10-11', '2026-10-17']);
+  });
+
   it('never fire twice for the same morning', () => {
     const run = new Date('2026-10-12T08:00:00Z');
     expect(nextReportRun('weekly', run, 'UTC').toISOString()).toBe('2026-10-19T08:00:00.000Z');

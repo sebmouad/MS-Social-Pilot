@@ -25,6 +25,7 @@ export function WeekGrid<P extends WeekPost>({
   renderChip,
   newPostLabel,
   weekdayName,
+  weekStartsOn,
   dayName,
   ideaHref,
 }: {
@@ -36,6 +37,8 @@ export function WeekGrid<P extends WeekPost>({
   renderChip: (post: P) => ReactNode;
   newPostLabel: (date: Date) => string;
   weekdayName: (day: number) => string;
+  /** 0 Sunday … 6 Saturday: the day in the first column. */
+  weekStartsOn: number;
   /** The awareness days falling on a day. */
   dayName: (key: string) => string[];
   /** Where an awareness day's chip leads: the composer, with a first line. Null for past days. */
@@ -57,7 +60,7 @@ export function WeekGrid<P extends WeekPost>({
               const names = dayName(key);
               return (
                 <div key={key} className="border-l border-slate-200 px-2 py-2 text-center">
-                  <p className="text-[13px] font-semibold text-slate-600">{weekdayName((index + 1) % 7)}</p>
+                  <p className="text-[13px] font-semibold text-slate-600">{weekdayName((weekStartsOn + index) % 7)}</p>
                   <p
                     className={`mx-auto mt-0.5 flex h-8 w-8 items-center justify-center rounded-full text-lg font-bold ${
                       key === todayKey ? 'bg-brand-600 text-white' : 'text-slate-900'

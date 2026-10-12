@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { firstRealInstant, isValidTimeZone, localInputToUtc, monthGrid, nextAvailableSlot, type QueueSlotDefinition, utcToLocalInput, wallClockExists } from '../src/lib/time';
+import { firstRealInstant, isValidTimeZone, localInputToUtc, monthGrid, nextAvailableSlot, type QueueSlotDefinition, utcToLocalInput, wallClockExists, weekGrid } from '../src/lib/time';
 
 describe('timezone conversion', () => {
   it('interprets wall-clock input in the given zone', () => {
@@ -235,6 +235,18 @@ describe('monthGrid', () => {
 
   it('always returns six weeks', () => {
     expect(monthGrid(2026, 7, 'Europe/Paris')).toHaveLength(42);
+  });
+
+  it('starts on the workspace first day of the week', () => {
+    // October 2026 begins on a Thursday.
+    const first = (weekStartsOn: number) => utcToLocalInput(monthGrid(2026, 9, 'UTC', weekStartsOn)[0]!, 'UTC').slice(0, 10);
+    expect(first(1)).toBe('2026-09-28'); // Monday
+    expect(first(0)).toBe('2026-09-27'); // Sunday
+    expect(first(6)).toBe('2026-09-26'); // Saturday
+    const week = (weekStartsOn: number) => weekGrid('2026-10-08', 'UTC', weekStartsOn).map((day) => utcToLocalInput(day, 'UTC').slice(0, 10));
+    expect(week(0)[0]).toBe('2026-10-04');
+    expect(week(6)[0]).toBe('2026-10-03');
+    expect(week(6)).toContain('2026-10-08');
   });
 
   it('starts on a Monday and runs without a break', () => {

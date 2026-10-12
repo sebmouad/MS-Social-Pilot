@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import type { TargetOption } from './TargetPicker';
 
 export interface WorkspaceOptions {
   requiresApproval: boolean;
+  /** 0 Sunday … 6 Saturday. */
+  weekStartsOn: number;
   utmSource: string;
   utmMedium: string;
   utmCampaignTemplate: string;
@@ -52,6 +54,7 @@ export function SettingsClient({
   canManage,
 }: Props) {
   const t = useTranslations('settings');
+  const locale = useLocale();
   const tCommon = useTranslations('common');
   const router = useRouter();
 
@@ -148,6 +151,25 @@ export function SettingsClient({
               ))}
             </select>
             <p className="hint">{t('timezoneHint')}</p>
+          </div>
+          <div>
+            <label className="label" htmlFor="weekStartsOn">
+              {t('weekStartsOn')}
+            </label>
+            <select
+              id="weekStartsOn"
+              className="input"
+              value={settings.weekStartsOn}
+              onChange={(event) => setSettings({ ...settings, weekStartsOn: Number(event.target.value) })}
+            >
+              {/* 2024-01-07 was a Sunday: day d of the week is 7 + d. */}
+              {[1, 0, 6].map((day) => (
+                <option key={day} value={day}>
+                  {new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2024, 0, 7 + day)))}
+                </option>
+              ))}
+            </select>
+            <p className="hint">{t('weekStartsOnHint')}</p>
           </div>
         </div>
         <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">

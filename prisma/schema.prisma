@@ -186,6 +186,8 @@ model Workspace {
   slug          String @unique
   timezone      String @default("UTC")
   defaultLocale Locale @default(en)
+  /// First column of the calendar and first day of a reporting week: 0 Sunday … 6 Saturday.
+  weekStartsOn  Int    @default(1)
 
   /// Turns the approval workflow on for this client.
   requiresApproval Boolean @default(false)
