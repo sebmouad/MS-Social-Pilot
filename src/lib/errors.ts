@@ -330,6 +330,10 @@ export const errors = {
   // mistyped password, on the sign-in form, told the person to sign in.
   invalidCredentials: () =>
     new AppError({ key: 'errors.invalidCredentials', fallback: 'Incorrect email or password.', status: 401 }),
+  soleOwner: () =>
+    new AppError({ key: 'errors.soleOwner', fallback: 'This person is the only owner of a workspace. Give it another owner or delete it first.', status: 409 }),
+  noUserWithEmail: () =>
+    new AppError({ key: 'errors.noUserWithEmail', fallback: 'Nobody has an account with that email yet. Invite them first.', status: 404 }),
   rootCannotBeDisabled: () =>
     new AppError({
       key: 'errors.rootCannotBeDisabled',

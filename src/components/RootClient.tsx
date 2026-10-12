@@ -80,10 +80,34 @@ export function WorkspacesTable({ workspaces }: { workspaces: RootWorkspace[] })
   const { busy, run, messages } = useAction();
   const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState('');
+  const [newName, setNewName] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
 
   return (
     <div className="space-y-3">
       {messages}
+      <form
+        className="card flex flex-wrap items-end gap-2 p-4"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (await run('create', '/api/root/workspaces', 'POST', { name: newName, ownerEmail }, t('workspaces.createdDone', { name: newName }))) {
+            setNewName('');
+            setOwnerEmail('');
+          }
+        }}
+      >
+        <label className="flex-1 text-sm">
+          <span className="font-medium text-slate-700">{t('workspaces.newName')}</span>
+          <input className="input mt-1" required maxLength={100} value={newName} onChange={(event) => setNewName(event.target.value)} />
+        </label>
+        <label className="flex-1 text-sm">
+          <span className="font-medium text-slate-700">{t('workspaces.ownerEmail')}</span>
+          <input className="input mt-1" type="email" required value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} />
+        </label>
+        <button type="submit" className="btn-primary h-10" disabled={busy === 'create'}>
+          {t('workspaces.create')}
+        </button>
+      </form>
       <div className="card scroll-x p-0">
         <table className="w-full min-w-[40rem] text-start text-sm tabular-nums">
           <thead className="border-b border-slate-200 text-xs text-slate-500">
@@ -280,6 +304,22 @@ export function UsersTable({ users }: { users: RootUser[] }) {
                           {t('users.disable')}
                         </button>
                       )}
+                      <button
+                        type="button"
+                        className="btn-ghost h-9 whitespace-nowrap text-red-700"
+                        disabled={busy === user.id}
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: t('users.deleteQuestion', { name: user.name }),
+                            body: t('users.deleteBody'),
+                            confirmLabel: t('users.delete'),
+                            danger: true,
+                          });
+                          if (ok) await run(user.id, `/api/root/users/${user.id}`, 'DELETE', undefined, t('users.deleted', { name: user.name }));
+                        }}
+                      >
+                        <Icon name="trash" size={14} /> {t('users.delete')}
+                      </button>
                     </div>
                   )}
                 </td>
@@ -679,6 +719,22 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
               {t('workspace.suspend')}
             </button>
           )}
+          <button
+            type="button"
+            className="btn-ghost h-10 text-red-700"
+            disabled={busy === 'delete'}
+            onClick={async () => {
+              const ok = await confirm({
+                title: t('workspace.deleteQuestion', { name: workspace.name }),
+                body: t('workspace.deleteBody'),
+                confirmLabel: t('workspace.delete'),
+                danger: true,
+              });
+              if (ok && (await run('delete', base, 'DELETE'))) router.push('/root/workspaces');
+            }}
+          >
+            <Icon name="trash" size={16} /> {t('workspace.delete')}
+          </button>
         </div>
       </section>
 

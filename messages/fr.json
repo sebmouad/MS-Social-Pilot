@@ -1195,7 +1195,9 @@
     "planLimit_aiCredits": "Votre offre inclut {limit, plural, one {# crédit IA} other {# crédits IA}} par mois, et ceux de ce mois sont utilisés. Demandez une offre supérieure pour en utiliser plus.",
     "planFeature_api": "Votre offre n’inclut pas l’API. Demandez une offre supérieure pour créer des clés API.",
     "planFeature_clients": "Votre offre n’inclut pas l’accès client. Demandez une offre supérieure pour inviter des clients.",
-    "planFeature_whiteLabel": "Votre offre n’inclut pas la marque blanche. Demandez une offre supérieure pour utiliser votre logo et votre habillage de rapports."
+    "planFeature_whiteLabel": "Votre offre n’inclut pas la marque blanche. Demandez une offre supérieure pour utiliser votre logo et votre habillage de rapports.",
+    "soleOwner": "Cette personne est la seule propriétaire d’un espace. Donnez-lui un autre propriétaire ou supprimez-le d’abord.",
+    "noUserWithEmail": "Aucun compte n’existe avec cet e-mail. Invitez d’abord la personne."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -2625,7 +2627,11 @@
       "posts": "Publications",
       "created": "Créé le",
       "rename": "Renommer",
-      "renamed": "Espace de travail renommé."
+      "renamed": "Espace de travail renommé.",
+      "newName": "Nom du nouvel espace",
+      "ownerEmail": "E-mail du propriétaire",
+      "create": "Créer l’espace",
+      "createdDone": "{name} créé."
     },
     "users": {
       "title": "Utilisateurs",
@@ -2651,7 +2657,11 @@
       "reset": "Réinitialiser la 2e étape",
       "resetQuestion": "Réinitialiser la connexion en deux étapes de {name} ?",
       "resetBody": "Son application d’authentification, ses clés d’accès et ses codes de secours ne fonctionnent plus et la personne est déconnectée. Elle la configurera à sa prochaine connexion.",
-      "resetDone": "Connexion en deux étapes réinitialisée pour {name}."
+      "resetDone": "Connexion en deux étapes réinitialisée pour {name}.",
+      "delete": "Supprimer",
+      "deleteQuestion": "Supprimer le compte de {name} ?",
+      "deleteBody": "Cette personne perd tout accès. Ses publications restent dans leurs espaces. Action irréversible.",
+      "deleted": "{name} supprimé."
     },
     "registration": {
       "title": "Inscriptions et invitations",
@@ -2735,7 +2745,10 @@
         "session_signedOut": "Un navigateur de {email} déconnecté",
         "workspace_developerFeatures": "Fonctions développeur {on, select, on {activées} other {désactivées}} dans {workspace}",
         "plan_changed": "Formule {plan} modifiée",
-        "subscriber_planChanged": "{email} passe à la formule {plan} avec {extra} canaux supplémentaires"
+        "subscriber_planChanged": "{email} passe à la formule {plan} avec {extra} canaux supplémentaires",
+        "workspace_created": "Espace {name} créé pour {owner}",
+        "workspace_deleted": "Espace {name} supprimé",
+        "user_deleted": "Compte de {email} supprimé"
       }
     },
     "danger": {
@@ -2833,7 +2846,10 @@
       "addHelp": "Uniquement pour les personnes qui ont déjà un compte. Pour les autres : invitez-les depuis Inscription.",
       "developer": "Fonctions développeur",
       "developerHelp": "Clés d’API, Claude via MCP et webhooks sortants, pour le propriétaire de cet espace uniquement. Les désactiver arrête les clés et webhooks existants.",
-      "developerSaved": "Fonctions développeur enregistrées."
+      "developerSaved": "Fonctions développeur enregistrées.",
+      "delete": "Supprimer l’espace",
+      "deleteQuestion": "Supprimer {name} ?",
+      "deleteBody": "Ses canaux, publications, résultats et réglages sont supprimés définitivement. Ses membres gardent leur compte. Action irréversible."
     },
     "worker": {
       "title": "Worker et quotas Meta",

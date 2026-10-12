@@ -1195,7 +1195,9 @@
     "planLimit_aiCredits": "Your plan includes {limit, plural, one {# AI credit} other {# AI credits}} a month, and this month’s are used. Ask for a bigger plan to use more.",
     "planFeature_api": "Your plan does not include the API. Ask for a bigger plan to make API keys.",
     "planFeature_clients": "Your plan does not include client access. Ask for a bigger plan to invite clients.",
-    "planFeature_whiteLabel": "Your plan does not include white label. Ask for a bigger plan to use your own logo and report branding."
+    "planFeature_whiteLabel": "Your plan does not include white label. Ask for a bigger plan to use your own logo and report branding.",
+    "soleOwner": "This person is the only owner of a workspace. Give it another owner or delete it first.",
+    "noUserWithEmail": "Nobody has an account with that email yet. Invite them first."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -2625,7 +2627,11 @@
       "posts": "Posts",
       "created": "Created",
       "rename": "Rename",
-      "renamed": "Workspace renamed."
+      "renamed": "Workspace renamed.",
+      "newName": "New workspace name",
+      "ownerEmail": "Owner’s email",
+      "create": "Create workspace",
+      "createdDone": "Created {name}."
     },
     "users": {
       "title": "Users",
@@ -2651,7 +2657,11 @@
       "reset": "Reset two-step",
       "resetQuestion": "Reset two-step sign-in for {name}?",
       "resetBody": "Their authenticator app, passkeys and recovery codes stop working and they are signed out. They set it up again at their next sign-in.",
-      "resetDone": "Two-step sign-in reset for {name}."
+      "resetDone": "Two-step sign-in reset for {name}.",
+      "delete": "Delete",
+      "deleteQuestion": "Delete {name}’s account?",
+      "deleteBody": "They lose access to everything. Posts they made stay in their workspaces. This cannot be undone.",
+      "deleted": "Deleted {name}."
     },
     "registration": {
       "title": "Registration & invitations",
@@ -2735,7 +2745,10 @@
         "session_signedOut": "Signed one of {email}'s browsers out",
         "workspace_developerFeatures": "Developer features {on, select, on {switched on} other {switched off}} in {workspace}",
         "plan_changed": "Plan {plan} changed",
-        "subscriber_planChanged": "{email} moved to plan {plan} with {extra} extra channels"
+        "subscriber_planChanged": "{email} moved to plan {plan} with {extra} extra channels",
+        "workspace_created": "Created workspace {name} for {owner}",
+        "workspace_deleted": "Deleted workspace {name}",
+        "user_deleted": "Deleted the account of {email}"
       }
     },
     "danger": {
@@ -2833,7 +2846,10 @@
       "addHelp": "Only for people who already have an account. Anyone else: invite them from Registration.",
       "developer": "Developer features",
       "developerHelp": "API keys, Claude through MCP and outgoing webhooks, for this workspace’s owner only. Switching them off stops existing keys and webhooks.",
-      "developerSaved": "Developer features saved."
+      "developerSaved": "Developer features saved.",
+      "delete": "Delete workspace",
+      "deleteQuestion": "Delete {name}?",
+      "deleteBody": "Its channels, posts, results and settings are deleted for good. Its members keep their accounts. This cannot be undone."
     },
     "worker": {
       "title": "Worker & Meta usage",

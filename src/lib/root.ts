@@ -31,6 +31,9 @@ export const ROOT_ACTIONS = [
   'session.signedOut',
   'user.twoStepReset',
   'workspace.renamed',
+  'workspace.created',
+  'workspace.deleted',
+  'user.deleted',
   'invitation.revoked',
   'client.invited',
   'client.invitationRevoked',
@@ -172,6 +175,47 @@ export async function renameWorkspace(actorId: string, workspaceId: string, name
   if (!workspace) throw errors.notFound();
   await prisma.workspace.update({ where: { id: workspaceId }, data: { name } });
   await logRootActivity(actorId, 'workspace.renamed', { from: workspace.name, to: name });
+}
+
+/** A new workspace for an existing account, which becomes its owner. */
+export async function createWorkspaceAsRoot(actorId: string, name: string, ownerEmail: string): Promise<{ id: string }> {
+  const owner = await prisma.user.findUnique({ where: { email: ownerEmail.toLowerCase() } });
+  if (!owner) throw errors.noUserWithEmail();
+  const { createWorkspace } = await import('./auth');
+  const workspace = await createWorkspace({ name, ownerId: owner.id });
+  await logRootActivity(actorId, 'workspace.created', { name, owner: owner.email });
+  return { id: workspace.id };
+}
+
+/** Delete a workspace and everything in it. Its members keep their accounts. */
+export async function deleteWorkspaceAsRoot(actorId: string, workspaceId: string): Promise<void> {
+  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+  if (!workspace) throw errors.notFound();
+  await prisma.workspace.delete({ where: { id: workspaceId } });
+  await logRootActivity(actorId, 'workspace.deleted', { name: workspace.name });
+}
+
+/**
+ * Delete an account. Posts and invitations it made stay with their
+ * workspaces, credited to root; a workspace it alone owns must be handed on
+ * or deleted first, so no workspace is left without an owner.
+ */
+export async function deleteUserAsRoot(actorId: string, userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw errors.notFound();
+  if (user.isInstanceOwner) throw errors.rootCannotBeDisabled();
+  for (const membership of await prisma.membership.findMany({ where: { userId, role: WorkspaceRole.owner } })) {
+    const owners = await prisma.membership.count({ where: { workspaceId: membership.workspaceId, role: WorkspaceRole.owner } });
+    if (owners === 1) throw errors.soleOwner();
+  }
+  await prisma.$transaction([
+    prisma.post.updateMany({ where: { authorId: userId }, data: { authorId: actorId } }),
+    prisma.post.updateMany({ where: { submittedById: userId }, data: { submittedById: null } }),
+    prisma.post.updateMany({ where: { reviewedById: userId }, data: { reviewedById: null } }),
+    prisma.invitation.updateMany({ where: { invitedById: userId }, data: { invitedById: actorId } }),
+    prisma.user.delete({ where: { id: userId } }),
+  ]);
+  await logRootActivity(actorId, 'user.deleted', { email: user.email });
 }
 
 /** Invitations still waiting, in every workspace. */

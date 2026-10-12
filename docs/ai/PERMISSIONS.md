@@ -262,3 +262,11 @@ subscriber's workspaces) are enforced in `createPost` and every AI call
 API keys, `clients` gates inviting the client role, `whiteLabel` gates
 setting a logo or report branding (`errors.planFeature_*`). No payment
 provider yet. Every change is in root activity.
+
+## Root creates and deletes (owner request, 2026-10-12)
+Root can create a workspace for any existing account (that account becomes its
+owner), delete a workspace with everything in it, and delete any account except
+root's own. An account that is the only owner of a workspace cannot be deleted
+until the workspace has another owner or is deleted; its posts stay, credited
+to root. Each action is logged in Root › Activity. Code: `src/lib/root.ts`
+(`createWorkspaceAsRoot`, `deleteWorkspaceAsRoot`, `deleteUserAsRoot`).

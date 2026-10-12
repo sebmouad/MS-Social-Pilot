@@ -251,3 +251,30 @@ describe('inviting a client to create their own workspace', () => {
     await settings.clearSetting('auth.openRegistration');
   });
 });
+
+describe('root creates and deletes', () => {
+  it('creates a workspace for an existing account and deletes it', async () => {
+    const theRoot = await person({ root: true });
+    const owner = await person();
+    await expect(root.createWorkspaceAsRoot(theRoot.user.id, 'Client A', 'nobody@example.test')).rejects.toMatchObject({ key: 'errors.noUserWithEmail' });
+    const { id } = await root.createWorkspaceAsRoot(theRoot.user.id, 'Client A', owner.user.email);
+    expect(await prisma.membership.findFirst({ where: { workspaceId: id, userId: owner.user.id } })).toMatchObject({ role: WorkspaceRole.owner });
+    await root.deleteWorkspaceAsRoot(theRoot.user.id, id);
+    expect(await prisma.workspace.findUnique({ where: { id } })).toBeNull();
+  });
+
+  it('deletes an account, keeping its posts, but not the sole owner of a workspace or root', async () => {
+    const theRoot = await person({ root: true });
+    const owner = await person();
+    await expect(root.deleteUserAsRoot(theRoot.user.id, owner.user.id)).rejects.toMatchObject({ key: 'errors.soleOwner' });
+    await expect(root.deleteUserAsRoot(theRoot.user.id, theRoot.user.id)).rejects.toMatchObject({ key: 'errors.rootCannotBeDisabled' });
+
+    const editor = await person();
+    await prisma.membership.create({ data: { userId: editor.user.id, workspaceId: owner.workspace.id, role: WorkspaceRole.editor } });
+    const post = await prisma.post.create({ data: { workspaceId: owner.workspace.id, authorId: editor.user.id, message: 'Product launch' } });
+    await prisma.workspace.delete({ where: { id: editor.workspace.id } });
+    await root.deleteUserAsRoot(theRoot.user.id, editor.user.id);
+    expect(await prisma.user.findUnique({ where: { id: editor.user.id } })).toBeNull();
+    expect(await prisma.post.findUnique({ where: { id: post.id } })).toMatchObject({ authorId: theRoot.user.id });
+  });
+});
