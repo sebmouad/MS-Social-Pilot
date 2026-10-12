@@ -161,7 +161,8 @@ test.describe('the invited colleague, in French', () => {
 
   // An editor sees fewer screens than an owner; the ones they do see must be
   // whole. A missing French key throws, so rendering at all is the assertion.
-  for (const path of SIGNED_IN_SCREENS) {
+  // Developer screens are the workspace owner's alone.
+  for (const path of SIGNED_IN_SCREENS.filter((screen) => screen !== '/settings/webhooks')) {
     test(`${path} renders in French`, async ({ browser }) => {
       const context = await browser.newContext({
         storageState: 'e2e/.auth/colleague.json',

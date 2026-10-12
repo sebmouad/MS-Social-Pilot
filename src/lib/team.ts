@@ -1,3 +1,4 @@
+import { assertRoom } from './plans';
 import { WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
@@ -54,6 +55,8 @@ export async function inviteMember(options: {
   role: WorkspaceRole;
 }): Promise<InvitationResult> {
   assertRankPermits(options.actorRole, options.role);
+  // Clients are free on every plan; team members count against it.
+  if (options.role !== WorkspaceRole.client) await assertRoom(options.workspaceId, 'members');
 
   const email = options.email.trim().toLowerCase();
 

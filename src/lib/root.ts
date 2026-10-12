@@ -44,6 +44,8 @@ export const ROOT_ACTIONS = [
   'member.roleChanged',
   'member.modulesChanged',
   'member.removed',
+  'plan.changed',
+  'subscriber.planChanged',
 ] as const;
 
 export type RootAction = (typeof ROOT_ACTIONS)[number];

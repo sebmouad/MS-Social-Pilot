@@ -241,3 +241,15 @@ Built as a first, customisable version (`tests/root-oversight.integration.test.t
    matrix before the owner has reviewed it.
 6. Tests: first sign-up race (two at once → one root); invited "owner" is not
    root; non-root gets 404 on every `/root/*` and `/api/root/*` route; capability table matches the functions.
+
+## Plans (owner approved, 2026-10-12)
+Root › Plans (`/root/plans`, `src/lib/plans.ts`): root edits each plan's prices,
+limits (channels, team members, workspaces, posts and AI credits a month) and
+features, puts each subscriber (a user who owns a workspace) on a plan and
+grants extra channels. Limits count across every workspace the subscriber
+owns, and are enforced on new workspaces, team invitations (clients are free)
+and new channels (402 `errors.planLimit_*`; a Facebook sync leaves the extra
+Pages out with a warning). Root and users with no plan have no limits; new
+sign-ups start on the default plan. Seeded: Free, Solo, Team, Agency,
+Agency+. Posts, AI credits and features are stored but not yet enforced. No
+payment provider yet. Every change is in root activity.

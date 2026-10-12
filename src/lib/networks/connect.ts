@@ -1,3 +1,4 @@
+import { assertRoom } from '../plans';
 import { createHash } from 'node:crypto';
 import { Prisma, TargetType } from '@prisma/client';
 
@@ -250,6 +251,7 @@ export async function saveNetworkAccount(options: { workspaceId: string; key: Ne
         data: { name: target.name, pictureUrl: target.pictureUrl, category: target.category ?? null, socialAccountId: account.id, canPublish: true, publishBlocker: null },
       });
     } else {
+      await assertRoom(workspaceId, 'channels');
       await prisma.target.create({
         data: { workspaceId, type, providerId: target.providerId, name: target.name, pictureUrl: target.pictureUrl, category: target.category ?? null, socialAccountId: account.id, accessToken: null },
       });

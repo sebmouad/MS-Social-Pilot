@@ -1185,7 +1185,10 @@
     "workspaceBusy": "Cet espace de travail envoie trop de requêtes. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}.",
     "developerFeaturesOff": "Les fonctions développeur ne sont pas activées pour cet espace. Demandez à la personne qui gère cette installation.",
     "viewerReadOnly": "Un lecteur peut consulter mais ne rien modifier. Demandez un autre rôle à un administrateur de cet espace.",
-    "clientRoleFixed": "Un client reste client, et un membre de l’équipe ne peut pas le devenir. Invitez de nouveau la personne avec le rôle voulu."
+    "clientRoleFixed": "Un client reste client, et un membre de l’équipe ne peut pas le devenir. Invitez de nouveau la personne avec le rôle voulu.",
+    "planLimit_channels": "Votre formule inclut {limit} canaux. Demandez une formule supérieure ou des canaux supplémentaires.",
+    "planLimit_members": "Votre formule inclut {limit} membres. Demandez une formule supérieure pour en inviter plus. Les clients sont gratuits.",
+    "planLimit_workspaces": "Votre formule inclut {limit} espaces. Demandez une formule supérieure pour en ajouter."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -2575,7 +2578,8 @@
       "sessions": "Sessions",
       "status": "État",
       "errors": "Erreurs",
-      "agency": "Vue d’agence"
+      "agency": "Vue d’agence",
+      "plans": "Formules"
     },
     "overview": {
       "title": "Vue d’ensemble de l’installation",
@@ -2708,7 +2712,9 @@
         "member_modulesChanged": "Modules désactivés pour {email} dans {workspace} : {off}",
         "member_removed": "{email} retiré(e) de {workspace}",
         "session_signedOut": "Un navigateur de {email} déconnecté",
-        "workspace_developerFeatures": "Fonctions développeur {on, select, on {activées} other {désactivées}} dans {workspace}"
+        "workspace_developerFeatures": "Fonctions développeur {on, select, on {activées} other {désactivées}} dans {workspace}",
+        "plan_changed": "Formule {plan} modifiée",
+        "subscriber_planChanged": "{email} passe à la formule {plan} avec {extra} canaux supplémentaires"
       }
     },
     "danger": {
@@ -2949,6 +2955,38 @@
         "engagements": "Engagement",
         "aiSpend": "Dépenses IA"
       }
+    },
+    "plans": {
+      "title": "Formules",
+      "subtitle": "Prix, limites et fonctions de chaque formule, et la formule de chaque abonné. Les limites comptent sur tous les espaces d’un abonné ; une limite vide est illimitée.",
+      "plansTitle": "Formules",
+      "name": "Nom",
+      "currency": "Devise",
+      "priceMonthly": "Prix mensuel",
+      "priceYearly": "Prix annuel",
+      "extraChannelPrice": "Canal supplémentaire",
+      "channels": "Canaux",
+      "members": "Membres de l’équipe",
+      "workspaces": "Espaces",
+      "postsPerMonth": "Publications par mois",
+      "aiCredits": "Crédits IA par mois",
+      "features": "Inclus",
+      "feature_clients": "Comptes clients et liens de validation",
+      "feature_whiteLabel": "Rapports en marque blanche et portail client",
+      "feature_api": "API, MCP et webhooks",
+      "isDefault": "Les nouveaux inscrits commencent avec cette formule",
+      "save": "Enregistrer {plan}",
+      "saved": "Enregistré.",
+      "failed": "Rien n’a été enregistré. Vérifiez les valeurs et réessayez.",
+      "subscribersTitle": "Abonnés",
+      "subscribersHint": "Tous ceux qui possèdent un espace. Utilisé / autorisé.",
+      "subscriber": "Abonné",
+      "plan": "Formule",
+      "extraChannels": "Canaux supplémentaires",
+      "rootUnlimited": "root, sans limite",
+      "noPlan": "Aucune formule (sans limite)",
+      "planFor": "Formule de {name}",
+      "extraFor": "Canaux supplémentaires de {name}"
     }
   },
   "twoStep": {

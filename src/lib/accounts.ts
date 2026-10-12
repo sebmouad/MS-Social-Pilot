@@ -1,3 +1,4 @@
+import { channelRoom } from './plans';
 import { prisma } from './prisma';
 import { env } from './env';
 import { encryptSecret, decryptSecret } from './crypto';
@@ -89,8 +90,21 @@ export async function syncAccountTargets(socialAccountId: string): Promise<SyncS
   }
 
   const seen: string[] = [];
+  // Pages past the plan's channels are left out, and said so.
+  let room = await channelRoom(account.workspaceId);
+  const known = new Set(
+    (await prisma.target.findMany({ where: { workspaceId: account.workspaceId }, select: { providerId: true } })).map((row) => row.providerId),
+  );
+  let skipped = 0;
 
   for (const page of pages) {
+    if (!known.has(page.id)) {
+      if (room < 1) {
+        skipped++;
+        continue;
+      }
+      room--;
+    }
     // CREATE_CONTENT is the task that actually permits publishing; without it
     // the token will read fine and fail at post time.
     const canPublish = page.tasks.length === 0 || page.tasks.includes('CREATE_CONTENT');
@@ -127,6 +141,8 @@ export async function syncAccountTargets(socialAccountId: string): Promise<SyncS
     });
     seen.push(page.id);
   }
+
+  if (skipped > 0) warnings.push(`${skipped} Page(s) were not added: the plan's channel limit is reached.`);
 
   for (const group of groups) {
     await prisma.target.upsert({

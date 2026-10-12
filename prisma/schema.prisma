@@ -126,6 +126,11 @@ enum AiGenerationKind {
 
 model User {
   id                    String    @id @default(cuid())
+  /// The subscriber's plan (Root › Plans). Null: no limits, as before plans existed.
+  planId                String?
+  plan                  Plan?     @relation(fields: [planId], references: [id], onDelete: SetNull)
+  /// Channels bought on top of the plan's own.
+  extraChannels         Int       @default(0)
   email                 String    @unique
   name                  String
   passwordHash          String
@@ -2149,4 +2154,33 @@ model ContentMixRule {
 
   @@index([workspaceId])
   @@map("content_mix_rules")
+}
+
+/// A subscription tier, edited by root (Root › Plans). Limits count across
+/// every workspace the subscriber owns; null means unlimited. Prices are shown,
+/// not charged: no payment provider yet.
+model Plan {
+  id                String   @id @default(cuid())
+  key               String   @unique
+  name              String
+  position          Int      @default(0)
+  currency          String   @default("EUR")
+  priceMonthly      Int      @default(0)
+  priceYearly       Int      @default(0)
+  extraChannelPrice Int      @default(0)
+  channels          Int?
+  members           Int?
+  workspaces        Int?
+  postsPerMonth     Int?
+  aiCredits         Int?
+  /// `clients` (client logins and approval links), `whiteLabel`, `api`.
+  features          String[] @default([])
+  /// New sign-ups start on this plan.
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  users User[]
+
+  @@map("plans")
 }

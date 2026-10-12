@@ -1185,7 +1185,10 @@
     "workspaceBusy": "This workspace is sending too many requests. Try again in {seconds, plural, one {# second} other {# seconds}}.",
     "developerFeaturesOff": "Developer features are not switched on for this workspace. Ask the person who runs this installation.",
     "viewerReadOnly": "Viewers can look but not change anything. Ask an admin of this workspace for another role.",
-    "clientRoleFixed": "A client stays a client, and a team member cannot become one. Invite the person again with the role they need."
+    "clientRoleFixed": "A client stays a client, and a team member cannot become one. Invite the person again with the role they need.",
+    "planLimit_channels": "Your plan includes {limit} channels. Ask for a bigger plan or extra channels to add more.",
+    "planLimit_members": "Your plan includes {limit} team members. Ask for a bigger plan to invite more. Clients are free.",
+    "planLimit_workspaces": "Your plan includes {limit} workspaces. Ask for a bigger plan to add more."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -2575,7 +2578,8 @@
       "sessions": "Sessions",
       "status": "Status",
       "errors": "Errors",
-      "agency": "Agency overview"
+      "agency": "Agency overview",
+      "plans": "Plans"
     },
     "overview": {
       "title": "Installation overview",
@@ -2708,7 +2712,9 @@
         "member_modulesChanged": "Modules switched off for {email} in {workspace}: {off}",
         "member_removed": "Removed {email} from {workspace}",
         "session_signedOut": "Signed one of {email}'s browsers out",
-        "workspace_developerFeatures": "Developer features {on, select, on {switched on} other {switched off}} in {workspace}"
+        "workspace_developerFeatures": "Developer features {on, select, on {switched on} other {switched off}} in {workspace}",
+        "plan_changed": "Plan {plan} changed",
+        "subscriber_planChanged": "{email} moved to plan {plan} with {extra} extra channels"
       }
     },
     "danger": {
@@ -2949,6 +2955,38 @@
         "engagements": "Engagement",
         "aiSpend": "AI spend"
       }
+    },
+    "plans": {
+      "title": "Plans",
+      "subtitle": "Prices, limits and features of each plan, and which plan each subscriber is on. Limits count across every workspace a subscriber owns; an empty limit is unlimited.",
+      "plansTitle": "Plans",
+      "name": "Name",
+      "currency": "Currency",
+      "priceMonthly": "Monthly price",
+      "priceYearly": "Yearly price",
+      "extraChannelPrice": "Extra channel",
+      "channels": "Channels",
+      "members": "Team members",
+      "workspaces": "Workspaces",
+      "postsPerMonth": "Posts a month",
+      "aiCredits": "AI credits a month",
+      "features": "Included",
+      "feature_clients": "Client logins and approval links",
+      "feature_whiteLabel": "White-label reports and client portal",
+      "feature_api": "API, MCP and webhooks",
+      "isDefault": "New sign-ups start on this plan",
+      "save": "Save {plan}",
+      "saved": "Saved.",
+      "failed": "That was not saved. Check the values and try again.",
+      "subscribersTitle": "Subscribers",
+      "subscribersHint": "Everyone who owns a workspace. Used now / allowed.",
+      "subscriber": "Subscriber",
+      "plan": "Plan",
+      "extraChannels": "Extra channels",
+      "rootUnlimited": "root, no limits",
+      "noPlan": "No plan (no limits)",
+      "planFor": "Plan for {name}",
+      "extraFor": "Extra channels for {name}"
     }
   },
   "twoStep": {

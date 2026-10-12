@@ -21,6 +21,7 @@ import {
   PATHNAME_HEADER,
   type ModuleKey,
 } from './modules';
+import { assertWorkspaceRoom, defaultPlanId } from './plans';
 import { homeFor, mayOpenScreen, mayWrite } from './role-access';
 import { DEFAULT_THEME, isTheme, type Theme } from './themes';
 import { noteSignIn, requestDevice, touchSession } from './sessions';
@@ -123,6 +124,7 @@ export async function createWorkspace(options: {
   timezone?: string;
   locale?: Locale;
 }): Promise<{ id: string; slug: string }> {
+  await assertWorkspaceRoom(options.ownerId);
   // Asking whether a slug is free and then inserting it are two steps, and two
   // people creating "Acme" at the same moment — or one person double-clicking
   // the button — both see it free and both insert. One of them got a failed
@@ -273,6 +275,8 @@ export async function registerUser(input: {
         // workspace of their own to own below — which is exactly why owning a
         // workspace can never be what admits someone to instance settings.
         isInstanceOwner: admitted === 'first',
+        // Everybody after root starts on the default plan (Root › Plans).
+        planId: admitted === 'first' ? null : await defaultPlanId(),
         // A stranger through open registration proves the address by email
         // (S3) — unless the server cannot send one, which would lock them out.
         emailVerifiedAt: admitted !== 'open' || !emailEnabled() ? new Date() : null,
