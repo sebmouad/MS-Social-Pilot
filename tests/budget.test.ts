@@ -6,9 +6,18 @@ import {
   BACKGROUND_USAGE_CEILING,
   THROTTLE_COOLDOWN_MS,
   backgroundBudget,
+  budgetSnapshot,
+  callsLastHour,
   noteAppUsage,
+  noteCall,
+  noteObjectThrottled,
+  noteObjectUsage,
   noteThrottled,
+  pathObjectId,
+  readBudget,
   resetBudget,
+  restoreBudget,
+  setReadCeiling,
 } from '../src/lib/facebook/budget';
 import { createLoopState, dueJobs, seedFromHistory } from '../src/lib/scheduler/loop';
 import type { JobDefinition } from '../src/lib/scheduler/jobs';
@@ -68,9 +77,70 @@ describe('the background budget', () => {
   });
 });
 
+describe('each Page’s own allowance', () => {
+  it('knows which object a path is about', () => {
+    expect(pathObjectId('123/feed')).toBe('123');
+    expect(pathObjectId('/123_456')).toBe('123');
+    expect(pathObjectId('act_789/insights')).toBe('789');
+    expect(pathObjectId('me/accounts')).toBeNull();
+  });
+
+  it('refuses reads of a Page Facebook said is near its limit, and only that Page', () => {
+    noteObjectUsage(JSON.stringify({ '123': [{ type: 'pages', call_count: 95, total_time: 3, total_cputime: 2 }] }), 0);
+    expect(readBudget('123/feed', 1000).ok).toBe(false);
+    expect(readBudget('456/feed', 1000).ok).toBe(true);
+    expect(readBudget('123/feed', HOUR + 1).ok).toBe(true);
+  });
+
+  it('waits as long as Facebook says before reading a refused Page again', () => {
+    noteObjectUsage(JSON.stringify({ '123': [{ call_count: 10, estimated_time_to_regain_access: 40 }] }), 0);
+    const verdict = readBudget('123/feed', 60_000);
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.retryInMs).toBe(39 * 60_000);
+    expect(readBudget('123/feed', 41 * 60_000).ok).toBe(true);
+  });
+
+  it('holds a Page back after its own refusal', () => {
+    noteObjectThrottled('123', 0);
+    expect(readBudget('123_9/comments', 1000).ok).toBe(false);
+    expect(readBudget('123/feed', THROTTLE_COOLDOWN_MS + 1).ok).toBe(false);
+  });
+
+  it('lets the web app read a little further than the worker', () => {
+    noteAppUsage(80, 0);
+    expect(readBudget('me', 1).ok).toBe(true);
+    setReadCeiling(BACKGROUND_USAGE_CEILING);
+    expect(readBudget('me', 1).ok).toBe(false);
+  });
+
+  it('counts the calls of the last hour', () => {
+    noteCall(0);
+    noteCall(30_000);
+    noteCall(30 * 60_000);
+    expect(callsLastHour(30 * 60_000)).toBe(3);
+    expect(callsLastHour(HOUR + 60_000)).toBe(1);
+  });
+
+  it('carries what it knew across a restart, and drops what is past the hour', () => {
+    noteAppUsage(80, 0);
+    noteThrottled(1000);
+    noteObjectThrottled('123', 1000);
+    const saved = budgetSnapshot(2000);
+    resetBudget();
+    restoreBudget(saved, 3000);
+    expect(backgroundBudget(3000).ok).toBe(false);
+    expect(readBudget('123/feed', 3000).ok).toBe(false);
+    resetBudget();
+    restoreBudget(saved, 2 * HOUR);
+    expect(readBudget('123/feed', 2 * HOUR).ok).toBe(true);
+    expect(backgroundBudget(2 * HOUR).ok).toBe(true);
+  });
+});
+
 describe('what Graph tells the budget', () => {
   let server: Server;
-  let answer: { status: number; usage: string | null; body: unknown };
+  let answer: { status: number; usage: string | null; business?: string; body: unknown };
+  let calls = 0;
 
   beforeAll(async () => {
     process.env.ENCRYPTION_KEY = randomBytes(32).toString('base64');
@@ -82,6 +152,8 @@ describe('what Graph tells the budget', () => {
       request.on('end', () => {
         const headers: Record<string, string> = { 'content-type': 'application/json' };
         if (answer.usage) headers['x-app-usage'] = answer.usage;
+        if (answer.business) headers['x-business-use-case-usage'] = answer.business;
+        calls += 1;
         response.writeHead(answer.status, headers);
         response.end(JSON.stringify(answer.body));
       });
@@ -115,6 +187,32 @@ describe('what Graph tells the budget', () => {
     answer = { status: 403, usage: null, body: { error: { message: 'Page request limit reached', code: 32 } } };
     await expect(graphRequest('me', { accessToken: 'token' })).rejects.toMatchObject({ kind: 'rate_limit' });
     expect(backgroundBudget().ok).toBe(true);
+  });
+
+  it('holds back the Page a limit was about, without calling Facebook again', async () => {
+    const { graphRequest } = await import('../src/lib/facebook/graph');
+    answer = { status: 400, usage: null, body: { error: { message: 'Pages API throttled', code: 80001 } } };
+    await expect(graphRequest('555/feed', { accessToken: 'token' })).rejects.toMatchObject({ kind: 'rate_limit' });
+    const before = calls;
+    answer = { status: 200, usage: null, body: { data: [] } };
+    await expect(graphRequest('555/feed', { accessToken: 'token' })).rejects.toMatchObject({ kind: 'rate_limit' });
+    expect(calls).toBe(before);
+    await graphRequest('556/feed', { accessToken: 'token' });
+    expect(calls).toBe(before + 1);
+  });
+
+  it('reads the per-Page header, and still sends writes and essential reads', async () => {
+    const { graphRequest } = await import('../src/lib/facebook/graph');
+    answer = {
+      status: 200,
+      usage: null,
+      business: JSON.stringify({ '777': [{ type: 'pages', call_count: 99, total_time: 1, total_cputime: 1 }] }),
+      body: { id: 'x' },
+    };
+    await graphRequest('777/feed', { accessToken: 'token' });
+    await expect(graphRequest('777/feed', { accessToken: 'token' })).rejects.toMatchObject({ kind: 'rate_limit' });
+    await graphRequest('777/feed', { accessToken: 'token', method: 'POST', body: { message: 'x' } });
+    await graphRequest('777_1', { accessToken: 'token', essential: true });
   });
 });
 

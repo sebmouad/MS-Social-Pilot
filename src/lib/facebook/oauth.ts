@@ -159,6 +159,8 @@ export async function fetchProfile(accessToken: string): Promise<FacebookProfile
     picture?: { data?: { url?: string } };
   }>('me', {
     accessToken,
+    // Connecting waits on this; it is never deferred.
+    essential: true,
     params: { fields: 'id,name,picture.type(large)' },
   });
 
@@ -307,6 +309,8 @@ export async function debugToken(inputToken: string): Promise<TokenDebugInfo> {
     };
   }>('debug_token', {
     accessToken: appToken,
+    // Connecting waits on this; it is never deferred.
+    essential: true,
     params: { input_token: inputToken },
   });
 

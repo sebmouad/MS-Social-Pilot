@@ -12,6 +12,8 @@
  * two workers never publish the same post twice.
  */
 
+import { BACKGROUND_USAGE_CEILING, setReadCeiling } from '../src/lib/facebook/budget';
+import { restoreSavedBudget, saveBudget } from '../src/lib/facebook/budget-store';
 import { prisma } from '../src/lib/prisma';
 import { jobDefinitions, type JobDefinition } from '../src/lib/scheduler/jobs';
 import { createLoopState, dueJobs, markFinished, markStarted, seedFromHistory } from '../src/lib/scheduler/loop';
@@ -34,30 +36,70 @@ function log(message: string, detail?: unknown): void {
   }
 }
 
+interface JobOutcome {
+  started: number;
+  deferMs?: number;
+  summary: string | null;
+  error?: string;
+}
+
 /**
  * Run one job, swallowing its errors.
  *
  * A failing RSS poll must not stop posts publishing, so no job is allowed to
  * take the loop down with it.
  */
-async function runJob(job: JobDefinition): Promise<number | undefined> {
+async function runJob(job: JobDefinition): Promise<JobOutcome> {
   const started = Date.now();
-  let deferMs: number | undefined;
+  const outcome: JobOutcome = { started, summary: null };
   try {
-    const summary = await job.run({
+    outcome.summary = await job.run({
       now: new Date(),
       logger: (message, detail) => log(`[${job.name}] ${message}`, detail),
       defer: (ms) => {
-        deferMs = ms;
+        outcome.deferMs = ms;
       },
     });
     // Quiet when there was nothing to do: a worker that logs every 30 seconds
     // trains people to ignore its output.
-    if (summary) log(`[${job.name}] ${summary} (${Date.now() - started}ms)`);
+    if (outcome.summary) log(`[${job.name}] ${outcome.summary} (${Date.now() - started}ms)`);
   } catch (error) {
     console.error(`${new Date().toISOString()} [${workerId}] [${job.name}] failed`, error);
+    outcome.error = (error instanceof Error ? error.message : String(error)).slice(0, 2000);
   }
-  return deferMs;
+  return outcome;
+}
+
+/**
+ * Record how a run went, for the restart (when it last really ran) and for
+ * root (how it went, the last error, failures in a row). Never fatal.
+ */
+async function recordRun(job: JobDefinition, outcome: JobOutcome, finished: number): Promise<void> {
+  const state = outcome.error
+    ? 'failed'
+    : outcome.deferMs !== undefined
+      ? 'waiting'
+      : outcome.summary
+        ? 'ok'
+        : 'idle';
+  const fields = {
+    startedAt: new Date(outcome.started),
+    durationMs: finished - outcome.started,
+    outcome: state,
+    summary: outcome.summary?.slice(0, 2000) ?? null,
+    // A deferred run did not happen, so it does not reset the clock a
+    // restart would read.
+    ...(outcome.deferMs === undefined ? { finishedAt: new Date(finished) } : {}),
+    ...(outcome.error ? { lastError: outcome.error, lastErrorAt: new Date(finished) } : {}),
+  };
+  await prisma.workerJobRun
+    .upsert({
+      where: { name: job.name },
+      create: { name: job.name, ...fields, failures: outcome.error ? 1 : 0 },
+      update: { ...fields, failures: outcome.error ? { increment: 1 } : 0 },
+    })
+    .catch((error: unknown) => log('job history write failed', error));
+  await saveBudget(finished);
 }
 
 async function main(): Promise<void> {
@@ -66,6 +108,10 @@ async function main(): Promise<void> {
   await prisma.$queryRaw`SELECT 1`;
 
   await ensureSettings();
+  // Background reading stops at the background ceiling, call by call, and
+  // starts from what the last process knew rather than from optimism.
+  setReadCeiling(BACKGROUND_USAGE_CEILING);
+  await restoreSavedBudget();
   log(
     `starting; jobs: ${jobDefinitions()
       .map((job) => `${job.name}@${Math.round(job.intervalMs / 1000)}s`)
@@ -77,7 +123,10 @@ async function main(): Promise<void> {
   // worker that cannot read its history runs everything once, as it used to.
   const history = await prisma.workerJobRun
     .findMany()
-    .then((rows) => new Map(rows.map((row) => [row.name, row.finishedAt.getTime()])))
+    .then(
+      (rows) =>
+        new Map(rows.flatMap((row) => (row.finishedAt ? [[row.name, row.finishedAt.getTime()] as const] : []))),
+    )
     .catch(() => new Map<string, number>());
   seedFromHistory(state, jobDefinitions(), history);
   let lastHeartbeat = 0;
@@ -93,23 +142,13 @@ async function main(): Promise<void> {
     for (const job of dueJobs(jobs, state, Date.now())) {
       markStarted(state, job);
 
-      const running = runJob(job).then((deferMs) => {
+      const running = runJob(job).then(async (outcome) => {
         // Scheduled from the finish, so a job that overruns its interval
         // settles into a longer cycle rather than running back to back.
         const finished = Date.now();
-        markFinished(state, job, finished, deferMs);
+        markFinished(state, job, finished, outcome.deferMs);
+        await recordRun(job, outcome, finished);
         inFlight.delete(running);
-        // A deferred run did not happen, so it does not reset the clock a
-        // restart would read.
-        if (deferMs === undefined) {
-          void prisma.workerJobRun
-            .upsert({
-              where: { name: job.name },
-              create: { name: job.name, finishedAt: new Date(finished) },
-              update: { finishedAt: new Date(finished) },
-            })
-            .catch((error: unknown) => log('job history write failed', error));
-        }
       });
       inFlight.add(running);
     }

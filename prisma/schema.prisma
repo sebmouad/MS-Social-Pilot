@@ -1168,10 +1168,33 @@ model WorkerHeartbeat {
 /// its schedule instead of running every sync at once — which, on a small
 /// Meta app, spends the hour's call allowance in one go.
 model WorkerJobRun {
-  name       String   @id
-  finishedAt DateTime
+  name        String    @id
+  /// The last run that actually ran (not one deferred for the call budget).
+  finishedAt  DateTime?
+  /// The last attempt of any kind, and how it went, for the root status page.
+  startedAt   DateTime?
+  durationMs  Int?
+  /// ok · idle (nothing to do) · waiting (deferred for the call budget) · failed
+  outcome     String?
+  summary     String?
+  lastError   String?
+  lastErrorAt DateTime?
+  /// Failed runs in a row; reset by one that does not fail.
+  failures    Int       @default(0)
 
   @@map("worker_job_runs")
+}
+
+/// What the worker last knew about the Meta app's call allowance — the app's
+/// share used and each Page or account Facebook metered on its own — so a
+/// restarted worker does not spend an allowance already gone, and root can see
+/// it. One row, rewritten after every job.
+model GraphUsage {
+  key      String   @id
+  snapshot Json
+  savedAt  DateTime @default(now())
+
+  @@map("graph_usage")
 }
 
 model ActivityLog {

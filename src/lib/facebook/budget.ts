@@ -26,6 +26,31 @@ export const THROTTLE_COOLDOWN_MS = 30 * 60 * 1000;
 let usage: { percent: number; at: number } | null = null;
 let throttledAt: number | null = null;
 
+/**
+ * Meta also meters each Page, Instagram account and ad account on its own
+ * (the "business use case" limits), and reports them per object in
+ * `x-business-use-case-usage`. One busy Page can be refused while the app has
+ * plenty left, so each object is tracked by its id.
+ */
+interface ObjectUsage {
+  percent: number;
+  at: number;
+  /** Facebook said, or a refusal implied, that this object is off until then. */
+  blockedUntil: number | null;
+}
+const objects = new Map<string, ObjectUsage>();
+
+/** Calls made, per minute, over the last hour: what this process actually spent. */
+const callMinutes = new Map<number, number>();
+
+/**
+ * Above this share used, reads that can wait are refused here, before they
+ * reach Facebook. The worker lowers it to the background ceiling; the web app
+ * keeps a little more for what a person is waiting on.
+ */
+const DEFAULT_READ_CEILING = 90;
+let readCeiling = DEFAULT_READ_CEILING;
+
 /** The share of the allowance Facebook says is used, from a response header. */
 export function noteAppUsage(percent: number | null, now: number = Date.now()): void {
   if (percent === null || !Number.isFinite(percent)) return;
@@ -65,8 +90,159 @@ export function backgroundBudget(now: number = Date.now()): BudgetVerdict {
   return { ok: true };
 }
 
+/** Set the share used above which reads that can wait are refused locally. */
+export function setReadCeiling(percent: number): void {
+  readCeiling = percent;
+}
+
+/**
+ * Read `x-business-use-case-usage`: `{ "<object id>": [{ type, call_count,
+ * total_cputime, total_time, estimated_time_to_regain_access }] }`, the
+ * percentages per object and the minutes until a refused one is let back.
+ */
+export function noteObjectUsage(header: string | null, now: number = Date.now()): void {
+  if (!header) return;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(header);
+  } catch {
+    return;
+  }
+  if (!parsed || typeof parsed !== 'object') return;
+  for (const [id, entries] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!Array.isArray(entries)) continue;
+    let percent = 0;
+    let regainMinutes = 0;
+    for (const entry of entries as Array<Record<string, unknown>>) {
+      for (const key of ['call_count', 'total_cputime', 'total_time']) {
+        const value = entry?.[key];
+        if (typeof value === 'number' && Number.isFinite(value)) percent = Math.max(percent, value);
+      }
+      const regain = entry?.estimated_time_to_regain_access;
+      if (typeof regain === 'number' && regain > 0) regainMinutes = Math.max(regainMinutes, regain);
+    }
+    objects.set(id, { percent, at: now, blockedUntil: regainMinutes > 0 ? now + regainMinutes * 60_000 : null });
+  }
+}
+
+/** Facebook refused a call because one Page or account is over its own limit. */
+export function noteObjectThrottled(id: string, now: number = Date.now()): void {
+  const known = objects.get(id);
+  const blockedUntil = Math.max(known?.blockedUntil ?? 0, now + THROTTLE_COOLDOWN_MS);
+  objects.set(id, { percent: 100, at: now, blockedUntil });
+}
+
+/** Count one call made by this process. */
+export function noteCall(now: number = Date.now()): void {
+  const minute = Math.floor(now / 60_000);
+  callMinutes.set(minute, (callMinutes.get(minute) ?? 0) + 1);
+  for (const key of callMinutes.keys()) if (key <= minute - 60) callMinutes.delete(key);
+}
+
+/** Calls this process made in the last hour. */
+export function callsLastHour(now: number = Date.now()): number {
+  const minute = Math.floor(now / 60_000);
+  let total = 0;
+  for (const [key, count] of callMinutes) if (key > minute - 60) total += count;
+  return total;
+}
+
+/**
+ * The object a Graph path is about, as Meta keys its per-object limits:
+ * `123/feed` and `123_456` are Page 123, `act_789/insights` is ad account 789.
+ */
+export function pathObjectId(path: string): string | null {
+  const first = path.replace(/^\/+/, '').split(/[/?]/)[0] ?? '';
+  const id = first.replace(/^act_/, '').split('_')[0] ?? '';
+  return /^\d+$/.test(id) ? id : null;
+}
+
+/**
+ * Whether a read that can wait may go to Facebook now. Writes, and the reads
+ * that publishing itself needs, never ask: they are what the allowance is kept
+ * for.
+ */
+export function readBudget(path: string, now: number = Date.now()): BudgetVerdict {
+  if (throttledAt !== null && now - throttledAt < THROTTLE_COOLDOWN_MS) {
+    return {
+      ok: false,
+      reason: 'Facebook is refusing calls for this app (request limit reached)',
+      retryInMs: THROTTLE_COOLDOWN_MS - (now - throttledAt),
+    };
+  }
+  if (usage && now - usage.at < HOLD_MS && usage.percent >= readCeiling) {
+    return {
+      ok: false,
+      reason: `this app has used ${Math.round(usage.percent)}% of its Facebook call allowance`,
+      retryInMs: 15 * 60 * 1000,
+    };
+  }
+  const id = pathObjectId(path);
+  const object = id ? objects.get(id) : undefined;
+  if (object) {
+    if (object.blockedUntil !== null && now < object.blockedUntil) {
+      return {
+        ok: false,
+        reason: 'Facebook is refusing calls for this profile (its own request limit is reached)',
+        retryInMs: object.blockedUntil - now,
+      };
+    }
+    if (now - object.at < HOLD_MS && object.percent >= readCeiling) {
+      return {
+        ok: false,
+        reason: `this profile has used ${Math.round(object.percent)}% of its Facebook call allowance`,
+        retryInMs: 15 * 60 * 1000,
+      };
+    }
+  }
+  return { ok: true };
+}
+
+/** What a process knows about the allowance, to save and to show. */
+export interface BudgetSnapshot {
+  app: { percent: number | null; throttledUntil: number | null; callsLastHour: number; at: number };
+  objects: Array<{ id: string; percent: number; at: number; blockedUntil: number | null }>;
+}
+
+export function budgetSnapshot(now: number = Date.now()): BudgetSnapshot {
+  return {
+    app: {
+      percent: currentAppUsage(now),
+      throttledUntil:
+        throttledAt !== null && now - throttledAt < THROTTLE_COOLDOWN_MS ? throttledAt + THROTTLE_COOLDOWN_MS : null,
+      callsLastHour: callsLastHour(now),
+      at: now,
+    },
+    objects: [...objects]
+      .filter(([, entry]) => now - entry.at < HOLD_MS || (entry.blockedUntil ?? 0) > now)
+      .map(([id, entry]) => ({ id, ...entry })),
+  };
+}
+
+/**
+ * Take back what an earlier process saw, so a restarted worker does not start
+ * optimistic and spend an allowance that is already gone. Readings past
+ * Meta's hour are dropped.
+ */
+export function restoreBudget(snapshot: BudgetSnapshot, now: number = Date.now()): void {
+  const { app } = snapshot;
+  if (app.percent !== null && now - app.at < HOLD_MS && !usage) usage = { percent: app.percent, at: app.at };
+  if (app.throttledUntil !== null && app.throttledUntil > now && throttledAt === null) {
+    throttledAt = app.throttledUntil - THROTTLE_COOLDOWN_MS;
+  }
+  for (const entry of snapshot.objects) {
+    if (objects.has(entry.id)) continue;
+    if (now - entry.at < HOLD_MS || (entry.blockedUntil ?? 0) > now) {
+      objects.set(entry.id, { percent: entry.percent, at: entry.at, blockedUntil: entry.blockedUntil });
+    }
+  }
+}
+
 /** For tests: forget everything seen. */
 export function resetBudget(): void {
   usage = null;
   throttledAt = null;
+  objects.clear();
+  callMinutes.clear();
+  readCeiling = DEFAULT_READ_CEILING;
 }

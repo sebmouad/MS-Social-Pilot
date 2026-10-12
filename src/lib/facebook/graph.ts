@@ -1,6 +1,6 @@
 import { env } from '../env';
 import { hmacHex } from '../crypto';
-import { noteAppUsage, noteThrottled } from './budget';
+import { noteAppUsage, noteCall, noteObjectThrottled, noteObjectUsage, noteThrottled, pathObjectId, readBudget } from './budget';
 
 /**
  * A thin, typed client over the Facebook Graph API.
@@ -93,6 +93,8 @@ export class GraphError extends Error {
  */
 /** "Application request limit reached": the whole app is over its allowance. */
 const APP_RATE_LIMIT_CODE = 4;
+/** "User request limit reached": on most installations one person is the app. */
+const USER_RATE_LIMIT_CODE = 17;
 
 const ERROR_CODE_KINDS: Record<number, GraphFailureKind> = {
   1: 'transient', // Unknown error — Meta explicitly advises retrying.
@@ -103,6 +105,14 @@ const ERROR_CODE_KINDS: Record<number, GraphFailureKind> = {
   613: 'rate_limit', // Custom-rate-limit hit.
   80001: 'rate_limit', // Pages API throttling.
   80002: 'rate_limit', // Instagram/other bucket throttling.
+  80000: 'rate_limit', // Ads Insights throttling.
+  80003: 'rate_limit', // Custom audience throttling.
+  80004: 'rate_limit', // Ads management throttling.
+  80005: 'rate_limit', // Lead generation throttling.
+  80006: 'rate_limit', // Messenger throttling.
+  80008: 'rate_limit', // WhatsApp Business throttling.
+  80009: 'rate_limit', // Catalog management throttling.
+  80014: 'rate_limit', // Catalog batch throttling.
   10: 'permission', // Permission denied.
   190: 'auth', // Invalid/expired OAuth access token.
   200: 'permission', // Permissions error.
@@ -131,6 +141,13 @@ export interface GraphRequestOptions {
   /** Overrides the pinned API version, for endpoints that need a specific one. */
   version?: string;
   signal?: AbortSignal;
+  /**
+   * A read that publishing or connecting needs right now. Other reads are
+   * refused here, without calling Facebook, once the app or the object read
+   * is near its limit, so background reading never eats the allowance that
+   * publishing depends on.
+   */
+  essential?: boolean;
 }
 
 export interface GraphResponse<T> {
@@ -223,6 +240,16 @@ export async function graphRequest<T = unknown>(
   const method = options.method ?? 'GET';
   const url = buildUrl(path, options.version ?? env.graphVersion);
 
+  if (method === 'GET' && !options.essential) {
+    const verdict = readBudget(path);
+    if (!verdict.ok) {
+      throw new GraphError({
+        message: `Not read from Facebook: ${verdict.reason}. It is tried again in ${Math.ceil(verdict.retryInMs / 60_000)} min.`,
+        kind: 'rate_limit',
+      });
+    }
+  }
+
   for (const [key, value] of Object.entries(options.params ?? {})) {
     if (value !== undefined) url.searchParams.set(key, String(value));
   }
@@ -249,6 +276,7 @@ export async function graphRequest<T = unknown>(
   init.headers = headers;
 
   let response: Response;
+  noteCall();
   try {
     response = await withTimeout(
       (signal) => fetch(url, { ...init, signal: options.signal ?? signal }),
@@ -283,13 +311,20 @@ export async function graphRequest<T = unknown>(
   // keeps the last word, so background syncs stop before publishing has to.
   const appUsagePercent = parseAppUsage(response.headers.get('x-app-usage'));
   noteAppUsage(appUsagePercent);
+  noteObjectUsage(response.headers.get('x-business-use-case-usage'));
 
   if (!response.ok) {
     const body = (parsed as { error?: GraphErrorBody } | null)?.error ?? null;
     const error = toGraphError(body, response.status, `Graph API request failed (HTTP ${response.status}).`);
-    // Code 4 is the app's own limit — the one every Page shares. A Page's or
-    // a user's limit (32, 17) holds only that Page back.
-    if (error.code === APP_RATE_LIMIT_CODE) noteThrottled();
+    // Code 4 is the app's own limit — the one every Page shares — and 17 the
+    // person's, which on most installations is the same thing. Any other
+    // limit holds back only the Page or account the call was about.
+    if (error.code === APP_RATE_LIMIT_CODE || error.code === USER_RATE_LIMIT_CODE) {
+      noteThrottled();
+    } else if (error.kind === 'rate_limit') {
+      const id = pathObjectId(path);
+      if (id) noteObjectThrottled(id);
+    }
     throw error;
   }
 
@@ -365,6 +400,7 @@ export async function graphUpload<T = unknown>(
   );
 
   let response: Response;
+  noteCall();
   try {
     response = await withTimeout(
       (signal) => fetch(url, { method: 'POST', body: form, signal: options.signal ?? signal }),
@@ -471,6 +507,7 @@ export async function graphResumableUpload(
   }
 
   let response: Response;
+  noteCall();
   try {
     response = await withTimeout(
       (signal) => fetch(uploadUrl, { method: 'POST', headers, body, signal }),

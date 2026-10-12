@@ -504,6 +504,7 @@ export async function fetchRemotePostState(
 ): Promise<RemotePostState> {
   const { data } = await graphRequest<Record<string, unknown>>(remotePostId, {
     accessToken,
+    essential: true,
     params: { fields: 'is_published,created_time' },
   });
 

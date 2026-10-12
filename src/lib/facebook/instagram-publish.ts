@@ -154,6 +154,7 @@ async function awaitContainer(
       {
         accessToken,
         signal: options.signal,
+        essential: true,
         params: { fields: 'status_code,status' },
       },
     );
