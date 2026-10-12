@@ -1091,13 +1091,13 @@
     "noScheduledTime": "This post has no date to move. Open it and set one."
   },
   "feeds": {
-    "title": "RSS feeds",
-    "subtitle": "Watch a feed and schedule new items automatically.",
+    "title": "Website auto-share",
+    "subtitle": "Watch your sites and schedule each new article to your Pages automatically.",
     "add": "Add a feed",
     "name": "Name",
     "url": "Feed URL",
     "template": "Post template",
-    "templateHint": "Use '{{title}}', '{{link}}' and '{{description}}'.",
+    "templateHint": "Use '{title}', '{excerpt}', '{link}' and '{hashtags}'.",
     "destinations": "Destinations",
     "autoApprove": "Schedule new items automatically",
     "autoApproveHint": "When off, new items go to the approval queue instead.",
@@ -1123,7 +1123,19 @@
     "sampleTitle": "An example headline",
     "sampleDescription": "The first lines of the article appear here.",
     "noDestinations": "Connect a Facebook Page or Group first: feeds post to those.",
-    "noneHint": "Add a blog or news feed, and each new article becomes a post scheduled to your Pages."
+    "noneHint": "Add a blog or news feed, and each new article becomes a post scheduled to your Pages.",
+    "kind": "Source",
+    "kindRss": "RSS or Atom feed",
+    "kindWordpress": "WordPress site",
+    "kindRssHint": "The address of the site's feed, usually ending in /feed or .xml.",
+    "kindWordpressHint": "The site's home address. Articles and their featured images are read through WordPress's own REST API.",
+    "siteUrl": "Site address",
+    "hashtags": "Hashtags",
+    "hashtagsHint": "Put into '{hashtags}' in the template.",
+    "spread": "Spread over the Pages",
+    "spreadNone": "All Pages at once",
+    "spreadEvery": "One Page every {minutes, plural, one {# minute} other {# minutes}}",
+    "spreadHint": "With a spread, each Page gets its own post, a little later than the one before, so the same link does not appear everywhere in the same minute."
   },
   "history": {
     "actions": {
@@ -1286,7 +1298,7 @@
     "posts": "Posts",
     "approvals": "Approvals",
     "accounts": "Accounts",
-    "feeds": "RSS feeds",
+    "feeds": "Auto-share",
     "reports": "Reports",
     "settings": "Settings",
     "signOut": "Sign out",

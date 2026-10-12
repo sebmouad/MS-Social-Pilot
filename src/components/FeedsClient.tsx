@@ -28,6 +28,9 @@ export interface FeedView {
   url: string;
   enabled: boolean;
   autoApprove: boolean;
+  kind: FeedKind;
+  hashtags: string;
+  spreadMinutes: number;
   messageTemplate: string;
   targetIds: string[];
   lastPolledLabel: string | null;
@@ -43,12 +46,20 @@ interface Props {
   canManage: boolean;
 }
 
-const DEFAULT_TEMPLATE = '{{title}}\n\n{{link}}';
+const DEFAULT_TEMPLATE = '{title}\n\n{excerpt}\n\n{link}\n\n{hashtags}';
+
+type FeedKind = 'rss' | 'wordpress';
+
+/** Choices for spreading one article over several Pages; 0 = all at once. */
+const SPREAD_CHOICES = [0, 10, 20, 30, 60, 120];
 
 interface FeedFields {
   name: string;
   url: string;
+  kind: FeedKind;
   messageTemplate: string;
+  hashtags: string;
+  spreadMinutes: number;
   targetIds: string[];
   autoApprove: boolean;
 }
@@ -122,6 +133,8 @@ export function FeedsClient({ feeds, targets, canManage }: Props) {
       body: JSON.stringify({
         name: fields.name,
         messageTemplate: fields.messageTemplate,
+        hashtags: fields.hashtags,
+        spreadMinutes: fields.spreadMinutes,
         targetIds: [...fields.targetIds, ...unavailable],
         autoApprove: fields.autoApprove,
       }),
@@ -172,7 +185,16 @@ export function FeedsClient({ feeds, targets, canManage }: Props) {
           ) : (
             <FeedForm
               mode="add"
-              initial={{ name: '', url: '', messageTemplate: DEFAULT_TEMPLATE, targetIds: [], autoApprove: true }}
+              initial={{
+                name: '',
+                url: '',
+                kind: 'rss',
+                messageTemplate: DEFAULT_TEMPLATE,
+                hashtags: '',
+                spreadMinutes: 0,
+                targetIds: [],
+                autoApprove: true,
+              }}
               targets={selectable}
               pending={pending}
               sample={null}
@@ -204,6 +226,9 @@ export function FeedsClient({ feeds, targets, canManage }: Props) {
                   {feed.pollErrorCount > 0 && ` · ${t('errorCount', { count: feed.pollErrorCount })}`}
                   {' · '}
                   {feed.autoApprove ? t('autoApproveOn') : t('autoApproveOff')}
+                  {' · '}
+                  {feed.kind === 'wordpress' ? t('kindWordpress') : t('kindRss')}
+                  {feed.spreadMinutes > 0 && ` · ${t('spreadEvery', { minutes: feed.spreadMinutes })}`}
                 </p>
               </div>
 
@@ -274,7 +299,10 @@ export function FeedsClient({ feeds, targets, canManage }: Props) {
                   initial={{
                     name: feed.name,
                     url: feed.url,
+                    kind: feed.kind,
                     messageTemplate: feed.messageTemplate,
+                    hashtags: feed.hashtags,
+                    spreadMinutes: feed.spreadMinutes,
                     // Only what can be ticked; `save` puts back the rest.
                     targetIds: feed.targetIds.filter((id) => selectable.some((target) => target.id === id)),
                     autoApprove: feed.autoApprove,
@@ -356,7 +384,10 @@ function FeedForm({
 
   const [name, setName] = useState(initial.name);
   const [url, setUrl] = useState(initial.url);
+  const [kind, setKind] = useState<FeedKind>(initial.kind);
   const [template, setTemplate] = useState(initial.messageTemplate);
+  const [hashtags, setHashtags] = useState(initial.hashtags);
+  const [spread, setSpread] = useState(initial.spreadMinutes);
   const [selected, setSelected] = useState<string[]>(initial.targetIds);
   const [autoApprove, setAutoApprove] = useState(initial.autoApprove);
 
@@ -368,7 +399,7 @@ function FeedForm({
     link: sample?.url ?? 'https://example.com/article',
     description: t('sampleDescription'),
     publishedAt: null,
-  });
+  }, { hashtags });
 
   const ready = name.trim() && template.trim() && selected.length > 0 && (mode === 'edit' || url.trim());
 
@@ -377,7 +408,9 @@ function FeedForm({
       className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
-        if (ready) onSubmit({ name, url, messageTemplate: template, targetIds: selected, autoApprove });
+        if (ready) {
+          onSubmit({ name, url, kind, messageTemplate: template, hashtags, spreadMinutes: spread, targetIds: selected, autoApprove });
+        }
       }}
     >
       <div className="grid gap-4 sm:grid-cols-2">
@@ -395,19 +428,42 @@ function FeedForm({
         {mode === 'add' && (
           <div>
             <label className="label" htmlFor={`${id}-url`}>
-              {t('url')}
+              {kind === 'wordpress' ? t('siteUrl') : t('url')}
             </label>
             <input
               id={`${id}-url`}
               className="input"
               type="url"
-              placeholder="https://example.com/feed.xml"
+              placeholder={kind === 'wordpress' ? 'https://example.com' : 'https://example.com/feed.xml'}
               value={url}
               onChange={(event) => setUrl(event.target.value)}
             />
           </div>
         )}
       </div>
+
+      {mode === 'add' && (
+        <div>
+          <span className="label" id={`${id}-kind`}>
+            {t('kind')}
+          </span>
+          <div className="segmented w-fit" role="radiogroup" aria-labelledby={`${id}-kind`}>
+            {(['rss', 'wordpress'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={kind === value}
+                className={`segmented-item ${kind === value ? 'segmented-item-active' : ''}`}
+                onClick={() => setKind(value)}
+              >
+                {value === 'wordpress' ? t('kindWordpress') : t('kindRss')}
+              </button>
+            ))}
+          </div>
+          <p className="hint">{kind === 'wordpress' ? t('kindWordpressHint') : t('kindRssHint')}</p>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -430,6 +486,40 @@ function FeedForm({
           >
             {preview || <span className="text-slate-400">{t('previewEmpty')}</span>}
           </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="label" htmlFor={`${id}-hashtags`}>
+            {t('hashtags')}
+          </label>
+          <input
+            id={`${id}-hashtags`}
+            className="input"
+            placeholder="#news #launch"
+            value={hashtags}
+            onChange={(event) => setHashtags(event.target.value)}
+          />
+          <p className="hint">{t('hashtagsHint')}</p>
+        </div>
+        <div>
+          <label className="label" htmlFor={`${id}-spread`}>
+            {t('spread')}
+          </label>
+          <select
+            id={`${id}-spread`}
+            className="input"
+            value={spread}
+            onChange={(event) => setSpread(Number(event.target.value))}
+          >
+            {[...new Set([...SPREAD_CHOICES, spread])].sort((a, b) => a - b).map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {minutes === 0 ? t('spreadNone') : t('spreadEvery', { minutes })}
+              </option>
+            ))}
+          </select>
+          <p className="hint">{t('spreadHint')}</p>
         </div>
       </div>
 

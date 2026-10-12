@@ -20,6 +20,10 @@ const createSchema = z.object({
   targetIds: z.array(z.string().min(1)).min(1, 'Choose at least one destination.'),
   publishMode: z.nativeEnum(PublishMode).default(PublishMode.worker),
   autoApprove: z.boolean().default(true),
+  /** An RSS or Atom address, or a WordPress site read through its REST API. */
+  kind: z.enum(['rss', 'wordpress']).default('rss'),
+  hashtags: z.string().trim().max(500).default(''),
+  spreadMinutes: z.number().int().min(0).max(720).default(0),
 });
 
 export const GET = route(async () => {
@@ -40,6 +44,9 @@ export const GET = route(async () => {
       messageTemplate: source.messageTemplate,
       targetIds: parseTargetIds(source.targetIds),
       autoApprove: source.autoApprove,
+      kind: source.kind,
+      hashtags: source.hashtags,
+      spreadMinutes: source.spreadMinutes,
       lastPolledAt: source.lastPolledAt,
       lastError: source.lastError,
       pollErrorCount: source.pollErrorCount,
@@ -70,6 +77,9 @@ export const POST = route(async (request: Request) => {
       targetIds: toJson(valid.map((target) => target.id)),
       publishMode: input.publishMode,
       autoApprove: input.autoApprove,
+      kind: input.kind,
+      hashtags: input.hashtags,
+      spreadMinutes: input.spreadMinutes,
       // Nothing published before now: subscribing must not queue the archive.
       ingestFrom: new Date(),
     },

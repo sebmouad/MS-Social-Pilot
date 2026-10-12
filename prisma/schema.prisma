@@ -673,14 +673,21 @@ model FeedSource {
   workspaceId     String
   name            String
   url             String
+  /// "rss" (RSS or Atom) or "wordpress" (the site's REST API, /wp-json/wp/v2/posts).
+  kind            String      @default("rss")
   enabled         Boolean     @default(true)
-  /// Supports {{title}}, {{link}}, {{description}}.
+  /// Supports {title}, {excerpt}, {link}, {hashtags} (and the older {{title}}, {{link}}, {{description}}).
   messageTemplate String      @default("{{title}}\n\n{{link}}")
   /// Target ids to publish new items to (string[]).
   targetIds       Json        @default("[]")
   publishMode     PublishMode @default(worker)
   /// When false, new items land in the approval queue instead of scheduling.
   autoApprove     Boolean     @default(true)
+  /// Filled into {hashtags}.
+  hashtags        String      @default("")
+  /// 0: one post to every Page at once. Otherwise one post per Page, this many
+  /// minutes apart, so a new article does not land everywhere in the same minute.
+  spreadMinutes   Int         @default(0)
 
   // Conditional-request state, so polling is cheap and polite.
   lastPolledAt DateTime?

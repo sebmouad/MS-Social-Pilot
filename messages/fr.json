@@ -1091,13 +1091,13 @@
     "noScheduledTime": "Cette publication n’a pas de date à déplacer. Ouvrez-la pour en choisir une."
   },
   "feeds": {
-    "title": "Flux RSS",
-    "subtitle": "Surveillez un flux et planifiez automatiquement les nouveaux articles.",
+    "title": "Partage automatique des sites",
+    "subtitle": "Surveillez vos sites et programmez chaque nouvel article sur vos Pages automatiquement.",
     "add": "Ajouter un flux",
     "name": "Nom",
     "url": "URL du flux",
     "template": "Modèle de publication",
-    "templateHint": "Utilisez '{{title}}', '{{link}}' et '{{description}}'.",
+    "templateHint": "Utilisez '{title}', '{excerpt}', '{link}' et '{hashtags}'.",
     "destinations": "Destinations",
     "autoApprove": "Planifier automatiquement les nouveaux articles",
     "autoApproveHint": "Si désactivé, les nouveaux articles passent par la file de validation.",
@@ -1123,7 +1123,19 @@
     "sampleTitle": "Un exemple de titre",
     "sampleDescription": "Les premières lignes de l’article apparaissent ici.",
     "noDestinations": "Connectez d’abord une Page ou un Groupe Facebook : les flux y publient.",
-    "noneHint": "Ajoutez le flux d'un blog ou d'un site d'actualité : chaque nouvel article devient une publication programmée sur vos Pages."
+    "noneHint": "Ajoutez le flux d'un blog ou d'un site d'actualité : chaque nouvel article devient une publication programmée sur vos Pages.",
+    "kind": "Source",
+    "kindRss": "Flux RSS ou Atom",
+    "kindWordpress": "Site WordPress",
+    "kindRssHint": "L’adresse du flux du site, qui finit souvent par /feed ou .xml.",
+    "kindWordpressHint": "L’adresse d’accueil du site. Les articles et leur image à la une sont lus par l’API REST de WordPress.",
+    "siteUrl": "Adresse du site",
+    "hashtags": "Hashtags",
+    "hashtagsHint": "Insérés à la place de '{hashtags}' dans le modèle.",
+    "spread": "Étaler sur les Pages",
+    "spreadNone": "Toutes les Pages en même temps",
+    "spreadEvery": "Une Page {minutes, plural, one {par minute} other {toutes les # minutes}}",
+    "spreadHint": "Avec un étalement, chaque Page reçoit sa propre publication, un peu après la précédente, pour que le même lien n’apparaisse pas partout à la même minute."
   },
   "history": {
     "actions": {
@@ -1286,7 +1298,7 @@
     "posts": "Publications",
     "approvals": "Validations",
     "accounts": "Comptes",
-    "feeds": "Flux RSS",
+    "feeds": "Partage auto",
     "reports": "Rapports",
     "settings": "Paramètres",
     "signOut": "Se déconnecter",

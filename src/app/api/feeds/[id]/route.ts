@@ -15,6 +15,8 @@ const patchSchema = z.object({
   messageTemplate: z.string().trim().min(1).max(2000).optional(),
   targetIds: z.array(z.string().min(1)).min(1).optional(),
   autoApprove: z.boolean().optional(),
+  hashtags: z.string().trim().max(500).optional(),
+  spreadMinutes: z.number().int().min(0).max(720).optional(),
 });
 
 type Context = { params: Promise<{ id: string }> };
@@ -46,6 +48,8 @@ export const PATCH = route(async (request: Request, context: Context) => {
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.messageTemplate !== undefined ? { messageTemplate: input.messageTemplate } : {}),
       ...(input.autoApprove !== undefined ? { autoApprove: input.autoApprove } : {}),
+      ...(input.hashtags !== undefined ? { hashtags: input.hashtags } : {}),
+      ...(input.spreadMinutes !== undefined ? { spreadMinutes: input.spreadMinutes } : {}),
       ...(targetIds ? { targetIds: toJson(targetIds) } : {}),
       ...(input.enabled !== undefined
         ? {

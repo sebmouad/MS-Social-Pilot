@@ -316,3 +316,55 @@ describe('an entry with nothing to post', () => {
     expect(await prisma.post.count()).toBe(0);
   });
 });
+
+describe('a WordPress site', () => {
+  it('reads the REST API, keeps the featured image for the link card, and spreads Pages apart', async () => {
+    const { workspace, target, source } = await seed();
+    const second = await prisma.target.create({
+      data: { workspaceId: workspace.id, type: 'page', providerId: '2000', name: 'Second Page' },
+    });
+    await prisma.feedSource.update({
+      where: { id: source.id },
+      data: {
+        kind: 'wordpress',
+        url: 'https://blog.example.com',
+        targetIds: [target.id, second.id],
+        messageTemplate: '{title}\n\n{excerpt}\n\n{link}\n\n{hashtags}',
+        hashtags: '#launch',
+        spreadMinutes: 20,
+      },
+    });
+    const posts = [
+      {
+        id: 7,
+        link: 'https://blog.example.com/product-launch/',
+        date_gmt: '2026-09-30T08:00:00',
+        guid: { rendered: 'https://blog.example.com/?p=7' },
+        title: { rendered: 'Product launch &#8211; day one' },
+        excerpt: { rendered: '<p>Everything about the launch.</p>' },
+        _embedded: { 'wp:featuredmedia': [{ source_url: 'https://blog.example.com/launch.jpg' }] },
+      },
+    ];
+    const fetchMock = vi.fn(async (_url: string | URL) => new Response(JSON.stringify(posts), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await poll.pollSource(await reload(source.id), { now });
+    expect(result).toMatchObject({ status: 'ingested', created: 1 });
+    expect(String(fetchMock.mock.calls[0]![0])).toContain('/wp-json/wp/v2/posts');
+
+    const created = await prisma.post.findMany({
+      include: { targets: true },
+      orderBy: { scheduledAt: 'asc' },
+    });
+    expect(created).toHaveLength(2);
+    expect(created[0]!.message).toBe(
+      'Product launch – day one\n\nEverything about the launch.\n\nhttps://blog.example.com/product-launch/\n\n#launch',
+    );
+    expect(created[0]!.targets.map((row) => row.targetId)).toEqual([target.id]);
+    expect(created[1]!.targets.map((row) => row.targetId)).toEqual([second.id]);
+    expect(created[1]!.scheduledAt!.getTime() - created[0]!.scheduledAt!.getTime()).toBe(20 * 60_000);
+    expect(created[0]!.linkPreview).toMatchObject({ imageUrl: 'https://blog.example.com/launch.jpg' });
+    // Both posts belong to the one article, which is seen once.
+    expect(await prisma.feedItem.count()).toBe(1);
+  });
+});

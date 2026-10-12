@@ -1,12 +1,12 @@
 import { ApprovalStatus, PostStatus, Prisma, type FeedSource } from '@prisma/client';
 
 import { prisma } from './../prisma';
-import { parseTargetIds } from '../json';
+import { parseTargetIds, toJson, type LinkPreview } from '../json';
 import { QUEUE_OCCUPYING_STATUSES } from '../constants';
 import { AppError } from '../errors';
 import { allocateQueueSlot } from '../posts';
 import { notifyApprovalRequest } from '../email/notify';
-import { parseFeed, renderTemplate, type FeedEntry } from './parse';
+import { excerptOf, parseFeed, parseWordPressPosts, renderTemplate, wordpressApiUrl, type FeedEntry } from './parse';
 import { fetchPublic, readCapped } from '../safe-fetch';
 
 /**
@@ -44,16 +44,20 @@ async function fetchFeed(source: FeedSource): Promise<
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
+    const wordpress = source.kind === 'wordpress';
     const headers: Record<string, string> = {
       'user-agent': 'MS-Social-Pilot/1.0 (+RSS reader)',
-      accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+      accept: wordpress ? 'application/json' : 'application/rss+xml, application/atom+xml, application/xml, text/xml',
     };
     if (source.lastEtag) headers['if-none-match'] = source.lastEtag;
     if (source.lastModified) headers['if-modified-since'] = source.lastModified;
 
     // Guarded: the address is whatever somebody typed into the feeds screen,
     // and this runs inside the server's network. See `safe-fetch.ts`.
-    const response = await fetchPublic(source.url, { headers, signal: controller.signal });
+    const response = await fetchPublic(wordpress ? wordpressApiUrl(source.url) : source.url, {
+      headers,
+      signal: controller.signal,
+    });
 
     // Nothing new since last time — the cheap, common case.
     if (response.status === 304) return { status: 'not-modified' };
@@ -112,6 +116,29 @@ export function fallbackTime(now: Date, taken: Date[]): Date {
   return new Date(candidate);
 }
 
+/**
+ * Which Pages go out together. Without a spread, all of them in one post; with
+ * one, a post per Page, each `spreadMinutes` after the one before, so a new
+ * article does not appear on every Page in the same minute.
+ */
+export function spreadGroups(targetIds: string[], spreadMinutes: number): string[][] {
+  return spreadMinutes > 0 ? targetIds.map((id) => [id]) : [targetIds];
+}
+
+/** The link card's picture: the article's featured image, when the feed gave one. */
+export function entryPreview(entry: FeedEntry, now: Date): LinkPreview | null {
+  if (!entry.link || !entry.imageUrl) return null;
+  return {
+    url: entry.link,
+    title: entry.title,
+    description: excerptOf(entry.description) || null,
+    imageUrl: entry.imageUrl,
+    siteName: null,
+    source: 'html',
+    fetchedAt: now.toISOString(),
+  };
+}
+
 /** A post created from a feed entry. */
 interface ScheduledEntry {
   postId: string;
@@ -152,7 +179,8 @@ async function scheduleEntry(options: {
   now: Date;
 }): Promise<ScheduledEntry | null> {
   const { source, entry } = options;
-  const message = renderTemplate(source.messageTemplate, entry);
+  const message = renderTemplate(source.messageTemplate, entry, { hashtags: source.hashtags });
+  const preview = entryPreview(entry, options.now);
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -191,26 +219,31 @@ async function scheduleEntry(options: {
       }
 
       const needsApproval = !source.autoApprove;
-      const post = await tx.post.create({
-        data: {
-          workspaceId: source.workspaceId,
-          authorId: options.authorId,
-          message,
-          link: entry.link,
-          status: needsApproval ? PostStatus.pending_approval : PostStatus.scheduled,
-          approvalStatus: needsApproval ? ApprovalStatus.pending : ApprovalStatus.not_required,
-          // Reviewers see how long something has waited by this; a feed post
-          // is submitted the moment it is imported.
-          submittedAt: needsApproval ? options.now : null,
-          publishMode: source.publishMode,
-          scheduledAt,
-          timezone: options.timezone,
-          sourceFeedItemId: item.id,
-          targets: { create: options.targetIds.map((targetId) => ({ targetId })) },
-        },
-      });
+      let postId = '';
+      for (const [index, group] of spreadGroups(options.targetIds, source.spreadMinutes).entries()) {
+        const post = await tx.post.create({
+          data: {
+            workspaceId: source.workspaceId,
+            authorId: options.authorId,
+            message,
+            link: entry.link,
+            ...(preview ? { linkPreview: toJson(preview) } : {}),
+            status: needsApproval ? PostStatus.pending_approval : PostStatus.scheduled,
+            approvalStatus: needsApproval ? ApprovalStatus.pending : ApprovalStatus.not_required,
+            // Reviewers see how long something has waited by this; a feed post
+            // is submitted the moment it is imported.
+            submittedAt: needsApproval ? options.now : null,
+            publishMode: source.publishMode,
+            scheduledAt: new Date(scheduledAt.getTime() + index * source.spreadMinutes * 60_000),
+            timezone: options.timezone,
+            sourceFeedItemId: item.id,
+            targets: { create: group.map((targetId) => ({ targetId })) },
+          },
+        });
+        postId ||= post.id;
+      }
 
-      return { postId: post.id, scheduledAt, needsApproval };
+      return { postId, scheduledAt, needsApproval };
     });
   } catch (error) {
     // "Poll now" racing the worker: the other poll recorded it, and posted it.
@@ -268,7 +301,7 @@ export async function pollSource(
       return { sourceId: source.id, status: 'unchanged', created: 0 };
     }
 
-    const feed = parseFeed(fetched.body);
+    const feed = source.kind === 'wordpress' ? parseWordPressPosts(fetched.body) : parseFeed(fetched.body);
 
     const seen = await prisma.feedItem.findMany({
       where: { feedSourceId: source.id },

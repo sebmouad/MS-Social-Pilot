@@ -1,5 +1,6 @@
 /**
- * A minimal RSS 2.0 and Atom reader.
+ * A minimal RSS 2.0 and Atom reader, and the same entries read from a
+ * WordPress site's REST API.
  *
  * Hand-written rather than a dependency because the requirement is narrow: pull
  * id, title, link and date out of each entry. Feeds in the wild are messy —
@@ -15,6 +16,8 @@ export interface FeedEntry {
   link: string | null;
   description: string | null;
   publishedAt: Date | null;
+  /** The article's featured image, when the feed names one. */
+  imageUrl?: string | null;
 }
 
 export interface ParsedFeed {
@@ -88,6 +91,23 @@ function atomLink(xml: string): string | null {
   return null;
 }
 
+/**
+ * The featured image: an image enclosure, `media:content` or
+ * `media:thumbnail`, the forms RSS and WordPress feeds use.
+ */
+function imageOf(xml: string): string | null {
+  for (const match of xml.matchAll(/<(?:enclosure|media:content|media:thumbnail)\b([^>]*)\/?>/gi)) {
+    const raw = match[1] ?? '';
+    const url = /\burl\s*=\s*"([^"]+)"/i.exec(raw)?.[1];
+    if (!url) continue;
+    const type = /\btype\s*=\s*"([^"]+)"/i.exec(raw)?.[1];
+    const medium = /\bmedium\s*=\s*"([^"]+)"/i.exec(raw)?.[1];
+    if (!type && !medium) return decodeEntities(url);
+    if (type?.startsWith('image/') || medium === 'image') return decodeEntities(url);
+  }
+  return null;
+}
+
 function parseDate(value: string | null): Date | null {
   if (!value) return null;
   const parsed = new Date(value);
@@ -114,6 +134,7 @@ export function parseFeed(xml: string): ParsedFeed {
       link,
       description: tagText(block, 'description', 'summary', 'content'),
       publishedAt: parseDate(tagText(block, 'pubDate', 'published', 'updated', 'date')),
+      imageUrl: imageOf(block),
     });
   }
 
@@ -123,12 +144,76 @@ export function parseFeed(xml: string): ParsedFeed {
   return { title: tagText(channel, 'title'), entries };
 }
 
-/** Fill a post template from a feed entry. */
-export function renderTemplate(template: string, entry: FeedEntry): string {
+/** Where a WordPress site lists its latest posts, featured images included. */
+export function wordpressApiUrl(site: string): string {
+  const url = new URL(site);
+  const base = url.pathname.replace(/\/wp-json.*$/, '').replace(/\/+$/, '');
+  return `${url.origin}${base}/wp-json/wp/v2/posts?_embed=wp:featuredmedia&per_page=20&orderby=date&order=desc`;
+}
+
+interface WordPressPost {
+  id?: number;
+  link?: string;
+  date_gmt?: string;
+  guid?: { rendered?: string };
+  title?: { rendered?: string };
+  excerpt?: { rendered?: string };
+  _embedded?: { 'wp:featuredmedia'?: Array<{ source_url?: string }> };
+}
+
+/** Entries from `/wp-json/wp/v2/posts`. Anything unreadable gives no entries, never a throw. */
+export function parseWordPressPosts(body: string): ParsedFeed {
+  let posts: unknown;
+  try {
+    posts = JSON.parse(body);
+  } catch {
+    return { title: null, entries: [] };
+  }
+  if (!Array.isArray(posts)) return { title: null, entries: [] };
+
+  const entries: FeedEntry[] = [];
+  for (const post of posts as WordPressPost[]) {
+    const link = post.link ?? null;
+    const guid = post.guid?.rendered ?? link ?? (post.id !== undefined ? `wp:${post.id}` : null);
+    if (!guid) continue;
+    entries.push({
+      guid,
+      title: post.title?.rendered ? stripHtml(post.title.rendered) || null : null,
+      link,
+      description: post.excerpt?.rendered ?? null,
+      // WordPress gives the GMT time without a zone marker.
+      publishedAt: post.date_gmt ? parseDate(`${post.date_gmt}Z`) : null,
+      imageUrl: post._embedded?.['wp:featuredmedia']?.[0]?.source_url ?? null,
+    });
+  }
+  return { title: null, entries };
+}
+
+/** Longest excerpt put into a post: a teaser, not the article. */
+const EXCERPT_CHARS = 280;
+
+/** The start of the article as plain text, cut at a word. */
+export function excerptOf(description: string | null): string {
+  const text = stripHtml(description ?? '').replace(/\s+/g, ' ').trim();
+  if (text.length <= EXCERPT_CHARS) return text;
+  const cut = text.slice(0, EXCERPT_CHARS);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > EXCERPT_CHARS / 2 ? cut.slice(0, space) : cut).replace(/[\s.,;:!?-]+$/, '')}…`;
+}
+
+/**
+ * Fill a post template from a feed entry. `{title}`, `{excerpt}`, `{link}` and
+ * `{hashtags}`; the older double-brace forms, and `{{description}}` for the
+ * whole summary, keep working.
+ */
+export function renderTemplate(template: string, entry: FeedEntry, options: { hashtags?: string } = {}): string {
   return template
-    .replace(/\{\{\s*title\s*\}\}/gi, entry.title ?? '')
-    .replace(/\{\{\s*link\s*\}\}/gi, entry.link ?? '')
-    .replace(/\{\{\s*description\s*\}\}/gi, stripHtml(entry.description ?? ''))
+    .replace(/\{\{?\s*title\s*\}?\}/gi, entry.title ?? '')
+    .replace(/\{\{?\s*link\s*\}?\}/gi, entry.link ?? '')
+    .replace(/\{\{?\s*excerpt\s*\}?\}/gi, excerptOf(entry.description))
+    .replace(/\{\{?\s*description\s*\}?\}/gi, stripHtml(entry.description ?? ''))
+    .replace(/\{\{?\s*hashtags\s*\}?\}/gi, (options.hashtags ?? '').trim())
+    .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

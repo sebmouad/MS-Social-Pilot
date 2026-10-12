@@ -83,6 +83,8 @@ test('a feed shows what it imported, and can be edited in place', async ({ page 
   // The preview uses the feed's own latest headline.
   await expect(card.getByTestId('feed-template-preview')).toHaveText('New on the journal: Rye week starts Monday');
   await card.getByLabel(/schedule new items automatically/i).uncheck();
+  await card.getByLabel(/^hashtags$/i).fill('#journal');
+  await card.getByLabel(/spread over the pages/i).selectOption('20');
 
   await card.getByRole('button', { name: /^save$/i }).click();
   await expect(page.getByRole('status')).toHaveText(/feed saved/i);
@@ -93,6 +95,8 @@ test('a feed shows what it imported, and can be edited in place', async ({ page 
   expect(saved.name).toBe('Bakery journal (weekly)');
   expect(saved.messageTemplate).toBe('New on the journal: {{title}}');
   expect(saved.autoApprove).toBe(false);
+  expect(saved.hashtags).toBe('#journal');
+  expect(saved.spreadMinutes).toBe(20);
   expect(saved.targetIds).toHaveLength(1);
 
   expect(failures).toEqual([]);

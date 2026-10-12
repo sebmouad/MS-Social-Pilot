@@ -509,13 +509,15 @@ most time), the rest after Phase D2. S/M/L = effort.
   logged as `session.signedOut`).
 
 ### Facebook growth and safety
-- **G5. Website auto-share (M)** — users add their own sites. Per site: RSS/Atom
+- **G5. Website auto-share (M)** ✅ — users add their own sites. Per site: RSS/Atom
   feed or WordPress REST API
   (`/wp-json/wp/v2/posts?_embed`), target Pages, caption template
   (`{title}`, `{excerpt}`, `{link}`, hashtags), featured image, spread rule
   (e.g. one Page every 20 min, Page-specific best times), UTM per Page; new
   articles become scheduled posts (or drafts for review). Builds on the existing
-  RSS feature. Works for any site and niche.
+  RSS feature. Works for any site and niche. *Done: RSS/Atom + WordPress,
+  template with hashtags, featured image, fixed spread, UTM per Page at publish;
+  spreading on each Page's best times waits for G10.*
 - **G6. Spam-risk guard (M)** — before scheduling, detect the same link or
   near-identical text going to many Pages within a short window; warn with the
   count and suggest **auto-stagger** (spread over N hours) and **AI caption

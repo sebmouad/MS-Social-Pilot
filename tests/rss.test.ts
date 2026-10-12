@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseFeed, renderTemplate, stripHtml } from '../src/lib/rss/parse';
+import { excerptOf, parseFeed, parseWordPressPosts, renderTemplate, stripHtml, wordpressApiUrl } from '../src/lib/rss/parse';
 import { selectNewEntries } from '../src/lib/rss/poll';
 
 const RSS = `<?xml version="1.0"?>
@@ -210,3 +210,58 @@ describe('which destinations a feed may have', () => {
     ).toThrow(/@client/);
   });
 })
+
+describe('website auto-share', () => {
+  const entry = {
+    guid: 'g',
+    title: 'Product launch',
+    link: 'https://example.com/launch',
+    description: '<p>Big news today.</p>',
+    publishedAt: null,
+  };
+
+  it('fills the single-brace placeholders, hashtags included', () => {
+    expect(renderTemplate('{title} {excerpt} {link} {hashtags}', entry, { hashtags: '#news' })).toBe(
+      'Product launch Big news today. https://example.com/launch #news',
+    );
+  });
+
+  it('leaves no trailing gap when there are no hashtags', () => {
+    expect(renderTemplate('{title}\n\n{hashtags}', entry)).toBe('Product launch');
+  });
+
+  it('cuts a long excerpt at a word', () => {
+    const long = `<p>${'word '.repeat(100)}</p>`;
+    const excerpt = excerptOf(long);
+    expect(excerpt.length).toBeLessThanOrEqual(281);
+    expect(excerpt.endsWith('word…')).toBe(true);
+  });
+
+  it('reads the featured image from an RSS enclosure or media tag', () => {
+    const xml = `<rss><channel>
+      <item><guid>a</guid><title>A</title><enclosure url="https://example.com/a.jpg" type="image/jpeg" length="1"/></item>
+      <item><guid>b</guid><title>B</title><media:content url="https://example.com/b.png" medium="image"/></item>
+      <item><guid>c</guid><title>C</title><enclosure url="https://example.com/c.mp3" type="audio/mpeg"/></item>
+    </channel></rss>`;
+    expect(parseFeed(xml).entries.map((item) => item.imageUrl)).toEqual([
+      'https://example.com/a.jpg',
+      'https://example.com/b.png',
+      null,
+    ]);
+  });
+
+  it('builds the WordPress REST address from the site address', () => {
+    expect(wordpressApiUrl('https://example.com/')).toMatch(/^https:\/\/example\.com\/wp-json\/wp\/v2\/posts\?/);
+    expect(wordpressApiUrl('https://example.com/blog')).toMatch(/^https:\/\/example\.com\/blog\/wp-json\/wp\/v2\/posts\?/);
+  });
+
+  it('reads WordPress posts, and gives nothing for an answer that is not a list', () => {
+    const parsed = parseWordPressPosts(
+      JSON.stringify([{ id: 3, link: 'https://example.com/x', title: { rendered: 'X &amp; Y' }, date_gmt: '2026-01-02T03:04:05' }]),
+    );
+    expect(parsed.entries[0]).toMatchObject({ guid: 'https://example.com/x', title: 'X & Y' });
+    expect(parsed.entries[0]!.publishedAt?.toISOString()).toBe('2026-01-02T03:04:05.000Z');
+    expect(parseWordPressPosts('{"code":"rest_no_route"}').entries).toEqual([]);
+    expect(parseWordPressPosts('not json').entries).toEqual([]);
+  });
+});

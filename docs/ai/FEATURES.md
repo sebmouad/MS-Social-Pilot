@@ -1,8 +1,8 @@
 # Feature inventory (screen by screen)
 
 App shell (like Simplified): a narrow **icon rail** on the far left with the
-main areas — **Home** · **Publish** (Calendar, Queue, Posts, Approvals, RSS
-feeds; also the composer) · **Inbox** · **Analytics** (Pages, Reports) ·
+main areas — **Home** · **Publish** (Calendar, Queue, Posts, Approvals, Website
+auto-share; also the composer) · **Inbox** · **Analytics** (Pages, Reports) ·
 **Ads** · **Workspace** (Connections, Client links, Settings), Root at the
 bottom for root. Beside it the **sidebar** with the area's pages, the client
 switcher and "New post". A slim **top bar** holds utilities only: fold the
@@ -33,7 +33,11 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   (removes Facebook-held copies), **delete from Facebook** (published).
 - **Approvals** `/approvals`: review list and Board (Draft / Waiting / Ready /
   Sent back) with client feedback counts.
-- **RSS feeds** `/feeds`: auto-posting from feeds.
+- **Website auto-share** `/feeds`: each site is an RSS/Atom feed or a WordPress
+  site (REST API, featured image kept for the link card); caption template with
+  `{title}`, `{excerpt}`, `{link}`, `{hashtags}`; optional spread (one Page every
+  N minutes, one post per Page); new articles become scheduled posts, or wait
+  for approval when auto-approve is off. UTM per Page applies at publish time.
 
 ## Analytics
 - **Pages** `/analytics?view=…`: All profiles (default with 2+ selected: summed
