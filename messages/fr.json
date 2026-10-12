@@ -854,6 +854,13 @@
       "heading": "Une Page n’a plus de publication programmée",
       "body": "La dernière publication programmée pour {page} est partie et rien d’autre n’est prévu. Écrivez la suivante ou remplissez la file pour que la Page reste active.",
       "cta": "Écrire une publication"
+    },
+    "draftUpdated": {
+      "subject": "{editor} a modifié votre publication",
+      "heading": "Votre publication a été modifiée",
+      "body": "{editor} a modifié une publication que vous avez écrite, avant sa sortie : « {excerpt} ». Ouvrez-la pour voir la dernière version.",
+      "bodyNoText": "{editor} a modifié une publication que vous avez écrite, avant sa sortie. Ouvrez-la pour voir la dernière version.",
+      "cta": "Ouvrir la publication"
     }
   },
   "engagement": {
@@ -1340,7 +1347,8 @@
     "pageEvent_newInbox": "Nouveaux commentaires et messages",
     "perPageToggle": "{event} pour {page}",
     "onQueueEmpty": "Une Page n’a plus de publication programmée",
-    "pageEvent_queueEmpty": "Plus rien de programmé"
+    "pageEvent_queueEmpty": "Plus rien de programmé",
+    "onDraftUpdated": "Quelqu’un modifie une publication que j’ai écrite avant sa sortie (un e-mail par heure au plus)"
   },
   "pageAnalysis": {
     "analyseNow": "Analyser maintenant",

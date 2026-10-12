@@ -368,7 +368,10 @@ Each verified missing in our code on 2026-10-11:
   scheduled ahead has none left (`Target.queueFilledAt` /
   `queueEmptyNotifiedAt`; filling it again re-arms it; a Page never
   scheduled stays quiet); on by default (`onQueueEmpty`), mutable per Page.
-  Still to do: draft updated (weekly summary is the scheduled report).
+  **Draft updated done 2026-10-12:** when someone else saves a post its
+  author wrote before it went out (draft, waiting, sent back or scheduled),
+  the author gets one email (at most one an hour; `onDraftUpdated`, on by
+  default). Weekly summary is the scheduled report. Matrix complete.
 - **First day of week** workspace setting (calendar, week view, reports).
   **Done 2026-10-12:** `Workspace.weekStartsOn` (0 Sunday … 6 Saturday,
   default Monday), chosen in Settings (Monday · Sunday · Saturday); month and

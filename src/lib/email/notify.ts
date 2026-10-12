@@ -9,6 +9,7 @@ import {
   approvalDecisionEmail,
   approvalRequestEmail,
   connectionExpiredEmail,
+  draftUpdatedEmail,
   inboxDigestEmail,
   publishFailureEmail,
   queueEmptyEmail,
@@ -27,7 +28,7 @@ import {
  * problem must not undo either.
  */
 
-type Preference = 'onPublishFailure' | 'onTokenExpiry' | 'onApprovalRequest' | 'onApprovalDecision' | 'onQueueEmpty';
+type Preference = 'onPublishFailure' | 'onTokenExpiry' | 'onApprovalRequest' | 'onApprovalDecision' | 'onQueueEmpty' | 'onDraftUpdated';
 
 /** Events a member can switch off for one Page (`NotificationMute.event`). */
 export const PAGE_EVENTS = ['publishFailure', 'newInbox', 'queueEmpty'] as const;
@@ -433,4 +434,59 @@ export async function notifyEmptyQueues(now: Date = new Date()): Promise<number>
     }, 'queue empty');
   }
   return told;
+}
+
+/** Statuses of a post that is still being worked on. */
+const UNSENT = new Set(['draft', 'pending_approval', 'rejected', 'scheduled']);
+
+/**
+ * Somebody else changed a post its author wrote before it went out. Goes to
+ * the author only, at most one email an hour, so a colleague saving a draft
+ * several times sends one note, not ten.
+ */
+export async function notifyDraftUpdated(options: {
+  workspaceId: string;
+  postId: string;
+  authorId: string;
+  editorId: string;
+  editorName: string;
+  /** The post's status before the save. */
+  previousStatus: string;
+  message: string | null;
+  now?: Date;
+}): Promise<boolean> {
+  if (options.authorId === options.editorId || !UNSENT.has(options.previousStatus)) return false;
+  let sent = false;
+  await safely(async () => {
+    const [workspace, membership, setting] = await Promise.all([
+      prisma.workspace.findUnique({ where: { id: options.workspaceId }, select: { name: true } }),
+      prisma.membership.findUnique({
+        where: { userId_workspaceId: { userId: options.authorId, workspaceId: options.workspaceId } },
+        include: { user: true },
+      }),
+      prisma.notificationSetting.findUnique({
+        where: { userId_workspaceId: { userId: options.authorId, workspaceId: options.workspaceId } },
+      }),
+    ]);
+    // Someone who left the workspace is not told about its posts.
+    if (!workspace || !membership) return;
+    if (setting && !setting.onDraftUpdated) return;
+
+    const now = options.now ?? new Date();
+    const recent = await prisma.emailLog.count({
+      where: { to: membership.user.email, template: 'draftUpdated', createdAt: { gt: new Date(now.getTime() - 60 * 60 * 1000) } },
+    });
+    if (recent > 0) return;
+
+    const rendered = draftUpdatedEmail({
+      locale: membership.user.locale,
+      workspace: workspace.name,
+      editor: options.editorName,
+      excerpt: (options.message ?? '').slice(0, 140),
+      postId: options.postId,
+    });
+    await sendEmail({ to: membership.user.email, template: 'draftUpdated', workspaceId: options.workspaceId, ...rendered });
+    sent = true;
+  }, 'draft updated');
+  return sent;
 }

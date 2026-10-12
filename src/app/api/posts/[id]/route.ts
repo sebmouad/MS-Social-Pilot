@@ -8,6 +8,7 @@ import { updatePostSchema } from '@/lib/validation';
 import { parseInsights, parseLinkPreview, parseMedia } from '@/lib/json';
 import { ok, readJson, route } from '@/lib/api';
 import { errors } from '@/lib/errors';
+import { notifyDraftUpdated } from '@/lib/email/notify';
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -52,6 +53,7 @@ export const PATCH = route(async (request: Request, context: Context) => {
   const input = updatePostSchema.parse(await readJson(request));
   await assertPostInScope(auth.pageScope, auth.workspace.id, id);
   if (input.targetIds) assertPagesAllowed(auth.pageScope, input.targetIds);
+  const before = await prisma.post.findUnique({ where: { id }, select: { authorId: true, status: true } });
 
   const result = await updatePost(
     {
@@ -63,6 +65,20 @@ export const PATCH = route(async (request: Request, context: Context) => {
     id,
     input,
   );
+
+  // A colleague changed the author's post before it went out: tell the author.
+  if (before) {
+    const after = await prisma.post.findUnique({ where: { id }, select: { message: true } });
+    await notifyDraftUpdated({
+      workspaceId: auth.workspace.id,
+      postId: id,
+      authorId: before.authorId,
+      editorId: auth.user.id,
+      editorName: auth.user.name,
+      previousStatus: before.status,
+      message: after?.message ?? null,
+    });
+  }
 
   // The one outcome of a save the author would not otherwise learn: they chose
   // "let Facebook hold it" and Facebook would have refused the time.

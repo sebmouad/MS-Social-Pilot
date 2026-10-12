@@ -10,6 +10,7 @@ export interface NotificationPreferences {
   onApprovalDecision: boolean;
   onNewInbox: boolean;
   onQueueEmpty: boolean;
+  onDraftUpdated: boolean;
 }
 
 /** Events a member can switch off for one Page (mirrors `PAGE_EVENTS` on the server). */
@@ -44,6 +45,7 @@ export function NotificationsClient({
     { key: 'onApprovalDecision', label: t('onApprovalDecision') },
     { key: 'onNewInbox', label: t('onNewInbox') },
     { key: 'onQueueEmpty', label: t('onQueueEmpty') },
+    { key: 'onDraftUpdated', label: t('onDraftUpdated') },
   ];
   const columns: Array<{ event: (typeof PAGE_EVENTS)[number]; label: string; on: boolean }> = [
     { event: 'publishFailure', label: t('pageEvent_publishFailure'), on: preferences.onPublishFailure },

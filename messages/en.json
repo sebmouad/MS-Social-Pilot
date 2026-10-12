@@ -854,6 +854,13 @@
       "heading": "A Page has run out of scheduled posts",
       "body": "The last post scheduled for {page} has gone out, and nothing else is planned. Write the next one or fill the queue so the Page stays active.",
       "cta": "Write a post"
+    },
+    "draftUpdated": {
+      "subject": "{editor} changed your post",
+      "heading": "Your post was changed",
+      "body": "{editor} changed a post you wrote, before it went out: “{excerpt}”. Open it to see the latest version.",
+      "bodyNoText": "{editor} changed a post you wrote, before it went out. Open it to see the latest version.",
+      "cta": "Open the post"
     }
   },
   "engagement": {
@@ -1340,7 +1347,8 @@
     "pageEvent_newInbox": "New comments and messages",
     "perPageToggle": "{event} for {page}",
     "onQueueEmpty": "A Page runs out of scheduled posts",
-    "pageEvent_queueEmpty": "Nothing scheduled"
+    "pageEvent_queueEmpty": "Nothing scheduled",
+    "onDraftUpdated": "Someone changes a post I wrote before it goes out (one email an hour at most)"
   },
   "pageAnalysis": {
     "analyseNow": "Analyse now",

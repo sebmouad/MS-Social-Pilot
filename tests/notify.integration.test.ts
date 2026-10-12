@@ -392,3 +392,47 @@ describe('a Page that runs out of scheduled posts', () => {
     expect(await recipients(workspace.id)).toEqual([]);
   });
 });
+
+describe('a post changed by somebody else before it went out', () => {
+  it('tells the author, at most once an hour, and not about their own edits', async () => {
+    const workspace = await seedWorkspace();
+    const author = await addMember(workspace.id, WorkspaceRole.contributor);
+    const editor = await addMember(workspace.id, WorkspaceRole.editor);
+    const base = {
+      workspaceId: workspace.id,
+      postId: 'post-1',
+      authorId: author.id,
+      editorName: 'A colleague',
+      previousStatus: 'draft',
+      message: 'Product launch on Friday',
+      now: new Date('2026-08-01T10:00:00Z'),
+    };
+
+    expect(await notify.notifyDraftUpdated({ ...base, editorId: author.id })).toBe(false);
+    expect(await notify.notifyDraftUpdated({ ...base, editorId: editor.id, previousStatus: 'published' })).toBe(false);
+    expect(await notify.notifyDraftUpdated({ ...base, editorId: editor.id })).toBe(true);
+    const log = await prisma.emailLog.findFirstOrThrow({ where: { template: 'draftUpdated' } });
+    expect(log).toMatchObject({ to: author.email, subject: 'A colleague changed your post' });
+
+    // Saved again a few minutes later: no second email.
+    expect(await notify.notifyDraftUpdated({ ...base, editorId: editor.id, now: new Date() })).toBe(false);
+  });
+
+  it('respects the author switching it off', async () => {
+    const workspace = await seedWorkspace();
+    const author = await addMember(workspace.id, WorkspaceRole.editor);
+    const editor = await addMember(workspace.id, WorkspaceRole.admin);
+    await prisma.notificationSetting.create({ data: { userId: author.id, workspaceId: workspace.id, onDraftUpdated: false } });
+    expect(
+      await notify.notifyDraftUpdated({
+        workspaceId: workspace.id,
+        postId: 'post-1',
+        authorId: author.id,
+        editorId: editor.id,
+        editorName: 'A colleague',
+        previousStatus: 'scheduled',
+        message: null,
+      }),
+    ).toBe(false);
+  });
+});
