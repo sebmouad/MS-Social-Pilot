@@ -17,3 +17,6 @@ systemctl restart social-pilot social-pilot-worker
 for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:3100/api/health 2>/dev/null && break; sleep 1; done
 curl -sS http://127.0.0.1:3100/api/health; echo
 systemctl is-active social-pilot social-pilot-worker
+# Keep the five newest release tarballs; older ones are in git anyway.
+ls -t /root/deploy-socialpilot-20261009/release-*.tar 2>/dev/null | tail -n +6 | xargs -r rm -f
+rm -rf /srv/ms-social-pilot.failed

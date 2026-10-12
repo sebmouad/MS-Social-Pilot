@@ -5,12 +5,19 @@
 set -euo pipefail
 : "${H:?H (release hash) must be set}"
 D=/root/deploy-socialpilot-20261009
+L=/srv/ms-social-pilot
 N=/srv/ms-social-pilot.new
 rm -rf "$N"
-# Start from the live tree: keeps .env, node_modules cache and .next cache.
-cp -a /srv/ms-social-pilot "$N"
+# Start from a clean copy of the release. Copying the live tree would keep files
+# deleted from the repo, and one stale route is enough to break the build.
+# Only .env and the Next build cache are carried over.
+install -d -m 750 "$N"
 tar -xf "$D/release-$H.tar" -C "$N"
 echo "$H" > "$N/RELEASE"
+cp -a "$L/.env" "$N/.env"
+if [ -d "$L/.next/cache" ]; then
+  mkdir -p "$N/.next" && cp -a "$L/.next/cache" "$N/.next/cache"
+fi
 chown -R socialpilot:socialpilot "$N"
 cd "$N"
 # Limited CPU/RAM/IO so the WordPress sites on the same box stay responsive.

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Deploy the current commit (HEAD of main) to production.
 #
-#   scripts/deploy/deploy.sh            # full deploy
-#   scripts/deploy/deploy.sh --rollback # put the previous release back
+#   scripts/deploy/deploy.sh            # full deploy        (npm run deploy)
+#   scripts/deploy/deploy.sh --rollback # previous release   (npm run deploy:rollback)
+#   scripts/deploy/deploy.sh --status   # what is live       (npm run deploy:status)
 #
 # Requirements on this machine: git, ssh, curl, and the SSH key below.
 # Override with DEPLOY_HOST / DEPLOY_KEY. See docs/ai/RELEASE.md.
@@ -29,7 +30,20 @@ if [ "${1:-}" = "--rollback" ]; then
   exit
 fi
 
+if [ "${1:-}" = "--status" ]; then
+  "${SSH[@]}" 'echo "live:     $(cat /srv/ms-social-pilot/RELEASE 2>/dev/null || echo unknown)"
+    echo "previous: $(cat /srv/ms-social-pilot.prev/RELEASE 2>/dev/null || echo none)"
+    echo "services: $(systemctl is-active social-pilot social-pilot-worker | tr "\n" " ")"
+    echo "backup:   $(ls -t /var/backups/ms-social-pilot/db-*.dump | head -1 | xargs ls -lh | awk "{print \$5, \$9}")"'
+  check_sites
+  exit
+fi
+
 cd "$(git rev-parse --show-toplevel)"
+if [ "$(git branch --show-current)" != "main" ]; then
+  echo "Not on main: switch to main first (deploy pushes HEAD to main)." >&2
+  exit 1
+fi
 if [ -n "$(git status --porcelain)" ]; then
   echo "Working tree not clean: commit first (only committed code is deployed)." >&2
   exit 1

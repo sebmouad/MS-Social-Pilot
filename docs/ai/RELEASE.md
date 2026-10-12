@@ -8,11 +8,12 @@ Everything a new session needs to ship safely. Tested end to end many times on
 ```bash
 # 1. tests must pass (see TESTING.md)
 # 2. commit on main
-scripts/deploy/deploy.sh          # build on the server, migrate, swap, health-check
-scripts/deploy/deploy.sh --rollback   # if something is wrong
+npm run deploy            # build on the server, migrate, swap, health-check
+npm run deploy:rollback   # if something is wrong
+npm run deploy:status     # live/previous release, services, newest backup, sites
 ```
 
-`deploy.sh` refuses to run with uncommitted changes (only the committed tree is
+`deploy.sh` refuses to run off `main` or with uncommitted changes (only the committed tree is
 shipped, via `git archive HEAD`). It ends with `DEPLOY_OK <hash>` when the app
 and the three WordPress sites answer 200.
 
@@ -28,13 +29,13 @@ and the three WordPress sites answer 200.
 | App directory (live) | `/srv/ms-social-pilot` (owned by `socialpilot:socialpilot`) |
 | Previous release | `/srv/ms-social-pilot.prev` (kept by every deploy, used by rollback) |
 | Staging dir during a deploy | `/srv/ms-social-pilot.new` |
-| Release tarballs and old scripts | `/root/deploy-socialpilot-20261009/` (`release-<hash>.tar`, old `stage-*.sh`/`swap-*.sh`, `database_url`, `env.backup`, `httpd_config.conf`, `nftables.conf`) |
+| Release tarballs and old scripts | `/root/deploy-socialpilot-20261009/` (the five newest `release-<hash>.tar`, plus `httpd_config.conf`, `nftables.conf`, `vhconf.morocco-only.conf` and `env.backup` (the original `.env`, with the old `FACEBOOK_APP_ID`) from the 2026-10-09 setup) |
 | Environment | `/srv/ms-social-pilot/.env` (bootstrap: DATABASE_URL, ENCRYPTION_KEY, SESSION_SECRET, PORT=3100, HOST=127.0.0.1, TRUST_PROXY; older lines such as APP_URL and FACEBOOK_* still work as fallbacks). Settings live in the DB and are edited by root on **/root/config**, which flags values still read from `.env` and offers **Move into the database**; after that the lines can be removed from `.env` (with the owner's OK — never edit the production `.env` unasked). Never print or copy secret values. |
 | Data | `/var/lib/ms-social-pilot` (HOME of the services; `media/` uploads) |
 | Database | PostgreSQL 15 on the same host, database `social_pilot` |
 | Node | v22 |
 | Services (systemd) | `social-pilot` (web: `node scripts/start.mjs`, MemoryMax 2G, CPUQuota 200%) and `social-pilot-worker` (scheduler: `node --import tsx scripts/worker.ts`, MemoryMax 1G). Both `User=socialpilot`, `EnvironmentFile=/srv/ms-social-pilot/.env`, hardened (`ProtectSystem=strict`, `ReadWritePaths=/var/lib/ms-social-pilot /srv/ms-social-pilot/.next`). |
-| Backups | `/usr/local/sbin/ms-social-pilot-backup` → `/var/backups/ms-social-pilot` (pg_dump `db-*.dump`, `media-*.tar.gz`, `env-*`), kept 14 days. Cron `/etc/cron.d/ms-social-pilot-backup`: 04:15 daily. Every deploy runs it first. |
+| Backups | `/usr/local/sbin/ms-social-pilot-backup` → `/var/backups/ms-social-pilot` (pg_dump `db-*.dump`, `media-*.tar.gz`, `env-*`), kept 14 days. Cron `/etc/cron.d/ms-social-pilot-backup`: 04:15 daily (the file sets `PATH`, and the script exports one: without `/usr/sbin`, `runuser` is not found and the dump is empty). Every deploy runs it first. |
 | Health | `curl http://127.0.0.1:3100/api/health` on the server, or https://social.newsgeet.com/api/health → `{"status":"ok","worker":{"status":"ok",...}}` |
 | Logs | `journalctl -u social-pilot -n 100`, `journalctl -u social-pilot-worker -n 100` (worker logs every publish: `[publish] Published post … url: …`) |
 | Server clock | Europe/Paris in logs (CEST); the app works in UTC/workspace time zones |
@@ -44,12 +45,14 @@ and the three WordPress sites answer 200.
 
 1. `git archive HEAD` → `/root/deploy-socialpilot-20261009/release-<hash>.tar`.
 2. `remote-stage.sh` (piped over ssh with `H=<hash>`): copies the live tree to
-   `/srv/ms-social-pilot.new` (keeps `.env` and caches), untars the release,
+   a clean `/srv/ms-social-pilot.new` (only `.env` and `.next/cache` are copied
+   from live, so files deleted from the repo don't linger), untars the release,
    `npm ci`, `npm run build` inside `systemd-run` with CPU/RAM/IO limits (so the
    WordPress sites are not starved), checks `.next/BUILD_ID`, prints `BUILD_OK`.
    **The live app is untouched until this succeeds.**
 3. `remote-swap.sh`: backup → `prisma migrate deploy` → swap dirs (`live → .prev`,
-   `.new → live`) → restart both services → poll `/api/health`.
+   `.new → live`) → restart both services → poll `/api/health` → keep only the
+   five newest `release-*.tar`.
    The single `curl: (7) Failed to connect … port 3100` line during restart is
    normal (Next is still booting); the next line must be the JSON health.
 4. Checks the four public URLs.
