@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
 
@@ -42,10 +43,7 @@ export default async function ExportPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900 sm:text-2xl">{t('title')}</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">{t('intro', { days: EXPORT_DAYS })}</p>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={t('intro', { days: EXPORT_DAYS })} />
 
       <section className="card space-y-3 p-4 sm:p-5">
         <ul className="list-disc space-y-1 ps-5 text-sm text-slate-700">

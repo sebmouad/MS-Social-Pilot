@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyState } from '@/components/EmptyState';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -98,7 +99,7 @@ export function AgencyClient({ clients, people, currentId }: { clients: Client[]
           </p>
         )}
         {people.length === 0 ? (
-          <p className="card p-6 text-center text-sm text-slate-600">{t('noTeam')}</p>
+          <EmptyState title={t('noTeam')} />
         ) : (
           <div className="card scroll-x p-0">
             <table className="w-full text-start text-sm">

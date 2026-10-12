@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyState } from '@/components/EmptyState';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -110,7 +111,7 @@ export function MediaLibrary({ files, usage, truncated, canDelete }: Props) {
       )}
 
       {files.length === 0 ? (
-        <p className="card p-8 text-center text-sm text-slate-600">{t('empty')}</p>
+        <EmptyState title={t('empty')} />
       ) : (
         <ul className="space-y-2">
           {files.map((file) => {

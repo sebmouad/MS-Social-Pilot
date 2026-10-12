@@ -1,3 +1,5 @@
+import { EmptyState } from '@/components/EmptyState';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { getTranslations } from 'next-intl/server';
 
 import { AgencyClient } from '@/components/AgencyClient';
@@ -19,12 +21,9 @@ export default async function AgencyPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900 sm:text-2xl">{t('title')}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
       {overview.clients.length === 0 ? (
-        <p className="card p-8 text-center text-sm text-slate-600">{t('ownersOnly')}</p>
+        <EmptyState title={t('ownersOnly')} />
       ) : (
         <AgencyClient clients={overview.clients} people={overview.people} currentId={auth.workspace.id} />
       )}

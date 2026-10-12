@@ -15,11 +15,21 @@ export function EmptyState({
   hint,
   action,
 }: {
-  icon: IconName;
-  title: string;
+  /** Without an icon it is the compact, one-line form. */
+  icon?: IconName;
+  title: ReactNode;
   hint?: string;
   action?: ReactNode;
 }) {
+  if (!icon) {
+    return (
+      <div className="card p-8 text-center text-sm text-slate-600">
+        {title}
+        {hint && <p className="mt-1 text-slate-500">{hint}</p>}
+        {action && <div className="mt-3">{action}</div>}
+      </div>
+    );
+  }
   return (
     <div className="card flex flex-col items-center gap-2 px-6 py-10 text-center">
       <span aria-hidden className="mb-1 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500">

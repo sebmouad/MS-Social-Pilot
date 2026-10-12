@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/EmptyState';
 import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 
@@ -34,10 +35,10 @@ export function generateMetadata() {
 const STATUS_DOT: Record<string, string> = {
   pending_approval: 'bg-violet-500',
   rejected: 'bg-red-500',
-  scheduled: 'bg-blue-500',
+  scheduled: 'bg-brand-500',
   publishing: 'bg-amber-500',
   published: 'bg-emerald-500',
-  partially_failed: 'bg-orange-500',
+  partially_failed: 'bg-amber-500',
   failed: 'bg-red-500',
   draft: 'bg-slate-400',
   cancelled: 'bg-slate-300',
@@ -566,7 +567,7 @@ export default async function CalendarPage({
             }))}
           />
         ) : (
-          <div className="card p-8 text-center text-sm text-slate-600">{t('feedNoPage')}</div>
+          <EmptyState title={t('feedNoPage')} />
         )
       ) : (
       <CalendarDrag timeZone={timezone} todayKey={todayKey}>

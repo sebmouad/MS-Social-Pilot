@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/EmptyState';
 import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 
@@ -275,7 +276,7 @@ export async function PageAnalysisView({
       </div>
 
       {empty ? (
-        <div className="card p-8 text-center text-sm text-slate-600">{t('empty')}</div>
+        <EmptyState title={t('empty')} />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -568,7 +569,7 @@ export async function ComparePagesView({
     return (
       <div className="space-y-4">
         {groupChips}
-        <div className="card p-8 text-center text-sm text-slate-600">{t('compare.none')}</div>
+        <EmptyState title={t('compare.none')} />
       </div>
     );
 

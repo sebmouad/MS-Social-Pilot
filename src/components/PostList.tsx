@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyState } from '@/components/EmptyState';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -323,7 +324,7 @@ export function PostList({
           filtered tab empties the tab, and what Facebook refused to remove
           still has to be said. */}
       {posts.length === 0 && (
-        <div className="card p-8 text-center text-sm text-slate-600">{emptyText ?? t('noPosts')}</div>
+        <EmptyState title={emptyText ?? t('noPosts')} />
       )}
 
       {groupByDay(posts).map((group) => (

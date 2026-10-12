@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/EmptyState';
 import { TargetType } from '@prisma/client';
 import { getLocale, getTranslations } from 'next-intl/server';
 
@@ -40,7 +41,7 @@ export async function PortalResults({ link }: { link: { workspaceId: string; pag
     );
   }
 
-  if (results.length === 0) return <div className="card p-8 text-center text-sm text-slate-600">{t('empty')}</div>;
+  if (results.length === 0) return <EmptyState title={t('empty')} />;
 
   return (
     <div className="space-y-4">

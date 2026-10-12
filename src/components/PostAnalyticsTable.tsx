@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyState } from '@/components/EmptyState';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
@@ -120,7 +121,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
   ];
 
   if (posts.length === 0) {
-    return <div className="card p-8 text-center text-sm text-slate-600">{t('noPosts')}</div>;
+    return <EmptyState title={t('noPosts')} />;
   }
 
   const biggestReach = Math.max(...posts.map((post) => post.reach), 1);

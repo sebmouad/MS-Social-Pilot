@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { canManageSettings } from '@/lib/constants';
 import { getTranslations } from 'next-intl/server';
 
@@ -33,10 +34,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
 
       <SettingsClient
         canManage={canManageSettings(auth.role)}

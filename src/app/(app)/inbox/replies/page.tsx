@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { getTranslations } from 'next-intl/server';
 
 import { EmptyState } from '@/components/EmptyState';
@@ -35,10 +36,7 @@ export default async function SavedRepliesPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">{t('intro')}</p>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={t('intro')} />
       <SavedRepliesClient replies={replies} />
     </div>
   );

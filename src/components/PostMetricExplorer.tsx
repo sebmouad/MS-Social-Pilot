@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyState } from '@/components/EmptyState';
 import { useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 
@@ -65,7 +66,7 @@ export function PostMetricExplorer({ metrics }: { metrics: PostMetricView[] }) {
 
 
       {metrics.length === 0 && (
-        <p className="card p-6 text-center text-sm text-slate-600">{t('noData')}</p>
+        <EmptyState title={t('noData')} />
       )}
 
       {grouped.map(([category, rows]) => (

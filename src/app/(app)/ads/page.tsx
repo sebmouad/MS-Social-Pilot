@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 
@@ -83,10 +84,7 @@ export default async function AdsPage({
   const accounts = await listAdAccounts(auth.workspace.id);
 
   const header = (
-    <header>
-      <h1 className="text-xl font-semibold sm:text-2xl text-slate-900 sm:text-2xl">{t('title')}</h1>
-      <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
-    </header>
+    <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
   );
 
   if (accounts.length === 0) {

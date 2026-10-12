@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyState } from '@/components/EmptyState';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
@@ -101,7 +102,7 @@ export function HistoryClient({
 
       {view === 'activity' ? (
         activity.length === 0 ? (
-          <p className="card p-8 text-center text-sm text-slate-600">{t('emptyActivity')}</p>
+          <EmptyState title={t('emptyActivity')} />
         ) : (
           <ul className="card divide-y divide-slate-100">
             {activity.map((row) => (
@@ -123,7 +124,7 @@ export function HistoryClient({
           </ul>
         )
       ) : emails.length === 0 ? (
-        <p className="card p-8 text-center text-sm text-slate-600">{t('emptyEmail')}</p>
+        <EmptyState title={t('emptyEmail')} />
       ) : (
         <ul className="card divide-y divide-slate-100">
           {emails.map((row) => (
@@ -170,9 +171,7 @@ function StatusPill({ status }: { status: string }) {
 
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-        styles[status] ?? styles.skipped
-      }`}
+      className={`badge ${styles[status] ?? styles.skipped}`}
     >
       {labels[status] ?? status}
     </span>

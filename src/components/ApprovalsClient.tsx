@@ -1,5 +1,6 @@
 'use client';
 
+import { EmptyState } from '@/components/EmptyState';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -108,7 +109,7 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
           the queue empties it, and that is exactly when "approved" has to
           still be on screen. */}
       {posts.length === 0 && (
-        <div className="card p-8 text-center text-sm text-slate-600">{t('none')}</div>
+        <EmptyState title={t('none')} />
       )}
 
       {posts.map((post) => (

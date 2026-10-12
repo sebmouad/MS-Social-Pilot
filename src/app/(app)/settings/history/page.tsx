@@ -1,3 +1,5 @@
+import { EmptyState } from '@/components/EmptyState';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { getTranslations } from 'next-intl/server';
 
 import { HistoryClient } from '@/components/HistoryClient';
@@ -46,10 +48,8 @@ export default async function HistoryPage({
   if (!canManageTeam(auth.role)) {
     return (
       <div className="space-y-6">
-        <header>
-          <h1 className="text-xl font-semibold sm:text-2xl text-slate-900 sm:text-2xl">{t('title')}</h1>
-        </header>
-        <p className="card p-8 text-center text-sm text-slate-600">{t('ownerOnly')}</p>
+        <ScreenHeader title={t('title')} />
+        <EmptyState title={t('ownerOnly')} />
       </div>
     );
   }
@@ -78,10 +78,7 @@ export default async function HistoryPage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900 sm:text-2xl">{t('title')}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
 
       <HistoryClient
         view={view}

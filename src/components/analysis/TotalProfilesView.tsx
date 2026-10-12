@@ -1,3 +1,4 @@
+import { EmptyState } from '@/components/EmptyState';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
@@ -38,7 +39,7 @@ export async function TotalProfilesView({
   const rows = await comparePages({ workspaceId, from, to, timeZone, compare, targetIds });
 
   if (rows.length === 0) {
-    return <div className="card p-8 text-center text-sm text-slate-600">{t('none')}</div>;
+    return <EmptyState title={t('none')} />;
   }
 
   const total = totalProfiles(rows);

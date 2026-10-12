@@ -1,3 +1,5 @@
+import { EmptyState } from '@/components/EmptyState';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { getTranslations } from 'next-intl/server';
 
 import { PrivilegesView } from '@/components/PrivilegesView';
@@ -19,10 +21,8 @@ export default async function PermissionsPage() {
   if (!auth.isInstanceOwner) {
     return (
       <div className="space-y-6">
-        <header>
-          <h1 className="text-xl font-semibold sm:text-2xl text-slate-900 sm:text-2xl">{t('workspaceTitle')}</h1>
-        </header>
-        <p className="card p-8 text-center text-sm text-slate-600">{t('adminsOnly')}</p>
+        <ScreenHeader title={t('workspaceTitle')} />
+        <EmptyState title={t('adminsOnly')} />
       </div>
     );
   }
@@ -30,10 +30,7 @@ export default async function PermissionsPage() {
   const members = await privilegesByMember({ workspaceId: auth.workspace.id });
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900 sm:text-2xl">{t('workspaceTitle')}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t('workspaceSubtitle')}</p>
-      </header>
+      <ScreenHeader title={t('workspaceTitle')} subtitle={t('workspaceSubtitle')} />
       <PrivilegesView members={members} showWorkspace={false} />
     </div>
   );

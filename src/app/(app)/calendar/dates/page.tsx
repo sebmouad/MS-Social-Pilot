@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import { KeyDatesClient } from '@/components/KeyDatesClient';
@@ -75,10 +76,7 @@ export default async function KeyDatesPage({ searchParams }: { searchParams: Pro
   return (
     <ChannelsLayout auth={auth} selection={filter}>
     <div className="min-w-0 flex-1 space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">{t('intro')}</p>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={t('intro')} />
       <KeyDatesClient
         canEdit={canManageSettings(auth.role)}
         pages={filter.pages.map((page) => ({ id: page.id, name: page.name }))}

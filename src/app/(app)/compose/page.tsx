@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { notFound, redirect } from 'next/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { TargetType } from '@prisma/client';
@@ -133,14 +134,7 @@ export default async function ComposePage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">
-          {editing ? t('editTitle') : t('title')}
-        </h1>
-        <p className="mt-1 text-sm text-slate-600">
-          {editing ? t('editSubtitle') : t('subtitle')}
-        </p>
-      </header>
+      <ScreenHeader title={editing ? t('editTitle') : t('title')} subtitle={editing ? t('editSubtitle') : t('subtitle')} />
 
       <Composer
         timezone={auth.workspace.timezone}

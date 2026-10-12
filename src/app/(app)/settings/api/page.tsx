@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { getTranslations } from 'next-intl/server';
 
 import { ApiTokensClient } from '@/components/ApiTokensClient';
@@ -29,10 +30,7 @@ export default async function ApiKeysPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900 sm:text-2xl">{t('title')}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
       <ApiTokensClient
         baseUrl={base}
         showOwner={admin}
