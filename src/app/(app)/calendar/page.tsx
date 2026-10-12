@@ -394,29 +394,8 @@ export default async function CalendarPage({
         </Link>
   );
 
-  return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
-      <PagesSidebar
-        workspaceId={auth.workspace.id}
-        pages={filter.pages}
-        groups={filter.groups}
-        group={filter.group}
-        visible={filter.visible}
-        net={filter.net}
-        networks={filter.networks}
-        canManageGroups={canManageSettings(auth.role)}
-        canManageQueue={canManageOthersPosts(auth.role)}
-      />
-    <div className="min-w-0 flex-1 space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold capitalize text-slate-900">{title}</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {t('title')} · {t('timesShownIn', { timezone })}
-            {view !== 'feed' && <span className="hidden sm:inline"> · {t('dragHint')}</span>}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+  const tools = (
+    <div className="flex flex-col gap-2 [&_.btn-primary]:w-full [&_.btn-secondary]:w-full">
           <nav className="segmented" aria-label={t('viewLabel')}>
             {(['month', 'week', 'feed'] as const).map((option) => (
               <Link
@@ -450,6 +429,54 @@ export default async function CalendarPage({
             {t('showDrafts')}
           </Link>
           <LabelFilter labels={labels} active={activeLabel?.id ?? null} />
+          {aiOn && (
+            <AiPlanner
+              pages={filter.pages.map((page) => ({ id: page.id, name: page.name, pictureUrl: page.pictureUrl }))}
+              defaultPageId={feedPageId ?? (filter.visible?.length === 1 ? filter.visible[0]! : null)}
+              tomorrow={formatInZone(new Date(today.getTime() + 24 * 60 * 60 * 1000), timezone, 'yyyy-MM-dd')}
+            />
+          )}
+          <CalendarFeedButton
+            pageIds={filter.visible ?? []}
+            groupId={filter.group}
+            selection={
+              filter.group
+                ? (filter.groups.find((entry) => entry.id === filter.group)?.name ?? '')
+                : filter.visible
+                  ? t('feedPages', { count: filter.visible.length })
+                  : t('feedAllPages')
+            }
+          />
+          <Link href="/compose" className="btn-primary">
+            {tDash('newPost')}
+          </Link>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+      <PagesSidebar
+        workspaceId={auth.workspace.id}
+        pages={filter.pages}
+        groups={filter.groups}
+        group={filter.group}
+        visible={filter.visible}
+        net={filter.net}
+        networks={filter.networks}
+        canManageGroups={canManageSettings(auth.role)}
+        canManageQueue={canManageOthersPosts(auth.role)}
+        tools={tools}
+      />
+    <div className="min-w-0 flex-1 space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold capitalize text-slate-900">{title}</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            {t('title')} · {t('timesShownIn', { timezone })}
+            {view !== 'feed' && <span className="hidden sm:inline"> · {t('dragHint')}</span>}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           {view !== 'feed' && (
           <>
           <Link
@@ -476,27 +503,6 @@ export default async function CalendarPage({
           </Link>
           </>
           )}
-          {aiOn && (
-            <AiPlanner
-              pages={filter.pages.map((page) => ({ id: page.id, name: page.name, pictureUrl: page.pictureUrl }))}
-              defaultPageId={feedPageId ?? (filter.visible?.length === 1 ? filter.visible[0]! : null)}
-              tomorrow={formatInZone(new Date(today.getTime() + 24 * 60 * 60 * 1000), timezone, 'yyyy-MM-dd')}
-            />
-          )}
-          <CalendarFeedButton
-            pageIds={filter.visible ?? []}
-            groupId={filter.group}
-            selection={
-              filter.group
-                ? (filter.groups.find((entry) => entry.id === filter.group)?.name ?? '')
-                : filter.visible
-                  ? t('feedPages', { count: filter.visible.length })
-                  : t('feedAllPages')
-            }
-          />
-          <Link href="/compose" className="btn-primary">
-            {tDash('newPost')}
-          </Link>
         </div>
       </header>
 
