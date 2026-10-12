@@ -2,7 +2,7 @@
 
 App shell (like Simplified): a narrow **icon rail** on the far left with the
 main areas — **Home** · **Publish** (Calendar, Queue, Content mix, Templates, Posts, Approvals, Website
-auto-share; also the composer) · **Inbox** · **Analytics** (Pages, Reports, Caption tests, Link clicks) ·
+auto-share, Trending; also the composer) · **Inbox** · **Analytics** (Pages, Reports, Caption tests, Link clicks) ·
 **Ads** · **Workspace** (Connections, Client links, Settings), Root at the
 bottom for root. Beside it the **sidebar** with the area's pages, the client
 switcher and "New post". A slim **top bar** holds utilities only: fold the
@@ -44,6 +44,10 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
 - **Key dates & seasons** `/calendar/dates`: the next 90 days of key days,
   custom dates (once or yearly, per Page), seasonal modes (pause, move times,
   fewer, more) that the queue applies. Admins edit; everyone reads.
+- **Trending** `/calendar/trends` (H7): today's Google Trends searches for
+  each country the selected Pages' audiences name, with traffic and a news
+  link; kept to the workspace's subjects (admins set words; empty shows
+  all); "Make a post" opens Compose with the topic.
 - **Queue** `/queue`: weekly slots (workspace or per Page), suggested times from
   results, add-all-suggested, shuffle, clear (back to drafts). With Settings ›
   "Best times per Page" set to add, a weekly job adds each Page's best new
@@ -170,7 +174,7 @@ errors grouped, scrubbed, with release; mark resolved), Alerts, Backups, Activit
 publish (every few seconds), native reconcile, RSS, evergreen recycling,
 analytics (post insights), page insights, edges (comments, reviews, inbox,
 external posts, videos), Instagram, ads, housekeeping, token expiry warnings,
-scheduled reports (every 10 min), outgoing webhooks (every 30 s), inbox digest email (hourly), empty-queue email (hourly), negative-comment alert (hourly, AI).
+scheduled reports (every 10 min), outgoing webhooks (every 30 s), inbox digest email (hourly), empty-queue email (hourly), negative-comment alert (hourly, AI), trending topics (hourly, Google Trends feed).
 
 ## Integrations
 REST `/api/v1/pages`, `/api/v1/pages/:id/analytics`, `/api/v1/posts` (GET with `status`, `from`, `to`, `limit`, `pages=id,id`; POST),

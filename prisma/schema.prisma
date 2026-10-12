@@ -268,6 +268,8 @@ model Workspace {
   aiBrandVoice String?
   /// Negative-comment alert (H15): the worker reads the mood of new comments with AI.
   watchNegativeComments Boolean @default(false)
+  /// Trending topics (H7): words that keep the list to the team's subjects; empty shows every topic.
+  trendKeywords String[] @default([])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2025,6 +2027,24 @@ model HolidayYear {
 
   @@id([country, year])
   @@map("holiday_years")
+}
+
+/// A search trending today in one country (H7), from Google Trends' daily feed. Shared by every workspace.
+model TrendingTopic {
+  id        String    @id @default(cuid())
+  country   String
+  title     String
+  /// "20,000+" as Google gives it.
+  traffic   String?
+  /// The first news article Google links to the search.
+  newsTitle String?
+  newsUrl   String?
+  startedAt DateTime?
+  fetchedAt DateTime  @default(now())
+
+  @@unique([country, title])
+  @@index([country, fetchedAt])
+  @@map("trending_topics")
 }
 
 /// A date the team adds to its calendar (H2): a launch, a sale, an event.

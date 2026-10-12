@@ -1432,7 +1432,8 @@
     "linkClicks": "Clics sur les liens",
     "keyDates": "Dates clés et saisons",
     "contentMix": "Mix de contenu",
-    "templates": "Modèles"
+    "templates": "Modèles",
+    "trends": "Tendances"
   },
   "notifications": {
     "title": "Notifications",
@@ -2805,7 +2806,8 @@
         "exports": "Exports d’espace",
         "holidays": "Jours fériés",
         "contentMix": "Mix de contenu",
-        "negativeComments": "Alerte commentaires négatifs"
+        "negativeComments": "Alerte commentaires négatifs",
+        "trends": "Sujets tendance"
       },
       "heaviestObjects": "Pages et comptes les plus sollicités, dernière heure",
       "heaviestJobs": "Appels par tâche, dernière heure",
@@ -3807,5 +3809,29 @@
       "afternoon": "après-midi",
       "evening": "soir"
     }
+  },
+  "trends": {
+    "title": "Sujets tendance",
+    "intro": "Ce que les gens recherchent aujourd’hui dans les pays des audiences de vos Pages sélectionnées, d’après Google Trends. Choisissez-en un pour écrire une publication d’actualité.",
+    "keywords": "Vos sujets",
+    "keywordsHint": "Des mots séparés par des virgules. Seuls les sujets qui en mentionnent un sont affichés ; laissez vide pour tout voir.",
+    "keywordsPlaceholder": "ex. football, recettes, voyage",
+    "keywordsNone": "Aucun sujet défini : tout est affiché. Les administrateurs peuvent les définir.",
+    "saveKeywords": "Enregistrer les sujets",
+    "saved": "Sujets enregistrés.",
+    "saveFailed": "Les sujets n’ont pas pu être enregistrés. Réessayez.",
+    "noCountries": "Pas encore de pays d’audience",
+    "noCountriesHint": "Les tendances suivent l’audience de chaque Page. Définissez les pays dans Paramètres › Pages, ou une valeur par défaut pour l’espace.",
+    "setAudience": "Définir les audiences",
+    "none": "Pas encore de sujets tendance",
+    "noneHint": "Le service récupère les tendances du jour chaque heure pour les pays de vos audiences. Revenez un peu plus tard.",
+    "hidden": "{count, plural, one {# sujet ne mentionne pas vos sujets.} other {# sujets ne mentionnent pas vos sujets.}}",
+    "showAll": "Tout afficher",
+    "noMatch": "Rien aujourd’hui ne correspond à vos sujets",
+    "noMatchHint": "Affichez tout, ou élargissez vos sujets ci-dessus.",
+    "searches": "{traffic} recherches",
+    "news": "Dans l’actualité",
+    "makePost": "Créer une publication",
+    "makePostAbout": "Créer une publication sur {topic}"
   }
 }

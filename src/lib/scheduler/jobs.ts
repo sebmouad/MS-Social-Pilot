@@ -27,6 +27,7 @@ import { applyBestTimes } from '../best-times';
 import { deliverDueWebhooks } from '../webhooks';
 import { runContentMix } from '../content-mix';
 import { watchNegativeComments } from '../negative-comments';
+import { refreshTrends } from '../trends';
 
 /**
  * The worker's job set.
@@ -56,6 +57,7 @@ export type JobName =
   | 'inboxDigest'
   | 'queueEmpty'
   | 'negativeComments'
+  | 'trends'
   | 'contentMix'
   | 'captionTests'
   | 'bestTimes'
@@ -727,6 +729,16 @@ export function jobDefinitions(): JobDefinition[] {
       run: async ({ now }) => {
         const sent = await sendInboxDigests(now);
         return sent > 0 ? `${sent} inbox email(s) sent` : null;
+      },
+    },
+    {
+      // Trending topics (H7): today's searches for the countries audiences
+      // name, from Google Trends' public feed. No Graph call.
+      name: 'trends',
+      intervalMs: 60 * 60 * 1000,
+      run: async ({ now }) => {
+        const refreshed = await refreshTrends(now);
+        return refreshed.length > 0 ? `trends fetched for ${refreshed.join(', ')}` : null;
       },
     },
     {

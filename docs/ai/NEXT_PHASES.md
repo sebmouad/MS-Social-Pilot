@@ -743,9 +743,17 @@ setup from Phase 0.2 (marked AI).
   call); each factor needs 3 matching posts, the Page needs 10. Topic is
   not compared yet: it needs topic labels on past posts, which no feature
   produces today; no AI call is made.*
-- **H7. Trending topics (S)** — Google Trends daily trends for each country in
+- **H7. Trending topics (S)** ✅ — Google Trends daily trends for each country in
   the Page's audience (H0), filtered by the workspace's themes; "Make a
   post" opens Compose with the topic.
+  *Done 2026-10-12: Publish › Trending (`/calendar/trends`). Hourly job
+  `trends` reads Google Trends' public RSS (`trending/rss?geo=XX`, no key)
+  for every audience country, a list per country at most every 3 hours,
+  stored and shared by workspaces (`TrendingTopic`); lists over 36 h old are
+  not shown. "Themes" are the workspace's subjects (`trendKeywords`, admins
+  set them on the screen); empty shows every topic. "Make a post" opens
+  Compose with the topic for the first selected Page with that country.
+  Production needs outbound HTTPS to trends.google.com.*
 
 ### Team and clients
 - **H8. Internal notes on posts (S)** ✅ — team-only comment thread on each post

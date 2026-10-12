@@ -1432,7 +1432,8 @@
     "linkClicks": "Link clicks",
     "keyDates": "Key dates & seasons",
     "contentMix": "Content mix",
-    "templates": "Templates"
+    "templates": "Templates",
+    "trends": "Trending"
   },
   "notifications": {
     "title": "Notifications",
@@ -2805,7 +2806,8 @@
         "exports": "Workspace exports",
         "holidays": "Public holidays",
         "contentMix": "Content mix",
-        "negativeComments": "Negative-comment alert"
+        "negativeComments": "Negative-comment alert",
+        "trends": "Trending topics"
       },
       "heaviestObjects": "Heaviest Pages and accounts, last hour",
       "heaviestJobs": "Calls by job, last hour",
@@ -3807,5 +3809,29 @@
       "afternoon": "afternoon",
       "evening": "evening"
     }
+  },
+  "trends": {
+    "title": "Trending topics",
+    "intro": "What people search for today in the countries your selected Pages’ audiences name, from Google Trends. Pick one to write a timely post.",
+    "keywords": "Your subjects",
+    "keywordsHint": "Words separated by commas. Only topics that mention one of them are shown; leave empty to see every topic.",
+    "keywordsPlaceholder": "e.g. football, recipes, travel",
+    "keywordsNone": "No subjects set: every topic is shown. Admins can set them.",
+    "saveKeywords": "Save subjects",
+    "saved": "Subjects saved.",
+    "saveFailed": "The subjects could not be saved. Try again.",
+    "noCountries": "No audience countries yet",
+    "noCountriesHint": "Trending topics follow each Page’s audience. Set the countries in Settings › Pages, or a default for the workspace.",
+    "setAudience": "Set audiences",
+    "none": "No trending topics yet",
+    "noneHint": "The worker fetches today’s trends every hour for the countries your audiences name. Come back a little later.",
+    "hidden": "{count, plural, one {# topic does not mention your subjects.} other {# topics do not mention your subjects.}}",
+    "showAll": "Show all",
+    "noMatch": "Nothing today matches your subjects",
+    "noMatchHint": "Show all topics, or widen your subjects above.",
+    "searches": "{traffic} searches",
+    "news": "In the news",
+    "makePost": "Make a post",
+    "makePostAbout": "Make a post about {topic}"
   }
 }

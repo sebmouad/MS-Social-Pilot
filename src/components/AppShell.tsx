@@ -201,6 +201,7 @@ export function AppShell({
       items: [
         { href: '/calendar', label: t('calendar'), icon: 'calendar' },
         { href: '/calendar/dates', label: t('keyDates'), icon: 'star' },
+        { href: '/calendar/trends', label: t('trends'), icon: 'trendUp' },
         { href: '/queue', label: t('queue'), icon: 'clock' },
         { href: '/queue/mix', label: t('contentMix'), icon: 'tag' },
         { href: '/templates', label: t('templates'), icon: 'compose' },

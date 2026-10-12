@@ -54,7 +54,7 @@ function decodeEntities(value: string): string {
 }
 
 /** Read the text of the first matching tag, ignoring any namespace prefix. */
-function tagText(xml: string, ...names: string[]): string | null {
+export function tagText(xml: string, ...names: string[]): string | null {
   for (const name of names) {
     const pattern = new RegExp(`<(?:\\w+:)?${name}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:\\w+:)?${name}>`, 'i');
     const match = pattern.exec(xml);
