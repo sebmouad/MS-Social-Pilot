@@ -110,7 +110,7 @@
     "syncNow": "Pull from Facebook",
     "synced": "Stored {stored} values across {metrics} metrics.",
     "syncFailed": "Could not read analytics from Facebook.",
-    "noData": "Nothing captured yet. Pull from Facebook to fill this in.",
+    "noData": "Nothing captured yet.",
     "filterPlaceholder": "Filter metrics…",
     "metricsShown": "{count, plural, one {# metric} other {# metrics}}",
     "fans": "Page likes",
@@ -2667,5 +2667,11 @@
     "edit": "Change in Overview",
     "upTo": "up to {value}",
     "uniqueNote": "{count, plural, one {Counts people.} other {Sum over # profiles: someone reached by several is counted once per profile, so the real number is at most this.}}"
+  },
+  "autoSync": {
+    "updated": "Brought in from Facebook automatically. Last read {when}.",
+    "pending": "Brought in from Facebook automatically. The first read has not run yet.",
+    "firstRead": "This Page was just connected. Its first read from Facebook runs within a few minutes.",
+    "emptyHint": "They are brought in from Facebook automatically every few hours."
   }
 }

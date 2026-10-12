@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 
 import { BarList } from './charts/BarList';
@@ -53,8 +52,6 @@ interface Props {
    * day a data point ends on.
    */
   timeZone: string;
-  /** Whether this member may make the server call Graph (editor and up). */
-  canSync: boolean;
   series: SeriesView[];
   availability: AvailabilityView[];
   coverage: CoverageView[];
@@ -100,7 +97,6 @@ export function AnalyticsClient({
   targetId,
   targetName,
   timeZone,
-  canSync,
   series,
   availability,
   coverage,
@@ -110,13 +106,8 @@ export function AnalyticsClient({
 }: Props) {
   const t = useTranslations('analytics');
   const locale = useLocale();
-  const tCommon = useTranslations('common');
-  const router = useRouter();
+  const tAuto = useTranslations('autoSync');
 
-  const [probing, setProbing] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [showUnavailable, setShowUnavailable] = useState(false);
   const [filter, setFilter] = useState('');
   const [featured, setFeatured] = useState<string | null>(null);
@@ -177,83 +168,9 @@ export function AnalyticsClient({
   const shown = categories.reduce((sum, [, rows]) => sum + rows.length, 0);
   const unavailable = availability.filter((entry) => !entry.available);
 
-  /**
-   * Post one action and settle the busy flag whatever happens.
-   *
-   * The `finally` matters: a dropped connection throws out of `fetch`, and
-   * without it the buttons stayed on "Working…" and the whole screen greyed
-   * out until a reload.
-   */
-  async function run<T>(
-    action: 'sync' | 'probeAll',
-    setBusy: (value: boolean) => void,
-    onSuccess: (body: T) => void,
-  ) {
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const response = await fetch(`/api/analytics/${targetId}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action }),
-      });
-      const body = (await response.json().catch(() => ({}))) as T & { error?: string };
-
-      if (!response.ok || body.error) {
-        setError(body.error ?? t('syncFailed'));
-      } else {
-        onSuccess(body);
-        router.refresh();
-      }
-    } catch {
-      setError(t('syncFailed'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function sync() {
-    return run<{ stored?: number; metrics?: number }>('sync', setSyncing, (body) =>
-      setMessage(t('synced', { stored: body.stored ?? 0, metrics: body.metrics ?? 0 })),
-    );
-  }
-
-  /**
-   * Ask Graph what it will actually serve, level by level.
-   *
-   * Separate from `sync` because it is a different question: sync fetches the
-   * numbers, this establishes which of the catalogue names exist for this
-   * destination at all — against a real Page, a real post, a real video and,
-   * when linked, a real Instagram account.
-   */
-  function probeAll() {
-    return run<{ levels?: Array<{ checked: number; available: number }> }>(
-      'probeAll',
-      setProbing,
-      (body) => {
-        const checked = (body.levels ?? []).reduce((sum, level) => sum + level.checked, 0);
-        const available = (body.levels ?? []).reduce((sum, level) => sum + level.available, 0);
-        setMessage(t('probed', { checked, available }));
-      },
-    );
-  }
-
-  const busy = syncing || probing;
 
   return (
-    <div className={`space-y-6 ${busy ? 'is-stale' : ''}`}>
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-      {message && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-          {message}
-        </div>
-      )}
+    <div className="space-y-6">
 
       {/* Profile counters lead: they need no insights permission, so they still
           land when everything below is restricted. */}
@@ -322,11 +239,6 @@ export function AnalyticsClient({
             <h2 className="text-sm font-semibold text-slate-900">{t('coverageTitle')}</h2>
             <p className="mt-0.5 text-xs text-slate-500">{t('coverageHint')}</p>
           </div>
-          {canSync && (
-            <button type="button" className="btn-secondary" onClick={probeAll} disabled={busy}>
-              {probing ? tCommon('working') : t('probeAll')}
-            </button>
-          )}
         </div>
 
         <ul className="mt-4 space-y-3">
@@ -388,22 +300,13 @@ export function AnalyticsClient({
         />
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-500">{t('metricsShown', { count: shown })}</span>
-          {canSync && (
-            <button type="button" className="btn-primary" onClick={sync} disabled={busy}>
-              {syncing ? tCommon('working') : t('syncNow')}
-            </button>
-          )}
         </div>
       </div>
 
       {series.length === 0 ? (
         <div className="card p-8 text-center">
           <p className="text-sm text-slate-600">{t('noData')}</p>
-          {canSync && (
-            <button type="button" className="btn-primary mt-4" onClick={sync} disabled={busy}>
-              {syncing ? tCommon('working') : t('syncNow')}
-            </button>
-          )}
+          <p className="mt-2 text-xs text-slate-500">{tAuto('emptyHint')}</p>
         </div>
       ) : (
         categories.map(([category, metrics]) => (

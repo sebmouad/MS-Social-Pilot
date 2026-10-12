@@ -36,7 +36,8 @@ tests and in the metric's ⓘ text.
   (max 8, then "Others").
 - Every chart in `ChartFrame` (table view) with ⓘ; shared hover tooltip.
 - Withdrawn metrics greyed with "Meta stopped providing this on <date>".
-- Show freshness ("Updated 12 min ago") + `SyncButton` that reports the outcome.
+- Show freshness with `AutoSyncNote` ("Last read …"). Never a pull button: the
+  worker reads Facebook, within the Meta call budget (`budget.ts`).
 
 ## Verify
 Unit tests for each aggregation rule; e2e on seeded multi-Page data; live in the

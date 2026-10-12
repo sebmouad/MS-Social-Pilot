@@ -136,18 +136,6 @@ export function ConnectionsClient({
     if (waiting > 0) setNotice(t('stillScheduledOff', { count: waiting }));
   }
 
-  async function sync(accountId: string) {
-    const body = (await call(accountId, `/api/accounts/${accountId}/sync`, 'POST')) as {
-      pages?: number;
-      groups?: number;
-      warnings?: string[];
-    } | null;
-    if (body) {
-      setNotice(t('syncedResult', { pages: body.pages ?? 0, groups: body.groups ?? 0 }));
-      if (body.warnings?.length) setError(String(body.warnings[0]));
-    }
-  }
-
   async function check(accountId: string) {
     const body = (await call(accountId, `/api/accounts/${accountId}`, 'GET')) as {
       health?: { valid: boolean; message: string | null; expiresAt: string | null };
@@ -266,14 +254,6 @@ export function ConnectionsClient({
 
             {canManage && (
               <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={busy === connection.id}
-                  onClick={() => sync(connection.id)}
-                >
-                  <Icon name="refresh" size={15} /> {t('syncTargets')}
-                </button>
                 <button
                   type="button"
                   className="btn-secondary"

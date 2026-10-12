@@ -280,7 +280,7 @@ post / video / Instagram / ads levels in the explorer.
   — never as empty charts.
 - Budget: aggregate fetches go through the existing `budget.ts`; prefer stored
   snapshots (sync job) over live calls for 2+ profiles; show "Updated 12 min
-  ago" + `SyncButton`.
+  ago" (`AutoSyncNote`). No pull buttons: the worker reads Facebook.
 
 ### B4. Design upgrade of analytics (Simplified refs 01, 05, 19, 42, 44)
 - KPI card = label · big value · change pill (arrow + %) · sparkline; cards are

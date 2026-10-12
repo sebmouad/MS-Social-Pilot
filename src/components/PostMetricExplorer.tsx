@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 
 export interface PostMetricView {
@@ -22,23 +21,11 @@ export interface PostMetricView {
  * is the rest — grouped by category, filterable, with breakdown maps expanded
  * rather than rendered as `[object Object]`.
  */
-export function PostMetricExplorer({
-  postTargetId,
-  external,
-  metrics,
-}: {
-  postTargetId: string;
-  external: boolean;
-  metrics: PostMetricView[];
-}) {
+export function PostMetricExplorer({ metrics }: { metrics: PostMetricView[] }) {
   const t = useTranslations('analytics');
   const locale = useLocale();
-  const tCommon = useTranslations('common');
-  const router = useRouter();
 
   const [filter, setFilter] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const grouped = useMemo(() => {
     const needle = filter.trim().toLowerCase();
@@ -62,24 +49,6 @@ export function PostMetricExplorer({
 
   const shown = grouped.reduce((sum, [, rows]) => sum + rows.length, 0);
 
-  async function refresh() {
-    setBusy(true);
-    setError(null);
-    try {
-      const response = await fetch(
-        `/api/analytics/post/${postTargetId}${external ? '?external=true' : ''}`,
-        { method: 'POST' },
-      );
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? tCommon('genericError'));
-      router.refresh();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -91,13 +60,9 @@ export function PostMetricExplorer({
         />
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-500">{t('metricsShown', { count: shown })}</span>
-          <button type="button" className="btn-secondary" onClick={refresh} disabled={busy}>
-            {busy ? tCommon('working') : t('syncNow')}
-          </button>
         </div>
       </div>
 
-      {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
 
       {metrics.length === 0 && (
         <p className="card p-6 text-center text-sm text-slate-600">{t('noData')}</p>

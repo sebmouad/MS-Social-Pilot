@@ -20,7 +20,7 @@ messages. Agreed sandbox: **DIY Page 3** (1 follower).
    - Analytics → Comments → Pull → Reply as the Page → Delete (Hide is refused by
      Facebook for the Page's own comments).
    - Compare a busy Page's numbers (followers, reactions, comments, shares,
-     engagement rate) with Facebook after "Pull from Facebook".
+     engagement rate) with Facebook after the worker's next read.
 3. Clean up: Posts → each test post → **Delete from Facebook**; confirm the old
    URLs say "Ce contenu n'est pas disponible".
 4. Connections → untick DIY Page 3 (Paused).

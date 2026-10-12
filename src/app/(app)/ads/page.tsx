@@ -6,7 +6,7 @@ import { BreakdownBars } from '@/components/BreakdownBars';
 import { StatTile } from '@/components/charts/StatTile';
 import { Icon, type IconName } from '@/components/Icon';
 import { QuerySelect } from '@/components/QuerySelect';
-import { SyncButton } from '@/components/SyncButton';
+import { AutoSyncNote } from '@/components/AutoSyncNote';
 import { requirePage } from '@/lib/auth';
 import { listAdAccounts, readAdSummary, readCampaigns, syncedSince, type CampaignRow } from '@/lib/ads';
 import { adFindings, adKpis, type AdFinding, type AdKpiKey } from '@/lib/ads-analysis';
@@ -76,10 +76,6 @@ export default async function AdsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const auth = await requirePage();
-  // Discovery and syncing are refused to anyone below admin by the API, so
-  // the buttons are not offered to them either: a button that can only fail
-  // is worse than none.
-  const admin = canManageAccounts(auth.role);
   const t = await getTranslations('ads');
   const locale = await getLocale();
   const params = await searchParams;
@@ -109,10 +105,8 @@ export default async function AdsPage({
             <Link href="/connections" className="btn-secondary">
               {t('openConnections')}
             </Link>
-          ) : admin ? (
-            <SyncButton endpoint="/api/ads" body={{ action: 'discover' }} label={t('discover')} variant="primary" />
           ) : (
-            <p className="max-w-md text-sm text-slate-500">{t('askAdmin')}</p>
+            <AutoSyncNote job="ads" timezone={timezone} />
           )}
         </div>
       </div>
@@ -261,17 +255,6 @@ export default async function AdsPage({
           <a className="btn-secondary" href={exportHref}>
             {t('exportCsv')}
           </a>
-          {admin && (
-            <>
-              <SyncButton endpoint="/api/ads" body={{ action: 'discover' }} label={t('discover')} />
-              <SyncButton
-                endpoint="/api/ads"
-                body={{ action: 'sync', adAccountId: account.id }}
-                label={t('sync')}
-                variant="primary"
-              />
-            </>
-          )}
         </div>
       </div>
 

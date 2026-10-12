@@ -30,7 +30,7 @@ The app now has a left sidebar. Every screen named below is in it.
    that manages a Page linked to an Instagram professional account, and allow the
    requested permissions.
 3. **Inbox:** Sidebar → **Pages** (under Analytics) → **Inbox** tab. Pick the Page.
-   Press **Pull from Facebook**; the Page's Messenger conversations are listed; open one, type a reply, press Send. The
+   The Page's Messenger conversations are listed (the worker reads them on its own; the line under the hint says when it last did); open one, type a reply, press Send. The
    reply appears in Messenger.
 4. **Instagram analytics:** Sidebar → **Pages** → **Instagram** tab. The linked account's
    followers, reach and recent media with their results are shown.
@@ -54,7 +54,7 @@ pages_messaging. MS Social Pilot uses it only to read the conversations of Pages
 person connected, so they can be listed and answered in the Inbox. It changes no Page
 settings.
 **Screencast:** same recording as pages_messaging: send a message to the Page from
-another account, press "Pull from Facebook" in the Inbox, and show it in the list.
+another account, wait for the worker's next read of the inbox, and show it in the list.
 
 ### instagram_basic
 **Use case:** After a Page is connected, MS Social Pilot finds the Instagram professional

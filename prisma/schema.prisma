@@ -345,6 +345,10 @@ model Target {
   canPublish      Boolean    @default(true)
   publishBlocker  String?
   lastSyncedAt    DateTime?
+  /// When the worker first read this Page's insights and edges. Empty for a
+  /// Page just connected: the `firstRead` job takes those first, within
+  /// minutes, rather than leaving its screens empty until the next pass.
+  firstReadAt     DateTime?
 
   /// How this Page sounds, for AI writing; the workspace's voice when empty.
   brandVoice  String?

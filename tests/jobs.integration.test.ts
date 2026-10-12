@@ -840,3 +840,33 @@ describe('POST /api/cron/tick', () => {
     expect((await call('anything', 'publish')).status).toBe(404);
   });
 });
+
+describe('the first read of a Page just connected', () => {
+  const now = new Date('2026-09-01T10:00:00Z');
+
+  it('reads only Pages not yet read, and marks them read', async () => {
+    // Nothing listens here: every call fails fast, as a refusal would.
+    process.env.FACEBOOK_GRAPH_BASE_URL = 'http://127.0.0.1:9';
+    const { target } = await seedWorkspace();
+
+    expect(await jobs.runFirstRead({ now, logger })).toBe('first read of 1 new Page(s)');
+    const after = await prisma.target.findUniqueOrThrow({ where: { id: target.id } });
+    expect(after.firstReadAt).toEqual(now);
+
+    expect(await jobs.runFirstRead({ now, logger })).toBeNull();
+  });
+
+  it('leaves a Page the call budget held back for a later pass', async () => {
+    process.env.FACEBOOK_GRAPH_BASE_URL = 'http://127.0.0.1:9';
+    const { noteObjectThrottled, resetBudget } = await import('../src/lib/facebook/budget');
+    const { target } = await seedWorkspace();
+    noteObjectThrottled('1000');
+    try {
+      expect(await jobs.runFirstRead({ now, logger })).toBeNull();
+      const after = await prisma.target.findUniqueOrThrow({ where: { id: target.id } });
+      expect(after.firstReadAt).toBeNull();
+    } finally {
+      resetBudget();
+    }
+  });
+});

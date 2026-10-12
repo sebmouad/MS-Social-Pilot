@@ -22,7 +22,7 @@ Read `docs/ai/DESIGN.md` first (tokens, component classes, UX rules). Then:
    No `@/lib/prisma` imports in client code.
 4. **Reuse components**: `Dialog`, `useConfirm()` (never `window.confirm`),
    `EmptyState`, `InfoTip`, `StatTile`, `KpiExplorer`, `charts/*`, `FeedPost`,
-   `TargetPicker`, `SplitButton`, `SyncButton`, `PageMenu`, `LabelChips`, `Icon`.
+   `TargetPicker`, `SplitButton`, `AutoSyncNote`, `PageMenu`, `LabelChips`, `Icon`.
 5. **States**: loading (`loading.tsx` skeletons), empty (what it is + why empty +
    one action), error (what happened + why + how to fix), success (say the
    result; clear it when the next task starts).

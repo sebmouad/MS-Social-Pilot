@@ -18,7 +18,7 @@ import { DateRangePicker } from '@/components/DateRangePicker';
 import { parseCompare, parseRange, rangeQuery } from '@/lib/date-range';
 import { PostAnalyticsTable, type PostRow } from '@/components/PostAnalyticsTable';
 import { StatTile } from '@/components/charts/StatTile';
-import { SyncButton } from '@/components/SyncButton';
+import { AutoSyncNote } from '@/components/AutoSyncNote';
 import { requirePage } from '@/lib/auth';
 import { targetScope } from '@/lib/page-access';
 import { listPageGroups } from '@/lib/page-groups';
@@ -32,7 +32,6 @@ import { Pagination } from '@/components/Pagination';
 import { pageHref, pageNumber, paginate } from '@/lib/paging';
 import { prisma } from '@/lib/prisma';
 import {
-  canRefreshAnalytics,
   readAvailability,
   readCoverage,
   readInteractions,
@@ -55,7 +54,6 @@ import { pageRatingsAvailable } from '@/lib/facebook/graph';
 import { ExternalLink } from '@/components/ExternalLink';
 import { FeedPost } from '@/components/FeedPost';
 import { EmptyState } from '@/components/EmptyState';
-import type { EdgeName } from '@/lib/engagement';
 import type { IconName } from '@/components/Icon';
 import { formatOfStatusType } from '@/lib/page-analysis';
 import { feedMediaOfPicture } from '@/lib/feed';
@@ -318,7 +316,7 @@ export default async function AnalyticsPage({
           workspaceId={auth.workspace.id}
           targetId={selected.id}
           timezone={timezone}
-          canSync={canModerateComments(auth.role)}
+          firstReadPending={!selected.firstReadAt}
         />
       )}
 
@@ -329,6 +327,7 @@ export default async function AnalyticsPage({
           timezone={timezone}
           canModerate={canModerateComments(auth.role)}
           canDelete={canDeleteComments(auth.role)}
+          firstReadPending={!selected.firstReadAt}
           params={params}
         />
       )}
@@ -338,7 +337,7 @@ export default async function AnalyticsPage({
           workspaceId={auth.workspace.id}
           targetId={selected.id}
           timezone={timezone}
-          canSync={canModerateComments(auth.role)}
+          firstReadPending={!selected.firstReadAt}
         />
       )}
 
@@ -348,13 +347,14 @@ export default async function AnalyticsPage({
           targetId={selected.id}
           timezone={timezone}
           canReply={canModerateComments(auth.role)}
+          firstReadPending={!selected.firstReadAt}
           params={params}
         />
       )}
 
       {view === 'external' && (
         <ExternalView
-          canSync={canModerateComments(auth.role)}
+          firstReadPending={!selected.firstReadAt}
           workspaceId={auth.workspace.id}
           targetId={selected.id}
           from={from}
@@ -379,7 +379,6 @@ export default async function AnalyticsPage({
           targetId={selected.id}
           targetName={selected.name}
           timeZone={timezone}
-          canSync={canRefreshAnalytics(auth.role)}
           series={overviewSeries}
           pinned={pinnedKeys}
           pinnable={overviewSeries.map((entry) => `${entry.metric}::${entry.period}`).filter(isPinnable)}
@@ -472,18 +471,18 @@ async function VideosView({
   workspaceId,
   targetId,
   timezone,
-  canSync,
+  firstReadPending,
 }: {
   workspaceId: string;
   targetId: string;
   timezone: string;
-  canSync: boolean;
+  firstReadPending: boolean;
 }) {
   const t = await getTranslations('engagement');
   const videos = await readVideos({ workspaceId, targetId });
 
   if (videos.length === 0) {
-    return <EmptyEdge icon="video" edge="videos" message={t('noVideos')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
+    return <EmptyEdge icon="video" message={t('noVideos')} firstReadPending={firstReadPending} />;
   }
 
   const seconds = (milliseconds: number | null) =>
@@ -509,7 +508,7 @@ async function VideosView({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('videosHint')}</p>
-        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId, edges: ['videos'] }} label={t('refresh')} />}
+        <AutoSyncNote job="edges" timezone={timezone} firstReadPending={firstReadPending} />
       </div>
 
       {/* Facebook's video tab: the still, its length on it, then the title
@@ -586,6 +585,7 @@ async function CommentsView({
   timezone,
   canModerate,
   canDelete,
+  firstReadPending,
   params,
 }: {
   workspaceId: string;
@@ -593,9 +593,11 @@ async function CommentsView({
   timezone: string;
   canModerate: boolean;
   canDelete: boolean;
+  firstReadPending: boolean;
   params: Record<string, string | string[] | undefined>;
 }) {
   const t = await getTranslations('engagement');
+  const tAuto = await getTranslations('autoSync');
 
   const search = (first(params.q) ?? '').trim();
   const shown = first(params.shown);
@@ -662,7 +664,8 @@ async function CommentsView({
       </form>
 
     <CommentsPanel
-      targetId={targetId}
+      note={<AutoSyncNote job="edges" timezone={timezone} firstReadPending={firstReadPending} />}
+      emptyHint={tAuto(firstReadPending ? 'firstRead' : 'emptyHint')}
       canModerate={canModerate}
       canDelete={canDelete}
       comments={comments.map((comment) => ({
@@ -691,12 +694,12 @@ async function ReviewsView({
   workspaceId,
   targetId,
   timezone,
-  canSync,
+  firstReadPending,
 }: {
   workspaceId: string;
   targetId: string;
   timezone: string;
-  canSync: boolean;
+  firstReadPending: boolean;
 }) {
   const t = await getTranslations('engagement');
   const summary = await readReviews({ workspaceId, targetId });
@@ -714,7 +717,7 @@ async function ReviewsView({
     return retired ? (
       retiredNotice
     ) : (
-      <EmptyEdge icon="star" edge="reviews" message={t('noReviews')} targetId={targetId} label={t('refresh')} canSync={canSync} />
+      <EmptyEdge icon="star" message={t('noReviews')} firstReadPending={firstReadPending} />
     );
   }
 
@@ -730,7 +733,7 @@ async function ReviewsView({
       {retired && retiredNotice}
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('reviewsHint')}</p>
-        {!retired && canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId, edges: ['reviews'] }} label={t('refresh')} />}
+        {!retired && <AutoSyncNote job="edges" timezone={timezone} firstReadPending={firstReadPending} />}
       </div>
 
       <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -771,18 +774,17 @@ async function InboxView({
   targetId,
   timezone,
   canReply,
+  firstReadPending,
   params,
 }: {
   workspaceId: string;
   targetId: string;
   timezone: string;
   canReply: boolean;
+  firstReadPending: boolean;
   params: Record<string, string | string[] | undefined>;
 }) {
   const t = await getTranslations('engagement');
-  // Replying and pulling are the same permission: both act on the Page's
-  // conversations on the workspace's behalf.
-  const canSync = canReply;
 
   // Paged like the comments, so a busy inbox is not cut off at its fiftieth thread.
   const page = paginate({
@@ -798,7 +800,7 @@ async function InboxView({
     if (!env.messagingEnabled) {
       return <EmptyState icon="inbox" title={t('inboxWaiting')} hint={t('inboxWaitingHint')} />;
     }
-    return <EmptyEdge icon="inbox" edge="conversations" message={t('noConversations')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
+    return <EmptyEdge icon="inbox" message={t('noConversations')} firstReadPending={firstReadPending} />;
   }
 
   const href = (next: number) => pageHref('/analytics', { ...params, view: 'inbox' }, next);
@@ -807,7 +809,7 @@ async function InboxView({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('inboxHint')}</p>
-        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId, edges: ['conversations'] }} label={t('refresh')} />}
+        <AutoSyncNote job="edges" timezone={timezone} firstReadPending={firstReadPending} />
       </div>
 
       <InboxPanel
@@ -846,14 +848,14 @@ async function ExternalView({
   from,
   to,
   timezone,
-  canSync,
+  firstReadPending,
 }: {
   workspaceId: string;
   targetId: string;
   from: Date;
   to: Date;
   timezone: string;
-  canSync: boolean;
+  firstReadPending: boolean;
 }) {
   const t = await getTranslations('engagement');
   const tFormat = await getTranslations('pageAnalysis');
@@ -861,14 +863,14 @@ async function ExternalView({
   const posts = await readExternalPosts({ workspaceId, targetId, from, to });
 
   if (posts.length === 0) {
-    return <EmptyEdge icon="posts" edge="externalPosts" message={t('noExternal')} targetId={targetId} label={t('refresh')} canSync={canSync} />;
+    return <EmptyEdge icon="posts" message={t('noExternal')} firstReadPending={firstReadPending} />;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-600">{t('externalHint')}</p>
-        {canSync && <SyncButton endpoint="/api/engagement/sync" body={{ targetId, edges: ['externalPosts'] }} label={t('refresh')} />}
+        <AutoSyncNote job="edges" timezone={timezone} firstReadPending={firstReadPending} />
       </div>
 
       <ul className="mx-auto max-w-[680px] space-y-3">
@@ -951,42 +953,18 @@ async function ExternalView({
   );
 }
 
-/** A "nothing here yet, pull it" placeholder shared by the edge views. */
+/** A "nothing here yet" placeholder shared by the edge views: the worker fills them. */
 async function EmptyEdge({
   message,
-  targetId,
-  label,
-  canSync,
   icon = 'inbox',
-  edge,
+  firstReadPending,
 }: {
   message: string;
   icon?: IconName;
-  /** The one thing to read from Facebook: what this empty screen would show. */
-  edge?: EdgeName;
-  targetId: string;
-  label: string;
-  /** The sync route refuses anyone who cannot moderate comments; so does the button. */
-  canSync: boolean;
+  firstReadPending: boolean;
 }) {
-  const t = await getTranslations('engagement');
-  return (
-    <EmptyState
-      icon={icon}
-      title={message}
-      hint={canSync ? t('emptyHint') : undefined}
-      action={
-        canSync ? (
-          <SyncButton
-            endpoint="/api/engagement/sync"
-            body={{ targetId, ...(edge ? { edges: [edge] } : {}) }}
-            label={label}
-            variant="primary"
-          />
-        ) : undefined
-      }
-    />
-  );
+  const t = await getTranslations('autoSync');
+  return <EmptyState icon={icon} title={message} hint={firstReadPending ? t('firstRead') : t('emptyHint')} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -1013,12 +991,7 @@ async function InstagramView({
     return (
       <div className="card flex flex-col items-center gap-3 p-8 text-center">
         <p className="text-sm text-slate-600">{t('none')}</p>
-        <SyncButton
-          endpoint="/api/instagram"
-          body={{ action: 'discover' }}
-          label={t('discover')}
-          variant="primary"
-        />
+        <AutoSyncNote job="instagram" timezone={timezone} />
       </div>
     );
   }
@@ -1044,15 +1017,6 @@ async function InstagramView({
             {selected.linkedPage ? t('via', { page: selected.linkedPage }) : t('unlinked')}
             {selected.lastSyncedAt && ` · ${formatInZone(selected.lastSyncedAt, timezone)}`}
           </p>
-        </div>
-        <div className="flex gap-2">
-          <SyncButton endpoint="/api/instagram" body={{ action: 'discover' }} label={t('discover')} />
-          <SyncButton
-            endpoint="/api/instagram"
-            body={{ action: 'sync', accountId: selected.id }}
-            label={t('sync')}
-            variant="primary"
-          />
         </div>
       </div>
 

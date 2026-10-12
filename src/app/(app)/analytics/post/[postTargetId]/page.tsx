@@ -78,11 +78,7 @@ export default async function PostMetricsPage({
         }
       />
 
-      <PostMetricExplorer
-        postTargetId={postTargetId}
-        external={external}
-        metrics={post.metrics}
-      />
+      <PostMetricExplorer metrics={post.metrics} />
     </div>
   );
 }

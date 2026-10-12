@@ -19,8 +19,9 @@ description: Build or change anything that calls the Facebook/Instagram Graph AP
    `src/lib/settings/definitions.ts` until Meta approves them (an unapproved scope
    breaks the whole login dialog). Describe them in `src/lib/facebook/permissions.ts`.
 5. Metrics: add to the catalogue `src/lib/facebook/metrics.ts` with the periods
-   Graph actually serves; probe live with the app's coverage tool
-   (Analytics → Overview → Technical details → Test coverage).
+   Graph actually serves; the worker's `firstRead` job probes every level for a
+   new Page (`probeAllLevels`), and Analytics → Overview → Technical details
+   shows the result.
 6. Check changes against Meta with the DevTools MCP: `devtools_api_changelog`,
    `devtools_api_usage`, and docs search (see the `search-meta-docs` skill).
 7. Tests: mock Graph with a local server + `FACEBOOK_GRAPH_BASE_URL` or

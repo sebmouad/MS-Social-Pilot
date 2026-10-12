@@ -22,7 +22,7 @@ invited) asks it to.
 4. **Publish:** Schedule → Compose. Tick the Page, write a message, optionally a
    first comment, choose "Publish now" or a time, press Publish/Schedule. The post
    appears on the Page; the first comment is added as the Page.
-5. **Comments:** Analytics → Comments. Pick the Page, press "Pull from Facebook".
+5. **Comments:** Analytics → Comments. Pick the Page; its comments are read by the worker on its own.
    Reply, hide or delete a comment; the change happens on Facebook.
 6. **Insights:** Analytics → Analysis / Overview / By post for the Page.
 
@@ -55,7 +55,7 @@ and shares, and the Page's follower count, so the person sees how each post did
 and can answer comments in one place. Data is shown only to the people in the
 person's workspace.
 **Screencast:** Analytics → By post (reactions, comments, shares per post) →
-Analytics → Comments → Pull from Facebook → comments listed under each post.
+Analytics → Comments → comments, read automatically, listed under each post.
 
 ### pages_manage_engagement
 **Use case:** From the Comments screen, the person can reply to a comment as the
@@ -91,8 +91,8 @@ show the reply in the Page's Messenger inbox on Facebook.
 **Use case:** Requested with pages_messaging so the app can read the Page's
 conversation list and keep it in step with Facebook. It does not change Page
 settings.
-**Screencast:** Same as pages_messaging: Pull from Facebook on the Inbox screen
-brings in the Page's conversations.
+**Screencast:** Same as pages_messaging: the Inbox screen shows the Page's
+conversations, read automatically by the worker.
 
 ### ads_read
 **Use case:** The Ads screen shows read-only results for the ad accounts the

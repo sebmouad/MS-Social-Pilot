@@ -85,7 +85,9 @@ afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
-beforeEach(() => {
+beforeEach(async () => {
+  // A test below has Facebook refuse the app; the next must not inherit it.
+  (await import('../src/lib/facebook/budget')).resetBudget();
   removed = new Set();
   requests = [];
   paths = [];

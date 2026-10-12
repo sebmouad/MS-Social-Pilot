@@ -110,7 +110,7 @@
     "syncNow": "Récupérer depuis Facebook",
     "synced": "{stored} valeurs enregistrées sur {metrics} indicateurs.",
     "syncFailed": "Impossible de lire les statistiques depuis Facebook.",
-    "noData": "Rien n'a encore été collecté. Récupérez les données depuis Facebook.",
+    "noData": "Rien n’a encore été collecté.",
     "filterPlaceholder": "Filtrer les indicateurs…",
     "metricsShown": "{count, plural, one {# indicateur} other {# indicateurs}}",
     "fans": "Mentions J'aime",
@@ -2667,5 +2667,11 @@
     "edit": "Modifier dans Vue d’ensemble",
     "upTo": "jusqu’à {value}",
     "uniqueNote": "{count, plural, one {Compte des personnes.} other {Somme sur # profils : une personne touchée par plusieurs est comptée une fois par profil, le nombre réel est donc au plus celui-ci.}}"
+  },
+  "autoSync": {
+    "updated": "Récupéré automatiquement depuis Facebook. Dernière lecture {when}.",
+    "pending": "Récupéré automatiquement depuis Facebook. La première lecture n’a pas encore eu lieu.",
+    "firstRead": "Cette Page vient d’être connectée. Sa première lecture depuis Facebook a lieu d’ici quelques minutes.",
+    "emptyHint": "Ils sont récupérés automatiquement depuis Facebook toutes les quelques heures."
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
@@ -39,14 +39,17 @@ export interface CommentView {
  */
 export function CommentsPanel({
   comments,
-  targetId,
   canModerate,
   canDelete,
+  note,
+  emptyHint,
 }: {
   comments: CommentView[];
-  targetId: string;
   canModerate: boolean;
   canDelete: boolean;
+  /** When the worker last read the comments: they are not pulled from here. */
+  note: ReactNode;
+  emptyHint: string;
 }) {
   const t = useTranslations('engagement');
   const tCommon = useTranslations('common');
@@ -57,7 +60,6 @@ export function CommentsPanel({
   const [error, setError] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
-  const [syncing, setSyncing] = useState(false);
 
   /**
    * POST and report, the one way both actions talk to the server.
@@ -101,26 +103,11 @@ export function CommentsPanel({
     }
   }
 
-  async function sync() {
-    setSyncing(true);
-    setError(null);
-    try {
-      if (await post('/api/engagement/sync', { targetId, edges: ['comments'] })) router.refresh();
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="min-w-0 flex-1 text-sm text-slate-600">{t('commentsHint')}</p>
-        {/* Editors and above, the same rule the sync route enforces. */}
-        {canModerate && (
-          <button type="button" className="btn-secondary" onClick={sync} disabled={syncing}>
-            {syncing ? tCommon('working') : t('refresh')}
-          </button>
-        )}
+        {note}
       </div>
 
       {error && (
@@ -130,7 +117,7 @@ export function CommentsPanel({
       )}
 
       {comments.length === 0 ? (
-        <EmptyState icon="comment" title={t('noComments')} hint={canModerate ? t('emptyHint') : undefined} />
+        <EmptyState icon="comment" title={t('noComments')} hint={emptyHint} />
       ) : (
         // Facebook's comment threads: the person's initial, their words in a
         // grey bubble, and the small actions under it. Grouped by post, the

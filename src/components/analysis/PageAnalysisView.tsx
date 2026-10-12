@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
 
-import { AnalyseButton } from './AnalyseButton';
 import { CadenceChart } from './CadenceChart';
 import { TimeHeatmap } from './TimeHeatmap';
 import { ChartFrame } from '@/components/charts/ChartFrame';
@@ -264,7 +263,6 @@ export async function PageAnalysisView({
               : t('neverRefreshed')}
           </p>
         </div>
-        <AnalyseButton targetId={targetId} days={days} />
       </div>
 
       {empty ? (

@@ -120,7 +120,9 @@ best, the strongest and weakest posts, and a short list of findings in plain
 sentences. It reads every post on the Page, not only those published from here,
 and compares the Page with itself rather than with benchmarks nobody can check.
 **Compare pages** puts every Page in a workspace side by side on the same
-figures. **Analyse now** re-reads the Page from Facebook on demand.
+figures. There is nothing to press to refresh: the worker reads every Page from
+Facebook on its own, a newly connected Page within minutes, and stays inside
+Meta's call limits for the app and for each Page.
 
 ![Page analysis: health score, findings, period comparison, cadence, formats and the best-time grid](docs/images/analysis.png)
 

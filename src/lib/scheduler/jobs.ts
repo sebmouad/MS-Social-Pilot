@@ -7,7 +7,8 @@ import { notifyTokenExpiring } from '../email/notify';
 import { runEvergreenCycle } from '../evergreen';
 import { pollDueSources } from '../rss/poll';
 import { refreshPostStatus, runSchedulerTick } from './runner';
-import { syncPostInsights, syncWorkspaceAnalytics } from '../analytics';
+import { probeAllLevels, syncPostInsights, syncTargetAnalytics, syncWorkspaceAnalytics } from '../analytics';
+import { syncAccountTargets } from '../accounts';
 import { syncTargetEdges } from '../engagement';
 import { discoverInstagramAccounts, syncWorkspaceInstagram } from '../instagram';
 import { discoverAdAccounts, syncWorkspaceAds } from '../ads';
@@ -37,6 +38,8 @@ export type JobName =
   | 'analytics'
   | 'pageInsights'
   | 'edges'
+  | 'firstRead'
+  | 'accounts'
   | 'instagram'
   | 'ads'
   | 'housekeeping'
@@ -377,6 +380,75 @@ export async function runEdgeSync(context: JobContext): Promise<string | null> {
   return `comments=${comments} reviews=${reviews} threads=${conversations} external=${external} failed=${failed}`;
 }
 
+/** How many new Pages one `firstRead` pass reads, so a big connect is spread out. */
+const FIRST_READ_BATCH = 2;
+
+/**
+ * Read a Page just connected — its insights, its edges and which metrics it
+ * serves — within minutes,
+ * so its screens fill without anyone pressing a button. A Page refused for
+ * the call budget stays unread and is taken again on a later pass; any other
+ * outcome marks it read, and the regular jobs carry on from there.
+ */
+export async function runFirstRead(context: JobContext): Promise<string | null> {
+  const targets = await prisma.target.findMany({
+    where: { type: 'page', enabled: true, firstReadAt: null, accessToken: { not: null } },
+    orderBy: { createdAt: 'asc' },
+    take: FIRST_READ_BATCH,
+    select: { id: true, name: true },
+  });
+  if (targets.length === 0) return null;
+
+  let read = 0;
+  for (const target of targets) {
+    const analytics = await syncTargetAnalytics({
+      targetId: target.id,
+      since: new Date(context.now.getTime() - 28 * 24 * 60 * 60 * 1000),
+      until: context.now,
+    });
+    const edges = await syncTargetEdges({ targetId: target.id, now: context.now });
+    // Which metrics Facebook serves this Page, once: what the "check every
+    // metric" button asked for.
+    const probe = await probeAllLevels(target.id)
+      .then(() => null)
+      .catch((error: unknown) => asGraphError(error).displayMessage);
+    const errors = [analytics.error, probe, ...edges.errors.map((error) => error.message)].filter(
+      (message): message is string => Boolean(message),
+    );
+    for (const message of errors) context.logger(`${target.name}: ${message}`);
+    // Only the budget's own refusal leaves it for later; it says "Not read".
+    if (errors.some((message) => message.startsWith('Not read from Facebook'))) continue;
+    await prisma.target.update({ where: { id: target.id }, data: { firstReadAt: context.now } });
+    read += 1;
+  }
+  return read > 0 ? `first read of ${read} new Page(s)` : null;
+}
+
+/**
+ * Re-read each Facebook account's Pages and Groups once a day: names,
+ * pictures, page tokens, a Page added or a role removed on Facebook. What a
+ * "re-read Pages" button did, without the button.
+ */
+export async function runAccountRefresh(context: JobContext): Promise<string | null> {
+  const accounts = await prisma.socialAccount.findMany({
+    where: { provider: 'facebook', invalidatedAt: null },
+    select: { id: true, name: true },
+  });
+  let refreshed = 0;
+  let failed = 0;
+  for (const account of accounts) {
+    try {
+      await syncAccountTargets(account.id);
+      refreshed += 1;
+    } catch (error) {
+      failed += 1;
+      context.logger(`${account.name}: ${asGraphError(error).displayMessage}`);
+    }
+  }
+  if (refreshed + failed === 0) return null;
+  return `accounts refreshed=${refreshed} failed=${failed}`;
+}
+
 /**
  * Discover and refresh Instagram Business accounts.
  *
@@ -553,6 +625,17 @@ export function jobDefinitions(): JobDefinition[] {
       name: 'edges',
       intervalMs: env.edgeSyncHours * 60 * 60 * 1000,
       run: withinBudget(runEdgeSync),
+    },
+    {
+      // Cheap when there is nothing new: one database read.
+      name: 'firstRead',
+      intervalMs: 2 * 60 * 1000,
+      run: withinBudget(runFirstRead),
+    },
+    {
+      name: 'accounts',
+      intervalMs: 24 * 60 * 60 * 1000,
+      run: withinBudget(runAccountRefresh),
     },
     // Instagram and Ads need permissions Meta reviews separately. Running them
     // unapproved would spend the rate limit on a permission error every pass,

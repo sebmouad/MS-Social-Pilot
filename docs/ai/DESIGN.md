@@ -29,8 +29,8 @@ always the left sidebar (`src/components/AppShell.tsx`).
   its card), `StatTile`, `KpiExplorer`, `charts/*` (TimeSeries, BarList,
   WorldMap, ChartFrame with table view), `FeedPost` (Facebook post card),
   `PostPreview`, `FeedAvatar`, `LabelChips`, `PagesSidebar`, `PageMenu`,
-  `TargetPicker`, `SplitButton`, `DateRangePicker`, `SyncButton` (reports
-  outcome), `DismissibleCard`.
+  `TargetPicker`, `SplitButton`, `DateRangePicker`, `AutoSyncNote` (when
+  the worker last read Facebook; there are no pull buttons), `DismissibleCard`.
 - Icons: `Icon.tsx` (inline SVG paths, `name` union). Add new names there.
 
 ## UX rules learned from real use
