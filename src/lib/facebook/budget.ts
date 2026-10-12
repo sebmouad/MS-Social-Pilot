@@ -42,6 +42,12 @@ const objects = new Map<string, ObjectUsage>();
 
 /** Calls made, per minute, over the last hour: what this process actually spent. */
 const callMinutes = new Map<number, number>();
+/**
+ * The same calls by who they were about and which worker job made them
+ * (NEXT_PHASES H16), keyed `minute|object|job`; empty object or job means
+ * none could be told.
+ */
+const callSources = new Map<string, number>();
 
 /**
  * Above this share used, reads that can wait are refused here, before they
@@ -132,11 +138,32 @@ export function noteObjectThrottled(id: string, now: number = Date.now()): void 
   objects.set(id, { percent: 100, at: now, blockedUntil });
 }
 
-/** Count one call made by this process. */
-export function noteCall(now: number = Date.now()): void {
+/** Count one call made by this process, with the object it was about and the job making it, when known. */
+export function noteCall(now: number = Date.now(), source: { object?: string | null; job?: string | null } = {}): void {
   const minute = Math.floor(now / 60_000);
   callMinutes.set(minute, (callMinutes.get(minute) ?? 0) + 1);
   for (const key of callMinutes.keys()) if (key <= minute - 60) callMinutes.delete(key);
+  const key = `${minute}|${source.object ?? ''}|${source.job ?? ''}`;
+  callSources.set(key, (callSources.get(key) ?? 0) + 1);
+  for (const old of callSources.keys()) if (Number(old.split('|')[0]) <= minute - 60) callSources.delete(old);
+}
+
+/** Calls in the last hour per object and per job, busiest first. */
+export function callsBySource(now: number = Date.now()): { objects: Array<{ id: string; calls: number }>; jobs: Array<{ name: string; calls: number }> } {
+  const minute = Math.floor(now / 60_000);
+  const objectCalls = new Map<string, number>();
+  const jobCalls = new Map<string, number>();
+  for (const [key, count] of callSources) {
+    const [at, object, job] = key.split('|');
+    if (Number(at) <= minute - 60) continue;
+    if (object) objectCalls.set(object, (objectCalls.get(object) ?? 0) + count);
+    jobCalls.set(job ?? '', (jobCalls.get(job ?? '') ?? 0) + count);
+  }
+  const sorted = <T extends { calls: number }>(rows: T[]) => rows.sort((a, b) => b.calls - a.calls);
+  return {
+    objects: sorted([...objectCalls].map(([id, calls]) => ({ id, calls }))),
+    jobs: sorted([...jobCalls].map(([name, calls]) => ({ name, calls }))),
+  };
 }
 
 /** Calls this process made in the last hour. */
@@ -202,6 +229,8 @@ export function readBudget(path: string, now: number = Date.now()): BudgetVerdic
 export interface BudgetSnapshot {
   app: { percent: number | null; throttledUntil: number | null; callsLastHour: number; at: number };
   objects: Array<{ id: string; percent: number; at: number; blockedUntil: number | null }>;
+  /** Calls in the last hour per object and per job (H16); absent in snapshots saved before. */
+  calls?: ReturnType<typeof callsBySource>;
 }
 
 export function budgetSnapshot(now: number = Date.now()): BudgetSnapshot {
@@ -216,6 +245,7 @@ export function budgetSnapshot(now: number = Date.now()): BudgetSnapshot {
     objects: [...objects]
       .filter(([, entry]) => now - entry.at < HOLD_MS || (entry.blockedUntil ?? 0) > now)
       .map(([id, entry]) => ({ id, ...entry })),
+    calls: callsBySource(now),
   };
 }
 
@@ -244,5 +274,6 @@ export function resetBudget(): void {
   throttledAt = null;
   objects.clear();
   callMinutes.clear();
+  callSources.clear();
   readCeiling = DEFAULT_READ_CEILING;
 }

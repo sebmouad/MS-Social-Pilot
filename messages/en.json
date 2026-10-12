@@ -2792,7 +2792,12 @@
         "exports": "Workspace exports",
         "holidays": "Public holidays",
         "contentMix": "Content mix"
-      }
+      },
+      "heaviestObjects": "Heaviest Pages and accounts, last hour",
+      "heaviestJobs": "Calls by job, last hour",
+      "job": "Job",
+      "calls": "Calls",
+      "otherCalls": "Outside a job"
     },
     "sessions": {
       "title": "Sessions",

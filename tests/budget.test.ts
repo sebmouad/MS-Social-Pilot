@@ -7,6 +7,7 @@ import {
   THROTTLE_COOLDOWN_MS,
   backgroundBudget,
   budgetSnapshot,
+  callsBySource,
   callsLastHour,
   noteAppUsage,
   noteCall,
@@ -256,5 +257,29 @@ describe('the background jobs', () => {
       expect(deferred).toBeGreaterThan(0);
       expect(deferred).toBeLessThan(job.intervalMs);
     }
+  });
+});
+
+describe('calls by source (H16)', () => {
+  beforeEach(() => resetBudget());
+
+  it('counts the last hour per object and per job, busiest first', async () => {
+    const { runAsJob, currentJob } = await import('../src/lib/facebook/call-source');
+    const now = Date.UTC(2026, 9, 12, 12, 0);
+    noteCall(now - 2 * 60 * 60 * 1000, { object: '111', job: 'analytics' });
+    noteCall(now - 60_000, { object: '111', job: 'analytics' });
+    noteCall(now - 30_000, { object: '111', job: 'edges' });
+    noteCall(now, { object: '222', job: 'analytics' });
+    noteCall(now, {});
+    await runAsJob('publish', async () => {
+      await Promise.resolve();
+      expect(currentJob()).toBe('publish');
+    });
+    expect(currentJob()).toBeNull();
+
+    const calls = callsBySource(now);
+    expect(calls.objects).toEqual([{ id: '111', calls: 2 }, { id: '222', calls: 1 }]);
+    expect(calls.jobs).toEqual([{ name: 'analytics', calls: 2 }, { name: 'edges', calls: 1 }, { name: '', calls: 1 }]);
+    expect(budgetSnapshot(now).calls).toEqual(calls);
   });
 });

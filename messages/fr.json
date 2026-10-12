@@ -2792,7 +2792,12 @@
         "exports": "Exports d’espace",
         "holidays": "Jours fériés",
         "contentMix": "Mix de contenu"
-      }
+      },
+      "heaviestObjects": "Pages et comptes les plus sollicités, dernière heure",
+      "heaviestJobs": "Appels par tâche, dernière heure",
+      "job": "Tâche",
+      "calls": "Appels",
+      "otherCalls": "Hors tâche"
     },
     "sessions": {
       "title": "Sessions",

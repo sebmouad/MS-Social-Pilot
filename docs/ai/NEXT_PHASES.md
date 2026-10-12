@@ -803,9 +803,14 @@ setup from Phase 0.2 (marked AI).
 - **H15. Negative-comment alert (M, AI)** — sentiment on new comments (batch,
   cheap model); alert when negative share or volume spikes vs the Page's
   baseline; links to the comments; respects G7 rules.
-- **H16. Meta API usage per Page (S)** — record call counts and the
+- **H16. Meta API usage per Page (S)** ✅ — record call counts and the
   `x-app-usage` / `x-business-use-case-usage` headers per Page (budget.ts
   already reads them); root view with the heaviest Pages and jobs.
+  *Done 2026-10-12: every Graph call is counted by the object it is about
+  and the worker job making it (`call-source.ts`, AsyncLocalStorage); the
+  worker saves the last hour with its usage snapshot, and Root › Worker
+  lists the heaviest Pages and jobs. Calls made by the web app are counted
+  in that process only and are not shown.*
 - **H17. Earnings tracking (M, check first)** — verify which monetisation
   metrics the Graph API still returns for these Pages (META_API_NOTES, the
   `search-meta-docs` skill); build only what is available; otherwise document

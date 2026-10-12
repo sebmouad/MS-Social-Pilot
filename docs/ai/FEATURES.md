@@ -155,7 +155,8 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
 ## Root — `/root/*`
 Overview, Status (app, database, worker, last publish, last off-site backup,
 90-day uptime bars), Configuration, Workspaces, Users, Sessions, Registration,
-Privileges, Worker (jobs and Meta usage), Errors (server, worker and browser
+Privileges, Worker (jobs and Meta usage: app share, per-Page share, and
+the last hour's calls per Page and per job, H16), Errors (server, worker and browser
 errors grouped, scrubbed, with release; mark resolved), Alerts, Backups, Activity, Danger zone.
 
 ## Background (worker, `src/lib/scheduler/jobs.ts`)

@@ -59,7 +59,9 @@ export default async function RootWorkerPage() {
 
   const app = saved?.snapshot.app;
   const objects = (saved?.snapshot.objects ?? []).sort((a, b) => b.percent - a.percent);
-  const ids = objects.map((object) => object.id);
+  const calls = saved?.snapshot.calls ?? { objects: [], jobs: [] };
+  const heaviest = calls.objects.slice(0, 15);
+  const ids = [...new Set([...objects.map((object) => object.id), ...heaviest.map((object) => object.id)])];
   const [targets, adAccounts, instagram] = ids.length
     ? await Promise.all([
         prisma.target.findMany({ where: { providerId: { in: ids } }, select: { providerId: true, name: true } }),
@@ -166,6 +168,49 @@ export default async function RootWorkerPage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {(heaviest.length > 0 || calls.jobs.length > 0) && (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="scroll-x">
+                  <table className="w-full text-start text-sm">
+                    <caption className="pb-1 text-start text-xs font-semibold text-slate-700">{t('heaviestObjects')}</caption>
+                    <thead className="text-xs text-slate-500">
+                      <tr>
+                        <th scope="col" className="py-1.5 pe-3 font-medium">{t('object')}</th>
+                        <th scope="col" className="py-1.5 font-medium">{t('calls')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {heaviest.map((object) => (
+                        <tr key={object.id}>
+                          <td className="py-1.5 pe-3 text-slate-900">{names.get(object.id) ?? <span className="font-mono text-xs">{object.id}</span>}</td>
+                          <td className="nums py-1.5">{format.number(object.calls)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="scroll-x">
+                  <table className="w-full text-start text-sm">
+                    <caption className="pb-1 text-start text-xs font-semibold text-slate-700">{t('heaviestJobs')}</caption>
+                    <thead className="text-xs text-slate-500">
+                      <tr>
+                        <th scope="col" className="py-1.5 pe-3 font-medium">{t('job')}</th>
+                        <th scope="col" className="py-1.5 font-medium">{t('calls')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {calls.jobs.map((job) => (
+                        <tr key={job.name || 'other'}>
+                          <td className="py-1.5 pe-3 text-slate-900">{job.name ? (t.has(`jobs.${job.name}`) ? t(`jobs.${job.name}`) : job.name) : t('otherCalls')}</td>
+                          <td className="nums py-1.5">{format.number(job.calls)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </>

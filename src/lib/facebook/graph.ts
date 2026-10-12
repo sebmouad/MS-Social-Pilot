@@ -1,5 +1,6 @@
 import { env } from '../env';
 import { hmacHex } from '../crypto';
+import { currentJob } from './call-source';
 import { noteAppUsage, noteCall, noteObjectThrottled, noteObjectUsage, noteThrottled, pathObjectId, readBudget } from './budget';
 
 /**
@@ -276,7 +277,7 @@ export async function graphRequest<T = unknown>(
   init.headers = headers;
 
   let response: Response;
-  noteCall();
+  noteCall(Date.now(), { object: pathObjectId(path), job: currentJob() });
   try {
     response = await withTimeout(
       (signal) => fetch(url, { ...init, signal: options.signal ?? signal }),
@@ -400,7 +401,7 @@ export async function graphUpload<T = unknown>(
   );
 
   let response: Response;
-  noteCall();
+  noteCall(Date.now(), { object: pathObjectId(path), job: currentJob() });
   try {
     response = await withTimeout(
       (signal) => fetch(url, { method: 'POST', body: form, signal: options.signal ?? signal }),
@@ -507,7 +508,7 @@ export async function graphResumableUpload(
   }
 
   let response: Response;
-  noteCall();
+  noteCall(Date.now(), { job: currentJob() });
   try {
     response = await withTimeout(
       (signal) => fetch(uploadUrl, { method: 'POST', headers, body, signal }),

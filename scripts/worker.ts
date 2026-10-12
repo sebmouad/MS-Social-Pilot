@@ -14,6 +14,7 @@
 
 import { BACKGROUND_USAGE_CEILING, setReadCeiling } from '../src/lib/facebook/budget';
 import { restoreSavedBudget, saveBudget } from '../src/lib/facebook/budget-store';
+import { runAsJob } from '../src/lib/facebook/call-source';
 import { recordError } from '../src/lib/error-tracking';
 import { prisma } from '../src/lib/prisma';
 import { jobDefinitions, type JobDefinition } from '../src/lib/scheduler/jobs';
@@ -144,7 +145,7 @@ async function main(): Promise<void> {
     for (const job of dueJobs(jobs, state, Date.now())) {
       markStarted(state, job);
 
-      const running = runJob(job).then(async (outcome) => {
+      const running = runAsJob(job.name, () => runJob(job)).then(async (outcome) => {
         // Scheduled from the finish, so a job that overruns its interval
         // settles into a longer cycle rather than running back to back.
         const finished = Date.now();
