@@ -193,6 +193,15 @@ test('a person picks the Warm look, it follows them, and Facebook comes back', a
   const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   expect(background).toBe('rgb(245, 241, 232)');
 
+  // Dark turns the cards dark while white text stays white.
+  const dark = await page.request.patch('/api/account', { data: { theme: 'dark' } });
+  expect(dark.status(), await dark.text()).toBe(200);
+  await open(page, '/dashboard');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(24, 25, 26)');
+  const button = page.getByRole('link', { name: /new post/i }).first();
+  await expect(button).toHaveCSS('color', 'rgb(255, 255, 255)');
+
   // Back to the default, so the other walks see the usual look.
   const reset = await page.request.patch('/api/account', { data: { theme: 'facebook' } });
   expect(reset.status(), await reset.text()).toBe(200);

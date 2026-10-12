@@ -22,6 +22,7 @@ interface Props {
 const THEME_SWATCHES: Record<Theme, string[]> = {
   facebook: ['#ffffff', '#f0f2f5', '#1877f2'],
   warm: ['#2b241c', '#f5f1e8', '#b45309'],
+  dark: ['#18191a', '#242526', '#2d88ff'],
 };
 
 /** One status line under a section, so each form reports on itself. */
@@ -176,7 +177,7 @@ export function AccountClient({ initial, locales }: Props) {
           </div>
           <fieldset className="sm:col-span-2">
             <legend className="label">{t('theme')}</legend>
-            <div className="mt-1 grid gap-3 sm:grid-cols-2">
+            <div className="mt-1 grid gap-3 sm:grid-cols-3">
               {THEMES.map((option) => (
                 <label
                   key={option}

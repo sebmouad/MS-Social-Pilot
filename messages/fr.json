@@ -30,11 +30,13 @@
     "theme": "Apparence",
     "themes": {
       "facebook": "Facebook",
-      "warm": "Chaleureuse"
+      "warm": "Chaleureuse",
+      "dark": "Sombre"
     },
     "themeHints": {
       "facebook": "Accent bleu sur les gris de Facebook, par défaut.",
-      "warm": "Barre latérale crème, accent ambre, rail d’icônes sombre."
+      "warm": "Barre latérale crème, accent ambre, rail d’icônes sombre.",
+      "dark": "Gris foncés, plus doux pour les yeux le soir."
     }
   },
   "accounts": {

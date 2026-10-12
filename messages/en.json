@@ -30,11 +30,13 @@
     "theme": "Look",
     "themes": {
       "facebook": "Facebook",
-      "warm": "Warm"
+      "warm": "Warm",
+      "dark": "Dark"
     },
     "themeHints": {
       "facebook": "Blue accent on Facebook’s greys, the default.",
-      "warm": "Cream sidebar, amber accent, dark icon rail."
+      "warm": "Cream sidebar, amber accent, dark icon rail.",
+      "dark": "Dark greys, easier on the eyes at night."
     }
   },
   "accounts": {

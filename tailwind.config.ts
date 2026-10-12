@@ -31,7 +31,16 @@ const config: Config = {
       colors: {
         brand: themed('brand'),
         slate: themed('slate'),
+        red: themed('red'),
+        emerald: themed('emerald'),
+        amber: themed('amber'),
+        rose: themed('rose'),
+        violet: themed('violet'),
       },
+      // White surfaces follow the theme; white text and icons stay white.
+      backgroundColor: { white: 'rgb(var(--surface) / <alpha-value>)' },
+      borderColor: { white: 'rgb(var(--surface) / <alpha-value>)' },
+      ringColor: { white: 'rgb(var(--surface) / <alpha-value>)' },
       fontFamily: {
         // Facebook's own stack: the platform's UI face on each system.
         sans: [

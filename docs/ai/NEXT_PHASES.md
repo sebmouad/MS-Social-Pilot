@@ -399,7 +399,7 @@ Skills: `frontend-design`, `design:design-critique`,
 `design:accessibility-review`.
 - Critique every signed-in screen at 1440 px and 375 px against Simplified
   screens; fix hierarchy, spacing, empty states. Record results in `DESIGN.md`.
-- Tokens: add elevation and spacing scale, dark mode (tokens are in
+- Tokens: add elevation and spacing scale, dark mode ✅ (tokens are in
   `tailwind.config.ts`).
 - ✅ Connections page: tabs or anchor chips (2026-10-12: "Jump to" chips —
   Health, Facebook, Instagram, Ad accounts, Other networks, Meta app settings).
@@ -423,7 +423,7 @@ out" below); don't propose it again unless the owner asks.
   `screens/20`, `CRAWL-2026-10-11.md` § Visual note, README §2. Update
   `AppShell.tsx`; phone: rail + sidebar become one drawer.
 - ✅ built 2026-10-12, Facebook is the default; **owner to confirm the
-  default** (dark mode still to do on the same variables).
+  default**. Dark theme built on the same variables (2026-10-12).
   **Warm light theme (cream + amber), as a selectable theme.** Add theme tokens
   in `tailwind.config.ts`/`globals.css` (CSS variables) with two themes:
   *Facebook* (blue `#1877f2`, today's look, default) and *Warm* (cream

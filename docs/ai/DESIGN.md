@@ -13,7 +13,9 @@ always the left sidebar (`src/components/AppShell.tsx`).
   per theme in `globals.css` and switched by `<html data-theme>` (the user's
   pick, `src/lib/themes.ts`, Settings → Account). *Facebook* (default) and
   *Warm* (cream page and sidebar, amber accent at AA-safe steps, dark icon
-  rail). Shell colours: `.rail`, `.rail-item`, `.shell-sidebar`. Never write
+  rail) and *Dark* (Facebook's dark greys; `bg-white`/`border-white`/`ring-white`
+  read `--surface` while `text-white` stays white; red, emerald, amber, rose and
+  violet are themed too, their pale and dark ends swapped, middle fills kept). Shell colours: `.rail`, `.rail-item`, `.shell-sidebar`. Never write
   raw hex for brand or greys in components, or the theme cannot reach it.
 - Font: the system UI stack (Facebook's). Sizes: page title `text-xl sm:text-2xl
   font-semibold`, section title `text-[15px]/[17px] font-bold`, body `text-sm` /
