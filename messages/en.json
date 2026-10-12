@@ -2070,7 +2070,9 @@
     "confirmTitle_clearDrafts": "Delete {page}’s drafts?",
     "confirmHint_shuffle": "The same times stay booked; the posts are dealt out among them in a new order.",
     "confirmHint_clear": "Every upcoming post sent from here goes back to drafts. Nothing is deleted; posts Facebook holds or that wait for review keep their place.",
-    "confirmHint_clearDrafts": "Drafts written for this Page only are deleted for good. Drafts shared with other Pages are kept."
+    "confirmHint_clearDrafts": "Drafts written for this Page only are deleted for good. Drafts shared with other Pages are kept.",
+    "collapse": "Fold the Pages column",
+    "expand": "Open the Pages column"
   },
   "labels": {
     "allLabels": "All labels",

@@ -121,6 +121,23 @@ test('two profiles add up on All profiles, and the selection follows to Posts an
   expect(failures).toEqual([]);
 });
 
+test('the Pages column folds to a rail of pictures and stays folded', async ({ page }) => {
+  const failures = collectFailures(page);
+  await open(page, '/calendar');
+  const column = page.getByRole('complementary', { name: 'Pages' });
+  await column.getByRole('button', { name: 'Fold the Pages column' }).click();
+  await expect(column.getByRole('button', { name: `Hide ${SECOND_PAGE}` })).toBeHidden();
+
+  // Clicking a picture shows that Page alone, as the open column does.
+  await column.getByRole('button', { name: `Show ${SECOND_PAGE} only` }).click();
+  await expect(page).toHaveURL(new RegExp(`pages=${secondId}`));
+
+  await page.reload();
+  await column.getByRole('button', { name: 'Open the Pages column' }).click();
+  await expect(column.getByRole('button', { name: `Hide ${SECOND_PAGE}` })).toBeVisible();
+  expect(failures).toEqual([]);
+});
+
 test('the comparison draws a line per profile that the legend hides and shows', async ({ page }) => {
   const failures = collectFailures(page);
 

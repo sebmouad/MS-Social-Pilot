@@ -323,7 +323,9 @@ preview already shows the first comment and post cards a status per
 destination. E2e for drag and bulk is due at the next browser checkpoint.
 - Calendar: profile colour dots on chips, filter by status (planned / posted /
   failed / draft / review) as pills next to the bar, drag-and-drop rescheduling,
-  collapse the Pages column (ROADMAP UX backlog), day hover actions (ref 40).
+  collapse the Pages column (ROADMAP UX backlog) — **done 2026-10-12**: folds to
+  a rail of pictures on wide screens (click = that Page alone), remembered per
+  browser —, day hover actions (ref 40).
 - Posts: list / feed / grid share one toolbar; bulk select → reschedule, label,
   delete (with `useConfirm` and counts).
 - Per-network status chips on post cards.

@@ -42,6 +42,8 @@ interface Props {
  *
  * On a phone the column folds into one line above the screen it filters.
  */
+const FOLD_KEY = 'msp_pages_column_folded';
+
 export function PagesSidebar({ pages, groups, group, visible, canManageGroups, inline = false, canManageQueue = false, workspaceId }: Props) {
   const t = useTranslations('pagesSidebar');
   const router = useRouter();
@@ -50,6 +52,23 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  // Folded to a rail of pictures on wide screens, remembered in this browser.
+  const [folded, setFolded] = useState(false);
+  useEffect(() => {
+    try {
+      setFolded(localStorage.getItem(FOLD_KEY) === '1');
+    } catch {
+      // Storage blocked: the column simply starts open.
+    }
+  }, []);
+  function fold(next: boolean) {
+    setFolded(next);
+    try {
+      localStorage.setItem(FOLD_KEY, next ? '1' : '0');
+    } catch {
+      // Remembering is a convenience only.
+    }
+  }
 
   const activeGroup = groups.find((entry) => entry.id === group) ?? null;
   const universe = useMemo(
@@ -244,10 +263,13 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
     </div>
   );
 
+  const collapsible = !inline;
+  const isFolded = collapsible && folded;
+
   return (
     <aside
       aria-label={t('label')}
-      className={`min-w-0 ${inline ? '' : 'lg:sticky lg:top-6 lg:w-[264px] lg:shrink-0 lg:self-start'}`}
+      className={`min-w-0 ${inline ? '' : `lg:sticky lg:top-6 lg:shrink-0 lg:self-start ${isFolded ? 'lg:w-14' : 'lg:w-[264px]'}`}`}
     >
       {/* One line on a phone, opened when wanted. */}
       <details className="card group/details p-0 lg:hidden">
@@ -260,7 +282,58 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
         </summary>
         <div className="border-t border-slate-200 p-3">{body}</div>
       </details>
-      <div className="card hidden p-3 lg:block">{body}</div>
+      {isFolded ? (
+        <div className="card hidden flex-col items-center gap-1 px-1.5 py-2 lg:flex">
+          <button
+            type="button"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
+            aria-expanded={false}
+            aria-label={t('expand')}
+            title={t('expand')}
+            onClick={() => fold(false)}
+          >
+            <Icon name="chevronRight" size={18} />
+          </button>
+          <ul className="max-h-[60vh] space-y-1 overflow-y-auto">
+            {universe.map((page) => {
+              const on = shown.has(page.id);
+              const alone = on && shownCount === 1;
+              return (
+                <li key={page.id}>
+                  <button
+                    type="button"
+                    className={`rounded-full p-0.5 ${alone ? 'ring-2 ring-brand-500' : ''} ${on ? '' : 'opacity-45'}`}
+                    title={alone ? t('showOthers') : t('onlyThis', { page: page.name })}
+                    aria-label={alone ? t('showOthers') : t('onlyThis', { page: page.name })}
+                    aria-pressed={alone}
+                    onClick={() => solo(page.id)}
+                  >
+                    <FeedAvatar name={page.name} pictureUrl={page.pictureUrl} size="sm" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : (
+        <div className="card hidden p-3 lg:block">
+          {collapsible && (
+            <div className="-mt-1 mb-1 flex justify-end">
+              <button
+                type="button"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
+                aria-expanded
+                aria-label={t('collapse')}
+                title={t('collapse')}
+                onClick={() => fold(true)}
+              >
+                <Icon name="chevronLeft" size={17} />
+              </button>
+            </div>
+          )}
+          {body}
+        </div>
+      )}
     </aside>
   );
 }
