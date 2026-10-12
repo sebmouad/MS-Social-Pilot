@@ -57,7 +57,7 @@ test('changing a role asks first, and a refusal changes nothing', async ({ page 
   // Cancelled: the menu goes back to what is stored and nothing is sent.
   await select.selectOption('editor');
   const confirmDialog = page.getByRole('dialog');
-  await expect(confirmDialog).toContainText(`Change ${MEMBER.name} from Contributor to Editor?`);
+  await expect(confirmDialog).toContainText(`Change ${MEMBER.name} from Creator to Manager?`);
   await confirmDialog.getByRole('button', { name: /^cancel$/i }).click();
   await expect(select).toHaveValue('contributor');
   expect(patches).toBe(0);
