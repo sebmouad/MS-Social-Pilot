@@ -8,6 +8,10 @@ import { Dialog } from './Dialog';
 import { EmptyState } from './EmptyState';
 import { Icon } from './Icon';
 
+/** The MCP clients the setup guide covers, each with its own steps. */
+const ASSISTANTS = ['claudeCode', 'claudeDesktop', 'cursor', 'vscode'] as const;
+type Assistant = (typeof ASSISTANTS)[number];
+
 interface TokenRow {
   id: string;
   name: string;
@@ -57,6 +61,7 @@ export function ApiTokensClient({ tokens, baseUrl, showOwner }: { tokens: TokenR
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [confirming, setConfirming] = useState<TokenRow | null>(null);
+  const [assistant, setAssistant] = useState<Assistant>('claudeCode');
   const close = useCallback(() => {
     setOpen(false);
     setMade(null);
@@ -91,11 +96,40 @@ export function ApiTokensClient({ tokens, baseUrl, showOwner }: { tokens: TokenR
   const mcpUrl = `${baseUrl}/api/mcp`;
   const key = made ?? 'msp_YOUR_KEY';
   const claudeCommand = `claude mcp add --transport http ms-social-pilot ${mcpUrl} \\\n  --header "Authorization: Bearer ${key}"`;
-  const desktopConfig = JSON.stringify(
-    { mcpServers: { 'ms-social-pilot': { type: 'http', url: mcpUrl, headers: { Authorization: `Bearer ${key}` } } } },
-    null,
-    2,
-  );
+  // What each assistant needs pasted, and how many steps its guide has.
+  const guides: Record<Assistant, { snippet: string; steps: number }> = {
+    claudeCode: { snippet: claudeCommand, steps: 3 },
+    // Claude Desktop reaches a remote server through the mcp-remote bridge.
+    claudeDesktop: {
+      snippet: JSON.stringify(
+        {
+          mcpServers: {
+            'ms-social-pilot': {
+              command: 'npx',
+              args: ['-y', 'mcp-remote', mcpUrl, '--header', 'Authorization:${AUTH_HEADER}'],
+              env: { AUTH_HEADER: `Bearer ${key}` },
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      steps: 4,
+    },
+    cursor: {
+      snippet: JSON.stringify({ mcpServers: { 'ms-social-pilot': { url: mcpUrl, headers: { Authorization: `Bearer ${key}` } } } }, null, 2),
+      steps: 3,
+    },
+    vscode: {
+      snippet: JSON.stringify(
+        { servers: { 'ms-social-pilot': { type: 'http', url: mcpUrl, headers: { Authorization: `Bearer ${key}` } } } },
+        null,
+        2,
+      ),
+      steps: 3,
+    },
+  };
+  const guide = guides[assistant];
   const curl = `curl ${baseUrl}/api/v1/pages \\\n  -H "Authorization: Bearer ${key}"`;
   const copy = { copyLabel: t('copy'), copiedLabel: t('copied') };
 
@@ -153,14 +187,29 @@ export function ApiTokensClient({ tokens, baseUrl, showOwner }: { tokens: TokenR
             <p className="text-sm text-slate-600">{t('mcpHint')}</p>
           </div>
         </div>
-        <div className="space-y-1.5">
-          <p className="text-[13px] font-semibold text-slate-700">{t('mcpCode')}</p>
-          <CopyField value={claudeCommand} label={t('mcpCode')} multiline {...copy} />
+        <div className="segmented w-fit max-w-full flex-wrap" role="radiogroup" aria-label={t('mcpAssistant')}>
+          {ASSISTANTS.map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={assistant === value}
+              className={`segmented-item ${assistant === value ? 'segmented-item-active' : ''}`}
+              onClick={() => setAssistant(value)}
+            >
+              {t(`mcpName_${value}`)}
+            </button>
+          ))}
         </div>
-        <div className="space-y-1.5">
-          <p className="text-[13px] font-semibold text-slate-700">{t('mcpDesktop')}</p>
-          <CopyField value={desktopConfig} label={t('mcpDesktop')} multiline {...copy} />
-        </div>
+        <ol className="list-decimal space-y-3 pl-5 text-sm text-slate-700">
+          <li>{tokens.some((row) => !row.revoked) ? t('mcpStepKeyHave') : t('mcpStepKey')}</li>
+          {Array.from({ length: guide.steps - 1 }, (_, index) => (
+            <li key={index} className="space-y-1.5">
+              <span>{t(`mcpStep_${assistant}_${index + 1}`)}</span>
+              {index === 0 && <CopyField value={guide.snippet} label={t(`mcpName_${assistant}`)} multiline {...copy} />}
+            </li>
+          ))}
+        </ol>
         <p className="text-xs text-slate-500">{t('mcpTools')}</p>
       </section>
 

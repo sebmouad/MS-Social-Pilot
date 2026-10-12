@@ -376,7 +376,7 @@ Each verified missing in our code on 2026-10-11:
   as written by AI. Counted against whoever set the schedule up (kind
   `recap`), inside the same rate limit and monthly budget; if anything fails
   the report goes out without it.
-- MCP setup page: step-by-step per assistant (Claude, others) with copy buttons.
+- ~~MCP setup page: step-by-step per assistant (Claude, others) with copy buttons.~~ Done: API keys screen picks Claude Code, Claude Desktop, Cursor or VS Code and shows numbered steps with the snippet pre-filled with a newly created key.
 
 ## Phase D — Design system pass
 
