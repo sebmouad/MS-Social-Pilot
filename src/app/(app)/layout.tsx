@@ -18,7 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const t = await getTranslations('suspended');
 
   const showApprovals = canApprove(auth.role) && auth.workspace.requiresApproval && auth.modules.includes('schedule');
-  const pendingApprovals = showApprovals && !refusal ? await pendingApprovalCount(auth.workspace.id) : 0;
+  const pendingApprovals = showApprovals && !refusal ? await pendingApprovalCount(auth.workspace.id, auth.pageScope) : 0;
 
   return (
     <ConfirmProvider>

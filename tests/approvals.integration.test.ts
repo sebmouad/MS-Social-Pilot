@@ -666,7 +666,7 @@ describe('cancelling something that is waiting for review', () => {
 
     // The approval state is kept as a record of what was asked for; the queue
     // is what must not show work nobody can act on.
-    expect(await approvals.pendingApprovalCount(workspace.id)).toBe(0);
+    expect(await approvals.pendingApprovalCount(workspace.id, { all: true })).toBe(0);
   });
 
   it('refuses to approve it back into existence', async () => {
@@ -723,7 +723,7 @@ describe('cancelling something that is waiting for review', () => {
       },
     });
 
-    expect(await approvals.pendingApprovalCount(workspace.id)).toBe(1);
+    expect(await approvals.pendingApprovalCount(workspace.id, { all: true })).toBe(1);
   });
 });
 
@@ -1185,8 +1185,10 @@ describe('cross-tenant isolation', () => {
       }
     }
 
-    expect(await approvals.pendingApprovalCount(clientA.workspace.id)).toBe(1);
-    expect(await approvals.pendingApprovalCount(clientB.workspace.id)).toBe(3);
+    expect(await approvals.pendingApprovalCount(clientA.workspace.id, { all: true })).toBe(1);
+    expect(await approvals.pendingApprovalCount(clientB.workspace.id, { all: true })).toBe(3);
+    // A member limited to other Pages does not count them.
+    expect(await approvals.pendingApprovalCount(clientB.workspace.id, { all: false, ids: ['elsewhere'] })).toBe(0);
   });
 });
 

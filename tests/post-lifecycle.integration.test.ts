@@ -195,7 +195,7 @@ describe('editing a contributor draft into the schedule', () => {
     expect(after.status).toBe(PostStatus.pending_approval);
     expect(after.approvalStatus).toBe(ApprovalStatus.pending);
     expect(after.submittedById).toBe(s.contributor.id);
-    expect(await approvals.pendingApprovalCount(s.workspace.id)).toBe(1);
+    expect(await approvals.pendingApprovalCount(s.workspace.id, { all: true })).toBe(1);
   });
 
   it('lets an editor schedule their own draft directly', async () => {
@@ -248,7 +248,7 @@ describe('editing a post that is waiting for review', () => {
     const after = await prisma.post.findUniqueOrThrow({ where: { id: held.id } });
     expect(after.status).toBe(PostStatus.pending_approval);
     expect(after.approvalStatus).toBe(ApprovalStatus.pending);
-    expect(await approvals.pendingApprovalCount(s.workspace.id)).toBe(1);
+    expect(await approvals.pendingApprovalCount(s.workspace.id, { all: true })).toBe(1);
   });
 
   it('keeps it waiting even when an editor edits it — editing is not approving', async () => {
@@ -296,7 +296,7 @@ describe('editing a post that is waiting for review', () => {
     expect(after.status).toBe(PostStatus.pending_approval);
     expect(after.approvalStatus).toBe(ApprovalStatus.pending);
     expect(after.reviewNote).toBeNull();
-    expect(await approvals.pendingApprovalCount(s.workspace.id)).toBe(1);
+    expect(await approvals.pendingApprovalCount(s.workspace.id, { all: true })).toBe(1);
   });
 
   it('is not handed to Facebook when switched to native', async () => {
@@ -563,7 +563,7 @@ describe('withdrawing a post from review', () => {
     expect(after.status).toBe(PostStatus.draft);
     expect(after.approvalStatus).toBe(ApprovalStatus.not_required);
     expect(after.submittedById).toBeNull();
-    expect(await approvals.pendingApprovalCount(s.workspace.id)).toBe(0);
+    expect(await approvals.pendingApprovalCount(s.workspace.id, { all: true })).toBe(0);
   });
 
   it('refuses someone else\'s post, and one no longer waiting', async () => {

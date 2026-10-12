@@ -1,6 +1,7 @@
 import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
+import { postScope, type PageScope } from './page-access';
 import { AppError, errors } from './errors';
 import { canApprove, canManageOthersPosts, canPublishWithoutApproval } from './constants';
 import { notifyApprovalDecision, notifyApprovalRequest } from './email/notify';
@@ -390,6 +391,7 @@ export const IN_APPROVAL_QUEUE = {
   status: PostStatus.pending_approval,
 } as const;
 
-export async function pendingApprovalCount(workspaceId: string): Promise<number> {
-  return prisma.post.count({ where: { workspaceId, ...IN_APPROVAL_QUEUE } });
+/** Waiting posts on the Pages this member may see. */
+export async function pendingApprovalCount(workspaceId: string, scope: PageScope): Promise<number> {
+  return prisma.post.count({ where: { workspaceId, ...postScope(scope), ...IN_APPROVAL_QUEUE } });
 }
