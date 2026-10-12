@@ -684,10 +684,10 @@ test('the same post to many Pages at once is flagged, and can go out one Page at
       await expect(page.getByText(/^3 of 3 selected$/)).toBeVisible({ timeout: 1_500 });
     }).toPass({ timeout: 30_000 });
 
-    await expect(page.getByText(/same content on 3 pages within 20 minutes/i)).toBeVisible({ timeout: 15_000 });
-    await page.getByRole('checkbox', { name: /send to one page every 20 minutes/i }).check();
+    await expect(page.getByText(/same content on 3 channels within 20 minutes/i)).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('checkbox', { name: /send to one channel every 20 minutes/i }).check();
     await page.getByRole('button', { name: /^schedule$/i }).click();
-    await expect(page.getByText(/scheduled as 3 posts, one page at a time/i)).toBeVisible();
+    await expect(page.getByText(/scheduled as 3 posts, one channel at a time/i)).toBeVisible();
 
     const posts = await prisma.post.findMany({ where: { message: caption }, orderBy: { scheduledAt: 'asc' } });
     expect(posts).toHaveLength(3);
