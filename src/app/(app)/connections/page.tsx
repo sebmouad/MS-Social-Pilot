@@ -108,7 +108,35 @@ export default async function ConnectionsPage({
       {/* Admins set up and repair the connection; the values it depends on
           belong next to the button that uses them. Open when nothing is
           connected yet, which is when somebody is most likely to need them. */}
-      {canManage && <MetaAppSettings settings={metaAppSettings()} open={accounts.length === 0} />}
+      {/* A long screen: chips jump to each part, as Simplified does. */}
+      <nav aria-label={t('jumpTo')} className="flex flex-wrap gap-2">
+        {[
+          ...(accounts.length > 0
+            ? [
+                { href: '#health', label: t('jump_health') },
+                { href: '#facebook', label: t('jump_facebook') },
+                { href: '#instagram', label: t('jump_instagram') },
+                { href: '#ads', label: t('jump_ads') },
+              ]
+            : []),
+          { href: '#networks', label: t('jump_networks') },
+          ...(canManage ? [{ href: '#meta-app', label: t('jump_metaApp') }] : []),
+        ].map((chip) => (
+          <a
+            key={chip.href}
+            href={chip.href}
+            className="rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-surface hover:bg-slate-50"
+          >
+            {chip.label}
+          </a>
+        ))}
+      </nav>
+
+      {canManage && (
+        <div id="meta-app" className="scroll-mt-20">
+          <MetaAppSettings settings={metaAppSettings()} open={accounts.length === 0} />
+        </div>
+      )}
 
       {accounts.length === 0 ? (
         <div className="card flex flex-col items-center gap-3 p-8 text-center">
@@ -127,7 +155,9 @@ export default async function ConnectionsPage({
         <>
         {/* Above the list: the answer to "is it working" comes before the
             inventory of what is connected. */}
-        <ConnectionHealth canManage={canManage} />
+        <div id="health" className="scroll-mt-20">
+          <ConnectionHealth canManage={canManage} />
+        </div>
 
         <ConnectionsClient
           canManage={canManage}
@@ -191,6 +221,7 @@ export default async function ConnectionsPage({
         </>
       )}
 
+      <div id="networks" className="scroll-mt-20">
       <OtherNetworks
         canManage={canManage}
         isOwner={auth.role === 'owner'}
@@ -209,6 +240,7 @@ export default async function ConnectionsPage({
           targets: account.targets.map((target) => ({ id: target.id, name: target.name, category: target.category, enabled: target.enabled })),
         }))}
       />
+      </div>
 
       {!env.groupsEnabled && (
         <p className="flex items-start gap-2 text-xs text-slate-500">

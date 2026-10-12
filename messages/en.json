@@ -706,7 +706,14 @@
       "code": "Confirmation code:",
       "noCode": "No confirmation code was supplied. Open this page using the link Facebook gave you when you requested deletion.",
       "retained": "Records of posts already published to your pages are kept as the workspace owner’s business records. Contact the workspace owner if you need those removed as well."
-    }
+    },
+    "jumpTo": "Jump to",
+    "jump_health": "Health",
+    "jump_facebook": "Facebook",
+    "jump_instagram": "Instagram",
+    "jump_ads": "Ad accounts",
+    "jump_networks": "Other networks",
+    "jump_metaApp": "Meta app settings"
   },
   "dashboard": {
     "title": "Dashboard",

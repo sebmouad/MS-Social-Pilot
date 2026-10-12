@@ -401,7 +401,8 @@ Skills: `frontend-design`, `design:design-critique`,
   screens; fix hierarchy, spacing, empty states. Record results in `DESIGN.md`.
 - Tokens: add elevation and spacing scale, dark mode (tokens are in
   `tailwind.config.ts`).
-- Connections page: tabs or anchor chips.
+- ✅ Connections page: tabs or anchor chips (2026-10-12: "Jump to" chips —
+  Health, Facebook, Instagram, Ad accounts, Other networks, Meta app settings).
 
 ## Phase D2 — Owner's picks from the Simplified crawl (decided 2026-10-11)
 

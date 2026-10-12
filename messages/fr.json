@@ -706,7 +706,14 @@
       "code": "Code de confirmation :",
       "noCode": "Aucun code de confirmation n’a été fourni. Ouvrez cette page avec le lien que Facebook vous a donné lors de votre demande de suppression.",
       "retained": "Les traces des publications déjà parues sur vos pages sont conservées dans les archives professionnelles du propriétaire de l’espace de travail. Contactez-le si vous souhaitez aussi les faire supprimer."
-    }
+    },
+    "jumpTo": "Aller à",
+    "jump_health": "État",
+    "jump_facebook": "Facebook",
+    "jump_instagram": "Instagram",
+    "jump_ads": "Comptes publicitaires",
+    "jump_networks": "Autres réseaux",
+    "jump_metaApp": "Réglages de l’app Meta"
   },
   "dashboard": {
     "title": "Tableau de bord",

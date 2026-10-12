@@ -187,6 +187,7 @@ export function ConnectionsClient({
         </p>
       )}
 
+      <div id="facebook" className="scroll-mt-20" />
       {connections.map((connection) => {
         const badge = tokenBadge(connection);
         const pages = connection.targets.filter((target) => target.type === 'page');
@@ -320,6 +321,7 @@ export function ConnectionsClient({
       })}
 
       <LinkedAccounts
+        anchor="instagram"
         title={t('instagramTitle')}
         description={t('instagramHint')}
         icon="instagram"
@@ -334,6 +336,7 @@ export function ConnectionsClient({
       />
 
       <LinkedAccounts
+        anchor="ads"
         title={t('adsTitle')}
         description={t('adsHint')}
         icon="megaphone"
@@ -437,6 +440,7 @@ function TargetList({
 }
 
 function LinkedAccounts({
+  anchor,
   title,
   description,
   icon,
@@ -449,6 +453,8 @@ function LinkedAccounts({
   busy,
   call,
 }: {
+  /** The id the page's "jump to" chips link to. */
+  anchor: string;
   title: string;
   description: string;
   icon: IconName;
@@ -464,7 +470,7 @@ function LinkedAccounts({
   const t = useTranslations('connections');
 
   return (
-    <section className="card p-4 sm:p-5">
+    <section id={anchor} className="card scroll-mt-20 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
