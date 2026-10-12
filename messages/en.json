@@ -2500,7 +2500,8 @@
       "scheduled": "Posts scheduled",
       "failed": "Failed publications, 30 days",
       "setupMissing": "{count, plural, one {# required setup step is missing. Open the setup checklist.} other {# required setup steps are missing. Open the setup checklist.}}",
-      "disabled": "{count, plural, one {# account is disabled.} other {# accounts are disabled.}}"
+      "disabled": "{count, plural, one {# account is disabled.} other {# accounts are disabled.}}",
+      "operatorMissing": "{count, plural, one {The Terms and Privacy pages lack # operator detail} other {The Terms and Privacy pages lack # operator details}}: fill them in Configuration › Operator and legal pages."
     },
     "workspaces": {
       "title": "Workspaces",

@@ -6,6 +6,7 @@ import { requireRoot } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { rootOverview } from '@/lib/root';
 import { readSetupChecks } from '@/lib/setup';
+import { missingOperatorDetails, operatorDetails } from '@/lib/operator';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,8 @@ export default async function RootOverviewPage() {
   await requireRoot();
   const t = await getTranslations('root');
   const format = await getFormatter();
-  const [overview, checks] = await Promise.all([rootOverview(), readSetupChecks()]);
+  const [overview, checks, operator] = await Promise.all([rootOverview(), readSetupChecks(), operatorDetails()]);
+  const legalGaps = missingOperatorDetails(operator).length;
   const missing = checks.filter((check) => !check.ok && !check.optional).length;
 
   const tiles = [
@@ -40,6 +42,12 @@ export default async function RootOverviewPage() {
       {missing > 0 && (
         <Link href="/setup" className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100">
           <Icon name="warning" size={16} /> {t('overview.setupMissing', { count: missing })}
+        </Link>
+      )}
+
+      {legalGaps > 0 && (
+        <Link href="/root/config" className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100">
+          <Icon name="warning" size={16} /> {t('overview.operatorMissing', { count: legalGaps })}
         </Link>
       )}
 

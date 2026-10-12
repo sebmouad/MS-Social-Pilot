@@ -7,30 +7,36 @@
  */
 
 import { LegalPage, type LegalSection } from '@/components/LegalPage';
+import { operatorDetails, type OperatorDetails } from '@/lib/operator';
 
-const CONTROLLER = 'ANASSO TRAVAUX';
-const CONTACT_EMAIL = 'sebmouad@gmail.com';
-const UPDATED = '10 October 2026';
+export const dynamic = 'force-dynamic';
 
-
-const mail = (
-  <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>
-    {CONTACT_EMAIL}
-  </a>
-);
 const deletion = (label: string) => (
   <a className="underline" href="/data-deletion">
     {label}
   </a>
 );
 
-const SECTIONS: LegalSection[] = [
+/** The page's sections, in the words root's operator details give it (S2). */
+function sections(op: OperatorDetails): LegalSection[] {
+  const controller = op.name || 'the operator of this installation';
+  const mail = op.email ? (
+    <a className="underline" href={`mailto:${op.email}`}>
+      {op.email}
+    </a>
+  ) : (
+    <>the operator of this installation</>
+  );
+  return [
   {
     title: 'Who we are',
     body: (
       <>
-        MS Social Pilot (https://social.newsgeet.com) is a publishing and analytics tool for people who manage
-        Facebook Pages. The data controller is {CONTROLLER}, Morocco. Contact: {mail}.
+        {op.productName}
+        {op.appUrl ? ` (${op.appUrl})` : ''} is a publishing and analytics tool for people who manage Facebook
+        Pages. The data controller is {controller}
+        {[op.address, op.country].filter(Boolean).length > 0 ? `, ${[op.address, op.country].filter(Boolean).join(', ')}` : ''}.
+        Contact: {mail}.
       </>
     ),
   },
@@ -67,9 +73,9 @@ const SECTIONS: LegalSection[] = [
     title: 'Who can see it',
     body: (
       <>
-        Only the members of your workspace. Our technical providers host it on our behalf: IKOULA (servers in
-        France) and Cloudflare (secure delivery). Data is sent to Meta only to carry out your actions
-        (publish, reply, hide).
+        Only the members of your workspace.{' '}
+        {op.hosting ? `Our technical providers host it on our behalf: ${op.hosting}.` : 'Our hosting providers store it on our behalf.'}{' '}
+        Data is sent to Meta only to carry out your actions (publish, reply, hide).
       </>
     ),
   },
@@ -97,8 +103,8 @@ const SECTIONS: LegalSection[] = [
     title: 'Your rights',
     body: (
       <>
-        You can access, correct or delete your data, or object to its processing (Moroccan law 09-08 and, where
-        it applies, the GDPR), by writing to {mail}. You can also remove the app from your Facebook settings
+        You can access, correct or delete your data, or object to its processing (
+        {op.dataProtection || 'under the data-protection law that applies to you'}), by writing to {mail}. You can also remove the app from your Facebook settings
         (Apps and websites): Facebook tells us and your profile and its tokens are deleted — see the{' '}
         {deletion('data deletion page')}.
       </>
@@ -112,8 +118,10 @@ const SECTIONS: LegalSection[] = [
     title: 'Changes',
     body: <>Any change will be published on this page with its update date.</>,
   },
-];
+  ];
+}
 
-export default function PrivacyPolicyPage() {
-  return <LegalPage title="Privacy policy" updated={`Last updated ${UPDATED}`} sections={SECTIONS} />;
+export default async function PrivacyPolicyPage() {
+  const op = await operatorDetails();
+  return <LegalPage title="Privacy policy" updated={op.legalUpdated ? `Last updated ${op.legalUpdated}` : ''} sections={sections(op)} />;
 }

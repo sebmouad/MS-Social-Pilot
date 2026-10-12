@@ -27,6 +27,7 @@ export type SettingType = 'string' | 'secret' | 'number' | 'boolean' | 'select' 
 
 export type SettingGroup =
   | 'general'
+  | 'operator'
   | 'facebook'
   | 'networks'
   | 'features'
@@ -136,6 +137,85 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     default: '',
     env: 'CRON_SECRET',
     hint: 'Leave blank to disable the HTTP trigger entirely and run the worker as a process.',
+  },
+
+  // --- Operator (NEXT_PHASES S2) -------------------------------------------------
+  // Who runs this installation, as the Terms, Privacy and Data deletion pages
+  // say it. Nothing here is hard-coded in the pages: each operator enters their
+  // own, and has the legal wording reviewed for their country.
+  {
+    key: 'operator.productName',
+    group: 'operator',
+    type: 'string',
+    label: 'Product name',
+    description: 'What the legal pages call the service.',
+    default: 'MS Social Pilot',
+  },
+  {
+    key: 'operator.name',
+    group: 'operator',
+    type: 'string',
+    label: 'Operator',
+    description: 'The company or person that runs this installation and is responsible for the data.',
+    default: '',
+    hint: 'Shown on the Terms and Privacy pages, which Meta reads during App Review. Until it is set they say "the operator of this installation".',
+  },
+  {
+    key: 'operator.country',
+    group: 'operator',
+    type: 'string',
+    label: 'Operator country',
+    description: 'Where the operator is established.',
+    default: '',
+  },
+  {
+    key: 'operator.address',
+    group: 'operator',
+    type: 'string',
+    label: 'Operator address',
+    description: 'Postal address shown in the privacy policy.',
+    default: '',
+  },
+  {
+    key: 'operator.email',
+    group: 'operator',
+    type: 'string',
+    label: 'Contact email',
+    description: 'Where users write about their data and these terms.',
+    default: '',
+    pattern: { regex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter an email address.' },
+  },
+  {
+    key: 'operator.governingLaw',
+    group: 'operator',
+    type: 'string',
+    label: 'Governing law',
+    description: 'The law the Terms are governed by, as a phrase: "the law of Country A".',
+    default: '',
+  },
+  {
+    key: 'operator.dataProtection',
+    group: 'operator',
+    type: 'string',
+    label: 'Data-protection law and authority',
+    description: 'The data-protection rules that apply, as a phrase: "the GDPR; the authority is …".',
+    default: '',
+  },
+  {
+    key: 'operator.hosting',
+    group: 'operator',
+    type: 'string',
+    label: 'Hosting providers',
+    description: 'Who hosts the data on the operator\'s behalf, and where: "Provider A (servers in Country B)".',
+    default: '',
+  },
+  {
+    key: 'operator.legalUpdated',
+    group: 'operator',
+    type: 'string',
+    label: 'Legal pages last updated',
+    description: 'The date the legal wording last changed, as it should read on the pages.',
+    default: '',
   },
 
   // --- Facebook --------------------------------------------------------------
@@ -936,6 +1016,7 @@ export const SETTINGS_BY_KEY = new Map(SETTING_DEFINITIONS.map((entry) => [entry
 
 export const GROUP_LABELS: Record<SettingGroup, string> = {
   general: 'General',
+  operator: 'Operator and legal pages',
   facebook: 'Facebook connection',
   networks: 'Other social networks',
   features: 'Feature switches',
@@ -952,6 +1033,7 @@ export const GROUP_LABELS: Record<SettingGroup, string> = {
 /** The order groups appear on the config screen. */
 export const GROUP_ORDER: SettingGroup[] = [
   'general',
+  'operator',
   'facebook',
   'networks',
   'features',

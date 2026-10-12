@@ -7,28 +7,35 @@
  */
 
 import { LegalPage, type LegalSection } from '@/components/LegalPage';
+import { operatorDetails, type OperatorDetails } from '@/lib/operator';
 
-const OPERATOR = 'ANASSO TRAVAUX';
-const CONTACT_EMAIL = 'sebmouad@gmail.com';
-const UPDATED = '10 October 2026';
+export const dynamic = 'force-dynamic';
 
-const mail = (
-  <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>
-    {CONTACT_EMAIL}
-  </a>
-);
 const link = (href: string, label: string) => (
   <a className="underline" href={href}>
     {label}
   </a>
 );
 
-const SECTIONS: LegalSection[] = [
+/** The page's sections, in the words root's operator details give it (S2). */
+function sections(op: OperatorDetails): LegalSection[] {
+  const operator = op.name || 'the operator of this installation';
+  const product = op.productName;
+  const mail = op.email ? (
+    <a className="underline" href={`mailto:${op.email}`}>
+      {op.email}
+    </a>
+  ) : (
+    <>the operator of this installation</>
+  );
+  return [
   {
     title: 'The service',
     body: (
       <>
-        MS Social Pilot (https://social.newsgeet.com), operated by {OPERATOR} (Morocco), lets its users publish,
+        {product}
+        {op.appUrl ? ` (${op.appUrl})` : ''}, operated by {operator}
+        {op.country ? ` (${op.country})` : ''}, lets its users publish,
         schedule and track posts on the Facebook Pages they manage, and answer their comments and messages. By
         using it you agree to these terms.
       </>
@@ -47,7 +54,7 @@ const SECTIONS: LegalSection[] = [
     title: 'Your content',
     body: (
       <>
-        You are responsible for what you publish through MS Social Pilot, which must follow Meta&apos;s Terms
+        You are responsible for what you publish through {product}, which must follow Meta&apos;s Terms
         of Service and Community Standards. Your content stays yours; we use it only to publish and show it
         when you ask.
       </>
@@ -88,7 +95,7 @@ const SECTIONS: LegalSection[] = [
     title: 'Liability',
     body: (
       <>
-        To the extent the law allows, {OPERATOR} is not liable for indirect losses, or for Meta&apos;s decisions
+        To the extent the law allows, {operator} is not liable for indirect losses, or for Meta&apos;s decisions
         about your Pages, posts or accounts.
       </>
     ),
@@ -99,11 +106,18 @@ const SECTIONS: LegalSection[] = [
   },
   {
     title: 'Changes and governing law',
-    body: <>Any change will be published on this page with its date. These terms are governed by Moroccan law.</>,
+    body: (
+      <>
+        Any change will be published on this page with its date. These terms are governed by{' '}
+        {op.governingLaw || "the law of the operator's country"}.
+      </>
+    ),
   },
   { title: 'Contact', body: <>Questions about these terms: {mail}.</> },
-];
+  ];
+}
 
-export default function TermsPage() {
-  return <LegalPage title="Terms of service" updated={`Last updated ${UPDATED}`} sections={SECTIONS} />;
+export default async function TermsPage() {
+  const op = await operatorDetails();
+  return <LegalPage title="Terms of service" updated={op.legalUpdated ? `Last updated ${op.legalUpdated}` : ''} sections={sections(op)} />;
 }

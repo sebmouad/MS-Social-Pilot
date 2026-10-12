@@ -2500,7 +2500,8 @@
       "scheduled": "Publications programmées",
       "failed": "Publications échouées, 30 jours",
       "setupMissing": "{count, plural, one {# étape de configuration obligatoire manque. Ouvrez la liste de configuration.} other {# étapes de configuration obligatoires manquent. Ouvrez la liste de configuration.}}",
-      "disabled": "{count, plural, one {# compte est désactivé.} other {# comptes sont désactivés.}}"
+      "disabled": "{count, plural, one {# compte est désactivé.} other {# comptes sont désactivés.}}",
+      "operatorMissing": "{count, plural, one {Il manque # information sur l’exploitant aux pages Conditions et Confidentialité} other {Il manque # informations sur l’exploitant aux pages Conditions et Confidentialité}} : renseignez-les dans Configuration › Exploitant et pages légales."
     },
     "workspaces": {
       "title": "Espaces de travail",

@@ -143,7 +143,7 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   (owner: runtime settings incl. network app keys).
 
 ## Public
-`/share/<token>` client view, `/privacy-policy`, `/terms`, `/data-deletion`,
+`/share/<token>` client view, `/privacy-policy`, `/terms`, `/data-deletion`, Terms and Privacy read the operator details root sets in Configuration › "Operator and legal pages".
 `/login`, `/register` (first account / open registration), `/invite/<token>`.
 
 ## Root — `/root/*`

@@ -828,7 +828,7 @@ details) may be done earlier if a phase touches those files.
 
 The app will be hosted and sold to other users when done. Everything must be
 generic (CLAUDE.md rule 9). Items:
-- **S1. Generic-content sweep** — remove every niche/country leftover from code,
+- **S1. Generic-content sweep** ✅ — remove every niche/country leftover from code,
   copy, defaults and demo data. Known today: Terms and Privacy pages
   (`src/app/terms/page.tsx`, `src/app/privacy-policy/page.tsx`) name Morocco
   and Moroccan law and the newsgeet.com URL; code comments using Casablanca as
@@ -836,11 +836,17 @@ generic (CLAUDE.md rule 9). Items:
   (`prisma/demo.ts`) and test fixtures using recipe/bakery text and Casablanca
   (fine as test data, but prefer neutral). Add a test that greps `src/` and
   `messages/` for a blocklist of owner-specific names.
-- **S2. Operator details set by root** — in the root section: company/operator
+  *Done 2026-10-12:* legal pages rewritten from root settings, no owner,
+  country or host names left; `tests/generic-content.test.ts` guards it.
+- **S2. Operator details set by root** ✅ (logo and email branding still open) — in the root section: company/operator
   name, country, address, contact email, governing law, data-protection
   authority, product name and logo, app URL. Terms, Privacy, Data deletion and
   emails read these; no hard-coded legal text naming a country. The legal
   wording itself is the owner's responsibility (suggest they have it reviewed).
+  *Done 2026-10-12:* Root › Configuration › "Operator and legal pages"
+  (`operator.*` settings, `src/lib/operator.ts`); Terms and Privacy read them
+  and fall back to neutral wording; root overview warns while name, email or
+  governing law is empty. **After deploy, root must fill these in.**
 - **S3. Self-service sign-up** — open registration (root switch exists), email
   verification, onboarding wizard that asks the user's niche-free basics
   (workspace name, time zone, languages, first Pages), trial period.
