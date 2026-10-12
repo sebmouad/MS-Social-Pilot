@@ -250,6 +250,7 @@ model Workspace {
   labels               Label[]
   snippets             Snippet[]
   savedReplies         SavedReply[]
+  captionTests         CaptionTest[]
   shareLinks           ShareLink[]
   reportTemplates      ReportTemplate[]
   reportSchedules      ReportSchedule[]
@@ -482,6 +483,11 @@ model Post {
   /// Set when this post was created from an RSS item.
   sourceFeedItemId String?
 
+  /// Caption A/B test (NEXT_PHASES G9): the test this post is one caption of,
+  /// and which one ("A", "B", …).
+  captionTestId String?
+  captionLabel  String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -494,6 +500,7 @@ model Post {
   labels          PostLabel[]
   reviewDecisions ReviewDecision[]
   feedItem        FeedItem?        @relation(fields: [sourceFeedItemId], references: [id])
+  captionTest     CaptionTest?     @relation(fields: [captionTestId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, status])
   @@index([mediaKeys], type: Gin)
@@ -504,6 +511,7 @@ model Post {
   @@index([authorId])
   @@index([originPostId])
   @@index([sourceFeedItemId])
+  @@index([captionTestId])
   @@map("posts")
 }
 
@@ -1319,6 +1327,41 @@ model SavedReply {
 
   @@index([workspaceId])
   @@map("saved_replies")
+}
+
+/// Caption A/B test (NEXT_PHASES G9): the same content posted with two to four
+/// captions, on comparable Pages or at the same hour on following days. After
+/// `hours` the worker compares engagement per view and names a winner, or says
+/// there were not enough views to tell.
+model CaptionTest {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  /// Hours after the last caption goes out before the results are read.
+  hours       Int       @default(48)
+  /// Views each caption needs before a winner is named.
+  minViews    Int       @default(500)
+  /// running | decided | inconclusive
+  status      String    @default("running")
+  /// Why it ended without a winner: not_enough_views | not_published | no_insights.
+  reason      String?
+  winnerLabel String?
+  /// The winner's engagement rate over the runner-up's, in percent.
+  lift        Float?
+  /// Per caption: { label, views, engagements, rate }.
+  results     Json?
+  decidedAt   DateTime?
+  /// When the learning was added to the Pages' voice.
+  learnedAt   DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  posts     Post[]
+
+  @@index([workspaceId, createdAt])
+  @@index([status])
+  @@map("caption_tests")
 }
 
 /// A link a client opens without an account: a review page where they approve,

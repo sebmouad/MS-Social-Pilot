@@ -4,6 +4,7 @@ import { backgroundBudget } from '../facebook/budget';
 import { postDueFirstComments, postFirstComment } from '../first-comment';
 import { env } from '../env';
 import { notifyEmptyQueues, notifyTokenExpiring, sendInboxDigests } from '../email/notify';
+import { evaluateCaptionTests } from '../caption-test';
 import { runEvergreenCycle } from '../evergreen';
 import { pollDueSources } from '../rss/poll';
 import { refreshPostStatus, runSchedulerTick } from './runner';
@@ -47,6 +48,7 @@ export type JobName =
   | 'reports'
   | 'inboxDigest'
   | 'queueEmpty'
+  | 'captionTests'
   | 'alerts';
 
 export interface JobContext {
@@ -704,6 +706,15 @@ export function jobDefinitions(): JobDefinition[] {
       run: async ({ now }) => {
         const told = await notifyEmptyQueues(now);
         return told > 0 ? `${told} Page(s) ran out of scheduled posts` : null;
+      },
+    },
+    {
+      // Database only: reads the insights the analytics sync stored.
+      name: 'captionTests',
+      intervalMs: 60 * 60 * 1000,
+      run: async ({ now }) => {
+        const finished = await evaluateCaptionTests(now);
+        return finished > 0 ? `${finished} caption test(s) finished` : null;
       },
     },
   ];

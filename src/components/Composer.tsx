@@ -21,6 +21,7 @@ import { LIMITS } from '@/lib/constants';
 import { countCharacters } from '@/lib/text';
 import { formatInZone } from '@/lib/time';
 import { IG_CAPTION_LIMIT } from '@/lib/constants';
+import { CaptionTestFields, NO_CAPTION_TEST, type CaptionTestChoice } from './CaptionTestFields';
 import { SpamGuard, type StaggerChoice } from './SpamGuard';
 
 interface Props {
@@ -137,6 +138,8 @@ export function Composer({
   );
   const [pending, setPending] = useState(false);
   const [stagger, setStagger] = useState<StaggerChoice>({ minutes: 0, aiVariants: false });
+  const [captionTest, setCaptionTest] = useState<CaptionTestChoice>(NO_CAPTION_TEST);
+  const testing = captionTest.on && !editing && timing !== 'queue';
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
@@ -378,8 +381,9 @@ export function Composer({
               timezone,
               useQueue: timing === 'queue',
               saveAsDraft,
-              staggerMinutes: timing === 'queue' ? 0 : stagger.minutes,
-              aiVariants: stagger.aiVariants,
+              staggerMinutes: timing === 'queue' || testing ? 0 : stagger.minutes,
+              aiVariants: testing ? false : stagger.aiVariants,
+              ...(testing ? { captionVariants: captionTest.captions, testHours: captionTest.hours } : {}),
             }),
           });
 
@@ -462,10 +466,14 @@ export function Composer({
 
       const staggered = !saveAsDraft && (body.posts ?? 1) > 1 ? body.posts! : 0;
       setStagger({ minutes: 0, aiVariants: false });
+      const tested = testing;
+      setCaptionTest(NO_CAPTION_TEST);
 
       setResult(
         saveAsDraft
           ? t('savedDraft')
+          : tested
+            ? t('captionTestOk', { count: body.posts ?? 1 })
           : staggered > 0
             ? t('staggeredOk', { count: staggered })
           : needsApproval
@@ -873,10 +881,14 @@ export function Composer({
             timezone={timezone}
             postId={editing?.id}
             aiEnabled={aiEnabled}
-            canStagger={!editing && timing !== 'queue'}
+            canStagger={!editing && timing !== 'queue' && !testing}
             value={stagger}
             onChange={setStagger}
           />
+
+          {!editing && timing !== 'queue' && (
+            <CaptionTestFields value={captionTest} onChange={setCaptionTest} pages={selected.length} />
+          )}
 
           {timing === 'schedule' && (
             <div className="mt-4">
@@ -1014,7 +1026,7 @@ export function Composer({
 
         <div>
           <div className="flex gap-2">
-            <button type="button" className="btn-secondary" disabled={pending || uploading} onClick={() => submit(true)}>
+            <button type="button" className="btn-secondary" disabled={pending || uploading || testing} onClick={() => submit(true)}>
               {editing ? t('moveToDrafts') : t('saveDraft')}
             </button>
             {editing ? (

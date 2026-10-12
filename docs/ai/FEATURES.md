@@ -55,6 +55,13 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   Inbox (after Meta step 2), Other posts (posted outside the app), Instagram (when
   on). Date range presets + custom; compare with previous period or a year earlier.
   Export menu.
+- **Caption tests** `/analytics/tests`: A/B tests started from the composer
+  ("A/B test the caption", up to four captions, compare after 1, 2, 3 or 7
+  days). With at least as many Pages as captions the Pages are shared out and
+  all go out together; otherwise each Page gets every caption, one a day. The
+  worker compares engagements per view from synced insights and names a winner
+  only when every caption reached the test's minimum views (500); otherwise it
+  says why. Admins can add the result to the Pages' voice for the AI.
 - **Reports** `/reports`: per Page, sections checklist, branding (logo, title,
   subtitle, footer), saved templates, Download PDF (print), CSV, scheduled email
   (weekly/monthly to any address), optional AI recap paragraph at the top of the

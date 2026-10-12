@@ -536,10 +536,14 @@ most time), the rest after Phase D2. S/M/L = effort.
   `{page}`) for comments and Messenger; shortcut `/` in the reply box; shared
   per workspace. *Done: `/inbox/replies`; `/` or the button in every comment and
   Messenger reply box; editor+ (`canModerateComments`).*
-- **G9. Caption A/B tests (M)** — two (or more) captions for the same content on
+- **G9. Caption A/B tests (M)** ✅ — two (or more) captions for the same content on
   comparable Pages or times; after N hours compare engagement rate per view;
   declare a winner only with enough views (show "not enough data" otherwise);
-  learnings saved to the Page voice.
+  learnings saved to the Page voice. *Done: composer toggle (captions B–D,
+  compare after 1/2/3/7 days); Pages are shared out between captions, or with
+  fewer Pages each caption goes out a day apart; the `captionTests` worker job
+  reads stored insights only (no extra Graph calls); `/analytics/tests`; "Add to
+  Page voice" is admin+ (`canManageSettings`, like editing the voice).*
 - **G10. Best time per Page, automatically (S)** — weekly job recalculates each
   Page's best hours from its own posts (existing heatmap) and proposes or
   applies queue slots (setting: suggest / apply); shows what changed.

@@ -163,11 +163,31 @@ export const createPostSchema = z
     staggerMinutes: z.number().int().min(0).max(720).optional(),
     /** With a stagger: the AI rewords the caption for each Page after the first. */
     aiVariants: z.boolean().optional(),
+    /**
+     * Caption A/B test (G9): captions B, C, D for the same content. The
+     * message is caption A.
+     */
+    captionVariants: z.array(postMessage).max(3).optional(),
+    /** Hours after the last caption goes out before the test is read. */
+    testHours: z.union([z.literal(24), z.literal(48), z.literal(72), z.literal(168)]).optional(),
   })
   .superRefine((value, ctx) => {
     // `link` is optional here and absent means none, so it is normalised for
     // the shared check, which reads `undefined` as "not sent".
     refinePostContent({ ...value, link: value.link ?? null }, ctx);
+
+    if (value.captionVariants?.length) {
+      if (value.saveAsDraft || value.useQueue) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['captionVariants'],
+          message: 'A caption test needs a date or Publish now; it cannot be a draft or go to the queue.',
+        });
+      }
+      if (!value.message.trim() || value.captionVariants.some((caption) => !caption.trim())) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['captionVariants'], message: 'Write every caption of the test.' });
+      }
+    }
 
     const needsTime = !value.saveAsDraft && value.publishMode !== 'immediate' && !value.useQueue;
     if (needsTime && !value.scheduledAtLocal) {

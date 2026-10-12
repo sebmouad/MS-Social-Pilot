@@ -215,6 +215,7 @@ export function AppShell({
       items: [
         { href: '/analytics', label: t('pages'), icon: 'analytics' },
         { href: '/reports', label: t('reports'), icon: 'reports' },
+        { href: '/analytics/tests', label: t('captionTests'), icon: 'trendUp' },
       ],
     },
     { key: 'ads', label: t('module.ads'), rail: t('rail_ads'), icon: 'megaphone', items: [{ href: '/ads', label: t('module.ads'), icon: 'megaphone' }] },

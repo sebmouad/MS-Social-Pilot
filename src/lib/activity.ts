@@ -21,6 +21,7 @@ export const ACTIVITY_ACTIONS = [
   'instagram.discovered',
   'moderation.ruleChanged',
   'moderation.undone',
+  'captionTest.learned',
   'post.approved',
   'post.bulkAction',
   'post.bulkUploaded',

@@ -562,7 +562,8 @@
     "aiHashtagsNone": "No new hashtags to suggest for this post.",
     "aiHashtagsPick": "Pick the ones that fit. They go at the end of the post.",
     "aiHashtagsAdd": "{count, plural, =0 {Add hashtags} one {Add 1 hashtag} other {Add # hashtags}}",
-    "staggeredOk": "Scheduled as {count, plural, one {# post} other {# posts}}, one Page at a time."
+    "staggeredOk": "Scheduled as {count, plural, one {# post} other {# posts}}, one Page at a time.",
+    "captionTestOk": "Caption test started: {count, plural, one {# post} other {# posts}} scheduled. The result shows in Analyse › Caption tests."
   },
   "config": {
     "title": "Configuration",
@@ -1202,6 +1203,9 @@
       "moderation": {
         "ruleChanged": "changed a moderation rule",
         "undone": "undid an automatic moderation action"
+      },
+      "captionTest": {
+        "learned": "added a caption test result to the Page voice"
       }
     },
     "byDeparted": "Someone no longer in this workspace",
@@ -1365,7 +1369,8 @@
     "accountMenu": "Your account menu",
     "yourAccount": "Your account",
     "moderation": "Moderation rules",
-    "savedReplies": "Saved replies"
+    "savedReplies": "Saved replies",
+    "captionTests": "Caption tests"
   },
   "notifications": {
     "title": "Notifications",
@@ -2697,7 +2702,8 @@
         "alerts": "Alerts",
         "reports": "Scheduled reports",
         "inboxDigest": "New comments and messages email",
-        "queueEmpty": "Empty queue email"
+        "queueEmpty": "Empty queue email",
+        "captionTests": "Caption tests: read results"
       }
     },
     "sessions": {
@@ -3026,5 +3032,47 @@
     "noMatch": "No saved reply matches.",
     "manage": "Manage saved replies",
     "listLabel": "Saved replies"
+  },
+  "captionTests": {
+    "title": "Caption tests",
+    "intro": "The same content with different captions. Once the posts have had time to reach people, the caption that got the most engagement per view wins — only when every caption had enough views to say so.",
+    "emptyTitle": "No caption tests yet",
+    "emptyHint": "In the composer, tick “A/B test the caption” and write a second caption. The result shows up here.",
+    "emptyAction": "Write a post",
+    "untitled": "Untitled test",
+    "started": "Started {date}",
+    "running": "Running",
+    "runningUntil": "Running until {date}",
+    "winner": "Caption {label} won",
+    "winnerLift": "Caption {label} won (+{lift}% engagement per view)",
+    "winnerShort": "Winner",
+    "reason": {
+      "not_enough_views": "No winner: a caption had fewer than {views} views",
+      "not_published": "No winner: a caption did not go out",
+      "no_insights": "No winner: Facebook sent no figures for these posts",
+      "tie": "No winner: the captions did equally well"
+    },
+    "caption": "Caption",
+    "pages": "Pages",
+    "views": "Views",
+    "engagements": "Engagements",
+    "rate": "Per view",
+    "learn": "Add to Page voice",
+    "learnFailed": "The result could not be added. Try again.",
+    "learnHint": "The AI then writes more like the winning caption on these Pages.",
+    "learned": "Added to the Page voice.",
+    "learning": "A caption test preferred “{winner}” over “{loser}”.",
+    "learningLift": "A caption test preferred “{winner}” over “{loser}” ({lift}% more engagement per view).",
+    "composer": {
+      "toggle": "A/B test the caption",
+      "toggleHint": "Send the same content with up to four captions and see which one people engage with most.",
+      "caption": "Caption {label}",
+      "remove": "Remove",
+      "add": "Add a caption",
+      "compareAfter": "Compare after",
+      "hours": "{hours, plural, =24 {1 day} =48 {2 days} =72 {3 days} =168 {1 week} other {# hours}}",
+      "planSplit": "The {pages} Pages are shared out between the {captions} captions, all at the same time.",
+      "planDays": "Every Page gets each of the {captions} captions, one a day at the same hour."
+    }
   }
 }
