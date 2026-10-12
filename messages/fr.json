@@ -1163,7 +1163,8 @@
     "templateNameTaken": "Un modèle porte déjà ce nom. Choisissez-en un autre.",
     "emailNotVerified": "Confirmez d’abord votre adresse e-mail : ouvrez le lien que nous vous avons envoyé.",
     "resetLinkInvalid": "Ce lien a expiré ou a déjà servi. Demandez-en un nouveau.",
-    "tooManyEmails": "Trop d’e-mails demandés. Réessayez dans {minutes, plural, one {# minute} other {# minutes}}."
+    "tooManyEmails": "Trop d’e-mails demandés. Réessayez dans {minutes, plural, one {# minute} other {# minutes}}.",
+    "workspaceBusy": "Cet espace de travail envoie trop de requêtes. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -3887,5 +3888,27 @@
     "resend": "Renvoyer le lien",
     "resent": "Un nouveau lien est en route.",
     "signOut": "Se déconnecter"
+  },
+  "welcome": {
+    "title": "Bienvenue",
+    "subtitle": "Deux étapes rapides pour préparer cet espace de travail. Vous pourrez tout modifier plus tard dans les paramètres.",
+    "step": "Étape {step} sur {total}",
+    "basicsTitle": "À propos de cet espace de travail",
+    "name": "Nom de l’espace de travail",
+    "nameHint": "Le client ou la marque concernée. Ce nom apparaît dans l’onglet du navigateur et dans vos rapports.",
+    "timezone": "Fuseau horaire",
+    "timezoneHint": "Les publications sont programmées et les rapports calculés dans ce fuseau horaire.",
+    "audienceTitle": "Pour qui vous publiez",
+    "audienceHint": "Pays et langues de votre audience. La rédaction par IA, les traductions et le calendrier des dates s’y adaptent. Laissez vide pour décider plus tard.",
+    "skip": "Passer pour l’instant",
+    "continue": "Continuer",
+    "saving": "Enregistrement…",
+    "saveFailed": "Les paramètres n’ont pas pu être enregistrés. Vérifiez votre connexion et réessayez.",
+    "pagesTitle": "Connectez vos premières Pages",
+    "pagesHint": "Connectez les Pages Facebook et autres profils sur lesquels vous publiez. Rien n’est publié tant que vous ne l’avez pas programmé.",
+    "pagesConnected": "{count, plural, one {# profil est déjà connecté. Vous pouvez en ajouter maintenant ou plus tard.} other {# profils sont déjà connectés. Vous pouvez en ajouter maintenant ou plus tard.}}",
+    "back": "Retour",
+    "finish": "Aller au tableau de bord",
+    "connectPages": "Connecter des Pages"
   }
 }

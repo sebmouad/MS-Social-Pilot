@@ -14,7 +14,7 @@ export default async function VerifyEmailPage({ searchParams }: { searchParams: 
   const { failed } = await searchParams;
   const auth = await getAuthContext();
   const t = await getTranslations('accountEmail');
-  if (auth?.user.emailVerified) redirect('/dashboard');
+  if (auth?.user.emailVerified) redirect('/welcome');
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6">
       <div className="card space-y-4 p-6">

@@ -104,7 +104,8 @@ export function AuthForm({ mode, inviteToken, defaults }: Props) {
       router.push(withInviteParam(step, inviteToken));
       return;
     }
-    router.push(afterAuthPath(inviteToken));
+    // A new workspace starts with its basics (S3); an invitation goes to the invitation.
+    router.push(isRegister && !inviteToken ? '/welcome' : afterAuthPath(inviteToken));
   }
 
   return (

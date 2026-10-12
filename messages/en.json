@@ -1163,7 +1163,8 @@
     "templateNameTaken": "A template with this name already exists. Choose another name.",
     "emailNotVerified": "Confirm your email address first: open the link we sent you.",
     "resetLinkInvalid": "This link has expired or was already used. Ask for a new one.",
-    "tooManyEmails": "Too many emails asked for. Try again in {minutes, plural, one {# minute} other {# minutes}}."
+    "tooManyEmails": "Too many emails asked for. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+    "workspaceBusy": "This workspace is sending too many requests. Try again in {seconds, plural, one {# second} other {# seconds}}."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -3887,5 +3888,27 @@
     "resend": "Send the link again",
     "resent": "A new link is on its way.",
     "signOut": "Sign out"
+  },
+  "welcome": {
+    "title": "Welcome",
+    "subtitle": "Two quick steps to set up this workspace. You can change any of it later in Settings.",
+    "step": "Step {step} of {total}",
+    "basicsTitle": "About this workspace",
+    "name": "Workspace name",
+    "nameHint": "The client or brand this workspace is for. It names the browser tab and your reports.",
+    "timezone": "Time zone",
+    "timezoneHint": "Posts are scheduled and reports are counted in this time zone.",
+    "audienceTitle": "Who you post for",
+    "audienceHint": "Countries and languages of your audience. AI writing, translations and the calendar of dates follow them. Leave empty to decide later.",
+    "skip": "Skip for now",
+    "continue": "Continue",
+    "saving": "Saving…",
+    "saveFailed": "The settings could not be saved. Check your connection and try again.",
+    "pagesTitle": "Connect your first Pages",
+    "pagesHint": "Connect the Facebook Pages and other profiles you publish to. Nothing is posted until you schedule it.",
+    "pagesConnected": "{count, plural, one {# profile is already connected. You can add more now or later.} other {# profiles are already connected. You can add more now or later.}}",
+    "back": "Back",
+    "finish": "Go to the dashboard",
+    "connectPages": "Connect Pages"
   }
 }

@@ -38,8 +38,19 @@ setup('the first visitor creates the first account', async ({ page }) => {
 
   // The nav bar only renders inside the signed-in layout, so its presence is
   // the proof that registration actually took.
-  await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  await page.waitForURL(/\/welcome/, { timeout: 30_000 });
   await expect(page.getByRole('banner')).toBeVisible();
+
+  // The welcome steps (S3): the basics are saved, then the Pages step offers
+  // the connections screen. UTC is chosen on purpose: the rest of the walk
+  // reads times in it, whatever zone this browser reports.
+  await expect(page.getByLabel('Workspace name', { exact: true })).toHaveValue(OWNER.workspace);
+  await page.getByLabel('Time zone', { exact: true }).selectOption('UTC');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Connect your first Pages' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Connect Pages' })).toHaveAttribute('href', '/connections');
+  await page.getByRole('link', { name: 'Go to the dashboard' }).click();
+  await page.waitForURL(/\/dashboard/);
 
   // A form submitted before React attached its handler goes out as a GET with
   // every field in the query string. Nowhere in the journey should the

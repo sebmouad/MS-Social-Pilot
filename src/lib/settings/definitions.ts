@@ -118,6 +118,17 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     max: 1440,
   },
   {
+    key: 'limits.workspaceRequestsPerMinute',
+    group: 'general',
+    type: 'number',
+    label: 'Requests per workspace per minute',
+    description: 'Signed-in API calls one workspace may make in a minute, all its members together. 0 means no limit.',
+    default: 600,
+    min: 0,
+    max: 100000,
+    hint: 'A brake so one customer cannot slow the server for everyone. Ordinary use stays far below the default; work done by the background worker is not counted.',
+  },
+  {
     key: 'i18n.defaultLocale',
     group: 'general',
     type: 'select',

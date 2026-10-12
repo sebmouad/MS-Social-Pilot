@@ -16,6 +16,7 @@ import { enabledModules, moduleOfPath, PATHNAME_HEADER, type ModuleKey } from '.
 import { DEFAULT_THEME, isTheme, type Theme } from './themes';
 import { noteSignIn, requestDevice, touchSession } from './sessions';
 import { emailEnabled } from './email/send';
+import { hit } from './rate-limit';
 
 /**
  * Sessions, and resolving which workspace the request is acting on.
@@ -542,7 +543,9 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
       name: user.name,
       locale: user.locale,
       theme: isTheme(user.theme) ? user.theme : DEFAULT_THEME,
-      emailVerified: user.emailVerifiedAt !== null,
+      // Nobody can be asked for a link the server cannot send: with email off
+      // (or turned off after they signed up), the address counts as confirmed.
+      emailVerified: user.emailVerifiedAt !== null || !emailEnabled(),
     },
     workspace: {
       id: membership.workspace.id,
@@ -624,7 +627,20 @@ export async function requireAuth(requestedWorkspaceId?: string): Promise<AuthCo
   const refusal = await accessRefusal(context);
   if (refusal === 'suspended') throw errors.workspaceSuspended();
   if (refusal === 'module') throw errors.moduleOff();
+  limitWorkspaceRequests(context.workspace.id);
   return context;
+}
+
+/**
+ * One workspace's share of the server (NEXT_PHASES S5): every signed-in API
+ * call counts against its members' common budget for the minute, so one
+ * customer's script cannot slow the app for the others. Root sets the size.
+ */
+function limitWorkspaceRequests(workspaceId: string): void {
+  const limit = env.workspaceRequestsPerMinute;
+  if (limit <= 0) return;
+  const attempt = hit(`workspace:${workspaceId}`, { limit, windowMs: 60_000 });
+  if (!attempt.allowed) throw errors.workspaceBusy(Math.max(1, Math.ceil((attempt.resetAt - Date.now()) / 1000)));
 }
 
 /** Root opens a workspace they are not a member of; the caller logs it. */

@@ -31,6 +31,8 @@ const PUBLIC: Record<string, string> = {
   'auth/login': 'Signing in cannot require being signed in.',
   'auth/register': 'Creating the first account cannot require an account.',
   'auth/logout': 'Signing out twice is not an error worth a 401.',
+  'auth/password-reset': 'Someone who forgot their password cannot sign in to ask for a new one.',
+  'auth/password-reset/confirm': 'The emailed link is the proof, not a session.',
   health: 'A load balancer has no cookies.',
   'cron/tick': 'Called by a scheduler, and guarded by its own secret rather than a session.',
   'share/[token]': 'A client answering a review link has no account; the unguessable token is the authority, and it reaches only its own Pages.',

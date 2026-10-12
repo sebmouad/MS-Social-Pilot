@@ -930,13 +930,20 @@ generic (CLAUDE.md rule 9). Items:
   not the address has an account, it is rate limited per address and per
   client, and a reset ends every session. Links are one-time, stored as
   sha256 (`EmailToken`, `src/lib/email-tokens.ts`). Existing accounts were
-  marked confirmed by the migration. Still open: the onboarding wizard and
-  the trial period (the trial waits on S4's plans).
+  marked confirmed by the migration.
+  *Welcome steps done 2026-10-12:* someone who creates a workspace (not an
+  invitation) lands on `/welcome`: workspace name, time zone (the browser's
+  own zone suggested when the workspace is still on UTC) and audience
+  countries and languages, saved through the same endpoint as Settings; then
+  "Connect your first Pages" (to Connections) or the dashboard. Skippable;
+  members who cannot change settings are sent to the dashboard. The email
+  confirmation link also lands there. Still open: the trial period (waits on
+  S4's plans).
 - **S4. Plans and billing (decided: yes, final step)** — plans with limits
   (Pages, members, scheduled posts, AI spend), payment provider (Stripe or
   Paddle; the app never stores card data), invoices, plan changes, dunning,
   usage page. Ask the owner for the plans, prices and limits before building.
-- **S5. Tenant isolation review** — **started 2026-10-11 (owner asked to do it first):** cross-workspace sweep test + three routes fixed to answer 404; rate limits per workspace and AI metering still to do — every query scoped by workspace and
+- **S5. Tenant isolation review** — **started 2026-10-11 (owner asked to do it first):** cross-workspace sweep test + three routes fixed to answer 404. *Done 2026-10-12:* requests per workspace — every signed-in API call counts against its workspace's budget per minute (Root › Configuration › General, default 600, 0 = off; 429 "This workspace is sending too many requests"; the worker is not counted); AI is metered on shared keys (per-workspace hourly limit, monthly budget, spend per workspace on Root › Agency). Per-tenant AI keys are not built (shared keys with metering chosen) — every query scoped by workspace and
   `pageScope`; e2e that one customer can never read another's data; rate
   limits per workspace; per-tenant AI keys or shared keys with metering
   (ties to 0.2 costs).

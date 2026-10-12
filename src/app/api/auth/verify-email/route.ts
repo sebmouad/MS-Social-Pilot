@@ -14,7 +14,7 @@ const RESEND_LIMIT = { limit: 5, windowMs: 60 * 60 * 1000 };
 export async function GET(request: Request) {
   const token = new URL(request.url).searchParams.get('token') ?? '';
   const done = await verifyEmail(token);
-  return NextResponse.redirect(new URL(done ? '/dashboard' : '/verify-email?failed=1', env.appUrl), 303);
+  return NextResponse.redirect(new URL(done ? '/welcome' : '/verify-email?failed=1', env.appUrl), 303);
 }
 
 /** "Send the link again", for the signed-in person who has not confirmed yet. */

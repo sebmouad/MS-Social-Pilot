@@ -407,6 +407,13 @@ export const errors = {
       params: { minutes },
       status: 429,
     }),
+  workspaceBusy: (seconds: number) =>
+    new AppError({
+      key: 'errors.workspaceBusy',
+      fallback: `This workspace is sending too many requests. Try again in ${seconds} second(s).`,
+      params: { seconds },
+      status: 429,
+    }),
   emailNotVerified: () =>
     new AppError({
       key: 'errors.emailNotVerified',

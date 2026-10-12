@@ -50,6 +50,7 @@ export async function open(page: Page, path: string): Promise<void> {
 /** Every screen behind the sign-in wall, in roughly the order the nav lists them. */
 export const SIGNED_IN_SCREENS = [
   '/dashboard',
+  '/welcome',
   '/compose',
   '/calendar',
   '/calendar?view=week',

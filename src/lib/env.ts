@@ -331,6 +331,9 @@ export const env = {
   },
 
   /** Failed sign-ins allowed per address, and per client, in one window. */
+  get workspaceRequestsPerMinute(): number {
+    return settingNumber('limits.workspaceRequestsPerMinute');
+  },
   get loginAttempts(): number {
     return settingNumber('auth.loginAttempts');
   },
