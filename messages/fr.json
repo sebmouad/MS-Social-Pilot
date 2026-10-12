@@ -131,7 +131,7 @@
       "ads": "Publicités",
       "analysis": "Analyse",
       "compare": "Comparer les canaux",
-      "total": "Tous les profils",
+      "total": "Tous les canaux",
       "responseTime": "Temps de réponse"
     },
     "byPost": "Impressions et interactions par publication",
@@ -234,11 +234,11 @@
     },
     "mapLabel": "Carte des abonnés par pays",
     "technicalDetails": "Détails techniques : métriques que Facebook fournit pour ce canal",
-    "allSelected": "{count, plural, one {Le profil choisi} other {Les # profils choisis}}",
+    "allSelected": "{count, plural, one {Le canal choisi} other {Les # canaux choisis}}",
     "pin": "Épingler {metric} à l’analyse",
     "unpin": "Désépingler {metric}",
-    "pinHint": "Afficher en tuile dans Analyse et Tous les profils",
-    "unpinHint": "Retirer cette tuile d’Analyse et de Tous les profils",
+    "pinHint": "Afficher en tuile dans Analyse et Tous les canaux",
+    "unpinHint": "Retirer cette tuile d’Analyse et de Tous les canaux",
     "pinFailed": "Les métriques épinglées n’ont pas pu être enregistrées. Réessayez.",
     "pinLimit": "Vous pouvez épingler jusqu’à 8 métriques. Retirez-en une pour en ajouter une autre.",
     "moreViews": "Plus",
@@ -1148,7 +1148,7 @@
     "rootNoSuchUser": "Aucun compte n’existe avec cet e-mail. Invitez cette personne depuis Inscription.",
     "rootAlreadyMember": "Cette personne est déjà membre de cet espace de travail.",
     "rootLastOwner": "Un espace de travail doit avoir un propriétaire. Nommez d’abord quelqu’un d’autre propriétaire.",
-    "exportNeedsAllPages": "Cet export couvre tout l’espace de travail. Demandez à un administrateur l’accès à tous les profils.",
+    "exportNeedsAllPages": "Cet export couvre tout l’espace de travail. Demandez à un administrateur l’accès à tous les canaux.",
     "noScheduledTime": "Cette publication n’a pas de date à déplacer. Ouvrez-la pour en choisir une.",
     "ruleNeedsKeywords": "Ajoutez au moins un mot à rechercher.",
     "ruleNeedsReply": "Écrivez la réponse que le canal doit publier.",
@@ -2592,7 +2592,7 @@
       "subtitle": "Tous les espaces de travail et comptes de cette installation.",
       "workspaces": "Espaces de travail",
       "users": "Comptes",
-      "pages": "Profils connectés",
+      "pages": "Canaux connectés",
       "invitations": "Invitations en attente",
       "scheduled": "Publications programmées",
       "failed": "Publications échouées, 30 jours",
@@ -2606,7 +2606,7 @@
       "name": "Nom",
       "owners": "Propriétaires",
       "members": "Membres",
-      "pages": "Profils",
+      "pages": "Canaux",
       "posts": "Publications",
       "created": "Créé le",
       "rename": "Renommer",
@@ -2681,7 +2681,7 @@
       "workspace": "Espace de travail",
       "person": "Personne",
       "role": "Rôle",
-      "pages": "Profils",
+      "pages": "Canaux",
       "lastSignIn": "Dernière connexion",
       "root": "Root",
       "disabled": "Désactivé",
@@ -2689,8 +2689,8 @@
       "somePages": "{count, plural, =0 {Aucun profil} one {# profil} other {# profils}}",
       "never": "Jamais",
       "capabilities": {
-        "manageAccounts": "Connecter et retirer des profils",
-        "manageTeam": "Inviter, changer les rôles et l’accès aux profils",
+        "manageAccounts": "Connecter et retirer des canaux",
+        "manageTeam": "Inviter, changer les rôles et l’accès aux canaux",
         "manageSettings": "Modifier les paramètres de l’espace",
         "approve": "Approuver ou refuser des publications",
         "deleteComments": "Supprimer des commentaires",
@@ -3088,11 +3088,11 @@
       "body": "Publications échouées dans la dernière heure : {count}. Ouvrez Publications → Échouées pour voir pourquoi."
     },
     "accounts_disconnected": {
-      "title": "Des profils sont déconnectés",
+      "title": "Des canaux sont déconnectés",
       "body": "Comptes connectés à reconnecter : {count}. Leurs publications ne partiront pas tant que quelqu’un ne les reconnecte pas."
     },
     "accounts_expiring": {
-      "title": "L’accès à des profils expire bientôt",
+      "title": "L’accès à des canaux expire bientôt",
       "body": "Comptes dont l’accès expire sous 7 jours : {count}. Reconnectez-les dans Connexions."
     },
     "disk_full": {
@@ -3109,10 +3109,10 @@
     }
   },
   "profileScope": {
-    "title": "Choisir les profils",
-    "all": "{count, plural, one {Tous les profils (#)} other {Tous les profils (#)}}",
+    "title": "Choisir les canaux",
+    "all": "{count, plural, one {Tous les canaux (#)} other {Tous les canaux (#)}}",
     "some": "{count, plural, one {# profil} other {# profils}}",
-    "search": "Rechercher un profil",
+    "search": "Rechercher un canal",
     "groups": "Groupes",
     "allGroups": "Tous",
     "networks": "Réseaux",
@@ -3120,10 +3120,10 @@
     "selected": "{count} sur {total} sélectionnés",
     "selectAll": "Tout sélectionner",
     "clear": "Effacer",
-    "profiles": "Profils",
+    "profiles": "Canaux",
     "only": "Seulement",
-    "noMatch": "Aucun profil ne correspond.",
-    "pickOne": "Choisissez au moins un profil.",
+    "noMatch": "Aucun canal ne correspond.",
+    "pickOne": "Choisissez au moins un canal.",
     "show": "{count, plural, =0 {Afficher les profils} one {Afficher # profil} other {Afficher # profils}}",
     "cancel": "Annuler",
     "network": {
@@ -3142,38 +3142,38 @@
   },
   "suspended": {
     "title": "Cet espace de travail est suspendu",
-    "body": "Personne ne peut y travailler sur les publications, profils ou rapports pour l’instant. Contactez l’administrateur du service pour le réactiver."
+    "body": "Personne ne peut y travailler sur les publications, canaux ou rapports pour l’instant. Contactez l’administrateur du service pour le réactiver."
   },
   "totalView": {
-    "none": "Aucun profil à additionner pour l’instant. Connectez un canal ou choisissez des profils ci-dessus.",
+    "none": "Aucun canal à additionner pour l’instant. Connectez un canal ou choisissez des canaux ci-dessus.",
     "noRanking": "Rien à classer sur cette période.",
     "intro": "{count, plural, one {Totaux pour # profil} other {Totaux pour # profils}} sur {days, plural, one {le dernier jour} other {les # derniers jours}}.",
     "followers": "Abonnés",
-    "followersHelp": "Somme des abonnés de chaque profil choisi à la fin de la période.",
+    "followersHelp": "Somme des abonnés de chaque canal choisi à la fin de la période.",
     "netFollows": "Abonnements nets",
-    "netFollowsHelp": "Nouveaux abonnements moins désabonnements, additionnés sur les profils choisis.",
+    "netFollowsHelp": "Nouveaux abonnements moins désabonnements, additionnés sur les canaux choisis.",
     "posts": "Publications",
-    "postsHelp": "Publications parues sur la période sur les profils choisis.",
+    "postsHelp": "Publications parues sur la période sur les canaux choisis.",
     "interactions": "Interactions",
     "interactionsHelp": "Réactions, commentaires et partages, additionnés.",
     "perPost": "Interactions par publication",
-    "perPostHelp": "Total des interactions divisé par le total des publications, et non la moyenne des taux de chaque profil.",
+    "perPostHelp": "Total des interactions divisé par le total des publications, et non la moyenne des taux de chaque canal.",
     "reach": "Portée",
     "upTo": "jusqu’à {value}",
-    "reachHelp": "{count, plural, one {Portée de # profil.} other {Somme de la portée de # profils.}} Une même personne peut être touchée par plusieurs profils : le nombre réel de personnes est au plus celui-ci.",
+    "reachHelp": "{count, plural, one {Portée de # canal.} other {Somme de la portée de # canaux.}} Une même personne peut être touchée par plusieurs canaux : le nombre réel de personnes est au plus celui-ci.",
     "topInteractions": "Le plus d’interactions",
     "topGrowth": "Le plus de nouveaux abonnés",
-    "seeTable": "Voir tous les profils côte à côte"
+    "seeTable": "Voir tous les canaux côte à côte"
   },
   "compareChart": {
-    "title": "Jour par jour, une ligne par profil",
-    "hint": "Cliquez sur un nom pour masquer ou afficher sa ligne. Les profils choisis ne changent pas.",
+    "title": "Jour par jour, une ligne par canal",
+    "hint": "Cliquez sur un nom pour masquer ou afficher sa ligne. Les canaux choisis ne changent pas.",
     "hintTop": "{count, plural, one {Le plus grand profil, les autres additionnés dans Autres.} other {Les # plus grands profils, les autres additionnés dans Autres.}} Cliquez sur un nom pour masquer ou afficher sa ligne.",
     "metric": "Chiffre à tracer",
-    "legend": "Profils sur le graphique",
+    "legend": "Canaux sur le graphique",
     "others": "Autres",
     "allHidden": "Toutes les lignes sont masquées. Cliquez sur un nom ci-dessus pour en réafficher une.",
-    "reachNote": "Portée des publications de chaque jour, par profil. Les lignes ne s’additionnent pas : une même personne peut être touchée par plusieurs profils.",
+    "reachNote": "Portée des publications de chaque jour, par canal. Les lignes ne s’additionnent pas : une même personne peut être touchée par plusieurs canaux.",
     "metrics": {
       "interactions": "Interactions",
       "posts": "Publications",
@@ -3184,7 +3184,7 @@
     "title": "Vos métriques épinglées",
     "edit": "Modifier dans Vue d’ensemble",
     "upTo": "jusqu’à {value}",
-    "uniqueNote": "{count, plural, one {Compte des personnes.} other {Somme sur # profils : une personne touchée par plusieurs est comptée une fois par profil, le nombre réel est donc au plus celui-ci.}}"
+    "uniqueNote": "{count, plural, one {Compte des personnes.} other {Somme sur # canaux : une personne touchée par plusieurs est comptée une fois par profil, le nombre réel est donc au plus celui-ci.}}"
   },
   "autoSync": {
     "updated": "Récupéré automatiquement depuis Facebook. Dernière lecture {when}.",
@@ -3217,9 +3217,9 @@
     "failed": "Enregistrement impossible. Réessayez.",
     "showMore": "Afficher plus",
     "emptyOpenTitle": "Rien en attente",
-    "emptyOpenHint": "Tous les commentaires et messages de ces profils sont traités. Les nouveaux apparaissent ici dès leur arrivée.",
+    "emptyOpenHint": "Tous les commentaires et messages de ces canaux sont traités. Les nouveaux apparaissent ici dès leur arrivée.",
     "emptyTitle": "Rien ici",
-    "emptyHint": "Aucun commentaire ni message ne correspond à ces filtres pour les profils sélectionnés. Essayez un autre type ou état, ou sélectionnez plus de profils."
+    "emptyHint": "Aucun commentaire ni message ne correspond à ces filtres pour les canaux sélectionnés. Essayez un autre type ou état, ou sélectionnez plus de canaux."
   },
   "sessions": {
     "listLabel": "Navigateurs connectés",

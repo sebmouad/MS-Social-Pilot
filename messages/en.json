@@ -131,7 +131,7 @@
       "ads": "Ads",
       "analysis": "Analysis",
       "compare": "Compare channels",
-      "total": "All profiles",
+      "total": "All channels",
       "responseTime": "Response time"
     },
     "byPost": "Impressions and interaction per post",
@@ -237,8 +237,8 @@
     "allSelected": "{count, plural, one {The selected profile} other {All # selected profiles}}",
     "pin": "Pin {metric} to the analysis",
     "unpin": "Unpin {metric}",
-    "pinHint": "Show this as a tile on Analysis and All profiles",
-    "unpinHint": "Remove this tile from Analysis and All profiles",
+    "pinHint": "Show this as a tile on Analysis and All channels",
+    "unpinHint": "Remove this tile from Analysis and All channels",
     "pinFailed": "The pinned metrics could not be saved. Try again.",
     "pinLimit": "You can pin up to 8 metrics. Unpin one to add another.",
     "moreViews": "More",
@@ -1148,7 +1148,7 @@
     "rootNoSuchUser": "Nobody has an account with that email. Invite them from Registration instead.",
     "rootAlreadyMember": "That person is already a member of this workspace.",
     "rootLastOwner": "A workspace needs an owner. Make someone else owner first.",
-    "exportNeedsAllPages": "This export covers the whole workspace. Ask an admin for access to every profile.",
+    "exportNeedsAllPages": "This export covers the whole workspace. Ask an admin for access to every channel.",
     "noScheduledTime": "This post has no date to move. Open it and set one.",
     "ruleNeedsKeywords": "Add at least one word to look for.",
     "ruleNeedsReply": "Write the reply the channel should post.",
@@ -2565,7 +2565,7 @@
     "save": "Save",
     "cancel": "Cancel",
     "working": "Working…",
-    "networkError": "Couldn't reach the server. Check your connection and try again.",
+    "networkError": "Could not reach the server. Check your connection and try again.",
     "nav": {
       "label": "Root section",
       "menu": "Root menu",
@@ -2592,7 +2592,7 @@
       "subtitle": "Every workspace and account on this installation.",
       "workspaces": "Workspaces",
       "users": "Accounts",
-      "pages": "Connected profiles",
+      "pages": "Connected channels",
       "invitations": "Invitations waiting",
       "scheduled": "Posts scheduled",
       "failed": "Failed publications, 30 days",
@@ -2606,7 +2606,7 @@
       "name": "Name",
       "owners": "Owners",
       "members": "Members",
-      "pages": "Profiles",
+      "pages": "Channels",
       "posts": "Posts",
       "created": "Created",
       "rename": "Rename",
@@ -2681,7 +2681,7 @@
       "workspace": "Workspace",
       "person": "Person",
       "role": "Role",
-      "pages": "Profiles",
+      "pages": "Channels",
       "lastSignIn": "Last sign-in",
       "root": "Root",
       "disabled": "Disabled",
@@ -2689,8 +2689,8 @@
       "somePages": "{count, plural, =0 {No profile} one {# profile} other {# profiles}}",
       "never": "Never",
       "capabilities": {
-        "manageAccounts": "Connect and remove profiles",
-        "manageTeam": "Invite people, change roles and profile access",
+        "manageAccounts": "Connect and remove channels",
+        "manageTeam": "Invite people, change roles and channel access",
         "manageSettings": "Change workspace settings",
         "approve": "Approve or reject posts",
         "deleteComments": "Delete comments",
@@ -2792,7 +2792,7 @@
       "sending": "Sending…",
       "sent": "Invitation emailed. You can also send them this link:",
       "notEmailed": "Email isn't set up, so nothing was sent. Send them this link yourself:",
-      "networkError": "Couldn't reach the server. Check your connection and try again.",
+      "networkError": "Could not reach the server. Check your connection and try again.",
       "expires": "Link valid until {date}",
       "revoke": "Revoke",
       "revokeQuestion": "Revoke the invitation for {email}?",
@@ -3022,7 +3022,7 @@
     "useRecovery": "Use a recovery code instead",
     "usePasskey": "Use a passkey",
     "passkeyCancelled": "The passkey request was cancelled or timed out. Try again.",
-    "networkError": "Couldn't reach the server. Check your connection and try again.",
+    "networkError": "Could not reach the server. Check your connection and try again.",
     "codesIntro": "{count, plural, one {Save this recovery code somewhere safe. It signs you in once if you lose your phone, and it isn't shown again.} other {Save these # recovery codes somewhere safe. Each signs you in once if you lose your phone, and they aren't shown again.}}",
     "copy": "Copy codes",
     "copied": "Copied",
@@ -3088,11 +3088,11 @@
       "body": "Failed publications in the last hour: {count}. Open Posts → Failed to see why."
     },
     "accounts_disconnected": {
-      "title": "Profiles are disconnected",
+      "title": "Channels are disconnected",
       "body": "Connected accounts that need reconnecting: {count}. Their posts can't go out until someone reconnects them."
     },
     "accounts_expiring": {
-      "title": "Access to profiles expires soon",
+      "title": "Access to channels expires soon",
       "body": "Accounts whose access expires within 7 days: {count}. Reconnect them in Connections."
     },
     "disk_full": {
@@ -3109,10 +3109,10 @@
     }
   },
   "profileScope": {
-    "title": "Choose profiles",
-    "all": "{count, plural, one {All profiles (#)} other {All profiles (#)}}",
+    "title": "Choose channels",
+    "all": "{count, plural, one {All channels (#)} other {All channels (#)}}",
     "some": "{count, plural, one {# profile} other {# profiles}}",
-    "search": "Search profiles",
+    "search": "Search channels",
     "groups": "Groups",
     "allGroups": "All",
     "networks": "Networks",
@@ -3120,10 +3120,10 @@
     "selected": "{count} of {total} selected",
     "selectAll": "Select all",
     "clear": "Clear",
-    "profiles": "Profiles",
+    "profiles": "Channels",
     "only": "Only",
-    "noMatch": "No profile matches.",
-    "pickOne": "Pick at least one profile.",
+    "noMatch": "No channel matches.",
+    "pickOne": "Pick at least one channel.",
     "show": "{count, plural, =0 {Show profiles} one {Show # profile} other {Show # profiles}}",
     "cancel": "Cancel",
     "network": {
@@ -3142,38 +3142,38 @@
   },
   "suspended": {
     "title": "This workspace is suspended",
-    "body": "Nobody in it can work on posts, profiles or reports for now. Contact the service administrator to have it resumed."
+    "body": "Nobody in it can work on posts, channels or reports for now. Contact the service administrator to have it resumed."
   },
   "totalView": {
-    "none": "No profile to add up yet. Connect a channel or pick profiles above.",
+    "none": "No channel to add up yet. Connect a channel or pick channels above.",
     "noRanking": "Nothing to rank for this period.",
     "intro": "{count, plural, one {Totals for # profile} other {Totals for # profiles}} over {days, plural, one {the last day} other {the last # days}}.",
     "followers": "Followers",
-    "followersHelp": "Sum of the followers of every selected profile at the end of the period.",
+    "followersHelp": "Sum of the followers of every selected channel at the end of the period.",
     "netFollows": "Net follows",
-    "netFollowsHelp": "New follows minus unfollows, added up over the selected profiles.",
+    "netFollowsHelp": "New follows minus unfollows, added up over the selected channels.",
     "posts": "Posts",
-    "postsHelp": "Posts published in the period on the selected profiles.",
+    "postsHelp": "Posts published in the period on the selected channels.",
     "interactions": "Interactions",
     "interactionsHelp": "Reactions, comments and shares, added up.",
     "perPost": "Interactions per post",
-    "perPostHelp": "Total interactions divided by total posts, not an average of each profile's rate.",
+    "perPostHelp": "Total interactions divided by total posts, not an average of each channel's rate.",
     "reach": "Reach",
     "upTo": "up to {value}",
-    "reachHelp": "{count, plural, one {Reach of # profile.} other {Sum of the reach of # profiles.}} The same person can be reached by several profiles, so the real number of people is at most this.",
+    "reachHelp": "{count, plural, one {Reach of # channel.} other {Sum of the reach of # channels.}} The same person can be reached by several profiles, so the real number of people is at most this.",
     "topInteractions": "Most interactions",
     "topGrowth": "Most new followers",
-    "seeTable": "See every profile side by side"
+    "seeTable": "See every channel side by side"
   },
   "compareChart": {
-    "title": "Day by day, one line per profile",
-    "hint": "Click a name to hide or show its line. This does not change the profiles selected.",
+    "title": "Day by day, one line per channel",
+    "hint": "Click a name to hide or show its line. This does not change the channels selected.",
     "hintTop": "{count, plural, one {The largest profile, the rest added up as Others.} other {The # largest profiles, the rest added up as Others.}} Click a name to hide or show its line.",
     "metric": "Figure to plot",
-    "legend": "Profiles on the chart",
+    "legend": "Channels on the chart",
     "others": "Others",
     "allHidden": "Every line is hidden. Click a name above to show it again.",
-    "reachNote": "Reach of each day's posts, per profile. Lines are not added up: the same person can be reached by several profiles.",
+    "reachNote": "Reach of each day's posts, per channel. Lines are not added up: the same person can be reached by several channels.",
     "metrics": {
       "interactions": "Interactions",
       "posts": "Posts",
@@ -3184,7 +3184,7 @@
     "title": "Your pinned metrics",
     "edit": "Change in Overview",
     "upTo": "up to {value}",
-    "uniqueNote": "{count, plural, one {Counts people.} other {Sum over # profiles: someone reached by several is counted once per profile, so the real number is at most this.}}"
+    "uniqueNote": "{count, plural, one {Counts people.} other {Sum over # channels: someone reached by several is counted once per profile, so the real number is at most this.}}"
   },
   "autoSync": {
     "updated": "Brought in from Facebook automatically. Last read {when}.",
@@ -3217,9 +3217,9 @@
     "failed": "Could not save. Try again.",
     "showMore": "Show more",
     "emptyOpenTitle": "Nothing waiting",
-    "emptyOpenHint": "Every comment and message on these profiles is marked done. New ones appear here as they arrive.",
+    "emptyOpenHint": "Every comment and message on these channels is marked done. New ones appear here as they arrive.",
     "emptyTitle": "Nothing here",
-    "emptyHint": "No comments or messages match these filters for the selected profiles. Try another type or state, or select more profiles."
+    "emptyHint": "No comments or messages match these filters for the selected channels. Try another type or state, or select more channels."
   },
   "sessions": {
     "listLabel": "Signed-in browsers",
@@ -3702,7 +3702,7 @@
     "editHint": "A group’s mix applies to each of its channels. A channel’s own mix replaces its groups’ mix.",
     "noLabels": "The mix counts posts by label, and this workspace has no labels yet.",
     "noLabelsAction": "Add a label while writing a post",
-    "noPages": "Connect a channel, or check the profile selection, to set its mix.",
+    "noPages": "Connect a channel, or check the channel selection, to set its mix.",
     "scope": "Channel or group",
     "pages": "Channels",
     "groups": "Groups",
