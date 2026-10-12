@@ -553,10 +553,17 @@ most time), the rest after Phase D2. S/M/L = effort.
   the queue screen lists what was added in the last week; history logs it.*
 
 ### Content
-- **G11. AI translation (S, after 0.2)** — translate a post into each language
+- **G11. AI translation (S, after 0.2)** ✅ — translate a post into each language
   of the target Pages' audiences (H0: e.g. French, English US, Spanish) as
   per-Page variants; right-to-left preview when an audience language needs it;
   keep hashtags and links.
+  *Done: composer "Translate for each Page's audience" (AI on, new post): Pages
+  grouped by their effective first audience language, one editable version per
+  language (`dir="rtl"` where needed), Pages with no language keep the original;
+  links, hashtags and @mentions put back if the model drops them
+  (`src/lib/translation.ts`); saving makes one post per language
+  (`translations` on POST /api/posts, `src/lib/translated-posts.ts`). Not
+  combined with caption tests or spreading posts out.*
 - **G12. More interface languages (M)** — beyond en/fr, add languages the
   owner picks (e.g. Spanish `messages/es.json`, Arabic `messages/ar.json`);
   make the layout RTL-ready (`dir`, logical CSS properties) so right-to-left

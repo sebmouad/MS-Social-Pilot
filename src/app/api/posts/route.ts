@@ -5,6 +5,7 @@ import { assertPagesAllowed, postScope } from '@/lib/page-access';
 import { prisma } from '@/lib/prisma';
 import { createStaggered } from '@/lib/stagger';
 import { createCaptionTest } from '@/lib/caption-test';
+import { createTranslated } from '@/lib/translated-posts';
 import { createPostSchema } from '@/lib/validation';
 import { parseLinkPreview, parseMedia } from '@/lib/json';
 import { ok, readJson, route } from '@/lib/api';
@@ -90,6 +91,8 @@ export const POST = route(async (request: Request) => {
   };
   const result = input.captionVariants?.length
     ? await createCaptionTest(context, input)
-    : await createStaggered({ ...context, locale: auth.workspace.defaultLocale }, input);
+    : input.translations?.length
+      ? await createTranslated(context, input)
+      : await createStaggered({ ...context, locale: auth.workspace.defaultLocale }, input);
   return ok(result, 201);
 });

@@ -139,6 +139,23 @@ describe('what the model is told', () => {
     expect(sent[0]?.system).toMatch(/mainly in: Mexico, United States/);
   });
 
+  it('translates for an audience and keeps links, hashtags and mentions (G11)', async () => {
+    const { user, workspace } = await seed();
+    reply = 'Nueva colección en la tienda #rebajas';
+    const result = await ai.translateCaption({
+      workspaceId: workspace.id,
+      userId: user.id,
+      text: 'New collection in store #sale @clienta https://example.com/new',
+      language: 'es-MX',
+      countries: ['MX'],
+    });
+
+    expect(sent[0]?.system).toMatch(/Translate into .*Spanish.*\(es-MX\)/);
+    expect(sent[0]?.system).toMatch(/mainly in: Mexico/);
+    expect(result.text).toBe('Nueva colección en la tienda #rebajas\n\n#sale @clienta https://example.com/new');
+    expect(await prisma.aiGeneration.count({ where: { kind: AiGenerationKind.translate } })).toBe(1);
+  });
+
   it('passes the tone and the brand voice through', async () => {
     const { user, workspace } = await seed();
     await generate(workspace.id, user.id, {

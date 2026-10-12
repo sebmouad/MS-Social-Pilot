@@ -563,7 +563,8 @@
     "aiHashtagsPick": "Pick the ones that fit. They go at the end of the post.",
     "aiHashtagsAdd": "{count, plural, =0 {Add hashtags} one {Add 1 hashtag} other {Add # hashtags}}",
     "staggeredOk": "Scheduled as {count, plural, one {# post} other {# posts}}, one Page at a time.",
-    "captionTestOk": "Caption test started: {count, plural, one {# post} other {# posts}} scheduled. The result shows in Analyse › Caption tests."
+    "captionTestOk": "Caption test started: {count, plural, one {# post} other {# posts}} scheduled. The result shows in Analyse › Caption tests.",
+    "translatedOk": "{count, plural, one {Done: one post.} other {Done: # posts, one per language.}}"
   },
   "config": {
     "title": "Configuration",
@@ -3119,5 +3120,18 @@
       "lunar_new_year": "Lunar New Year",
       "buddhist": "Buddhist"
     }
+  },
+  "translate": {
+    "start": "Translate for each Page’s audience",
+    "working": "Translating…",
+    "again": "Translate again",
+    "stop": "Stop translating",
+    "title": "{count, plural, one {# translation} other {# translations}}",
+    "hint": "Each Page gets the version in its audience’s language, as one post per language. Links, hashtags and mentions stay as written. Check each version before scheduling.",
+    "stale": "The post changed since it was translated.",
+    "original": "Original",
+    "originalHint": "These Pages have no audience language, so they get the post as written.",
+    "noLanguages": "None of these Pages has an audience language yet. Set one in Settings › Pages › Voice, audience & links.",
+    "failed": "The translation did not work. Try again in a moment."
   }
 }

@@ -563,7 +563,8 @@
     "aiHashtagsPick": "Choisissez ceux qui conviennent. Ils s’ajoutent à la fin.",
     "aiHashtagsAdd": "{count, plural, =0 {Ajouter des hashtags} one {Ajouter 1 hashtag} other {Ajouter # hashtags}}",
     "staggeredOk": "Programmé en {count, plural, one {# publication} other {# publications}}, une Page à la fois.",
-    "captionTestOk": "Test de légendes lancé : {count, plural, one {# publication programmée} other {# publications programmées}}. Le résultat s’affiche dans Analyser › Tests de légendes."
+    "captionTestOk": "Test de légendes lancé : {count, plural, one {# publication programmée} other {# publications programmées}}. Le résultat s’affiche dans Analyser › Tests de légendes.",
+    "translatedOk": "{count, plural, one {C’est fait : un post.} other {C’est fait : # posts, un par langue.}}"
   },
   "config": {
     "title": "Configuration",
@@ -3119,5 +3120,18 @@
       "lunar_new_year": "Nouvel An lunaire",
       "buddhist": "Bouddhiste"
     }
+  },
+  "translate": {
+    "start": "Traduire pour l’audience de chaque Page",
+    "working": "Traduction…",
+    "again": "Traduire à nouveau",
+    "stop": "Arrêter la traduction",
+    "title": "{count, plural, one {# traduction} other {# traductions}}",
+    "hint": "Chaque Page reçoit la version dans la langue de son audience, en un post par langue. Les liens, hashtags et mentions restent tels quels. Vérifiez chaque version avant de programmer.",
+    "stale": "Le post a changé depuis la traduction.",
+    "original": "Original",
+    "originalHint": "Ces Pages n’ont pas de langue d’audience : elles reçoivent le post tel qu’il est écrit.",
+    "noLanguages": "Aucune de ces Pages n’a encore de langue d’audience. Définissez-en une dans Paramètres › Pages › Ton, audience et liens.",
+    "failed": "La traduction n’a pas fonctionné. Réessayez dans un instant."
   }
 }

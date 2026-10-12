@@ -171,6 +171,14 @@ export const createPostSchema = z
     captionVariants: z.array(postMessage).max(3).optional(),
     /** Hours after the last caption goes out before the test is read. */
     testHours: z.union([z.literal(24), z.literal(48), z.literal(72), z.literal(168)]).optional(),
+    /**
+     * AI translation (G11): these Pages get this text instead of the message,
+     * one post per translation. Pages in none keep the message.
+     */
+    translations: z
+      .array(z.object({ targetIds: postTargetIds, message: postMessage }))
+      .max(LIMITS.targetsPerPost)
+      .optional(),
   })
   .superRefine((value, ctx) => {
     // `link` is optional here and absent means none, so it is normalised for
@@ -187,6 +195,23 @@ export const createPostSchema = z
       }
       if (!value.message.trim() || value.captionVariants.some((caption) => !caption.trim())) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['captionVariants'], message: 'Write every caption of the test.' });
+      }
+    }
+
+    if (value.translations?.length) {
+      const ids = value.translations.flatMap((translation) => translation.targetIds);
+      if (new Set(ids).size !== ids.length || ids.some((id) => !value.targetIds.includes(id))) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['translations'], message: 'Each translation must be for Pages of this post, once each.' });
+      }
+      if (value.translations.some((translation) => !translation.message.trim())) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['translations'], message: 'A translation is empty.' });
+      }
+      if (value.captionVariants?.length || (value.staggerMinutes ?? 0) > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['translations'],
+          message: 'Translations cannot be combined with a caption test or spreading posts out.',
+        });
       }
     }
 

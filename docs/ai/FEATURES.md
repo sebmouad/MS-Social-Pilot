@@ -23,7 +23,9 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   contributors; spam-risk guard (same link or near-identical text on 3+ Pages of
   one network within the workspace gap, Settings → General) warns and offers
   one post per Page N minutes apart, optionally reworded per Page by AI;
-  AI: generate, improve, hashtags (needs Anthropic key); Facebook-like
+  AI: generate, improve, hashtags, translate for each Page's audience language
+  (one editable version per language, right-to-left where needed, saved as one
+  post per language) (needs an AI key); Facebook-like
   preview (phone frame for Stories/Reels). Prefill from `?title=&text=&url=` (phone
   share target), `?to=<targetId>`, `?at=<local time>`.
 - **Calendar** `/calendar`: Month / Week / Page feed views, drafts toggle,

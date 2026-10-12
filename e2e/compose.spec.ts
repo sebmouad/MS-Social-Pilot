@@ -444,9 +444,7 @@ test('a caption too long for Instagram is flagged while it is being written', as
   await open(page, '/compose');
   await page.getByLabel(/what do you want to say/i).fill('x'.repeat(2_300));
 
-  const box = page.getByRole('checkbox').nth(
-    (await page.getByRole('checkbox').count()) - 1,
-  );
+  const box = page.getByRole('checkbox', { name: /@walkbakery/ });
   await expect(async () => {
     await box.click();
     await expect(page.getByText(/Instagram takes 2,?200/i)).toBeVisible({ timeout: 1_500 });

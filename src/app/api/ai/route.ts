@@ -2,11 +2,12 @@ import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { aiAvailable, generateCaption, improveCaption, planWeek, suggestHashtags, TONES } from '@/lib/ai';
+import { aiAvailable, generateCaption, improveCaption, planWeek, suggestHashtags, TONES, translateCaption } from '@/lib/ai';
 import { assertPagesAllowed } from '@/lib/page-access';
 import { EMPTY_AUDIENCE, audienceOf, effectiveAudience } from '@/lib/audience';
 import { createPost } from '@/lib/posts';
 import { formatInZone } from '@/lib/time';
+import { groupByLanguage, isRightToLeft } from '@/lib/translation';
 import { errors } from '@/lib/errors';
 import { ok, readJson, route } from '@/lib/api';
 
@@ -31,6 +32,11 @@ const schema = z.discriminatedUnion('action', [
     action: z.literal('hashtags'),
     text: z.string().trim().min(3, 'Write the post first.').max(6000),
     targetIds,
+  }),
+  z.object({
+    action: z.literal('translate'),
+    text: z.string().trim().min(3, 'Write the post first.').max(6000),
+    targetIds: z.array(z.string().min(1)).min(1).max(500),
   }),
   z.object({
     action: z.literal('plan'),
@@ -94,6 +100,39 @@ export const POST = route(async (request: Request) => {
 
   if (input.action === 'hashtags') {
     return ok({ hashtags: await suggestHashtags({ ...shared, text: input.text }) });
+  }
+
+  if (input.action === 'translate') {
+    // Each Page's own audience language (H0), else the workspace's default.
+    const pages = await prisma.target.findMany({
+      where: { id: { in: input.targetIds }, workspaceId: auth.workspace.id },
+      select: { id: true, brandVoice: true, audienceCountries: true, audienceLanguages: true, audienceTimezone: true, audienceCalendars: true },
+    });
+    const byId = new Map(pages.map((row) => [row.id, row]));
+    const audiences = new Map(
+      pages.map((row) => [row.id, effectiveAudience(audienceOf(row), audienceOf(workspace), auth.workspace.timezone)]),
+    );
+    const groups = groupByLanguage(
+      input.targetIds.filter((id) => byId.has(id)).map((id) => ({ id, language: audiences.get(id)!.languages[0] ?? null })),
+    );
+    const translations = [];
+    for (const group of groups) {
+      const first = byId.get(group.targetIds[0]!)!;
+      const text = group.language
+        ? (
+            await translateCaption({
+              workspaceId: auth.workspace.id,
+              userId: auth.user.id,
+              text: input.text,
+              language: group.language,
+              countries: audiences.get(first.id)!.countries,
+              brandVoice: (group.targetIds.length === 1 && first.brandVoice?.trim()) || workspace.aiBrandVoice,
+            })
+          ).text
+        : input.text;
+      translations.push({ ...group, text, rtl: isRightToLeft(group.language) });
+    }
+    return ok({ translations });
   }
 
   if (input.action === 'plan') {

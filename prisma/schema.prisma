@@ -108,6 +108,8 @@ enum AiGenerationKind {
   plan
   /// The plain-language summary at the top of a scheduled report.
   recap
+  /// A post translated for a Page's audience (G11).
+  translate
 }
 
 // ---------------------------------------------------------------------------

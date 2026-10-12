@@ -23,6 +23,7 @@ import { formatInZone } from '@/lib/time';
 import { IG_CAPTION_LIMIT } from '@/lib/constants';
 import { CaptionTestFields, NO_CAPTION_TEST, type CaptionTestChoice } from './CaptionTestFields';
 import { SpamGuard, type StaggerChoice } from './SpamGuard';
+import { TranslationFields, type Translation } from './TranslationFields';
 
 interface Props {
   targets: TargetOption[];
@@ -139,7 +140,13 @@ export function Composer({
   const [pending, setPending] = useState(false);
   const [stagger, setStagger] = useState<StaggerChoice>({ minutes: 0, aiVariants: false });
   const [captionTest, setCaptionTest] = useState<CaptionTestChoice>(NO_CAPTION_TEST);
+  const [translations, setTranslations] = useState<Translation[] | null>(null);
   const testing = captionTest.on && !editing && timing !== 'queue';
+  // Translations are for the Pages picked when they were made.
+  const selectedKey = selected.join(',');
+  useEffect(() => setTranslations(null), [selectedKey]);
+  const translating = translations !== null && !editing && !testing;
+  const pageNames = new Map(targets.map((target) => [target.id, target.name]));
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
@@ -384,6 +391,14 @@ export function Composer({
               staggerMinutes: timing === 'queue' || testing ? 0 : stagger.minutes,
               aiVariants: testing ? false : stagger.aiVariants,
               ...(testing ? { captionVariants: captionTest.captions, testHours: captionTest.hours } : {}),
+              ...(translating
+                ? {
+                    staggerMinutes: 0,
+                    translations: translations
+                      .filter((translation) => translation.language)
+                      .map((translation) => ({ targetIds: translation.targetIds, message: translation.text })),
+                  }
+                : {}),
             }),
           });
 
@@ -468,12 +483,16 @@ export function Composer({
       setStagger({ minutes: 0, aiVariants: false });
       const tested = testing;
       setCaptionTest(NO_CAPTION_TEST);
+      const translated = translating;
+      setTranslations(null);
 
       setResult(
         saveAsDraft
           ? t('savedDraft')
           : tested
             ? t('captionTestOk', { count: body.posts ?? 1 })
+          : translated
+            ? t('translatedOk', { count: body.posts ?? 1 })
           : staggered > 0
             ? t('staggeredOk', { count: staggered })
           : needsApproval
@@ -633,6 +652,15 @@ export function Composer({
               onResult={writeMessage}
               targetIds={selected}
               onHashtags={(tags) => writeMessage(`${message.trimEnd()}\n\n${tags.join(' ')}`)}
+            />
+          )}
+          {aiEnabled && !editing && !testing && selected.length > 0 && (
+            <TranslationFields
+              message={message}
+              targetIds={selected}
+              pageNames={pageNames}
+              value={translations}
+              onChange={setTranslations}
             />
           )}
 
@@ -881,12 +909,12 @@ export function Composer({
             timezone={timezone}
             postId={editing?.id}
             aiEnabled={aiEnabled}
-            canStagger={!editing && timing !== 'queue' && !testing}
+            canStagger={!editing && timing !== 'queue' && !testing && !translating}
             value={stagger}
             onChange={setStagger}
           />
 
-          {!editing && timing !== 'queue' && (
+          {!editing && timing !== 'queue' && !translating && (
             <CaptionTestFields value={captionTest} onChange={setCaptionTest} pages={selected.length} />
           )}
 

@@ -6,6 +6,7 @@ import { activeAiProvider, generateWith, providerKey } from './ai-providers';
 import { costUsd, priceFor, type AiSpendView } from './ai-prices';
 import { env } from './env';
 import { errors } from './errors';
+import { keepTokens } from './translation';
 
 /**
  * AI writing help for the composer.
@@ -243,6 +244,42 @@ export async function improveCaption(options: {
       options.draft,
     ].join('\n'),
   });
+}
+
+/**
+ * The post in another language, for the Pages whose audience reads it (G11).
+ * Links, hashtags and @mentions stay exactly as written.
+ */
+export async function translateCaption(options: {
+  workspaceId: string;
+  userId: string;
+  text: string;
+  /** BCP-47 tag. */
+  language: string;
+  countries?: string[];
+  brandVoice?: string | null;
+}): Promise<GenerationResult> {
+  const result = await complete({
+    workspaceId: options.workspaceId,
+    userId: options.userId,
+    kind: AiGenerationKind.translate,
+    system: [
+      'You translate social media posts for Facebook Pages.',
+      `Translate into ${writingLanguage(Locale.en, { languages: [options.language], countries: [] })} (${options.language}).`,
+      audienceLine({ languages: [], countries: options.countries ?? [] }),
+      '',
+      'Rules:',
+      '- Return only the translated post. No preamble, no explanation, no surrounding quotes.',
+      '- Keep every link, hashtag, @mention, emoji and line break exactly as in the original.',
+      '- Keep the meaning and every concrete detail; do not add or remove facts.',
+      '- Write naturally for that audience rather than word for word.',
+      options.brandVoice ? `\nHow this brand sounds:\n${options.brandVoice}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    prompt: options.text,
+  });
+  return { ...result, text: keepTokens(options.text, result.text.trim()) };
 }
 
 /**
