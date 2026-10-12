@@ -217,7 +217,7 @@ export function AppShell({
         { href: '/reports', label: t('reports'), icon: 'reports' },
       ],
     },
-    { key: 'ads', label: t('module.ads'), rail: t('rail_ads'), icon: 'megaphone', items: [{ href: '/ads', label: t('adsPerformance'), icon: 'megaphone' }] },
+    { key: 'ads', label: t('module.ads'), rail: t('rail_ads'), icon: 'megaphone', items: [{ href: '/ads', label: t('module.ads'), icon: 'megaphone' }] },
     {
       key: 'workspace',
       label: t('section_workspace'),
