@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { planPublish } from '../src/lib/facebook/publish';
-import { awarenessOn } from '../src/lib/awareness-days';
+import { computedDays } from '../src/lib/key-dates';
 import { weekGrid } from '../src/lib/time';
 import { nextReportRun, reportPeriod } from '../src/lib/report-schedules';
 import { comparisonWindow, parseCompare } from '../src/lib/date-range';
@@ -49,10 +49,11 @@ describe('the calendar', () => {
   });
 
   it('marks fixed awareness days and the moving Black Friday', () => {
-    expect(awarenessOn('2026-02-14').map((day) => day.key)).toContain('valentines');
-    expect(awarenessOn('2026-11-27').map((day) => day.key)).toContain('blackFriday');
-    expect(awarenessOn('2027-11-26').map((day) => day.key)).toContain('blackFriday');
-    expect(awarenessOn('2026-11-28').map((day) => day.key)).not.toContain('blackFriday');
+    const on = (date: string) => computedDays(Number(date.slice(0, 4)), ['international_days']).filter((day) => day.date === date).map((day) => day.key);
+    expect(on('2026-02-14')).toContain('valentines');
+    expect(on('2026-11-27')).toContain('blackFriday');
+    expect(on('2027-11-26')).toContain('blackFriday');
+    expect(on('2026-11-28')).not.toContain('blackFriday');
   });
 });
 

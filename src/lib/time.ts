@@ -178,6 +178,8 @@ export function nextAvailableSlot(options: {
   now?: Date;
   /** How far ahead to search before giving up. */
   horizonDays?: number;
+  /** A day's times after the seasonal modes (H2), by `yyyy-MM-dd`. */
+  adjustDay?: (day: string, slots: Array<{ hour: number; minute: number }>) => Array<{ hour: number; minute: number }>;
 }): Date | null {
   const { slots, timeZone } = options;
   if (slots.length === 0) return null;
@@ -194,16 +196,17 @@ export function nextAvailableSlot(options: {
     const day = addDays(cursor, dayOffset);
     const dayOfWeek = day.getDay();
 
-    const candidates = slots
-      .filter((slot) => slot.dayOfWeek === dayOfWeek)
+    const stamp = [
+      `${day.getFullYear()}`,
+      String(day.getMonth() + 1).padStart(2, '0'),
+      String(day.getDate()).padStart(2, '0'),
+    ].join('-');
+    const weekdaySlots = slots.filter((slot) => slot.dayOfWeek === dayOfWeek);
+    const candidates = (options.adjustDay ? options.adjustDay(stamp, weekdaySlots) : weekdaySlots)
+      .slice()
       .sort((a, b) => a.hour - b.hour || a.minute - b.minute);
 
     for (const slot of candidates) {
-      const stamp = [
-        `${day.getFullYear()}`,
-        String(day.getMonth() + 1).padStart(2, '0'),
-        String(day.getDate()).padStart(2, '0'),
-      ].join('-');
       const wallClock = `${stamp}T${String(slot.hour).padStart(2, '0')}:${String(slot.minute).padStart(2, '0')}:00`;
 
       // `firstRealInstant`, not `fromZonedTime`: one Sunday a year the slot's

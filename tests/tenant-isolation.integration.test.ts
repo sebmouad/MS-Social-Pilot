@@ -69,6 +69,8 @@ const BODY: Record<string, unknown> = {
   'targets/[id]/profile': { brandVoice: 'Hijacked' },
   'labels/[id]': { name: 'Hijacked' },
   'page-groups/[id]': { name: 'Hijacked' },
+  'key-dates/[id]': { title: 'Hijacked' },
+  'seasons/[id]': { name: 'Hijacked', startsOn: '2026-01-01', endsOn: '2026-01-02', rule: 'pause' },
   'snippets/[id]': { name: 'Hijacked', body: 'x' },
   'feeds/[id]': { enabled: false },
   'moderation/rules/[id]': { enabled: false },
@@ -141,6 +143,8 @@ beforeAll(async () => {
   const exported = await prisma.workspaceExport.create({
     data: { workspaceId: w, requestedById: ownerA.id, status: 'ready', storageKey: 'exports/a.zip', expiresAt: new Date(Date.now() + 86_400_000) },
   });
+  const keyDate = await prisma.keyDate.create({ data: { workspaceId: w, date: '2026-05-10', title: 'A date' } });
+  const season = await prisma.seasonalMode.create({ data: { workspaceId: w, name: 'A season', startsOn: '2026-08-01', endsOn: '2026-08-31', rule: 'pause' } });
   const moderated = await prisma.moderationAction.create({
     data: { workspaceId: w, ruleId: rule.id, ruleName: 'A rule', targetId: target.id, remoteCommentId: 'c-a', message: 'x', action: 'hide' },
   });
@@ -159,11 +163,13 @@ beforeAll(async () => {
     'connections/instagram/[id]': instagram.id,
     'exports/[id]': exported.id,
     'feeds/[id]': feed.id,
+    'key-dates/[id]': keyDate.id,
     'labels/[id]': label.id,
     'media/[id]': media.id,
     'media/[id]/raw': media.id,
     'moderation/rules/[id]': rule.id,
     'saved-replies/[id]': savedReply.id,
+    'seasons/[id]': season.id,
     'moderation/actions/[id]/undo': moderated.id,
     'page-groups/[id]': group.id,
     'report-schedules/[id]': schedule.id,

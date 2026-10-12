@@ -17,7 +17,7 @@ import { canManageOthersPosts, canManageSettings, postIsEditable } from '@/lib/c
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
 import { formatInZone, monthGrid, weekGrid } from '@/lib/time';
-import { awarenessOn } from '@/lib/awareness-days';
+import { keyDaysBetween, type KeyDay } from '@/lib/calendar-days';
 import { StatusBadge } from '@/components/StatusBadge';
 import { parseMedia } from '@/lib/json';
 import { Icon } from '@/components/Icon';
@@ -120,6 +120,20 @@ export default async function CalendarPage({
   const days = view === 'month' ? monthGrid(safeYear, safeMonth, timezone, weekStartsOn) : weekGrid(anchor, timezone, weekStartsOn);
   const gridStart = days[0]!;
   const gridEnd = new Date(days[days.length - 1]!.getTime() + 24 * 60 * 60 * 1000);
+  const keyDays = await keyDaysBetween(
+    auth.workspace.id,
+    filter.ids,
+    formatInZone(gridStart, timezone, 'yyyy-MM-dd'),
+    formatInZone(days[days.length - 1]!, timezone, 'yyyy-MM-dd'),
+  );
+  /** What a key day is called for this reader. */
+  const keyDayName = (day: KeyDay) =>
+    day.kind === 'computed'
+      ? tDays(day.key)
+      : day.kind === 'custom'
+        ? day.title
+        : `${locale.startsWith('en') ? day.name : day.localName} (${day.country})`;
+  const keyDaysOn = (key: string) => (keyDays.get(key) ?? []).map((day) => ({ id: `${day.kind}:${keyDayName(day)}`, name: keyDayName(day), kind: day.kind }));
 
   const [posts, drafts] = await Promise.all([
     prisma.post.findMany({
@@ -551,7 +565,7 @@ export default async function CalendarPage({
           newPostLabel={(date: Date) => t('newPostOn', { date: dayLabel.format(date) })}
           weekdayName={weekdayName}
           weekStartsOn={weekStartsOn}
-          dayName={(key: string) => awarenessOn(key).map((entry) => tDays(entry.key))}
+          dayName={(key: string) => keyDaysOn(key).map((entry) => entry.name)}
           ideaHref={(key: string, name: string) => (key >= todayKey ? ideaHref(key, name) : null)}
         />
       ) : (
@@ -617,17 +631,17 @@ export default async function CalendarPage({
                   </span>
                 </div>
 
-                {awarenessOn(key).length > 0 && (
+                {keyDaysOn(key).length > 0 && (
                   <ul className="mt-1 space-y-0.5">
-                    {awarenessOn(key).map((entry) => (
-                      <li key={entry.key}>
+                    {keyDaysOn(key).map((entry) => (
+                      <li key={entry.id}>
                         <Link
-                          href={key >= todayKey ? ideaHref(key, tDays(entry.key)) : '#'}
-                          className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50"
-                          title={tDays(entry.key)}
+                          href={key >= todayKey ? ideaHref(key, entry.name) : '#'}
+                          className={`flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px] font-semibold hover:bg-emerald-50 ${entry.kind === 'custom' ? 'text-brand-700' : 'text-emerald-700'}`}
+                          title={entry.name}
                         >
-                          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                          <span className="truncate">{tDays(entry.key)}</span>
+                          <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${entry.kind === 'custom' ? 'bg-brand-500' : 'bg-emerald-500'}`} />
+                          <span className="truncate">{entry.name}</span>
                         </Link>
                       </li>
                     ))}

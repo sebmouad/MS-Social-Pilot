@@ -54,6 +54,7 @@ export const SIGNED_IN_SCREENS = [
   '/calendar',
   '/calendar?view=week',
   '/calendar?view=feed',
+  '/calendar/dates',
   '/queue',
   '/posts',
   '/approvals',

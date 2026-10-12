@@ -16,6 +16,7 @@ import { discoverAdAccounts, syncWorkspaceAds } from '../ads';
 import { deleteUnusedMedia } from '../media';
 import { pruneErrors } from '../error-tracking';
 import { runExports } from '../workspace-export';
+import { refreshHolidays } from '../holidays';
 import { pruneHistory, prunedTotal } from '../housekeeping';
 import { forEachEnabledPage, forEachWorkspace } from './iterate';
 import { fetchRemotePostState } from '../facebook/publish';
@@ -54,7 +55,8 @@ export type JobName =
   | 'captionTests'
   | 'bestTimes'
   | 'alerts'
-  | 'exports';
+  | 'exports'
+  | 'holidays';
 
 export interface JobContext {
   now: Date;
@@ -683,6 +685,16 @@ export function jobDefinitions(): JobDefinition[] {
       name: 'exports',
       intervalMs: 60 * 1000,
       run: async ({ now }) => runExports(now),
+    },
+    {
+      // Public holidays for the countries audiences name (H2): a few
+      // country-years per run from the open holidays dataset, no Graph calls.
+      name: 'holidays',
+      intervalMs: 6 * 60 * 60 * 1000,
+      run: async ({ now }) => {
+        const fetched = await refreshHolidays(now);
+        return fetched.length > 0 ? `holidays fetched for ${fetched.join(', ')}` : null;
+      },
     },
     {
       // Root's alerts: database reads and a disk check, no Graph calls.

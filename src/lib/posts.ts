@@ -13,6 +13,8 @@ import {
   type LinkPreview,
 } from './json';
 import { localInputToUtc, nextAvailableSlot, wallClockExists } from './time';
+import { adjustDaySlots, adjustmentFor } from './seasons';
+import { formatInTimeZone } from 'date-fns-tz';
 import { resolveMediaForPublish } from './media';
 import { resolveLinkPreview } from './facebook/opengraph';
 import { publishPost } from './facebook/publish';
@@ -56,7 +58,7 @@ import { hasPostContent } from './validation';
  * post it is allocating for; everything else keeps calling it with the plain
  * client and never notices.
  */
-type PrismaClientLike = Pick<typeof prisma, 'queueSlot' | 'post'>;
+type PrismaClientLike = Pick<typeof prisma, 'queueSlot' | 'post' | 'seasonalMode'>;
 
 export interface ResolvedSchedule {
   scheduledAt: Date | null;
@@ -121,7 +123,7 @@ async function nextQueueSlot(
   now: Date,
   targetIds: string[] = [],
 ): Promise<Date> {
-  const [rows, taken] = await Promise.all([
+  const [rows, taken, seasons] = await Promise.all([
     client.queueSlot.findMany({
       where: { workspaceId, OR: [{ targetId: null }, ...(targetIds.length ? [{ targetId: { in: targetIds } }] : [])] },
       select: { dayOfWeek: true, hour: true, minute: true, targetId: true },
@@ -138,6 +140,11 @@ async function nextQueueSlot(
       },
       select: { scheduledAt: true },
     }),
+    // Seasonal modes (H2) still running or to come; dates are compared as text.
+    client.seasonalMode.findMany({
+      where: { workspaceId, endsOn: { gte: formatInTimeZone(now, timeZone, 'yyyy-MM-dd') } },
+      select: { startsOn: true, endsOn: true, targetIds: true, rule: true, shiftMinutes: true, extraTimes: true },
+    }),
   ]);
 
   const slots = slotsForPages(rows, targetIds);
@@ -148,6 +155,7 @@ async function nextQueueSlot(
     timeZone,
     takenUtc: taken.map((post) => post.scheduledAt).filter((date): date is Date => Boolean(date)),
     now,
+    adjustDay: seasons.length ? (day, daySlots) => adjustDaySlots(daySlots, adjustmentFor(seasons, targetIds, day)) : undefined,
   });
 
   if (!slot) throw errors.queueFull();

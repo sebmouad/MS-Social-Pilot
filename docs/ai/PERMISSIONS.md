@@ -28,7 +28,7 @@ Order: owner 4 > admin 3 > editor 2 > contributor 1. A workspace owner is
 |---|---|
 | Connect/remove Pages and accounts (`canManageAccounts`) | admin |
 | Invite, change roles, Page access per member (`canManageTeam`) | admin |
-| Workspace settings (`canManageSettings`) | admin |
+| Workspace settings (`canManageSettings`), incl. key dates and seasonal modes | admin |
 | Approve / reject posts (`canApprove`) | admin |
 | Delete comments (`canDeleteComments`) | admin |
 | Reply / hide comments (`canModerateComments`) | editor |

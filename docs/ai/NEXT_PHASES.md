@@ -675,7 +675,7 @@ setup from Phase 0.2 (marked AI).
   "Question"); the queue fills slots to match from
   drafts, evergreen and WordPress items, and warns when a category runs dry.
   Categories = post labels (exist).
-- **H2. Cultural calendar and seasonal modes (S)** — from the audience (H0):
+- **H2. Cultural calendar and seasonal modes (S)** ✅ — from the audience (H0):
   public holidays of each country the user chose (from a worldwide holidays
   dataset/API covering every country, not hand-typed) and any cultural or
   commercial calendars the user ticks from a worldwide list, plus **custom
@@ -684,6 +684,19 @@ setup from Phase 0.2 (marked AI).
   **Seasonal posting modes** defined by the user per Page: a date range plus a
   rule (shift slots, fewer/more posts, different times, pause). Nothing on by
   default; no country or religion favoured.
+  *Done 2026-10-12: the calendar shows, for the Pages in the selection, the
+  computed days of the calendars their audiences tick (international days;
+  Western and Orthodox Easter by the computus; Islamic, Hebrew, Chinese and
+  Buddhist dates from the calendars built into `Intl`; Hindu dates are not
+  computed — they come with a country's holidays or as custom dates), the
+  public holidays of their countries (Nager.Date, fetched by the `holidays`
+  worker job for the countries in use, nationwide only, shared and refreshed
+  every 90 days; uncovered countries are named on screen) and the team's own
+  key dates (once or yearly, all Pages or some). New screen Publish › Key
+  dates & seasons (`/calendar/dates`): upcoming 90 days with "Plan a post",
+  custom dates and seasonal modes (pause / move times / fewer / more) that the
+  queue allocator applies per day. The old fixed `awareness-days.ts` (with
+  country-specific entries) is gone. Admins edit (`canManageSettings`).*
 - **H3. Posts from structured page data (M)** — read schema.org JSON-LD from
   the user's linked pages, whatever the niche (`Article`, `Product` with price
   and offers, `Event` with date/place, `Recipe`, `JobPosting`, `Course`,

@@ -29,8 +29,12 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   preview (phone frame for Stories/Reels). Prefill from `?title=&text=&url=` (phone
   share target), `?to=<targetId>`, `?at=<local time>`.
 - **Calendar** `/calendar`: Month / Week / Page feed views, drafts toggle,
-  awareness days (click → compose with a first line), labels filter, Pages column
+  key days from the selected Pages' audiences (calendars, public holidays,
+  the team's own dates; click → compose with a first line), labels filter, Pages column
   with show/hide/solo + ⋮ Page menu, "Plan with AI" (week of drafts).
+- **Key dates & seasons** `/calendar/dates`: the next 90 days of key days,
+  custom dates (once or yearly, per Page), seasonal modes (pause, move times,
+  fewer, more) that the queue applies. Admins edit; everyone reads.
 - **Queue** `/queue`: weekly slots (workspace or per Page), suggested times from
   results, add-all-suggested, shuffle, clear (back to drafts). With Settings ›
   "Best times per Page" set to add, a weekly job adds each Page's best new

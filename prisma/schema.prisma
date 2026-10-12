@@ -280,6 +280,8 @@ model Workspace {
   adAccounts           AdAccount[]
   moderationRules      ModerationRule[]
   exports              WorkspaceExport[]
+  keyDates             KeyDate[]
+  seasonalModes        SeasonalMode[]
   moderationActions    ModerationAction[]
 
   @@map("workspaces")
@@ -1774,4 +1776,74 @@ model WorkspaceExport {
   @@index([workspaceId, createdAt])
   @@index([status])
   @@map("workspace_exports")
+}
+
+/// Public holidays of one country (H2), from the worldwide holidays dataset.
+/// Shared by every workspace; fetched by the worker for the countries in use.
+model PublicHoliday {
+  country   String
+  /// `yyyy-MM-dd`.
+  date      String
+  name      String
+  localName String
+
+  @@id([country, date, name])
+  @@index([date])
+  @@map("public_holidays")
+}
+
+/// Which country-years have been fetched, so each is asked for once.
+model HolidayYear {
+  country   String
+  year      Int
+  /// Holidays found; 0 when the dataset does not cover the country.
+  count     Int
+  fetchedAt DateTime @default(now())
+
+  @@id([country, year])
+  @@map("holiday_years")
+}
+
+/// A date the team adds to its calendar (H2): a launch, a sale, an event.
+model KeyDate {
+  id          String   @id @default(cuid())
+  workspaceId String
+  /// `yyyy-MM-dd`; with `yearly`, only the month and day count.
+  date        String
+  title       String
+  yearly      Boolean  @default(false)
+  /// The Pages it is for; empty for every Page.
+  targetIds   String[] @default([])
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, date])
+  @@map("key_dates")
+}
+
+/// A seasonal posting mode (H2): between two dates, the queue of these Pages
+/// pauses, moves its times, keeps fewer of them or adds more.
+model SeasonalMode {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  name         String
+  /// `yyyy-MM-dd`, inclusive, in the workspace's time zone.
+  startsOn     String
+  endsOn       String
+  /// The Pages it is for; empty for every Page.
+  targetIds    String[] @default([])
+  /// pause · shift · fewer · more
+  rule         String
+  /// For `shift`: minutes to move each queue time (negative is earlier).
+  shiftMinutes Int      @default(0)
+  /// For `more`: extra queue times each day, `HH:mm`.
+  extraTimes   String[] @default([])
+  createdAt    DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("seasonal_modes")
 }

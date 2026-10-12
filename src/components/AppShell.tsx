@@ -200,6 +200,7 @@ export function AppShell({
       also: ['/compose'],
       items: [
         { href: '/calendar', label: t('calendar'), icon: 'calendar' },
+        { href: '/calendar/dates', label: t('keyDates'), icon: 'star' },
         { href: '/queue', label: t('queue'), icon: 'clock' },
         { href: '/posts', label: t('posts'), icon: 'posts' },
         ...(showApprovals ? [{ href: '/approvals', label: t('approvals'), icon: 'approvals' as IconName, badge: pendingApprovals }] : []),
