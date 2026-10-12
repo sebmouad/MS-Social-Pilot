@@ -16,6 +16,7 @@ export interface ScheduleRow {
   nextLabel: string;
   lastLabel: string | null;
   lastError: string | null;
+  aiRecap: boolean;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,11 +32,14 @@ export function ReportSchedules({
   pageName,
   schedules,
   templateId,
+  aiOn,
 }: {
   targetId: string;
   pageName: string;
   schedules: ScheduleRow[];
   templateId: string | null;
+  /** AI is set up and on for this workspace: offer the summary. */
+  aiOn: boolean;
 }) {
   const t = useTranslations('reports');
   const tCommon = useTranslations('common');
@@ -44,6 +48,7 @@ export function ReportSchedules({
   const [open, setOpen] = useState(false);
   const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('monthly');
   const [recipients, setRecipients] = useState('');
+  const [aiRecap, setAiRecap] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const close = useCallback(() => {
@@ -63,7 +68,7 @@ export function ReportSchedules({
     const response = await fetch('/api/report-schedules', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ targetId, frequency, recipients: list, templateId }),
+      body: JSON.stringify({ targetId, frequency, recipients: list, templateId, aiRecap: aiOn && aiRecap }),
     }).catch(() => null);
     setPending(false);
     if (!response?.ok) {
@@ -124,6 +129,11 @@ export function ReportSchedules({
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-slate-900">
                       {t(`frequency_${row.frequency}`)} · {row.recipients.join(', ')}
+                      {row.aiRecap && (
+                        <span className="ml-2 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
+                          {t('scheduleAiRecapBadge')}
+                        </span>
+                      )}
                     </span>
                     <span className="block text-xs text-slate-500">
                       {t('scheduleNext', { when: row.nextLabel })}
@@ -177,6 +187,20 @@ export function ReportSchedules({
                 {invalid.length ? t('recipientsInvalid', { list: invalid.join(', ') }) : t('recipientsHint')}
               </p>
             </div>
+            {aiOn && (
+              <label className="flex items-start gap-3 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                  checked={aiRecap}
+                  onChange={(event) => setAiRecap(event.target.checked)}
+                />
+                <span>
+                  {t('scheduleAiRecap')}
+                  <span className="block text-xs text-slate-500">{t('scheduleAiRecapHint')}</span>
+                </span>
+              </label>
+            )}
           </div>
         </div>
       </Dialog>

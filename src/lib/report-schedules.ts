@@ -1,6 +1,7 @@
-import { TargetType } from '@prisma/client';
+import { Locale, TargetType, WorkspaceRole } from '@prisma/client';
 import { z } from 'zod';
 
+import { aiAvailable, writeReportRecap, type RecapFigures } from './ai';
 import { prisma } from './prisma';
 import { buildReport } from './reports';
 import { sendEmail } from './email/send';
@@ -40,6 +41,7 @@ export const reportScheduleSchema = z.object({
     .max(MAX_RECIPIENTS)
     .transform((list) => [...new Set(list)]),
   templateId: z.string().min(1).nullable().optional(),
+  aiRecap: z.boolean().optional(),
 });
 
 /** `YYYY-MM-DD` of a moment, in a zone. */
@@ -106,7 +108,11 @@ export function reportPeriod(
   };
 }
 
-export async function createReportSchedule(workspaceId: string, input: z.infer<typeof reportScheduleSchema>) {
+export async function createReportSchedule(
+  workspaceId: string,
+  input: z.infer<typeof reportScheduleSchema>,
+  createdById: string | null = null,
+) {
   const [workspace, target] = await Promise.all([
     prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { timezone: true, weekStartsOn: true } }),
     prisma.target.findFirst({ where: { id: input.targetId, workspaceId, type: TargetType.page } }),
@@ -123,6 +129,8 @@ export async function createReportSchedule(workspaceId: string, input: z.infer<t
       templateId: input.templateId ?? null,
       frequency: input.frequency,
       recipients: input.recipients,
+      aiRecap: input.aiRecap ?? false,
+      createdById,
       nextRunAt: nextReportRun(input.frequency, new Date(), workspace.timezone, workspace.weekStartsOn),
     },
   });
@@ -136,7 +144,9 @@ export async function createReportSchedule(workspaceId: string, input: z.infer<t
 export async function sendDueReports(now: Date): Promise<{ sent: number; failed: number }> {
   const due = await prisma.reportSchedule.findMany({
     where: { nextRunAt: { lte: now } },
-    include: { workspace: { select: { id: true, name: true, timezone: true, defaultLocale: true, weekStartsOn: true } } },
+    include: {
+      workspace: { select: { id: true, name: true, timezone: true, defaultLocale: true, weekStartsOn: true, aiEnabled: true } },
+    },
     orderBy: { nextRunAt: 'asc' },
     take: 50,
   });
@@ -161,14 +171,20 @@ export async function sendDueReports(now: Date): Promise<{ sent: number; failed:
         to: period.to,
         targetIds: [target.id],
       });
+      const periodLabel = `${formatInZone(period.from, timeZone, 'd MMM')} – ${formatInZone(period.to, timeZone, 'd MMM yyyy')}`;
+      const recap =
+        schedule.aiRecap && schedule.workspace.aiEnabled && aiAvailable()
+          ? await recapFor({ schedule, pageName: target.name, periodLabel, report, period })
+          : null;
       const email = scheduledReportEmail({
         locale: schedule.workspace.defaultLocale,
         workspace: schedule.workspace.name,
         page: target.name,
         frequency,
-        period: `${formatInZone(period.from, timeZone, 'd MMM')} – ${formatInZone(period.to, timeZone, 'd MMM yyyy')}`,
+        period: periodLabel,
         followers: target.followersCount ?? target.fanCount ?? null,
         report,
+        recap,
       });
       const outcomes = await Promise.all(
         schedule.recipients.map((to) =>
@@ -205,4 +221,59 @@ export async function rescheduleWeeklyReports(workspaceId: string, now: Date = n
     where: { workspaceId, frequency: 'weekly' },
     data: { nextRunAt: nextReportRun('weekly', now, workspace.timezone, workspace.weekStartsOn) },
   });
+}
+
+function recapFigures(report: Awaited<ReturnType<typeof buildReport>>): RecapFigures {
+  return {
+    posts: report.postsPublished,
+    reach: report.totals.reach,
+    engagement: report.totals.engagement,
+    topPosts: report.topPosts.slice(0, 3).map((post) => ({
+      text: post.message.replace(/\s+/g, ' ').trim().slice(0, 140),
+      engagement: post.engagement,
+    })),
+  };
+}
+
+/**
+ * The AI recap, or null: the report goes out without it rather than not at
+ * all when the provider fails, the budget is spent or nobody can be billed.
+ */
+async function recapFor(options: {
+  schedule: { id: string; workspaceId: string; targetId: string; createdById: string | null; workspace: { timezone: string; defaultLocale: Locale } };
+  pageName: string;
+  periodLabel: string;
+  report: Awaited<ReturnType<typeof buildReport>>;
+  period: { from: Date; to: Date };
+}): Promise<string | null> {
+  const { schedule } = options;
+  try {
+    const length = options.period.to.getTime() - options.period.from.getTime();
+    const previous = await buildReport({
+      workspaceId: schedule.workspaceId,
+      timezone: schedule.workspace.timezone,
+      from: new Date(options.period.from.getTime() - length),
+      to: options.period.from,
+      targetIds: [schedule.targetId],
+    });
+    // Counted against whoever set the schedule up, or the workspace owner.
+    const userId =
+      (schedule.createdById &&
+        (await prisma.membership.findFirst({ where: { workspaceId: schedule.workspaceId, userId: schedule.createdById } }))?.userId) ||
+      (await prisma.membership.findFirst({ where: { workspaceId: schedule.workspaceId, role: WorkspaceRole.owner }, orderBy: { createdAt: 'asc' } }))
+        ?.userId;
+    if (!userId) return null;
+    return await writeReportRecap({
+      workspaceId: schedule.workspaceId,
+      userId,
+      pageName: options.pageName,
+      periodLabel: options.periodLabel,
+      current: recapFigures(options.report),
+      previous: recapFigures(previous),
+      locale: schedule.workspace.defaultLocale,
+    });
+  } catch (error) {
+    console.error(`[reports] recap for schedule ${schedule.id} failed`, error);
+    return null;
+  }
 }

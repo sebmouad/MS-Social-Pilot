@@ -106,6 +106,8 @@ enum AiGenerationKind {
   improve
   hashtags
   plan
+  /// The plain-language summary at the top of a scheduled report.
+  recap
 }
 
 // ---------------------------------------------------------------------------
@@ -1340,6 +1342,10 @@ model ReportSchedule {
   nextRunAt   DateTime
   lastRunAt   DateTime?
   lastError   String?
+  /// Open the email with a short AI summary of what changed (needs AI on).
+  aiRecap     Boolean   @default(false)
+  /// Who set it up: the AI recap is counted against them.
+  createdById String?
   createdAt   DateTime  @default(now())
 
   workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

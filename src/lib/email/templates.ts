@@ -386,6 +386,8 @@ export function scheduledReportEmail(options: {
   period: string;
   followers: number | null;
   report: Report;
+  /** The AI summary, when the schedule asks for one and it could be written. */
+  recap?: string | null;
 }): RenderedEmail {
   const t = (key: string, params?: Record<string, string | number>) =>
     translate(options.locale, key, params);
@@ -401,7 +403,10 @@ export function scheduledReportEmail(options: {
       { label: t('email.scheduledReport.reach'), value: number(report.totals.reach) },
       { label: t('email.scheduledReport.engagement'), value: number(report.totals.engagement) },
     ],
-    details: report.postsPublished === 0 ? [t('email.scheduledReport.nothing')] : [],
+    details: [
+      ...(options.recap ? [t('email.scheduledReport.recap', { recap: options.recap })] : []),
+      ...(report.postsPublished === 0 ? [t('email.scheduledReport.nothing')] : []),
+    ],
     list: {
       title: t('email.scheduledReport.topPosts'),
       items: report.topPosts.slice(0, 3).map((post) => {

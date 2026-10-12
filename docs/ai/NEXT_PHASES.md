@@ -369,6 +369,13 @@ Each verified missing in our code on 2026-10-11:
   week grids, their headers and weekly scheduled reports follow it.
 - **AI weekly recap** on scheduled reports: plain-language "what changed and
   why" at the top (needs the Anthropic key).
+  **Done 2026-10-12:** a schedule can ask for it (`ReportSchedule.aiRecap`,
+  offered only while AI is set up and on for the workspace). At send time the
+  period and the one before are built, only those figures go to the active
+  provider (any of the three), and the 3–4 sentences open the email, marked
+  as written by AI. Counted against whoever set the schedule up (kind
+  `recap`), inside the same rate limit and monthly budget; if anything fails
+  the report goes out without it.
 - MCP setup page: step-by-step per assistant (Claude, others) with copy buttons.
 
 ## Phase D — Design system pass

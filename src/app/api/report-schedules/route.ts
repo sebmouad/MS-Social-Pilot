@@ -22,6 +22,6 @@ export const POST = route(async (request: Request) => {
   const auth = await requireCapability((role) => atLeast(role, WorkspaceRole.editor));
   const input = reportScheduleSchema.parse(await readJson(request));
   assertPagesAllowed(auth.pageScope, [input.targetId]);
-  const schedule = await createReportSchedule(auth.workspace.id, input);
+  const schedule = await createReportSchedule(auth.workspace.id, input, auth.user.id);
   return ok({ schedule }, 201);
 });

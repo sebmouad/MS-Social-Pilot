@@ -341,6 +341,55 @@ describe('the hourly limit', () => {
   });
 });
 
+describe('the recap on a scheduled report', () => {
+  it('opens the email with a summary of the figures, billed to whoever set it up', async () => {
+    const { user, workspace } = await seed();
+    await prisma.membership.create({ data: { userId: user.id, workspaceId: workspace.id, role: 'owner' } });
+    const target = await prisma.target.create({
+      data: { workspaceId: workspace.id, type: 'page', providerId: `p-${randomBytes(3).toString('hex')}`, name: 'Client Page', accessToken: null },
+    });
+    const reports = await import('../src/lib/report-schedules');
+    const schedule = await reports.createReportSchedule(
+      workspace.id,
+      { targetId: target.id, frequency: 'weekly', recipients: ['client@example.test'], aiRecap: true },
+      user.id,
+    );
+    reply = 'Reach held steady with no posts this week.';
+
+    expect(await reports.sendDueReports(schedule.nextRunAt)).toEqual({ sent: 1, failed: 0 });
+
+    expect(sent[0]?.system).toMatch(/Never invent a cause/);
+    expect(JSON.parse(sent[0]!.prompt)).toMatchObject({ page: 'Client Page', current: { posts: 0 }, previous: { posts: 0 } });
+    const generation = await prisma.aiGeneration.findFirstOrThrow();
+    expect(generation).toMatchObject({ kind: AiGenerationKind.recap, userId: user.id });
+    const email = await prisma.emailLog.findFirstOrThrow({ where: { template: 'scheduledReport' } });
+    expect(email.to).toBe('client@example.test');
+    await prisma.emailLog.deleteMany();
+    await prisma.reportSchedule.deleteMany();
+    await prisma.target.deleteMany();
+  });
+
+  it('still sends the report when the workspace switched AI off', async () => {
+    const { user, workspace } = await seed();
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { aiEnabled: false } });
+    const target = await prisma.target.create({
+      data: { workspaceId: workspace.id, type: 'page', providerId: `p-${randomBytes(3).toString('hex')}`, name: 'Client Page', accessToken: null },
+    });
+    const reports = await import('../src/lib/report-schedules');
+    const schedule = await reports.createReportSchedule(
+      workspace.id,
+      { targetId: target.id, frequency: 'weekly', recipients: ['client@example.test'], aiRecap: true },
+      user.id,
+    );
+
+    expect(await reports.sendDueReports(schedule.nextRunAt)).toEqual({ sent: 1, failed: 0 });
+    expect(sent).toEqual([]);
+    await prisma.emailLog.deleteMany();
+    await prisma.reportSchedule.deleteMany();
+    await prisma.target.deleteMany();
+  });
+});
+
 describe('when things go wrong', () => {
   it('still returns the draft when the audit row cannot be written', async () => {
     // Losing the record of a generation must not lose somebody their draft.

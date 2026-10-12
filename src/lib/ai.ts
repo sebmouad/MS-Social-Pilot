@@ -298,6 +298,48 @@ export async function planWeek(options: {
   return parsePlan(result.text, options.days, options.count);
 }
 
+/** The figures a report recap may talk about: this period against the one before. */
+export interface RecapFigures {
+  posts: number;
+  reach: number;
+  engagement: number;
+  /** The best posts' openings with their interactions. */
+  topPosts: Array<{ text: string; engagement: number }>;
+}
+
+/**
+ * Three or four plain sentences for the top of a scheduled report: what
+ * changed against the period before, and what in the figures explains it.
+ * Only these figures go to the model, and it is told to name no cause they
+ * do not show.
+ */
+export async function writeReportRecap(options: {
+  workspaceId: string;
+  userId: string;
+  pageName: string;
+  periodLabel: string;
+  current: RecapFigures;
+  previous: RecapFigures;
+  locale: Locale;
+}): Promise<string> {
+  const language = options.locale === Locale.fr ? 'French' : 'English';
+  const result = await complete({
+    workspaceId: options.workspaceId,
+    userId: options.userId,
+    kind: AiGenerationKind.recap,
+    maxTokens: 400,
+    system: [
+      'You summarise a social media Page report for a busy business owner.',
+      `Write in ${language}, three or four short sentences, plain words, no headings, no lists, no emoji.`,
+      'Say what went up or down against the previous period, with the numbers, then what in the figures explains it (number of posts, the best posts).',
+      'Only use the figures given. Never invent a cause, an event, a statistic or advice the figures do not support.',
+      'If the previous period has no figures, describe this period alone.',
+    ].join('\n'),
+    prompt: JSON.stringify({ page: options.pageName, period: options.periodLabel, current: options.current, previous: options.previous }),
+  });
+  return result.text.trim().slice(0, 1200);
+}
+
 /** The model's JSON, made safe: days in range, real times, non-empty texts. */
 export function parsePlan(text: string, days: number, count: number): PlannedPost[] {
   const start = text.indexOf('[');

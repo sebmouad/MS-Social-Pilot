@@ -806,7 +806,8 @@
       "nothing": "Rien n’a été publié sur cette période.",
       "topPosts": "Meilleures publications",
       "interactions": "{total} interactions",
-      "footer": "Envoyé automatiquement par {workspace} avec MS Social Pilot."
+      "footer": "Envoyé automatiquement par {workspace} avec MS Social Pilot.",
+      "recap": "En bref (rédigé par l’IA à partir de ces chiffres) : {recap}"
     },
     "chat": {
       "test": "✅ MS Social Pilot est connecté. Les alertes de {workspace} arriveront ici.",
@@ -1724,7 +1725,10 @@
     "recipients": "Destinataires",
     "recipientsHint": "Jusqu’à 10 adresses, séparées par des virgules.",
     "recipientsInvalid": "Vérifiez ces adresses : {list}",
-    "downloadPdf": "Télécharger le PDF"
+    "downloadPdf": "Télécharger le PDF",
+    "scheduleAiRecap": "Commencer par un court résumé rédigé par l’IA",
+    "scheduleAiRecapHint": "Ce qui a augmenté ou baissé par rapport à la période précédente, et pourquoi, uniquement à partir de ces chiffres. Compte dans votre quota d’IA.",
+    "scheduleAiRecapBadge": "Résumé IA"
   },
   "settings": {
     "addTime": "Ajouter un créneau",

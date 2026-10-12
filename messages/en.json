@@ -806,7 +806,8 @@
       "nothing": "Nothing was published in this period.",
       "topPosts": "Best posts",
       "interactions": "{total} interactions",
-      "footer": "Sent automatically by {workspace} with MS Social Pilot."
+      "footer": "Sent automatically by {workspace} with MS Social Pilot.",
+      "recap": "In short (written by AI from these figures): {recap}"
     },
     "chat": {
       "test": "✅ MS Social Pilot is connected. Alerts for {workspace} will arrive here.",
@@ -1724,7 +1725,10 @@
     "recipients": "Send to",
     "recipientsHint": "Up to 10 addresses, separated by commas.",
     "recipientsInvalid": "Check these addresses: {list}",
-    "downloadPdf": "Download PDF"
+    "downloadPdf": "Download PDF",
+    "scheduleAiRecap": "Start with a short summary written by AI",
+    "scheduleAiRecapHint": "What went up or down against the period before, and why, from these figures only. Counts towards your AI allowance.",
+    "scheduleAiRecapBadge": "AI summary"
   },
   "settings": {
     "addTime": "Add time",

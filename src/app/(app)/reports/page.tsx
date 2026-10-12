@@ -19,6 +19,7 @@ import { atLeast, canManageSettings } from '@/lib/constants';
 import { targetScope } from '@/lib/page-access';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { ExternalLink } from '@/components/ExternalLink';
+import { aiAvailable } from '@/lib/ai';
 import { FeedPost } from '@/components/FeedPost';
 import { PageAnalysisView } from '@/components/analysis/PageAnalysisView';
 import { AudienceView } from '@/components/AudienceSection';
@@ -88,7 +89,7 @@ export default async function ReportsPage({
   const has = (section: (typeof sections)[number]) => sections.includes(section);
   const branding = await prisma.workspace.findUniqueOrThrow({
     where: { id: auth.workspace.id },
-    select: { name: true, logoUrl: true, reportTitle: true, reportSubtitle: true, reportFooter: true },
+    select: { name: true, logoUrl: true, reportTitle: true, reportSubtitle: true, reportFooter: true, aiEnabled: true },
   });
   const selected = pages.find((page) => page.id === first(params.target)) ?? pages[0] ?? null;
   const canEdit = atLeast(auth.role, WorkspaceRole.editor);
@@ -169,7 +170,9 @@ export default async function ReportsPage({
                 nextLabel: formatInZone(row.nextRunAt, timezone, 'EEE d MMM, HH:mm'),
                 lastLabel: row.lastRunAt ? formatInZone(row.lastRunAt, timezone, 'd MMM, HH:mm') : null,
                 lastError: row.lastError,
+                aiRecap: row.aiRecap,
               }))}
+              aiOn={aiAvailable() && branding.aiEnabled}
             />
           )}
           <ReportControls
