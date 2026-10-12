@@ -26,6 +26,7 @@ import { IG_CAPTION_LIMIT } from '@/lib/constants';
 import { CaptionTestFields, NO_CAPTION_TEST, type CaptionTestChoice } from './CaptionTestFields';
 import { SpamGuard, type StaggerChoice } from './SpamGuard';
 import { TemplatePicker } from './TemplatePicker';
+import { VersionHistory } from './VersionHistory';
 import { TranslationFields, type Translation } from './TranslationFields';
 
 interface Props {
@@ -649,6 +650,28 @@ export function Composer({
                 }
               }}
             />
+            {editing && (
+              <VersionHistory
+                postId={editing.id}
+                currentMessage={message}
+                pageName={(id) => targets.find((target) => target.id === id)?.name ?? null}
+                labelName={(id) => labels.find((label) => label.id === id)?.name ?? null}
+                onRestore={(version) => {
+                  startedNext();
+                  writeMessage(version.message);
+                  setFirstComment(version.firstComment ?? '');
+                  if (commentBox.current) commentBox.current.value = version.firstComment ?? '';
+                  writeLink(version.link ?? '');
+                  void loadPreview(version.link ?? '');
+                  setMedia(version.media as PostMedia[]);
+                  if (['post', 'reel', 'story'].includes(version.format)) setFormat(version.format as 'post' | 'reel' | 'story');
+                  // Pages and labels this person can no longer use are left out.
+                  setSelected(version.targetIds.filter((id) => targets.some((target) => target.id === id)));
+                  setLabelIds(version.labelIds.filter((id) => labels.some((label) => label.id === id)));
+                  if (version.scheduledAtLocal) setScheduledAt(version.scheduledAtLocal);
+                }}
+              />
+            )}
           </div>
           <label className="label" htmlFor="message">
             {format === 'story' ? t('storyNote') : t('whatToSay')}

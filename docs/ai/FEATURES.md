@@ -46,6 +46,10 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
 - **Templates** `/templates`: saved post structures by category (text with
   `{blanks}`, hashtags, first comment, label); picked from Compose ›
   Templates, which asks for each blank. Editors and up manage them.
+- **Version history** (Compose › History, editing a post): every save keeps
+  a version (text, first comment, link, media, Pages, labels, time, who; 50
+  per post). Lists what each save changed, compares a version's text with the
+  form word by word, and loads one back; saving it is a normal save.
 - **Content mix** `/queue/mix`: per Page or group, how many posts of each
   label the coming 7 days should hold; a table of planned vs target with
   ready drafts per Page (selection-aware). Admins edit; with "Fill gaps from

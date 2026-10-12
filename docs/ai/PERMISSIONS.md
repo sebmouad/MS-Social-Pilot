@@ -36,6 +36,7 @@ Order: owner 4 > admin 3 > editor 2 > contributor 1. A workspace owner is
 | Edit or delete other people's posts (`canManageOthersPosts`) | editor |
 | Delete media (`canDeleteMedia`) | editor |
 | Add, change, remove post templates (`canManageTemplates`, NEXT_PHASES H4; using one needs no role) | editor |
+| See a post's version history (NEXT_PHASES H9): same as editing it — its author, or `canManageOthersPosts`, within the member's Pages | contributor (own posts) |
 | Compose drafts (`canCompose`) | contributor (everyone) |
 
 Marking an inbox comment or conversation done / not done (`POST /api/inbox`)

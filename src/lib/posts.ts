@@ -38,6 +38,7 @@ import { ApprovalStatus, PostStatus, Prisma, WorkspaceRole } from '@prisma/clien
 import { prepareLinks } from './links';
 import { hasPostContent } from './validation';
 import { emitWebhook } from './webhooks';
+import { recordVersion } from './post-versions';
 
 /**
  * Post lifecycle: composing, scheduling, editing and cancelling.
@@ -386,6 +387,7 @@ export async function createPost(
     : await write(prisma);
 
   const { post, schedule, status } = written;
+  await recordVersion(post.id, context.userId);
 
   await logActivity(context.workspaceId, 'post.created', {
     postId: post.id,
@@ -1127,6 +1129,7 @@ export async function updatePost(
       });
     }
   });
+  await recordVersion(postId, context.userId);
 
   // A post that is native, cleared, and scheduled once this edit lands is one
   // Facebook is supposed to be holding, so ask it to. Recording the choice and

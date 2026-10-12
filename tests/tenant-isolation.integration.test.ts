@@ -197,7 +197,7 @@ beforeAll(async () => {
     target: target.id,
     post: post.id,
   });
-  for (const action of ['', '/approve', '/duplicate', '/first-comment', '/publish', '/recycle', '/remove', '/retry', '/undo-send']) {
+  for (const action of ['', '/approve', '/duplicate', '/first-comment', '/publish', '/recycle', '/remove', '/retry', '/undo-send', '/versions']) {
     A[`posts/[id]${action}`] = post.id;
   }
 

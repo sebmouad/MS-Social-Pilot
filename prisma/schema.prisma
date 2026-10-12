@@ -153,6 +153,7 @@ model User {
   memberships          Membership[]
   sessions             Session[]
   posts                Post[]
+  postVersions         PostVersion[]
   submittedPosts       Post[]                @relation("PostSubmitter")
   reviewedPosts        Post[]                @relation("PostReviewer")
   sentInvitations      Invitation[]          @relation("InvitationSender")
@@ -538,6 +539,7 @@ model Post {
   reviewDecisions ReviewDecision[]
   feedItem        FeedItem?        @relation(fields: [sourceFeedItemId], references: [id])
   captionTest     CaptionTest?     @relation(fields: [captionTestId], references: [id], onDelete: SetNull)
+  versions        PostVersion[]
 
   @@index([workspaceId, status])
   @@index([mediaKeys], type: Gin)
@@ -550,6 +552,31 @@ model Post {
   @@index([sourceFeedItemId])
   @@index([captionTestId])
   @@map("posts")
+}
+
+/// A post as it stood after one save (NEXT_PHASES H9): what it said, where and
+/// when it was going, and who saved it. Compared and restored from Compose.
+model PostVersion {
+  id           String    @id @default(cuid())
+  postId       String
+  authorId     String?
+  createdAt    DateTime  @default(now())
+  message      String
+  firstComment String?
+  link         String?
+  media        Json      @default("[]")
+  format       String
+  targetIds    String[]  @default([])
+  labelIds     String[]  @default([])
+  scheduledAt  DateTime?
+  timezone     String
+
+  post   Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@map("post_versions")
 }
 
 /// The unit of work the scheduler claims and publishes: one post, one

@@ -744,8 +744,15 @@ setup from Phase 0.2 (marked AI).
 - **H8. Internal notes on posts (S)** — team-only comment thread on each post
   with @mentions (notifies), never published; shown in Compose, calendar
   popover and approvals.
-- **H9. Post version history (S)** — every save stores a version (text, media,
+- **H9. Post version history (S)** ✅ — every save stores a version (text, media,
   targets, time, who); compare and restore.
+  *Done 2026-10-12: `post_versions` written after every create and edit
+  through `createPost`/`updatePost` (skipped when nothing versioned changed;
+  50 kept per post). Compose › History (editing) lists saves with what each
+  changed, a word diff of a version's text against the form, and "Load this
+  version", which fills the form only: saving it goes through every normal
+  check and the approval rules. `GET /api/posts/[id]/versions`: the post's
+  author or editors+, within the member's Pages.*
 - **H10. Undo send (S)** ✅ — "Publish now" waits 30 s (setting 0–60 s) with an
   "Undo" toast; the worker publishes after the delay; scheduled posts
   unaffected.
