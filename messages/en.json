@@ -3765,5 +3765,34 @@
     "duration_minutes": "{major, plural, one {# min} other {# min}}",
     "duration_hours": "{major} h {minor} min",
     "duration_days": "{major, plural, one {# day} other {# days}} {minor} h"
+  },
+  "outlook": {
+    "label": "Engagement outlook",
+    "unknown": "{count, plural, =0 {No past posts on this Page to compare with yet.} one {Only # past post on this Page: not enough to compare with yet.} other {Only # past posts on this Page: not enough to compare with yet.}}",
+    "outlook_above": "Likely above this Page’s usual engagement",
+    "outlook_around": "Likely around this Page’s usual engagement",
+    "outlook_below": "Likely below this Page’s usual engagement",
+    "reason": "{factor} {value}: {percent}% of the usual ({posts, plural, one {# post} other {# posts}})",
+    "basis": "{count, plural, one {Compared with # past post on this Page.} other {Compared with # past posts on this Page.}} A guide, not a promise.",
+    "factor": {
+      "format": "Format",
+      "length": "Length",
+      "time": "Time of day",
+      "weekday": "Day"
+    },
+    "value": {
+      "photo": "photo",
+      "video": "video",
+      "link": "link",
+      "text": "text only",
+      "other": "other",
+      "short": "short",
+      "medium": "medium",
+      "long": "long",
+      "night": "night",
+      "morning": "morning",
+      "afternoon": "afternoon",
+      "evening": "evening"
+    }
   }
 }

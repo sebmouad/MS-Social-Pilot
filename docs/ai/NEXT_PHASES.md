@@ -732,10 +732,17 @@ setup from Phase 0.2 (marked AI).
   (editable, sent as Facebook alt text — already supported); Reel/video
   transcription to burned-in or SRT captions (speech-to-text provider; OpenAI
   or Gemini from 0.2).
-- **H6. Engagement prediction (M, AI)** — before scheduling, compare the draft
+- **H6. Engagement prediction (M, AI)** ✅ — before scheduling, compare the draft
   (format, length, time, topic) with the Page's past posts; show "likely above
   / around / below this Page's usual" with the reasons; never a fake precise
   number.
+  *Done 2026-10-12: Compose shows an "Engagement outlook" card for the first
+  selected Page (`src/lib/engagement-prediction.ts`, `/api/posts/outlook`).
+  It compares format, length, time of day and weekday with the Page's last
+  year of posts (app and Facebook-side, from stored insights, no Graph
+  call); each factor needs 3 matching posts, the Page needs 10. Topic is
+  not compared yet: it needs topic labels on past posts, which no feature
+  produces today; no AI call is made.*
 - **H7. Trending topics (S)** — Google Trends daily trends for each country in
   the Page's audience (H0), filtered by the workspace's themes; "Make a
   post" opens Compose with the topic.

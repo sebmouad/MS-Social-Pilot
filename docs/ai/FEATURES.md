@@ -30,6 +30,8 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
   contributors; spam-risk guard (same link or near-identical text on 3+ Pages of
   one network within the workspace gap, Settings → General) warns and offers
   one post per Page N minutes apart, optionally reworded per Page by AI;
+  engagement outlook for the first Page (H6: likely above / around / below
+  the Page's usual, with the reasons: format, length, time, day; never a number);
   AI: generate, improve, hashtags, translate for each Page's audience language
   (one editable version per language, right-to-left where needed, saved as one
   post per language) (needs an AI key); Facebook-like

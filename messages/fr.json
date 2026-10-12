@@ -3765,5 +3765,34 @@
     "duration_minutes": "{major, plural, one {# min} other {# min}}",
     "duration_hours": "{major} h {minor} min",
     "duration_days": "{major, plural, one {# jour} other {# jours}} {minor} h"
+  },
+  "outlook": {
+    "label": "Engagement prévu",
+    "unknown": "{count, plural, =0 {Aucune publication passée sur cette Page pour comparer.} one {Une seule publication passée sur cette Page : pas assez pour comparer.} other {Seulement # publications passées sur cette Page : pas assez pour comparer.}}",
+    "outlook_above": "Probablement au-dessus de l’engagement habituel de cette Page",
+    "outlook_around": "Probablement proche de l’engagement habituel de cette Page",
+    "outlook_below": "Probablement en dessous de l’engagement habituel de cette Page",
+    "reason": "{factor} {value} : {percent} % de l’habituel ({posts, plural, one {# publication} other {# publications}})",
+    "basis": "{count, plural, one {Comparé à # publication passée de cette Page.} other {Comparé à # publications passées de cette Page.}} Une indication, pas une promesse.",
+    "factor": {
+      "format": "Format",
+      "length": "Longueur",
+      "time": "Moment de la journée",
+      "weekday": "Jour"
+    },
+    "value": {
+      "photo": "photo",
+      "video": "vidéo",
+      "link": "lien",
+      "text": "texte seul",
+      "other": "autre",
+      "short": "court",
+      "medium": "moyen",
+      "long": "long",
+      "night": "nuit",
+      "morning": "matin",
+      "afternoon": "après-midi",
+      "evening": "soir"
+    }
   }
 }

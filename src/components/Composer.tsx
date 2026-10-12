@@ -25,6 +25,7 @@ import { formatInZone } from '@/lib/time';
 import { IG_CAPTION_LIMIT } from '@/lib/constants';
 import { CaptionTestFields, NO_CAPTION_TEST, type CaptionTestChoice } from './CaptionTestFields';
 import { SpamGuard, type StaggerChoice } from './SpamGuard';
+import { EngagementOutlook } from './EngagementOutlook';
 import { TemplatePicker } from './TemplatePicker';
 import { VersionHistory } from './VersionHistory';
 import { PostNotes } from './PostNotes';
@@ -1023,6 +1024,21 @@ export function Composer({
             canStagger={!editing && timing !== 'queue' && !testing && !translating}
             value={stagger}
             onChange={setStagger}
+          />
+          <EngagementOutlook
+            targetId={selectedTargets.find((target) => target.type === 'page')?.id ?? null}
+            format={
+              format === 'reel' || media.some((item) => item.kind === 'video')
+                ? 'video'
+                : media.length > 0
+                  ? 'photo'
+                  : format === 'post' && link.trim()
+                    ? 'link'
+                    : 'text'
+            }
+            length={message.length}
+            scheduledAtLocal={timing === 'schedule' ? scheduledAt : null}
+            timezone={timezone}
           />
 
           {!editing && timing !== 'queue' && !translating && (

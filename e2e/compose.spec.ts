@@ -500,6 +500,37 @@ test('picking a time offers the times the Page has done best at', async ({ page 
   expect(failures).toEqual([]);
 });
 
+test('the composer says how a draft compares with the Page\'s usual engagement', async ({ page }) => {
+  const failures = collectFailures(page);
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const insights = (reactions: number) => ({ impressions: null, reach: 1000, engagedUsers: null, reactions, comments: 0, shares: 0, clicks: 0 });
+  // Text posts did far better on this Page than photos.
+  await prisma.externalPost.createMany({
+    data: Array.from({ length: 12 }, (_, index) => ({
+      targetId: target.id,
+      remoteId: `outlook-${index}`,
+      createdTime: new Date(Date.now() - (index + 1) * 24 * 60 * 60 * 1000),
+      message: 'A short note',
+      statusType: index % 2 === 0 ? 'mobile_status_update' : 'added_photos',
+      insights: insights(index % 2 === 0 ? 300 : 20),
+    })),
+  });
+
+  try {
+    await open(page, `/compose?to=${target.id}`);
+    const outlook = page.getByRole('region', { name: 'Engagement outlook' });
+    await expect(async () => {
+      await page.getByLabel(/what do you want to say/i).fill('A quick update for everyone');
+      await expect(outlook).toContainText('Likely above this Page’s usual engagement', { timeout: 3_000 });
+    }).toPass({ timeout: 30_000 });
+    await expect(outlook).toContainText(/Format text only: \d+% of the usual/);
+  } finally {
+    await prisma.externalPost.deleteMany({ where: { remoteId: { startsWith: 'outlook-' } } });
+  }
+
+  expect(failures).toEqual([]);
+});
+
 test('Instagram without a picture is stopped before it is sent, and Facebook cannot hold it', async ({ page }) => {
   // Instagram has no text-only post and no scheduling of its own; both used to
   // be learnt from the server's refusal after pressing the button.
