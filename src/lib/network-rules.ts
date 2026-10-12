@@ -4,7 +4,7 @@
  * refuse the same things when it is saved.
  */
 
-export type NetworkRuleKey = 'bluesky' | 'mastodon' | 'linkedin' | 'threads' | 'x' | 'pinterest' | 'telegram' | 'youtube';
+export type NetworkRuleKey = 'bluesky' | 'mastodon' | 'linkedin' | 'threads' | 'x' | 'pinterest' | 'telegram' | 'youtube' | 'tiktok';
 
 export interface NetworkRules {
   label: string;
@@ -26,6 +26,7 @@ export const NETWORK_RULES: Record<NetworkRuleKey, NetworkRules> = {
   x: { label: 'X', textLimit: 280, maxImages: 4, video: false, needsMedia: false, linkCard: false },
   telegram: { label: 'Telegram', textLimit: 4096, maxImages: 10, video: true, needsMedia: false, linkCard: true },
   youtube: { label: 'YouTube', textLimit: 5000, maxImages: 0, video: true, needsMedia: true, linkCard: false },
+  tiktok: { label: 'TikTok', textLimit: 2200, maxImages: 0, video: true, needsMedia: true, linkCard: false },
   pinterest: { label: 'Pinterest', textLimit: 500, maxImages: 5, video: false, needsMedia: true, linkCard: true },
 };
 

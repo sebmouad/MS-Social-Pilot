@@ -8,6 +8,7 @@ import { env } from '../env';
 import { GraphError } from '../facebook/graph';
 import { blueskyProfile, blueskySession } from './bluesky';
 import { telegramCall } from './telegram';
+import { TIKTOK_SCOPES, tiktokToken, tiktokUser } from './tiktok';
 import { YOUTUBE_SCOPES, youtubeChannels, youtubeToken } from './youtube';
 import { LINKEDIN_MEMBER_SCOPES, LINKEDIN_ORG_SCOPES, linkedinMember, linkedinOrganizations, linkedinToken } from './linkedin';
 import { MASTODON_SCOPES, mastodonAccount, mastodonToken, normaliseInstance, registerMastodonApp } from './mastodon';
@@ -93,6 +94,21 @@ export async function startNetworkAuth(
     case 'pinterest': {
       url = new URL('https://www.pinterest.com/oauth/');
       url.search = new URLSearchParams({ client_id: env.pinterestClientId, redirect_uri: redirect, response_type: 'code', scope: PINTEREST_SCOPES.join(','), state }).toString();
+      break;
+    }
+    case 'tiktok': {
+      const verifier = randomToken(48);
+      pending.verifier = verifier;
+      url = new URL('https://www.tiktok.com/v2/auth/authorize/');
+      url.search = new URLSearchParams({
+        client_key: env.tiktokClientKey,
+        redirect_uri: redirect,
+        response_type: 'code',
+        scope: TIKTOK_SCOPES.join(','),
+        state,
+        code_challenge: challengeOf(verifier),
+        code_challenge_method: 'S256',
+      }).toString();
       break;
     }
     case 'youtube': {
@@ -196,6 +212,19 @@ export async function finishNetworkAuth(key: Exclude<NetworkKey, 'bluesky' | 'te
         refreshToken: token.refresh_token ?? null,
         expiresAt: new Date(Date.now() + token.expires_in * 1000),
         targets: [{ providerId: me.id, name: `@${me.username}`, pictureUrl: me.profile_image_url ?? null, category: 'X' }],
+      };
+    }
+    case 'tiktok': {
+      const token = await tiktokToken({ code, redirectUri, verifier: pending.verifier! });
+      const user = await tiktokUser(token.access_token);
+      return {
+        providerUserId: user.open_id,
+        name: user.display_name,
+        pictureUrl: user.avatar_url ?? null,
+        accessToken: token.access_token,
+        refreshToken: token.refresh_token,
+        expiresAt: new Date(Date.now() + token.expires_in * 1000),
+        targets: [{ providerId: user.open_id, name: user.display_name, pictureUrl: user.avatar_url ?? null, category: 'TikTok' }],
       };
     }
     case 'youtube': {

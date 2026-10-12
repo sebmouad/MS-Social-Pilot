@@ -10,7 +10,7 @@ import { FeedAvatar } from './FeedPost';
 import { Icon } from './Icon';
 import { NetworkMark } from './NetworkMark';
 
-type NetworkKey = 'bluesky' | 'mastodon' | 'linkedin' | 'threads' | 'x' | 'pinterest' | 'telegram' | 'youtube';
+type NetworkKey = 'bluesky' | 'mastodon' | 'linkedin' | 'threads' | 'x' | 'pinterest' | 'telegram' | 'youtube' | 'tiktok';
 
 interface Account {
   id: string;

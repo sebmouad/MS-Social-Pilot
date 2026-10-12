@@ -10,7 +10,7 @@ import { assertPublicUrl, assertResolvesPublicly } from '../safe-fetch';
  * to every network without knowing which one it is talking to.
  */
 
-export const NETWORK_KEYS = ['bluesky', 'mastodon', 'linkedin', 'threads', 'x', 'pinterest', 'telegram', 'youtube'] as const;
+export const NETWORK_KEYS = ['bluesky', 'mastodon', 'linkedin', 'threads', 'x', 'pinterest', 'telegram', 'youtube', 'tiktok'] as const;
 export type NetworkKey = (typeof NETWORK_KEYS)[number];
 
 export function isNetworkKey(value: string): value is NetworkKey {

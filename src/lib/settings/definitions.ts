@@ -609,6 +609,32 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
   // --- Other networks ---------------------------------------------------------
   {
+    key: 'networks.tiktok',
+    group: 'networks',
+    type: 'boolean',
+    label: 'TikTok switched on',
+    description: 'Off hides TikTok from Connections and stops new TikTok accounts from being connected. Accounts already connected keep their posts.',
+    default: true,
+  },
+  {
+    key: 'tiktok.clientKey',
+    group: 'networks',
+    type: 'string',
+    label: 'TikTok Client key',
+    description: 'From a TikTok for Developers app with Login Kit and the Content Posting API (direct post). Until TikTok audits the app, posts go out as private. Blank hides TikTok from Connections.',
+    default: '',
+    env: 'TIKTOK_CLIENT_KEY',
+  },
+  {
+    key: 'tiktok.clientSecret',
+    group: 'networks',
+    type: 'secret',
+    label: 'TikTok Client secret',
+    description: 'Kept encrypted. Shown once when saved.',
+    default: '',
+    env: 'TIKTOK_CLIENT_SECRET',
+  },
+  {
     key: 'networks.youtube',
     group: 'networks',
     type: 'boolean',

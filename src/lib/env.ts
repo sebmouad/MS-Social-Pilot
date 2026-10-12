@@ -196,6 +196,12 @@ export const env = {
   get xClientSecret(): string {
     return settingString('x.clientSecret');
   },
+  get tiktokClientKey(): string {
+    return settingString('tiktok.clientKey');
+  },
+  get tiktokClientSecret(): string {
+    return settingString('tiktok.clientSecret');
+  },
   get youtubeClientId(): string {
     return settingString('youtube.clientId');
   },

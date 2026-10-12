@@ -2143,7 +2143,8 @@
     "search": "Search channels",
     "noMatch": "No channel matches that.",
     "telegram": "Telegram channel",
-    "youtube": "YouTube channel"
+    "youtube": "YouTube channel",
+    "tiktok": "TikTok"
   },
   "team": {
     "title": "Team",
@@ -2302,7 +2303,8 @@
       "x": "X",
       "pinterest": "Pinterest board",
       "telegram": "Telegram channel",
-      "youtube": "YouTube channel"
+      "youtube": "YouTube channel",
+      "tiktok": "TikTok"
     },
     "hide": "Hide {page}",
     "show": "Show {page}",
@@ -3131,7 +3133,8 @@
       "x": "X",
       "pinterest": "Pinterest",
       "telegram": "Telegram",
-      "youtube": "YouTube"
+      "youtube": "YouTube",
+      "tiktok": "TikTok"
     }
   },
   "suspended": {
