@@ -20,6 +20,12 @@ owner will audit them later.** Keep this file true whenever a check changes.
 - Registration after root: invitation only, unless `openRegistration` is on
   (`admission()` in `auth.ts`).
 
+## Technical details are root's (owner approved, 2026-10-12)
+The Meta app panel (redirect and webhook addresses for Meta's dashboard) is
+only in Root › Configuration; Connections and its health panel show what a
+connection can do in plain words (`src/lib/scope-abilities.ts`), never Meta's
+permission names.
+
 ## Workspace roles (per workspace) — `src/lib/constants.ts`
 Order: owner 4 > admin 3 > editor 2 > contributor 1. A workspace owner is
 **not** root.

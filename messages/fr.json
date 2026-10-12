@@ -694,7 +694,7 @@
     "ownToken": "Possède son propre jeton de page",
     "pages": "Pages",
     "paused": "En pause",
-    "permissions": "Autorisations accordées",
+    "permissions": "Ce qu’elle permet",
     "reconnect": "Reconnecter",
     "reconnectRequired": "Reconnexion nécessaire.",
     "subtitle": "Comptes Facebook connectés, pages associées, et les jetons qui y donnent accès.",
@@ -734,7 +734,6 @@
     "jump_instagram": "Instagram",
     "jump_ads": "Comptes publicitaires",
     "jump_networks": "Autres réseaux",
-    "jump_metaApp": "Réglages de l’app Meta",
     "removeTarget": "Retirer",
     "removeTargetNamed": "Retirer {name}",
     "removeTargetConfirm": "Retirer {name} de cet espace de travail ?",
@@ -742,7 +741,18 @@
     "targetRemoved": "{name} a été retirée.",
     "stillScheduledRemoved": "{count, plural, =1 {Retirée. Une publication n’a pas pu être supprimée de Facebook et sera quand même publiée.} other {Retirée. # publications n’ont pas pu être supprimées de Facebook et seront quand même publiées.}}",
     "orphansTitle": "Pages qui ne sont plus connectées",
-    "orphansHint": "Le compte qui y donnait accès a été déconnecté. Impossible d’y publier : retirez-les, ou reconnectez le compte pour les retrouver."
+    "orphansHint": "Le compte qui y donnait accès a été déconnecté. Impossible d’y publier : retirez-les, ou reconnectez le compte pour les retrouver.",
+    "abilityMissing": "reconnectez pour corriger",
+    "ability": {
+      "pages": "Voir vos Pages",
+      "publish": "Publier",
+      "stats": "Lire les statistiques",
+      "comments": "Lire et répondre aux commentaires",
+      "messages": "Lire et répondre aux messages",
+      "instagram": "Lire Instagram",
+      "instagramPublish": "Publier sur Instagram",
+      "ads": "Lire les résultats publicitaires"
+    }
   },
   "dashboard": {
     "title": "Tableau de bord",

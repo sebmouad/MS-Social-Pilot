@@ -694,7 +694,7 @@
     "ownToken": "Has its own page token",
     "pages": "Pages",
     "paused": "Paused",
-    "permissions": "Permissions granted",
+    "permissions": "What it can do",
     "reconnect": "Reconnect",
     "reconnectRequired": "Reconnect required.",
     "subtitle": "Connected Facebook users, the pages behind them, and the tokens that reach them.",
@@ -734,7 +734,6 @@
     "jump_instagram": "Instagram",
     "jump_ads": "Ad accounts",
     "jump_networks": "Other networks",
-    "jump_metaApp": "Meta app settings",
     "removeTarget": "Remove",
     "removeTargetNamed": "Remove {name}",
     "removeTargetConfirm": "Remove {name} from this workspace?",
@@ -742,7 +741,18 @@
     "targetRemoved": "{name} was removed.",
     "stillScheduledRemoved": "{count, plural, =1 {Removed. One post could not be deleted from Facebook and will still publish.} other {Removed. # posts could not be deleted from Facebook and will still publish.}}",
     "orphansTitle": "Pages no longer connected",
-    "orphansHint": "The account that reached these was disconnected. They cannot be published to; remove them, or reconnect the account to bring them back."
+    "orphansHint": "The account that reached these was disconnected. They cannot be published to; remove them, or reconnect the account to bring them back.",
+    "abilityMissing": "reconnect to fix",
+    "ability": {
+      "pages": "See your Pages",
+      "publish": "Publish",
+      "stats": "Read statistics",
+      "comments": "Read and answer comments",
+      "messages": "Read and answer messages",
+      "instagram": "Read Instagram",
+      "instagramPublish": "Publish to Instagram",
+      "ads": "Read ad results"
+    }
   },
   "dashboard": {
     "title": "Dashboard",

@@ -139,7 +139,7 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
 ## Workspace
 - **Connections** `/connections`: Facebook profiles → Pages (enable/pause,
   remove), Pages left by a disconnected account (remove),
-  token health checks, Meta app settings helper, Instagram and ad accounts,
+  token health checks, what each connection can do in plain words (Meta app settings are in Root › Configuration), Instagram and ad accounts,
   **Other networks** cards (Bluesky, Mastodon, LinkedIn, Threads, X, Pinterest).
 - **Client links** `/settings/sharing`: portal (to review + calendar + results),
   review link (approve / request changes / comment, no account), calendar link

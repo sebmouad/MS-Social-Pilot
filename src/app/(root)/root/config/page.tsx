@@ -1,8 +1,10 @@
 import { getTranslations } from 'next-intl/server';
 
 import { ConfigClient } from '@/components/ConfigClient';
+import { MetaAppSettings } from '@/components/MetaAppSettings';
 import { aiSpend } from '@/lib/ai';
 import { requireRoot } from '@/lib/auth';
+import { metaAppSettings } from '@/lib/meta-app';
 import { screenMetadata } from '@/lib/metadata';
 import { GROUP_LABELS, GROUP_ORDER, describeSettings } from '@/lib/settings';
 
@@ -28,6 +30,12 @@ export default async function RootConfigPage() {
         <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
+
+      {/* The values Meta's app dashboard asks for. Technical, so root's alone
+          (agencies and their clients never see them). */}
+      <div id="meta-app" className="scroll-mt-20">
+        <MetaAppSettings settings={metaAppSettings()} open={false} />
+      </div>
 
       <ConfigClient settings={settings} groupLabels={GROUP_LABELS} groupOrder={GROUP_ORDER} aiSpend={spend} />
 

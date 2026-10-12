@@ -1,6 +1,4 @@
 import { getTranslations } from 'next-intl/server';
-import { MetaAppSettings } from '@/components/MetaAppSettings';
-import { metaAppSettings } from '@/lib/meta-app';
 
 import { ConnectionHealth } from '@/components/ConnectionHealth';
 import { ConnectionsClient } from '@/components/ConnectionsClient';
@@ -13,6 +11,7 @@ import { canManageAccounts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
 import { formatInZone } from '@/lib/time';
+import { abilitiesOf } from '@/lib/scope-abilities';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,9 +123,6 @@ export default async function ConnectionsPage({
         );
       })}
 
-      {/* Admins set up and repair the connection; the values it depends on
-          belong next to the button that uses them. Open when nothing is
-          connected yet, which is when somebody is most likely to need them. */}
       {/* A long screen: chips jump to each part, as Simplified does. */}
       <nav aria-label={t('jumpTo')} className="flex flex-wrap gap-2">
         {[
@@ -139,7 +135,6 @@ export default async function ConnectionsPage({
               ]
             : []),
           { href: '#networks', label: t('jump_networks') },
-          ...(canManage ? [{ href: '#meta-app', label: t('jump_metaApp') }] : []),
         ].map((chip) => (
           <a
             key={chip.href}
@@ -151,11 +146,6 @@ export default async function ConnectionsPage({
         ))}
       </nav>
 
-      {canManage && (
-        <div id="meta-app" className="scroll-mt-20">
-          <MetaAppSettings settings={metaAppSettings()} open={accounts.length === 0} />
-        </div>
-      )}
 
       {accounts.length === 0 && orphans.length === 0 ? (
         <div className="card flex flex-col items-center gap-3 p-8 text-center">
@@ -190,7 +180,10 @@ export default async function ConnectionsPage({
             name: account.name,
             pictureUrl: account.pictureUrl,
             providerUserId: account.providerUserId,
-            scopes: account.scopes.split(',').map((scope) => scope.trim()).filter(Boolean),
+            abilities: abilitiesOf(
+              account.scopes.split(',').map((scope) => scope.trim()).filter(Boolean),
+              env.facebookScopes,
+            ),
             tokenExpiresAt: account.tokenExpiresAt?.toISOString() ?? null,
             // Days rather than a date: "expires 14 Sep" makes the reader do
             // the arithmetic before they know whether to act.

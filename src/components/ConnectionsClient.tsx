@@ -8,6 +8,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { Icon, type IconName } from './Icon';
 import { useConfirm } from './ConfirmProvider';
 import { blockerMessage } from './blockerMessage';
+import type { Ability } from '@/lib/scope-abilities';
 
 export interface TargetView {
   id: string;
@@ -29,7 +30,8 @@ export interface ConnectionView {
   name: string;
   pictureUrl: string | null;
   providerUserId: string;
-  scopes: string[];
+  /** What the connection can do, in plain words (never Meta's scope names). */
+  abilities: Array<{ ability: Ability; granted: boolean }>;
   tokenExpiresAt: string | null;
   /** Days until expiry, or null when the token does not expire. */
   daysLeft: number | null;
@@ -261,12 +263,17 @@ export function ConnectionsClient({
                 {t('permissions')}
               </p>
               <ul className="mt-1 flex flex-wrap gap-1">
-                {connection.scopes.length === 0 ? (
+                {connection.abilities.length === 0 ? (
                   <li className="text-xs text-slate-500">{t('noScopes')}</li>
                 ) : (
-                  connection.scopes.map((scope) => (
-                    <li key={scope} className="badge bg-slate-100 font-mono text-[10px] text-slate-600">
-                      {scope}
+                  connection.abilities.map(({ ability, granted }) => (
+                    <li
+                      key={ability}
+                      className={`badge ${granted ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}
+                    >
+                      <Icon name={granted ? 'check' : 'warning'} size={12} />
+                      {t(`ability.${ability}`)}
+                      {!granted && ` · ${t('abilityMissing')}`}
                     </li>
                   ))
                 )}

@@ -174,8 +174,8 @@ export function ConnectionHealth({ canManage }: { canManage: boolean }) {
                           }`}
                         />
                         <span className="min-w-0">
-                          <span className="text-slate-800">{state.label}</span>{' '}
-                          <code className="text-xs text-slate-400">{state.permission}</code>
+                          {/* Plain words only: Meta's permission names are root's business. */}
+                          <span className="text-slate-800">{state.label}</span>
                           {state.status !== 'granted' && (
                             <span className="block text-xs text-slate-500">
                               {state.status === 'declined'
