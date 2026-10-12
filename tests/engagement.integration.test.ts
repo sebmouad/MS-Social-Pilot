@@ -2711,3 +2711,100 @@ describe('a post the installation cannot read', () => {
     expect(result.error).toMatch(/envelope|encrypted/i);
   });
 });
+
+describe('the inbox', () => {
+  let inbox: typeof import('../src/lib/inbox');
+  beforeAll(async () => {
+    inbox = await import('../src/lib/inbox');
+  });
+
+  /** One thread whose messages a test can add to between syncs. */
+  function stubThread(messages: Array<{ id: string; at: string; from: { id?: string; name: string } }>) {
+    routes['/conversations'] = () => ({
+      data: [
+        {
+          id: 't1',
+          snippet: 'Are you open?',
+          message_count: messages.length,
+          updated_time: messages.at(-1)!.at,
+          participants: { data: [{ name: 'Ada' }] },
+          messages: {
+            data: messages.map((message) => ({ id: message.id, message: 'Hi', created_time: message.at, from: message.from })),
+          },
+        },
+      ],
+    });
+  }
+
+  it('merges comments and messages newest first, without the Page’s own replies', async () => {
+    const { workspace, target, postTarget } = await seedWorkspace();
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: target.id });
+    await prisma.postComment.create({
+      data: {
+        postTargetId: postTarget.id,
+        remoteId: 'own',
+        message: 'Thanks!',
+        fromId: target.providerId,
+        createdTime: new Date('2026-08-05T10:00:00Z'),
+      },
+    });
+
+    const scope = { workspaceId: workspace.id, targetIds: [target.id] };
+    const items = await inbox.readInbox({ ...scope, state: 'open', limit: 50 });
+    expect(items.map((item) => [item.kind, item.text])).toEqual([
+      ['message', 'Are you open?'],
+      ['comment', 'Love this'],
+    ]);
+    expect(await inbox.countOpenInbox(scope)).toEqual({ comments: 1, messages: 1 });
+    expect(await inbox.readInbox({ ...scope, kind: 'comment', state: 'open', limit: 50 })).toHaveLength(1);
+  });
+
+  it('marks done and reopens only inside the member’s Pages and workspace', async () => {
+    const mine = await seedWorkspace('mine');
+    const theirs = await seedWorkspace('theirs');
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: mine.target.id });
+    const comment = await prisma.postComment.findFirstOrThrow();
+
+    // Another workspace, or a member without that Page, cannot touch it.
+    expect(
+      await inbox.setInboxResolved({ workspaceId: theirs.workspace.id, targetIds: [theirs.target.id], kind: 'comment', id: comment.id, resolved: true }),
+    ).toBe(false);
+    expect(
+      await inbox.setInboxResolved({ workspaceId: mine.workspace.id, targetIds: [], kind: 'comment', id: comment.id, resolved: true }),
+    ).toBe(false);
+
+    const scope = { workspaceId: mine.workspace.id, targetIds: [mine.target.id] };
+    expect(await inbox.setInboxResolved({ ...scope, kind: 'comment', id: comment.id, resolved: true })).toBe(true);
+    expect(await inbox.countOpenInbox(scope)).toEqual({ comments: 0, messages: 1 });
+    expect((await inbox.readInbox({ ...scope, state: 'resolved', limit: 50 })).map((item) => item.id)).toEqual([comment.id]);
+
+    expect(await inbox.setInboxResolved({ ...scope, kind: 'comment', id: comment.id, resolved: false })).toBe(true);
+    expect(await inbox.countOpenInbox(scope)).toEqual({ comments: 1, messages: 1 });
+  });
+
+  it('opens a thread again when the other person writes, not when the Page answers', async () => {
+    const { workspace, target } = await seedWorkspace();
+    const scope = { workspaceId: workspace.id, targetIds: [target.id] };
+    stubThread([{ id: 'm1', at: '2026-08-02T09:00:00+0000', from: { id: 'u1', name: 'Ada' } }]);
+    await engagement.syncTargetEdges({ targetId: target.id, edges: ['conversations'] });
+    const thread = await prisma.conversation.findFirstOrThrow();
+    await inbox.setInboxResolved({ ...scope, kind: 'message', id: thread.id, resolved: true, now: new Date('2026-08-02T09:30:00Z') });
+
+    stubThread([
+      { id: 'm1', at: '2026-08-02T09:00:00+0000', from: { id: 'u1', name: 'Ada' } },
+      { id: 'm2', at: '2026-08-02T10:00:00+0000', from: { id: target.providerId, name: 'Page' } },
+    ]);
+    await engagement.syncTargetEdges({ targetId: target.id, edges: ['conversations'] });
+    expect((await prisma.conversation.findFirstOrThrow()).resolvedAt).not.toBeNull();
+
+    stubThread([
+      { id: 'm1', at: '2026-08-02T09:00:00+0000', from: { id: 'u1', name: 'Ada' } },
+      { id: 'm2', at: '2026-08-02T10:00:00+0000', from: { id: target.providerId, name: 'Page' } },
+      { id: 'm3', at: '2026-08-02T11:00:00+0000', from: { id: 'u1', name: 'Ada' } },
+    ]);
+    await engagement.syncTargetEdges({ targetId: target.id, edges: ['conversations'] });
+    expect((await prisma.conversation.findFirstOrThrow()).resolvedAt).toBeNull();
+  });
+});

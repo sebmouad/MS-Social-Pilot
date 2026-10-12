@@ -859,6 +859,17 @@ export async function syncTargetEdges(options: {
       await prisma.conversationMessage.createMany({ data: pending, skipDuplicates: true });
     }
 
+    // A thread marked done opens again when the other person writes after it.
+    await prisma.$executeRaw`
+      UPDATE "conversations" c SET "resolvedAt" = NULL
+      WHERE c."targetId" = ${target.id} AND c."resolvedAt" IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM "conversation_messages" m
+          WHERE m."conversationId" = c."id" AND m."createdTime" > c."resolvedAt"
+            AND m."fromId" IS DISTINCT FROM ${target.providerId}
+        )
+    `;
+
     return conversations.length;
   });
 

@@ -13,6 +13,7 @@ import { loadSelection } from '@/lib/page-filter';
 import { SelectionBar } from '@/components/SelectionBar';
 import { screenMetadata } from '@/lib/metadata';
 import { summariseConnections } from '@/lib/connections';
+import { countOpenInbox } from '@/lib/inbox';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
 import { formatInZone, relativeTime, appLocale } from '@/lib/time';
@@ -49,7 +50,7 @@ export default async function DashboardPage({
   const scopeIds = scope.all ? undefined : scope.ids;
   const postsIn = postScope(scope);
 
-  const [upcoming, recent, counts, targetCount, staleAccounts, failures, totals, health, newComments, aiSetting] =
+  const [upcoming, recent, counts, targetCount, staleAccounts, failures, totals, health, inbox, aiSetting] =
     await Promise.all([
     prisma.post.findMany({
       where: { workspaceId, status: { in: ['scheduled', 'publishing'] }, scheduledAt: { gte: now }, ...postsIn },
@@ -67,12 +68,7 @@ export default async function DashboardPage({
     prisma.postTarget.count({ where: { status: 'failed', post: { workspaceId }, ...postTargetScope(scope) } }),
       publishedTotals(workspaceId, scopeIds),
       summariseConnections(workspaceId, { now, warnWithinDays: env.tokenWarningDays }),
-      prisma.postComment.count({
-        where: {
-          createdTime: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
-          postTarget: { post: { workspaceId }, ...postTargetScope(scope) },
-        },
-      }),
+      countOpenInbox({ workspaceId, targetIds: selection.ids }),
       prisma.workspace.findUnique({ where: { id: workspaceId }, select: { aiEnabled: true } }),
     ]);
   const aiOn = aiAvailable() && Boolean(aiSetting?.aiEnabled) && auth.modules.includes('schedule');
@@ -94,7 +90,7 @@ export default async function DashboardPage({
         ]
       : []),
     ...(auth.modules.includes('analytics')
-      ? [{ label: t('shortcutComments', { count: newComments }), count: newComments, icon: 'comment' as const, href: `/analytics?view=comments${selection.query ? `&${selection.query}` : ''}`, tone: 'text-brand-700' }]
+      ? [{ label: t('shortcutInbox', { count: inbox.comments + inbox.messages }), count: inbox.comments + inbox.messages, icon: 'inbox' as const, href: `/inbox${selection.query ? `?${selection.query}` : ''}`, tone: 'text-brand-700' }]
       : []),
   ];
   const visiblePages = selection.pages.filter((page) => selection.ids.includes(page.id));

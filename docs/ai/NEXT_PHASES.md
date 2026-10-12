@@ -338,11 +338,19 @@ Each verified missing in our code on 2026-10-11:
   **Done 2026-10-12:** the dashboard already led with "Going out next" and New
   post; it now has **Plan with AI** (the calendar's planner, on the selected
   profiles) and a "Waiting for you" row of counted links (posts waiting for
-  approval, new comments in 7 days), shown only for modules root left on;
-  failed posts keep their banner. Unread inbox comes with the inbox stream.
+  approval, comments and messages still to do in the inbox), shown only for
+  modules root left on; failed posts keep their banner.
 - **Inbox stream**: one merged, chronological view of comments + messages for
   the selection, type filter, and a **resolved / unresolved** state (no such
   field today — needs a migration).
+  **Done 2026-10-12:** `/inbox` (Analytics module, left sidebar) merges
+  comments other people wrote and Page conversations for the selection,
+  newest first, with type (everything / comments / messages) and state
+  (to do / done / all) filters and "show more". `PostComment.resolvedAt` and
+  `Conversation.resolvedAt` hold the shared done state; a thread opens again
+  when the other person writes after it was marked done (the worker's sync
+  checks message authors, so the Page's own answer does not reopen it).
+  Replying stays in Analytics → Comments / Messages, linked from each item.
 - **Notifications matrix** per member × Page × event (publish failed, account
   disconnected, new message, queue empty, draft updated, weekly summary).
   Today `NotificationSetting` has 4 workspace-wide booleans only.

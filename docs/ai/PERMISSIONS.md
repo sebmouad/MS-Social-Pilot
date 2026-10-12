@@ -37,6 +37,11 @@ Order: owner 4 > admin 3 > editor 2 > contributor 1. A workspace owner is
 | Delete media (`canDeleteMedia`) | editor |
 | Compose drafts (`canCompose`) | contributor (everyone) |
 
+Marking an inbox comment or conversation done / not done (`POST /api/inbox`)
+needs no role: any member who can see the Page may do it, like reading it.
+It changes only the team's shared state in this app, never Facebook.
+**For the owner's audit (2026-10-12).**
+
 Plus **Page scope** per member: a member sees and acts only on the Pages they
 are given (`auth.pageScope`, applied by `loadPageFilter`). Every action is
 recorded in `ActivityLog` (Settings → History, admins).

@@ -744,7 +744,7 @@
     "gsHint_claude": "Ask Claude to plan, draft and analyse through MCP.",
     "shortcuts": "Waiting for you",
     "shortcutApprovals": "{count, plural, one {# post waiting for approval} other {# posts waiting for approval}}",
-    "shortcutComments": "{count, plural, one {# new comment in 7 days} other {# new comments in 7 days}}"
+    "shortcutInbox": "{count, plural, =0 {Nothing to do in the inbox} one {# comment or message to do} other {# comments and messages to do}}"
   },
   "email": {
     "invitation": {
@@ -1269,7 +1269,8 @@
     "root": "Root",
     "rootVisit": "You are looking after {name} as root. Every visit is logged.",
     "leaveVisit": "Leave workspace",
-    "leaveVisitFailed": "Could not leave the workspace. Check your connection and try again."
+    "leaveVisitFailed": "Could not leave the workspace. Check your connection and try again.",
+    "inbox": "Inbox"
   },
   "notifications": {
     "title": "Notifications",
@@ -2745,5 +2746,34 @@
     "pending": "Brought in from Facebook automatically. The first read has not run yet.",
     "firstRead": "This Page was just connected. Its first read from Facebook runs within a few minutes.",
     "emptyHint": "They are brought in from Facebook automatically every few hours."
+  },
+  "inbox": {
+    "title": "Inbox",
+    "subtitle": "{comments, plural, =0 {No open comments} one {# open comment} other {# open comments}} · {messages, plural, =0 {no open conversations} one {# open conversation} other {# open conversations}} · {profiles, plural, one {# profile} other {# profiles}}",
+    "typeLabel": "Type",
+    "typeAll": "Everything",
+    "typeComments": "Comments",
+    "typeMessages": "Messages",
+    "stateLabel": "State",
+    "stateOpen": "To do",
+    "stateResolved": "Done",
+    "stateAll": "All",
+    "listLabel": "Comments and messages, newest first",
+    "kindComment": "Comment",
+    "kindReply": "Reply",
+    "kindMessage": "Message",
+    "done": "Done",
+    "someone": "Someone",
+    "noText": "(no text — a photo, sticker or attachment)",
+    "onPost": "On: {post}",
+    "reply": "Reply",
+    "markDone": "Mark done",
+    "reopen": "Reopen",
+    "failed": "Could not save. Try again.",
+    "showMore": "Show more",
+    "emptyOpenTitle": "Nothing waiting",
+    "emptyOpenHint": "Every comment and message on these profiles is marked done. New ones appear here as the worker brings them in from Facebook.",
+    "emptyTitle": "Nothing here",
+    "emptyHint": "No comments or messages match these filters for the selected profiles. Try another type or state, or select more profiles."
   }
 }

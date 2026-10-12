@@ -876,6 +876,8 @@ model PostComment {
   isHidden       Boolean  @default(false)
   createdTime    DateTime
   fetchedAt      DateTime @default(now())
+  /// Marked done in the inbox; null while it waits on someone.
+  resolvedAt     DateTime?
 
   postTarget PostTarget @relation(fields: [postTargetId], references: [id], onDelete: Cascade)
 
@@ -916,6 +918,8 @@ model Conversation {
   participants Json?
   updatedTime  DateTime
   fetchedAt    DateTime @default(now())
+  /// Marked done in the inbox; cleared when the other person writes again.
+  resolvedAt   DateTime?
 
   target   Target                @relation(fields: [targetId], references: [id], onDelete: Cascade)
   messages ConversationMessage[]

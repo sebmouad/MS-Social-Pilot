@@ -40,6 +40,7 @@ export const MODULES: AppModule[] = [
     icon: 'analytics',
     pages: [
       { href: '/analytics', label: 'pages', icon: 'analytics' },
+      { href: '/inbox', label: 'inbox', icon: 'inbox' },
       { href: '/reports', label: 'reports', icon: 'reports' },
     ],
   },
@@ -108,6 +109,7 @@ export function enabledModules(workspaceOff: readonly string[], memberOff: reado
 /** API routes that belong to one module, refused when it is switched off. */
 const API_MODULES: Array<{ prefix: string; module: ModuleKey }> = [
   { prefix: '/api/analytics', module: 'analytics' },
+  { prefix: '/api/inbox', module: 'analytics' },
   { prefix: '/api/reports', module: 'analytics' },
   { prefix: '/api/report-schedules', module: 'analytics' },
   { prefix: '/api/report-templates', module: 'analytics' },

@@ -744,7 +744,7 @@
     "gsHint_claude": "Demandez à Claude de planifier, rédiger et analyser via MCP.",
     "shortcuts": "En attente",
     "shortcutApprovals": "{count, plural, one {# post en attente de validation} other {# posts en attente de validation}}",
-    "shortcutComments": "{count, plural, one {# nouveau commentaire en 7 jours} other {# nouveaux commentaires en 7 jours}}"
+    "shortcutInbox": "{count, plural, =0 {Rien à traiter dans la boîte de réception} one {# commentaire ou message à traiter} other {# commentaires et messages à traiter}}"
   },
   "email": {
     "invitation": {
@@ -1269,7 +1269,8 @@
     "root": "Root",
     "rootVisit": "Vous gérez {name} en tant que root. Chaque visite est journalisée.",
     "leaveVisit": "Quitter l’espace",
-    "leaveVisitFailed": "Impossible de quitter l’espace de travail. Vérifiez votre connexion et réessayez."
+    "leaveVisitFailed": "Impossible de quitter l’espace de travail. Vérifiez votre connexion et réessayez.",
+    "inbox": "Boîte de réception"
   },
   "notifications": {
     "title": "Notifications",
@@ -2745,5 +2746,34 @@
     "pending": "Récupéré automatiquement depuis Facebook. La première lecture n’a pas encore eu lieu.",
     "firstRead": "Cette Page vient d’être connectée. Sa première lecture depuis Facebook a lieu d’ici quelques minutes.",
     "emptyHint": "Ils sont récupérés automatiquement depuis Facebook toutes les quelques heures."
+  },
+  "inbox": {
+    "title": "Boîte de réception",
+    "subtitle": "{comments, plural, =0 {Aucun commentaire à traiter} one {# commentaire à traiter} other {# commentaires à traiter}} · {messages, plural, =0 {aucune conversation à traiter} one {# conversation à traiter} other {# conversations à traiter}} · {profiles, plural, one {# profil} other {# profils}}",
+    "typeLabel": "Type",
+    "typeAll": "Tout",
+    "typeComments": "Commentaires",
+    "typeMessages": "Messages",
+    "stateLabel": "État",
+    "stateOpen": "À traiter",
+    "stateResolved": "Traités",
+    "stateAll": "Tous",
+    "listLabel": "Commentaires et messages, du plus récent au plus ancien",
+    "kindComment": "Commentaire",
+    "kindReply": "Réponse",
+    "kindMessage": "Message",
+    "done": "Traité",
+    "someone": "Quelqu’un",
+    "noText": "(pas de texte — une photo, un autocollant ou une pièce jointe)",
+    "onPost": "Sur : {post}",
+    "reply": "Répondre",
+    "markDone": "Marquer comme traité",
+    "reopen": "Rouvrir",
+    "failed": "Enregistrement impossible. Réessayez.",
+    "showMore": "Afficher plus",
+    "emptyOpenTitle": "Rien en attente",
+    "emptyOpenHint": "Tous les commentaires et messages de ces profils sont traités. Les nouveaux apparaissent ici dès que le worker les récupère sur Facebook.",
+    "emptyTitle": "Rien ici",
+    "emptyHint": "Aucun commentaire ni message ne correspond à ces filtres pour les profils sélectionnés. Essayez un autre type ou état, ou sélectionnez plus de profils."
   }
 }
