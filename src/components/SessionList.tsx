@@ -83,7 +83,7 @@ export function SessionList({
               <p className="text-xs text-slate-500">
                 {[row.ip, row.country].filter(Boolean).join(' · ') || t('unknownPlace')}
                 {' · '}
-                {t('lastSeen', { when: format.relativeTime(new Date(row.lastSeenAt)) })}
+                {t('lastSeen', { when: format.dateTime(new Date(row.lastSeenAt), { dateStyle: 'medium', timeStyle: 'short' }) })}
               </p>
             </div>
             {!row.current && (

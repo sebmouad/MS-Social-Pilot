@@ -2886,7 +2886,7 @@
     "unknownDevice": "Unknown browser",
     "unknownPlace": "Place unknown",
     "thisBrowser": "This browser",
-    "lastSeen": "active {when}",
+    "lastSeen": "last active {when}",
     "signOut": "Sign out",
     "signOutQuestion": "Sign this browser out?",
     "signOutQuestionFor": "Sign {name} out of this browser?",

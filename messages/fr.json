@@ -2886,7 +2886,7 @@
     "unknownDevice": "Navigateur inconnu",
     "unknownPlace": "Lieu inconnu",
     "thisBrowser": "Ce navigateur",
-    "lastSeen": "actif {when}",
+    "lastSeen": "dernière activité : {when}",
     "signOut": "Déconnecter",
     "signOutQuestion": "Déconnecter ce navigateur ?",
     "signOutQuestionFor": "Déconnecter {name} de ce navigateur ?",

@@ -177,9 +177,12 @@ test('a person picks the Warm look, it follows them, and Facebook comes back', a
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'facebook');
 
   // A tick before hydration is undone by React, so wait for React's own
-  // highlight on the chosen option, not just the native check.
+  // highlight on the chosen option, not just the native check. A radio left
+  // checked by a lost click would make the next check() a no-op, so each try
+  // goes through Facebook first.
   const warm = page.getByRole('radio', { name: /warm/i });
   await expect(async () => {
+    await page.getByRole('radio', { name: /facebook/i }).check();
     await warm.check();
     await expect(page.locator('label').filter({ has: warm })).toHaveClass(/ring-2/, { timeout: 1_500 });
   }).toPass();
