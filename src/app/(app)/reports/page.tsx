@@ -12,6 +12,8 @@ import { parseRange } from '@/lib/date-range';
 import { formatInZone, appLocale } from '@/lib/time';
 import { ReportControls } from '@/components/ReportControls';
 import { ReportBuilder } from '@/components/ReportBuilder';
+import { GoalsView } from '@/components/GoalsView';
+import { readGoals } from '@/lib/page-goals';
 import { ReportTemplates } from '@/components/ReportTemplates';
 import { ReportSchedules } from '@/components/ReportSchedules';
 import { parseSections } from '@/lib/report-sections';
@@ -117,6 +119,14 @@ export default async function ReportsPage({
     };
   });
   const activeTemplate = templateRows.find((row) => row.active) ?? null;
+
+  // Goals (H12) of the month the report ends in (`to` is the instant after its last day).
+  const lastInstant = new Date(to.getTime() - 1);
+  const goals =
+    selected && !rangeError
+      ? await readGoals({ workspaceId: auth.workspace.id, targetIds: [selected.id], timeZone: timezone, at: lastInstant })
+      : [];
+  const tGoals = await getTranslations('goals');
 
   const report = rangeError
     ? null
@@ -272,6 +282,17 @@ export default async function ReportsPage({
                   days={range.days}
                   timeZone={timezone}
                 />
+              )}
+
+              {has('goals') && goals.length > 0 && (
+                <section aria-labelledby="report-goals" className="space-y-4">
+                  <h2 id="report-goals" className="text-[17px] font-bold text-slate-900">
+                    {tGoals('reportTitle', { month: formatInZone(lastInstant, timezone, 'MMMM yyyy') })}
+                  </h2>
+                  <div className="card p-5">
+                    <GoalsView pages={goals} showNames={false} />
+                  </div>
+                </section>
               )}
 
               {has('audience') && (

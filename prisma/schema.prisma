@@ -272,6 +272,7 @@ model Workspace {
   labels               Label[]
   snippets             Snippet[]
   calendarFeeds   CalendarFeed[]
+  pageGoals            PageGoal[]
   postTemplates        PostTemplate[]
   savedReplies         SavedReply[]
   captionTests         CaptionTest[]
@@ -451,6 +452,7 @@ model Target {
   reviews            PageReview[]
   conversations      Conversation[]
   externalPosts      ExternalPost[]
+  goals              PageGoal[]
   videos             PageVideo[]
   instagramAccounts  InstagramAccount[]
   /// Why publishing is blocked, as a code the interface can translate. The
@@ -604,6 +606,27 @@ model PostNote {
 /// A member's private calendar subscription (NEXT_PHASES H19): an ICS address
 /// for Google Calendar or Outlook, narrowed to some Pages or a group, and
 /// always to what the member may still see when it is read.
+/// A Page's monthly target for one figure (NEXT_PHASES H12): followers
+/// gained, views, engagement or posts. The same target applies every month
+/// until it is changed.
+model PageGoal {
+  id          String   @id @default(cuid())
+  workspaceId String
+  targetId    String
+  /// followers | views | engagements | posts (src/lib/goals.ts).
+  metric      String
+  target      Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  page      Target    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, metric])
+  @@index([workspaceId])
+  @@map("page_goals")
+}
+
 model CalendarFeed {
   id          String    @id @default(cuid())
   workspaceId String

@@ -34,6 +34,7 @@ const PUBLIC: Record<string, string> = {
   health: 'A load balancer has no cookies.',
   'cron/tick': 'Called by a scheduler, and guarded by its own secret rather than a session.',
   'share/[token]': 'A client answering a review link has no account; the unguessable token is the authority, and it reaches only its own Pages.',
+  'calendar-feed/[token]': 'A calendar app (Google Calendar, Outlook) fetching a member’s private feed has no session; the unguessable token is the authority, and the feed is clamped to what that member may still see.',
   'facebook/data-deletion': "Meta calls this, with a signed_request it verifies rather than a cookie.",
   'facebook/deauthorize': 'Meta calls this too, same verification.',
   setup: 'Open only while the database holds no accounts; owner-only from the first registration onwards.',

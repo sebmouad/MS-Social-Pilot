@@ -772,9 +772,15 @@ setup from Phase 0.2 (marked AI).
 - **H11. Inbox response time (S)** — first-response and resolution time per
   Page and per member (median, slowest), business hours aware; in analytics
   and reports.
-- **H12. Goals per Page (S)** — monthly targets (followers, views, engagement,
+- **H12. Goals per Page (S)** ✅ — monthly targets (followers, views, engagement,
   posts) with progress bars and pace ("on track / behind"), in the dashboard
   and reports.
+  *Done 2026-10-12: `page_goals` (one target per Page and figure, same every
+  month). Dashboard card for the selected Pages, "Goals" report section for
+  the month the report ends in. Followers = follows − unfollows, views =
+  `page_media_view` (older `page_impressions`), engagement =
+  `page_post_engagements`, posts = published (app + Facebook). On track while
+  ≥ 90% of the straight-line share. Admins set them (`canManageSettings`).*
 - **H13. Notes on charts (S)** — annotations (date, label, colour) on analytics
   timelines, per Page or workspace; shown in reports.
 - **H14. Agency overview for root (M)** — in the root section: KPIs for every

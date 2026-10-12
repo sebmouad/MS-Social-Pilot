@@ -1871,7 +1871,9 @@
     "downloadPdf": "Télécharger le PDF",
     "scheduleAiRecap": "Commencer par un court résumé rédigé par l’IA",
     "scheduleAiRecapHint": "Ce qui a augmenté ou baissé par rapport à la période précédente, et pourquoi, uniquement à partir de ces chiffres. Compte dans votre quota d’IA.",
-    "scheduleAiRecapBadge": "Résumé IA"
+    "scheduleAiRecapBadge": "Résumé IA",
+    "section_goals": "Objectifs",
+    "sectionHint_goals": "Objectifs mensuels et rythme pour les atteindre"
   },
   "settings": {
     "addTime": "Ajouter un créneau",
@@ -3667,5 +3669,29 @@
     "loadFailed": "Impossible de charger vos abonnements. Fermez et réessayez.",
     "createFailed": "Impossible de créer l’adresse. Réessayez.",
     "revokeFailed": "Impossible de la révoquer. Réessayez."
+  },
+  "goals": {
+    "title": "Objectifs du mois",
+    "subtitle": "Objectifs mensuels par Page, comparés à ce que Facebook a déjà communiqué. Les chiffres arrivent avec un ou deux jours de retard.",
+    "empty": "Aucun objectif pour l’instant. Fixez un objectif mensuel d’abonnés, de vues, d’engagement ou de publications et voyez si chaque Page est dans le rythme.",
+    "emptyReadOnly": "Aucun objectif pour ces Pages. Un administrateur de l’espace peut les fixer.",
+    "edit": "Fixer des objectifs",
+    "editTitle": "Objectifs mensuels",
+    "editHint": "Laissez une case vide pour ne pas fixer d’objectif. Les objectifs valent pour chaque mois jusqu’à ce que vous les changiez.",
+    "page": "Page",
+    "save": "Enregistrer",
+    "none": "Aucun objectif",
+    "loadFailed": "Impossible de charger les objectifs de cette Page. Réessayez.",
+    "saveFailed": "Impossible d’enregistrer les objectifs. Vérifiez les nombres (entiers à partir de 1) et réessayez.",
+    "metric_followers": "Nouveaux abonnés",
+    "metric_views": "Vues",
+    "metric_engagements": "Engagement",
+    "metric_posts": "Publications",
+    "pace_met": "Atteint",
+    "pace_onTrack": "Dans le rythme",
+    "pace_behind": "En retard",
+    "pace_noData": "Pas encore de données",
+    "progress": "{actual} sur {target}",
+    "reportTitle": "Objectifs de {month}"
   }
 }

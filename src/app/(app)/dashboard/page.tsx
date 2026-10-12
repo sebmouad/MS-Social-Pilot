@@ -18,10 +18,13 @@ import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
 import { formatInZone, relativeTime, appLocale } from '@/lib/time';
 import { publishedTotals, recentOutcomes } from '@/lib/analytics';
-import { canManageAccounts, canManageInstance } from '@/lib/constants';
+import { canManageAccounts, canManageInstance, canManageSettings } from '@/lib/constants';
 import { readSetupState } from '@/lib/setup';
 import { aiAvailable } from '@/lib/ai';
 import { AiPlanner } from '@/components/AiPlanner';
+import { GoalsEditor } from '@/components/GoalsEditor';
+import { GoalsView } from '@/components/GoalsView';
+import { readGoals } from '@/lib/page-goals';
 
 export const dynamic = 'force-dynamic';
 
@@ -94,6 +97,14 @@ export default async function DashboardPage({
       : []),
   ];
   const visiblePages = selection.pages.filter((page) => selection.ids.includes(page.id));
+  // Monthly goals (H12) for the selected Facebook Pages, from stored figures.
+  const goalPages = visiblePages.filter((page) => page.type === 'page');
+  const showGoals = auth.modules.includes('analytics') && goalPages.length > 0;
+  const canSetGoals = canManageSettings(auth.role);
+  const goals = showGoals
+    ? await readGoals({ workspaceId, targetIds: goalPages.map((page) => page.id), timeZone: auth.workspace.timezone, now })
+    : [];
+  const tGoals = await getTranslations('goals');
 
   const stats: Array<{ label: string; value: number; icon: IconName; href: string }> = [
     {
@@ -271,6 +282,23 @@ export default async function DashboardPage({
             ))}
           </dl>
         </div>
+      )}
+
+      {showGoals && (goals.length > 0 || canSetGoals) && (
+        <section className="card p-5" aria-labelledby="dash-goals">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 id="dash-goals" className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <Icon name="analytics" className="text-slate-400" /> {tGoals('title')}
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">{tGoals('subtitle')}</p>
+            </div>
+            {canSetGoals && <GoalsEditor pages={goalPages.map((page) => ({ id: page.id, name: page.name }))} />}
+          </div>
+          <div className="mt-4">
+            {goals.length > 0 ? <GoalsView pages={goals} /> : <p className="text-sm text-slate-600">{tGoals('empty')}</p>}
+          </div>
+        </section>
       )}
 
       <div className="grid items-start gap-6 lg:grid-cols-2">

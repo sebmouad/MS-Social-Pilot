@@ -1871,7 +1871,9 @@
     "downloadPdf": "Download PDF",
     "scheduleAiRecap": "Start with a short summary written by AI",
     "scheduleAiRecapHint": "What went up or down against the period before, and why, from these figures only. Counts towards your AI allowance.",
-    "scheduleAiRecapBadge": "AI summary"
+    "scheduleAiRecapBadge": "AI summary",
+    "section_goals": "Goals",
+    "sectionHint_goals": "Monthly targets and the pace towards them"
   },
   "settings": {
     "addTime": "Add time",
@@ -3667,5 +3669,29 @@
     "loadFailed": "Couldn’t load your subscriptions. Close this and try again.",
     "createFailed": "Couldn’t create the address. Try again.",
     "revokeFailed": "Couldn’t revoke it. Try again."
+  },
+  "goals": {
+    "title": "Goals this month",
+    "subtitle": "Monthly targets per Page, against what Facebook has reported so far. Figures arrive a day or two late.",
+    "empty": "No goals yet. Set a monthly target for followers, views, engagement or posts and see whether each Page is on pace.",
+    "emptyReadOnly": "No goals set for these Pages yet. A workspace admin can set them.",
+    "edit": "Set goals",
+    "editTitle": "Monthly goals",
+    "editHint": "Leave a box empty for no goal. Targets apply to every month until you change them.",
+    "page": "Page",
+    "save": "Save goals",
+    "none": "No goal",
+    "loadFailed": "Couldn’t load this Page’s goals. Try again.",
+    "saveFailed": "Couldn’t save the goals. Check the numbers (whole numbers from 1) and try again.",
+    "metric_followers": "New followers",
+    "metric_views": "Views",
+    "metric_engagements": "Engagement",
+    "metric_posts": "Posts published",
+    "pace_met": "Reached",
+    "pace_onTrack": "On track",
+    "pace_behind": "Behind",
+    "pace_noData": "No data yet",
+    "progress": "{actual} of {target}",
+    "reportTitle": "Goals for {month}"
   }
 }

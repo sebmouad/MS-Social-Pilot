@@ -13,6 +13,9 @@ account, sign out). Phone: one drawer with every page, grouped.
 Getting-started checklist (connect, first post, queue, team, client link, Claude;
 dismissible), setup banner, token-expiry and failure warnings, Pages hub (per
 Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
+"Goals this month" card (H12): monthly targets per Page (new followers, views,
+engagement, posts published) with progress bars and pace (reached / on track /
+behind / no data yet), read from stored insights; admins set them with "Set goals".
 
 ## Publishing
 - **Compose** `/compose` (`Composer.tsx`): Post / Reel / Story; multi-Page and
