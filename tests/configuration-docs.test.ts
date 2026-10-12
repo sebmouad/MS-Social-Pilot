@@ -5,7 +5,7 @@ import { SETTING_DEFINITIONS } from '../src/lib/settings/definitions';
 
 /**
  * The registry, the sample environment file and the schema notes describe the
- * same configuration three times, and three copies drift. They drifted: this
+ * same configuration, and copies drift. They drifted: this
  * suite was written after two settings added in one sitting reached one file
  * and not the others.
  *
@@ -56,9 +56,11 @@ function namesAssignedIn(text: string): string[] {
 }
 
 describe('configuration documentation', () => {
-  it('offers every setting in the sample environment file', () => {
-    const missing = registryEnvNames.filter((name) => !envExample.includes(name));
-    expect(missing).toEqual([]);
+  it('keeps the sample environment file to infrastructure: settings belong to root', () => {
+    // Everything in the registry is set on the Configuration screen, so a
+    // fresh installation's .env carries nothing root would have to move.
+    const settings = namesAssignedIn(envExample).filter((name) => registryEnvNames.includes(name));
+    expect(settings).toEqual([]);
   });
 
   it('offers every setting in the schema notes', () => {

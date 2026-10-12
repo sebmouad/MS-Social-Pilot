@@ -608,7 +608,13 @@
     "aiSpendPerGeneration": "Per generation",
     "aiSpendWorkspace": "Workspace",
     "aiSpendPlusUnpriced": "{count, plural, one {+ # unpriced} other {+ # unpriced}}",
-    "aiSpendFootnote": "Worked out from each model's price when the text was written. The provider's invoice is the final figure."
+    "aiSpendFootnote": "Worked out from each model's price when the text was written. The provider's invoice is the final figure.",
+    "envTitle": "{count, plural, one {# setting still comes from the .env file} other {# settings still come from the .env file}}",
+    "envHint": "Move them here so they are managed on this screen, then remove those lines from .env. The .env file only needs the database, the two secret keys and the port.",
+    "adopt": "Move into the database",
+    "adopting": "Moving…",
+    "adopted": "{count, plural, =0 {Nothing to move.} one {# setting moved. Remove its line from .env.} other {# settings moved. Remove their lines from .env.}}",
+    "adoptInvalid": "{count, plural, one {# value in .env is not valid and stayed there. Correct it below.} other {# values in .env are not valid and stayed there. Correct them below.}}"
   },
   "connections": {
     "active": "Active",

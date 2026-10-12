@@ -153,6 +153,11 @@ summary and last error, the Meta call allowance the worker last saved
 account), and a root-only "Test the app ID and secret" (`POST
 /api/root/app-check`, one Graph call on request). Next: plans/limits per
 client, delete users.
+**Minimal .env done 2026-10-12**: `.env.example` holds infrastructure only
+(PORT, HOST, APP_PORT, DATABASE_URL, POSTGRES_PASSWORD, SESSION_SECRET,
+ENCRYPTION_KEY, TRUST_PROXY); every other value is a setting root manages on
+`/root/config`. Values still in `.env` are flagged there with **Move into the
+database** (`POST /api/root/config/adopt`; invalid ones stay and are reported).
 Owner's rule (2026-10-11): the first registered user is root and sets up every
 aspect of the app; other admins and users have separate privileges, which the
 owner will audit. Root already exists (`isInstanceOwner`, first account only;

@@ -201,11 +201,11 @@ describe('root testing the Facebook app', () => {
     const check = await import('../src/app/api/root/app-check/route');
     const client = await person();
     signIn(client.token);
-    expect((await check.POST(new Request('http://test/', { method: 'POST' }), { params: Promise.resolve({}) })).status).toBe(404);
+    expect((await check.POST()).status).toBe(404);
 
     const owner = await person({ root: true });
     signIn(owner.token);
-    const response = await check.POST(new Request('http://test/', { method: 'POST' }), { params: Promise.resolve({}) });
+    const response = await check.POST();
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ configured: expect.any(Boolean), valid: expect.any(Boolean) });
   });

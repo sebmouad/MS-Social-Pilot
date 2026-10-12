@@ -29,7 +29,7 @@ and the three WordPress sites answer 200.
 | Previous release | `/srv/ms-social-pilot.prev` (kept by every deploy, used by rollback) |
 | Staging dir during a deploy | `/srv/ms-social-pilot.new` |
 | Release tarballs and old scripts | `/root/deploy-socialpilot-20261009/` (`release-<hash>.tar`, old `stage-*.sh`/`swap-*.sh`, `database_url`, `env.backup`, `httpd_config.conf`, `nftables.conf`) |
-| Environment | `/srv/ms-social-pilot/.env` (bootstrap only: DATABASE_URL, ENCRYPTION_KEY, SESSION_SECRET, APP_URL, PORT=3100, HOST=127.0.0.1, FACEBOOK_*…). Most settings live in the DB and are edited in **Settings → Configuration** (owner only). Never print or copy secret values. |
+| Environment | `/srv/ms-social-pilot/.env` (bootstrap: DATABASE_URL, ENCRYPTION_KEY, SESSION_SECRET, PORT=3100, HOST=127.0.0.1, TRUST_PROXY; older lines such as APP_URL and FACEBOOK_* still work as fallbacks). Settings live in the DB and are edited by root on **/root/config**, which flags values still read from `.env` and offers **Move into the database**; after that the lines can be removed from `.env` (with the owner's OK — never edit the production `.env` unasked). Never print or copy secret values. |
 | Data | `/var/lib/ms-social-pilot` (HOME of the services; `media/` uploads) |
 | Database | PostgreSQL 15 on the same host, database `social_pilot` |
 | Node | v22 |

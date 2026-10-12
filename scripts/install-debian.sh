@@ -200,9 +200,9 @@ cat <<SUMMARY
     2. The Setup screen asks for your Meta app ID and secret.
     3. Connect a Facebook account from Connections.
 
-    Set APP_URL in ${APP_DIR}/.env to the address people will actually use,
-    including https://, before connecting Facebook — the OAuth redirect has to
-    match it exactly.
+    Set the Application URL on the Configuration screen (/root/config) to the
+    address people will actually use, including https://, before connecting
+    Facebook — the OAuth redirect has to match it exactly.
 
     The app listens on PORT (80 by default) and serves plain HTTP. HTTPS is
     terminated in front of it — Cloudflare, or another proxy — because the app

@@ -608,7 +608,13 @@
     "aiSpendPerGeneration": "Par génération",
     "aiSpendWorkspace": "Espace de travail",
     "aiSpendPlusUnpriced": "{count, plural, one {+ # sans prix} other {+ # sans prix}}",
-    "aiSpendFootnote": "Calculé avec le prix de chaque modèle au moment de la rédaction. La facture du fournisseur fait foi."
+    "aiSpendFootnote": "Calculé avec le prix de chaque modèle au moment de la rédaction. La facture du fournisseur fait foi.",
+    "envTitle": "{count, plural, one {# réglage vient encore du fichier .env} other {# réglages viennent encore du fichier .env}}",
+    "envHint": "Déplacez-les ici pour les gérer depuis cet écran, puis retirez ces lignes du fichier .env. Le fichier .env n’a besoin que de la base de données, des deux clés secrètes et du port.",
+    "adopt": "Déplacer dans la base de données",
+    "adopting": "Déplacement…",
+    "adopted": "{count, plural, =0 {Rien à déplacer.} one {# réglage déplacé. Retirez sa ligne du fichier .env.} other {# réglages déplacés. Retirez leurs lignes du fichier .env.}}",
+    "adoptInvalid": "{count, plural, one {# valeur du fichier .env n’est pas valide et y est restée. Corrigez-la ci-dessous.} other {# valeurs du fichier .env ne sont pas valides et y sont restées. Corrigez-les ci-dessous.}}"
   },
   "connections": {
     "active": "Actif",

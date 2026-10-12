@@ -132,8 +132,40 @@ export function ConfigClient({
     );
   };
 
+  const fromEnvironment = settings.filter((entry) => entry.source === 'environment');
+
+  async function adopt() {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch('/api/root/config/adopt', { method: 'POST' });
+      const body = (await response.json()) as { error?: string; moved?: number; invalid?: number };
+      if (!response.ok) throw new Error(body.error ?? tCommon('genericError'));
+      setMessage(t('adopted', { count: body.moved ?? 0 }));
+      if (body.invalid) setError(t('adoptInvalid', { count: body.invalid }));
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {fromEnvironment.length > 0 && (
+        <section className="card space-y-3 border-l-4 border-amber-400 p-4 sm:p-5">
+          <h2 className="text-sm font-semibold text-slate-900">{t('envTitle', { count: fromEnvironment.length })}</h2>
+          <p className="text-sm text-slate-600">{t('envHint')}</p>
+          <p className="break-words font-mono text-xs text-slate-600">
+            {fromEnvironment.map((entry) => entry.envVar).join(' · ')}
+          </p>
+          <button type="button" className="btn-secondary" disabled={saving} onClick={adopt}>
+            <Icon name="download" size={14} /> {saving ? t('adopting') : t('adopt')}
+          </button>
+        </section>
+      )}
       {error && (
         <p className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           <Icon name="error" /> {error}

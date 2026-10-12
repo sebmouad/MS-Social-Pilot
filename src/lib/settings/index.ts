@@ -367,6 +367,33 @@ export async function writeSetting(
   invalidateSettings();
 }
 
+/**
+ * Copy every value still read from the environment into the database, so root
+ * manages it on the Configuration screen and the line can leave `.env`.
+ * Values already in the database are never touched.
+ */
+export async function adoptEnvironmentSettings(
+  userId: string | null,
+): Promise<{ moved: string[]; invalid: string[] }> {
+  const stored = new Set((await prisma.appSetting.findMany({ select: { key: true } })).map((row) => row.key));
+  const moved: string[] = [];
+  // A value the screen would refuse stays in .env for root to correct here.
+  const invalid: string[] = [];
+  for (const definition of SETTING_DEFINITIONS) {
+    if (stored.has(definition.key)) continue;
+    const value = fromEnv(definition);
+    if (value === null) continue;
+    try {
+      await writeSetting(definition.key, value, userId);
+      moved.push(definition.key);
+    } catch (error) {
+      if (!(error instanceof SettingError)) throw error;
+      invalid.push(definition.key);
+    }
+  }
+  return { moved, invalid };
+}
+
 /** Remove the override, letting the environment or the default take over. */
 export async function clearSetting(key: string): Promise<void> {
   if (!SETTINGS_BY_KEY.has(key)) throw new SettingError(`Unknown setting "${key}".`);

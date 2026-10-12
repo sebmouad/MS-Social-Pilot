@@ -86,6 +86,44 @@ describe('who reaches the root section', () => {
   });
 });
 
+describe('moving settings out of .env', () => {
+  it('copies what the environment sets into the database, leaves stored values alone, root only', async () => {
+    const adopt = await import('../src/app/api/root/config/adopt/route');
+    const settings = await import('../src/lib/settings');
+    const owner = await person();
+    const theRoot = await person({ root: true });
+    await prisma.appSetting.deleteMany({ where: { key: { in: ['alerts.email', 'alerts.telegramBotToken', 'alerts.diskPercent'] } } });
+    process.env.ALERTS_EMAIL = 'ops@example.test';
+    process.env.ALERTS_TELEGRAM_BOT_TOKEN = '123:secret';
+    process.env.ALERTS_DISK_PERCENT = '70';
+    try {
+      await settings.writeSetting('alerts.diskPercent', 85, theRoot.user.id);
+
+      cookieJar.set('msp_session', owner.token);
+      expect((await adopt.POST()).status).toBe(404);
+
+      cookieJar.set('msp_session', theRoot.token);
+      const response = await adopt.POST();
+      expect(response.status).toBe(200);
+      expect(((await response.json()) as { moved: number }).moved).toBeGreaterThanOrEqual(2);
+
+      const view = new Map((await settings.describeSettings()).map((entry) => [entry.key, entry]));
+      expect(view.get('alerts.email')).toMatchObject({ source: 'database', value: 'ops@example.test' });
+      expect(view.get('alerts.telegramBotToken')).toMatchObject({ source: 'database', hasValue: true });
+      expect(view.get('alerts.diskPercent')).toMatchObject({ source: 'database', value: 85 });
+      const secret = await prisma.appSetting.findUniqueOrThrow({ where: { key: 'alerts.telegramBotToken' } });
+      expect(secret.encrypted).toBe(true);
+      expect(JSON.stringify(secret.value)).not.toContain('123:secret');
+    } finally {
+      delete process.env.ALERTS_EMAIL;
+      delete process.env.ALERTS_TELEGRAM_BOT_TOKEN;
+      delete process.env.ALERTS_DISK_PERCENT;
+      await prisma.appSetting.deleteMany();
+      settings.invalidateSettings();
+    }
+  });
+});
+
 describe('disabling an account', () => {
   it('signs it out everywhere and refuses its password until enabled again', async () => {
     const theRoot = await person({ root: true });

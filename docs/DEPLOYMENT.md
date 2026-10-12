@@ -39,8 +39,9 @@ Everything here assumes the Meta app already exists. If it does not, start with
       does both, or `openssl rand -base64 48` and `-base64 32` by hand
 - [ ] `ENCRYPTION_KEY` stored somewhere you can recover it. Lose it and every
       stored Facebook token is unreadable — see [Key rotation](#key-rotation)
-- [ ] `APP_URL` uses https and matches the Meta app's OAuth redirect URI
-      **exactly**, trailing slash and all
+- [ ] The Application URL (`app.url`, set by root on `/root/config`; the
+      `APP_URL` variable still works as a fallback) uses https and matches the
+      Meta app's OAuth redirect URI **exactly**, trailing slash and all
 - [ ] Behind Cloudflare, a tunnel or a reverse proxy: `TRUST_PROXY="true"` in
       `.env` — Docker included, it is read from there — and the proxy is the
       only way in. Unset, every visitor looks like the proxy
@@ -264,10 +265,11 @@ The arrangement Cloudflare is used for here: DNS record proxied (orange cloud),
 Cloudflare answers 443 with its own certificate, and forwards to this server.
 
 ```
-APP_URL="https://your.domain"
 PORT="80"
 TRUST_PROXY="true"
 ```
+
+and the Application URL `https://your.domain` on `/root/config`.
 
 **Set the SSL/TLS mode to Full, not Flexible.** Flexible makes the hop from
 Cloudflare to your server plain HTTP across the open internet, which is where

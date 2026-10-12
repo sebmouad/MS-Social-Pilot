@@ -4,8 +4,9 @@
  *
  * Creates .env from .env.example and fills the values that cannot be guessed
  * and must not be shared between installations: the session signing secret,
- * the token encryption key, and the password of the bundled Postgres. Everything else in .env has a working
- * default or is configured later from Settings inside the app.
+ * the token encryption key, and the password of the bundled Postgres. .env holds
+ * infrastructure only: everything else is set by root on the Configuration
+ * screen (/root/config) and stored in the database.
  *
  * Safe to run more than once. An existing .env is never overwritten; only
  * blank secrets are filled in, and a line that already has a value is left
@@ -84,6 +85,7 @@ Next:
   1. docker compose up -d          start Postgres, the app and the worker
   2. open http://localhost:3000    create the first account, which is the owner
   3. follow the setup screen       it asks for your Meta app ID and secret
+  4. open /root/config             the public URL, email, AI, alerts and limits
 
 Running without Docker instead:
 
