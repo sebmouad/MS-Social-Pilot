@@ -21,6 +21,7 @@ import { keyDaysBetween, type KeyDay } from '@/lib/calendar-days';
 import { StatusBadge } from '@/components/StatusBadge';
 import { parseMedia } from '@/lib/json';
 import { Icon } from '@/components/Icon';
+import { CalendarFeedButton } from '@/components/CalendarFeedButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -480,6 +481,17 @@ export default async function CalendarPage({
               tomorrow={formatInZone(new Date(today.getTime() + 24 * 60 * 60 * 1000), timezone, 'yyyy-MM-dd')}
             />
           )}
+          <CalendarFeedButton
+            pageIds={filter.visible ?? []}
+            groupId={filter.group}
+            selection={
+              filter.group
+                ? (filter.groups.find((entry) => entry.id === filter.group)?.name ?? '')
+                : filter.visible
+                  ? t('feedPages', { count: filter.visible.length })
+                  : t('feedAllPages')
+            }
+          />
           <Link href="/compose" className="btn-primary">
             {tDash('newPost')}
           </Link>

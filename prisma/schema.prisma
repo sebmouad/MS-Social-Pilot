@@ -155,6 +155,7 @@ model User {
   posts                Post[]
   postVersions         PostVersion[]
   postNotes            PostNote[]
+  calendarFeeds        CalendarFeed[]
   submittedPosts       Post[]                @relation("PostSubmitter")
   reviewedPosts        Post[]                @relation("PostReviewer")
   sentInvitations      Invitation[]          @relation("InvitationSender")
@@ -270,6 +271,7 @@ model Workspace {
   pageGroups           PageGroup[]
   labels               Label[]
   snippets             Snippet[]
+  calendarFeeds   CalendarFeed[]
   postTemplates        PostTemplate[]
   savedReplies         SavedReply[]
   captionTests         CaptionTest[]
@@ -597,6 +599,30 @@ model PostNote {
   @@index([postId, createdAt])
   @@index([authorId])
   @@map("post_notes")
+}
+
+/// A member's private calendar subscription (NEXT_PHASES H19): an ICS address
+/// for Google Calendar or Outlook, narrowed to some Pages or a group, and
+/// always to what the member may still see when it is read.
+model CalendarFeed {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  /// What the selection was called when it was made ("All Pages", a group).
+  name        String
+  /// sha256 of the token; the address is shown once.
+  tokenHash   String    @unique
+  /// Empty with no group: every Page the member may see.
+  pageIds     String[]  @default([])
+  groupId     String?
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, userId])
+  @@map("calendar_feeds")
 }
 
 /// The unit of work the scheduler claims and publishes: one post, one

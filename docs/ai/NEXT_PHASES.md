@@ -808,8 +808,13 @@ setup from Phase 0.2 (marked AI).
   followed; deliveries kept 30 days. Comments only when under 48 h old and not
   the Page's own. REST hooks: `GET/POST /api/v1/webhooks`, `DELETE
   /api/v1/webhooks/:id` with an owner/admin write key.*
-- **H19. Calendar feed (S)** — private ICS URL per member (selection-aware:
+- **H19. Calendar feed (S)** ✅ — private ICS URL per member (selection-aware:
   pages/group in the token), revocable; Google Calendar / Outlook subscribe.
+  *Done 2026-10-12: Calendar › Subscribe makes an address for the sidebar's
+  selection (`calendar_feeds`: Pages or group stored with the feed, token
+  hashed and shown once). `GET /api/calendar-feed/[token]` serves ICS (no
+  session), clamped on every read to the member's current Pages; 404 once
+  revoked or the member leaves. Drafts are left out.*
 - **H20. Bulk Page info editing (M, check permission)** — edit hours,
   description, website, phone, cover across selected Pages; confirm Meta
   permission (`pages_manage_metadata` or Page settings fields) and add it behind

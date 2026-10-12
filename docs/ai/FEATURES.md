@@ -54,6 +54,11 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   a count on calendar chips): a team-only thread on each post, never
   published. `@` suggests members who may see the post's Pages; those
   mentioned are emailed (Settings › Notifications, on by default).
+- **Calendar feed** (Calendar › Subscribe): a private ICS address per member
+  for the sidebar's selection (Pages or group), for Google Calendar, Outlook
+  or Apple Calendar. Scheduled, waiting-approval and sent posts from 30 days
+  back to 180 ahead; always clamped to the Pages the member may see now; dead
+  once revoked or the member leaves. Shown once (stored hashed).
 - **Content mix** `/queue/mix`: per Page or group, how many posts of each
   label the coming 7 days should hold; a table of planned vs target with
   ready drafts per Page (selection-aware). Admins edit; with "Fill gaps from

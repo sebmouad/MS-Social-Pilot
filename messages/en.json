@@ -399,7 +399,9 @@
     "statusFilterClear": "Show every status",
     "dragHint": "Drag a post to another day to move it.",
     "openWeekOf": "See the week of {date}",
-    "notesCount": "{count, plural, one {# internal note} other {# internal notes}}"
+    "notesCount": "{count, plural, one {# internal note} other {# internal notes}}",
+    "feedPages": "{count, plural, one {# Page} other {# Pages}}",
+    "feedAllPages": "all your Pages"
   },
   "common": {
     "all": "All",
@@ -3640,5 +3642,29 @@
     "removeConfirmBody": "It disappears for the whole team. This cannot be undone.",
     "removeFailed": "Couldn’t remove the note. Try again.",
     "mentionList": "Members to mention"
+  },
+  "calendarFeed": {
+    "open": "Subscribe",
+    "title": "Subscribe in your calendar app",
+    "intro": "Get a private address that Google Calendar, Outlook or Apple Calendar subscribes to. Planned and published posts appear there and update by themselves, roughly every hour. Anyone with the address sees these posts, so keep it to yourself.",
+    "create": "Create address",
+    "forSelection": "For {selection}",
+    "allPagesName": "{workspace}: all Pages",
+    "addressLabel": "Your private address",
+    "copy": "Copy",
+    "copied": "Copied",
+    "addressHint": "Shown only now. In Google Calendar: Other calendars › From URL. In Outlook: Add calendar › Subscribe from web.",
+    "yourFeeds": "Your subscriptions",
+    "loading": "Loading…",
+    "none": "No subscriptions yet.",
+    "createdOn": "Created {date}",
+    "lastRead": "last read {date}",
+    "neverRead": "not read yet",
+    "revoke": "Revoke",
+    "revokeConfirm": "Revoke “{name}”?",
+    "revokeConfirmBody": "The address stops working, and calendars subscribed to it stop updating. This cannot be undone.",
+    "loadFailed": "Couldn’t load your subscriptions. Close this and try again.",
+    "createFailed": "Couldn’t create the address. Try again.",
+    "revokeFailed": "Couldn’t revoke it. Try again."
   }
 }

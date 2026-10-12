@@ -39,6 +39,7 @@ const NOT_WORKSPACE_DATA: Record<string, string> = {
   'networks/[network]/callback': 'An OAuth return address, keyed by the network name.',
   'networks/[network]/connect': 'Starts OAuth for the caller’s own workspace, keyed by the network name.',
   'share/[token]': 'Public review link: the token is the authority.',
+  'calendar-feed/[token]': 'Private calendar feed: the token is the authority.',
   'root/invitations/[id]': 'Root section: 404 for everybody but root (root.integration.test.ts).',
   'root/users/[id]': 'Root section.',
   'root/users/[id]/reset-two-step': 'Root section.',
@@ -150,6 +151,7 @@ beforeAll(async () => {
   const savedReply = await prisma.savedReply.create({ data: { workspaceId: w, name: 'A reply', body: 'x' } });
   const postTemplate = await prisma.postTemplate.create({ data: { workspaceId: w, name: 'A template', body: 'x' } });
   const postNote = await prisma.postNote.create({ data: { postId: post.id, body: 'A note' } });
+  const calendarFeed = await prisma.calendarFeed.create({ data: { workspaceId: w, userId: ownerA.id, name: 'A feed', tokenHash: 'feed-a' } });
   const rule = await prisma.moderationRule.create({ data: { workspaceId: w, name: 'A rule', match: 'links', action: 'hide' } });
   const exported = await prisma.workspaceExport.create({
     data: { workspaceId: w, requestedById: ownerA.id, status: 'ready', storageKey: 'exports/a.zip', expiresAt: new Date(Date.now() + 86_400_000) },
@@ -182,6 +184,7 @@ beforeAll(async () => {
     'saved-replies/[id]': savedReply.id,
     'post-templates/[id]': postTemplate.id,
     'post-notes/[id]': postNote.id,
+    'calendar-feeds/[id]': calendarFeed.id,
     'seasons/[id]': season.id,
     'moderation/actions/[id]/undo': moderated.id,
     'page-groups/[id]': group.id,
@@ -215,7 +218,7 @@ afterAll(async () => {
 /** Everything A owns, as a fingerprint: counts and the fields a hijack would change. */
 async function snapshot() {
   const w = A.workspace;
-  const [posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes] = await Promise.all([
+  const [posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes, calendarFeeds] = await Promise.all([
     prisma.post.findMany({ where: { workspaceId: w }, select: { id: true, message: true, status: true } }),
     prisma.target.findMany({ where: { workspaceId: w }, select: { id: true, enabled: true, name: true } }),
     prisma.label.findMany({ where: { workspaceId: w }, select: { id: true, name: true } }),
@@ -237,8 +240,9 @@ async function snapshot() {
     prisma.webhookDelivery.findMany({ where: { workspaceId: w }, select: { id: true, status: true, attempts: true } }),
     prisma.postTemplate.findMany({ where: { workspaceId: w }, select: { id: true, name: true, body: true } }),
     prisma.postNote.findMany({ where: { post: { workspaceId: w } }, select: { id: true, body: true } }),
+    prisma.calendarFeed.findMany({ where: { workspaceId: w }, select: { id: true } }),
   ]);
-  return { posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes };
+  return { posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes, calendarFeeds };
 }
 
 describe("another client's owner", () => {

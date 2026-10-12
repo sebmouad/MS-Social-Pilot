@@ -399,7 +399,9 @@
     "statusFilterClear": "Afficher tous les statuts",
     "dragHint": "Faites glisser une publication vers un autre jour pour la déplacer.",
     "openWeekOf": "Voir la semaine du {date}",
-    "notesCount": "{count, plural, one {# note interne} other {# notes internes}}"
+    "notesCount": "{count, plural, one {# note interne} other {# notes internes}}",
+    "feedPages": "{count, plural, one {# Page} other {# Pages}}",
+    "feedAllPages": "toutes vos Pages"
   },
   "common": {
     "all": "Tout",
@@ -3640,5 +3642,29 @@
     "removeConfirmBody": "Elle disparaît pour toute l’équipe. Action irréversible.",
     "removeFailed": "Impossible de supprimer la note. Réessayez.",
     "mentionList": "Membres à mentionner"
+  },
+  "calendarFeed": {
+    "open": "S’abonner",
+    "title": "S’abonner dans votre agenda",
+    "intro": "Obtenez une adresse privée à laquelle Google Agenda, Outlook ou Calendrier d’Apple s’abonne. Les publications planifiées et publiées y apparaissent et se mettent à jour d’elles-mêmes, environ toutes les heures. Toute personne qui a l’adresse voit ces publications : gardez-la pour vous.",
+    "create": "Créer l’adresse",
+    "forSelection": "Pour {selection}",
+    "allPagesName": "{workspace} : toutes les Pages",
+    "addressLabel": "Votre adresse privée",
+    "copy": "Copier",
+    "copied": "Copiée",
+    "addressHint": "Affichée seulement maintenant. Dans Google Agenda : Autres agendas › À partir de l’URL. Dans Outlook : Ajouter un calendrier › S’abonner à partir du web.",
+    "yourFeeds": "Vos abonnements",
+    "loading": "Chargement…",
+    "none": "Aucun abonnement pour l’instant.",
+    "createdOn": "Créé le {date}",
+    "lastRead": "lu le {date}",
+    "neverRead": "pas encore lu",
+    "revoke": "Révoquer",
+    "revokeConfirm": "Révoquer « {name} » ?",
+    "revokeConfirmBody": "L’adresse ne fonctionne plus et les agendas abonnés ne se mettent plus à jour. Action irréversible.",
+    "loadFailed": "Impossible de charger vos abonnements. Fermez et réessayez.",
+    "createFailed": "Impossible de créer l’adresse. Réessayez.",
+    "revokeFailed": "Impossible de la révoquer. Réessayez."
   }
 }
