@@ -30,6 +30,7 @@ import { TemplatePicker } from './TemplatePicker';
 import { VersionHistory } from './VersionHistory';
 import { PostNotes } from './PostNotes';
 import { TranslationFields, type Translation } from './TranslationFields';
+import AltTextSuggest from './AltTextSuggest';
 
 interface Props {
   targets: TargetOption[];
@@ -919,6 +920,15 @@ export function Composer({
                         maxLength={1000}
                         value={item.altText ?? ''}
                         onChange={(event) => setAltText(item.id, event.target.value)}
+                      />
+                    )}
+                    {item.kind === 'image' && aiEnabled && item.storageKey && (
+                      <AltTextSuggest
+                        mediaId={item.id}
+                        number={index + 1}
+                        context={message}
+                        targetIds={selected}
+                        onSuggest={(text) => setAltText(item.id, text)}
                       />
                     )}
                   </li>

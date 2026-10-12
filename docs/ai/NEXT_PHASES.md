@@ -728,10 +728,21 @@ setup from Phase 0.2 (marked AI).
   category, asks for each blank, previews, and fills the text (hashtags on
   their own line), the first comment and the label. Everyone picks; editors
   and up add, change and remove (`canManageTemplates`).*
-- **H5. AI alt text and subtitles (M, AI)** — alt text suggested for every photo
+- **H5. AI alt text and subtitles (M, AI)** ◐ — alt text suggested for every photo
   (editable, sent as Facebook alt text — already supported); Reel/video
   transcription to burned-in or SRT captions (speech-to-text provider; OpenAI
   or Gemini from 0.2).
+  *Alt text done 2026-10-12: under each uploaded photo in Compose, "Suggest a
+  description" (when AI is on) asks the configured provider — Anthropic,
+  OpenAI or Gemini, whichever root set — to describe it in the Page audience's
+  language, using the post's text as context; the answer fills the box and
+  stays editable. Only the workspace's own stored uploads are read (no URL is
+  fetched on request), shrunk to a 1024 px JPEG first; each call is an
+  `altText` AI generation, under the hourly limit and monthly budget
+  (`src/lib/alt-text.ts`, `describeImage` in `src/lib/ai.ts`, action `altText`
+  on `/api/ai`). Subtitles not built yet: they need a speech-to-text call on
+  the video's audio track (extracting it needs ffmpeg on the server) and a
+  decision on SRT upload vs burned-in captions.*
 - **H6. Engagement prediction (M, AI)** ✅ — before scheduling, compare the draft
   (format, length, time, topic) with the Page's past posts; show "likely above
   / around / below this Page's usual" with the reasons; never a fake precise

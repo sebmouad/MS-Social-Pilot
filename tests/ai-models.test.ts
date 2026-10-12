@@ -154,4 +154,28 @@ describe('generating text', () => {
     anthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'Hey' }], usage: { input_tokens: 4, output_tokens: 1 } });
     expect(await generateWith('anthropic', 'a', request)).toEqual({ text: 'Hey', inputTokens: 4, outputTokens: 1 });
   });
+
+  it('sends a photo the way each provider reads one (H5)', async () => {
+    const image = { data: 'QUJD', mimeType: 'image/jpeg' as const };
+    anthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'A' }], usage: { input_tokens: 1, output_tokens: 1 } });
+    await generateWith('anthropic', 'a', { ...request, image });
+    expect(anthropicCreate.mock.calls[0]![0].messages[0].content).toEqual([
+      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'QUJD' } },
+      { type: 'text', text: 'hi' },
+    ]);
+
+    fetchMock.mockResolvedValueOnce(respond({ choices: [{ message: { content: 'B' } }] }));
+    await generateWith('openai', 'o', { ...request, image });
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body).messages[1].content).toEqual([
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,QUJD' } },
+      { type: 'text', text: 'hi' },
+    ]);
+
+    fetchMock.mockResolvedValueOnce(respond({ candidates: [{ content: { parts: [{ text: 'C' }] } }] }));
+    await generateWith('gemini', 'g', { ...request, image });
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body).contents[0].parts).toEqual([
+      { inline_data: { mime_type: 'image/jpeg', data: 'QUJD' } },
+      { text: 'hi' },
+    ]);
+  });
 });

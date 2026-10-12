@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { aiAvailable, generateCaption, improveCaption, planWeek, suggestHashtags, TONES, translateCaption } from '@/lib/ai';
+import { aiAvailable, describeImage, generateCaption, improveCaption, planWeek, suggestHashtags, TONES, translateCaption } from '@/lib/ai';
 import { assertPagesAllowed } from '@/lib/page-access';
+import { altTextImage } from '@/lib/alt-text';
 import { EMPTY_AUDIENCE, audienceOf, effectiveAudience } from '@/lib/audience';
 import { createPost } from '@/lib/posts';
 import { formatInZone } from '@/lib/time';
@@ -37,6 +38,14 @@ const schema = z.discriminatedUnion('action', [
     action: z.literal('translate'),
     text: z.string().trim().min(3, 'Write the post first.').max(6000),
     targetIds: z.array(z.string().min(1)).min(1).max(500),
+  }),
+  z.object({
+    action: z.literal('altText'),
+    /** An uploaded photo of this workspace. */
+    mediaId: z.string().min(1),
+    /** The post's text, so the description fits what the post is about. */
+    context: z.string().max(6000).default(''),
+    targetIds,
   }),
   z.object({
     action: z.literal('plan'),
@@ -97,6 +106,12 @@ export const POST = route(async (request: Request) => {
     // The Page's audience (H0), or the workspace's default when several are picked.
     audience: effectiveAudience(page ? audienceOf(page) : EMPTY_AUDIENCE, audienceOf(workspace), auth.workspace.timezone),
   };
+
+  if (input.action === 'altText') {
+    const image = await altTextImage(auth.workspace.id, input.mediaId);
+    const result = await describeImage({ ...shared, context: input.context, image });
+    return ok({ text: result.text, model: result.model });
+  }
 
   if (input.action === 'hashtags') {
     return ok({ hashtags: await suggestHashtags({ ...shared, text: input.text }) });

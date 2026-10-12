@@ -112,6 +112,8 @@ enum AiGenerationKind {
   translate
   /// The mood of a batch of new comments (H15).
   sentiment
+  /// A description of a photo for screen readers (H5).
+  altText
 }
 
 // ---------------------------------------------------------------------------

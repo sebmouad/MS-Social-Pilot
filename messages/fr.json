@@ -3833,5 +3833,11 @@
     "news": "Dans l’actualité",
     "makePost": "Créer une publication",
     "makePostAbout": "Créer une publication sur {topic}"
+  },
+  "altText": {
+    "suggest": "Suggérer une description",
+    "suggesting": "Description en cours…",
+    "suggestFor": "Suggérer une description pour la photo {number}",
+    "failed": "L’IA n’a pas pu décrire cette photo. Écrivez la description vous-même, ou réessayez."
   }
 }

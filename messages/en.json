@@ -3833,5 +3833,11 @@
     "news": "In the news",
     "makePost": "Make a post",
     "makePostAbout": "Make a post about {topic}"
+  },
+  "altText": {
+    "suggest": "Suggest a description",
+    "suggesting": "Describing…",
+    "suggestFor": "Suggest a description for photo {number}",
+    "failed": "The AI could not describe this photo. Write the description yourself, or try again."
   }
 }

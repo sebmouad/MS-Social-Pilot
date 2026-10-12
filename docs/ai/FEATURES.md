@@ -24,7 +24,7 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
   link with Open Graph card; "Use page details" reads the linked page's
   schema.org JSON-LD (product, event, recipe, job, course, how-to, place,
   article) and fills the text from a template (key facts, price and offer,
-  countdown, steps), copying its pictures into the media library; photos/video with alt text; labels; Schedule /
+  countdown, steps), copying its pictures into the media library; photos/video with alt text (AI can suggest it for a photo, H5); labels; Schedule /
   Queue / Now (Now waits the workspace's undo-send delay with an Undo that
   turns it back into a draft); who holds it (this app or Facebook-native); approval submit for
   contributors; spam-risk guard (same link or near-identical text on 3+ Pages of

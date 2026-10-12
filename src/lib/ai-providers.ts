@@ -111,14 +111,32 @@ export async function listProviderModels(provider: AiProvider, apiKey: string): 
 export async function generateWith(
   provider: AiProvider,
   apiKey: string,
-  request: { model: string; system: string; prompt: string; maxTokens: number },
+  request: {
+    model: string;
+    system: string;
+    prompt: string;
+    maxTokens: number;
+    /** A picture to read with the prompt (alt text, H5): base64 bytes. */
+    image?: { data: string; mimeType: 'image/jpeg' };
+  },
 ): Promise<Generated> {
+  const image = request.image;
   if (provider === 'anthropic') {
     const response = await new Anthropic({ apiKey }).messages.create({
       model: request.model,
       max_tokens: request.maxTokens,
       system: request.system,
-      messages: [{ role: 'user', content: request.prompt }],
+      messages: [
+        {
+          role: 'user',
+          content: image
+            ? [
+                { type: 'image', source: { type: 'base64', media_type: image.mimeType, data: image.data } },
+                { type: 'text', text: request.prompt },
+              ]
+            : request.prompt,
+        },
+      ],
     });
     return {
       text: response.content
@@ -141,7 +159,15 @@ export async function generateWith(
           max_completion_tokens: request.maxTokens,
           messages: [
             { role: 'system', content: request.system },
-            { role: 'user', content: request.prompt },
+            {
+              role: 'user',
+              content: image
+                ? [
+                    { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.data}` } },
+                    { type: 'text', text: request.prompt },
+                  ]
+                : request.prompt,
+            },
           ],
         }),
       }),
@@ -163,7 +189,14 @@ export async function generateWith(
         headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: request.system }] },
-          contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
+          contents: [
+            {
+              role: 'user',
+              parts: image
+                ? [{ inline_data: { mime_type: image.mimeType, data: image.data } }, { text: request.prompt }]
+                : [{ text: request.prompt }],
+            },
+          ],
           generationConfig: { maxOutputTokens: request.maxTokens },
         }),
       },

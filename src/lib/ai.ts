@@ -145,6 +145,7 @@ async function complete(options: {
   system: string;
   prompt: string;
   maxTokens?: number;
+  image?: { data: string; mimeType: 'image/jpeg' };
 }): Promise<GenerationResult> {
   await assertWithinRateLimit(options.workspaceId);
   await assertWithinBudget();
@@ -159,6 +160,7 @@ async function complete(options: {
     system: options.system,
     prompt: options.prompt,
     maxTokens: options.maxTokens ?? MAX_OUTPUT_TOKENS,
+    image: options.image,
   });
   const text = generated.text;
 
@@ -433,6 +435,48 @@ export async function readCommentSentiments(options: {
     prompt: JSON.stringify(options.comments.map((text) => text.slice(0, 500))),
   });
   return parseSentiments(result.text, options.comments.length);
+}
+
+/**
+ * Alt text for a photo (H5): what a screen reader says in its place, in the
+ * language the post is written for. The picture is a JPEG already shrunk by
+ * the caller, so its tokens stay few.
+ */
+export async function describeImage(options: {
+  workspaceId: string;
+  userId: string;
+  locale: Locale;
+  audience?: AiAudience | null;
+  /** The post's text, so the description names what the post is about. */
+  context?: string;
+  image: { data: string; mimeType: 'image/jpeg' };
+}): Promise<GenerationResult> {
+  const result = await complete({
+    workspaceId: options.workspaceId,
+    userId: options.userId,
+    kind: AiGenerationKind.altText,
+    maxTokens: 200,
+    image: options.image,
+    system: [
+      'You write alt text for photos posted on social media, read aloud by screen readers to people who cannot see them.',
+      `Write in ${writingLanguage(options.locale, options.audience)}.`,
+      'One or two plain sentences, under 250 characters: what the picture shows that matters to the post, and any text written in it.',
+      'Do not start with "Image of" or "Photo of". No hashtags, no emoji, no quotes around the answer.',
+    ].join('\n'),
+    prompt: options.context?.trim()
+      ? `Describe this photo. The post it goes with says:\n${options.context.trim().slice(0, 1000)}`
+      : 'Describe this photo.',
+  });
+  return { ...result, text: cleanAltText(result.text) };
+}
+
+/** The model's answer as alt text: one paragraph, unquoted, within the field's 1000 characters. */
+export function cleanAltText(text: string): string {
+  return text
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^["“«]\s*|\s*["”»]$/g, '')
+    .slice(0, 1000);
 }
 
 /** The model's answer, made safe: one known word per comment, else null. */
