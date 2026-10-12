@@ -15,6 +15,7 @@ import { LabelPicker, type LabelOption } from './LabelPicker';
 import { CommentDelay } from './CommentDelay';
 import { SplitButton } from './SplitButton';
 import { ComposerTools } from './ComposerTools';
+import { UndoSendBar } from './UndoSendBar';
 import type { PageGroupView } from '@/lib/page-groups';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 import { LIMITS } from '@/lib/constants';
@@ -168,6 +169,8 @@ export function Composer({
   const [published, setPublished] = useState<Array<{ name: string; url: string }>>([]);
   /** A post that was made but reached only some of its destinations. */
   const [partial, setPartial] = useState<{ text: string; allFailed: boolean } | null>(null);
+  /** Undo send (H10): the post just sent with "Publish now", held until then. */
+  const [undo, setUndo] = useState<{ postId: string; until: string } | null>(null);
   /** Writing the next post clears the last one's "Scheduled": it was about that one. */
   const startedNext = () => {
     setResult(null);
@@ -372,6 +375,7 @@ export function Composer({
     setResult(null);
     setPartial(null);
     setPublished([]);
+    setUndo(null);
 
     const publishMode = timing === 'now' ? 'immediate' : effectiveHandler;
 
@@ -436,6 +440,7 @@ export function Composer({
         posts?: number;
         scheduledAt?: string | null;
         notice?: string;
+        undoUntil?: string;
         results?: Array<{ targetName: string; status: string; url?: string; error?: string }>;
       };
 
@@ -512,6 +517,11 @@ export function Composer({
       setCaptionTest(NO_CAPTION_TEST);
       const translated = translating;
       setTranslations(null);
+
+      if (body.undoUntil && body.postId) {
+        setUndo({ postId: body.postId, until: body.undoUntil });
+        return;
+      }
 
       setResult(
         saveAsDraft
@@ -1056,6 +1066,7 @@ export function Composer({
             {error}
           </div>
         )}
+        {undo && <UndoSendBar key={undo.postId} postId={undo.postId} until={undo.until} />}
         {(result || partial) && (
           <div
             role={partial ? 'alert' : 'status'}

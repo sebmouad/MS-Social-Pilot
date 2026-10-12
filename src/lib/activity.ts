@@ -32,6 +32,7 @@ export const ACTIVITY_ACTIONS = [
   'post.rejected',
   'post.retried',
   'post.submitted',
+  'post.undone',
   'post.updated',
   'post.withdrawn',
   'queue.bestTimesAdded',

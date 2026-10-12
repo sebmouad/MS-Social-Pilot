@@ -233,6 +233,9 @@ model Workspace {
   /// should not reach several Pages of one network closer together than this.
   /// 0 turns the warning off.
   spamGapMinutes Int @default(20)
+  /// Undo send (H10): "Publish now" waits this many seconds, with an Undo,
+  /// before the worker publishes. 0 publishes during the request.
+  undoSendSeconds Int @default(30)
   /// Best time per Page (G10): "suggest" shows good times on the queue screen;
   /// "apply" also lets a weekly job add them as the Page's own queue times.
   bestTimeMode   String    @default("suggest")

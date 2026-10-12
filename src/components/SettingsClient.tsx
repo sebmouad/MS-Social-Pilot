@@ -20,6 +20,8 @@ export interface WorkspaceOptions {
   shortenerEnabled: boolean;
   /** Spam-risk guard gap between Pages for the same content; 0 is off. */
   spamGapMinutes: number;
+  /** Undo send: seconds "Publish now" waits; 0 is off. */
+  undoSendSeconds: number;
   /** Best time per Page: show good times, or also add them to the queue weekly. */
   bestTimeMode: 'suggest' | 'apply';
   /** Default target audience (H0) for Pages that set none of their own. */
@@ -199,6 +201,24 @@ export function SettingsClient({
             ))}
           </select>
           <p className="hint">{t('spamGapHint')}</p>
+        </div>
+        <div className="mt-4 sm:max-w-xs">
+          <label className="label" htmlFor="undoSendSeconds">
+            {t('undoSend')}
+          </label>
+          <select
+            id="undoSendSeconds"
+            className="input"
+            value={settings.undoSendSeconds}
+            onChange={(event) => setSettings({ ...settings, undoSendSeconds: Number(event.target.value) })}
+          >
+            {[0, 10, 20, 30, 45, 60].map((seconds) => (
+              <option key={seconds} value={seconds}>
+                {seconds === 0 ? t('undoSendOff') : t('undoSendSeconds', { seconds })}
+              </option>
+            ))}
+          </select>
+          <p className="hint">{t('undoSendHint')}</p>
         </div>
         <div className="mt-4 sm:max-w-xs">
           <label className="label" htmlFor="bestTimeMode">

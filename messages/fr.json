@@ -572,7 +572,10 @@
     "staggeredOk": "Programmé en {count, plural, one {# publication} other {# publications}}, une Page à la fois.",
     "captionTestOk": "Test de légendes lancé : {count, plural, one {# publication programmée} other {# publications programmées}}. Le résultat s’affiche dans Analyser › Tests de légendes.",
     "translatedOk": "{count, plural, one {C’est fait : un post.} other {C’est fait : # posts, un par langue.}}",
-    "focusHint": "Cliquez sur le sujet pour le garder dans le cadre quand l’image est recadrée pour Instagram ou une story"
+    "focusHint": "Cliquez sur le sujet pour le garder dans le cadre quand l’image est recadrée pour Instagram ou une story",
+    "undoSendWaiting": "{seconds, plural, one {Publication dans # seconde.} other {Publication dans # secondes.}}",
+    "undoSend": "Annuler",
+    "undoSendGone": "Envoyée aux Pages : elle apparaît d’ici une minute."
   },
   "config": {
     "title": "Configuration",
@@ -1112,7 +1115,8 @@
     "undoFailed": "Impossible d’annuler : {reason}",
     "targetNotFound": "Page introuvable.",
     "keyDateNotFound": "Date clé introuvable.",
-    "seasonNotFound": "Mode saisonnier introuvable."
+    "seasonNotFound": "Mode saisonnier introuvable.",
+    "undoTooLate": "Trop tard pour annuler : la publication est déjà en cours d’envoi."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -1199,7 +1203,8 @@
         "submitted": "a soumis une publication pour validation",
         "updated": "a modifié une publication",
         "withdrawn": "a retiré une publication de la validation",
-        "bulkAction": "a agi sur plusieurs publications à la fois"
+        "bulkAction": "a agi sur plusieurs publications à la fois",
+        "undone": "a repris une publication juste avant son envoi"
       },
       "settings": {
         "changed": "a modifié les réglages de l’espace de travail"
@@ -1910,7 +1915,11 @@
     "bestTimeApply": "Les ajouter à la file chaque semaine",
     "bestTimeModeHint": "Chaque semaine, le worker examine les résultats propres à chaque Page. Avec « Ajouter », jusqu’à deux nouveaux horaires par Page entrent dans sa file (14 au plus) ; l’écran de la file indique ce qui a été ajouté, et chaque horaire peut être retiré.",
     "audienceTitle": "Audience par défaut",
-    "audienceHint": "Les Pages sans audience propre suivent ces valeurs. Rien n’est supposé : laissez vide ce qui ne s’applique pas."
+    "audienceHint": "Les Pages sans audience propre suivent ces valeurs. Rien n’est supposé : laissez vide ce qui ne s’applique pas.",
+    "undoSend": "Annulation de l’envoi",
+    "undoSendOff": "Désactivée — publier tout de suite",
+    "undoSendSeconds": "{seconds, plural, one {# seconde} other {# secondes}}",
+    "undoSendHint": "« Publier maintenant » attend ce délai, avec un bouton Annuler, avant que la publication parte. Annulée, elle devient un brouillon."
   },
   "setup": {
     "title": "Configurer MS Social Pilot",

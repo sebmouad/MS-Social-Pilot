@@ -17,7 +17,7 @@ import type { CreatePostInput } from './validation';
  * else (a draft, the queue) is created as usual.
  */
 export async function createStaggered(
-  context: { workspaceId: string; userId: string; role: WorkspaceRole; requiresApproval: boolean; locale: Locale },
+  context: { workspaceId: string; userId: string; role: WorkspaceRole; requiresApproval: boolean; locale: Locale; undoSendSeconds?: number },
   input: CreatePostInput,
   now: Date = new Date(),
 ): Promise<CreatePostResult & { posts: number }> {
@@ -27,6 +27,8 @@ export async function createStaggered(
     (input.publishMode === 'immediate' || Boolean(input.scheduledAtLocal));
   const { locale: _locale, ...postContext } = context;
   if (!applies) return { ...(await createPost(postContext, input, now)), posts: 1 };
+  // One Undo cannot take back the Pages that follow, so a staggered post is not held.
+  delete postContext.undoSendSeconds;
 
   const start = input.scheduledAtLocal ?? utcToLocalInput(now, input.timezone);
   const voices = input.aiVariants && aiAvailable() ? await pageVoices(context.workspaceId, input.targetIds) : null;

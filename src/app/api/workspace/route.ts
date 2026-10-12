@@ -32,6 +32,7 @@ export const PATCH = route(async (request: Request) => {
   assign('utmCampaignTemplate', input.utmCampaignTemplate);
   assign('shortenerEnabled', input.shortenerEnabled);
   assign('spamGapMinutes', input.spamGapMinutes);
+  assign('undoSendSeconds', input.undoSendSeconds);
   assign('bestTimeMode', input.bestTimeMode);
   assign('audienceCountries', input.audienceCountries);
   assign('audienceLanguages', input.audienceLanguages);

@@ -93,6 +93,15 @@ export const POST = route(async (request: Request) => {
     ? await createCaptionTest(context, input)
     : input.translations?.length
       ? await createTranslated(context, input)
-      : await createStaggered({ ...context, locale: auth.workspace.defaultLocale }, input);
+      : await createStaggered(
+          {
+            ...context,
+            locale: auth.workspace.defaultLocale,
+            undoSendSeconds: (
+              await prisma.workspace.findUniqueOrThrow({ where: { id: auth.workspace.id }, select: { undoSendSeconds: true } })
+            ).undoSendSeconds,
+          },
+          input,
+        );
   return ok(result, 201);
 });

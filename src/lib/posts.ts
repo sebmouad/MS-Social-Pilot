@@ -273,10 +273,19 @@ export interface CreatePostResult {
   scheduledAt: Date | null;
   /** Per-destination outcome, populated for immediate and native publishing. */
   results: Array<{ targetId: string; targetName: string; status: string; url?: string; error?: string }>;
+  /** Undo send (H10): "Publish now" was held until then, and can be taken back before it. */
+  undoUntil?: Date;
 }
 
 export async function createPost(
-  context: { workspaceId: string; userId: string; role: WorkspaceRole; requiresApproval: boolean },
+  context: {
+    workspaceId: string;
+    userId: string;
+    role: WorkspaceRole;
+    requiresApproval: boolean;
+    /** Undo send (H10): hold "Publish now" this long, for the worker to publish. */
+    undoSendSeconds?: number;
+  },
   input: CreatePostInput,
   now: Date = new Date(),
 ): Promise<CreatePostResult> {
@@ -291,6 +300,10 @@ export async function createPost(
     saveAsDraft: input.saveAsDraft,
   });
   const needsApproval = approvalStatus === ApprovalStatus.pending;
+  // "Publish now" held for a few seconds so it can be taken back: the worker
+  // publishes it once the time is up, like any scheduled post.
+  const undoSeconds =
+    !input.saveAsDraft && !needsApproval && input.publishMode === 'immediate' ? (context.undoSendSeconds ?? 0) : 0;
 
   if (input.publishMode === 'native') assertNativeSupported(targets);
   if (!input.saveAsDraft) {
@@ -320,7 +333,10 @@ export async function createPost(
    * to prevent.
    */
   const write = async (client: PrismaClientLike, at: Date = now) => {
-    const schedule = await resolveSchedule(context.workspaceId, input, at, client);
+    const schedule: ResolvedSchedule =
+      undoSeconds > 0
+        ? { scheduledAt: new Date(at.getTime() + undoSeconds * 1000), timezone: input.timezone, publishMode: 'worker', usedQueueSlot: false }
+        : await resolveSchedule(context.workspaceId, input, at, client);
 
     const status: PostStatus = input.saveAsDraft
       ? PostStatus.draft
@@ -403,7 +419,33 @@ export async function createPost(
     return summarise(post.id);
   }
 
-  return { postId: post.id, status, scheduledAt: schedule.scheduledAt, results: [] };
+  return {
+    postId: post.id,
+    status,
+    scheduledAt: schedule.scheduledAt,
+    results: [],
+    ...(undoSeconds > 0 && schedule.scheduledAt ? { undoUntil: schedule.scheduledAt } : {}),
+  };
+}
+
+/**
+ * Undo send (H10): a held "Publish now" goes back to the drafts, as long as
+ * its time has not come. Past it the worker may already be publishing, so it
+ * is refused rather than raced. True when it was taken back.
+ */
+export async function undoSend(workspaceId: string, postId: string, now: Date = new Date()): Promise<boolean> {
+  const { count } = await prisma.post.updateMany({
+    where: {
+      id: postId,
+      workspaceId,
+      status: PostStatus.scheduled,
+      publishMode: 'worker',
+      scheduledAt: { gt: now },
+      targets: { every: { status: 'pending' } },
+    },
+    data: { status: PostStatus.draft, scheduledAt: null },
+  });
+  return count === 1;
 }
 
 /**

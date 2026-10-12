@@ -572,7 +572,10 @@
     "staggeredOk": "Scheduled as {count, plural, one {# post} other {# posts}}, one Page at a time.",
     "captionTestOk": "Caption test started: {count, plural, one {# post} other {# posts}} scheduled. The result shows in Analyse › Caption tests.",
     "translatedOk": "{count, plural, one {Done: one post.} other {Done: # posts, one per language.}}",
-    "focusHint": "Click the subject to keep it in frame when the image is cropped for Instagram or a story"
+    "focusHint": "Click the subject to keep it in frame when the image is cropped for Instagram or a story",
+    "undoSendWaiting": "{seconds, plural, one {Publishing in # second.} other {Publishing in # seconds.}}",
+    "undoSend": "Undo",
+    "undoSendGone": "Sent to the Pages: it appears within a minute."
   },
   "config": {
     "title": "Configuration",
@@ -1112,7 +1115,8 @@
     "undoFailed": "This could not be undone: {reason}",
     "targetNotFound": "Page not found.",
     "keyDateNotFound": "Key date not found.",
-    "seasonNotFound": "Seasonal mode not found."
+    "seasonNotFound": "Seasonal mode not found.",
+    "undoTooLate": "Too late to undo: the post is already going out."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -1199,7 +1203,8 @@
         "submitted": "submitted a post for approval",
         "updated": "edited a post",
         "withdrawn": "took a post back out of review",
-        "bulkAction": "acted on several posts at once"
+        "bulkAction": "acted on several posts at once",
+        "undone": "took back a post just before it went out"
       },
       "settings": {
         "changed": "changed the workspace settings"
@@ -1910,7 +1915,11 @@
     "bestTimeApply": "Add them to the queue every week",
     "bestTimeModeHint": "Each week the worker looks at every Page’s own results. With “Add”, up to two new times per Page go into its queue (at most 14 of its own); the queue screen says what was added, and any time can be removed.",
     "audienceTitle": "Default audience",
-    "audienceHint": "Pages that set no audience of their own follow these. Nothing is assumed: leave empty what does not apply."
+    "audienceHint": "Pages that set no audience of their own follow these. Nothing is assumed: leave empty what does not apply.",
+    "undoSend": "Undo send",
+    "undoSendOff": "Off — publish straight away",
+    "undoSendSeconds": "{seconds, plural, one {# second} other {# seconds}}",
+    "undoSendHint": "“Publish now” waits this long, with an Undo button, before the post goes out. Undone, it becomes a draft."
   },
   "setup": {
     "title": "Set up MS Social Pilot",

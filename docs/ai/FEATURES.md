@@ -19,7 +19,8 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   multi-network targets with search and groups; text with saved snippets, emoji,
   character/#/@ counters; per-network limit warnings; first comment + delay;
   link with Open Graph card; photos/video with alt text; labels; Schedule /
-  Queue / Now; who holds it (this app or Facebook-native); approval submit for
+  Queue / Now (Now waits the workspace's undo-send delay with an Undo that
+  turns it back into a draft); who holds it (this app or Facebook-native); approval submit for
   contributors; spam-risk guard (same link or near-identical text on 3+ Pages of
   one network within the workspace gap, Settings → General) warns and offers
   one post per Page N minutes apart, optionally reworded per Page by AI;
@@ -102,7 +103,7 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
 - **Client links** `/settings/sharing`: portal (to review + calendar + results),
   review link (approve / request changes / comment, no account), calendar link
   (read-only, includes Facebook-side posts); revocable; shown once.
-- **Settings**: Workspace (timezone, approvals, UTM, shortener, AI voice, report
+- **Settings**: Workspace (timezone, approvals, UTM, shortener, undo send, AI voice, report
   branding), Team (roles owner/admin/editor/contributor, per-Page access, roles
   guide), Pages & groups (per-Page voice, audience, watermark & UTM, groups, labels; audience =
   countries, languages, time zone, cultural calendars, with workspace defaults

@@ -283,6 +283,7 @@ export const workspaceSettingsSchema = z.object({
   utmCampaignTemplate: z.string().trim().max(200).nullish(),
   shortenerEnabled: z.boolean().optional(),
   spamGapMinutes: z.number().int().min(0).max(720).optional(),
+  undoSendSeconds: z.number().int().min(0).max(60).optional(),
   bestTimeMode: z.enum(['suggest', 'apply']).optional(),
 
   aiEnabled: z.boolean().optional(),

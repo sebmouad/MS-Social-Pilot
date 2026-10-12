@@ -722,9 +722,16 @@ setup from Phase 0.2 (marked AI).
   popover and approvals.
 - **H9. Post version history (S)** — every save stores a version (text, media,
   targets, time, who); compare and restore.
-- **H10. Undo send (S)** — "Publish now" waits 30 s (setting 0–60 s) with an
+- **H10. Undo send (S)** ✅ — "Publish now" waits 30 s (setting 0–60 s) with an
   "Undo" toast; the worker publishes after the delay; scheduled posts
   unaffected.
+  *Done 2026-10-12: Settings › Undo send (0, 10–60 s, default 30). From the
+  composer, "Publish now" is stored as a worker post due after the delay and
+  the composer shows a countdown with Undo (`POST /api/posts/[id]/undo-send`,
+  author or editors+); undone, it becomes a draft and opens in the composer.
+  Refused once the time is up so it never races the worker. Not applied to
+  staggered sends (one Undo cannot take back the later Pages), caption tests,
+  translations, the public API or "Post now" on an existing post.*
 - **H11. Inbox response time (S)** — first-response and resolution time per
   Page and per member (median, slowest), business hours aware; in analytics
   and reports.
