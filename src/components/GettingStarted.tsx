@@ -19,7 +19,9 @@ const STEPS: Array<{ id: string; href: string; icon: IconName }> = [
  * ticked off from what the workspace has actually done. It goes away once
  * everything is done, or when someone closes it.
  */
-export async function GettingStarted({ workspaceId }: { workspaceId: string }) {
+export async function GettingStarted({ workspaceId, developer }: { workspaceId: string; developer: boolean }) {
+  // API keys only exist for a workspace root has switched developer features on for.
+  const steps = developer ? STEPS : STEPS.filter((step) => step.id !== 'claude');
   const t = await getTranslations('dashboard');
   const [pages, posts, slots, members, links, reports, keys] = await Promise.all([
     prisma.target.count({ where: { workspaceId } }),
@@ -38,9 +40,9 @@ export async function GettingStarted({ workspaceId }: { workspaceId: string }) {
     client: links + reports > 0,
     claude: keys > 0,
   };
-  const count = STEPS.filter((step) => done[step.id]).length;
-  if (count === STEPS.length) return null;
-  const next = STEPS.find((step) => !done[step.id])!;
+  const count = steps.filter((step) => done[step.id]).length;
+  if (count === steps.length) return null;
+  const next = steps.find((step) => !done[step.id])!;
 
   return (
     <DismissibleCard storageKey={`msp-getting-started-${workspaceId}`} closeLabel={t('gsHide')}>
@@ -56,11 +58,11 @@ export async function GettingStarted({ workspaceId }: { workspaceId: string }) {
               stroke="#1877f2"
               strokeWidth="4"
               strokeLinecap="round"
-              strokeDasharray={`${(count / STEPS.length) * 97.4} 97.4`}
+              strokeDasharray={`${(count / steps.length) * 97.4} 97.4`}
             />
           </svg>
           <span className="nums absolute inset-0 flex items-center justify-center text-xs font-bold text-slate-900">
-            {count}/{STEPS.length}
+            {count}/{steps.length}
           </span>
         </div>
         <div className="min-w-0 flex-1">
@@ -69,7 +71,7 @@ export async function GettingStarted({ workspaceId }: { workspaceId: string }) {
         </div>
       </div>
       <ol className="grid gap-px bg-slate-100 sm:grid-cols-2 lg:grid-cols-3">
-        {STEPS.map((step) => (
+        {steps.map((step) => (
           <li key={step.id} className="bg-white">
             <Link
               href={step.href}

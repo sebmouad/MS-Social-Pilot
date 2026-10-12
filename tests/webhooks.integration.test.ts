@@ -44,7 +44,7 @@ describe('webhook schema', () => {
 
 describe('deliveries', () => {
   it('queues per listening endpoint, signs, retries and gives up', async () => {
-    const workspace = await prisma.workspace.create({ data: { name: 'Client A', slug: 'client-a-hooks', timezone: 'UTC' } });
+    const workspace = await prisma.workspace.create({ data: { name: 'Client A', slug: 'client-a-hooks', timezone: 'UTC', developerFeatures: true } });
     const { id, secret } = await webhooks.createWebhook(workspace.id, { name: 'Zap', url: 'https://hooks.example.com/zap', events: ['post.published'] });
     await webhooks.createWebhook(workspace.id, { name: 'Other', url: 'https://hooks.example.com/other', events: ['post.failed'] });
     expect(secret).toMatch(/^whsec_/);
@@ -93,7 +93,7 @@ describe('deliveries', () => {
   });
 
   it('refuses an address that resolves to a private network, and does not follow redirects', async () => {
-    const workspace = await prisma.workspace.create({ data: { name: 'Client B', slug: 'client-b-hooks', timezone: 'UTC' } });
+    const workspace = await prisma.workspace.create({ data: { name: 'Client B', slug: 'client-b-hooks', timezone: 'UTC', developerFeatures: true } });
     const { id } = await webhooks.createWebhook(workspace.id, { name: 'Sneaky', url: 'https://inside.example.com/x', events: ['post.failed'] });
     const fetchSpy = vi.fn(async () => new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/' } }));
     vi.stubGlobal('fetch', fetchSpy);
@@ -111,10 +111,17 @@ describe('deliveries', () => {
   });
 
   it('queues nothing for a switched-off endpoint, and never throws', async () => {
-    const workspace = await prisma.workspace.create({ data: { name: 'Client C', slug: 'client-c-hooks', timezone: 'UTC' } });
+    const workspace = await prisma.workspace.create({ data: { name: 'Client C', slug: 'client-c-hooks', timezone: 'UTC', developerFeatures: true } });
     const { id } = await webhooks.createWebhook(workspace.id, { name: 'Off', url: 'https://hooks.example.com/off', events: ['report.ready'] });
     await prisma.webhookEndpoint.update({ where: { id }, data: { enabled: false } });
     expect(await webhooks.emitWebhook(workspace.id, 'report.ready', {})).toBe(0);
     expect(await webhooks.emitWebhook('no-such-workspace', 'report.ready', {})).toBe(0);
+  });
+
+  it('queues nothing once root switches developer features off', async () => {
+    const workspace = await prisma.workspace.create({ data: { name: 'Client D', slug: 'client-d-hooks', timezone: 'UTC', developerFeatures: true } });
+    await webhooks.createWebhook(workspace.id, { name: 'Zap', url: 'https://hooks.example.com/d', events: ['report.ready'] });
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { developerFeatures: false } });
+    expect(await webhooks.emitWebhook(workspace.id, 'report.ready', {})).toBe(0);
   });
 });

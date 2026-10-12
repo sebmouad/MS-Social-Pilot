@@ -83,8 +83,8 @@ test('a finished test shows its winner and goes into the Page voice', async ({ p
   await expect(page.getByRole('link', { name: 'Caption tests' })).toHaveAttribute('aria-current', 'page');
 
   await expect(async () => {
-    await page.getByRole('button', { name: 'Add to Page voice' }).click({ timeout: 2000 }).catch(() => undefined);
-    await expect(page.getByText('Added to the Page voice.')).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Add to channel voice' }).click({ timeout: 2000 }).catch(() => undefined);
+    await expect(page.getByText('Added to the channel voice.')).toBeVisible({ timeout: 5000 });
   }).toPass();
   const voice = await prisma.target.findUniqueOrThrow({ where: { id: targetId }, select: { brandVoice: true } });
   expect(voice.brandVoice).toContain(`${NAME} caption B`);

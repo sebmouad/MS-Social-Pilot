@@ -125,10 +125,10 @@ test('the Pages column folds to a rail of pictures and stays folded', async ({ p
   test.setTimeout(120_000);
   const failures = collectFailures(page);
   await open(page, '/calendar');
-  const column = page.getByRole('complementary', { name: 'Pages' });
+  const column = page.getByRole('complementary', { name: 'Channels' });
   // A click that lands before hydration does nothing: click until it folds.
   await expect(async () => {
-    const fold = column.getByRole('button', { name: 'Fold the Pages column' });
+    const fold = column.getByRole('button', { name: 'Fold the channels column' });
     if (await fold.isVisible()) await fold.click();
     await expect(column.getByRole('button', { name: `Hide ${SECOND_PAGE}` })).toBeHidden({ timeout: 2_000 });
   }).toPass({ timeout: 30_000 });
@@ -138,7 +138,7 @@ test('the Pages column folds to a rail of pictures and stays folded', async ({ p
   await expect(page).toHaveURL(new RegExp(`pages=${secondId}`));
 
   await page.reload();
-  await column.getByRole('button', { name: 'Open the Pages column' }).click();
+  await column.getByRole('button', { name: 'Open the channels column' }).click();
   await expect(column.getByRole('button', { name: `Hide ${SECOND_PAGE}` })).toBeVisible();
   expect(failures).toEqual([]);
 });

@@ -54,7 +54,7 @@ test('sets business hours and shows how fast comments were answered', async ({ p
 
   await prisma.workspace.update({ where: { id: workspaceId }, data: { businessDays: [] } });
   await page.reload();
-  const byPage = page.getByRole('region', { name: 'By Page' });
+  const byPage = page.getByRole('region', { name: 'By channel' });
   await expect(byPage.getByRole('row', { name: new RegExp(`${target.name} · comments`) })).toContainText('25 min');
   const members = page.getByRole('region', { name: 'Who answered' });
   await expect(members.getByRole('row', { name: new RegExp(OWNER.name) })).toContainText('25 min');

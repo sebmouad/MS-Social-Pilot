@@ -47,8 +47,8 @@ setup('the first visitor creates the first account', async ({ page }) => {
   await expect(page.getByLabel('Workspace name', { exact: true })).toHaveValue(OWNER.workspace);
   await page.getByLabel('Time zone', { exact: true }).selectOption('UTC');
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Connect your first Pages' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Connect Pages' })).toHaveAttribute('href', '/connections');
+  await expect(page.getByRole('heading', { name: 'Connect your first channels' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Connect channels' })).toHaveAttribute('href', '/connections');
   await page.getByRole('link', { name: 'Go to the dashboard' }).click();
   await page.waitForURL(/\/dashboard/);
 
@@ -56,6 +56,13 @@ setup('the first visitor creates the first account', async ({ page }) => {
   // every field in the query string. Nowhere in the journey should the
   // password appear in a URL.
   expect(page.url()).not.toContain(OWNER.password);
+
+  // Developer features (API keys, webhooks) start off; root switches them on
+  // for this workspace so the walk can reach those screens.
+  await open(page, '/root/workspaces');
+  await page.getByRole('link', { name: OWNER.workspace }).click();
+  await page.getByLabel(/^Developer features/).check();
+  await expect(page.getByText('Developer features saved.')).toBeVisible();
 
   expect(failures).toEqual([]);
 

@@ -62,7 +62,7 @@ test('a rule is created, paused and deleted', async ({ page }) => {
 
   await expect(page.getByRole('status')).toContainText('Rule saved');
   const card = page.getByRole('listitem').filter({ hasText: RULE });
-  await expect(card).toContainText('Reply as the Page when a comment contains one of these words');
+  await expect(card).toContainText('Reply as the channel when a comment contains one of these words');
   await expect(card).toContainText('giveaway, free followers');
 
   await card.getByRole('button', { name: 'Pause' }).click();

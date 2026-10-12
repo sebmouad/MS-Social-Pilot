@@ -79,6 +79,8 @@ export async function requireApiToken(request: Request, need: ApiScope = 'read')
   });
   if (!row || row.revokedAt || row.user.disabledAt) throw new AuthError('That API key is not valid.');
   if (row.workspace.suspendedAt) throw errors.workspaceSuspended();
+  // Root turned developer features off: keys stop working, without being revoked.
+  if (!row.workspace.developerFeatures) throw errors.developerFeaturesOff();
 
   const membership = await prisma.membership.findUnique({
     where: { userId_workspaceId: { userId: row.userId, workspaceId: row.workspaceId } },

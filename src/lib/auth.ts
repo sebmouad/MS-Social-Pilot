@@ -12,7 +12,7 @@ import { hashPassword, hashToken, randomToken, verifyPassword } from './crypto';
 import { uniqueSlug } from './slug';
 import { DEFAULT_QUEUE_SLOTS, setDateLocale } from './time';
 import { nextStepAfterPassword, type PendingStep } from './two-step';
-import { enabledModules, moduleOfPath, PATHNAME_HEADER, type ModuleKey } from './modules';
+import { enabledModules, isDeveloperPath, mayUseDeveloperFeatures, moduleOfPath, PATHNAME_HEADER, type ModuleKey } from './modules';
 import { DEFAULT_THEME, isTheme, type Theme } from './themes';
 import { noteSignIn, requestDevice, touchSession } from './sessions';
 import { emailEnabled } from './email/send';
@@ -60,6 +60,8 @@ export interface AuthContext {
     defaultLocale: Locale;
     /** Root suspended it: members are refused, root still gets in. */
     suspended: boolean;
+    /** Root turned on API keys, MCP and outgoing webhooks (owner only). */
+    developerFeatures: boolean;
   };
   role: WorkspaceRole;
   /** The modules this member may use here (root's switches, `src/lib/modules.ts`). */
@@ -555,6 +557,7 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
       requiresApproval: membership.workspace.requiresApproval,
       defaultLocale: membership.workspace.defaultLocale,
       suspended: membership.workspace.suspendedAt !== null,
+      developerFeatures: membership.workspace.developerFeatures,
     },
     role: membership.role,
     modules: enabledModules(membership.workspace.disabledModules, membership.disabledModules),
@@ -616,6 +619,7 @@ export async function accessRefusal(context: AuthContext): Promise<'suspended' |
   const pathname = (await headers()).get(PATHNAME_HEADER);
   const module = pathname ? moduleOfPath(pathname) : null;
   if (module && !context.modules.includes(module)) return 'module';
+  if (pathname && isDeveloperPath(pathname) && !mayUseDeveloperFeatures(context)) return 'module';
   return null;
 }
 

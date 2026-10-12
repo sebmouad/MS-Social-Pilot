@@ -444,6 +444,10 @@ test('a caption too long for Instagram is flagged while it is being written', as
   await open(page, '/compose');
   await page.getByLabel(/what do you want to say/i).fill('x'.repeat(2_300));
 
+  // With two platforms, the channels are listed under one heading per platform.
+  await expect(page.getByRole('region', { name: 'Instagram' }).getByRole('checkbox', { name: /@walkbakery/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Facebook' }).getByRole('checkbox', { name: new RegExp(PAGE_NAME) })).toBeVisible();
+
   const box = page.getByRole('checkbox', { name: /@walkbakery/ });
   await expect(async () => {
     await box.click();
@@ -521,7 +525,7 @@ test('the composer says how a draft compares with the Page\'s usual engagement',
     const outlook = page.getByRole('region', { name: 'Engagement outlook' });
     await expect(async () => {
       await page.getByLabel(/what do you want to say/i).fill('A quick update for everyone');
-      await expect(outlook).toContainText('Likely above this Page’s usual engagement', { timeout: 3_000 });
+      await expect(outlook).toContainText('Likely above this channel’s usual engagement', { timeout: 3_000 });
     }).toPass({ timeout: 30_000 });
     await expect(outlook).toContainText(/Format text only: \d+% of the usual/);
   } finally {

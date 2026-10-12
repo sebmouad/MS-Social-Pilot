@@ -45,7 +45,7 @@ for (const name of [EXTRA, ORPHAN]) {
     const failures = collectFailures(page);
     await open(page, '/connections');
 
-    if (name === ORPHAN) await expect(page.getByRole('heading', { name: 'Pages no longer connected' })).toBeVisible();
+    if (name === ORPHAN) await expect(page.getByRole('heading', { name: 'Channels no longer connected' })).toBeVisible();
     await page.getByRole('button', { name: `Remove ${name}` }).click();
     await expect(page.getByRole('dialog')).toContainText(`Remove ${name} from this workspace?`);
     await page.getByRole('dialog').getByRole('button', { name: 'Remove' }).click();

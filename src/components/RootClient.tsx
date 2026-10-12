@@ -564,6 +564,7 @@ export interface RootWorkspaceDetail {
   id: string;
   name: string;
   suspended: boolean;
+  developerFeatures: boolean;
   disabledModules: string[];
   members: Array<{
     id: string;
@@ -691,6 +692,22 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
           disabled={busy === 'modules'}
           onChange={(off) => void run('modules', base, 'PATCH', { disabledModules: off }, t('workspace.modulesSaved'))}
         />
+        <label className="flex items-start gap-2 border-t border-slate-100 pt-3 text-sm text-slate-700">
+          <input
+            id="workspace-developer"
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600"
+            checked={workspace.developerFeatures}
+            disabled={busy === 'developer'}
+            onChange={(event) =>
+              void run('developer', base, 'PATCH', { developerFeatures: event.target.checked }, t('workspace.developerSaved'))
+            }
+          />
+          <span>
+            <span className="font-medium">{t('workspace.developer')}</span>
+            <span className="block text-xs text-slate-500">{t('workspace.developerHelp')}</span>
+          </span>
+        </label>
       </section>
 
       <section className="card space-y-3 p-0">

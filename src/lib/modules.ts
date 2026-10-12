@@ -127,3 +127,18 @@ export function moduleOfPath(pathname: string): ModuleKey | null {
   }
   return moduleFor(pathname)?.key ?? null;
 }
+
+/**
+ * Developer features (API keys, MCP, outgoing webhooks): off unless root turns
+ * them on for the workspace, and then for its owner only. Screens 404 and API
+ * routes answer 403 otherwise, like a switched-off module.
+ */
+const DEVELOPER_PATHS = ['/settings/api', '/settings/webhooks', '/api/api-tokens', '/api/webhooks', '/api/webhook-deliveries'];
+
+export function isDeveloperPath(pathname: string): boolean {
+  return DEVELOPER_PATHS.some((prefix) => matches(pathname, prefix));
+}
+
+export function mayUseDeveloperFeatures(context: { role: string; workspace: { developerFeatures: boolean } }): boolean {
+  return context.workspace.developerFeatures && context.role === 'owner';
+}

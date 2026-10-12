@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { FeedAvatar } from './FeedPost';
 import { Icon } from './Icon';
 import { PageMenu } from './PageMenu';
+import { NetworkGroups } from './NetworkGroups';
 import { NetworkMark } from './NetworkMark';
 import { paletteOf } from '@/lib/palette';
 import type { PageGroupView } from '@/lib/page-groups';
@@ -215,51 +216,53 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
         )}
       </div>
 
-      <ul className="-mx-1 max-h-[60vh] space-y-0.5 overflow-y-auto">
-        {listed.map((page) => {
-          const on = shown.has(page.id);
-          const alone = on && shownCount === 1;
-          return (
-            <li key={page.id} className="group flex items-center gap-1 rounded-lg pe-1 hover:bg-slate-100">
-              <button
-                type="button"
-                className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-start ${on ? '' : 'opacity-45'}`}
-                title={alone ? t('showOthers') : t('onlyThis', { page: page.name })}
-                aria-pressed={alone}
-                onClick={() => solo(page.id)}
-              >
-                <span className="relative shrink-0">
-                  <FeedAvatar name={page.name} pictureUrl={page.pictureUrl} size="sm" />
-                  {page.type !== 'page' && (
-                    <NetworkMark network={page.type} size={13} className="absolute -bottom-0.5 -end-0.5 ring-2 ring-white" />
-                  )}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className={`block truncate text-sm font-semibold ${alone ? 'text-brand-700' : 'text-slate-900'}`}>
-                    {page.name}
+      <div className="-mx-1 max-h-[60vh] overflow-y-auto">
+        <NetworkGroups items={listed} className="space-y-0.5">
+          {(page) => {
+            const on = shown.has(page.id);
+            const alone = on && shownCount === 1;
+            return (
+              <li key={page.id} className="group flex items-center gap-1 rounded-lg pe-1 hover:bg-slate-100">
+                <button
+                  type="button"
+                  className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-start ${on ? '' : 'opacity-45'}`}
+                  title={alone ? t('showOthers') : t('onlyThis', { page: page.name })}
+                  aria-pressed={alone}
+                  onClick={() => solo(page.id)}
+                >
+                  <span className="relative shrink-0">
+                    <FeedAvatar name={page.name} pictureUrl={page.pictureUrl} size="sm" />
+                    {page.type !== 'page' && (
+                      <NetworkMark network={page.type} size={13} className="absolute -bottom-0.5 -end-0.5 ring-2 ring-white" />
+                    )}
                   </span>
-                  <span className="block truncate text-xs text-slate-500">
-                    {page.enabled ? page.category ?? t(`type.${page.type}` as 'type.page') : t('paused')}
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate text-sm font-semibold ${alone ? 'text-brand-700' : 'text-slate-900'}`}>
+                      {page.name}
+                    </span>
+                    <span className="block truncate text-xs text-slate-500">
+                      {page.enabled ? page.category ?? t(`type.${page.type}` as 'type.page') : t('paused')}
+                    </span>
                   </span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                  on ? 'text-slate-600 hover:bg-slate-200' : 'text-slate-400 hover:bg-slate-200'
-                }`}
-                aria-pressed={on}
-                aria-label={on ? t('hide', { page: page.name }) : t('show', { page: page.name })}
-                onClick={() => toggle(page.id)}
-              >
-                <Icon name={on ? 'eye' : 'eyeOff'} size={17} />
-              </button>
-              <PageMenu page={page} canManageQueue={canManageQueue} canSettings={canManageGroups} />
-            </li>
-          );
-        })}
-        {listed.length === 0 && <li className="px-2 py-3 text-sm text-slate-500">{t('noMatch')}</li>}
-      </ul>
+                </button>
+                <button
+                  type="button"
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                    on ? 'text-slate-600 hover:bg-slate-200' : 'text-slate-400 hover:bg-slate-200'
+                  }`}
+                  aria-pressed={on}
+                  aria-label={on ? t('hide', { page: page.name }) : t('show', { page: page.name })}
+                  onClick={() => toggle(page.id)}
+                >
+                  <Icon name={on ? 'eye' : 'eyeOff'} size={17} />
+                </button>
+                <PageMenu page={page} canManageQueue={canManageQueue} canSettings={canManageGroups} />
+              </li>
+            );
+          }}
+        </NetworkGroups>
+        {listed.length === 0 && <p className="px-2 py-3 text-sm text-slate-500">{t('noMatch')}</p>}
+      </div>
     </div>
   );
 

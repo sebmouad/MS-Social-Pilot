@@ -90,7 +90,7 @@ export function signWebhook(secret: string, timestamp: number, body: string): st
 export async function emitWebhook(workspaceId: string, event: WebhookEvent, data: Record<string, unknown>, now = new Date()): Promise<number> {
   try {
     const endpoints = await prisma.webhookEndpoint.findMany({
-      where: { workspaceId, enabled: true, events: { has: event } },
+      where: { workspaceId, enabled: true, events: { has: event }, workspace: { developerFeatures: true } },
       select: { id: true },
     });
     if (endpoints.length === 0) return 0;
@@ -189,7 +189,7 @@ async function attempt(deliveryId: string, now: Date, retry: boolean): Promise<A
 /** The worker's job: send what is due, then forget deliveries older than a month. */
 export async function deliverDueWebhooks(now = new Date()): Promise<{ delivered: number; failed: number }> {
   const due = await prisma.webhookDelivery.findMany({
-    where: { status: 'pending', nextAttemptAt: { lte: now }, endpoint: { enabled: true } },
+    where: { status: 'pending', nextAttemptAt: { lte: now }, endpoint: { enabled: true, workspace: { developerFeatures: true } } },
     orderBy: { nextAttemptAt: 'asc' },
     take: BATCH,
     select: { id: true, nextAttemptAt: true },

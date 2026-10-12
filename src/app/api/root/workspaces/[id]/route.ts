@@ -3,11 +3,12 @@ import { z } from 'zod';
 import { requireRootApi } from '@/lib/auth';
 import { ok, readJson, route } from '@/lib/api';
 import { MODULE_KEYS, type ModuleKey } from '@/lib/modules';
-import { renameWorkspace, setWorkspaceModules, setWorkspaceSuspended } from '@/lib/root';
+import { renameWorkspace, setWorkspaceDeveloperFeatures, setWorkspaceModules, setWorkspaceSuspended } from '@/lib/root';
 
 const schema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
   suspended: z.boolean().optional(),
+  developerFeatures: z.boolean().optional(),
   disabledModules: z.array(z.enum(MODULE_KEYS as [ModuleKey, ...ModuleKey[]])).optional(),
 });
 
@@ -18,6 +19,7 @@ export const PATCH = route(async (request: Request, { params }: { params: Promis
   const body = schema.parse(await readJson(request));
   if (body.name !== undefined) await renameWorkspace(auth.user.id, id, body.name);
   if (body.suspended !== undefined) await setWorkspaceSuspended(auth.user.id, id, body.suspended);
+  if (body.developerFeatures !== undefined) await setWorkspaceDeveloperFeatures(auth.user.id, id, body.developerFeatures);
   if (body.disabledModules !== undefined) await setWorkspaceModules(auth.user.id, id, body.disabledModules);
   return ok({ ok: true });
 });

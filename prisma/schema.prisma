@@ -249,6 +249,8 @@ model Workspace {
   suspendedAt     DateTime?
   /// Modules root has switched off for this workspace (`src/lib/modules.ts` keys).
   disabledModules String[]  @default([])
+  /// Set by root: API keys, MCP and outgoing webhooks, for the workspace owner only.
+  developerFeatures Boolean @default(false)
 
   // Light branding, used on client-facing reports.
   logoUrl        String?

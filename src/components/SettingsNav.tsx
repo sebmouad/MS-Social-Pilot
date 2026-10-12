@@ -12,6 +12,7 @@ export function SettingsNav({
   showHistory = true,
   showExport = false,
   showWebhooks = false,
+  showApi = false,
 }: {
   /** Admins: the read-only list of who may do what in this workspace. */
   showPermissions?: boolean;
@@ -19,8 +20,10 @@ export function SettingsNav({
   showHistory?: boolean;
   /** Owner only: download everything the workspace holds. */
   showExport?: boolean;
-  /** Owners and admins: outgoing webhooks. */
+  /** Owner, once root turned developer features on: outgoing webhooks. */
   showWebhooks?: boolean;
+  /** Owner, once root turned developer features on: API keys. */
+  showApi?: boolean;
 }) {
   const t = useTranslations();
   const pathname = usePathname();
@@ -30,7 +33,7 @@ export function SettingsNav({
     { href: '/settings/team', label: t('team.title'), icon: 'team' },
     { href: '/settings/pages', label: t('groups.title'), icon: 'folders' },
     { href: '/settings/sharing', label: t('sharing.title'), icon: 'link' },
-    { href: '/settings/api', label: t('apiKeys.title'), icon: 'code' },
+    ...(showApi ? [{ href: '/settings/api', label: t('apiKeys.title'), icon: 'code' as IconName }] : []),
     { href: '/settings/notifications', label: t('notifications.title'), icon: 'bell' },
     ...(showWebhooks ? [{ href: '/settings/webhooks', label: t('webhooks.title'), icon: 'share' as IconName }] : []),
     { href: '/settings/account', label: t('account.title'), icon: 'key' },

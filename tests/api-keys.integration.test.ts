@@ -36,7 +36,7 @@ beforeEach(async () => {
 async function seed(role: WorkspaceRole = WorkspaceRole.owner, allPages = true) {
   const user = await prisma.user.create({ data: { email: 'a@example.test', name: 'A', passwordHash: 'x' } });
   const workspace = await prisma.workspace.create({
-    data: { name: 'Agency', slug: 'agency', timezone: 'UTC', memberships: { create: [{ userId: user.id, role, allPages }] } },
+    data: { name: 'Agency', slug: 'agency', timezone: 'UTC', developerFeatures: true, memberships: { create: [{ userId: user.id, role, allPages }] } },
   });
   const page = (name: string) =>
     prisma.target.create({ data: { workspaceId: workspace.id, type: 'page', providerId: name, name, accessToken: null } });
@@ -106,6 +106,12 @@ describe('API keys under root’s switches', () => {
     expect((await call(posts.GET, { key: made.token })).status).toBe(403);
     expect((await call(pages.GET, { key: made.token })).status).toBe(200);
     await prisma.workspace.update({ where: { id: workspace.id }, data: { disabledModules: [] } });
+
+    // Root switches developer features off: the key stops, and comes back with them.
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { developerFeatures: false } });
+    expect((await call(pages.GET, { key: made.token })).status).toBe(403);
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { developerFeatures: true } });
+    expect((await call(pages.GET, { key: made.token })).status).toBe(200);
 
     await prisma.workspace.update({ where: { id: workspace.id }, data: { suspendedAt: new Date() } });
     expect((await call(pages.GET, { key: made.token })).status).toBe(403);

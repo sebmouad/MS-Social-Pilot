@@ -38,6 +38,7 @@ export const ROOT_ACTIONS = [
   'workspace.suspended',
   'workspace.resumed',
   'workspace.modulesChanged',
+  'workspace.developerFeatures',
   'workspace.visited',
   'member.added',
   'member.roleChanged',
@@ -352,6 +353,7 @@ export async function workspaceDetail(workspaceId: string) {
       createdAt: true,
       suspendedAt: true,
       disabledModules: true,
+      developerFeatures: true,
       _count: { select: { targets: true, posts: true } },
       memberships: {
         orderBy: { createdAt: 'asc' },
@@ -372,6 +374,7 @@ export async function workspaceDetail(workspaceId: string) {
     name: row.name,
     createdAt: row.createdAt.toISOString(),
     suspended: row.suspendedAt !== null,
+    developerFeatures: row.developerFeatures,
     disabledModules: row.disabledModules.filter(isKnownModule),
     pages: row._count.targets,
     posts: row._count.posts,
@@ -411,6 +414,14 @@ export async function setWorkspaceModules(actorId: string, workspaceId: string, 
   const off = MODULE_KEYS.filter((key) => disabled.includes(key));
   await prisma.workspace.update({ where: { id: workspaceId }, data: { disabledModules: off } });
   await logRootActivity(actorId, 'workspace.modulesChanged', { workspace: workspace.name, off: off.join(', ') || '—' });
+}
+
+/** API keys, MCP and outgoing webhooks for this workspace's owner (off by default). */
+export async function setWorkspaceDeveloperFeatures(actorId: string, workspaceId: string, on: boolean): Promise<void> {
+  const workspace = await findWorkspace(workspaceId);
+  if (workspace.developerFeatures === on) return;
+  await prisma.workspace.update({ where: { id: workspaceId }, data: { developerFeatures: on } });
+  await logRootActivity(actorId, 'workspace.developerFeatures', { workspace: workspace.name, on: on ? 'on' : 'off' });
 }
 
 /** Root adds someone who already has an account; anyone else gets an invitation. */

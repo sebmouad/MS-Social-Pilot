@@ -1,5 +1,6 @@
 'use client';
 
+import { NetworkGroups } from './NetworkGroups';
 import { NetworkMark } from './NetworkMark';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -124,61 +125,63 @@ export function TargetPicker({ targets, selected, onChange, groups = [] }: Props
       )}
       <div className="max-h-[22rem] space-y-1.5 overflow-y-auto rounded-lg border border-slate-200 p-2">
         {listed.length === 0 && <p className="px-2 py-3 text-sm text-slate-500">{t('noMatch')}</p>}
-        {listed.map((target) => {
-          const disabled = !target.canPublish;
-          const checked = selected.includes(target.id);
-          // A post being edited can still name a destination switched off
-          // since it was written. It stays ticked so that is visible, and it
-          // can be unticked — only never ticked again.
-          const locked = disabled && !checked;
-          const blocked = blockerMessage(
-            target.publishBlockerCode,
-            target.publishBlocker,
-            (key) => tBlocked(key as Parameters<typeof tBlocked>[0]),
-            (key) => tBlocked.has(key as Parameters<typeof tBlocked>[0]),
-          );
-          return (
-            <label
-              key={target.id}
-              title={blocked ?? undefined}
-              className={`flex items-center gap-3 rounded-lg px-2 py-2 ${
-                locked
-                  ? 'cursor-not-allowed opacity-60'
-                  : disabled
-                    ? 'cursor-pointer bg-amber-50/60 hover:bg-amber-50'
-                    : 'cursor-pointer hover:bg-slate-50'
-              }`}
-            >
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-                checked={checked}
-                disabled={locked}
-                onChange={() => toggle(target)}
-              />
-              <span className="relative shrink-0">
-                {target.pictureUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={target.pictureUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
-                ) : (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
-                    {target.name.slice(0, 2).toUpperCase()}
-                  </span>
-                )}
-                {/* Which network, at a glance, once there is more than Facebook. */}
-                <NetworkMark network={target.type} size={14} className="absolute -bottom-0.5 -end-0.5 ring-2 ring-white" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-slate-900">{target.name}</span>
-                <span className="block truncate text-xs text-slate-500">
-                  {t(targetTypeKey(target.type))}
-                  {target.accountName ? ` · ${target.accountName}` : ''}
-                  {disabled && blocked ? ` · ${blocked}` : ''}
+        <NetworkGroups items={listed} as="div" className="space-y-1.5">
+          {(target) => {
+            const disabled = !target.canPublish;
+            const checked = selected.includes(target.id);
+            // A post being edited can still name a destination switched off
+            // since it was written. It stays ticked so that is visible, and it
+            // can be unticked — only never ticked again.
+            const locked = disabled && !checked;
+            const blocked = blockerMessage(
+              target.publishBlockerCode,
+              target.publishBlocker,
+              (key) => tBlocked(key as Parameters<typeof tBlocked>[0]),
+              (key) => tBlocked.has(key as Parameters<typeof tBlocked>[0]),
+            );
+            return (
+              <label
+                key={target.id}
+                title={blocked ?? undefined}
+                className={`flex items-center gap-3 rounded-lg px-2 py-2 ${
+                  locked
+                    ? 'cursor-not-allowed opacity-60'
+                    : disabled
+                      ? 'cursor-pointer bg-amber-50/60 hover:bg-amber-50'
+                      : 'cursor-pointer hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                  checked={checked}
+                  disabled={locked}
+                  onChange={() => toggle(target)}
+                />
+                <span className="relative shrink-0">
+                  {target.pictureUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={target.pictureUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
+                      {target.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
+                  {/* Which network, at a glance, once there is more than Facebook. */}
+                  <NetworkMark network={target.type} size={14} className="absolute -bottom-0.5 -end-0.5 ring-2 ring-white" />
                 </span>
-              </span>
-            </label>
-          );
-        })}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-slate-900">{target.name}</span>
+                  <span className="block truncate text-xs text-slate-500">
+                    {t(targetTypeKey(target.type))}
+                    {target.accountName ? ` · ${target.accountName}` : ''}
+                    {disabled && blocked ? ` · ${blocked}` : ''}
+                  </span>
+                </span>
+              </label>
+            );
+          }}
+        </NetworkGroups>
       </div>
     </div>
   );

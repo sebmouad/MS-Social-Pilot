@@ -8,6 +8,7 @@ import { PagesHub } from '@/components/PagesHub';
 import { GettingStarted } from '@/components/GettingStarted';
 import { feedLinkOf, feedMediaOf } from '@/lib/feed';
 import { requirePage } from '@/lib/auth';
+import { mayUseDeveloperFeatures } from '@/lib/modules';
 import { postScope, postTargetScope, targetScope } from '@/lib/page-access';
 import { loadSelection } from '@/lib/page-filter';
 import { SelectionBar } from '@/components/SelectionBar';
@@ -165,7 +166,7 @@ export default async function DashboardPage({
         </div>
       )}
 
-      {!(setup && !setup.complete) && <GettingStarted workspaceId={workspaceId} />}
+      {!(setup && !setup.complete) && <GettingStarted workspaceId={workspaceId} developer={mayUseDeveloperFeatures(auth)} />}
 
       {staleAccounts.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

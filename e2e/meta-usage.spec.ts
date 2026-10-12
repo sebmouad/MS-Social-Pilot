@@ -22,7 +22,7 @@ test('root sees calls per Page and per job from the worker’s saved usage', asy
   await prisma.graphUsage.upsert({ where: { key: 'worker' }, create: { key: 'worker', snapshot }, update: { snapshot, savedAt: new Date() } });
 
   await open(page, '/root/worker');
-  const pages = page.getByRole('table', { name: 'Heaviest Pages and accounts, last hour' });
+  const pages = page.getByRole('table', { name: 'Heaviest channels and accounts, last hour' });
   await expect(pages.getByRole('row', { name: new RegExp(target.name) })).toContainText('7');
   const jobs = page.getByRole('table', { name: 'Calls by job, last hour' });
   await expect(jobs.getByRole('row', { name: /Outside a job/ })).toContainText('3');
@@ -36,9 +36,9 @@ test('root sorts the agency overview and opens a workspace from it', async ({ pa
   await open(page, '/root/agency');
   const table = page.getByRole('table', { name: 'Agency overview' });
   await expect(table.getByRole('rowheader', { name: new RegExp(OWNER.workspace) })).toBeVisible();
-  await table.getByRole('link', { name: 'Pages' }).click();
+  await table.getByRole('link', { name: 'Channels' }).click();
   await expect(page).toHaveURL(/sort=pages&order=desc/);
-  await expect(table.getByRole('columnheader', { name: /Pages/ })).toHaveAttribute('aria-sort', 'descending');
+  await expect(table.getByRole('columnheader', { name: /Channels/ })).toHaveAttribute('aria-sort', 'descending');
   await table.getByRole('link', { name: OWNER.workspace }).click();
   await expect(page).toHaveURL(/\/root\/workspaces\/[^/]+$/);
   expect(failures).toEqual([]);

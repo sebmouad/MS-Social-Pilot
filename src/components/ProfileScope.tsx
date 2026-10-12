@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 
 import { FeedAvatar } from './FeedPost';
 import { Icon } from './Icon';
+import { NetworkGroups } from './NetworkGroups';
 import { NetworkMark } from './NetworkMark';
 import { paletteOf } from '@/lib/palette';
 import type { PageGroupView } from '@/lib/page-groups';
@@ -208,37 +209,39 @@ export function ProfileScope({ workspaceId, pages, groups, group, ids, net, netw
               </span>
             </div>
 
-            <ul className="max-h-72 space-y-0.5 overflow-y-auto" aria-label={t('profiles')}>
-              {listed.map((page) => (
-                <li key={page.id} className="group flex items-center gap-2 rounded-lg px-1 hover:bg-slate-50">
-                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-slate-300"
-                      checked={picked.has(page.id)}
-                      onChange={(event) => {
-                        const next = new Set(picked);
-                        if (event.target.checked) next.add(page.id);
-                        else next.delete(page.id);
-                        setPicked(next);
-                      }}
-                    />
-                    <FeedAvatar name={page.name} pictureUrl={page.pictureUrl} size="xs" />
-                    <NetworkMark network={page.type} size={14} />
-                    <span className={`min-w-0 truncate text-sm ${page.enabled ? 'text-slate-900' : 'text-slate-400'}`}>{page.name}</span>
-                  </label>
-                  <button
-                    type="button"
-                    className="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold text-brand-600 opacity-100 hover:bg-brand-50 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
-                    onClick={() => apply({ group: draftGroup, net: draftNet, ids: [page.id] })}
-                  >
-                    {t('only')}
-                    <span className="sr-only"> {page.name}</span>
-                  </button>
-                </li>
-              ))}
-              {listed.length === 0 && <li className="px-1 py-2 text-sm text-slate-500">{t('noMatch')}</li>}
-            </ul>
+            <div className="max-h-72 overflow-y-auto" role="group" aria-label={t('profiles')}>
+              <NetworkGroups items={listed} className="space-y-0.5">
+                {(page) => (
+                  <li key={page.id} className="group flex items-center gap-2 rounded-lg px-1 hover:bg-slate-50">
+                    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-slate-300"
+                        checked={picked.has(page.id)}
+                        onChange={(event) => {
+                          const next = new Set(picked);
+                          if (event.target.checked) next.add(page.id);
+                          else next.delete(page.id);
+                          setPicked(next);
+                        }}
+                      />
+                      <FeedAvatar name={page.name} pictureUrl={page.pictureUrl} size="xs" />
+                      <NetworkMark network={page.type} size={14} />
+                      <span className={`min-w-0 truncate text-sm ${page.enabled ? 'text-slate-900' : 'text-slate-400'}`}>{page.name}</span>
+                    </label>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold text-brand-600 opacity-100 hover:bg-brand-50 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                      onClick={() => apply({ group: draftGroup, net: draftNet, ids: [page.id] })}
+                    >
+                      {t('only')}
+                      <span className="sr-only"> {page.name}</span>
+                    </button>
+                  </li>
+                )}
+              </NetworkGroups>
+              {listed.length === 0 && <p className="px-1 py-2 text-sm text-slate-500">{t('noMatch')}</p>}
+            </div>
 
             {selected.length === 0 && <p role="alert" className="text-sm text-amber-800">{t('pickOne')}</p>}
             <div className="flex gap-2 border-t border-slate-100 pt-3">

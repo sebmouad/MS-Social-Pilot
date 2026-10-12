@@ -26,6 +26,13 @@ export function networkOfType(type: string): SelectionNetwork {
   return type === 'page' || type === 'group' ? 'facebook' : (type as SelectionNetwork);
 }
 
+/** Items split by network, in the order of SELECTION_NETWORKS; each keeps its own order. */
+export function groupByNetwork<T extends { type: string }>(items: T[]): Array<{ network: SelectionNetwork; items: T[] }> {
+  return SELECTION_NETWORKS.map((network) => ({ network, items: items.filter((item) => networkOfType(item.type) === network) })).filter(
+    (group) => group.items.length > 0,
+  );
+}
+
 export function selectionCookieName(workspaceId: string): string {
   return `msp_sel_${workspaceId}`;
 }

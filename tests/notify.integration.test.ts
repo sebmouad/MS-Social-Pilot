@@ -323,7 +323,7 @@ describe('the hourly inbox email', () => {
 
     expect(await notify.sendInboxDigests(new Date('2026-08-01T11:00:00Z'))).toBe(1);
     const log = await prisma.emailLog.findFirstOrThrow({ where: { template: 'inboxDigest' } });
-    expect(log.subject).toBe('New on your Pages: 1 new comment');
+    expect(log.subject).toBe('New on your channels: 1 new comment');
 
     // Nothing new: no second email.
     expect(await notify.sendInboxDigests(new Date('2026-08-01T12:00:00Z'))).toBe(0);

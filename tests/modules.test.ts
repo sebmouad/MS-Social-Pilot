@@ -2,7 +2,7 @@ import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { MODULES, SHARED_LINKS, isPageActive, moduleFor } from '../src/lib/modules';
+import { MODULES, SHARED_LINKS, isDeveloperPath, isPageActive, mayUseDeveloperFeatures, moduleFor } from '../src/lib/modules';
 
 /**
  * The app is three modules — Analytics, Ads, Schedule — and every screen
@@ -79,5 +79,20 @@ describe('root switching modules off', () => {
     expect(moduleOfPath('/api/settings/workspace')).toBeNull();
     expect(moduleOfPath('/calendar')).toBe('schedule');
     expect(moduleOfPath('/dashboard')).toBeNull();
+  });
+});
+
+describe('developer features', () => {
+  it('cover the API key and webhook screens and endpoints only', () => {
+    for (const path of ['/settings/api', '/settings/webhooks', '/api/api-tokens', '/api/api-tokens/abc', '/api/webhooks/x', '/api/webhook-deliveries/y']) {
+      expect(isDeveloperPath(path), path).toBe(true);
+    }
+    for (const path of ['/settings', '/settings/apis', '/api/v1/posts', '/settings/team']) expect(isDeveloperPath(path), path).toBe(false);
+  });
+
+  it('need root’s switch and the owner role', () => {
+    expect(mayUseDeveloperFeatures({ role: 'owner', workspace: { developerFeatures: true } })).toBe(true);
+    expect(mayUseDeveloperFeatures({ role: 'admin', workspace: { developerFeatures: true } })).toBe(false);
+    expect(mayUseDeveloperFeatures({ role: 'owner', workspace: { developerFeatures: false } })).toBe(false);
   });
 });
