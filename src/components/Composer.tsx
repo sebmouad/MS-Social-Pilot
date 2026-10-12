@@ -21,6 +21,7 @@ import { LIMITS } from '@/lib/constants';
 import { countCharacters } from '@/lib/text';
 import { formatInZone } from '@/lib/time';
 import { IG_CAPTION_LIMIT } from '@/lib/constants';
+import { SpamGuard, type StaggerChoice } from './SpamGuard';
 
 interface Props {
   targets: TargetOption[];
@@ -135,6 +136,7 @@ export function Composer({
     editing?.scheduledAtLocal ?? defaultScheduledAt,
   );
   const [pending, setPending] = useState(false);
+  const [stagger, setStagger] = useState<StaggerChoice>({ minutes: 0, aiVariants: false });
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
@@ -376,6 +378,8 @@ export function Composer({
               timezone,
               useQueue: timing === 'queue',
               saveAsDraft,
+              staggerMinutes: timing === 'queue' ? 0 : stagger.minutes,
+              aiVariants: stagger.aiVariants,
             }),
           });
 
@@ -383,6 +387,7 @@ export function Composer({
         error?: string;
         fields?: Record<string, string>;
         postId?: string;
+        posts?: number;
         scheduledAt?: string | null;
         notice?: string;
         results?: Array<{ targetName: string; status: string; url?: string; error?: string }>;
@@ -455,9 +460,14 @@ export function Composer({
           ? formatInZone(new Date(body.scheduledAt), timezone, undefined, locale)
           : null;
 
+      const staggered = !saveAsDraft && (body.posts ?? 1) > 1 ? body.posts! : 0;
+      setStagger({ minutes: 0, aiVariants: false });
+
       setResult(
         saveAsDraft
           ? t('savedDraft')
+          : staggered > 0
+            ? t('staggeredOk', { count: staggered })
           : needsApproval
             ? t('submittedOk')
             : timing === 'now'
@@ -854,6 +864,19 @@ export function Composer({
               {needsApproval ? t('nowNeedsApproval') : t('nowExplain')}
             </p>
           )}
+
+          <SpamGuard
+            message={message}
+            link={format === 'post' ? link : ''}
+            targetIds={selected}
+            scheduledAtLocal={timing === 'schedule' ? scheduledAt : null}
+            timezone={timezone}
+            postId={editing?.id}
+            aiEnabled={aiEnabled}
+            canStagger={!editing && timing !== 'queue'}
+            value={stagger}
+            onChange={setStagger}
+          />
 
           {timing === 'schedule' && (
             <div className="mt-4">

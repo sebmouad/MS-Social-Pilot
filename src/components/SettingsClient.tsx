@@ -17,6 +17,8 @@ export interface WorkspaceOptions {
   utmMedium: string;
   utmCampaignTemplate: string;
   shortenerEnabled: boolean;
+  /** Spam-risk guard gap between Pages for the same content; 0 is off. */
+  spamGapMinutes: number;
   aiEnabled: boolean;
   aiTone: string;
   aiBrandVoice: string;
@@ -171,6 +173,24 @@ export function SettingsClient({
             </select>
             <p className="hint">{t('weekStartsOnHint')}</p>
           </div>
+        </div>
+        <div className="mt-4 sm:max-w-xs">
+          <label className="label" htmlFor="spamGapMinutes">
+            {t('spamGap')}
+          </label>
+          <select
+            id="spamGapMinutes"
+            className="input"
+            value={settings.spamGapMinutes}
+            onChange={(event) => setSettings({ ...settings, spamGapMinutes: Number(event.target.value) })}
+          >
+            {[0, 10, 20, 30, 60, 120].map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {minutes === 0 ? t('spamGapOff') : t('spamGapMinutes', { minutes })}
+              </option>
+            ))}
+          </select>
+          <p className="hint">{t('spamGapHint')}</p>
         </div>
         <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
           <input

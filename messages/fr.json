@@ -561,7 +561,8 @@
     "aiHashtags": "Hashtags",
     "aiHashtagsNone": "Aucun nouveau hashtag à suggérer pour cette publication.",
     "aiHashtagsPick": "Choisissez ceux qui conviennent. Ils s’ajoutent à la fin.",
-    "aiHashtagsAdd": "{count, plural, =0 {Ajouter des hashtags} one {Ajouter 1 hashtag} other {Ajouter # hashtags}}"
+    "aiHashtagsAdd": "{count, plural, =0 {Ajouter des hashtags} one {Ajouter 1 hashtag} other {Ajouter # hashtags}}",
+    "staggeredOk": "Programmé en {count, plural, one {# publication} other {# publications}}, une Page à la fois."
   },
   "config": {
     "title": "Configuration",
@@ -1854,7 +1855,11 @@
       "informative": "Informatif"
     },
     "weekStartsOn": "Premier jour de la semaine",
-    "weekStartsOnHint": "La première colonne du calendrier, pour tous les membres de cet espace."
+    "weekStartsOnHint": "La première colonne du calendrier, pour tous les membres de cet espace.",
+    "spamGap": "Écart entre Pages pour un même contenu",
+    "spamGapOff": "Désactivé — aucun avertissement",
+    "spamGapMinutes": "{minutes} minutes",
+    "spamGapHint": "L’éditeur prévient quand le même lien ou texte toucherait 3 Pages ou plus d’un même réseau à moins de cet écart, et propose de les espacer."
   },
   "setup": {
     "title": "Configurer MS Social Pilot",
@@ -2905,5 +2910,15 @@
     "signOutBody": "{device} devra saisir de nouveau le mot de passe pour revenir.",
     "failed": "Impossible de déconnecter ce navigateur. Réessayez.",
     "empty": "Aucun navigateur connecté."
+  },
+  "spamGuard": {
+    "title": "Même contenu sur {pages} Pages en {minutes} minutes",
+    "body": "Facebook peut prendre le même lien ou le même texte publié sur beaucoup de Pages à la fois pour du spam, et le montrer à moins de monde.",
+    "bodyOthers": "Facebook peut prendre le même lien ou le même texte publié sur beaucoup de Pages à la fois pour du spam. {posts, plural, one {# publication déjà prévue porte} other {# publications déjà prévues portent}} le même contenu vers cette heure-là.",
+    "stagger": "Publier sur une Page toutes les {minutes} minutes",
+    "staggerHint": "{pages} publications séparées, la dernière {minutes} minutes après la première.",
+    "aiVariants": "Reformuler le texte pour chaque Page avec l’IA",
+    "aiVariantsHint": "La première Page reçoit votre texte ; les autres une reformulation dans leur propre ton. Vous pourrez modifier chaque publication ensuite.",
+    "pickAnotherTime": "Choisissez une heure plus éloignée des autres publications, ou changez le texte, pour réduire le risque. Vous pouvez aussi l’envoyer tel quel."
   }
 }

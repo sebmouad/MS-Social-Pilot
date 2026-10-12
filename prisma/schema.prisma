@@ -227,6 +227,11 @@ model Workspace {
   utmCampaignTemplate String?
   shortenerEnabled    Boolean @default(false)
 
+  /// Spam-risk guard (NEXT_PHASES G6): the same link or near-identical text
+  /// should not reach several Pages of one network closer together than this.
+  /// 0 turns the warning off.
+  spamGapMinutes Int @default(20)
+
   // AI caption defaults, fed into the prompt.
   aiEnabled    Boolean @default(true)
   aiTone       String?

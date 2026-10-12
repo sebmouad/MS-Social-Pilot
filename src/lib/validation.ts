@@ -10,11 +10,11 @@ import { THEMES } from './themes';
  * are written once, here.
  */
 
-const timezone = z
+export const timezone = z
   .string()
   .refine(isValidTimeZone, { message: 'Unknown timezone. Use an IANA name such as Europe/Paris.' });
 
-const httpUrl = z
+export const httpUrl = z
   .string()
   .trim()
   .url('Enter a valid URL.')
@@ -156,6 +156,13 @@ export const createPostSchema = z
     /** Ignore scheduledAtLocal and use the next free queue slot instead. */
     useQueue: z.boolean().default(false),
     saveAsDraft: z.boolean().default(false),
+    /**
+     * Spam-risk guard (G6): one post per Page, this many minutes apart,
+     * instead of one post to every Page at once. 0 or absent sends together.
+     */
+    staggerMinutes: z.number().int().min(0).max(720).optional(),
+    /** With a stagger: the AI rewords the caption for each Page after the first. */
+    aiVariants: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
     // `link` is optional here and absent means none, so it is normalised for
@@ -212,6 +219,7 @@ export const workspaceSettingsSchema = z.object({
   utmMedium: z.string().trim().max(100).nullish(),
   utmCampaignTemplate: z.string().trim().max(200).nullish(),
   shortenerEnabled: z.boolean().optional(),
+  spamGapMinutes: z.number().int().min(0).max(720).optional(),
 
   aiEnabled: z.boolean().optional(),
   aiTone: z.string().trim().max(50).nullish(),

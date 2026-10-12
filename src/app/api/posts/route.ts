@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertPagesAllowed, postScope } from '@/lib/page-access';
 import { prisma } from '@/lib/prisma';
-import { createPost } from '@/lib/posts';
+import { createStaggered } from '@/lib/stagger';
 import { createPostSchema } from '@/lib/validation';
 import { parseLinkPreview, parseMedia } from '@/lib/json';
 import { ok, readJson, route } from '@/lib/api';
@@ -81,13 +81,14 @@ export const POST = route(async (request: Request) => {
   const input = createPostSchema.parse(await readJson(request));
   assertPagesAllowed(auth.pageScope, input.targetIds);
 
-  const result = await createPost(
-        {
-          workspaceId: auth.workspace.id,
-          userId: auth.user.id,
-          role: auth.role,
-          requiresApproval: auth.workspace.requiresApproval,
-        },
+  const result = await createStaggered(
+    {
+      workspaceId: auth.workspace.id,
+      userId: auth.user.id,
+      role: auth.role,
+      requiresApproval: auth.workspace.requiresApproval,
+      locale: auth.workspace.defaultLocale,
+    },
     input,
   );
   return ok(result, 201);

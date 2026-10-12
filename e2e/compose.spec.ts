@@ -614,3 +614,53 @@ test('what a phone shares to the app arrives in the composer', async ({ page }) 
   await expect(page.locator('#message')).toHaveValue('Recipe of the day\n\nA lovely tart');
   await expect(page.locator('#link')).toHaveValue('https://example.com/tart');
 });
+
+test('the same post to many Pages at once is flagged, and can go out one Page at a time', async ({ page }) => {
+  // Spam-risk guard (NEXT_PHASES G6): warn, never block, and offer the stagger.
+  const failures = collectFailures(page);
+  const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
+  const extra = await Promise.all(
+    ['Client B', 'Client C'].map((name, index) =>
+      prisma.target.upsert({
+        where: { workspaceId_providerId: { workspaceId: target.workspaceId, providerId: `spam-${index}` } },
+        create: {
+          workspaceId: target.workspaceId,
+          socialAccountId: target.socialAccountId,
+          type: 'page',
+          providerId: `spam-${index}`,
+          name,
+          accessToken: target.accessToken,
+          canPublish: true,
+        },
+        update: { canPublish: true, enabled: true },
+      }),
+    ),
+  );
+  const caption = 'Our product launch is live today with free delivery for every order this week';
+
+  try {
+    await open(page, '/compose');
+    await page.getByLabel(/what do you want to say/i).fill(caption);
+    for (const name of [PAGE_NAME, 'Client B', 'Client C']) {
+      const box = page.getByRole('checkbox', { name: new RegExp(name) });
+      await expect(async () => {
+        if (!(await box.isChecked())) await box.click();
+        await expect(box).toBeChecked({ timeout: 1_500 });
+      }).toPass({ timeout: 30_000 });
+    }
+
+    await expect(page.getByText(/same content on 3 pages within 20 minutes/i)).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('checkbox', { name: /send to one page every 20 minutes/i }).check();
+    await page.getByRole('button', { name: /^schedule$/i }).click();
+    await expect(page.getByText(/scheduled as 3 posts, one page at a time/i)).toBeVisible();
+
+    const posts = await prisma.post.findMany({ where: { message: caption }, orderBy: { scheduledAt: 'asc' } });
+    expect(posts).toHaveLength(3);
+    expect(posts[1]!.scheduledAt!.getTime() - posts[0]!.scheduledAt!.getTime()).toBe(20 * 60_000);
+  } finally {
+    await prisma.post.deleteMany({ where: { message: caption } });
+    await prisma.target.deleteMany({ where: { id: { in: extra.map((row) => row.id) } } });
+  }
+
+  expect(failures).toEqual([]);
+});

@@ -518,7 +518,7 @@ most time), the rest after Phase D2. S/M/L = effort.
   RSS feature. Works for any site and niche. *Done: RSS/Atom + WordPress,
   template with hashtags, featured image, fixed spread, UTM per Page at publish;
   spreading on each Page's best times waits for G10.*
-- **G6. Spam-risk guard (M)** — before scheduling, detect the same link or
+- **G6. Spam-risk guard (M)** ✅ — before scheduling, detect the same link or
   near-identical text going to many Pages within a short window; warn with the
   count and suggest **auto-stagger** (spread over N hours) and **AI caption
   variants** per Page; workspace setting for the minimum gap. Never block —

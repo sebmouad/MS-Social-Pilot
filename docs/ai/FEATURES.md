@@ -20,7 +20,10 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   character/#/@ counters; per-network limit warnings; first comment + delay;
   link with Open Graph card; photos/video with alt text; labels; Schedule /
   Queue / Now; who holds it (this app or Facebook-native); approval submit for
-  contributors; AI: generate, improve, hashtags (needs Anthropic key); Facebook-like
+  contributors; spam-risk guard (same link or near-identical text on 3+ Pages of
+  one network within the workspace gap, Settings → General) warns and offers
+  one post per Page N minutes apart, optionally reworded per Page by AI;
+  AI: generate, improve, hashtags (needs Anthropic key); Facebook-like
   preview (phone frame for Stories/Reels). Prefill from `?title=&text=&url=` (phone
   share target), `?to=<targetId>`, `?at=<local time>`.
 - **Calendar** `/calendar`: Month / Week / Page feed views, drafts toggle,

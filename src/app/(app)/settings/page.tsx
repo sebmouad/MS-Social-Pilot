@@ -84,6 +84,7 @@ export default async function SettingsPage() {
           utmMedium: workspace.utmMedium ?? '',
           utmCampaignTemplate: workspace.utmCampaignTemplate ?? '',
           shortenerEnabled: workspace.shortenerEnabled,
+          spamGapMinutes: workspace.spamGapMinutes,
           aiEnabled: workspace.aiEnabled,
           aiTone: workspace.aiTone ?? '',
           aiBrandVoice: workspace.aiBrandVoice ?? '',

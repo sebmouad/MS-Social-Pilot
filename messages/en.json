@@ -561,7 +561,8 @@
     "aiHashtags": "Hashtags",
     "aiHashtagsNone": "No new hashtags to suggest for this post.",
     "aiHashtagsPick": "Pick the ones that fit. They go at the end of the post.",
-    "aiHashtagsAdd": "{count, plural, =0 {Add hashtags} one {Add 1 hashtag} other {Add # hashtags}}"
+    "aiHashtagsAdd": "{count, plural, =0 {Add hashtags} one {Add 1 hashtag} other {Add # hashtags}}",
+    "staggeredOk": "Scheduled as {count, plural, one {# post} other {# posts}}, one Page at a time."
   },
   "config": {
     "title": "Configuration",
@@ -1854,7 +1855,11 @@
       "informative": "Informative"
     },
     "weekStartsOn": "First day of the week",
-    "weekStartsOnHint": "The calendar’s first column, for everyone in this workspace."
+    "weekStartsOnHint": "The calendar’s first column, for everyone in this workspace.",
+    "spamGap": "Gap between Pages for the same content",
+    "spamGapOff": "Off — no warning",
+    "spamGapMinutes": "{minutes} minutes",
+    "spamGapHint": "The composer warns when the same link or text would reach 3 or more Pages of one network closer together than this, and offers to stagger them."
   },
   "setup": {
     "title": "Set up MS Social Pilot",
@@ -2905,5 +2910,15 @@
     "signOutBody": "{device} will need the password again to get back in.",
     "failed": "Could not sign that browser out. Try again.",
     "empty": "No signed-in browsers."
+  },
+  "spamGuard": {
+    "title": "Same content on {pages} Pages within {minutes} minutes",
+    "body": "Facebook can read the same link or text landing on many Pages at once as spam, and show it to fewer people.",
+    "bodyOthers": "Facebook can read the same link or text landing on many Pages at once as spam. {posts, plural, one {# post already planned carries} other {# posts already planned carry}} the same content around this time.",
+    "stagger": "Send to one Page every {minutes} minutes",
+    "staggerHint": "{pages} separate posts, the last one {minutes} minutes after the first.",
+    "aiVariants": "Reword the caption for each Page with AI",
+    "aiVariantsHint": "The first Page gets your words; the others get a rewording in their own voice. You can edit each post afterwards.",
+    "pickAnotherTime": "Pick a time further from the other posts, or change the text, to lower the risk. You can also send it as it is."
   }
 }
