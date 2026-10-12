@@ -4,6 +4,7 @@ import { ZodError } from 'zod';
 
 import { AuthError, ForbiddenError } from './auth';
 import { AppError } from './errors';
+import { recordError } from './error-tracking';
 import { GraphError } from './facebook/graph';
 import { MediaError } from './media';
 import { ensureSettings } from './settings';
@@ -86,6 +87,7 @@ export async function handleApiError(error: unknown): Promise<NextResponse> {
   }
 
   console.error('[api] unhandled error', error);
+  await recordError({ source: 'server', error, location: 'api' });
   return fail(await translate('errors.generic', {}, 'Something went wrong. Please try again.'), 500);
 }
 

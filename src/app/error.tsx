@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { reportBrowserError } from '@/components/ErrorReporter';
+
 /**
  * What a person sees when a page throws.
  *
@@ -28,6 +30,8 @@ export default function ErrorBoundary({
 
   useEffect(() => {
     console.error('[app] page failed to render', error);
+    // A server error arrives here as a digest only; the server recorded it already.
+    if (!error.digest) reportBrowserError(error);
   }, [error]);
 
   return (

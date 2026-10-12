@@ -439,6 +439,7 @@ async function handOffToFacebook(postId: string, scheduledAt: Date): Promise<voi
           shortenerEnabled: post.workspace.shortenerEnabled,
         },
         targetName: target.name,
+        targetId: target.id,
       });
 
       const result = await publishPost({

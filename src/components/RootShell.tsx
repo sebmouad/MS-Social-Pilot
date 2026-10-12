@@ -19,6 +19,7 @@ export function RootShell({ userName, children }: { userName: string; children: 
 
   const items: Array<{ href: string; label: string; icon: IconName }> = [
     { href: '/root', label: t('nav.overview'), icon: 'dashboard' },
+    { href: '/root/status', label: t('nav.status'), icon: 'check' },
     { href: '/root/config', label: t('nav.config'), icon: 'config' },
     { href: '/root/workspaces', label: t('nav.workspaces'), icon: 'folders' },
     { href: '/root/users', label: t('nav.users'), icon: 'team' },
@@ -26,6 +27,7 @@ export function RootShell({ userName, children }: { userName: string; children: 
     { href: '/root/registration', label: t('nav.registration'), icon: 'mail' },
     { href: '/root/privileges', label: t('nav.privileges'), icon: 'key' },
     { href: '/root/worker', label: t('nav.worker'), icon: 'refresh' },
+    { href: '/root/errors', label: t('nav.errors'), icon: 'warning' },
     { href: '/root/alerts', label: t('nav.alerts'), icon: 'bell' },
     { href: '/root/backups', label: t('nav.backups'), icon: 'download' },
     { href: '/root/activity', label: t('nav.activity'), icon: 'clock' },

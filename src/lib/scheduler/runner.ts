@@ -367,6 +367,7 @@ async function publishClaimed(
         shortenerEnabled: post.workspace.shortenerEnabled,
       },
       targetName: target.name,
+      targetId: target.id,
     });
 
     const network = isNetworkKey(target.type) ? target.type : null;

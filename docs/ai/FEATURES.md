@@ -2,7 +2,7 @@
 
 App shell (like Simplified): a narrow **icon rail** on the far left with the
 main areas — **Home** · **Publish** (Calendar, Queue, Posts, Approvals, Website
-auto-share; also the composer) · **Inbox** · **Analytics** (Pages, Reports) ·
+auto-share; also the composer) · **Inbox** · **Analytics** (Pages, Reports, Caption tests, Link clicks) ·
 **Ads** · **Workspace** (Connections, Client links, Settings), Root at the
 bottom for root. Beside it the **sidebar** with the area's pages, the client
 switcher and "New post". A slim **top bar** holds utilities only: fold the
@@ -66,6 +66,9 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   worker compares engagements per view from synced insights and names a winner
   only when every caption reached the test's minimum views (500); otherwise it
   says why. Admins can add the result to the Pages' voice for the AI.
+- **Link clicks** `/analytics/links`: clicks on the app's short links per day,
+  Page, article (tracking tags ignored) and post, with clicks per 1,000 views;
+  follows the selection and the period. Empty state says when the shortener is off.
 - **Reports** `/reports`: per Page, sections checklist, branding (logo, title,
   subtitle, footer), saved templates, Download PDF (print), CSV, scheduled email
   (weekly/monthly to any address), optional AI recap paragraph at the top of the
@@ -110,6 +113,12 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
 ## Public
 `/share/<token>` client view, `/privacy-policy`, `/terms`, `/data-deletion`,
 `/login`, `/register` (first account / open registration), `/invite/<token>`.
+
+## Root — `/root/*`
+Overview, Status (app, database, worker, last publish, last off-site backup,
+90-day uptime bars), Configuration, Workspaces, Users, Sessions, Registration,
+Privileges, Worker (jobs and Meta usage), Errors (server, worker and browser
+errors grouped, scrubbed, with release; mark resolved), Alerts, Backups, Activity, Danger zone.
 
 ## Background (worker, `src/lib/scheduler/jobs.ts`)
 publish (every few seconds), native reconcile, RSS, evergreen recycling,

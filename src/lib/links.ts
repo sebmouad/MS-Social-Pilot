@@ -93,12 +93,14 @@ export async function createShortLink(options: {
   workspaceId: string;
   targetUrl: string;
   postId?: string | null;
+  /** The Page it goes out on, so clicks count for that Page (G14). */
+  targetId?: string | null;
 }): Promise<string> {
-  // Reuse an existing link for the same post and destination so republishing
-  // does not fragment the click count across several slugs.
+  // Reuse an existing link for the same post, Page and destination so
+  // republishing does not fragment the click count across several slugs.
   if (options.postId) {
     const existing = await prisma.shortLink.findFirst({
-      where: { workspaceId: options.workspaceId, postId: options.postId, targetUrl: options.targetUrl },
+      where: { workspaceId: options.workspaceId, postId: options.postId, targetId: options.targetId ?? null, targetUrl: options.targetUrl },
     });
     if (existing) return shortLinkUrl(existing.slug);
   }
@@ -112,6 +114,7 @@ export async function createShortLink(options: {
           slug,
           targetUrl: options.targetUrl,
           postId: options.postId ?? null,
+          targetId: options.targetId ?? null,
         },
       });
       return shortLinkUrl(slug);
@@ -141,6 +144,7 @@ export async function prepareLinks(options: {
   link: string | null;
   settings: UtmSettings & { shortenerEnabled: boolean };
   targetName?: string;
+  targetId?: string;
 }): Promise<PreparedLinks> {
   const { settings } = options;
   const hasUtm = Boolean(settings.utmSource || settings.utmMedium || settings.utmCampaignTemplate);
@@ -156,6 +160,7 @@ export async function prepareLinks(options: {
       workspaceId: options.workspaceId,
       targetUrl: tagged,
       postId: options.postId,
+      targetId: options.targetId,
     });
   };
 

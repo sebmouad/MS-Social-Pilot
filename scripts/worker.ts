@@ -14,6 +14,7 @@
 
 import { BACKGROUND_USAGE_CEILING, setReadCeiling } from '../src/lib/facebook/budget';
 import { restoreSavedBudget, saveBudget } from '../src/lib/facebook/budget-store';
+import { recordError } from '../src/lib/error-tracking';
 import { prisma } from '../src/lib/prisma';
 import { jobDefinitions, type JobDefinition } from '../src/lib/scheduler/jobs';
 import { createLoopState, dueJobs, markFinished, markStarted, seedFromHistory } from '../src/lib/scheduler/loop';
@@ -66,6 +67,7 @@ async function runJob(job: JobDefinition): Promise<JobOutcome> {
   } catch (error) {
     console.error(`${new Date().toISOString()} [${workerId}] [${job.name}] failed`, error);
     outcome.error = (error instanceof Error ? error.message : String(error)).slice(0, 2000);
+    await recordError({ source: 'worker', error, location: job.name });
   }
   return outcome;
 }

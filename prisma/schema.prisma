@@ -442,6 +442,7 @@ model Target {
   /// syncs and the average is partial until this is true.
   reviewsBackfilled Boolean @default(false)
 
+  shortLinks      ShortLink[]
   @@unique([workspaceId, providerId])
   @@index([socialAccountId])
   @@map("targets")
@@ -775,15 +776,20 @@ model ShortLink {
   slug        String   @unique
   targetUrl   String
   postId      String?
+  /// The Page the link went out on (G14). Null for links made before, which
+  /// count for their post's first Page.
+  targetId    String?
   clickCount  Int      @default(0)
   createdAt   DateTime @default(now())
 
   workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   post      Post?       @relation(fields: [postId], references: [id], onDelete: SetNull)
+  target    Target?     @relation(fields: [targetId], references: [id], onDelete: SetNull)
   clicks    LinkClick[]
 
   @@index([workspaceId])
   @@index([postId])
+  @@index([targetId])
   @@map("short_links")
 }
 
@@ -1693,4 +1699,43 @@ model ModerationAction {
   @@index([workspaceId, createdAt])
   @@index([ruleId, createdAt])
   @@map("moderation_actions")
+}
+
+/// Minutes each part of the installation was seen up, per UTC day (G15). The
+/// web server counts one minute a minute for itself, and one for the worker
+/// when its heartbeat is fresh; the root status page turns them into 90 days
+/// of uptime.
+model UptimeDay {
+  day       String
+  /// `app` or `worker`.
+  component String
+  minutes   Int    @default(0)
+
+  @@id([day, component])
+  @@map("uptime_days")
+}
+
+/// One kind of error seen by the server, the worker or a browser (G16), kept
+/// in this database rather than sent anywhere. Grouped by fingerprint; the
+/// text is scrubbed of tokens, secrets and email addresses before it is stored.
+model ErrorEvent {
+  id          String    @id @default(cuid())
+  fingerprint String    @unique
+  /// `server`, `worker` or `browser`.
+  source      String
+  name        String
+  message     String
+  stack       String?
+  /// The route or job it happened in, without its query string.
+  location    String?
+  /// The release (commit) it was last seen on.
+  release     String
+  count       Int       @default(1)
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  /// Set by root; a new occurrence clears it.
+  resolvedAt  DateTime?
+
+  @@index([lastSeenAt])
+  @@map("error_events")
 }

@@ -49,6 +49,7 @@ const NOT_WORKSPACE_DATA: Record<string, string> = {
   'root/members/[id]': 'Root section (root-oversight.integration.test.ts).',
   'root/workspaces/[id]/members': 'Root section.',
   'root/workspaces/[id]/visit': 'Root section (root-oversight.integration.test.ts).',
+  'root/errors/[id]': 'Root section: error list, not workspace data.',
 };
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;

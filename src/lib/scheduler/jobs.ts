@@ -14,6 +14,7 @@ import { syncTargetEdges } from '../engagement';
 import { discoverInstagramAccounts, syncWorkspaceInstagram } from '../instagram';
 import { discoverAdAccounts, syncWorkspaceAds } from '../ads';
 import { deleteUnusedMedia } from '../media';
+import { pruneErrors } from '../error-tracking';
 import { pruneHistory, prunedTotal } from '../housekeeping';
 import { forEachEnabledPage, forEachWorkspace } from './iterate';
 import { fetchRemotePostState } from '../facebook/publish';
@@ -558,6 +559,7 @@ export async function runHousekeeping(context: JobContext): Promise<string | nul
   });
 
   for (const failure of pass.failures) context.logger(`Workspace ${failure.id}: ${failure.message}`);
+  records += await pruneErrors(context.now.getTime());
 
   if (files === 0 && records === 0 && pass.failures.length === 0) return null;
   return `pruned ${records} record(s), removed ${files} unused file(s) (${Math.round(bytes / 1024)}KB)`;

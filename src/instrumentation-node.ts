@@ -24,7 +24,8 @@ export async function checkEnvAtStartup(): Promise<void> {
 /**
  * The one alert the worker cannot raise: that it has stopped. The web server
  * checks the worker's heartbeat every minute, in production only, and opens
- * or closes the "worker stopped" incident (src/lib/system-alerts.ts).
+ * or closes the "worker stopped" incident (src/lib/system-alerts.ts). The same
+ * tick counts a minute of uptime for the root status page (src/lib/uptime.ts).
  */
 export function watchWorkerHeartbeat(): void {
   if (process.env.NEXT_PHASE === 'phase-production-build' || process.env.NODE_ENV !== 'production') return;
@@ -37,6 +38,12 @@ export function watchWorkerHeartbeat(): void {
         await applyChecks([await checkWorker()]);
       } catch (error) {
         console.error('[alerts] heartbeat check failed', error);
+      }
+      try {
+        const { recordUptimeMinute } = await import('./lib/uptime');
+        await recordUptimeMinute();
+      } catch (error) {
+        console.error('[uptime] could not record', error);
       }
     })();
   }, 60_000);

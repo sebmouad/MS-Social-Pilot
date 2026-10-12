@@ -1370,7 +1370,8 @@
     "yourAccount": "Votre compte",
     "moderation": "Règles de modération",
     "savedReplies": "Réponses enregistrées",
-    "captionTests": "Tests de légendes"
+    "captionTests": "Tests de légendes",
+    "linkClicks": "Clics sur les liens"
   },
   "notifications": {
     "title": "Notifications",
@@ -2427,7 +2428,9 @@
       "backups": "Sauvegardes",
       "alerts": "Alertes",
       "worker": "Worker et quotas Meta",
-      "sessions": "Sessions"
+      "sessions": "Sessions",
+      "status": "État",
+      "errors": "Erreurs"
     },
     "overview": {
       "title": "Vue d’ensemble de l’installation",
@@ -2721,6 +2724,52 @@
     "sessions": {
       "title": "Sessions",
       "subtitle": "{count, plural, =0 {Personne n’est connecté.} one {Un navigateur connecté, tous comptes confondus.} other {# navigateurs connectés, tous comptes confondus.}}"
+    },
+    "status": {
+      "title": "État",
+      "subtitle": "Si l’installation fonctionne en ce moment, et comment elle a tourné ces 90 derniers jours.",
+      "now": "En ce moment",
+      "app": "Application",
+      "appOk": "Sert cette page",
+      "database": "Base de données",
+      "databaseOk": "Réponse en {ms} ms",
+      "worker": "Worker",
+      "lastBeat": "Dernier signal {when}",
+      "workerNever": "N’a jamais démarré",
+      "lastPublish": "Dernière publication",
+      "publishDetail": "{published} · dernier échec {failed}",
+      "lastBackup": "Dernière sauvegarde externe",
+      "backupNever": "Aucune enregistrée",
+      "never": "Jamais",
+      "ok": "OK",
+      "problem": "Problème",
+      "uptimeTitle": "Disponibilité, {days} derniers jours",
+      "uptimeHint": "Le serveur web compte chaque minute où il tourne, et chaque minute où le signal du worker est récent. Les jours d’avant le début du comptage n’ont pas de données. Pour les pannes du serveur entier, ajoutez une surveillance externe sur /api/health.",
+      "uptimeOf": "Disponibilité quotidienne de {name}",
+      "noData": "Pas de données",
+      "legendFull": "Disponible toute la journée",
+      "legendSome": "Disponible 95 % ou plus",
+      "legendDown": "Disponible moins de 95 %"
+    },
+    "errors": {
+      "title": "Erreurs",
+      "subtitle": "Les erreurs du serveur, du worker et des navigateurs, regroupées par type. Gardées dans cette base de données uniquement, sans jetons, secrets ni adresses e-mail, {days} jours après leur dernière apparition. Version en service : {release}.",
+      "filter": "Quelles erreurs",
+      "open": "Ouvertes",
+      "all": "Toutes",
+      "emptyTitle": "Aucune erreur ouverte",
+      "emptyHint": "Les erreurs apparaissent ici quand elles se produisent. Rien à faire.",
+      "source": {
+        "server": "Serveur",
+        "worker": "Worker",
+        "browser": "Navigateur"
+      },
+      "seen": "{count, plural, one {# fois} other {# fois}}, dernière {when}",
+      "stack": "Pile d’appels",
+      "meta": "Version {release} · vue la première fois le {first}",
+      "resolve": "Marquer comme résolue",
+      "resolveFailed": "Enregistrement impossible. Réessayez.",
+      "resolvedAt": "Résolue {when}"
     }
   },
   "twoStep": {
@@ -3129,5 +3178,30 @@
     "originalHint": "Ces Pages n’ont pas de langue d’audience : elles reçoivent le post tel qu’il est écrit.",
     "noLanguages": "Aucune de ces Pages n’a encore de langue d’audience. Définissez-en une dans Paramètres › Pages › Ton, audience et liens.",
     "failed": "La traduction n’a pas fonctionné. Réessayez dans un instant."
+  },
+  "linkClicks": {
+    "title": "Clics sur les liens",
+    "intro": "Les clics sur les liens courts de vos publications, par jour, Page, article et publication. Chaque visite d’un lien court compte, les totaux peuvent donc différer du décompte de clics de Facebook.",
+    "emptyTitle": "Aucun clic sur cette période",
+    "emptyHint": "Les publications avec un lien reçoivent un lien court à l’envoi ; les clics apparaissent ici. Essayez une période plus longue ou publiez un lien.",
+    "emptyHintOff": "Le raccourcisseur de liens est désactivé, les clics ne sont donc pas comptés. Activez-le dans les réglages de l’espace ; les publications envoyées ensuite seront comptées.",
+    "emptyAction": "Écrire une publication avec un lien",
+    "turnOn": "Ouvrir les réglages de l’espace",
+    "total": "Clics",
+    "pages": "Pages avec des clics",
+    "articles": "Articles cliqués",
+    "perDay": "Clics par jour",
+    "date": "Date",
+    "clicks": "Clics",
+    "byPage": "Par Page",
+    "page": "Page",
+    "topArticles": "Articles les plus cliqués",
+    "article": "Article",
+    "topPosts": "Publications les plus cliquées",
+    "perThousandHint": "Les clics pour 1 000 vues comparent des publications qui ont touché des nombres de personnes différents. Les vues viennent de Facebook une fois les statistiques de la publication synchronisées.",
+    "post": "Publication",
+    "views": "Vues",
+    "perThousand": "Pour 1 000 vues",
+    "untitled": "(sans texte)"
   }
 }

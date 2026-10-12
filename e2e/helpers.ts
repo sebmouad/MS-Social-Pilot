@@ -61,6 +61,7 @@ export const SIGNED_IN_SCREENS = [
   '/inbox/rules',
   '/inbox/replies',
   '/analytics/tests',
+  '/analytics/links',
   '/approvals?view=board',
   '/connections',
   '/accounts',
@@ -93,6 +94,8 @@ export const SIGNED_IN_SCREENS = [
 /** The root section: root (the first account, the e2e owner) only; 404 for everybody else. */
 export const ROOT_SCREENS = [
   '/root',
+  '/root/status',
+  '/root/errors',
   '/root/config',
   '/root/workspaces',
   '/root/users',

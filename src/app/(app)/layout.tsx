@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { AppShell } from '@/components/AppShell';
 import { ConfirmProvider } from '@/components/ConfirmProvider';
+import { ErrorReporter } from '@/components/ErrorReporter';
 import { accessRefusal, getAuthContext } from '@/lib/auth';
 import { canApprove } from '@/lib/constants';
 import { pendingApprovalCount } from '@/lib/approvals';
@@ -22,6 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <ConfirmProvider>
+    <ErrorReporter />
     <AppShell
         userName={auth.user.name}
         workspaceId={auth.workspace.id}

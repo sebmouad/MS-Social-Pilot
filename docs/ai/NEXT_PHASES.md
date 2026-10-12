@@ -584,16 +584,37 @@ most time), the rest after Phase D2. S/M/L = effort.
 - **G13. Watermark and auto-crop (M)** — per-Page logo/text watermark (position,
   opacity), applied when the post is published (original kept); crops/resizes
   per network format (feed 4:5, story 9:16, link 1.91:1) with a focal point.
-- **G14. Short-link click analytics (S)** — dashboard of clicks per Page, post,
+- **G14. Short-link click analytics (S)** ✅ — dashboard of clicks per Page, post,
   article and day (data already collected by the shortener), top articles,
   clicks per 1,000 views; obeys the shared selection.
+  *Done: `/analytics/links` (sidebar Analytics → Link clicks),
+  `src/lib/link-analytics.ts`. Short links now record the Page they went out
+  on (`ShortLink.targetId`); older links count for their post's first Page.
+  Articles are grouped by address without `utm_*`/`fbclid`. Days follow the
+  workspace time zone.*
 
 ### Operations
-- **G15. Status page (S)** — public or root-only `/status`: app, worker,
+- **G15. Status page (S)** ✅ — public or root-only `/status`: app, worker,
   database, last publish, last backup, uptime history (90 days).
-- **G16. Error tracking (S)** — self-hosted GlitchTip or Sentry: server, worker
+  *Done, root-only: `/root/status`. The web server's one-minute tick
+  (`src/instrumentation-node.ts`, production only) counts a minute for the app
+  and one for the worker when its heartbeat is fresh (`uptime_days`,
+  `src/lib/uptime.ts`). It cannot see an outage of the whole server; the page
+  says to add an outside monitor on `/api/health`. Assumes one web container
+  (each would count its own minutes; capped at 1,440 a day).*
+- **G16. Error tracking (S)** ✅ — self-hosted GlitchTip or Sentry: server, worker
   and browser errors with release hash; no personal data or tokens in events
   (scrub); link from the root section.
+  *Done in the app's own database instead of a separate GlitchTip/Sentry
+  server (nothing extra to run on the shared box): `src/lib/error-tracking.ts`,
+  table `error_events`, root page `/root/errors` (open / all, mark resolved;
+  a new occurrence reopens). Server: `onRequestError` in `src/instrumentation.ts`
+  and the API's unhandled branch; worker: failed jobs; browser: `ErrorReporter`
+  in the app layout and `error.tsx`, posted to `/api/errors` (signed in, 20 per
+  10 minutes). Grouped by a fingerprint with ids and numbers folded. Scrubbed:
+  tokens, keys, bearer values, passwords, email addresses, long opaque values,
+  query strings. Release = `RELEASE` file written by the deploy (`dev`
+  otherwise). Pruned by housekeeping after 90 days unseen.*
 - **G17. Export everything (M)** — per workspace: posts, schedule, analytics,
   comments, media as a ZIP (JSON + CSV + files), built in the background with
   a download link that expires; also answers GDPR requests.

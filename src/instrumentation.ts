@@ -18,3 +18,15 @@ export async function register(): Promise<void> {
     watchWorkerHeartbeat();
   }
 }
+
+/**
+ * Every error a page, layout or route handler throws on the server, for root's
+ * error list (src/lib/error-tracking.ts). Node only, for the same reason as
+ * above.
+ */
+export async function onRequestError(error: unknown, request: { path: string }, context: { routePath?: string }): Promise<void> {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { recordError } = await import('./lib/error-tracking');
+    await recordError({ source: 'server', error, location: context.routePath ?? request.path });
+  }
+}

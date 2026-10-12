@@ -10,6 +10,7 @@ rm -rf "$N"
 # Start from the live tree: keeps .env, node_modules cache and .next cache.
 cp -a /srv/ms-social-pilot "$N"
 tar -xf "$D/release-$H.tar" -C "$N"
+echo "$H" > "$N/RELEASE"
 chown -R socialpilot:socialpilot "$N"
 cd "$N"
 # Limited CPU/RAM/IO so the WordPress sites on the same box stay responsive.
