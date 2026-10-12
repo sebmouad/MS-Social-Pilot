@@ -30,7 +30,7 @@ export default async function ModerationRulesPage() {
   if (!canModerateComments(auth.role)) {
     return (
       <div className="space-y-6">
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
+        <ScreenHeader title={t('title')} />
         <EmptyState icon="shield" title={t('noAccessTitle')} hint={t('noAccessHint')} />
       </div>
     );

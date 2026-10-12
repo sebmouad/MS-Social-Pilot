@@ -22,7 +22,7 @@ export default async function SavedRepliesPage() {
   if (!canModerateComments(auth.role)) {
     return (
       <div className="space-y-6">
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
+        <ScreenHeader title={t('title')} />
         <EmptyState icon="comment" title={t('noAccessTitle')} hint={t('noAccessHint')} />
       </div>
     );

@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { TargetType } from '@prisma/client';
 import { loadSelection } from '@/lib/page-filter';
@@ -185,12 +186,7 @@ export default async function QueuePage({
   return (
     <ChannelsLayout auth={auth} selection={selection}>
     <div className="min-w-0 flex-1 space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
-          <p className="mt-1 text-sm text-slate-600">{t('subtitle', { timezone: timeZone })}</p>
-        </div>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={t('subtitle', { timezone: timeZone })} />
 
       {recentlyAdded.length > 0 && (
         <section className="card p-4" aria-labelledby="best-times-added">

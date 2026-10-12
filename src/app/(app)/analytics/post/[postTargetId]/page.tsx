@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -49,7 +50,7 @@ export default async function PostMetricsPage({
           ← {t('backToPosts')}
         </Link>
 
-        <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('postMetricsTitle')}</h1>
+        <ScreenHeader title={t('postMetricsTitle')} />
       </header>
 
       {/* The post itself, as the Page's followers saw it, above its numbers. */}

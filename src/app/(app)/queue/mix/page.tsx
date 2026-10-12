@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { getTranslations } from 'next-intl/server';
 
 import { ContentMixClient } from '@/components/ContentMixClient';
@@ -46,12 +47,7 @@ export default async function ContentMixPage({ searchParams }: { searchParams: P
   return (
     <ChannelsLayout auth={auth} selection={selection}>
     <div className="min-w-0 flex-1 space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
-          <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
-        </div>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
       <ContentMixClient
         canEdit={canManageSettings(auth.role)}
         autoFill={workspace.mixAutoFill}

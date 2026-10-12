@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
 
@@ -74,14 +75,7 @@ export default async function InboxPage({
   return (
     <ChannelsLayout auth={auth} selection={selection}>
     <div className="min-w-0 flex-1 space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {t('subtitle', { comments: open.comments, messages: open.messages, profiles: selection.ids.length })}
-          </p>
-        </div>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={t('subtitle', { comments: open.comments, messages: open.messages, profiles: selection.ids.length })} />
 
       <div className="flex flex-wrap items-center gap-3">
         {segmented(

@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/EmptyState';
 import Link from 'next/link';
 import { TargetType, WorkspaceRole } from '@prisma/client';
@@ -196,12 +197,7 @@ export default async function ReportsPage({
             }}
           /></div>}>
     <div className="min-w-0 flex-1 space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3 print:hidden">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
-          <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
-        </div>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
 
       <ReportTemplates templates={templateRows} sections={sections} rangeKey={range.key} canSave={canEdit} />
 

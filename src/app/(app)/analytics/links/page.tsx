@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
 
@@ -68,13 +69,11 @@ export default async function LinkClicksPage({
   return (
     <ChannelsLayout auth={auth} selection={selection}>
     <div className="min-w-0 flex-1 space-y-6">
-      <header className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold sm:text-2xl text-slate-900">{t('title')}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-600">{t('intro')}</p>
-        </div>
-        <DateRangePicker range={range} path="/analytics/links" keep={keep} />
-      </header>
+      <ScreenHeader
+        title={t('title')}
+        subtitle={t('intro')}
+        actions={<DateRangePicker range={range} path="/analytics/links" keep={keep} />}
+      />
 
       {report.total === 0 ? (
         <EmptyState

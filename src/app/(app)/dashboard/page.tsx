@@ -1,3 +1,4 @@
+import { ScreenHeader } from '@/components/ScreenHeader';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
@@ -136,15 +137,7 @@ export default async function DashboardPage({
             <Icon name="plus" size={16} /> {t('newPost')}
           </Link></div>}>
     <div className="min-w-0 flex-1 space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {formatInZone(now, auth.workspace.timezone, 'EEEE d MMMM yyyy, HH:mm')} ·{' '}
-            {auth.workspace.timezone}
-          </p>
-        </div>
-      </header>
+      <ScreenHeader title={t('title')} subtitle={`${formatInZone(now, auth.workspace.timezone, 'EEEE d MMMM yyyy, HH:mm')} · ${auth.workspace.timezone}`} />
 
       {setup && !setup.complete && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
