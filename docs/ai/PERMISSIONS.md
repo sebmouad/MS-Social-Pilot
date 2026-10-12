@@ -109,7 +109,10 @@ and may open one as its owner (logged visit, see below).
   `/api/settings/config*` re-export the `/api/root/config*` handlers.
 - Users: disable / enable (`User.disabledAt`; disabled = sessions deleted,
   sign-in refused, existing cookie no longer signs in; root cannot be
-  disabled), sign out everywhere. Workspaces: list + rename. Invitations across
+  disabled), sign out everywhere. Sessions (`/root/sessions`): every
+  signed-in browser on the installation (person, browser, IP/country, last
+  seen), and root can end any one (logged). A person ends only their own
+  (`DELETE /api/account/sessions/[id]`, scoped to the signed-in user). Workspaces: list + rename. Invitations across
   every workspace + revoke. Open registration switch.
 - Transfer root (root's password; both emailed) and the SSH recovery script
   `scripts/admin/set-root.ts <email>` (RELEASE.md).

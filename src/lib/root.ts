@@ -28,6 +28,7 @@ export const ROOT_ACTIONS = [
   'user.disabled',
   'user.enabled',
   'user.signedOut',
+  'session.signedOut',
   'user.twoStepReset',
   'workspace.renamed',
   'invitation.revoked',

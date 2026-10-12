@@ -34,6 +34,7 @@ const A: Record<string, string> = {};
 
 /** Routes that are not about workspace data at all, with the reason. */
 const NOT_WORKSPACE_DATA: Record<string, string> = {
+  'account/sessions/[id]': "A person's own signed-in browser; checked against the signed-in user (account.integration.test.ts).",
   'auth/passkeys/[id]': "A person's own passkey; checked against the signed-in user.",
   'networks/[network]/callback': 'An OAuth return address, keyed by the network name.',
   'networks/[network]/connect': 'Starts OAuth for the caller’s own workspace, keyed by the network name.',
@@ -42,6 +43,7 @@ const NOT_WORKSPACE_DATA: Record<string, string> = {
   'root/users/[id]': 'Root section.',
   'root/users/[id]/reset-two-step': 'Root section.',
   'root/users/[id]/sign-out': 'Root section.',
+  'root/sessions/[id]': 'Root section.',
   'root/workspaces/[id]': 'Root section.',
   'root/client-invitations/[id]': 'Root section.',
   'root/members/[id]': 'Root section (root-oversight.integration.test.ts).',

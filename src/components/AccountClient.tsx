@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import { THEMES, type Theme } from '@/lib/themes';
+import { SessionList, type SessionRow } from './SessionList';
 
 type Locale = 'en' | 'fr';
 
@@ -15,6 +16,7 @@ interface Status {
 
 interface Props {
   initial: { name: string; email: string; locale: Locale; theme: Theme; otherSessions: number };
+  sessions: SessionRow[];
   locales: Locale[];
 }
 
@@ -51,7 +53,7 @@ async function send(url: string, method: string, body?: unknown) {
   return { ok: Boolean(response?.ok), data: data ?? {} };
 }
 
-export function AccountClient({ initial, locales }: Props) {
+export function AccountClient({ initial, sessions: initialSessions, locales }: Props) {
   const t = useTranslations('account');
   const tCommon = useTranslations('common');
   const router = useRouter();
@@ -69,6 +71,9 @@ export function AccountClient({ initial, locales }: Props) {
   const [passwordStatus, setPasswordStatus] = useState<Status | null>(null);
 
   const [otherSessions, setOtherSessions] = useState(initial.otherSessions);
+  const [sessions, setSessions] = useState(initialSessions);
+  // Bumped when the others are signed out together, so the list starts over.
+  const [sessionsKey, setSessionsKey] = useState(0);
   const [sessionsPending, setSessionsPending] = useState(false);
   const [sessionsStatus, setSessionsStatus] = useState<Status | null>(null);
 
@@ -120,6 +125,8 @@ export function AccountClient({ initial, locales }: Props) {
     setNewPassword('');
     setConfirmPassword('');
     setOtherSessions(0);
+    setSessions((list) => list.filter((entry) => entry.current));
+    setSessionsKey((key) => key + 1);
     setPasswordStatus({ kind: 'ok', text: t('passwordChanged', { count: signedOut }) });
   }
 
@@ -136,6 +143,8 @@ export function AccountClient({ initial, locales }: Props) {
     }
     const signedOut = typeof data.signedOut === 'number' ? data.signedOut : 0;
     setOtherSessions(0);
+    setSessions((list) => list.filter((entry) => entry.current));
+    setSessionsKey((key) => key + 1);
     setSessionsStatus({ kind: 'ok', text: t('signedOutOthers', { count: signedOut }) });
   }
 
@@ -288,6 +297,17 @@ export function AccountClient({ initial, locales }: Props) {
         <h2 className="text-sm font-semibold text-slate-900">{t('sessions')}</h2>
         <p className="mt-2 text-sm text-slate-700">{t('sessionsCount', { count: otherSessions })}</p>
         <p className="hint">{t('sessionsHint')}</p>
+        <div className="mt-4">
+          <SessionList
+            key={sessionsKey}
+            sessions={sessions}
+            endpoint="/api/account/sessions"
+            onSignedOut={(id) => {
+              setSessions((list) => list.filter((entry) => entry.id !== id));
+              setOtherSessions((count) => Math.max(0, count - 1));
+            }}
+          />
+        </div>
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <button
             type="button"

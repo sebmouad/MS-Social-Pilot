@@ -5,6 +5,7 @@ import { TwoStepSettings } from '@/components/TwoStepForms';
 import { twoStepStatus } from '@/lib/two-step';
 import { currentSessionTokenHash, requirePage } from '@/lib/auth';
 import { readAccount } from '@/lib/account';
+import { listSessions } from '@/lib/sessions';
 import { screenMetadata } from '@/lib/metadata';
 import { SUPPORTED_LOCALES } from '@/i18n/locale';
 
@@ -19,9 +20,11 @@ export default async function AccountSettingsPage() {
   const auth = await requirePage();
   const t = await getTranslations('account');
 
-  const [account, twoStep] = await Promise.all([
-    readAccount(auth.user.id, await currentSessionTokenHash()),
+  const tokenHash = await currentSessionTokenHash();
+  const [account, twoStep, sessions] = await Promise.all([
+    readAccount(auth.user.id, tokenHash),
     twoStepStatus(auth.user.id),
+    listSessions(auth.user.id, tokenHash),
   ]);
 
   return (
@@ -31,7 +34,7 @@ export default async function AccountSettingsPage() {
         <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
       </header>
 
-      <AccountClient initial={account} locales={SUPPORTED_LOCALES} />
+      <AccountClient initial={account} sessions={sessions} locales={SUPPORTED_LOCALES} />
 
       <TwoStepSettings initial={twoStep} />
     </div>

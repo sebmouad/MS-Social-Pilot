@@ -499,9 +499,14 @@ most time), the rest after Phase D2. S/M/L = effort.
   worker job `alerts` every 5 min, worker-heartbeat watch in the web server
   (`instrumentation-node.ts`, production only), settings group Alerts, Root →
   Alerts with open incidents, history and a test button.
-- **G4. Active sessions (S)** — list of a user's sessions (device, browser,
+- **G4. Active sessions (S)** ✅ — list of a user's sessions (device, browser,
   IP/country, last seen) with "Sign out" and "Sign out everywhere else"; email
-  on sign-in from a new device; root sees all users' sessions.
+  on sign-in from a new device; root sees all users' sessions. Built:
+  `src/lib/sessions.ts` (device stored on each session, `lastSeenAt` bumped at
+  most every 5 min, `User.knownDevices` = hashed user agents; the first sign-in
+  only remembers, later unknown ones email `account.newDevice`), Settings →
+  Account list with per-row sign-out, Root → Sessions (`/root/sessions`,
+  logged as `session.signedOut`).
 
 ### Facebook growth and safety
 - **G5. Website auto-share (M)** — users add their own sites. Per site: RSS/Atom

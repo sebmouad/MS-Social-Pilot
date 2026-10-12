@@ -71,7 +71,8 @@ Page: followers, next/last post, quick Write/Inbox/Comments/Insights).
   (keys, step-by-step MCP setup for Claude Code, Claude Desktop, Cursor and VS Code,
   REST instructions), Notifications (email prefs incl. hourly new-inbox email,
   per-Page × event mutes, Slack/Telegram channels), Account (name, language,
-  look: Facebook, Warm or Dark theme, password, sessions, two-step), Media library, History (activity log), Configuration
+  look: Facebook, Warm or Dark theme, password, signed-in browsers with device, place, last seen and sign-out per row;
+  email on a sign-in from a new browser; two-step), Media library, History (activity log), Configuration
   (owner: runtime settings incl. network app keys).
 
 ## Public

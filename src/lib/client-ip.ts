@@ -47,15 +47,27 @@ export function trustProxy(): boolean {
  * lets each caller decide what an unknown address means.
  */
 export function clientIp(request: Request): string | null {
+  return clientIpFromHeaders(request.headers);
+}
+
+/** The same, from the headers alone (server components and actions). */
+export function clientIpFromHeaders(headers: Headers): string | null {
   if (!trustProxy()) return null;
 
-  const cloudflare = request.headers.get(CLOUDFLARE)?.trim();
+  const cloudflare = headers.get(CLOUDFLARE)?.trim();
   if (cloudflare) return cloudflare;
 
   // The left-most entry is the original client; everything after it is the
   // chain of proxies that forwarded it.
-  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   if (forwarded) return forwarded;
 
-  return request.headers.get('x-real-ip')?.trim() || null;
+  return headers.get('x-real-ip')?.trim() || null;
+}
+
+/** Cloudflare's two-letter country for the visitor, behind a trusted proxy only. */
+export function clientCountry(headers: Headers): string | null {
+  if (!trustProxy()) return null;
+  const country = headers.get('cf-ipcountry')?.trim().toUpperCase();
+  return country && /^[A-Z]{2}$/.test(country) && country !== 'XX' ? country : null;
 }

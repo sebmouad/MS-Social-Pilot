@@ -140,6 +140,9 @@ model User {
   totpLastStep          Int?
   /// Page metrics this person pinned as tiles on the analysis (`metric::period`).
   pinnedMetrics         String[]  @default([])
+  /// Fingerprints of browsers this person has signed in from, so a sign-in
+  /// from a new one can be emailed (`src/lib/sessions.ts`). Newest last, capped.
+  knownDevices          String[]  @default([])
   /// The look picked in Settings → Account (`src/lib/themes.ts`).
   theme                 String    @default("facebook")
   createdAt             DateTime  @default(now())
@@ -175,6 +178,14 @@ model Session {
   pending   String?
   /// The WebAuthn challenge being answered by a passkey, if any.
   challenge String?
+  /// The browser it was opened from, for the list of signed-in devices.
+  userAgent  String?
+  /// Known only behind a trusted proxy (`TRUST_PROXY`).
+  ip         String?
+  /// Two-letter country, from Cloudflare's header when it is there.
+  country    String?
+  /// Bumped at most every few minutes while the session is used.
+  lastSeenAt DateTime @default(now())
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

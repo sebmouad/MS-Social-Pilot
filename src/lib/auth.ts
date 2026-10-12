@@ -14,6 +14,7 @@ import { DEFAULT_QUEUE_SLOTS, setDateLocale } from './time';
 import { nextStepAfterPassword, type PendingStep } from './two-step';
 import { enabledModules, moduleOfPath, PATHNAME_HEADER, type ModuleKey } from './modules';
 import { DEFAULT_THEME, isTheme, type Theme } from './themes';
+import { noteSignIn, requestDevice, touchSession } from './sessions';
 
 /**
  * Sessions, and resolving which workspace the request is acting on.
@@ -332,7 +333,12 @@ export async function createSession(userId: string, pending: PendingStep | null 
     Date.now() + (pending ? PENDING_TTL_MINUTES * 60 * 1000 : SESSION_TTL_DAYS * 24 * 60 * 60 * 1000),
   );
 
-  await prisma.session.create({ data: { userId, tokenHash: hashToken(token), expiresAt, pending } });
+  const device = await requestDevice();
+  const session = await prisma.session.create({
+    data: { userId, tokenHash: hashToken(token), expiresAt, pending, ...device },
+    select: { id: true },
+  });
+  if (!pending) await noteSignInQuietly(session.id);
   // Opportunistic cleanup; cheap, and keeps the table from growing unbounded
   // without a dedicated job.
   await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
@@ -373,6 +379,16 @@ export async function completePendingSession(sessionId: string): Promise<void> {
     where: { id: sessionId },
     data: { pending: null, challenge: null, expiresAt: new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000) },
   });
+  await noteSignInQuietly(sessionId);
+}
+
+/** The new-device email must never stand between a person and signing in. */
+async function noteSignInQuietly(sessionId: string): Promise<void> {
+  try {
+    await noteSignIn(sessionId);
+  } catch (error) {
+    console.error('[auth] could not record the sign-in device', error);
+  }
 }
 
 /** The current session row, pending or not, for storing a passkey challenge. */
@@ -481,6 +497,7 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
 
   const { user } = session;
   if (user.disabledAt) return null;
+  await touchSession(session.id, session.lastSeenAt).catch(() => undefined);
 
   // Root may open any workspace (owner decision, PERMISSIONS.md): they act as
   // its owner, without a membership row, so the client's team list is unchanged.

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { collectFailures, open } from './helpers';
+import { collectFailures, open, OWNER } from './helpers';
 
 /**
  * The account screens under pressure: a role changed by mistake, a request
@@ -207,4 +207,36 @@ test('a person picks the Warm look, it follows them, and Facebook comes back', a
   expect(reset.status(), await reset.text()).toBe(200);
   await open(page, '/dashboard');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'facebook');
+});
+
+test('a person sees their signed-in browsers and signs one out; root sees everybody’s', async ({ page, browser }) => {
+  // A second browser, as from another computer.
+  const other = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0',
+  });
+  const signedIn = await other.request.post('/api/auth/login', { data: { email: OWNER.email, password: OWNER.password } });
+  expect(signedIn.status(), await signedIn.text()).toBe(200);
+
+  await open(page, '/root/sessions');
+  const all = page.getByRole('list', { name: 'Signed-in browsers' });
+  await expect(all.getByText('Firefox on Windows')).toBeVisible();
+  await expect(all.getByText(OWNER.email).first()).toBeVisible();
+
+  await open(page, '/settings/account');
+  const list = page.getByRole('list', { name: 'Signed-in browsers' });
+  await expect(list.getByText('This browser')).toBeVisible();
+  const row = list.getByRole('listitem').filter({ hasText: 'Firefox on Windows' });
+  await expect(row).toHaveCount(1);
+
+  await expect(async () => {
+    await row.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await page.getByRole('dialog').locator('[data-confirm]').click();
+  await expect(row).toHaveCount(0);
+
+  const after = await other.request.get('/api/account/sessions');
+  expect(after.status()).toBe(401);
+  await other.close();
 });

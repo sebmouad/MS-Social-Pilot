@@ -98,6 +98,7 @@ export const ROOT_SCREENS = [
   '/root/worker',
   '/root/alerts',
   '/root/backups',
+  '/root/sessions',
   '/root/activity',
   '/root/danger',
 ];

@@ -880,6 +880,13 @@
       "body": "{editor} a modifié une publication que vous avez écrite, avant sa sortie : « {excerpt} ». Ouvrez-la pour voir la dernière version.",
       "bodyNoText": "{editor} a modifié une publication que vous avez écrite, avant sa sortie. Ouvrez-la pour voir la dernière version.",
       "cta": "Ouvrir la publication"
+    },
+    "newSignIn": {
+      "subject": "Nouvelle connexion à votre compte",
+      "heading": "Connexion depuis un navigateur inconnu",
+      "body": "Quelqu’un s’est connecté à votre compte depuis {device} ({place}) le {when}. Si c’était vous, rien à faire. Sinon, déconnectez ce navigateur et changez votre mot de passe.",
+      "bodyNoPlace": "Quelqu’un s’est connecté à votre compte depuis {device} le {when}. Si c’était vous, rien à faire. Sinon, déconnectez ce navigateur et changez votre mot de passe.",
+      "cta": "Voir les navigateurs connectés"
     }
   },
   "engagement": {
@@ -2369,7 +2376,8 @@
       "back": "Retour à l’application",
       "backups": "Sauvegardes",
       "alerts": "Alertes",
-      "worker": "Worker et quotas Meta"
+      "worker": "Worker et quotas Meta",
+      "sessions": "Sessions"
     },
     "overview": {
       "title": "Vue d’ensemble de l’installation",
@@ -2498,7 +2506,8 @@
         "member_added": "{email} ajouté(e) à {workspace} comme {role}",
         "member_roleChanged": "Rôle de {email} dans {workspace} changé de {from} à {to}",
         "member_modulesChanged": "Modules désactivés pour {email} dans {workspace} : {off}",
-        "member_removed": "{email} retiré(e) de {workspace}"
+        "member_removed": "{email} retiré(e) de {workspace}",
+        "session_signedOut": "Un navigateur de {email} déconnecté"
       }
     },
     "danger": {
@@ -2656,6 +2665,10 @@
         "inboxDigest": "E-mail des nouveaux commentaires et messages",
         "queueEmpty": "E-mail de file vide"
       }
+    },
+    "sessions": {
+      "title": "Sessions",
+      "subtitle": "{count, plural, =0 {Personne n’est connecté.} one {Un navigateur connecté, tous comptes confondus.} other {# navigateurs connectés, tous comptes confondus.}}"
     }
   },
   "twoStep": {
@@ -2866,5 +2879,19 @@
     "emptyOpenHint": "Tous les commentaires et messages de ces profils sont traités. Les nouveaux apparaissent ici dès que le worker les récupère sur Facebook.",
     "emptyTitle": "Rien ici",
     "emptyHint": "Aucun commentaire ni message ne correspond à ces filtres pour les profils sélectionnés. Essayez un autre type ou état, ou sélectionnez plus de profils."
+  },
+  "sessions": {
+    "listLabel": "Navigateurs connectés",
+    "browserOn": "{browser} sur {os}",
+    "unknownDevice": "Navigateur inconnu",
+    "unknownPlace": "Lieu inconnu",
+    "thisBrowser": "Ce navigateur",
+    "lastSeen": "actif {when}",
+    "signOut": "Déconnecter",
+    "signOutQuestion": "Déconnecter ce navigateur ?",
+    "signOutQuestionFor": "Déconnecter {name} de ce navigateur ?",
+    "signOutBody": "{device} devra saisir de nouveau le mot de passe pour revenir.",
+    "failed": "Impossible de déconnecter ce navigateur. Réessayez.",
+    "empty": "Aucun navigateur connecté."
   }
 }

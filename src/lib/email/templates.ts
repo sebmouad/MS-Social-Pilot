@@ -535,3 +535,22 @@ export function inboxDigestEmail(options: {
 
   return { subject: t('email.inboxDigest.subject', { counts: counts({ comments, messages }) }), ...block };
 }
+
+/** Someone signed in to the account from a browser it has not used before. */
+export function newSignInEmail(options: {
+  locale: Locale;
+  device: string;
+  place: string | null;
+  when: string;
+}): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) =>
+    translate(options.locale, key, params);
+  const block = layout({
+    heading: t('email.newSignIn.heading'),
+    body: options.place
+      ? t('email.newSignIn.body', { device: options.device, place: options.place, when: options.when })
+      : t('email.newSignIn.bodyNoPlace', { device: options.device, when: options.when }),
+    cta: { label: t('email.newSignIn.cta'), url: `${env.appUrl}/settings/account` },
+  });
+  return { subject: t('email.newSignIn.subject'), ...block };
+}

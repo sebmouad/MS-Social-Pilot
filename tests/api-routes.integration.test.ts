@@ -220,6 +220,7 @@ const CONTRIBUTOR_MUST_NOT: Array<[Method, string]> = [
   ['POST', 'root/config/test-email'],
   ['PATCH', 'root/users/[id]'],
   ['POST', 'root/users/[id]/sign-out'],
+  ['DELETE', 'root/sessions/[id]'],
   ['PATCH', 'root/workspaces/[id]'],
   ['DELETE', 'root/invitations/[id]'],
   ['POST', 'root/transfer'],

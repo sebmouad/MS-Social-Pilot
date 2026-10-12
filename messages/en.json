@@ -880,6 +880,13 @@
       "body": "{editor} changed a post you wrote, before it went out: “{excerpt}”. Open it to see the latest version.",
       "bodyNoText": "{editor} changed a post you wrote, before it went out. Open it to see the latest version.",
       "cta": "Open the post"
+    },
+    "newSignIn": {
+      "subject": "New sign-in to your account",
+      "heading": "New sign-in from a browser we don't know",
+      "body": "Someone signed in to your account from {device} ({place}) on {when}. If it was you, there is nothing to do. If not, sign that browser out and change your password.",
+      "bodyNoPlace": "Someone signed in to your account from {device} on {when}. If it was you, there is nothing to do. If not, sign that browser out and change your password.",
+      "cta": "Review signed-in browsers"
     }
   },
   "engagement": {
@@ -2369,7 +2376,8 @@
       "back": "Back to the app",
       "backups": "Backups",
       "alerts": "Alerts",
-      "worker": "Worker & Meta usage"
+      "worker": "Worker & Meta usage",
+      "sessions": "Sessions"
     },
     "overview": {
       "title": "Installation overview",
@@ -2498,7 +2506,8 @@
         "member_added": "Added {email} to {workspace} as {role}",
         "member_roleChanged": "Changed {email}'s role in {workspace} from {from} to {to}",
         "member_modulesChanged": "Modules switched off for {email} in {workspace}: {off}",
-        "member_removed": "Removed {email} from {workspace}"
+        "member_removed": "Removed {email} from {workspace}",
+        "session_signedOut": "Signed one of {email}'s browsers out"
       }
     },
     "danger": {
@@ -2656,6 +2665,10 @@
         "inboxDigest": "New comments and messages email",
         "queueEmpty": "Empty queue email"
       }
+    },
+    "sessions": {
+      "title": "Sessions",
+      "subtitle": "{count, plural, =0 {Nobody is signed in.} one {One signed-in browser across all accounts.} other {# signed-in browsers across all accounts.}}"
     }
   },
   "twoStep": {
@@ -2866,5 +2879,19 @@
     "emptyOpenHint": "Every comment and message on these profiles is marked done. New ones appear here as the worker brings them in from Facebook.",
     "emptyTitle": "Nothing here",
     "emptyHint": "No comments or messages match these filters for the selected profiles. Try another type or state, or select more profiles."
+  },
+  "sessions": {
+    "listLabel": "Signed-in browsers",
+    "browserOn": "{browser} on {os}",
+    "unknownDevice": "Unknown browser",
+    "unknownPlace": "Place unknown",
+    "thisBrowser": "This browser",
+    "lastSeen": "active {when}",
+    "signOut": "Sign out",
+    "signOutQuestion": "Sign this browser out?",
+    "signOutQuestionFor": "Sign {name} out of this browser?",
+    "signOutBody": "{device} will need the password again to get back in.",
+    "failed": "Could not sign that browser out. Try again.",
+    "empty": "No signed-in browsers."
   }
 }
