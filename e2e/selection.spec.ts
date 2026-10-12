@@ -280,3 +280,14 @@ test('approvals follow the selection, and the headings say how many', async ({ p
   await expect(page.getByText('1 post · 1 profile')).toBeVisible();
   expect(failures).toEqual([]);
 });
+
+test('a day in the month opens its week', async ({ page }) => {
+  const failures = collectFailures(page);
+  await open(page, '/calendar');
+  const day = page.locator('[data-drop-day]').nth(10);
+  const key = await day.getAttribute('data-drop-day');
+  await day.hover();
+  await day.getByRole('link', { name: /See the week of/ }).click();
+  await expect(page).toHaveURL(new RegExp(`view=week.*week=${key}|week=${key}.*view=week`));
+  expect(failures).toEqual([]);
+});

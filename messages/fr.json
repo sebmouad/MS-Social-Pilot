@@ -379,7 +379,8 @@
     "statusFilterOn": "N’afficher que les publications avec ce statut (cumulable)",
     "statusFilterOff": "Ne plus filtrer sur ce statut",
     "statusFilterClear": "Afficher tous les statuts",
-    "dragHint": "Faites glisser une publication vers un autre jour pour la déplacer."
+    "dragHint": "Faites glisser une publication vers un autre jour pour la déplacer.",
+    "openWeekOf": "Voir la semaine du {date}"
   },
   "common": {
     "all": "Tout",

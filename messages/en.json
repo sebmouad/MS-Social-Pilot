@@ -379,7 +379,8 @@
     "statusFilterOn": "Show only posts with this status (pick several to combine)",
     "statusFilterOff": "Stop filtering on this status",
     "statusFilterClear": "Show every status",
-    "dragHint": "Drag a post to another day to move it."
+    "dragHint": "Drag a post to another day to move it.",
+    "openWeekOf": "See the week of {date}"
   },
   "common": {
     "all": "All",

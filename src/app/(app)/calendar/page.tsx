@@ -575,7 +575,7 @@ export default async function CalendarPage({
               <div
                 key={key}
                 data-drop-day={key}
-                className={`min-h-[8rem] min-w-0 border-b border-r border-slate-200 p-1 sm:p-2 ${
+                className={`group/day min-h-[8rem] min-w-0 border-b border-r border-slate-200 p-1 sm:p-2 ${
                   key === todayKey ? 'bg-brand-50/60' : inMonth ? (key < todayKey ? 'bg-slate-50' : 'bg-white') : 'bg-slate-100/70'
                 }`}
               >
@@ -595,6 +595,15 @@ export default async function CalendarPage({
                     {dayPosts.length > 2 && (
                       <span className="text-[10px] text-slate-400">{dayPosts.length}</span>
                     )}
+                    {/* Day actions: shown on hover or keyboard focus where there is a pointer, always on touch. */}
+                    <Link
+                      href={linkWith({ view: 'week', week: key, month: null })}
+                      className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-brand-50 hover:text-brand-600 focus-visible:bg-brand-50 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:focus-visible:opacity-100 [@media(hover:hover)]:group-hover/day:opacity-100"
+                      aria-label={t('openWeekOf', { date: dayLabel.format(day) })}
+                      title={t('openWeekOf', { date: dayLabel.format(day) })}
+                    >
+                      <Icon name="calendar" size={13} />
+                    </Link>
                     {key >= todayKey && (
                       <Link
                         href={newPostHref(key)}
