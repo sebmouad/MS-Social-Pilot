@@ -63,3 +63,17 @@ export function parseAnalyticsView(value: string | undefined): AnalyticsView {
  * page that may not exist.
  */
 export const VIEW_SCOPED_PARAMS = ['page', 'q', 'shown', 'sort', 'order'] as const;
+
+/** The tabs always on show; the rest sit under "More" (Simplified keeps four). */
+export const PRIMARY_ANALYTICS_VIEWS: readonly AnalyticsView[] = ['total', 'analysis', 'posts', 'audience'];
+
+/**
+ * Engagement views that belong to the Inbox module and open there, from its
+ * sidebar, rather than as analytics tabs.
+ */
+export const INBOX_VIEW_PATHS: Partial<Record<AnalyticsView, string>> = {
+  comments: '/inbox/comments',
+  reviews: '/inbox/reviews',
+  responseTime: '/inbox/response-time',
+  inbox: '/inbox',
+};

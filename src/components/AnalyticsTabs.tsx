@@ -4,7 +4,10 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
-import { ANALYTICS_VIEWS as VIEWS, VIEW_SCOPED_PARAMS } from '@/lib/analytics-views';
+import { ANALYTICS_VIEWS, INBOX_VIEW_PATHS, PRIMARY_ANALYTICS_VIEWS, VIEW_SCOPED_PARAMS } from '@/lib/analytics-views';
+
+// Engagement views open from the Inbox sidebar, not from here.
+const VIEWS = ANALYTICS_VIEWS.filter((view) => !INBOX_VIEW_PATHS[view]);
 
 /**
  * View switcher for the analytics screen.
@@ -12,7 +15,8 @@ import { ANALYTICS_VIEWS as VIEWS, VIEW_SCOPED_PARAMS } from '@/lib/analytics-vi
  * Links rather than client state, so each view is a server render against the
  * data it needs — and so a particular view can be linked to or bookmarked.
  *
- * Eleven views do not fit across a phone. Rather than wrapping them into four
+ * Four main views as a segmented control, the rest under "More". Views
+ * do not fit across a phone. Rather than wrapping them into four
  * ragged rows that push the content below the fold, small screens get a select
  * — one tap, the full list, no horizontal hunting — and the tab strip appears
  * from `sm` up where there is room for it.
@@ -49,23 +53,34 @@ export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidde
         </select>
       </label>
 
-      <nav className="scroll-x hidden pb-1 sm:block" aria-label={t('chooseView')}>
-        <div className="flex gap-2">
-          {VIEWS.filter((view) => !hidden.includes(view) || view === current).map((view) => (
+      <nav className="hidden flex-wrap items-center gap-2 sm:flex" aria-label={t('chooseView')}>
+        <div className="segmented">
+          {PRIMARY_ANALYTICS_VIEWS.map((view) => (
             <Link
               key={view}
               href={hrefFor(view)}
               aria-current={view === current ? 'page' : undefined}
-              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
-                view === current
-                  ? 'bg-brand-50 text-brand-600'
-                  : 'bg-white text-slate-700 shadow-surface hover:bg-slate-50'
-              }`}
+              className={`segmented-item ${view === current ? 'segmented-item-active' : ''}`}
             >
               {t(`view.${view}`)}
             </Link>
           ))}
         </div>
+        <label>
+          <span className="sr-only">{t('moreViews')}</span>
+          <select
+            className={`input w-auto ${PRIMARY_ANALYTICS_VIEWS.includes(current as never) ? '' : 'border-brand-500 text-brand-600'}`}
+            value={PRIMARY_ANALYTICS_VIEWS.includes(current as never) ? '' : current}
+            onChange={(event) => event.target.value && router.push(hrefFor(event.target.value))}
+          >
+            <option value="">{t('moreViews')}</option>
+            {VIEWS.filter((view) => !PRIMARY_ANALYTICS_VIEWS.includes(view) && (!hidden.includes(view) || view === current)).map((view) => (
+              <option key={view} value={view}>
+                {t(`view.${view}`)}
+              </option>
+            ))}
+          </select>
+        </label>
       </nav>
     </>
   );

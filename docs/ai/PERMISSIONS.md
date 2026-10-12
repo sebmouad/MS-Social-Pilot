@@ -30,12 +30,17 @@ permission names.
 API keys (and Claude through MCP), outgoing webhooks and their delivery log
 are off for every workspace by default (`Workspace.developerFeatures`). Root
 switches them on per workspace in Root › Workspaces (logged as
-`workspace.developerFeatures`). When on, only the workspace **owner** sees and
-manages them (`mayUseDeveloperFeatures` in `src/lib/modules.ts`; screens 404,
+`workspace.developerFeatures`). When on, only **root** sees and manages them
+(changed 2026-10-12 at the owner's request: no technical screens for workspace
+members, owners included) (`mayUseDeveloperFeatures` in `src/lib/modules.ts`; screens 404,
 APIs 403). Switching them off stops existing keys (`errors.developerFeaturesOff`)
 and queues no more webhook deliveries; nothing is deleted, so switching back on
 restores them. Workspaces that already had a live key or a webhook were
 switched on by the migration, so nothing in use stopped.
+
+## Workspace privileges view is root-only (owner request, 2026-10-12)
+Settings › Permissions (who may do what in a workspace) shows to root only;
+workspace owners and admins no longer see it. Root › Privileges covers it.
 
 ## Workspace roles (per workspace) — `src/lib/constants.ts`
 Order: owner 4 > admin 3 > editor 2 > contributor 1 > viewer 0 = client 0.

@@ -219,7 +219,7 @@ export function AppShell({
         { href: '/feeds', label: t('feeds'), icon: 'feeds' },
       ],
     },
-    { key: 'inbox', label: t('inbox'), rail: t('rail_inbox'), icon: 'inbox', items: [{ href: '/inbox', label: t('inbox'), icon: 'inbox' }, { href: '/inbox/replies', label: t('savedReplies'), icon: 'comment' }, { href: '/inbox/rules', label: t('moderation'), icon: 'shield' }] },
+    { key: 'inbox', label: t('inbox'), rail: t('rail_inbox'), icon: 'inbox', items: [{ href: '/inbox', label: t('inbox'), icon: 'inbox' }, { href: '/inbox/comments', label: t('comments'), icon: 'comment' }, { href: '/inbox/reviews', label: t('reviews'), icon: 'star' }, { href: '/inbox/response-time', label: t('responseTime'), icon: 'clock' }, { href: '/inbox/replies', label: t('savedReplies'), icon: 'comment' }, { href: '/inbox/rules', label: t('moderation'), icon: 'shield' }] },
     {
       key: 'analyse',
       label: t('section_analyse'),

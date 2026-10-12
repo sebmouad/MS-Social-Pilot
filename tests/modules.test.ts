@@ -90,9 +90,9 @@ describe('developer features', () => {
     for (const path of ['/settings', '/settings/apis', '/api/v1/posts', '/settings/team']) expect(isDeveloperPath(path), path).toBe(false);
   });
 
-  it('need root’s switch and the owner role', () => {
-    expect(mayUseDeveloperFeatures({ role: 'owner', workspace: { developerFeatures: true } })).toBe(true);
-    expect(mayUseDeveloperFeatures({ role: 'admin', workspace: { developerFeatures: true } })).toBe(false);
-    expect(mayUseDeveloperFeatures({ role: 'owner', workspace: { developerFeatures: false } })).toBe(false);
+  it('need root’s switch and root itself', () => {
+    expect(mayUseDeveloperFeatures({ isInstanceOwner: true, workspace: { developerFeatures: true } })).toBe(true);
+    expect(mayUseDeveloperFeatures({ isInstanceOwner: false, workspace: { developerFeatures: true } })).toBe(false);
+    expect(mayUseDeveloperFeatures({ isInstanceOwner: true, workspace: { developerFeatures: false } })).toBe(false);
   });
 });

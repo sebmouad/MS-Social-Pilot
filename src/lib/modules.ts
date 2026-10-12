@@ -142,6 +142,7 @@ export function isDeveloperPath(pathname: string): boolean {
   return DEVELOPER_PATHS.some((prefix) => matches(pathname, prefix));
 }
 
-export function mayUseDeveloperFeatures(context: { role: string; workspace: { developerFeatures: boolean } }): boolean {
-  return context.workspace.developerFeatures && context.role === 'owner';
+export function mayUseDeveloperFeatures(context: { isInstanceOwner: boolean; workspace: { developerFeatures: boolean } }): boolean {
+  // Technical screens are root's alone; workspace owners never see them.
+  return context.workspace.developerFeatures && context.isInstanceOwner;
 }

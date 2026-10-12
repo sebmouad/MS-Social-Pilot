@@ -20,7 +20,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
     <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside className="min-w-0 lg:sticky lg:top-20">
         <p className="mb-2 hidden px-2 text-2xl font-bold text-slate-900 lg:block">{t('title')}</p>
-        <SettingsNav showPermissions={canManageTeam(auth.role)} showHistory={canManageTeam(auth.role)} showExport={auth.role === 'owner'} showWebhooks={canManageSettings(auth.role) && mayUseDeveloperFeatures(auth)} showApi={mayUseDeveloperFeatures(auth)} role={auth.role} clientAccess={auth.workspace.clientAccess} />
+        <SettingsNav showPermissions={auth.isInstanceOwner} showHistory={canManageTeam(auth.role)} showExport={auth.role === 'owner'} showWebhooks={canManageSettings(auth.role) && mayUseDeveloperFeatures(auth)} showApi={mayUseDeveloperFeatures(auth)} role={auth.role} clientAccess={auth.workspace.clientAccess} />
       </aside>
       <div className="min-w-0">{children}</div>
     </div>

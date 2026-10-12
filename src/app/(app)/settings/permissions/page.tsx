@@ -2,7 +2,6 @@ import { getTranslations } from 'next-intl/server';
 
 import { PrivilegesView } from '@/components/PrivilegesView';
 import { requirePage } from '@/lib/auth';
-import { canManageTeam } from '@/lib/constants';
 import { screenMetadata } from '@/lib/metadata';
 import { privilegesByMember } from '@/lib/root';
 
@@ -17,7 +16,7 @@ export default async function PermissionsPage() {
   const auth = await requirePage();
   const t = await getTranslations('root.privileges');
 
-  if (!canManageTeam(auth.role)) {
+  if (!auth.isInstanceOwner) {
     return (
       <div className="space-y-6">
         <header>
