@@ -502,6 +502,7 @@ async function publishClaimed(
     if (!decision.shouldRetry) {
       await notifyPublishFailure({
         workspaceId: post.workspaceId,
+        targetId: target.id,
         targetName: target.name,
         reason: graphError.displayMessage,
         scheduledAt: post.scheduledAt,

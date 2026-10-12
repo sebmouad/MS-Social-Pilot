@@ -148,6 +148,7 @@ model User {
   reviewedPosts        Post[]                @relation("PostReviewer")
   sentInvitations      Invitation[]          @relation("InvitationSender")
   notificationSettings NotificationSetting[]
+  notificationMutes    NotificationMute[]
   aiGenerations        AiGeneration[]
   settingChanges       AppSetting[]
   apiTokens            ApiToken[]
@@ -247,16 +248,16 @@ model Workspace {
 }
 
 model Membership {
-  id          String        @id @default(cuid())
-  userId      String
-  workspaceId String
-  role        WorkspaceRole @default(contributor)
+  id              String        @id @default(cuid())
+  userId          String
+  workspaceId     String
+  role            WorkspaceRole @default(contributor)
   /// False once an admin has limited this member to the Pages in `pages`.
   /// Owners and admins always see every Page, whatever this says.
-  allPages    Boolean       @default(true)
+  allPages        Boolean       @default(true)
   /// Modules root has switched off for this member, on top of the workspace's.
-  disabledModules String[]  @default([])
-  createdAt   DateTime      @default(now())
+  disabledModules String[]      @default([])
+  createdAt       DateTime      @default(now())
 
   user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -373,6 +374,7 @@ model Target {
   postTargets        PostTarget[]
   groups             PageGroupTarget[]
   memberAccess       MemberPageAccess[]
+  notificationMutes  NotificationMute[]
   queueSlots         QueueSlot[]
   insights           PageInsight[]
   availability       MetricAvailability[]
@@ -776,16 +778,37 @@ model NotificationSetting {
   userId      String
   workspaceId String
 
-  onPublishFailure   Boolean @default(true)
-  onTokenExpiry      Boolean @default(true)
-  onApprovalRequest  Boolean @default(true)
-  onApprovalDecision Boolean @default(true)
+  onPublishFailure   Boolean   @default(true)
+  onTokenExpiry      Boolean   @default(true)
+  onApprovalRequest  Boolean   @default(true)
+  onApprovalDecision Boolean   @default(true)
+  /// An hourly email of new comments and messages. Opt-in: no row means off.
+  onNewInbox         Boolean   @default(false)
+  /// Up to when the inbox email has already counted (the next one starts here).
+  inboxDigestAt      DateTime?
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workspaceId])
   @@map("notification_settings")
+}
+
+/// One Page a member does not want to hear about for one event. No row means
+/// they hear about it, as far as their workspace-wide switch says.
+model NotificationMute {
+  id       String @id @default(cuid())
+  userId   String
+  targetId String
+  /// `publishFailure` or `newInbox`.
+  event    String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetId, event])
+  @@index([targetId, event])
+  @@map("notification_mutes")
 }
 
 /// Needed to answer "was the failure alert actually sent?"
@@ -863,7 +886,7 @@ model MetricAvailability {
 
 /// A comment left on a post this app published.
 model PostComment {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   postTargetId   String
   remoteId       String
   /// Set for replies; null for top-level comments.
@@ -871,11 +894,13 @@ model PostComment {
   message        String
   fromName       String?
   fromId         String?
-  likeCount      Int      @default(0)
-  replyCount     Int      @default(0)
-  isHidden       Boolean  @default(false)
+  likeCount      Int       @default(0)
+  replyCount     Int       @default(0)
+  isHidden       Boolean   @default(false)
   createdTime    DateTime
-  fetchedAt      DateTime @default(now())
+  fetchedAt      DateTime  @default(now())
+  /// When the sync first stored it; never moves (the inbox email counts by it).
+  firstSeenAt    DateTime  @default(now())
   /// Marked done in the inbox; null while it waits on someone.
   resolvedAt     DateTime?
 
@@ -908,16 +933,16 @@ model PageReview {
 
 /// A Page inbox thread.
 model Conversation {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   targetId     String
   remoteId     String
   snippet      String?
-  unreadCount  Int      @default(0)
-  messageCount Int      @default(0)
+  unreadCount  Int       @default(0)
+  messageCount Int       @default(0)
   /// Names of the people in the thread.
   participants Json?
   updatedTime  DateTime
-  fetchedAt    DateTime @default(now())
+  fetchedAt    DateTime  @default(now())
   /// Marked done in the inbox; cleared when the other person writes again.
   resolvedAt   DateTime?
 
@@ -937,6 +962,8 @@ model ConversationMessage {
   fromId         String?
   message        String?
   createdTime    DateTime
+  /// When the sync first stored it; never moves (the inbox email counts by it).
+  firstSeenAt    DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 

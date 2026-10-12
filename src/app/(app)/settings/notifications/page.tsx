@@ -6,6 +6,7 @@ import { canManageSettings } from '@/lib/constants';
 import { formatInZone } from '@/lib/time';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
+import { targetScope } from '@/lib/page-access';
 import { prisma } from '@/lib/prisma';
 import { emailEnabled } from '@/lib/email/send';
 
@@ -22,9 +23,18 @@ export default async function NotificationsSettingsPage() {
   const t = await getTranslations('notifications');
 
   const admin = canManageSettings(auth.role);
-  const [setting, channels] = await Promise.all([
+  const [setting, pages, mutes, channels] = await Promise.all([
     prisma.notificationSetting.findUnique({
       where: { userId_workspaceId: { userId: auth.user.id, workspaceId: auth.workspace.id } },
+    }),
+    prisma.target.findMany({
+      where: { workspaceId: auth.workspace.id, ...targetScope(auth.pageScope) },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.notificationMute.findMany({
+      where: { userId: auth.user.id, target: { workspaceId: auth.workspace.id } },
+      select: { targetId: true, event: true },
     }),
     admin ? prisma.chatChannel.findMany({ where: { workspaceId: auth.workspace.id }, orderBy: { createdAt: 'asc' } }) : Promise.resolve([]),
   ]);
@@ -44,7 +54,10 @@ export default async function NotificationsSettingsPage() {
           onTokenExpiry: setting?.onTokenExpiry ?? true,
           onApprovalRequest: setting?.onApprovalRequest ?? true,
           onApprovalDecision: setting?.onApprovalDecision ?? true,
+          onNewInbox: setting?.onNewInbox ?? false,
         }}
+        pages={pages}
+        initialMutes={mutes.map((mute) => `${mute.targetId}:${mute.event}`)}
       />
 
       {admin && (

@@ -457,3 +457,37 @@ export function clientInvitationEmail(options: {
   });
   return { subject: t('email.clientInvitation.subject', { inviter: options.inviter }), ...block };
 }
+
+/** `{key}.one` or `{key}.other` for `count`, since this lookup has no ICU plurals. */
+function plural(locale: Locale, key: string, count: number): string {
+  const form = new Intl.PluralRules(locale).select(count) === 'one' ? 'one' : 'other';
+  return translate(locale, `${key}.${form}`, { n: count });
+}
+
+/** The hourly email of what people wrote to the member's Pages since the last one. */
+export function inboxDigestEmail(options: {
+  locale: Locale;
+  workspace: string;
+  pages: Array<{ name: string; comments: number; messages: number }>;
+}): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) => translate(options.locale, key, params);
+  const comments = options.pages.reduce((sum, page) => sum + page.comments, 0);
+  const messages = options.pages.reduce((sum, page) => sum + page.messages, 0);
+  const counts = (page: { comments: number; messages: number }) =>
+    [
+      page.comments > 0 ? plural(options.locale, 'email.inboxDigest.comments', page.comments) : null,
+      page.messages > 0 ? plural(options.locale, 'email.inboxDigest.messages', page.messages) : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
+  const block = layout({
+    heading: t('email.inboxDigest.heading'),
+    body: t('email.inboxDigest.body', { counts: counts({ comments, messages }) }),
+    list: { title: t('email.inboxDigest.listTitle'), items: options.pages.map((page) => `${page.name}: ${counts(page)}`) },
+    cta: { label: t('email.inboxDigest.cta'), url: `${env.appUrl}/inbox` },
+    footer: t('email.footer', { workspace: options.workspace }),
+  });
+
+  return { subject: t('email.inboxDigest.subject', { counts: counts({ comments, messages }) }), ...block };
+}

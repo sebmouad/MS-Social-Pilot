@@ -832,6 +832,21 @@
       "body": "{inviter} vous invite à créer un compte avec votre propre espace de travail. Votre espace, ses profils, publications et équipe n’appartiennent qu’à vous.",
       "expiry": "Le lien fonctionne jusqu’au {date}.",
       "cta": "Créer mon compte"
+    },
+    "inboxDigest": {
+      "subject": "Nouveau sur vos Pages : {counts}",
+      "heading": "Nouveaux commentaires et messages",
+      "body": "Depuis le dernier e-mail : {counts}. Répondez-y ou marquez-les comme traités dans la boîte de réception.",
+      "listTitle": "Par Page",
+      "cta": "Ouvrir la boîte de réception",
+      "comments": {
+        "one": "{n} nouveau commentaire",
+        "other": "{n} nouveaux commentaires"
+      },
+      "messages": {
+        "one": "{n} nouveau message",
+        "other": "{n} nouveaux messages"
+      }
     }
   },
   "engagement": {
@@ -1309,7 +1324,14 @@
     "chatTestSent": "Message de test envoyé. Vérifiez le canal.",
     "chatTestFailed": "Le test n’est pas arrivé : {error}",
     "chatLastSent": "Dernier message {when}",
-    "chatNever": "Rien envoyé pour l’instant"
+    "chatNever": "Rien envoyé pour l’instant",
+    "onNewInbox": "Nouveaux commentaires et messages sur mes Pages (un e-mail par heure au plus)",
+    "perPageTitle": "Page par Page",
+    "perPageHint": "Décochez une Page pour ne plus être prévenu à son sujet. Une colonne désactivée plus haut l’est pour toutes les Pages.",
+    "perPagePage": "Page",
+    "pageEvent_publishFailure": "Publications en échec",
+    "pageEvent_newInbox": "Nouveaux commentaires et messages",
+    "perPageToggle": "{event} pour {page}"
   },
   "pageAnalysis": {
     "analyseNow": "Analyser maintenant",
@@ -2563,7 +2585,8 @@
         "housekeeping": "Nettoyage",
         "tokens": "Expiration des jetons",
         "alerts": "Alertes",
-        "reports": "Rapports programmés"
+        "reports": "Rapports programmés",
+        "inboxDigest": "E-mail des nouveaux commentaires et messages"
       }
     }
   },

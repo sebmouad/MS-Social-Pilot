@@ -832,6 +832,21 @@
       "body": "{inviter} invited you to create an account with a workspace of your own. Your workspace, its profiles, posts and team are yours alone.",
       "expiry": "The link works until {date}.",
       "cta": "Create my account"
+    },
+    "inboxDigest": {
+      "subject": "New on your Pages: {counts}",
+      "heading": "New comments and messages",
+      "body": "Since the last email: {counts}. Answer them or mark them done in the inbox.",
+      "listTitle": "By Page",
+      "cta": "Open the inbox",
+      "comments": {
+        "one": "{n} new comment",
+        "other": "{n} new comments"
+      },
+      "messages": {
+        "one": "{n} new message",
+        "other": "{n} new messages"
+      }
     }
   },
   "engagement": {
@@ -1309,7 +1324,14 @@
     "chatTestSent": "Test message sent. Check the channel.",
     "chatTestFailed": "The test did not arrive: {error}",
     "chatLastSent": "Last message {when}",
-    "chatNever": "Nothing sent yet"
+    "chatNever": "Nothing sent yet",
+    "onNewInbox": "New comments and messages on my Pages (one email an hour at most)",
+    "perPageTitle": "Page by Page",
+    "perPageHint": "Untick a Page to stop hearing about it. A column switched off above is off for every Page.",
+    "perPagePage": "Page",
+    "pageEvent_publishFailure": "Failed posts",
+    "pageEvent_newInbox": "New comments and messages",
+    "perPageToggle": "{event} for {page}"
   },
   "pageAnalysis": {
     "analyseNow": "Analyse now",
@@ -2563,7 +2585,8 @@
         "housekeeping": "Clean-up",
         "tokens": "Token expiry check",
         "alerts": "Alerts",
-        "reports": "Scheduled reports"
+        "reports": "Scheduled reports",
+        "inboxDigest": "New comments and messages email"
       }
     }
   },

@@ -354,6 +354,15 @@ Each verified missing in our code on 2026-10-11:
 - **Notifications matrix** per member × Page × event (publish failed, account
   disconnected, new message, queue empty, draft updated, weekly summary).
   Today `NotificationSetting` has 4 workspace-wide booleans only.
+  **Done 2026-10-12 (part):** Settings → Notifications has a Page × event
+  table (`NotificationMute`, no row = on) for failed posts and the new
+  **hourly inbox email** (`onNewInbox`, opt-in; worker job `inboxDigest`,
+  database only, no Graph calls). It counts comments and messages by
+  `firstSeenAt` (when the sync first stored them), skips the Page's own and
+  ones already marked done, and is claimed per member so two workers never
+  send it twice. Failure emails now also skip members who may not see the
+  Page. Still to do: queue empty, draft updated (weekly summary is the
+  scheduled report).
 - **First day of week** workspace setting (calendar, week view, reports).
   **Done 2026-10-12:** `Workspace.weekStartsOn` (0 Sunday … 6 Saturday,
   default Monday), chosen in Settings (Monday · Sunday · Saturday); month and

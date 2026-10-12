@@ -42,6 +42,11 @@ needs no role: any member who can see the Page may do it, like reading it.
 It changes only the team's shared state in this app, never Facebook.
 **For the owner's audit (2026-10-12).**
 
+Notifications about one Page (failed post, hourly inbox email) go only to
+members who may see that Page and did not mute it there. Before 2026-10-12 a
+failed-post email went to every member of the workspace. Each member sets
+their own mutes; nobody sets them for someone else.
+
 Plus **Page scope** per member: a member sees and acts only on the Pages they
 are given (`auth.pageScope`, applied by `loadPageFilter`). Every action is
 recorded in `ActivityLog` (Settings → History, admins).

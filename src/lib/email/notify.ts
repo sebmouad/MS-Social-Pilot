@@ -3,11 +3,13 @@ import { Locale, WorkspaceRole } from '@prisma/client';
 import { prisma } from '../prisma';
 import { sendChat } from '../chat';
 import { canApprove } from '../constants';
+import { mayUsePage, scopeOf, targetScope } from '../page-access';
 import { sendEmail } from './send';
 import {
   approvalDecisionEmail,
   approvalRequestEmail,
   connectionExpiredEmail,
+  inboxDigestEmail,
   publishFailureEmail,
   tokenExpiringEmail,
 } from './templates';
@@ -26,6 +28,10 @@ import {
 
 type Preference = 'onPublishFailure' | 'onTokenExpiry' | 'onApprovalRequest' | 'onApprovalDecision';
 
+/** Events a member can switch off for one Page (`NotificationMute.event`). */
+export const PAGE_EVENTS = ['publishFailure', 'newInbox'] as const;
+export type PageEvent = (typeof PAGE_EVENTS)[number];
+
 interface Recipient {
   email: string;
   name: string;
@@ -42,23 +48,38 @@ interface Recipient {
 async function recipientsFor(
   workspaceId: string,
   preference: Preference,
-  options: { roles?: WorkspaceRole[] } = {},
+  options: { roles?: WorkspaceRole[]; page?: { targetId: string; event: PageEvent } } = {},
 ): Promise<Recipient[]> {
   const memberships = await prisma.membership.findMany({
     where: {
       workspaceId,
       ...(options.roles ? { role: { in: options.roles } } : {}),
     },
-    include: { user: true },
+    include: { user: true, pages: { select: { targetId: true } } },
   });
 
-  const settings = await prisma.notificationSetting.findMany({ where: { workspaceId } });
+  const [settings, mutes] = await Promise.all([
+    prisma.notificationSetting.findMany({ where: { workspaceId } }),
+    options.page
+      ? prisma.notificationMute.findMany({
+          where: { targetId: options.page.targetId, event: options.page.event },
+          select: { userId: true },
+        })
+      : [],
+  ]);
   const byUser = new Map(settings.map((setting) => [setting.userId, setting]));
+  const muted = new Set(mutes.map((mute) => mute.userId));
 
   return memberships
     .filter((membership) => {
       const setting = byUser.get(membership.userId);
-      return setting ? setting[preference] : true;
+      if (setting && !setting[preference]) return false;
+      // About one Page: only members who may see it, and did not mute it.
+      if (options.page) {
+        if (!mayUsePage(scopeOf(membership), options.page.targetId)) return false;
+        if (muted.has(membership.userId)) return false;
+      }
+      return true;
     })
     .map((membership) => ({
       email: membership.user.email,
@@ -78,6 +99,7 @@ async function safely(action: () => Promise<unknown>, label: string): Promise<vo
 /** A scheduled post could not be published to a destination. */
 export async function notifyPublishFailure(options: {
   workspaceId: string;
+  targetId: string;
   targetName: string;
   reason: string;
   scheduledAt: Date | null;
@@ -87,7 +109,9 @@ export async function notifyPublishFailure(options: {
     const workspace = await prisma.workspace.findUnique({ where: { id: options.workspaceId } });
     if (!workspace) return;
 
-    const recipients = await recipientsFor(options.workspaceId, 'onPublishFailure');
+    const recipients = await recipientsFor(options.workspaceId, 'onPublishFailure', {
+      page: { targetId: options.targetId, event: 'publishFailure' },
+    });
 
     for (const recipient of recipients) {
       const rendered = publishFailureEmail({
@@ -272,4 +296,80 @@ export async function notifyApprovalDecision(options: {
     params: { reviewer: options.reviewerName },
     path: '/posts',
   });
+}
+
+/**
+ * The hourly inbox email: for each member who asked for it, what people wrote
+ * to their Pages (minus the Pages they muted) since the last one.
+ *
+ * Counted by when the sync first stored each comment or message, so a comment
+ * written yesterday but read from Facebook this hour still counts, once. Only
+ * what still waits: a comment someone already marked done is left out.
+ * The first run after switching it on only sets the starting point.
+ */
+export async function sendInboxDigests(now: Date = new Date()): Promise<number> {
+  const settings = await prisma.notificationSetting.findMany({
+    where: { onNewInbox: true },
+    include: { user: true, workspace: { select: { name: true } } },
+  });
+
+  let sent = 0;
+  for (const setting of settings) {
+    await safely(async () => {
+      // Claimed first, so two workers never send the same hour twice.
+      const { count: claimed } = await prisma.notificationSetting.updateMany({
+        where: { id: setting.id, inboxDigestAt: setting.inboxDigestAt },
+        data: { inboxDigestAt: now },
+      });
+      if (claimed === 0 || !setting.inboxDigestAt) return;
+      const since = setting.inboxDigestAt;
+
+      const membership = await prisma.membership.findUnique({
+        where: { userId_workspaceId: { userId: setting.userId, workspaceId: setting.workspaceId } },
+        include: { pages: { select: { targetId: true } } },
+      });
+      if (!membership) return;
+      const pages = await prisma.target.findMany({
+        where: {
+          workspaceId: setting.workspaceId,
+          ...targetScope(scopeOf(membership)),
+          notificationMutes: { none: { userId: setting.userId, event: 'newInbox' } },
+        },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      });
+      if (pages.length === 0) return;
+      const ids = pages.map((page) => page.id);
+
+      const [comments, messages] = await Promise.all([
+        prisma.$queryRaw<Array<{ targetId: string; count: bigint }>>`
+          SELECT pt."targetId", count(*) AS count
+          FROM "post_comments" c
+          JOIN "post_targets" pt ON pt."id" = c."postTargetId"
+          JOIN "targets" t ON t."id" = pt."targetId"
+          WHERE pt."targetId" = ANY(${ids}) AND c."firstSeenAt" > ${since} AND c."firstSeenAt" <= ${now}
+            AND c."resolvedAt" IS NULL AND c."fromId" IS DISTINCT FROM t."providerId"
+          GROUP BY pt."targetId"`,
+        prisma.$queryRaw<Array<{ targetId: string; count: bigint }>>`
+          SELECT cv."targetId", count(*) AS count
+          FROM "conversation_messages" m
+          JOIN "conversations" cv ON cv."id" = m."conversationId"
+          JOIN "targets" t ON t."id" = cv."targetId"
+          WHERE cv."targetId" = ANY(${ids}) AND m."firstSeenAt" > ${since} AND m."firstSeenAt" <= ${now}
+            AND m."fromId" IS DISTINCT FROM t."providerId"
+          GROUP BY cv."targetId"`,
+      ]);
+      const commentsBy = new Map(comments.map((row) => [row.targetId, Number(row.count)]));
+      const messagesBy = new Map(messages.map((row) => [row.targetId, Number(row.count)]));
+      const lines = pages
+        .map((page) => ({ name: page.name, comments: commentsBy.get(page.id) ?? 0, messages: messagesBy.get(page.id) ?? 0 }))
+        .filter((line) => line.comments + line.messages > 0);
+      if (lines.length === 0) return;
+
+      const rendered = inboxDigestEmail({ locale: setting.user.locale, workspace: setting.workspace.name, pages: lines });
+      await sendEmail({ to: setting.user.email, template: 'inboxDigest', workspaceId: setting.workspaceId, ...rendered });
+      sent += 1;
+    }, 'inbox digest');
+  }
+  return sent;
 }

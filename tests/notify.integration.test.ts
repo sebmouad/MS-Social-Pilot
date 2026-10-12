@@ -38,6 +38,10 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await prisma.emailLog.deleteMany();
+  await prisma.notificationMute.deleteMany();
+  await prisma.post.deleteMany();
+  await prisma.target.deleteMany();
+  await prisma.socialAccount.deleteMany();
   await prisma.notificationSetting.deleteMany();
   await prisma.membership.deleteMany();
   await prisma.user.deleteMany();
@@ -82,6 +86,7 @@ describe('a post that failed to publish', () => {
 
     await notify.notifyPublishFailure({
       workspaceId: workspace.id,
+      targetId: 'page-1',
       targetName: 'Client Page',
       reason: 'The token expired.',
       scheduledAt: new Date(),
@@ -102,6 +107,7 @@ describe('a post that failed to publish', () => {
 
     await notify.notifyPublishFailure({
       workspaceId: workspace.id,
+      targetId: 'page-1',
       targetName: 'Client Page',
       reason: 'The token expired.',
       scheduledAt: null,
@@ -122,6 +128,7 @@ describe('a post that failed to publish', () => {
 
     await notify.notifyPublishFailure({
       workspaceId: workspace.id,
+      targetId: 'page-1',
       targetName: 'Client Page',
       reason: 'The token expired.',
       scheduledAt: null,
@@ -139,6 +146,7 @@ describe('a post that failed to publish', () => {
 
     await notify.notifyPublishFailure({
       workspaceId: mine.id,
+      targetId: 'page-1',
       targetName: 'Client Page',
       reason: 'The token expired.',
       scheduledAt: null,
@@ -156,6 +164,7 @@ describe('a post that failed to publish', () => {
 
     await notify.notifyPublishFailure({
       workspaceId: workspace.id,
+      targetId: 'page-1',
       targetName: 'Client Page',
       reason: 'The token expired.',
       scheduledAt: null,
@@ -236,11 +245,98 @@ describe('when the notification itself goes wrong', () => {
     await expect(
       notify.notifyPublishFailure({
         workspaceId: 'no-such-workspace',
+        targetId: 'page-1',
         targetName: 'Client Page',
         reason: 'The token expired.',
         scheduledAt: null,
         postId: 'post-1',
       }),
     ).resolves.toBeUndefined();
+  });
+});
+
+/** A Page in the workspace, with a published post to hang comments on. */
+async function addPage(workspaceId: string, authorId: string, name = 'Client Page') {
+  const suffix = randomBytes(3).toString('hex');
+  const account = await prisma.socialAccount.create({
+    data: { workspaceId, providerUserId: suffix, name: 'Sam', accessToken: 'x' },
+  });
+  const target = await prisma.target.create({
+    data: { workspaceId, socialAccountId: account.id, type: 'page', providerId: `page-${suffix}`, name, accessToken: 'x' },
+  });
+  const post = await prisma.post.create({
+    data: {
+      workspaceId,
+      authorId,
+      message: 'Hello',
+      status: 'published',
+      targets: { create: { targetId: target.id, status: 'published', remotePostId: `post-${suffix}` } },
+    },
+    include: { targets: true },
+  });
+  return { target, postTargetId: post.targets[0]!.id };
+}
+
+describe('per Page', () => {
+  it('leaves out a member who muted the Page, or may not see it', async () => {
+    const workspace = await seedWorkspace();
+    const owner = await addMember(workspace.id, WorkspaceRole.owner);
+    const muting = await addMember(workspace.id, WorkspaceRole.editor);
+    const limited = await addMember(workspace.id, WorkspaceRole.editor);
+    const { target } = await addPage(workspace.id, owner.id);
+    await prisma.membership.updateMany({ where: { userId: limited.id }, data: { allPages: false } });
+    await prisma.notificationMute.create({ data: { userId: muting.id, targetId: target.id, event: 'publishFailure' } });
+
+    await notify.notifyPublishFailure({
+      workspaceId: workspace.id,
+      targetId: target.id,
+      targetName: target.name,
+      reason: 'The token expired.',
+      scheduledAt: null,
+      postId: 'post-1',
+    });
+
+    expect(await recipients(workspace.id)).toEqual([owner.email]);
+  });
+});
+
+describe('the hourly inbox email', () => {
+  it('starts counting when switched on, then sends what arrived since, once', async () => {
+    const workspace = await seedWorkspace();
+    const owner = await addMember(workspace.id, WorkspaceRole.owner);
+    const { target, postTargetId } = await addPage(workspace.id, owner.id);
+    const muted = await addPage(workspace.id, owner.id, 'Muted Page');
+    await prisma.notificationMute.create({ data: { userId: owner.id, targetId: muted.target.id, event: 'newInbox' } });
+    await prisma.notificationSetting.create({ data: { userId: owner.id, workspaceId: workspace.id, onNewInbox: true } });
+
+    // First run only sets the starting point.
+    expect(await notify.sendInboxDigests(new Date('2026-08-01T10:00:00Z'))).toBe(0);
+
+    const seen = new Date('2026-08-01T10:30:00Z');
+    const comment = (postTarget: string, remoteId: string, fromId: string | null) =>
+      prisma.postComment.create({
+        data: { postTargetId: postTarget, remoteId, message: 'Hi', fromId, createdTime: new Date('2026-07-01T00:00:00Z'), firstSeenAt: seen },
+      });
+    await comment(postTargetId, 'a', 'someone');
+    await comment(postTargetId, 'b', target.providerId); // the Page's own reply
+    await comment(muted.postTargetId, 'c', 'someone');
+
+    expect(await notify.sendInboxDigests(new Date('2026-08-01T11:00:00Z'))).toBe(1);
+    const log = await prisma.emailLog.findFirstOrThrow({ where: { template: 'inboxDigest' } });
+    expect(log.subject).toBe('New on your Pages: 1 new comment');
+
+    // Nothing new: no second email.
+    expect(await notify.sendInboxDigests(new Date('2026-08-01T12:00:00Z'))).toBe(0);
+  });
+
+  it('sends nothing to someone who did not ask', async () => {
+    const workspace = await seedWorkspace();
+    const owner = await addMember(workspace.id, WorkspaceRole.owner);
+    const { postTargetId } = await addPage(workspace.id, owner.id);
+    await prisma.postComment.create({
+      data: { postTargetId, remoteId: 'a', message: 'Hi', fromId: 'someone', createdTime: new Date() },
+    });
+    expect(await notify.sendInboxDigests()).toBe(0);
+    expect(await notify.sendInboxDigests()).toBe(0);
   });
 });
