@@ -25,6 +25,7 @@ import { decryptSecret } from '../crypto';
 import { sendDueReports } from '../report-schedules';
 import { applyBestTimes } from '../best-times';
 import { deliverDueWebhooks } from '../webhooks';
+import { runContentMix } from '../content-mix';
 
 /**
  * The worker's job set.
@@ -53,6 +54,7 @@ export type JobName =
   | 'reports'
   | 'inboxDigest'
   | 'queueEmpty'
+  | 'contentMix'
   | 'captionTests'
   | 'bestTimes'
   | 'alerts'
@@ -732,6 +734,17 @@ export function jobDefinitions(): JobDefinition[] {
       run: async ({ now }) => {
         const told = await notifyEmptyQueues(now);
         return told > 0 ? `${told} Page(s) ran out of scheduled posts` : null;
+      },
+    },
+    {
+      // Content mix (H1). Database only: schedules labelled drafts into queue
+      // times when the workspace allows it, and warns when a label runs dry.
+      name: 'contentMix',
+      intervalMs: 60 * 60 * 1000,
+      run: async ({ now }) => {
+        const { scheduled, dry } = await runContentMix(now);
+        const parts = [scheduled > 0 ? `${scheduled} draft(s) scheduled for the mix` : null, dry > 0 ? `${dry} label(s) ran dry` : null].filter(Boolean);
+        return parts.length ? parts.join('; ') : null;
       },
     },
     {

@@ -276,6 +276,25 @@ export function queueEmptyEmail(options: {
   return { subject: t('email.queueEmpty.subject', { page: options.page }), ...block };
 }
 
+/** Content mix (H1): a Page's weekly mix needs a label that has no drafts left. */
+export function mixDryEmail(options: {
+  locale: Locale;
+  workspace: string;
+  page: string;
+  label: string;
+}): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) => translate(options.locale, key, params);
+
+  const block = layout({
+    heading: t('email.mixDry.heading'),
+    body: t('email.mixDry.body', { page: options.page, label: options.label }),
+    cta: { label: t('email.mixDry.cta'), url: `${env.appUrl}/queue/mix` },
+    footer: t('email.footer', { workspace: options.workspace }),
+  });
+
+  return { subject: t('email.mixDry.subject', { page: options.page, label: options.label }), ...block };
+}
+
 /** A new comment matched a moderation rule set to alert (NEXT_PHASES G7). */
 export function moderationAlertEmail(options: {
   locale: Locale;

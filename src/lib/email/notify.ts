@@ -14,6 +14,7 @@ import {
   moderationAlertEmail,
   publishFailureEmail,
   queueEmptyEmail,
+  mixDryEmail,
   tokenExpiringEmail,
 } from './templates';
 
@@ -442,6 +443,29 @@ export async function notifyEmptyQueues(now: Date = new Date()): Promise<number>
     }, 'queue empty');
   }
   return told;
+}
+
+/**
+ * Content mix (H1): a label a Page's mix needs has no draft left. Same people
+ * and switches as an empty queue: it is the same warning, one category early.
+ */
+export async function notifyMixDry(options: { workspaceId: string; targetId: string; labelId: string }): Promise<void> {
+  await safely(async () => {
+    const [workspace, page, label] = await Promise.all([
+      prisma.workspace.findUnique({ where: { id: options.workspaceId }, select: { name: true } }),
+      prisma.target.findUnique({ where: { id: options.targetId }, select: { name: true } }),
+      prisma.label.findUnique({ where: { id: options.labelId }, select: { name: true } }),
+    ]);
+    if (!workspace || !page || !label) return;
+    const recipients = await recipientsFor(options.workspaceId, 'onQueueEmpty', {
+      roles: [WorkspaceRole.owner, WorkspaceRole.admin, WorkspaceRole.editor],
+      page: { targetId: options.targetId, event: 'queueEmpty' },
+    });
+    for (const recipient of recipients) {
+      const rendered = mixDryEmail({ locale: recipient.locale, workspace: workspace.name, page: page.name, label: label.name });
+      await sendEmail({ to: recipient.email, template: 'mixDry', workspaceId: options.workspaceId, ...rendered });
+    }
+  }, 'content mix dry');
 }
 
 /** A new comment matched a moderation rule set to alert. Members who may moderate and see the Page. */

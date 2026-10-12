@@ -670,11 +670,19 @@ religion or holiday set.
 setup from Phase 0.2 (marked AI).
 
 ### Planning and content
-- **H1. Content mix planner (M)** — per Page or group, a weekly mix by category
+- **H1. Content mix planner (M)** ✅ — per Page or group, a weekly mix by category
   (categories the user creates, e.g. 4 × "Product" · 1 × "Tip" · 1 ×
   "Question"); the queue fills slots to match from
   drafts, evergreen and WordPress items, and warns when a category runs dry.
   Categories = post labels (exist).
+  *Done 2026-10-12: Publish › Content mix (`/queue/mix`). Rules per Page or
+  group (a Page's own rules replace its groups'; across groups the larger
+  number wins) over a rolling 7 days, so there is no week boundary. The hourly
+  `contentMix` job, with the workspace's auto-fill on, schedules labelled
+  drafts (feed and evergreen drafts included) into free queue times inside
+  those 7 days only, never a draft still waiting for approval, and emits the
+  `post.scheduled` webhook; a label short with no draft left emails once per
+  episode. Database only: no Meta calls.*
 - **H2. Cultural calendar and seasonal modes (S)** ✅ — from the audience (H0):
   public holidays of each country the user chose (from a worldwide holidays
   dataset/API covering every country, not hand-typed) and any cultural or

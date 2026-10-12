@@ -908,6 +908,12 @@
       "body": "{author} wrote on {page}: “{message}”. Open the inbox to answer, hide or delete it.",
       "someone": "Someone",
       "cta": "Open the inbox"
+    },
+    "mixDry": {
+      "subject": "{page} has no {label} drafts left this week",
+      "heading": "A Page is running short of one kind of post",
+      "body": "{page} should get more {label} posts this week, and no draft with that label is ready. Write one so the Page keeps its mix.",
+      "cta": "Open the content mix"
     }
   },
   "engagement": {
@@ -1117,7 +1123,8 @@
     "keyDateNotFound": "Key date not found.",
     "seasonNotFound": "Seasonal mode not found.",
     "undoTooLate": "Too late to undo: the post is already going out.",
-    "webhookNotFound": "That webhook does not exist."
+    "webhookNotFound": "That webhook does not exist.",
+    "mixScopeNotFound": "That Page, group or label is not in this workspace."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -1226,7 +1233,9 @@
         "learned": "added a caption test result to the Page voice"
       },
       "queue": {
-        "bestTimesAdded": "added queue times from a Page’s best times"
+        "bestTimesAdded": "added queue times from a Page’s best times",
+        "mixScheduled": "queued a draft to keep a Page’s content mix",
+        "mixUpdated": "changed the content mix"
       },
       "workspace": {
         "exported": "asked for an export of everything"
@@ -1400,7 +1409,8 @@
     "savedReplies": "Saved replies",
     "captionTests": "Caption tests",
     "linkClicks": "Link clicks",
-    "keyDates": "Key dates & seasons"
+    "keyDates": "Key dates & seasons",
+    "contentMix": "Content mix"
   },
   "notifications": {
     "title": "Notifications",
@@ -2757,7 +2767,8 @@
         "bestTimes": "Best times: add queue times",
         "webhooks": "Outgoing webhooks",
         "exports": "Workspace exports",
-        "holidays": "Public holidays"
+        "holidays": "Public holidays",
+        "contentMix": "Content mix"
       }
     },
     "sessions": {
@@ -3479,5 +3490,42 @@
     "countdown": "{days, plural, =0 {Starting today} =1 {Starting tomorrow} other {In # days}}",
     "ingredients": "Ingredients",
     "steps": "Steps"
+  },
+  "mix": {
+    "title": "Content mix",
+    "subtitle": "How many posts of each kind every Page should get per week, and how the coming week measures up.",
+    "weekTitle": "The coming week",
+    "weekHint": "Posts planned in the next 7 days for each label, against the Page’s mix. Drafts with the label are ready to fill the gaps.",
+    "weekHintAuto": "Posts planned in the next 7 days for each label, against the Page’s mix. Every hour, drafts with a short label are added to the queue on their own.",
+    "none": "No mix is set for these Pages yet. A workspace admin sets how many posts of each label a Page should get per week.",
+    "noneAdmin": "No mix is set for these Pages yet. Pick a Page or group below and say how many posts of each label it should get per week.",
+    "page": "Page",
+    "label": "Label",
+    "planned": "Planned",
+    "drafts": "Drafts ready",
+    "state": "State",
+    "plannedOf": "{planned} of {target}",
+    "onTrack": "On track",
+    "dry": "{count, plural, one {Short by 1, no draft left} other {Short by #, no draft left}}",
+    "short": "{count, plural, one {Short by 1 post} other {Short by # posts}}",
+    "editTitle": "Set the mix",
+    "editHint": "A group’s mix applies to each of its Pages. A Page’s own mix replaces its groups’ mix.",
+    "noLabels": "The mix counts posts by label, and this workspace has no labels yet.",
+    "noLabelsAction": "Add a label while writing a post",
+    "noPages": "Connect a Page, or check the profile selection, to set its mix.",
+    "scope": "Page or group",
+    "pages": "Pages",
+    "groups": "Groups",
+    "pageFollowsGroups": "This Page has no mix of its own, so it follows its groups’ mix.",
+    "perWeekLabel": "Posts per week for {label}",
+    "perWeek": "per week",
+    "remove": "Remove",
+    "addLabel": "Add a label",
+    "saving": "Saving…",
+    "save": "Save mix",
+    "saved": "Mix saved.",
+    "saveFailed": "Could not save the mix. Try again.",
+    "autoFill": "Fill gaps from drafts automatically",
+    "autoFillHint": "Every hour, when a Page is short of a label this week, its oldest ready draft with that label takes the next free queue time. Drafts that still need approval are never sent on their own."
   }
 }

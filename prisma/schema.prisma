@@ -241,6 +241,9 @@ model Workspace {
   bestTimeMode   String    @default("suggest")
   /// When the weekly best-time job last looked at this workspace.
   bestTimesRunAt DateTime?
+  /// Content mix (H1): the worker schedules labelled drafts into queue times
+  /// to meet each Page's weekly mix. Off: the mix is only shown and warned on.
+  mixAutoFill    Boolean   @default(false)
 
   /// Default target audience (H0) for Pages that set none of their own.
   audienceCountries String[] @default([])
@@ -273,6 +276,7 @@ model Workspace {
   apiTokens            ApiToken[]
   chatChannels         ChatChannel[]
   webhookEndpoints     WebhookEndpoint[]
+  contentMixRules      ContentMixRule[]
   activityLogs         ActivityLog[]
   invitations          Invitation[]
   feedSources          FeedSource[]
@@ -436,6 +440,7 @@ model Target {
   memberAccess       MemberPageAccess[]
   notificationMutes  NotificationMute[]
   queueSlots         QueueSlot[]
+  contentMixRules    ContentMixRule[]
   insights           PageInsight[]
   availability       MetricAvailability[]
   reviews            PageReview[]
@@ -659,8 +664,9 @@ model PageGroup {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  pages     PageGroupTarget[]
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pages           PageGroupTarget[]
+  contentMixRules ContentMixRule[]
 
   @@unique([workspaceId, name])
   @@map("page_groups")
@@ -699,8 +705,9 @@ model Label {
   color       String   @default("blue")
   createdAt   DateTime @default(now())
 
-  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  posts     PostLabel[]
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  posts           PostLabel[]
+  contentMixRules ContentMixRule[]
 
   @@unique([workspaceId, name])
   @@map("labels")
@@ -1898,4 +1905,28 @@ model SeasonalMode {
 
   @@index([workspaceId])
   @@map("seasonal_modes")
+}
+
+/// Content mix (NEXT_PHASES H1): how many posts with a label a Page, or each
+/// Page of a group, should have in any coming week. Rules set on a Page
+/// replace its groups' rules for that Page.
+model ContentMixRule {
+  id          String    @id @default(cuid())
+  workspaceId String
+  /// Exactly one of `targetId` and `groupId` is set.
+  targetId    String?
+  groupId     String?
+  labelId     String
+  perWeek     Int
+  /// When admins were told this label had run dry; cleared once it has drafts again.
+  dryNotifiedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  target    Target?    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  group     PageGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  label     Label      @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("content_mix_rules")
 }

@@ -908,6 +908,12 @@
       "body": "{author} a écrit sur {page} : « {message} ». Ouvrez la boîte de réception pour répondre, masquer ou supprimer le commentaire.",
       "someone": "Quelqu’un",
       "cta": "Ouvrir la boîte de réception"
+    },
+    "mixDry": {
+      "subject": "{page} n’a plus de brouillon {label} cette semaine",
+      "heading": "Une Page manque d’un type de publication",
+      "body": "{page} devrait recevoir plus de publications {label} cette semaine, et aucun brouillon avec cette étiquette n’est prêt. Rédigez-en un pour que la Page garde son mix.",
+      "cta": "Ouvrir le mix de contenu"
     }
   },
   "engagement": {
@@ -1117,7 +1123,8 @@
     "keyDateNotFound": "Date clé introuvable.",
     "seasonNotFound": "Mode saisonnier introuvable.",
     "undoTooLate": "Trop tard pour annuler : la publication est déjà en cours d’envoi.",
-    "webhookNotFound": "Ce webhook n’existe pas."
+    "webhookNotFound": "Ce webhook n’existe pas.",
+    "mixScopeNotFound": "Cette Page, ce groupe ou cette étiquette n’appartient pas à cet espace."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -1226,7 +1233,9 @@
         "learned": "a ajouté le résultat d’un test de légendes à la voix de la Page"
       },
       "queue": {
-        "bestTimesAdded": "a ajouté des horaires à la file d’après les meilleurs moments d’une Page"
+        "bestTimesAdded": "a ajouté des horaires à la file d’après les meilleurs moments d’une Page",
+        "mixScheduled": "a mis un brouillon en file pour respecter le mix de contenu d’une Page",
+        "mixUpdated": "a modifié le mix de contenu"
       },
       "workspace": {
         "exported": "a demandé un export complet"
@@ -1400,7 +1409,8 @@
     "savedReplies": "Réponses enregistrées",
     "captionTests": "Tests de légendes",
     "linkClicks": "Clics sur les liens",
-    "keyDates": "Dates clés et saisons"
+    "keyDates": "Dates clés et saisons",
+    "contentMix": "Mix de contenu"
   },
   "notifications": {
     "title": "Notifications",
@@ -2757,7 +2767,8 @@
         "bestTimes": "Meilleurs moments : ajout d’horaires",
         "webhooks": "Webhooks sortants",
         "exports": "Exports d’espace",
-        "holidays": "Jours fériés"
+        "holidays": "Jours fériés",
+        "contentMix": "Mix de contenu"
       }
     },
     "sessions": {
@@ -3479,5 +3490,42 @@
     "countdown": "{days, plural, =0 {C’est aujourd’hui} =1 {C’est demain} other {Dans # jours}}",
     "ingredients": "Ingrédients",
     "steps": "Étapes"
+  },
+  "mix": {
+    "title": "Mix de contenu",
+    "subtitle": "Combien de publications de chaque type chaque Page doit recevoir par semaine, et où en est la semaine à venir.",
+    "weekTitle": "La semaine à venir",
+    "weekHint": "Publications prévues dans les 7 prochains jours pour chaque étiquette, face au mix de la Page. Les brouillons portant l’étiquette sont prêts à combler les manques.",
+    "weekHintAuto": "Publications prévues dans les 7 prochains jours pour chaque étiquette, face au mix de la Page. Toutes les heures, les brouillons d’une étiquette en retard sont ajoutés à la file automatiquement.",
+    "none": "Aucun mix n’est défini pour ces Pages. Un administrateur de l’espace indique combien de publications de chaque étiquette une Page doit recevoir par semaine.",
+    "noneAdmin": "Aucun mix n’est défini pour ces Pages. Choisissez une Page ou un groupe ci-dessous et indiquez combien de publications de chaque étiquette il doit recevoir par semaine.",
+    "page": "Page",
+    "label": "Étiquette",
+    "planned": "Prévues",
+    "drafts": "Brouillons prêts",
+    "state": "État",
+    "plannedOf": "{planned} sur {target}",
+    "onTrack": "Dans les temps",
+    "dry": "{count, plural, one {Il en manque 1, plus aucun brouillon} other {Il en manque #, plus aucun brouillon}}",
+    "short": "{count, plural, one {Il manque 1 publication} other {Il manque # publications}}",
+    "editTitle": "Définir le mix",
+    "editHint": "Le mix d’un groupe s’applique à chacune de ses Pages. Le mix propre à une Page remplace celui de ses groupes.",
+    "noLabels": "Le mix compte les publications par étiquette, et cet espace n’a pas encore d’étiquette.",
+    "noLabelsAction": "Ajouter une étiquette en rédigeant une publication",
+    "noPages": "Connectez une Page, ou vérifiez la sélection de profils, pour définir son mix.",
+    "scope": "Page ou groupe",
+    "pages": "Pages",
+    "groups": "Groupes",
+    "pageFollowsGroups": "Cette Page n’a pas de mix propre, elle suit donc celui de ses groupes.",
+    "perWeekLabel": "Publications par semaine pour {label}",
+    "perWeek": "par semaine",
+    "remove": "Retirer",
+    "addLabel": "Ajouter une étiquette",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer le mix",
+    "saved": "Mix enregistré.",
+    "saveFailed": "Impossible d’enregistrer le mix. Réessayez.",
+    "autoFill": "Combler les manques avec les brouillons automatiquement",
+    "autoFillHint": "Toutes les heures, quand une Page manque d’une étiquette cette semaine, son plus ancien brouillon prêt avec cette étiquette prend le prochain horaire libre de la file. Les brouillons qui attendent une validation ne partent jamais seuls."
   }
 }
