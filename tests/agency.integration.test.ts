@@ -51,7 +51,7 @@ describe('agency access', () => {
     const overview = await agency.agencyOverview(owner.id);
     expect(overview.clients.map((c) => c.name)).toEqual(['Client A', 'Client B']);
     expect(overview.people).toHaveLength(1);
-    expect(overview.people[0].roles).toEqual({ [a.id]: 'editor', [b.id]: 'editor' });
+    expect(overview.people[0]?.roles).toEqual({ [a.id]: 'editor', [b.id]: 'editor' });
 
     await agency.setClientAccess({ ownerId: owner.id, workspaceId: b.id, userId: member.id, role: null });
     expect(await roleOf(member.id, b.id)).toBeNull();
