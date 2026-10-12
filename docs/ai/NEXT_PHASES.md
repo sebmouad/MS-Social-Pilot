@@ -335,6 +335,11 @@ Each verified missing in our code on 2026-10-11:
 - **Dashboard** leads with the upcoming queue for the current selection
   (+ "New post", "Plan with AI", connected-profile avatars) and a shortcuts
   column with counts (unread inbox, waiting approvals, failed posts).
+  **Done 2026-10-12:** the dashboard already led with "Going out next" and New
+  post; it now has **Plan with AI** (the calendar's planner, on the selected
+  profiles) and a "Waiting for you" row of counted links (posts waiting for
+  approval, new comments in 7 days), shown only for modules root left on;
+  failed posts keep their banner. Unread inbox comes with the inbox stream.
 - **Inbox stream**: one merged, chronological view of comments + messages for
   the selection, type filter, and a **resolved / unresolved** state (no such
   field today — needs a migration).

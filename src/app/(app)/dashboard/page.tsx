@@ -19,6 +19,8 @@ import { formatInZone, relativeTime, appLocale } from '@/lib/time';
 import { publishedTotals, recentOutcomes } from '@/lib/analytics';
 import { canManageAccounts, canManageInstance } from '@/lib/constants';
 import { readSetupState } from '@/lib/setup';
+import { aiAvailable } from '@/lib/ai';
+import { AiPlanner } from '@/components/AiPlanner';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +49,7 @@ export default async function DashboardPage({
   const scopeIds = scope.all ? undefined : scope.ids;
   const postsIn = postScope(scope);
 
-  const [upcoming, recent, counts, targetCount, staleAccounts, failures, totals, health] =
+  const [upcoming, recent, counts, targetCount, staleAccounts, failures, totals, health, newComments, aiSetting] =
     await Promise.all([
     prisma.post.findMany({
       where: { workspaceId, status: { in: ['scheduled', 'publishing'] }, scheduledAt: { gte: now }, ...postsIn },
@@ -65,7 +67,15 @@ export default async function DashboardPage({
     prisma.postTarget.count({ where: { status: 'failed', post: { workspaceId }, ...postTargetScope(scope) } }),
       publishedTotals(workspaceId, scopeIds),
       summariseConnections(workspaceId, { now, warnWithinDays: env.tokenWarningDays }),
+      prisma.postComment.count({
+        where: {
+          createdTime: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
+          postTarget: { post: { workspaceId }, ...postTargetScope(scope) },
+        },
+      }),
+      prisma.workspace.findUnique({ where: { id: workspaceId }, select: { aiEnabled: true } }),
     ]);
+  const aiOn = aiAvailable() && Boolean(aiSetting?.aiEnabled) && auth.modules.includes('schedule');
 
   // An unfinished installation otherwise greets its owner with four zeros and
   // no hint why. Setup belongs to the installation owner, so only they are pointed at it.
@@ -73,6 +83,21 @@ export default async function DashboardPage({
   const stepsLeft = setup?.steps.filter((step) => !step.optional && !step.done) ?? [];
 
   const countFor = (status: string) => counts.find((entry) => entry.status === status)?._count ?? 0;
+
+  // What is waiting on someone, each a link to the list that clears it
+  // (failed posts have their own banner above).
+  // Only modules root left on: a shortcut to a switched-off screen is a 404.
+  const shortcuts: Array<{ label: string; count: number; icon: IconName; href: string; tone: string }> = [
+    ...(auth.modules.includes('schedule')
+      ? [
+          { label: t('shortcutApprovals', { count: countFor('pending_approval') }), count: countFor('pending_approval'), icon: 'approvals' as const, href: '/approvals', tone: 'text-amber-700' },
+        ]
+      : []),
+    ...(auth.modules.includes('analytics')
+      ? [{ label: t('shortcutComments', { count: newComments }), count: newComments, icon: 'comment' as const, href: `/analytics?view=comments${selection.query ? `&${selection.query}` : ''}`, tone: 'text-brand-700' }]
+      : []),
+  ];
+  const visiblePages = selection.pages.filter((page) => selection.ids.includes(page.id));
 
   const stats: Array<{ label: string; value: number; icon: IconName; href: string }> = [
     {
@@ -103,6 +128,13 @@ export default async function DashboardPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SelectionBar auth={auth} selection={selection} />
+          {aiOn && (
+            <AiPlanner
+              pages={visiblePages.map((page) => ({ id: page.id, name: page.name, pictureUrl: page.pictureUrl }))}
+              defaultPageId={visiblePages.length === 1 ? visiblePages[0]!.id : null}
+              tomorrow={formatInZone(new Date(now.getTime() + 24 * 60 * 60 * 1000), auth.workspace.timezone, 'yyyy-MM-dd')}
+            />
+          )}
           <Link href="/compose" className="btn-primary">
             <Icon name="plus" size={16} /> {t('newPost')}
           </Link>
@@ -167,6 +199,22 @@ export default async function DashboardPage({
             {t('reviewAndRetry')}
           </Link>
         </div>
+      )}
+
+      {shortcuts.some((shortcut) => shortcut.count > 0) && (
+        <nav aria-label={t('shortcuts')} className="flex flex-wrap gap-2">
+          {shortcuts
+            .filter((shortcut) => shortcut.count > 0)
+            .map((shortcut) => (
+              <Link
+                key={shortcut.href}
+                href={shortcut.href}
+                className={`inline-flex min-h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold shadow-surface hover:bg-slate-50 ${shortcut.tone}`}
+              >
+                <Icon name={shortcut.icon} size={16} /> {shortcut.label}
+              </Link>
+            ))}
+        </nav>
       )}
 
       <PagesHub

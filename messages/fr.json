@@ -741,7 +741,10 @@
     "gs_client": "Partager avec un client",
     "gsHint_client": "Un lien de validation, un calendrier ou un rapport par e-mail.",
     "gs_claude": "Connecter Claude",
-    "gsHint_claude": "Demandez à Claude de planifier, rédiger et analyser via MCP."
+    "gsHint_claude": "Demandez à Claude de planifier, rédiger et analyser via MCP.",
+    "shortcuts": "En attente",
+    "shortcutApprovals": "{count, plural, one {# post en attente de validation} other {# posts en attente de validation}}",
+    "shortcutComments": "{count, plural, one {# nouveau commentaire en 7 jours} other {# nouveaux commentaires en 7 jours}}"
   },
   "email": {
     "invitation": {
