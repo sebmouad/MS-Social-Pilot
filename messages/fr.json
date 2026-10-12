@@ -1188,7 +1188,8 @@
     "clientRoleFixed": "Un client reste client, et un membre de l’équipe ne peut pas le devenir. Invitez de nouveau la personne avec le rôle voulu.",
     "planLimit_channels": "Votre formule inclut {limit} canaux. Demandez une formule supérieure ou des canaux supplémentaires.",
     "planLimit_members": "Votre formule inclut {limit} membres. Demandez une formule supérieure pour en inviter plus. Les clients sont gratuits.",
-    "planLimit_workspaces": "Votre formule inclut {limit} espaces. Demandez une formule supérieure pour en ajouter."
+    "planLimit_workspaces": "Votre formule inclut {limit} espaces. Demandez une formule supérieure pour en ajouter.",
+    "telegramConnect": "Telegram a refusé : vérifiez le jeton du bot, la chaîne, et que le bot est administrateur autorisé à publier."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -2135,7 +2136,8 @@
     "x": "X",
     "pinterest": "Tableau Pinterest",
     "search": "Rechercher un canal",
-    "noMatch": "Aucun canal ne correspond."
+    "noMatch": "Aucun canal ne correspond.",
+    "telegram": "Chaîne Telegram"
   },
   "team": {
     "title": "Équipe",
@@ -2292,7 +2294,8 @@
       "linkedin": "LinkedIn",
       "threads": "Threads",
       "x": "X",
-      "pinterest": "Tableau Pinterest"
+      "pinterest": "Tableau Pinterest",
+      "telegram": "Chaîne Telegram"
     },
     "hide": "Masquer {page}",
     "show": "Afficher {page}",
@@ -2550,7 +2553,12 @@
     "mastodonTitle": "Connecter Mastodon",
     "mastodonHint": "Indiquez le serveur de votre compte. Vous vous y connecterez puis reviendrez ici.",
     "mastodonServer": "Serveur",
-    "mastodonContinue": "Continuer vers la connexion"
+    "mastodonContinue": "Continuer vers la connexion",
+    "telegramTitle": "Connecter une chaîne Telegram",
+    "telegramHint": "Créez un bot avec @BotFather dans Telegram, puis ajoutez-le à votre chaîne comme administrateur autorisé à publier. Collez ici le jeton du bot et la chaîne.",
+    "telegramToken": "Jeton du bot",
+    "telegramChannel": "Chaîne",
+    "telegramChannelHint": "Le @nom de la chaîne, ou son identifiant numérique (commençant par -100) pour une chaîne privée."
   },
   "root": {
     "title": "Root",
@@ -3114,7 +3122,8 @@
       "linkedin": "LinkedIn",
       "threads": "Threads",
       "x": "X",
-      "pinterest": "Pinterest"
+      "pinterest": "Pinterest",
+      "telegram": "Telegram"
     }
   },
   "suspended": {

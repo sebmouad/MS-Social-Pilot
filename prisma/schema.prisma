@@ -42,6 +42,7 @@ enum TargetType {
   threads
   x
   pinterest
+  telegram
 }
 
 enum PostStatus {

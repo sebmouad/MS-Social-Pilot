@@ -10,7 +10,7 @@ import { FeedAvatar } from './FeedPost';
 import { Icon } from './Icon';
 import { NetworkMark } from './NetworkMark';
 
-type NetworkKey = 'bluesky' | 'mastodon' | 'linkedin' | 'threads' | 'x' | 'pinterest';
+type NetworkKey = 'bluesky' | 'mastodon' | 'linkedin' | 'threads' | 'x' | 'pinterest' | 'telegram';
 
 interface Account {
   id: string;
@@ -42,7 +42,9 @@ export function OtherNetworks({
   const t = useTranslations('networks');
   const tCommon = useTranslations('common');
   const router = useRouter();
-  const [dialog, setDialog] = useState<'bluesky' | 'mastodon' | null>(null);
+  const [dialog, setDialog] = useState<'bluesky' | 'mastodon' | 'telegram' | null>(null);
+  const [botToken, setBotToken] = useState('');
+  const [channel, setChannel] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [appPassword, setAppPassword] = useState('');
   const [instance, setInstance] = useState('');
@@ -65,6 +67,26 @@ export function OtherNetworks({
       return;
     }
     setAppPassword('');
+    setDialog(null);
+    router.refresh();
+  }
+
+  async function connectTelegram() {
+    setPending(true);
+    setError(null);
+    const response = await fetch('/api/networks/telegram', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ botToken, channel }),
+    }).catch(() => null);
+    setPending(false);
+    const body = (await response?.json().catch(() => ({}))) as { error?: string; fields?: Record<string, string> } | undefined;
+    if (!response?.ok) {
+      setError(Object.values(body?.fields ?? {})[0] ?? body?.error ?? tCommon('genericError'));
+      return;
+    }
+    setBotToken('');
+    setChannel('');
     setDialog(null);
     router.refresh();
   }
@@ -159,8 +181,8 @@ export function OtherNetworks({
               )}
 
               <div className="mt-auto pt-3">
-                {!canManage ? null : network.key === 'bluesky' || network.key === 'mastodon' ? (
-                  <button type="button" className="btn-secondary w-full" onClick={() => setDialog(network.key as 'bluesky' | 'mastodon')}>
+                {!canManage ? null : (network.key === 'bluesky' || network.key === 'mastodon' || network.key === 'telegram') && !network.available ? null : network.key === 'bluesky' || network.key === 'mastodon' || network.key === 'telegram' ? (
+                  <button type="button" className="btn-secondary w-full" onClick={() => setDialog(network.key as 'bluesky' | 'mastodon' | 'telegram')}>
                     <Icon name="plus" size={16} />
                     {mine.length ? t('connectAnother') : t('connect', { network: network.label })}
                   </button>
@@ -237,6 +259,43 @@ export function OtherNetworks({
               onChange={(event) => setAppPassword(event.target.value)}
             />
             <span className="hint">{t('blueskyAppPasswordHint')}</span>
+          </label>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={dialog === 'telegram'}
+        title={t('telegramTitle')}
+        onClose={() => setDialog(null)}
+        closeLabel={tCommon('close')}
+        footer={
+          <>
+            <button type="button" className="btn-secondary" onClick={() => setDialog(null)}>
+              {tCommon('cancel')}
+            </button>
+            <button type="button" className="btn-primary" disabled={pending || !botToken.trim() || !channel.trim()} onClick={() => void connectTelegram()}>
+              {pending ? tCommon('working') : t('connect', { network: 'Telegram' })}
+            </button>
+          </>
+        }
+      >
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void connectTelegram();
+          }}
+        >
+          <p className="text-sm text-slate-600">{t('telegramHint')}</p>
+          {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          <label className="block text-sm">
+            <span className="label">{t('telegramToken')}</span>
+            <input className="input font-mono" type="password" autoComplete="off" placeholder="123456789:AA…" value={botToken} onChange={(event) => setBotToken(event.target.value)} />
+          </label>
+          <label className="block text-sm">
+            <span className="label">{t('telegramChannel')}</span>
+            <input className="input" autoComplete="off" placeholder="@channelname" value={channel} onChange={(event) => setChannel(event.target.value)} />
+            <span className="hint">{t('telegramChannelHint')}</span>
           </label>
         </form>
       </Dialog>

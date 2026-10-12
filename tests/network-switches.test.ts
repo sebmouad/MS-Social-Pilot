@@ -5,7 +5,7 @@ import { SETTING_DEFINITIONS } from '@/lib/settings/definitions';
 
 describe('network switches', () => {
   it('has one switch per network, on by default', () => {
-    for (const key of ['bluesky', 'mastodon', 'linkedin', 'threads', 'x', 'pinterest']) {
+    for (const key of ['bluesky', 'mastodon', 'linkedin', 'threads', 'x', 'pinterest', 'telegram']) {
       const definition = SETTING_DEFINITIONS.find((item) => item.key === `networks.${key}`);
       expect(definition?.default).toBe(true);
     }

@@ -28,13 +28,13 @@ describe('invitationEmail', () => {
     const email = invitationEmail({ locale: Locale.en, ...base });
     expect(email.subject).toBe('Sam invited you to Acme');
     expect(email.html).toContain('Sam has invited you to join Acme');
-    expect(email.html).toContain('Editor');
+    expect(email.html).toContain('Manager');
   });
 
   it('renders in French', () => {
     const email = invitationEmail({ locale: Locale.fr, ...base });
     expect(email.subject).toBe('Sam vous invite à rejoindre Acme');
-    expect(email.html).toContain('Éditeur');
+    expect(email.html).toContain('Gestionnaire');
     // Nothing should have leaked through untranslated.
     expect(email.html).not.toContain('has invited you');
   });

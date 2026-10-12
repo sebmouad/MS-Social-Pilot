@@ -11,6 +11,7 @@ import { linkedin } from './linkedin';
 import { mastodon } from './mastodon';
 import { pinterest } from './pinterest';
 import { threads } from './threads';
+import { telegram } from './telegram';
 import { x } from './x';
 import {
   isNetworkKey,
@@ -24,7 +25,7 @@ import {
 
 export { NETWORK_KEYS, isNetworkKey, type NetworkKey };
 
-export const CONNECTORS: Record<NetworkKey, NetworkConnector> = { bluesky, mastodon, linkedin, threads, x, pinterest };
+export const CONNECTORS: Record<NetworkKey, NetworkConnector> = { bluesky, mastodon, linkedin, threads, x, pinterest, telegram };
 
 /** Networks that sign in through an app this installation registered, and whether its keys are set. */
 export function networkAvailable(key: NetworkKey): boolean {
@@ -32,6 +33,7 @@ export function networkAvailable(key: NetworkKey): boolean {
   switch (key) {
     case 'bluesky':
     case 'mastodon':
+    case 'telegram':
       return true;
     case 'linkedin':
       return Boolean(env.linkedinClientId && env.linkedinClientSecret);

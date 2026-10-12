@@ -17,7 +17,7 @@ export const GET = route(async (request: Request, context: { params: Promise<{ n
   const auth = await requireAuth();
   if (!canManageAccounts(auth.role)) throw errors.adminsOnlyConnect();
   const { network } = await context.params;
-  if (!isNetworkKey(network) || network === 'bluesky' || !networkAvailable(network)) throw errors.notFound();
+  if (!isNetworkKey(network) || network === 'bluesky' || network === 'telegram' || !networkAvailable(network)) throw errors.notFound();
   const url = new URL(request.url);
 
   let started: { url: string; cookie: string };

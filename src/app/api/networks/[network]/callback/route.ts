@@ -14,7 +14,7 @@ export const GET = route(async (request: Request, context: { params: Promise<{ n
   const auth = await requireAuth();
   const { network } = await context.params;
   const base = `${env.appUrl.replace(/\/$/, '')}/connections`;
-  if (!isNetworkKey(network) || network === 'bluesky') return NextResponse.redirect(base);
+  if (!isNetworkKey(network) || network === 'bluesky' || network === 'telegram') return NextResponse.redirect(base);
   const back = (params: Record<string, string>) => NextResponse.redirect(`${base}?${new URLSearchParams({ network, ...params }).toString()}`);
 
   const url = new URL(request.url);

@@ -5,7 +5,9 @@ import { Prisma, TargetType } from '@prisma/client';
 import { prisma } from '../prisma';
 import { decryptSecret, encryptSecret, randomToken, safeEqual } from '../crypto';
 import { env } from '../env';
+import { GraphError } from '../facebook/graph';
 import { blueskyProfile, blueskySession } from './bluesky';
+import { telegramCall } from './telegram';
 import { LINKEDIN_MEMBER_SCOPES, LINKEDIN_ORG_SCOPES, linkedinMember, linkedinOrganizations, linkedinToken } from './linkedin';
 import { MASTODON_SCOPES, mastodonAccount, mastodonToken, normaliseInstance, registerMastodonApp } from './mastodon';
 import { PINTEREST_SCOPES, pinterestAccount, pinterestBoards, pinterestToken } from './pinterest';
@@ -43,7 +45,7 @@ function challengeOf(verifier: string): string {
 
 /** Where to send the person to sign in, and the sealed state to keep in their cookie. */
 export async function startNetworkAuth(
-  key: Exclude<NetworkKey, 'bluesky'>,
+  key: Exclude<NetworkKey, 'bluesky' | 'telegram'>,
   options: { workspaceId: string; userId: string; instance?: string; organizations?: boolean },
 ): Promise<{ url: string; cookie: string }> {
   const state = randomToken(24);
@@ -120,7 +122,7 @@ interface Connected {
 }
 
 /** Trade the code for tokens and find what the account can post to. */
-export async function finishNetworkAuth(key: Exclude<NetworkKey, 'bluesky'>, pending: PendingAuth, code: string): Promise<Connected> {
+export async function finishNetworkAuth(key: Exclude<NetworkKey, 'bluesky' | 'telegram'>, pending: PendingAuth, code: string): Promise<Connected> {
   const redirectUri = callbackUrl(key);
   switch (key) {
     case 'mastodon': {
@@ -215,6 +217,28 @@ export async function connectBluesky(identifier: string, appPassword: string): P
     accessToken: appPassword.trim(),
     meta: { identifier: session.did, handle: session.handle, pds: session.pds },
     targets: [{ providerId: session.did, name: `@${session.handle}`, pictureUrl: profile.avatar ?? null, category: 'Bluesky' }],
+  };
+}
+
+/**
+ * Telegram: a bot token from @BotFather and the channel it posts to. The bot
+ * must be an administrator of the channel allowed to post messages.
+ */
+export async function connectTelegram(botToken: string, channel: string): Promise<Connected> {
+  const token = botToken.trim();
+  const me = await telegramCall<{ id: number; username: string; first_name: string }>(token, 'getMe');
+  const chat = await telegramCall<{ id: number; title?: string; username?: string }>(token, 'getChat', { chat_id: channel.trim() });
+  const member = await telegramCall<{ status: string; can_post_messages?: boolean }>(token, 'getChatMember', { chat_id: chat.id, user_id: me.id });
+  if (member.status !== 'creator' && !(member.status === 'administrator' && member.can_post_messages !== false)) {
+    throw new GraphError({ message: 'Telegram: the bot is not an administrator allowed to post in this channel.', kind: 'permission' });
+  }
+  return {
+    providerUserId: String(me.id),
+    name: `@${me.username}`,
+    pictureUrl: null,
+    accessToken: token,
+    meta: { bot: me.username },
+    targets: [{ providerId: String(chat.id), name: chat.title ?? (chat.username ? `@${chat.username}` : String(chat.id)), pictureUrl: null, category: 'Telegram channel' }],
   };
 }
 

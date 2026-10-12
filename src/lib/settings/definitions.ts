@@ -609,6 +609,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
   // --- Other networks ---------------------------------------------------------
   {
+    key: 'networks.telegram',
+    group: 'networks',
+    type: 'boolean',
+    label: 'Telegram switched on',
+    description: 'Off hides Telegram from Connections and stops new Telegram channels from being connected. Channels already connected keep their posts.',
+    default: true,
+  },
+  {
     key: 'networks.bluesky',
     group: 'networks',
     type: 'boolean',

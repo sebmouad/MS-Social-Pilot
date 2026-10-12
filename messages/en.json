@@ -1188,7 +1188,8 @@
     "clientRoleFixed": "A client stays a client, and a team member cannot become one. Invite the person again with the role they need.",
     "planLimit_channels": "Your plan includes {limit} channels. Ask for a bigger plan or extra channels to add more.",
     "planLimit_members": "Your plan includes {limit} team members. Ask for a bigger plan to invite more. Clients are free.",
-    "planLimit_workspaces": "Your plan includes {limit} workspaces. Ask for a bigger plan to add more."
+    "planLimit_workspaces": "Your plan includes {limit} workspaces. Ask for a bigger plan to add more.",
+    "telegramConnect": "Telegram refused: check the bot token, the channel, and that the bot is an administrator allowed to post."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -2135,7 +2136,8 @@
     "x": "X",
     "pinterest": "Pinterest board",
     "search": "Search channels",
-    "noMatch": "No channel matches that."
+    "noMatch": "No channel matches that.",
+    "telegram": "Telegram channel"
   },
   "team": {
     "title": "Team",
@@ -2292,7 +2294,8 @@
       "linkedin": "LinkedIn",
       "threads": "Threads",
       "x": "X",
-      "pinterest": "Pinterest board"
+      "pinterest": "Pinterest board",
+      "telegram": "Telegram channel"
     },
     "hide": "Hide {page}",
     "show": "Show {page}",
@@ -2550,7 +2553,12 @@
     "mastodonTitle": "Connect Mastodon",
     "mastodonHint": "Type the server your account is on. You will sign in there and come straight back.",
     "mastodonServer": "Server",
-    "mastodonContinue": "Continue to sign in"
+    "mastodonContinue": "Continue to sign in",
+    "telegramTitle": "Connect a Telegram channel",
+    "telegramHint": "Make a bot with @BotFather in Telegram, then add it to your channel as an administrator allowed to post messages. Paste the bot’s token and the channel here.",
+    "telegramToken": "Bot token",
+    "telegramChannel": "Channel",
+    "telegramChannelHint": "The channel’s @name, or its numeric id (starting with -100) for a private channel."
   },
   "root": {
     "title": "Root",
@@ -3114,7 +3122,8 @@
       "linkedin": "LinkedIn",
       "threads": "Threads",
       "x": "X",
-      "pinterest": "Pinterest"
+      "pinterest": "Pinterest",
+      "telegram": "Telegram"
     }
   },
   "suspended": {
