@@ -291,6 +291,7 @@ export const workspaceSettingsSchema = z.object({
   bestTimeMode: z.enum(['suggest', 'apply']).optional(),
 
   aiEnabled: z.boolean().optional(),
+  watchNegativeComments: z.boolean().optional(),
   aiTone: z.string().trim().max(50).nullish(),
   aiBrandVoice: z.string().trim().max(2000).nullish(),
 

@@ -128,6 +128,9 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
   48 hours old and never to the Page's own; a daily cap per rule and a stop on
   Facebook's rate-limit errors protect the app's allowance. A log lists the
   last 50 actions with "Show comment again" / "Delete reply" to undo.
+- **Negative-comment alert** (Settings › AI, H15): AI reads new comments' mood
+  hourly; one email a day per Page when negative comments reach at least
+  twice the Page's usual (3 or more in 24 hours).
 
 ## Workspace
 - **Connections** `/connections`: Facebook profiles → Pages (enable/pause),
@@ -167,7 +170,7 @@ errors grouped, scrubbed, with release; mark resolved), Alerts, Backups, Activit
 publish (every few seconds), native reconcile, RSS, evergreen recycling,
 analytics (post insights), page insights, edges (comments, reviews, inbox,
 external posts, videos), Instagram, ads, housekeeping, token expiry warnings,
-scheduled reports (every 10 min), outgoing webhooks (every 30 s), inbox digest email (hourly), empty-queue email (hourly).
+scheduled reports (every 10 min), outgoing webhooks (every 30 s), inbox digest email (hourly), empty-queue email (hourly), negative-comment alert (hourly, AI).
 
 ## Integrations
 REST `/api/v1/pages`, `/api/v1/pages/:id/analytics`, `/api/v1/posts` (GET with `status`, `from`, `to`, `limit`, `pages=id,id`; POST),

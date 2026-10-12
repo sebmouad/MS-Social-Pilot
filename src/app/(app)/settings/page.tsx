@@ -64,6 +64,7 @@ export default async function SettingsPage() {
           audienceTimezone: workspace.audienceTimezone,
           audienceCalendars: workspace.audienceCalendars,
           aiEnabled: workspace.aiEnabled,
+          watchNegativeComments: workspace.watchNegativeComments,
           aiTone: workspace.aiTone ?? '',
           aiBrandVoice: workspace.aiBrandVoice ?? '',
         }}

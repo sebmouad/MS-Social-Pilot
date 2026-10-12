@@ -924,6 +924,16 @@
       "heading": "You were mentioned in a note",
       "body": "{author} wrote a note on a post: “{note}”",
       "cta": "Open the post"
+    },
+    "negativeSpike": {
+      "subject": "{page}: more negative comments than usual",
+      "heading": "Negative comments are up on {page}",
+      "body": "{comments} on {page} in the last 24 hours read as negative, at least twice the Page’s usual. Open the inbox to see them and answer.",
+      "cta": "Open the inbox",
+      "comments": {
+        "one": "{n} comment",
+        "other": "{n} comments"
+      }
     }
   },
   "engagement": {
@@ -1955,7 +1965,9 @@
     "businessHours": "Business hours",
     "businessFrom": "From",
     "businessTo": "to",
-    "businessHoursHint": "Response times count only these days and hours, on the workspace's clock. Pick no day to count every hour."
+    "businessHoursHint": "Response times count only these days and hours, on the workspace's clock. Pick no day to count every hour.",
+    "watchNegativeComments": "Alert me when negative comments spike",
+    "watchNegativeCommentsHint": "AI reads the mood of new comments every hour and emails the team when a Page gets at least twice its usual negative comments. Uses the AI allowance; comments hidden by moderation rules are skipped."
   },
   "setup": {
     "title": "Set up MS Social Pilot",
@@ -2792,7 +2804,8 @@
         "webhooks": "Outgoing webhooks",
         "exports": "Workspace exports",
         "holidays": "Public holidays",
-        "contentMix": "Content mix"
+        "contentMix": "Content mix",
+        "negativeComments": "Negative-comment alert"
       },
       "heaviestObjects": "Heaviest Pages and accounts, last hour",
       "heaviestJobs": "Calls by job, last hour",

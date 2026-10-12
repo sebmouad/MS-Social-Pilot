@@ -110,6 +110,8 @@ enum AiGenerationKind {
   recap
   /// A post translated for a Page's audience (G11).
   translate
+  /// The mood of a batch of new comments (H15).
+  sentiment
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +266,8 @@ model Workspace {
   aiEnabled    Boolean @default(true)
   aiTone       String?
   aiBrandVoice String?
+  /// Negative-comment alert (H15): the worker reads the mood of new comments with AI.
+  watchNegativeComments Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -436,6 +440,8 @@ model Target {
   followersCount    Int?
   talkingAboutCount Int?
   profileSyncedAt   DateTime?
+  /// Last negative-comment alert for this Page (H15); one a day at most.
+  negativeAlertAt   DateTime?
 
   /// Last time the worker saw a post scheduled ahead for this Page.
   queueFilledAt        DateTime?
@@ -1135,6 +1141,8 @@ model PostComment {
   resolvedAt     DateTime?
   /// The member who wrote this reply from the app (H11); null otherwise.
   sentById       String?
+  /// negative · neutral · positive, read by AI when the workspace watches comments (H15).
+  sentiment      String?
 
   postTarget PostTarget @relation(fields: [postTargetId], references: [id], onDelete: Cascade)
 

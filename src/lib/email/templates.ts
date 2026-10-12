@@ -618,3 +618,23 @@ export function noteMentionEmail(options: {
 
   return { subject: t('email.noteMention.subject', { author: options.author }), ...block };
 }
+
+/** A Page got clearly more negative comments than usual (NEXT_PHASES H15). */
+export function negativeSpikeEmail(options: {
+  locale: Locale;
+  workspace: string;
+  page: string;
+  targetId: string;
+  count: number;
+}): RenderedEmail {
+  const t = (key: string, params?: Record<string, string | number>) => translate(options.locale, key, params);
+
+  const block = layout({
+    heading: t('email.negativeSpike.heading', { page: options.page }),
+    body: t('email.negativeSpike.body', { page: options.page, comments: plural(options.locale, 'email.negativeSpike.comments', options.count) }),
+    cta: { label: t('email.negativeSpike.cta'), url: `${env.appUrl}/inbox?pages=${options.targetId}` },
+    footer: t('email.footer', { workspace: options.workspace }),
+  });
+
+  return { subject: t('email.negativeSpike.subject', { page: options.page }), ...block };
+}

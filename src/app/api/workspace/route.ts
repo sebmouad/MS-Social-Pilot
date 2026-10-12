@@ -42,6 +42,7 @@ export const PATCH = route(async (request: Request) => {
   assign('audienceTimezone', input.audienceTimezone);
   assign('audienceCalendars', input.audienceCalendars);
   assign('aiEnabled', input.aiEnabled);
+  assign('watchNegativeComments', input.watchNegativeComments);
   assign('aiTone', input.aiTone);
   assign('aiBrandVoice', input.aiBrandVoice);
   assign('logoUrl', input.logoUrl);

@@ -411,6 +411,45 @@ export async function writeReportRecap(options: {
   return result.text.trim().slice(0, 1200);
 }
 
+export type Sentiment = 'negative' | 'neutral' | 'positive';
+const SENTIMENTS: Sentiment[] = ['negative', 'neutral', 'positive'];
+
+/** The mood of a batch of comments (H15), in the order given. */
+export async function readCommentSentiments(options: {
+  workspaceId: string;
+  userId: string;
+  comments: string[];
+}): Promise<Array<Sentiment | null>> {
+  const result = await complete({
+    workspaceId: options.workspaceId,
+    userId: options.userId,
+    kind: AiGenerationKind.sentiment,
+    maxTokens: 20 + options.comments.length * 6,
+    system: [
+      'You read comments left on a business Facebook Page, in any language.',
+      'For each comment, say whether it is negative (a complaint, anger, a bad experience, an insult), positive, or neutral (a question, a tag, anything else).',
+      'Answer with JSON only: an array of the words "negative", "neutral" or "positive", one per comment, in the same order.',
+    ].join('\n'),
+    prompt: JSON.stringify(options.comments.map((text) => text.slice(0, 500))),
+  });
+  return parseSentiments(result.text, options.comments.length);
+}
+
+/** The model's answer, made safe: one known word per comment, else null. */
+export function parseSentiments(text: string, count: number): Array<Sentiment | null> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text.slice(text.indexOf('['), text.lastIndexOf(']') + 1));
+  } catch {
+    parsed = null;
+  }
+  const list = Array.isArray(parsed) && parsed.length === count ? parsed : [];
+  return Array.from({ length: count }, (_, index) => {
+    const word = list[index];
+    return SENTIMENTS.includes(word as Sentiment) ? (word as Sentiment) : null;
+  });
+}
+
 /** The model's JSON, made safe: days in range, real times, non-empty texts. */
 export function parsePlan(text: string, days: number, count: number): PlannedPost[] {
   const start = text.indexOf('[');

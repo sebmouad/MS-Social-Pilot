@@ -26,6 +26,7 @@ import { sendDueReports } from '../report-schedules';
 import { applyBestTimes } from '../best-times';
 import { deliverDueWebhooks } from '../webhooks';
 import { runContentMix } from '../content-mix';
+import { watchNegativeComments } from '../negative-comments';
 
 /**
  * The worker's job set.
@@ -54,6 +55,7 @@ export type JobName =
   | 'reports'
   | 'inboxDigest'
   | 'queueEmpty'
+  | 'negativeComments'
   | 'contentMix'
   | 'captionTests'
   | 'bestTimes'
@@ -725,6 +727,15 @@ export function jobDefinitions(): JobDefinition[] {
       run: async ({ now }) => {
         const sent = await sendInboxDigests(now);
         return sent > 0 ? `${sent} inbox email(s) sent` : null;
+      },
+    },
+    {
+      // Negative-comment alert (H15): AI reads new comments' mood, no Graph call.
+      name: 'negativeComments',
+      intervalMs: 60 * 60 * 1000,
+      run: async ({ now }) => {
+        const { read, alerted } = await watchNegativeComments(now);
+        return read + alerted > 0 ? `${read} comment mood(s) read, ${alerted} alert(s)` : null;
       },
     },
     {

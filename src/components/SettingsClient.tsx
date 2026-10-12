@@ -34,6 +34,8 @@ export interface WorkspaceOptions {
   audienceTimezone: string | null;
   audienceCalendars: string[];
   aiEnabled: boolean;
+  /** Negative-comment alert (H15). */
+  watchNegativeComments: boolean;
   aiTone: string;
   aiBrandVoice: string;
 }
@@ -417,6 +419,19 @@ export function SettingsClient({
             onChange={(event) => setSettings({ ...settings, aiEnabled: event.target.checked })}
           />
           {t('aiEnabled')}
+        </label>
+        <label className="mt-3 flex items-start gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500"
+            checked={settings.watchNegativeComments}
+            disabled={!settings.aiEnabled}
+            onChange={(event) => setSettings({ ...settings, watchNegativeComments: event.target.checked })}
+          />
+          <span>
+            {t('watchNegativeComments')}
+            <span className="block text-xs text-slate-500">{t('watchNegativeCommentsHint')}</span>
+          </span>
         </label>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-3">

@@ -811,9 +811,18 @@ setup from Phase 0.2 (marked AI).
   figures last); the name opens `/root/workspaces/[id]`.*
 
 ### Monitoring
-- **H15. Negative-comment alert (M, AI)** — sentiment on new comments (batch,
+- **H15. Negative-comment alert (M, AI)** ✅ — sentiment on new comments (batch,
   cheap model); alert when negative share or volume spikes vs the Page's
   baseline; links to the comments; respects G7 rules.
+  *Done 2026-10-12: Settings › AI "Alert me when negative comments spike"
+  (off by default; needs AI on). Hourly job `negativeComments`
+  (`src/lib/negative-comments.ts`): one AI call per workspace reads up to 40
+  new comments (under 48 h, not hidden, not the Page's own) as negative,
+  neutral or positive; a Page with 3+ negative comments in 24 h and at least
+  twice its 14-day daily average gets one email a day to owners, admins and
+  editors who see it (preference "moderation alert"), linking to its inbox.
+  Uses the workspace's configured model (no separate cheap model setting),
+  under the AI hourly limit and monthly budget. No Graph call.*
 - **H16. Meta API usage per Page (S)** ✅ — record call counts and the
   `x-app-usage` / `x-business-use-case-usage` headers per Page (budget.ts
   already reads them); root view with the heaviest Pages and jobs.

@@ -924,6 +924,16 @@
       "heading": "Vous avez été mentionné dans une note",
       "body": "{author} a écrit une note sur une publication : « {note} »",
       "cta": "Ouvrir la publication"
+    },
+    "negativeSpike": {
+      "subject": "{page} : plus de commentaires négatifs que d’habitude",
+      "heading": "Les commentaires négatifs augmentent sur {page}",
+      "body": "{comments} sur {page} ces dernières 24 heures semblent négatifs, au moins deux fois plus que d’habitude pour cette Page. Ouvrez la boîte de réception pour les voir et y répondre.",
+      "cta": "Ouvrir la boîte de réception",
+      "comments": {
+        "one": "{n} commentaire",
+        "other": "{n} commentaires"
+      }
     }
   },
   "engagement": {
@@ -1955,7 +1965,9 @@
     "businessHours": "Heures d’ouverture",
     "businessFrom": "De",
     "businessTo": "à",
-    "businessHoursHint": "Les temps de réponse ne comptent que ces jours et ces heures, à l’heure de l’espace de travail. Ne cochez aucun jour pour compter toutes les heures."
+    "businessHoursHint": "Les temps de réponse ne comptent que ces jours et ces heures, à l’heure de l’espace de travail. Ne cochez aucun jour pour compter toutes les heures.",
+    "watchNegativeComments": "M’alerter quand les commentaires négatifs augmentent",
+    "watchNegativeCommentsHint": "L’IA lit l’humeur des nouveaux commentaires chaque heure et prévient l’équipe par e-mail quand une Page reçoit au moins deux fois plus de commentaires négatifs que d’habitude. Utilise le quota d’IA ; les commentaires masqués par les règles de modération sont ignorés."
   },
   "setup": {
     "title": "Configurer MS Social Pilot",
@@ -2792,7 +2804,8 @@
         "webhooks": "Webhooks sortants",
         "exports": "Exports d’espace",
         "holidays": "Jours fériés",
-        "contentMix": "Mix de contenu"
+        "contentMix": "Mix de contenu",
+        "negativeComments": "Alerte commentaires négatifs"
       },
       "heaviestObjects": "Pages et comptes les plus sollicités, dernière heure",
       "heaviestJobs": "Appels par tâche, dernière heure",

@@ -12,6 +12,7 @@ import {
   draftUpdatedEmail,
   inboxDigestEmail,
   moderationAlertEmail,
+  negativeSpikeEmail,
   publishFailureEmail,
   queueEmptyEmail,
   mixDryEmail,
@@ -491,6 +492,22 @@ export async function notifyModerationAlert(options: {
       await sendEmail({ to: recipient.email, template: 'moderationAlert', workspaceId: options.workspaceId, ...rendered });
     }
   }, 'moderation alert');
+}
+
+/** A Page's negative comments spiked (H15). Same people and preference as a moderation alert. */
+export async function notifyNegativeSpike(options: { workspaceId: string; targetId: string; page: string; count: number }): Promise<void> {
+  await safely(async () => {
+    const workspace = await prisma.workspace.findUnique({ where: { id: options.workspaceId }, select: { name: true } });
+    if (!workspace) return;
+    const recipients = await recipientsFor(options.workspaceId, 'onModerationAlert', {
+      roles: [WorkspaceRole.owner, WorkspaceRole.admin, WorkspaceRole.editor],
+      page: { targetId: options.targetId, event: 'newInbox' },
+    });
+    for (const recipient of recipients) {
+      const rendered = negativeSpikeEmail({ locale: recipient.locale, workspace: workspace.name, ...options });
+      await sendEmail({ to: recipient.email, template: 'negativeSpike', workspaceId: options.workspaceId, ...rendered });
+    }
+  }, 'negative spike');
 }
 
 /** Statuses of a post that is still being worked on. */
