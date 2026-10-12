@@ -13,7 +13,6 @@ import { AudienceView } from '@/components/AudienceSection';
 import { CommentsPanel } from '@/components/CommentsPanel';
 import { InboxPanel } from '@/components/InboxPanel';
 import { ExportMenu } from '@/components/ExportMenu';
-import { PagePicker } from '@/components/PagePicker';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { parseCompare, parseRange, rangeQuery } from '@/lib/date-range';
 import { PostAnalyticsTable, type PostRow } from '@/components/PostAnalyticsTable';
@@ -168,13 +167,6 @@ export async function AnalyticsScreen({
           />
         )}
 
-        <PagePicker
-          pages={pages.map((page) => ({ id: page.id, name: page.name }))}
-          selectedId={view === 'posts' && !requested ? '' : selected.id}
-          rangeQuery={periodQuery}
-          view={view}
-          allLabel={view === 'posts' ? t('allSelected', { count: pages.length }) : undefined}
-        />
 
         <div className="ms-auto">
           <ExportMenu targetId={selected.id} from={from.toISOString()} to={to.toISOString()} />
@@ -183,6 +175,10 @@ export async function AnalyticsScreen({
 
       {/* Instagram stays out of sight until it is switched on; its tab only ever said "nothing here". */}
       {!only && <AnalyticsTabs current={view} hidden={env.instagramEnabled ? [] : ['instagram']} />}
+
+      {pages.length > 1 && !requested && !['total', 'compare', 'posts', 'responseTime', 'instagram'].includes(view) && (
+        <p className="rounded-xl bg-brand-50 px-4 py-2 text-sm text-brand-800">{t('oneChannelHint', { name: selected.name })}</p>
+      )}
 
       {(view === 'total' || view === 'analysis') && (
         <PinnedTiles

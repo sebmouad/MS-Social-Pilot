@@ -8,7 +8,7 @@ import { useTranslations } from 'next-intl';
 import { useConfirm } from './ConfirmProvider';
 
 import { Icon } from './Icon';
-import { FeedAvatar, FeedPost, type FeedLinkPreview, type FeedMedia } from './FeedPost';
+import { FeedPost, type FeedLinkPreview, type FeedMedia } from './FeedPost';
 
 interface Slot {
   dayOfWeek: number;
@@ -16,15 +16,6 @@ interface Slot {
   minute: number;
   /** One Page's own time, rather than one every Page shares. */
   own?: boolean;
-}
-
-interface Scope {
-  /** Null for the timetable every Page shares. */
-  id: string | null;
-  name: string;
-  pictureUrl: string | null;
-  /** Times of its own. */
-  own: number;
 }
 
 interface Suggestion extends Slot {
@@ -65,7 +56,6 @@ export function QueueClient({
   canManage,
   canMovePosts = false,
   scope,
-  scopes,
   slots: initial,
   suggestions,
   upcoming,
@@ -78,7 +68,6 @@ export function QueueClient({
   canMovePosts?: boolean;
   /** The Page whose timetable is open, or null for the shared one. */
   scope: { id: string; name: string } | null;
-  scopes: Scope[];
   slots: Slot[];
   suggestions: Suggestion[];
   upcoming: Upcoming[];
@@ -174,43 +163,8 @@ export function QueueClient({
 
   return (
     <div className="space-y-6">
-      {/* Whose timetable: the one every Page shares, or one Page's own. */}
-      {scopes.length > 1 && (
-        <nav aria-label={t('timetableFor')} className="card p-3">
-          <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t('timetableFor')}</p>
-          <ul className="scroll-x flex gap-2">
-            {scopes.map((entry) => {
-              const active = (scope?.id ?? null) === entry.id;
-              return (
-                <li key={entry.id ?? 'shared'} className="shrink-0">
-                  <Link
-                    href={entry.id ? `/queue?for=${entry.id}` : '/queue'}
-                    aria-current={active ? 'page' : undefined}
-                    className={`flex items-center gap-2 rounded-full py-1 ps-1 pe-3.5 text-sm font-semibold ring-1 ring-inset transition-colors ${
-                      active ? 'bg-brand-50 text-brand-700 ring-brand-300' : 'bg-white text-slate-800 ring-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    {entry.id ? (
-                      <FeedAvatar name={entry.name} pictureUrl={entry.pictureUrl} size="xs" />
-                    ) : (
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                        <Icon name="folders" size={14} />
-                      </span>
-                    )}
-                    <span className="max-w-[12rem] truncate">{entry.name}</span>
-                    <span className={`nums rounded-full px-1.5 text-xs ${active ? 'bg-brand-100' : 'bg-slate-100 text-slate-600'}`}>
-                      {entry.own}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="px-1 pt-2 text-xs text-slate-500">
-            {scope ? t('ownTimesHint', { page: scope.name }) : t('sharedTimesHint')}
-          </p>
-        </nav>
-      )}
+      {/* Whose timetable follows the channel selector: one channel, its own times. */}
+      <p className="text-sm text-slate-600">{scope ? t('ownTimesHint', { page: scope.name }) : t('sharedTimesHint')}</p>
 
       {status && (
         <p

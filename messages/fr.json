@@ -251,7 +251,8 @@
     "unpinHint": "Retirer cette tuile d’Analyse et de Tous les profils",
     "pinFailed": "Les métriques épinglées n’ont pas pu être enregistrées. Réessayez.",
     "pinLimit": "Vous pouvez épingler jusqu’à 8 métriques. Retirez-en une pour en ajouter une autre.",
-    "moreViews": "Plus"
+    "moreViews": "Plus",
+    "oneChannelHint": "Affichage de {name}. Pour un autre canal, ouvrez le sélecteur de canaux et choisissez « Seulement » à côté."
   },
   "app": {
     "name": "MS Social Pilot",

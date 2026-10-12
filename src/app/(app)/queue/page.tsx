@@ -79,8 +79,10 @@ export default async function QueuePage({
   // Whose timetable is on screen: one Page's (its own times on top of the
   // shared ones), or the shared one. A member limited to some Pages has no
   // shared view to look at — every time they see is one of their Pages'.
+  // One channel picked in the channel selector: its own timetable.
   const scope =
-    pages.find((page) => page.id === requested) ?? (pageScope.all ? null : pages[0] ?? null);
+    pages.find((page) => page.id === requested) ??
+    (pages.length === 1 || !auth.pageScope.all ? pages[0] ?? null : null);
 
   const [allSlots, taken] = await Promise.all([
     prisma.queueSlot.findMany({
@@ -222,10 +224,6 @@ export default async function QueuePage({
         canManage={canManageSettings(auth.role)}
         canMovePosts={canManageOthersPosts(auth.role)}
         scope={scope ? { id: scope.id, name: scope.name } : null}
-        scopes={[
-          ...(pageScope.all ? [{ id: null, name: t('everyPage'), pictureUrl: null, own: allSlots.filter((slot) => !slot.targetId).length }] : []),
-          ...pages.map((page) => ({ id: page.id, name: page.name, pictureUrl: page.pictureUrl, own: ownCount.get(page.id) ?? 0 })),
-        ]}
         slots={slots}
         suggestions={suggestions}
         upcoming={upcoming}

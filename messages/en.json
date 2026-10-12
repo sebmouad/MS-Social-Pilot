@@ -251,7 +251,8 @@
     "unpinHint": "Remove this tile from Analysis and All profiles",
     "pinFailed": "The pinned metrics could not be saved. Try again.",
     "pinLimit": "You can pin up to 8 metrics. Unpin one to add another.",
-    "moreViews": "More"
+    "moreViews": "More",
+    "oneChannelHint": "Showing {name}. For another channel, open the channel selector and choose “Only” next to it."
   },
   "app": {
     "name": "MS Social Pilot",
