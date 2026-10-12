@@ -1,3 +1,4 @@
+import { assertMonthlyRoom } from './plans';
 import { NETWORK_LABELS, networkProblems } from './networks';
 import { ownLabels } from './page-groups';
 import { prisma } from './prisma';
@@ -291,6 +292,7 @@ export async function createPost(
   input: CreatePostInput,
   now: Date = new Date(),
 ): Promise<CreatePostResult> {
+  await assertMonthlyRoom(context.workspaceId, 'postsPerMonth', now);
   const targets = await loadTargets(context.workspaceId, input.targetIds);
   const labelIds = await ownLabels(context.workspaceId, input.labelIds ?? []);
 

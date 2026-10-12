@@ -1189,7 +1189,12 @@
     "planLimit_channels": "Your plan includes {limit} channels. Ask for a bigger plan or extra channels to add more.",
     "planLimit_members": "Your plan includes {limit} team members. Ask for a bigger plan to invite more. Clients are free.",
     "planLimit_workspaces": "Your plan includes {limit} workspaces. Ask for a bigger plan to add more.",
-    "telegramConnect": "Telegram refused: check the bot token, the channel, and that the bot is an administrator allowed to post."
+    "telegramConnect": "Telegram refused: check the bot token, the channel, and that the bot is an administrator allowed to post.",
+    "planLimit_postsPerMonth": "Your plan includes {limit, plural, one {# post} other {# posts}} a month, and this month’s are used. Ask for a bigger plan to write more.",
+    "planLimit_aiCredits": "Your plan includes {limit, plural, one {# AI credit} other {# AI credits}} a month, and this month’s are used. Ask for a bigger plan to use more.",
+    "planFeature_api": "Your plan does not include the API. Ask for a bigger plan to make API keys.",
+    "planFeature_clients": "Your plan does not include client access. Ask for a bigger plan to invite clients.",
+    "planFeature_whiteLabel": "Your plan does not include white label. Ask for a bigger plan to use your own logo and report branding."
   },
   "feeds": {
     "title": "Website auto-share",

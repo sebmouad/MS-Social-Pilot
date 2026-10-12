@@ -80,6 +80,24 @@ export async function assertRoom(workspaceId: string, kind: Exclude<PlanLimit, '
   if ((await room(subscriber, kind)) < 1) throw planLimitReached(kind, limitOf(subscriber!, kind));
 }
 
+export type MonthlyLimit = 'postsPerMonth' | 'aiCredits';
+
+/**
+ * Refuses one more post or AI generation this calendar month (UTC) when the
+ * subscriber's plan has used them all, counted across every workspace they own.
+ */
+export async function assertMonthlyRoom(workspaceId: string, kind: MonthlyLimit, now: Date = new Date()): Promise<void> {
+  const subscriber = await subscriberOf(workspaceId);
+  const limit = subscriber?.plan && !subscriber.isInstanceOwner ? subscriber.plan[kind] : null;
+  if (limit === null || limit === undefined) return;
+  const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const where = { workspaceId: { in: await ownedWorkspaceIds(subscriber!.id) }, createdAt: { gte: since } };
+  const used = kind === 'aiCredits' ? await prisma.aiGeneration.count({ where }) : await prisma.post.count({ where });
+  if (used >= limit) {
+    throw new AppError({ key: `errors.planLimit_${kind}`, fallback: `Your plan includes ${limit} a month, all used.`, status: 402, params: { limit } });
+  }
+}
+
 /** Refuses a new workspace for an owner whose plan is full. */
 export async function assertWorkspaceRoom(userId: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, isInstanceOwner: true, extraChannels: true, plan: true } });
@@ -91,6 +109,13 @@ export async function hasFeature(workspaceId: string, feature: PlanFeature): Pro
   const subscriber = await subscriberOf(workspaceId);
   if (!subscriber?.plan || subscriber.isInstanceOwner) return true;
   return subscriber.plan.features.includes(feature);
+}
+
+/** Refuses an action the workspace's plan does not include. */
+export async function assertFeature(workspaceId: string, feature: PlanFeature): Promise<void> {
+  if (!(await hasFeature(workspaceId, feature))) {
+    throw new AppError({ key: `errors.planFeature_${feature}`, fallback: 'Your plan does not include this. Ask for a bigger plan.', status: 402 });
+  }
 }
 
 /** The plan new sign-ups start on. */

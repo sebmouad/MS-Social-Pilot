@@ -39,4 +39,22 @@ describe('plan limits', () => {
     await prisma.user.update({ where: { id: user.id }, data: { planId: null } });
     await expect(plans.assertWorkspaceRoom(user.id)).resolves.toBeUndefined();
   });
+
+  it('counts posts and AI credits per month, and gates plan features', async () => {
+    await prisma.plan.create({ data: { id: 'plan_tiny', key: 'tiny', name: 'Tiny', postsPerMonth: 1, aiCredits: 1, features: ['api'] } });
+    const user = await prisma.user.create({ data: { email: 'tiny@example.com', name: 'Tiny', passwordHash: 'x', planId: 'plan_tiny' } });
+    const workspace = await prisma.workspace.create({ data: { name: 'Client B', slug: 'client-b', memberships: { create: { userId: user.id, role: WorkspaceRole.owner } } } });
+
+    await expect(plans.assertMonthlyRoom(workspace.id, 'postsPerMonth')).resolves.toBeUndefined();
+    await prisma.post.create({ data: { workspaceId: workspace.id, authorId: user.id, message: 'Product launch' } });
+    await expect(plans.assertMonthlyRoom(workspace.id, 'postsPerMonth')).rejects.toMatchObject({ key: 'errors.planLimit_postsPerMonth', status: 402 });
+    // Last month's posts do not count.
+    await expect(plans.assertMonthlyRoom(workspace.id, 'postsPerMonth', new Date(Date.now() + 40 * 86_400_000))).resolves.toBeUndefined();
+
+    await prisma.aiGeneration.create({ data: { workspaceId: workspace.id, userId: user.id, kind: 'generate', prompt: 'p', output: 'o', model: 'm' } });
+    await expect(plans.assertMonthlyRoom(workspace.id, 'aiCredits')).rejects.toMatchObject({ key: 'errors.planLimit_aiCredits' });
+
+    await expect(plans.assertFeature(workspace.id, 'api')).resolves.toBeUndefined();
+    await expect(plans.assertFeature(workspace.id, 'clients')).rejects.toMatchObject({ key: 'errors.planFeature_clients', status: 402 });
+  });
 });

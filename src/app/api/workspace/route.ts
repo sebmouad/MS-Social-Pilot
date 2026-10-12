@@ -1,3 +1,4 @@
+import { assertFeature } from '@/lib/plans';
 import { requireAuth } from '@/lib/auth';
 import { releaseHeldPosts } from '@/lib/approvals';
 import { rescheduleWeeklyReports } from '@/lib/report-schedules';
@@ -46,6 +47,8 @@ export const PATCH = route(async (request: Request) => {
   assign('trendKeywords', input.trendKeywords);
   assign('aiTone', input.aiTone);
   assign('aiBrandVoice', input.aiBrandVoice);
+  // White label: the agency's own logo and report branding.
+  if ([input.logoUrl, input.reportTitle, input.reportSubtitle, input.reportFooter].some((value) => value)) await assertFeature(auth.workspace.id, 'whiteLabel');
   assign('logoUrl', input.logoUrl);
   assign('reportTitle', input.reportTitle);
   assign('reportSubtitle', input.reportSubtitle);

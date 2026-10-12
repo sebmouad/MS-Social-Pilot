@@ -251,5 +251,9 @@ owns, and are enforced on new workspaces, team invitations (clients are free)
 and new channels (402 `errors.planLimit_*`; a Facebook sync leaves the extra
 Pages out with a warning). Root and users with no plan have no limits; new
 sign-ups start on the default plan. Seeded: Free, Solo, Team, Agency,
-Agency+. Posts, AI credits and features are stored but not yet enforced. No
-payment provider yet. Every change is in root activity.
+Agency+. Posts and AI generations per calendar month (UTC, across the
+subscriber's workspaces) are enforced in `createPost` and every AI call
+(`errors.planLimit_postsPerMonth` / `_aiCredits`). Features: `api` gates new
+API keys, `clients` gates inviting the client role, `whiteLabel` gates
+setting a logo or report branding (`errors.planFeature_*`). No payment
+provider yet. Every change is in root activity.

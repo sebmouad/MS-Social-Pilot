@@ -1,3 +1,4 @@
+import { assertFeature } from './plans';
 import { WorkspaceRole } from '@prisma/client';
 import { z } from 'zod';
 
@@ -36,6 +37,7 @@ export async function createApiToken(options: {
   name: string;
   scope: ApiScope;
 }): Promise<{ id: string; token: string }> {
+  await assertFeature(options.workspaceId, 'api');
   const token = `${PREFIX}${randomToken(32)}`;
   const row = await prisma.apiToken.create({
     data: {

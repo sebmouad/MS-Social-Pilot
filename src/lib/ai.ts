@@ -1,3 +1,4 @@
+import { assertMonthlyRoom } from './plans';
 import { AiGenerationKind, Locale } from '@prisma/client';
 
 import { prisma } from './prisma';
@@ -148,6 +149,7 @@ async function complete(options: {
   image?: { data: string; mimeType: 'image/jpeg' };
 }): Promise<GenerationResult> {
   await assertWithinRateLimit(options.workspaceId);
+  await assertMonthlyRoom(options.workspaceId, 'aiCredits');
   await assertWithinBudget();
 
   const provider = activeAiProvider();

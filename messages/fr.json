@@ -1189,7 +1189,12 @@
     "planLimit_channels": "Votre formule inclut {limit} canaux. Demandez une formule supérieure ou des canaux supplémentaires.",
     "planLimit_members": "Votre formule inclut {limit} membres. Demandez une formule supérieure pour en inviter plus. Les clients sont gratuits.",
     "planLimit_workspaces": "Votre formule inclut {limit} espaces. Demandez une formule supérieure pour en ajouter.",
-    "telegramConnect": "Telegram a refusé : vérifiez le jeton du bot, la chaîne, et que le bot est administrateur autorisé à publier."
+    "telegramConnect": "Telegram a refusé : vérifiez le jeton du bot, la chaîne, et que le bot est administrateur autorisé à publier.",
+    "planLimit_postsPerMonth": "Votre offre inclut {limit, plural, one {# publication} other {# publications}} par mois, et celles de ce mois sont utilisées. Demandez une offre supérieure pour en écrire plus.",
+    "planLimit_aiCredits": "Votre offre inclut {limit, plural, one {# crédit IA} other {# crédits IA}} par mois, et ceux de ce mois sont utilisés. Demandez une offre supérieure pour en utiliser plus.",
+    "planFeature_api": "Votre offre n’inclut pas l’API. Demandez une offre supérieure pour créer des clés API.",
+    "planFeature_clients": "Votre offre n’inclut pas l’accès client. Demandez une offre supérieure pour inviter des clients.",
+    "planFeature_whiteLabel": "Votre offre n’inclut pas la marque blanche. Demandez une offre supérieure pour utiliser votre logo et votre habillage de rapports."
   },
   "feeds": {
     "title": "Partage automatique des sites",
