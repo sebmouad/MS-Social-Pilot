@@ -196,6 +196,12 @@ export const env = {
   get xClientSecret(): string {
     return settingString('x.clientSecret');
   },
+  get youtubeClientId(): string {
+    return settingString('youtube.clientId');
+  },
+  get youtubeClientSecret(): string {
+    return settingString('youtube.clientSecret');
+  },
   get pinterestClientId(): string {
     return settingString('pinterest.clientId');
   },

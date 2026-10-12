@@ -609,6 +609,32 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
   // --- Other networks ---------------------------------------------------------
   {
+    key: 'networks.youtube',
+    group: 'networks',
+    type: 'boolean',
+    label: 'YouTube switched on',
+    description: 'Off hides YouTube from Connections and stops new YouTube channels from being connected. Channels already connected keep their posts.',
+    default: true,
+  },
+  {
+    key: 'youtube.clientId',
+    group: 'networks',
+    type: 'string',
+    label: 'YouTube (Google) Client ID',
+    description: 'From a Google Cloud OAuth client (web application) with the YouTube Data API v3 enabled. Blank hides YouTube from Connections.',
+    default: '',
+    env: 'YOUTUBE_CLIENT_ID',
+  },
+  {
+    key: 'youtube.clientSecret',
+    group: 'networks',
+    type: 'secret',
+    label: 'YouTube (Google) Client secret',
+    description: 'Kept encrypted. Shown once when saved.',
+    default: '',
+    env: 'YOUTUBE_CLIENT_SECRET',
+  },
+  {
     key: 'networks.telegram',
     group: 'networks',
     type: 'boolean',

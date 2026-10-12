@@ -43,6 +43,7 @@ enum TargetType {
   x
   pinterest
   telegram
+  youtube
 }
 
 enum PostStatus {

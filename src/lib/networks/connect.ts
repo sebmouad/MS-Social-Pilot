@@ -8,6 +8,7 @@ import { env } from '../env';
 import { GraphError } from '../facebook/graph';
 import { blueskyProfile, blueskySession } from './bluesky';
 import { telegramCall } from './telegram';
+import { YOUTUBE_SCOPES, youtubeChannels, youtubeToken } from './youtube';
 import { LINKEDIN_MEMBER_SCOPES, LINKEDIN_ORG_SCOPES, linkedinMember, linkedinOrganizations, linkedinToken } from './linkedin';
 import { MASTODON_SCOPES, mastodonAccount, mastodonToken, normaliseInstance, registerMastodonApp } from './mastodon';
 import { PINTEREST_SCOPES, pinterestAccount, pinterestBoards, pinterestToken } from './pinterest';
@@ -92,6 +93,20 @@ export async function startNetworkAuth(
     case 'pinterest': {
       url = new URL('https://www.pinterest.com/oauth/');
       url.search = new URLSearchParams({ client_id: env.pinterestClientId, redirect_uri: redirect, response_type: 'code', scope: PINTEREST_SCOPES.join(','), state }).toString();
+      break;
+    }
+    case 'youtube': {
+      url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      // offline + consent: Google only sends a refresh token when asked this way.
+      url.search = new URLSearchParams({
+        client_id: env.youtubeClientId,
+        redirect_uri: redirect,
+        response_type: 'code',
+        scope: YOUTUBE_SCOPES.join(' '),
+        access_type: 'offline',
+        prompt: 'consent',
+        state,
+      }).toString();
       break;
     }
   }
@@ -181,6 +196,26 @@ export async function finishNetworkAuth(key: Exclude<NetworkKey, 'bluesky' | 'te
         refreshToken: token.refresh_token ?? null,
         expiresAt: new Date(Date.now() + token.expires_in * 1000),
         targets: [{ providerId: me.id, name: `@${me.username}`, pictureUrl: me.profile_image_url ?? null, category: 'X' }],
+      };
+    }
+    case 'youtube': {
+      const token = await youtubeToken({ code, redirectUri });
+      const channels = await youtubeChannels(token.access_token);
+      if (channels.length === 0) throw new GraphError({ message: 'YouTube: this Google account has no YouTube channel.', kind: 'rejected' });
+      const first = channels[0]!;
+      return {
+        providerUserId: first.id,
+        name: first.snippet.title,
+        pictureUrl: first.snippet.thumbnails?.default?.url ?? null,
+        accessToken: token.access_token,
+        refreshToken: token.refresh_token ?? null,
+        expiresAt: new Date(Date.now() + token.expires_in * 1000),
+        targets: channels.map((channel) => ({
+          providerId: channel.id,
+          name: channel.snippet.title,
+          pictureUrl: channel.snippet.thumbnails?.default?.url ?? null,
+          category: 'YouTube channel',
+        })),
       };
     }
     case 'pinterest': {

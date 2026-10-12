@@ -2137,7 +2137,8 @@
     "pinterest": "Tableau Pinterest",
     "search": "Rechercher un canal",
     "noMatch": "Aucun canal ne correspond.",
-    "telegram": "Chaîne Telegram"
+    "telegram": "Chaîne Telegram",
+    "youtube": "Chaîne YouTube"
   },
   "team": {
     "title": "Équipe",
@@ -2295,7 +2296,8 @@
       "threads": "Threads",
       "x": "X",
       "pinterest": "Tableau Pinterest",
-      "telegram": "Chaîne Telegram"
+      "telegram": "Chaîne Telegram",
+      "youtube": "Chaîne YouTube"
     },
     "hide": "Masquer {page}",
     "show": "Afficher {page}",
@@ -3123,7 +3125,8 @@
       "threads": "Threads",
       "x": "X",
       "pinterest": "Pinterest",
-      "telegram": "Telegram"
+      "telegram": "Telegram",
+      "youtube": "YouTube"
     }
   },
   "suspended": {

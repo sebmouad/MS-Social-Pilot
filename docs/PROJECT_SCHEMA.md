@@ -367,6 +367,8 @@ X_CLIENT_ID=
 X_CLIENT_SECRET=
 PINTEREST_CLIENT_ID=
 PINTEREST_CLIENT_SECRET=
+YOUTUBE_CLIENT_ID=
+YOUTUBE_CLIENT_SECRET=
 
 # AI (Claude)
 AI_PROVIDER=auto                 # auto | anthropic | openai | gemini

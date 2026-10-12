@@ -2137,7 +2137,8 @@
     "pinterest": "Pinterest board",
     "search": "Search channels",
     "noMatch": "No channel matches that.",
-    "telegram": "Telegram channel"
+    "telegram": "Telegram channel",
+    "youtube": "YouTube channel"
   },
   "team": {
     "title": "Team",
@@ -2295,7 +2296,8 @@
       "threads": "Threads",
       "x": "X",
       "pinterest": "Pinterest board",
-      "telegram": "Telegram channel"
+      "telegram": "Telegram channel",
+      "youtube": "YouTube channel"
     },
     "hide": "Hide {page}",
     "show": "Show {page}",
@@ -3123,7 +3125,8 @@
       "threads": "Threads",
       "x": "X",
       "pinterest": "Pinterest",
-      "telegram": "Telegram"
+      "telegram": "Telegram",
+      "youtube": "YouTube"
     }
   },
   "suspended": {

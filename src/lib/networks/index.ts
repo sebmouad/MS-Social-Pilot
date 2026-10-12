@@ -13,6 +13,7 @@ import { pinterest } from './pinterest';
 import { threads } from './threads';
 import { telegram } from './telegram';
 import { x } from './x';
+import { youtube } from './youtube';
 import {
   isNetworkKey,
   NETWORK_KEYS,
@@ -25,7 +26,7 @@ import {
 
 export { NETWORK_KEYS, isNetworkKey, type NetworkKey };
 
-export const CONNECTORS: Record<NetworkKey, NetworkConnector> = { bluesky, mastodon, linkedin, threads, x, pinterest, telegram };
+export const CONNECTORS: Record<NetworkKey, NetworkConnector> = { bluesky, mastodon, linkedin, threads, x, pinterest, telegram, youtube };
 
 /** Networks that sign in through an app this installation registered, and whether its keys are set. */
 export function networkAvailable(key: NetworkKey): boolean {
@@ -43,6 +44,8 @@ export function networkAvailable(key: NetworkKey): boolean {
       return Boolean(env.xClientId && env.xClientSecret);
     case 'pinterest':
       return Boolean(env.pinterestClientId && env.pinterestClientSecret);
+    case 'youtube':
+      return Boolean(env.youtubeClientId && env.youtubeClientSecret);
   }
 }
 
