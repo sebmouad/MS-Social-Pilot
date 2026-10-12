@@ -156,4 +156,12 @@ describe('updateProfile', () => {
     expect(summary.locale).toBe('fr');
     expect(summary.email).toBe('sam@example.com');
   });
+
+  it('keeps the look each person picks, Facebook until they change it', async () => {
+    const { user, here } = await seedUser();
+    expect((await account.readAccount(user.id, here)).theme).toBe('facebook');
+
+    await account.updateProfile(user.id, { theme: 'warm' });
+    expect((await account.readAccount(user.id, here)).theme).toBe('warm');
+  });
 });

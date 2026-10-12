@@ -3,7 +3,9 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 
 import { ServiceWorker } from '@/components/ServiceWorker';
+import { getAuthContext } from '@/lib/auth';
 import { env } from '@/lib/env';
+import { DEFAULT_THEME } from '@/lib/themes';
 
 import './globals.css';
 
@@ -38,9 +40,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Messages are passed to the client provider so client components can
   // translate without a second round trip.
   const messages = await getMessages();
+  // The signed-in person's look; already loaded for the locale, so no extra query.
+  const auth = await getAuthContext().catch(() => null);
 
   return (
-    <html lang={locale}>
+    <html lang={locale} data-theme={auth?.user.theme ?? DEFAULT_THEME}>
       <body>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}

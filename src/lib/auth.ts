@@ -13,6 +13,7 @@ import { uniqueSlug } from './slug';
 import { DEFAULT_QUEUE_SLOTS, setDateLocale } from './time';
 import { nextStepAfterPassword, type PendingStep } from './two-step';
 import { enabledModules, moduleOfPath, PATHNAME_HEADER, type ModuleKey } from './modules';
+import { DEFAULT_THEME, isTheme, type Theme } from './themes';
 
 /**
  * Sessions, and resolving which workspace the request is acting on.
@@ -46,7 +47,7 @@ export interface WorkspaceSummary {
 }
 
 export interface AuthContext {
-  user: { id: string; email: string; name: string; locale: Locale };
+  user: { id: string; email: string; name: string; locale: Locale; theme: Theme };
   workspace: {
     id: string;
     name: string;
@@ -512,7 +513,7 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
         .find((entry) => entry !== undefined) ?? user.memberships[0]!);
 
   return {
-    user: { id: user.id, email: user.email, name: user.name, locale: user.locale },
+    user: { id: user.id, email: user.email, name: user.name, locale: user.locale, theme: isTheme(user.theme) ? user.theme : DEFAULT_THEME },
     workspace: {
       id: membership.workspace.id,
       name: membership.workspace.name,

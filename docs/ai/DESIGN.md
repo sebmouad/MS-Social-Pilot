@@ -9,6 +9,12 @@ always the left sidebar (`src/components/AppShell.tsx`).
 - Brand blue `brand-500 #1877f2` (links, rings, icons), `brand-600 #1467d6`
   (buttons), `brand-50 #e7f3ff` (selected backgrounds). Slate scale tuned to
   Facebook greys; page background `#f0f2f5`; cards white.
+- Themes: `brand-*` and `slate-*` are CSS variables (space-separated RGB) set
+  per theme in `globals.css` and switched by `<html data-theme>` (the user's
+  pick, `src/lib/themes.ts`, Settings → Account). *Facebook* (default) and
+  *Warm* (cream page and sidebar, amber accent at AA-safe steps, dark icon
+  rail). Shell colours: `.rail`, `.rail-item`, `.shell-sidebar`. Never write
+  raw hex for brand or greys in components, or the theme cannot reach it.
 - Font: the system UI stack (Facebook's). Sizes: page title `text-xl sm:text-2xl
   font-semibold`, section title `text-[15px]/[17px] font-bold`, body `text-sm` /
   `text-[15px]`, hints `text-xs text-slate-500`.

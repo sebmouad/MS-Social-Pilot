@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
+import { THEMES, type Theme } from '@/lib/themes';
+
 type Locale = 'en' | 'fr';
 
 interface Status {
@@ -12,9 +14,15 @@ interface Status {
 }
 
 interface Props {
-  initial: { name: string; email: string; locale: Locale; otherSessions: number };
+  initial: { name: string; email: string; locale: Locale; theme: Theme; otherSessions: number };
   locales: Locale[];
 }
+
+/** What each look is made of, shown beside its name. */
+const THEME_SWATCHES: Record<Theme, string[]> = {
+  facebook: ['#ffffff', '#f0f2f5', '#1877f2'],
+  warm: ['#2b241c', '#f5f1e8', '#b45309'],
+};
 
 /** One status line under a section, so each form reports on itself. */
 function StatusLine({ status }: { status: Status | null }) {
@@ -49,6 +57,7 @@ export function AccountClient({ initial, locales }: Props) {
 
   const [name, setName] = useState(initial.name);
   const [locale, setLocale] = useState<Locale>(initial.locale);
+  const [theme, setTheme] = useState<Theme>(initial.theme);
   const [profilePending, setProfilePending] = useState(false);
   const [profileStatus, setProfileStatus] = useState<Status | null>(null);
 
@@ -67,7 +76,7 @@ export function AccountClient({ initial, locales }: Props) {
     setProfilePending(true);
     setProfileStatus(null);
 
-    const { ok, data } = await send('/api/account', 'PATCH', { name, locale });
+    const { ok, data } = await send('/api/account', 'PATCH', { name, locale, theme });
     setProfilePending(false);
 
     if (!ok) {
@@ -75,8 +84,10 @@ export function AccountClient({ initial, locales }: Props) {
       return;
     }
     setProfileStatus({ kind: 'ok', text: t('profileSaved') });
+    // At once, rather than waiting for the refresh to repaint the page.
+    document.documentElement.dataset.theme = theme;
     // The language and the name in the header are rendered on the server.
-    if (locale !== initial.locale || name.trim() !== initial.name) router.refresh();
+    if (locale !== initial.locale || theme !== initial.theme || name.trim() !== initial.name) router.refresh();
   }
 
   async function savePassword(event: React.FormEvent) {
@@ -163,6 +174,36 @@ export function AccountClient({ initial, locales }: Props) {
               ))}
             </select>
           </div>
+          <fieldset className="sm:col-span-2">
+            <legend className="label">{t('theme')}</legend>
+            <div className="mt-1 grid gap-3 sm:grid-cols-2">
+              {THEMES.map((option) => (
+                <label
+                  key={option}
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 ${
+                    theme === option ? 'border-brand-500 ring-2 ring-brand-200' : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="theme"
+                    className="h-4 w-4 border-slate-300 text-brand-500 focus:ring-brand-500"
+                    checked={theme === option}
+                    onChange={() => setTheme(option)}
+                  />
+                  <span aria-hidden className="flex shrink-0 overflow-hidden rounded-md ring-1 ring-black/10">
+                    {THEME_SWATCHES[option].map((colour) => (
+                      <span key={colour} className="h-6 w-4" style={{ background: colour }} />
+                    ))}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-slate-900">{t(`themes.${option}`)}</span>
+                    <span className="block text-xs text-slate-600">{t(`themeHints.${option}`)}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <div className="sm:col-span-2">
             <label className="label" htmlFor="accountEmail">
               {t('email')}

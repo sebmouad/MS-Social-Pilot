@@ -26,7 +26,16 @@
     "signOutOthers": "Sign out other devices",
     "signedOutOthers": "{count, plural, =0 {There were no other devices to sign out.} one {Signed out one other device.} other {Signed out # other devices.}}",
     "subtitle": "Your own name, language, password and signed-in devices. These follow you across every client.",
-    "title": "Account"
+    "title": "Account",
+    "theme": "Look",
+    "themes": {
+      "facebook": "Facebook",
+      "warm": "Warm"
+    },
+    "themeHints": {
+      "facebook": "Blue accent on Facebook’s greys, the default.",
+      "warm": "Cream sidebar, amber accent, dark icon rail."
+    }
   },
   "accounts": {
     "title": "Connected accounts",
@@ -1306,7 +1315,7 @@
     "rail_inbox": "Inbox",
     "rail_analyse": "Analytics",
     "rail_ads": "Ads",
-    "rail_workspace": "Workspace",
+    "rail_workspace": "Settings",
     "areas": "Main areas",
     "breadcrumb": "You are here",
     "workspaceSettings": "Workspace settings",

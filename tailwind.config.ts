@@ -12,36 +12,25 @@ import type { Config } from 'tailwindcss';
  * passes. And `slate` is redefined wholesale rather than added beside, so the
  * hundreds of `text-slate-*` and `bg-slate-*` classes already in the screens
  * move to Facebook's greys together instead of half of them staying cool blue.
+ *
+ * Both scales are CSS variables, set per theme in `src/app/globals.css`
+ * (Facebook by default, Warm on request), so a theme is one attribute on
+ * `<html>` and no class changes.
  */
+const STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
+
+/** A colour scale read from the theme's CSS variables (`globals.css`). */
+function themed(name: string): Record<number, string> {
+  return Object.fromEntries(STEPS.map((step) => [step, `rgb(var(--${name}-${step}) / <alpha-value>)`]));
+}
+
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: '#e7f3ff',
-          100: '#dbebff',
-          200: '#b8d6fe',
-          300: '#86b9fb',
-          400: '#4e97f6',
-          500: '#1877f2',
-          600: '#1467d6',
-          700: '#0f57b8',
-          800: '#0c4795',
-          900: '#0a3a78',
-        },
-        slate: {
-          50: '#f7f8fa',
-          100: '#f0f2f5',
-          200: '#e4e6eb',
-          300: '#ced0d4',
-          400: '#8a8d91',
-          500: '#6a6d72',
-          600: '#65676b',
-          700: '#3e4042',
-          800: '#1c1e21',
-          900: '#050505',
-        },
+        brand: themed('brand'),
+        slate: themed('slate'),
       },
       fontFamily: {
         // Facebook's own stack: the platform's UI face on each system.

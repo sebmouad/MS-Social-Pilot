@@ -4,6 +4,7 @@ import { prisma } from './prisma';
 import { errors } from './errors';
 import { hashPassword, verifyPassword } from './crypto';
 import { hit } from './rate-limit';
+import { DEFAULT_THEME, isTheme, type Theme } from './themes';
 
 /**
  * A person's own account: what they are called, what language they read, their
@@ -23,6 +24,7 @@ export interface AccountSummary {
   name: string;
   email: string;
   locale: Locale;
+  theme: Theme;
   /** Other signed-in browsers, not counting this one. */
   otherSessions: number;
 }
@@ -31,7 +33,7 @@ export async function readAccount(userId: string, currentTokenHash: string | nul
   const [user, otherSessions] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { name: true, email: true, locale: true },
+      select: { name: true, email: true, locale: true, theme: true },
     }),
     prisma.session.count({
       where: {
@@ -42,18 +44,19 @@ export async function readAccount(userId: string, currentTokenHash: string | nul
     }),
   ]);
 
-  return { ...user, otherSessions };
+  return { ...user, theme: isTheme(user.theme) ? user.theme : DEFAULT_THEME, otherSessions };
 }
 
 export async function updateProfile(
   userId: string,
-  input: { name?: string; locale?: Locale },
+  input: { name?: string; locale?: Locale; theme?: Theme },
 ): Promise<void> {
   await prisma.user.update({
     where: { id: userId },
     data: {
       ...(input.name !== undefined ? { name: input.name.trim() } : {}),
       ...(input.locale !== undefined ? { locale: input.locale } : {}),
+      ...(input.theme !== undefined ? { theme: input.theme } : {}),
     },
   });
 }

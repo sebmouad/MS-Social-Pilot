@@ -140,6 +140,8 @@ model User {
   totpLastStep          Int?
   /// Page metrics this person pinned as tiles on the analysis (`metric::period`).
   pinnedMetrics         String[]  @default([])
+  /// The look picked in Settings → Account (`src/lib/themes.ts`).
+  theme                 String    @default("facebook")
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 

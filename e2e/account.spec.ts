@@ -169,3 +169,33 @@ test.describe('as the colleague', () => {
     expect(failures).toEqual([]);
   });
 });
+
+test('a person picks the Warm look, it follows them, and Facebook comes back', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await open(page, '/settings/account');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'facebook');
+
+  // A tick before hydration is undone by React, so wait for React's own
+  // highlight on the chosen option, not just the native check.
+  const warm = page.getByRole('radio', { name: /warm/i });
+  await expect(async () => {
+    await warm.check();
+    await expect(page.locator('label').filter({ has: warm })).toHaveClass(/ring-2/, { timeout: 1_500 });
+  }).toPass();
+  await page.getByRole('button', { name: /^save$/i }).first().click();
+  await expect(page.getByRole('status').filter({ hasText: /saved/i })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'warm');
+
+  // Another screen, rendered by the server, keeps it; the page under the cards turns cream.
+  await open(page, '/dashboard');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'warm');
+  const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  expect(background).toBe('rgb(245, 241, 232)');
+
+  // Back to the default, so the other walks see the usual look.
+  const reset = await page.request.patch('/api/account', { data: { theme: 'facebook' } });
+  expect(reset.status(), await reset.text()).toBe(200);
+  await open(page, '/dashboard');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'facebook');
+});

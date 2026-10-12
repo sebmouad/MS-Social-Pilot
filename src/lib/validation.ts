@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { LIMITS, Locale, PublishMode } from './constants';
 import { isValidTimeZone } from './time';
+import { THEMES } from './themes';
 
 /**
  * Request schemas. Every API route parses its input through one of these, so
@@ -38,8 +39,9 @@ export const profileSchema = z
   .object({
     name: z.string().trim().min(1, 'Enter your name.').max(120).optional(),
     locale: z.nativeEnum(Locale).optional(),
+    theme: z.enum(THEMES).optional(),
   })
-  .refine((value) => value.name !== undefined || value.locale !== undefined, {
+  .refine((value) => value.name !== undefined || value.locale !== undefined || value.theme !== undefined, {
     message: 'Nothing to change.',
   });
 

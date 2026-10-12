@@ -322,7 +322,7 @@ export function AppShell({
     <div className="min-h-screen lg:flex">
       <header className="sticky top-0 z-30 bg-white lg:flex lg:h-screen lg:shrink-0">
         {/* Laptop and up: the icon rail with the main areas… */}
-        <div className="hidden w-[76px] flex-col items-center border-r border-slate-200 bg-white py-3 lg:flex">
+        <div className="rail hidden w-[76px] flex-col items-center border-r py-3 lg:flex">
           <Link href="/dashboard" className="mb-3" aria-label={t('home')}>
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-[15px] font-bold text-white shadow-sm">SP</span>
           </Link>
@@ -337,11 +337,9 @@ export function AppShell({
                     <Link
                       href={first.href}
                       aria-current={active ? 'true' : undefined}
-                      className={`relative flex flex-col items-center gap-0.5 rounded-xl px-1 py-2 text-[11px] font-semibold leading-tight transition-colors ${
-                        active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
-                      }`}
+                      className="rail-item relative flex flex-col items-center gap-0.5 rounded-xl px-1 py-2 text-[11px] font-semibold leading-tight transition-colors"
                     >
-                      <Icon name={area.icon} size={22} className={active ? 'text-brand-600' : 'text-slate-500'} />
+                      <Icon name={area.icon} size={22} />
                       <span className="w-full truncate text-center">{area.rail}</span>
                       {badge > 0 && (
                         <span className="absolute right-1.5 top-1 rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white">{badge}</span>
@@ -366,7 +364,7 @@ export function AppShell({
 
         {/* …and beside it the sidebar with the pages of the area in use. */}
         {!collapsed && activeArea && (
-          <div className="hidden w-60 flex-col border-r border-slate-200 bg-white lg:flex">
+          <div className="shell-sidebar hidden w-60 flex-col border-r border-slate-200 lg:flex">
             <p className="px-5 pb-1 pt-5 text-[17px] font-bold text-slate-900">{activeArea.label}</p>
             <div className="px-3 py-2">{workspacePicker}</div>
             {composeButton && <div className="px-3 pb-2 pt-1">{composeButton}</div>}
@@ -463,7 +461,7 @@ export function AppShell({
             aria-pressed={collapsed}
             title={collapsed ? t('expandSidebar') : t('collapseSidebar')}
           >
-            <Icon name="chevronLeft" size={18} className={collapsed ? 'rotate-180' : ''} />
+            <Icon name="menu" size={18} />
             <span className="sr-only">{collapsed ? t('expandSidebar') : t('collapseSidebar')}</span>
           </button>
           <nav aria-label={t('breadcrumb')} className="min-w-0">

@@ -7,6 +7,42 @@
     color-scheme: light;
 
     /* ---------------------------------------------------------------------
+     * Theme tokens (`src/lib/themes.ts`). Tailwind's `brand-*` and `slate-*`
+     * read these, so every screen changes look together. Space-separated RGB
+     * so opacity modifiers (`bg-brand-500/20`) still work.
+     *
+     * Facebook (default): Facebook's blue and greys.
+     * ------------------------------------------------------------------- */
+    --brand-50: 231 243 255;
+    --brand-100: 219 235 255;
+    --brand-200: 184 214 254;
+    --brand-300: 134 185 251;
+    --brand-400: 78 151 246;
+    --brand-500: 24 119 242;
+    --brand-600: 20 103 214;
+    --brand-700: 15 87 184;
+    --brand-800: 12 71 149;
+    --brand-900: 10 58 120;
+    --slate-50: 247 248 250;
+    --slate-100: 240 242 245;
+    --slate-200: 228 230 235;
+    --slate-300: 206 208 212;
+    --slate-400: 138 141 145;
+    --slate-500: 106 109 114;
+    --slate-600: 101 103 107;
+    --slate-700: 62 64 66;
+    --slate-800: 28 30 33;
+    --slate-900: 5 5 5;
+    /* The icon rail beside the sidebar. */
+    --rail-bg: 255 255 255;
+    --rail-ink: 101 103 107;
+    --rail-ink-active: 15 87 184;
+    --rail-active-bg: 231 243 255;
+    --rail-hover-bg: 240 242 245;
+    --rail-border: 228 230 235;
+    --sidebar-bg: 255 255 255;
+
+    /* ---------------------------------------------------------------------
      * Data-visualisation tokens.
      *
      * Charts are written against these roles, never raw hex, so the whole
@@ -56,6 +92,39 @@
     --viz-critical: #d03b3b;
     /* Success *text* needs more contrast than the success mark. */
     --viz-good-text: #006300;
+  }
+
+  /* Warm: cream page and sidebar under white cards, an amber accent, a dark
+     icon rail. Amber text and buttons use the darker steps (brand-600 carries
+     white text at 5:1, brand-700 reads at 7:1 on white) to stay WCAG AA. */
+  :root[data-theme='warm'] {
+    --brand-50: 255 248 235;
+    --brand-100: 254 239 199;
+    --brand-200: 253 220 138;
+    --brand-300: 252 196 77;
+    --brand-400: 245 158 11;
+    --brand-500: 217 119 6;
+    --brand-600: 180 83 9;
+    --brand-700: 146 64 14;
+    --brand-800: 120 53 15;
+    --brand-900: 92 42 12;
+    --slate-50: 251 249 245;
+    --slate-100: 245 241 232;
+    --slate-200: 233 227 214;
+    --slate-300: 214 206 189;
+    --slate-400: 143 135 120;
+    --slate-500: 111 104 92;
+    --slate-600: 100 93 82;
+    --slate-700: 63 58 50;
+    --slate-800: 31 27 22;
+    --slate-900: 11 10 8;
+    --rail-bg: 43 36 28;
+    --rail-ink: 233 227 214;
+    --rail-ink-active: 252 196 77;
+    --rail-active-bg: 255 255 255 / 0.1;
+    --rail-hover-bg: 255 255 255 / 0.06;
+    --rail-border: 43 36 28;
+    --sidebar-bg: 251 249 245;
   }
 
   /* Inert until a theme toggle sets it: the app shell is light-only, and a
@@ -109,6 +178,25 @@
 }
 
 @layer components {
+  /* The app shell's icon rail and sidebar, coloured by the theme. */
+  .rail {
+    background: rgb(var(--rail-bg));
+    border-color: rgb(var(--rail-border));
+  }
+  .rail-item {
+    color: rgb(var(--rail-ink));
+  }
+  .rail-item:hover {
+    background: rgb(var(--rail-hover-bg));
+  }
+  .rail-item[aria-current] {
+    background: rgb(var(--rail-active-bg));
+    color: rgb(var(--rail-ink-active));
+  }
+  .shell-sidebar {
+    background: rgb(var(--sidebar-bg));
+  }
+
   /* Shared primitives, defined once so every screen looks like one product. */
   /* Facebook's surface: white, 8px corners, one soft shadow, no outline. */
   .card {

@@ -26,7 +26,16 @@
     "signOutOthers": "Déconnecter les autres appareils",
     "signedOutOthers": "{count, plural, =0 {Aucun autre appareil à déconnecter.} one {Un autre appareil a été déconnecté.} other {# autres appareils ont été déconnectés.}}",
     "subtitle": "Votre nom, votre langue, votre mot de passe et vos appareils connectés. Ces réglages vous suivent chez tous vos clients.",
-    "title": "Compte"
+    "title": "Compte",
+    "theme": "Apparence",
+    "themes": {
+      "facebook": "Facebook",
+      "warm": "Chaleureuse"
+    },
+    "themeHints": {
+      "facebook": "Accent bleu sur les gris de Facebook, par défaut.",
+      "warm": "Barre latérale crème, accent ambre, rail d’icônes sombre."
+    }
   },
   "accounts": {
     "title": "Comptes connectés",
@@ -1306,7 +1315,7 @@
     "rail_inbox": "Messages",
     "rail_analyse": "Analyses",
     "rail_ads": "Pubs",
-    "rail_workspace": "Espace",
+    "rail_workspace": "Réglages",
     "areas": "Rubriques principales",
     "breadcrumb": "Vous êtes ici",
     "workspaceSettings": "Réglages de l’espace",

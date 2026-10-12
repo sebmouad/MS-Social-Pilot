@@ -145,7 +145,7 @@ test('the icon rail lists the areas, the sidebar the pages of the one in use', a
   await open(page, '/queue');
 
   const rail = page.getByRole('navigation', { name: /main areas/i });
-  for (const name of [/^home$/i, /^publish$/i, /^inbox$/i, /^analytics$/i, /^workspace$/i]) {
+  for (const name of [/^home$/i, /^publish$/i, /^inbox$/i, /^analytics$/i, /^settings$/i]) {
     await expect(rail.getByRole('link', { name })).toBeVisible();
   }
   await expect(rail.getByRole('link', { name: /^publish$/i })).toHaveAttribute('aria-current', 'true');
