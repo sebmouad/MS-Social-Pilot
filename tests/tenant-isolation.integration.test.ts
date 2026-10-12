@@ -138,6 +138,9 @@ beforeAll(async () => {
   const captionTest = await prisma.captionTest.create({ data: { workspaceId: w, name: 'A test', status: 'decided', winnerLabel: 'A' } });
   const savedReply = await prisma.savedReply.create({ data: { workspaceId: w, name: 'A reply', body: 'x' } });
   const rule = await prisma.moderationRule.create({ data: { workspaceId: w, name: 'A rule', match: 'links', action: 'hide' } });
+  const exported = await prisma.workspaceExport.create({
+    data: { workspaceId: w, requestedById: ownerA.id, status: 'ready', storageKey: 'exports/a.zip', expiresAt: new Date(Date.now() + 86_400_000) },
+  });
   const moderated = await prisma.moderationAction.create({
     data: { workspaceId: w, ruleId: rule.id, ruleName: 'A rule', targetId: target.id, remoteCommentId: 'c-a', message: 'x', action: 'hide' },
   });
@@ -154,6 +157,7 @@ beforeAll(async () => {
     'chat-channels/[id]/test': chat.id,
     'connections/ads/[id]': ads.id,
     'connections/instagram/[id]': instagram.id,
+    'exports/[id]': exported.id,
     'feeds/[id]': feed.id,
     'labels/[id]': label.id,
     'media/[id]': media.id,

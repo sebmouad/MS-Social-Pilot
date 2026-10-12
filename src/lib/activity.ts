@@ -42,6 +42,7 @@ export const ACTIVITY_ACTIONS = [
   'team.pageAccessChanged',
   'team.removed',
   'team.roleChanged',
+  'workspace.exported',
 ] as const;
 
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];

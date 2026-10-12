@@ -46,7 +46,12 @@ Moderation rules (`/inbox/rules`, `/api/moderation/*`) use the existing
 editor may already do by hand, and undoing one is the same right. A member
 limited to some Pages sees and edits only rules that name only their Pages,
 and cannot write an "every Page" rule. **For the owner's audit (2026-10-12).**
-**For the owner's audit (2026-10-12).**
+
+Export everything (`/settings/export`, `POST /api/exports`,
+`GET /api/exports/[id]`, NEXT_PHASES G17): **workspace owner only**, not
+admins. The ZIP holds every Page's posts, comments, schedule, analytics and
+media of the workspace, never tokens; it expires after 7 days. Requests are
+logged as `workspace.exported`. **For the owner's audit (2026-10-12).**
 
 Notifications about one Page (failed post, hourly inbox email) go only to
 members who may see that Page and did not mute it there. Before 2026-10-12 a

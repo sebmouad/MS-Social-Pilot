@@ -1206,6 +1206,9 @@
       },
       "queue": {
         "bestTimesAdded": "added queue times from a Page’s best times"
+      },
+      "workspace": {
+        "exported": "asked for an export of everything"
       }
     },
     "byDeparted": "Someone no longer in this workspace",
@@ -3203,5 +3206,31 @@
     "views": "Views",
     "perThousand": "Per 1,000 views",
     "untitled": "(no text)"
+  },
+  "workspaceExport": {
+    "title": "Export everything",
+    "intro": "Download everything this workspace holds as one ZIP file of JSON, CSV and media files: for your own backups, moving elsewhere or answering a data request. The app builds it in the background; the download stays available for {days} days.",
+    "contentsPosts": "Every post, with its Pages, status, times, links and latest results (JSON and CSV)",
+    "contentsSchedule": "Queue times",
+    "contentsAnalytics": "Page insights as stored (CSV)",
+    "contentsComments": "Comments read from published posts",
+    "contentsMedia": "Media library files",
+    "noSecrets": "Access tokens, passwords and keys are never included.",
+    "request": "Build export",
+    "requesting": "Asking…",
+    "requestFailed": "Could not start the export. Try again.",
+    "pendingHint": "Building. This page updates by itself; a large media library can take a few minutes.",
+    "listTitle": "Exports",
+    "readyDetail": "{size} MB · expires {when}",
+    "failedDetail": "The export could not be built.",
+    "skipped": "{count, plural, one {# media file was left out to keep the ZIP under 4 GB or because it was missing.} other {# media files were left out to keep the ZIP under 4 GB or because they were missing.}}",
+    "download": "Download",
+    "status": {
+      "queued": "Waiting",
+      "building": "Building",
+      "ready": "Ready",
+      "failed": "Failed",
+      "expired": "Expired"
+    }
   }
 }

@@ -615,9 +615,16 @@ most time), the rest after Phase D2. S/M/L = effort.
   tokens, keys, bearer values, passwords, email addresses, long opaque values,
   query strings. Release = `RELEASE` file written by the deploy (`dev`
   otherwise). Pruned by housekeeping after 90 days unseen.*
-- **G17. Export everything (M)** — per workspace: posts, schedule, analytics,
+- **G17. Export everything (M)** ✅ — per workspace: posts, schedule, analytics,
   comments, media as a ZIP (JSON + CSV + files), built in the background with
   a download link that expires; also answers GDPR requests.
+  *Done 2026-10-12: Settings → Export (`/settings/export`), workspace owner
+  only. Table `workspace_exports`; worker job `exports` (every minute) builds
+  the oldest queued export with the in-app ZIP writer (`src/lib/zip.ts`, no
+  dependency): README, pages.json (no tokens), posts.json/csv, schedule.json,
+  analytics/pages.csv, comments.json, `media/`. Stored under the media folder,
+  expires and is deleted after 7 days; stuck builds fail after 1 hour. Logged
+  as `workspace.exported`.*
 - **G18. Promote a post (L)** — boost a published post (budget, duration,
   audience: location/age/interests, ad account) from the post card; results in
   the Ads view. Needs `ads_management` + Meta review and the owner's OK for each

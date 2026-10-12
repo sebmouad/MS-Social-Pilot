@@ -10,11 +10,14 @@ import { Icon, type IconName } from './Icon';
 export function SettingsNav({
   showPermissions = false,
   showHistory = true,
+  showExport = false,
 }: {
   /** Admins: the read-only list of who may do what in this workspace. */
   showPermissions?: boolean;
   /** Hidden from anyone who would only reach a refusal by clicking it. */
   showHistory?: boolean;
+  /** Owner only: download everything the workspace holds. */
+  showExport?: boolean;
 }) {
   const t = useTranslations();
   const pathname = usePathname();
@@ -31,6 +34,7 @@ export function SettingsNav({
     ...(showHistory
       ? [{ href: '/settings/history', label: t('history.title'), icon: 'clock' as IconName }]
       : []),
+    ...(showExport ? [{ href: '/settings/export', label: t('workspaceExport.title'), icon: 'download' as IconName }] : []),
     // Instance configuration lives in the root section now (/root/config).
     ...(showPermissions
       ? [{ href: '/settings/permissions', label: t('root.privileges.workspaceTitle'), icon: 'key' as IconName }]

@@ -279,6 +279,7 @@ model Workspace {
   instagramAccounts    InstagramAccount[]
   adAccounts           AdAccount[]
   moderationRules      ModerationRule[]
+  exports              WorkspaceExport[]
   moderationActions    ModerationAction[]
 
   @@map("workspaces")
@@ -1738,4 +1739,29 @@ model ErrorEvent {
 
   @@index([lastSeenAt])
   @@map("error_events")
+}
+
+/// A ZIP of everything a workspace holds (G17): posts, schedule, analytics,
+/// comments and media. Built by the worker; the download expires.
+model WorkspaceExport {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  requestedById String?
+  /// queued · building · ready · failed · expired
+  status        String    @default("queued")
+  /// Path within the media root while the file exists.
+  storageKey    String?
+  bytes         Int?
+  /// Media left out to stay under the ZIP size limit.
+  skippedMedia  Int       @default(0)
+  error         String?
+  createdAt     DateTime  @default(now())
+  finishedAt    DateTime?
+  expiresAt     DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([status])
+  @@map("workspace_exports")
 }

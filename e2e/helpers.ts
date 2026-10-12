@@ -85,6 +85,7 @@ export const SIGNED_IN_SCREENS = [
   '/settings/account',
   '/settings/media',
   '/settings/history',
+  '/settings/export',
   '/settings/sharing',
   '/settings/api',
   '/settings/pages',

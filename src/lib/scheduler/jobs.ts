@@ -15,6 +15,7 @@ import { discoverInstagramAccounts, syncWorkspaceInstagram } from '../instagram'
 import { discoverAdAccounts, syncWorkspaceAds } from '../ads';
 import { deleteUnusedMedia } from '../media';
 import { pruneErrors } from '../error-tracking';
+import { runExports } from '../workspace-export';
 import { pruneHistory, prunedTotal } from '../housekeeping';
 import { forEachEnabledPage, forEachWorkspace } from './iterate';
 import { fetchRemotePostState } from '../facebook/publish';
@@ -52,7 +53,8 @@ export type JobName =
   | 'queueEmpty'
   | 'captionTests'
   | 'bestTimes'
-  | 'alerts';
+  | 'alerts'
+  | 'exports';
 
 export interface JobContext {
   now: Date;
@@ -675,6 +677,12 @@ export function jobDefinitions(): JobDefinition[] {
       name: 'tokens',
       intervalMs: env.tokenExpiryCheckHours * 60 * 60 * 1000,
       run: runTokenExpiryCheck,
+    },
+    {
+      // Workspace exports (G17): database and disk only, no Graph calls.
+      name: 'exports',
+      intervalMs: 60 * 1000,
+      run: async ({ now }) => runExports(now),
     },
     {
       // Root's alerts: database reads and a disk check, no Graph calls.

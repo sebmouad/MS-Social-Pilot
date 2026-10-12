@@ -1206,6 +1206,9 @@
       },
       "queue": {
         "bestTimesAdded": "a ajouté des horaires à la file d’après les meilleurs moments d’une Page"
+      },
+      "workspace": {
+        "exported": "a demandé un export complet"
       }
     },
     "byDeparted": "Une personne qui n’est plus dans cet espace",
@@ -3203,5 +3206,31 @@
     "views": "Vues",
     "perThousand": "Pour 1 000 vues",
     "untitled": "(sans texte)"
+  },
+  "workspaceExport": {
+    "title": "Tout exporter",
+    "intro": "Téléchargez tout ce que contient cet espace en un seul fichier ZIP de JSON, CSV et médias : pour vos sauvegardes, pour partir ailleurs ou pour répondre à une demande d’accès aux données. L’application le prépare en arrière-plan ; le téléchargement reste disponible {days} jours.",
+    "contentsPosts": "Chaque publication, avec ses Pages, son statut, ses dates, ses liens et ses derniers résultats (JSON et CSV)",
+    "contentsSchedule": "Les horaires de la file",
+    "contentsAnalytics": "Les statistiques des Pages telles qu’enregistrées (CSV)",
+    "contentsComments": "Les commentaires lus sur les publications",
+    "contentsMedia": "Les fichiers de la médiathèque",
+    "noSecrets": "Les jetons d’accès, mots de passe et clés ne sont jamais inclus.",
+    "request": "Préparer l’export",
+    "requesting": "Demande…",
+    "requestFailed": "Impossible de lancer l’export. Réessayez.",
+    "pendingHint": "Préparation en cours. Cette page se met à jour toute seule ; une grande médiathèque peut prendre quelques minutes.",
+    "listTitle": "Exports",
+    "readyDetail": "{size} Mo · expire {when}",
+    "failedDetail": "L’export n’a pas pu être préparé.",
+    "skipped": "{count, plural, one {# fichier média a été laissé de côté pour rester sous 4 Go ou parce qu’il manquait.} other {# fichiers médias ont été laissés de côté pour rester sous 4 Go ou parce qu’ils manquaient.}}",
+    "download": "Télécharger",
+    "status": {
+      "queued": "En attente",
+      "building": "En préparation",
+      "ready": "Prêt",
+      "failed": "Échec",
+      "expired": "Expiré"
+    }
   }
 }
