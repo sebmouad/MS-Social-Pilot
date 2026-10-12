@@ -122,11 +122,16 @@ test('two profiles add up on All profiles, and the selection follows to Posts an
 });
 
 test('the Pages column folds to a rail of pictures and stays folded', async ({ page }) => {
+  test.setTimeout(120_000);
   const failures = collectFailures(page);
   await open(page, '/calendar');
   const column = page.getByRole('complementary', { name: 'Pages' });
-  await column.getByRole('button', { name: 'Fold the Pages column' }).click();
-  await expect(column.getByRole('button', { name: `Hide ${SECOND_PAGE}` })).toBeHidden();
+  // A click that lands before hydration does nothing: click until it folds.
+  await expect(async () => {
+    const fold = column.getByRole('button', { name: 'Fold the Pages column' });
+    if (await fold.isVisible()) await fold.click();
+    await expect(column.getByRole('button', { name: `Hide ${SECOND_PAGE}` })).toBeHidden({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
 
   // Clicking a picture shows that Page alone, as the open column does.
   await column.getByRole('button', { name: `Show ${SECOND_PAGE} only` }).click();

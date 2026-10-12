@@ -57,6 +57,8 @@ test('an empty composer says why it cannot send yet', async ({ page }) => {
 });
 
 test('the nav offers every screen it links to', async ({ page }) => {
+  // One request per screen, each compiled on first visit by the dev server.
+  test.setTimeout(180_000);
   await open(page, '/dashboard');
 
   const hrefs = await page
