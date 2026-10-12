@@ -56,9 +56,9 @@ export default async function RootAgencyPage({ searchParams }: { searchParams: P
         <p className="card p-6 text-sm text-slate-600">{t('empty')}</p>
       ) : (
         <div className="card scroll-x p-0">
-          <table className="w-full min-w-[48rem] text-sm tabular-nums">
+          <table className="data-table w-full min-w-[48rem] text-sm tabular-nums">
             <caption className="sr-only">{t('title')}</caption>
-            <thead className="border-b border-slate-200 text-xs text-slate-500">
+            <thead>
               <tr>{AGENCY_COLUMNS.map(header)}</tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

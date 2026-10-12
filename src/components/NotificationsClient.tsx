@@ -119,7 +119,7 @@ export function NotificationsClient({
           <h2 className="text-sm font-semibold text-slate-900">{t('perPageTitle')}</h2>
           <p className="mt-1 text-xs text-slate-600">{t('perPageHint')}</p>
           <div className="scroll-x mt-3">
-            <table className="w-full min-w-[22rem] text-sm">
+            <table className="data-table w-full min-w-[22rem] text-sm">
               <thead>
                 <tr className="text-start text-xs text-slate-500">
                   <th scope="col" className="py-2 pe-3 font-medium">{t('perPagePage')}</th>

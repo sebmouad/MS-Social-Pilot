@@ -69,7 +69,7 @@ export async function ResponseTimeView(props: {
       <section className="card p-4" aria-labelledby="response-pages">
         <Heading id="response-pages" className="text-base font-semibold text-slate-900">{t('byPage')}</Heading>
         <div className="scroll-x mt-3">
-          <table className="w-full min-w-[560px] text-sm">
+          <table className="data-table w-full min-w-[560px] text-sm">
             {head(t('page'))}
             <tbody>
               {data.pages.map((page) => (
@@ -86,7 +86,7 @@ export async function ResponseTimeView(props: {
         <Heading id="response-members" className="text-base font-semibold text-slate-900">{t('byMember')}</Heading>
         <p className="mt-1 text-xs text-slate-500">{t('byMemberHint')}</p>
         <div className="scroll-x mt-3">
-          <table className="w-full min-w-[360px] text-sm">
+          <table className="data-table w-full min-w-[360px] text-sm">
             <thead>
               <tr className="text-start text-xs font-semibold text-slate-500">
                 <th scope="col" className="pb-2 pe-3">{t('member')}</th>

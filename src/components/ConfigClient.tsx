@@ -552,9 +552,9 @@ function AiSpendPanel({ spend }: { spend: AiSpendView }) {
       ) : (
         <>
           <div className="scroll-x">
-            <table className="w-full min-w-[32rem] text-start text-sm tabular-nums">
+            <table className="data-table w-full min-w-[32rem] text-start text-sm tabular-nums">
               <caption className="sr-only">{t('aiSpendByModel')}</caption>
-              <thead className="text-xs text-slate-500">
+              <thead>
                 <tr>
                   <th className="py-1 pe-3 font-medium">{t('aiSpendModel')}</th>
                   <th className="py-1 pe-3 text-end font-medium">{t('aiSpendGenerationsShort')}</th>
@@ -588,9 +588,9 @@ function AiSpendPanel({ spend }: { spend: AiSpendView }) {
           </div>
 
           <div className="scroll-x">
-            <table className="w-full min-w-[20rem] text-start text-sm tabular-nums">
+            <table className="data-table w-full min-w-[20rem] text-start text-sm tabular-nums">
               <caption className="sr-only">{t('aiSpendByWorkspace')}</caption>
-              <thead className="text-xs text-slate-500">
+              <thead>
                 <tr>
                   <th className="py-1 pe-3 font-medium">{t('aiSpendWorkspace')}</th>
                   <th className="py-1 pe-3 text-end font-medium">{t('aiSpendGenerationsShort')}</th>

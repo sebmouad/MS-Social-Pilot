@@ -102,8 +102,8 @@ export function AgencyClient({ clients, people, currentId }: { clients: Client[]
           <EmptyState title={t('noTeam')} />
         ) : (
           <div className="card scroll-x p-0">
-            <table className="w-full text-start text-sm">
-              <thead className="border-b border-slate-200 text-xs text-slate-500">
+            <table className="data-table w-full text-start text-sm">
+              <thead>
                 <tr>
                   <th scope="col" className="px-4 py-2 text-start font-medium">{t('person')}</th>
                   {clients.map((client) => (

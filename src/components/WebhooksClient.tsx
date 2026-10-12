@@ -225,9 +225,9 @@ export function WebhooksClient({ webhooks }: { webhooks: Webhook[] }) {
                       <p className="px-3 py-3 text-xs text-slate-500">{t('noDeliveries')}</p>
                     ) : (
                       <div className="scroll-x">
-                        <table className="w-full text-start text-xs">
+                        <table className="data-table w-full text-start text-xs">
                           <caption className="sr-only">{t('deliveries')}</caption>
-                          <thead className="bg-slate-50 text-slate-500">
+                          <thead>
                             <tr>
                               <th scope="col" className="px-3 py-2 font-semibold">{t('colWhen')}</th>
                               <th scope="col" className="px-3 py-2 font-semibold">{t('colEvent')}</th>

@@ -109,8 +109,8 @@ export function WorkspacesTable({ workspaces }: { workspaces: RootWorkspace[] })
         </button>
       </form>
       <div className="card scroll-x p-0">
-        <table className="w-full min-w-[40rem] text-start text-sm tabular-nums">
-          <thead className="border-b border-slate-200 text-xs text-slate-500">
+        <table className="data-table w-full min-w-[40rem] text-start text-sm tabular-nums">
+          <thead>
             <tr>
               <th className="px-4 py-2 font-medium">{t('workspaces.name')}</th>
               <th className="px-4 py-2 font-medium">{t('workspaces.owners')}</th>
@@ -210,8 +210,8 @@ export function UsersTable({ users }: { users: RootUser[] }) {
     <div className="space-y-3">
       {messages}
       <div className="card scroll-x p-0">
-        <table className="w-full min-w-[44rem] text-start text-sm">
-          <thead className="border-b border-slate-200 text-xs text-slate-500">
+        <table className="data-table w-full min-w-[44rem] text-start text-sm">
+          <thead>
             <tr>
               <th className="px-4 py-2 font-medium">{t('users.person')}</th>
               <th className="px-4 py-2 font-medium">{t('users.workspaces')}</th>
@@ -386,8 +386,8 @@ export function InvitationsTable({ invitations }: { invitations: RootInvitation[
     <div className="space-y-3">
       {messages}
       <div className="scroll-x">
-        <table className="w-full min-w-[36rem] text-start text-sm">
-          <thead className="text-xs text-slate-500">
+        <table className="data-table w-full min-w-[36rem] text-start text-sm">
+          <thead>
             <tr>
               <th className="py-2 pe-3 font-medium">{t('registration.email')}</th>
               <th className="py-2 pe-3 font-medium">{t('registration.workspace')}</th>
@@ -772,8 +772,8 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
           <p className="text-sm text-slate-600">{t('workspace.membersHelp')}</p>
         </div>
         <div className="scroll-x">
-          <table className="w-full min-w-[44rem] text-start text-sm">
-            <thead className="border-y border-slate-200 text-xs text-slate-500">
+          <table className="data-table w-full min-w-[44rem] text-start text-sm">
+            <thead>
               <tr>
                 <th className="px-4 py-2 font-medium">{t('users.person')}</th>
                 <th className="px-4 py-2 font-medium">{t('workspace.role')}</th>

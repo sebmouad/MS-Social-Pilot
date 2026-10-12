@@ -1058,8 +1058,8 @@ async function InstagramView({
         <EmptyState title={t('noInsights')} />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[620px] text-sm">
-            <thead className="border-b border-slate-200 text-start text-[13px] font-semibold text-slate-600">
+          <table className="data-table w-full min-w-[620px] text-sm">
+            <thead>
               <tr>
                 <th className="px-4 py-3">{t('metric')}</th>
                 <th className="px-4 py-3">{t('period')}</th>
@@ -1090,8 +1090,8 @@ async function InstagramView({
 
       {media.length > 0 && (
         <div className="card overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="border-b border-slate-200 text-start text-[13px] font-semibold text-slate-600">
+          <table className="data-table w-full min-w-[720px] text-sm">
+            <thead>
               <tr>
                 <th className="px-4 py-3">{t('media')}</th>
                 <th className="px-4 py-3 text-end">{t('reach')}</th>

@@ -102,8 +102,8 @@ export default async function CaptionTestsPage() {
                 </div>
 
                 <div className="scroll-x">
-                  <table className="w-full min-w-[32rem] text-start text-sm">
-                    <thead className="text-xs text-slate-500">
+                  <table className="data-table w-full min-w-[32rem] text-start text-sm">
+                    <thead>
                       <tr>
                         <th scope="col" className="py-1 pe-3 font-medium">{t('caption')}</th>
                         <th scope="col" className="py-1 pe-3 font-medium">{t('pages')}</th>

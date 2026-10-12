@@ -112,8 +112,8 @@ export default async function LinkClicksPage({
               <h2 id="clicks-pages" className="text-sm font-semibold text-slate-900">
                 {t('byPage')}
               </h2>
-              <table className="mt-2 w-full text-sm">
-                <thead className="text-xs text-slate-500">
+              <table className="data-table mt-2 w-full text-sm">
+                <thead>
                   <tr>
                     <th scope="col" className="py-1.5 text-start font-medium">{t('page')}</th>
                     <th scope="col" className="py-1.5 text-end font-medium">{t('clicks')}</th>
@@ -134,8 +134,8 @@ export default async function LinkClicksPage({
               <h2 id="clicks-articles" className="text-sm font-semibold text-slate-900">
                 {t('topArticles')}
               </h2>
-              <table className="mt-2 w-full table-fixed text-sm">
-                <thead className="text-xs text-slate-500">
+              <table className="data-table mt-2 w-full table-fixed text-sm">
+                <thead>
                   <tr>
                     <th scope="col" className="py-1.5 text-start font-medium">{t('article')}</th>
                     <th scope="col" className="w-20 py-1.5 text-end font-medium">{t('clicks')}</th>
@@ -163,8 +163,8 @@ export default async function LinkClicksPage({
             </h2>
             <p className="hint">{t('perThousandHint')}</p>
             <div className="scroll-x">
-              <table className="mt-2 w-full min-w-[32rem] text-sm">
-                <thead className="text-xs text-slate-500">
+              <table className="data-table mt-2 w-full min-w-[32rem] text-sm">
+                <thead>
                   <tr>
                     <th scope="col" className="py-1.5 text-start font-medium">{t('post')}</th>
                     <th scope="col" className="py-1.5 text-end font-medium">{t('clicks')}</th>

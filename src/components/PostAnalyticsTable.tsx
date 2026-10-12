@@ -263,7 +263,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
 
       {/* Wide table: scrolls inside its own container, never the page. */}
       <div className="scroll-x mt-3 hidden sm:block">
-        <table className="w-full min-w-[56rem] text-sm">
+        <table className="data-table w-full min-w-[56rem] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-start text-[13px] font-semibold text-slate-600">
               <th scope="col" className="py-2 pe-3 font-medium">

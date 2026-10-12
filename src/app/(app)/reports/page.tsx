@@ -341,7 +341,7 @@ export default async function ReportsPage({
                   <h3 className="mb-3 text-sm font-semibold text-slate-900">{t('byDestination')}</h3>
                   {/* Wide table: scrolls inside its own container rather than the page. */}
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[42rem] text-sm">
+                    <table className="data-table w-full min-w-[42rem] text-sm">
                       <thead>
                         <tr className="border-b border-slate-200 text-start text-[13px] font-semibold text-slate-600">
                           <th scope="col" className="py-2 pe-3 font-medium">{t('destination')}</th>

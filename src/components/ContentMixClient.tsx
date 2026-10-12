@@ -116,7 +116,7 @@ export function ContentMixClient({
           <p className="mt-3 text-sm text-slate-600">{canEdit ? t('noneAdmin') : t('none')}</p>
         ) : (
           <div className="scroll-x mt-3">
-            <table className="w-full min-w-[520px] text-sm">
+            <table className="data-table w-full min-w-[520px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-start text-xs uppercase tracking-wide text-slate-500">
                   <th className="py-2 pe-3 text-start font-semibold">{t('page')}</th>

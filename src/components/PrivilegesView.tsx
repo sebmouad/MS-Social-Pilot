@@ -25,8 +25,8 @@ export async function PrivilegesView({
       <section className="card p-0">
         <h2 className="px-4 pt-4 text-sm font-semibold text-slate-900">{t('matrix')}</h2>
         <div className="scroll-x px-4 pb-4">
-          <table className="mt-3 w-full min-w-[32rem] text-start text-sm">
-            <thead className="text-xs text-slate-500">
+          <table className="data-table mt-3 w-full min-w-[32rem] text-start text-sm">
+            <thead>
               <tr>
                 <th className="py-2 pe-3 font-medium">{t('capability')}</th>
                 {ROLES_BY_RANK.map((role) => (
@@ -58,8 +58,8 @@ export async function PrivilegesView({
       <section className="card p-0">
         <h2 className="px-4 pt-4 text-sm font-semibold text-slate-900">{t('members', { count: members.length })}</h2>
         <div className="scroll-x px-4 pb-4">
-          <table className="mt-3 w-full min-w-[40rem] text-start text-sm">
-            <thead className="text-xs text-slate-500">
+          <table className="data-table mt-3 w-full min-w-[40rem] text-start text-sm">
+            <thead>
               <tr>
                 {showWorkspace && <th className="py-2 pe-3 font-medium">{t('workspace')}</th>}
                 <th className="py-2 pe-3 font-medium">{t('person')}</th>

@@ -385,6 +385,15 @@
     @apply mt-1 text-xs text-red-600;
   }
 
+  /* Every table: one header look (small, grey, ruled underneath), start-aligned
+     unless a cell says otherwise. Cell padding stays with the table. */
+  .data-table thead {
+    @apply border-b border-slate-200 text-xs text-slate-500;
+  }
+  .data-table th {
+    @apply text-start font-medium;
+  }
+
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
   }

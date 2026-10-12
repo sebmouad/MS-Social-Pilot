@@ -607,8 +607,8 @@ export async function ComparePagesView({
         <p className="mt-0.5 text-xs text-slate-500">{t('compare.hint', { days })}</p>
       </div>
       <div className="scroll-x">
-        <table className="mt-3 w-full min-w-[760px] text-sm">
-          <thead className="border-y border-slate-200 bg-slate-50 text-start text-[13px] font-semibold text-slate-600">
+        <table className="data-table mt-3 w-full min-w-[760px] text-sm">
+          <thead>
             <tr>
               <th scope="col" className="px-4 py-2">{t('compare.page')}</th>
               {header('health', t('compare.health'), 'left')}

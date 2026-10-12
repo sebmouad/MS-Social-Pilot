@@ -142,9 +142,9 @@ export default async function RootWorkerPage() {
 
             {objects.length > 0 && (
               <div className="scroll-x">
-                <table className="w-full min-w-[28rem] text-start text-sm">
+                <table className="data-table w-full min-w-[28rem] text-start text-sm">
                   <caption className="sr-only">{t('objectsTitle')}</caption>
-                  <thead className="text-xs text-slate-500">
+                  <thead>
                     <tr>
                       <th scope="col" className="py-1.5 pe-3 font-medium">{t('object')}</th>
                       <th scope="col" className="py-1.5 pe-3 font-medium">{t('objectUsage')}</th>
@@ -174,9 +174,9 @@ export default async function RootWorkerPage() {
             {(heaviest.length > 0 || calls.jobs.length > 0) && (
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="scroll-x">
-                  <table className="w-full text-start text-sm">
+                  <table className="data-table w-full text-start text-sm">
                     <caption className="pb-1 text-start text-xs font-semibold text-slate-700">{t('heaviestObjects')}</caption>
-                    <thead className="text-xs text-slate-500">
+                    <thead>
                       <tr>
                         <th scope="col" className="py-1.5 pe-3 font-medium">{t('object')}</th>
                         <th scope="col" className="py-1.5 font-medium">{t('calls')}</th>
@@ -193,9 +193,9 @@ export default async function RootWorkerPage() {
                   </table>
                 </div>
                 <div className="scroll-x">
-                  <table className="w-full text-start text-sm">
+                  <table className="data-table w-full text-start text-sm">
                     <caption className="pb-1 text-start text-xs font-semibold text-slate-700">{t('heaviestJobs')}</caption>
-                    <thead className="text-xs text-slate-500">
+                    <thead>
                       <tr>
                         <th scope="col" className="py-1.5 pe-3 font-medium">{t('job')}</th>
                         <th scope="col" className="py-1.5 font-medium">{t('calls')}</th>
