@@ -25,6 +25,7 @@ export function RootShell({ userName, children }: { userName: string; children: 
     { href: '/root/workspaces', label: t('nav.workspaces'), icon: 'folders' },
     { href: '/root/users', label: t('nav.users'), icon: 'team' },
     { href: '/root/plans', label: t('nav.plans'), icon: 'tag' },
+    { href: '/root/changelog', label: t('nav.changelog'), icon: 'pencil' },
     { href: '/root/sessions', label: t('nav.sessions'), icon: 'globe' },
     { href: '/root/registration', label: t('nav.registration'), icon: 'mail' },
     { href: '/root/privileges', label: t('nav.privileges'), icon: 'key' },

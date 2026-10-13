@@ -954,8 +954,13 @@ generic (CLAUDE.md rule 9). Items:
   (ties to 0.2 costs).
 - **S6. White-label (decided: yes, final step)** — custom domain per customer for the
   client portal and share links, custom logo/colours (theme tokens from D2).
-- **S7. Product site and docs** — public landing, pricing, help center, status
+- **S7. Product site and docs** ✅ — public landing, pricing, help center, status
   page (G15), changelog. All copy generic.
+  *Done 2026-10-13:* root switch `site.public` (Root › Configuration ›
+  Operator, off by default). On: signed-out visitors get `/` (home),
+  `/pricing` (Root › Plans), `/help` (FAQ), `/changelog` (written in
+  Root › Changelog, `ChangelogEntry`) and `/status` (web app + scheduler
+  only). Off: those pages 404 and `/` goes to sign-in as before.
 
 ## Phase E — Blocked on owner / Meta (unchanged)
 Meta App Review step 2 → Live mode; owner enters the Gmail app password and the

@@ -2644,7 +2644,8 @@
       "status": "Status",
       "errors": "Errors",
       "agency": "Agency overview",
-      "plans": "Plans"
+      "plans": "Plans",
+      "changelog": "Changelog"
     },
     "overview": {
       "title": "Installation overview",
@@ -2790,7 +2791,9 @@
         "subscriber_planChanged": "{email} moved to plan {plan} with {extra} extra channels",
         "workspace_created": "Created workspace {name} for {owner}",
         "workspace_deleted": "Deleted workspace {name}",
-        "user_deleted": "Deleted the account of {email}"
+        "user_deleted": "Deleted the account of {email}",
+        "changelog_added": "Changelog entry “{title}” added",
+        "changelog_removed": "A changelog entry was deleted"
       }
     },
     "danger": {
@@ -3066,6 +3069,20 @@
       "noPlan": "No plan (no limits)",
       "planFor": "Plan for {name}",
       "extraFor": "Extra channels for {name}"
+    },
+    "changelog": {
+      "title": "Changelog",
+      "subtitle": "Entries appear on the public /changelog page, newest first.",
+      "siteOff": "The public product site is off (Root › Configuration › Operator), so nobody sees these entries yet.",
+      "date": "Date",
+      "entryTitle": "Title",
+      "body": "Details (optional)",
+      "add": "Add entry",
+      "empty": "No entries yet. Add the first change you want customers to know about.",
+      "delete": "Delete",
+      "deleteTitle": "Delete this entry?",
+      "deleteBody": "“{title}” disappears from the public changelog.",
+      "failed": "Could not save. Try again."
     }
   },
   "twoStep": {
@@ -4335,5 +4352,116 @@
     "noText": "(no text)",
     "note": "Counters are read again regularly. Bluesky, Mastodon, X and YouTube report them; a dash means the network does not report that counter, or its counters are not read yet.",
     "views": "Views"
+  },
+  "site": {
+    "nav": {
+      "label": "Product",
+      "pricing": "Pricing",
+      "help": "Help",
+      "changelog": "Changelog",
+      "status": "Status"
+    },
+    "signIn": "Sign in",
+    "start": "Start free",
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "dataDeletion": "Data deletion",
+    "home": {
+      "title": "Plan, publish and measure every channel with {product}",
+      "subtitle": "One calendar for all your clients’ pages and profiles: schedule posts, answer comments and send clear reports.",
+      "cta": "Create your workspace",
+      "seePricing": "See pricing",
+      "features": {
+        "plan": {
+          "title": "Plan ahead",
+          "body": "A shared calendar and queue per channel, with suggested times and approvals before anything goes out."
+        },
+        "networks": {
+          "title": "Every network",
+          "body": "Facebook, Instagram, Bluesky, Mastodon, LinkedIn, Threads, X, Pinterest and more from one composer."
+        },
+        "inbox": {
+          "title": "One inbox",
+          "body": "Comments and replies in one stream, assigned to the right teammate and marked done together."
+        },
+        "analytics": {
+          "title": "Clear analytics",
+          "body": "Reach, engagement and growth across the channels you pick, with totals that add up correctly."
+        },
+        "team": {
+          "title": "Built for teams",
+          "body": "Roles, per-channel access and client approval links that need no account."
+        },
+        "reports": {
+          "title": "Reports clients read",
+          "body": "Branded reports by email on a schedule, or as a link you share."
+        }
+      }
+    },
+    "pricing": {
+      "title": "Pricing",
+      "subtitle": "Pick a plan; change or cancel it at any time.",
+      "none": "Plans are not published yet.",
+      "free": "Free",
+      "perMonth": "{price} / month",
+      "perYear": "or {price} / year",
+      "channels": "{count, plural, one {# channel} other {# channels}}",
+      "channelsUnlimited": "Unlimited channels",
+      "members": "{count, plural, one {# team member} other {# team members}}",
+      "membersUnlimited": "Unlimited team members",
+      "posts": "{count, plural, one {# scheduled post a month} other {# scheduled posts a month}}",
+      "postsUnlimited": "Unlimited scheduled posts",
+      "extraChannel": "Extra channel: {price} / month",
+      "feature": {
+        "clients": "Client logins and approval links",
+        "whiteLabel": "Your own logo and domain",
+        "api": "API and integrations"
+      },
+      "choose": "Get started"
+    },
+    "help": {
+      "title": "Help",
+      "connect": {
+        "q": "How do I connect my pages and profiles?",
+        "a": "After signing up, open Channels and pick a network. Facebook and Instagram connect with your Facebook login; other networks ask for their own sign-in."
+      },
+      "schedule": {
+        "q": "How does scheduling work?",
+        "a": "Write a post once, pick the channels and a time, or add it to a channel’s queue. The app publishes it at that time, even when nobody is signed in."
+      },
+      "networks": {
+        "q": "Which networks are supported?",
+        "a": "Facebook Pages and Groups, Instagram, Bluesky, Mastodon, LinkedIn, Threads, X, Pinterest, Telegram, YouTube and TikTok, depending on what the installation has switched on."
+      },
+      "team": {
+        "q": "Can my team work together?",
+        "a": "Yes. Invite teammates with a role (admin, editor, contributor, viewer) and choose which channels each one can use."
+      },
+      "clients": {
+        "q": "Can clients approve posts?",
+        "a": "Send an approval link: the client sees the post and approves or asks for changes without creating an account."
+      },
+      "analytics": {
+        "q": "Where do the numbers come from?",
+        "a": "Straight from each network’s API, read regularly in the background and kept so history stays available."
+      },
+      "data": {
+        "q": "How do I get my data out or delete it?",
+        "a": "Workspace owners can export everything as a ZIP from Settings. The data deletion page explains how to remove an account."
+      }
+    },
+    "changelog": {
+      "title": "Changelog",
+      "empty": "Nothing published yet."
+    },
+    "status": {
+      "title": "Status",
+      "allUp": "All systems running",
+      "degraded": "Some systems have a problem; we are on it.",
+      "app": "Web app",
+      "scheduler": "Publishing scheduler",
+      "up": "Running",
+      "down": "Problem"
+    }
   }
 }

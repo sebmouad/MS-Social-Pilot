@@ -2644,7 +2644,8 @@
       "status": "État",
       "errors": "Erreurs",
       "agency": "Vue d’agence",
-      "plans": "Formules"
+      "plans": "Formules",
+      "changelog": "Nouveautés"
     },
     "overview": {
       "title": "Vue d’ensemble de l’installation",
@@ -2790,7 +2791,9 @@
         "subscriber_planChanged": "{email} passe à la formule {plan} avec {extra} canaux supplémentaires",
         "workspace_created": "Espace {name} créé pour {owner}",
         "workspace_deleted": "Espace {name} supprimé",
-        "user_deleted": "Compte de {email} supprimé"
+        "user_deleted": "Compte de {email} supprimé",
+        "changelog_added": "Entrée « {title} » ajoutée aux nouveautés",
+        "changelog_removed": "Une entrée des nouveautés a été supprimée"
       }
     },
     "danger": {
@@ -3066,6 +3069,20 @@
       "noPlan": "Aucune formule (sans limite)",
       "planFor": "Formule de {name}",
       "extraFor": "Canaux supplémentaires de {name}"
+    },
+    "changelog": {
+      "title": "Nouveautés",
+      "subtitle": "Les entrées apparaissent sur la page publique /changelog, de la plus récente à la plus ancienne.",
+      "siteOff": "Le site public est désactivé (Root › Configuration › Opérateur) : personne ne voit encore ces entrées.",
+      "date": "Date",
+      "entryTitle": "Titre",
+      "body": "Détails (facultatif)",
+      "add": "Ajouter",
+      "empty": "Aucune entrée. Ajoutez le premier changement à faire connaître aux clients.",
+      "delete": "Supprimer",
+      "deleteTitle": "Supprimer cette entrée ?",
+      "deleteBody": "« {title} » disparaît de la page publique des nouveautés.",
+      "failed": "Enregistrement impossible. Réessayez."
     }
   },
   "twoStep": {
@@ -4335,5 +4352,116 @@
     "noText": "(sans texte)",
     "note": "Les compteurs sont relus régulièrement. Bluesky, Mastodon, X et YouTube les fournissent ; un tiret signifie que le réseau ne fournit pas ce compteur, ou que ses compteurs ne sont pas encore lus.",
     "views": "Vues"
+  },
+  "site": {
+    "nav": {
+      "label": "Produit",
+      "pricing": "Tarifs",
+      "help": "Aide",
+      "changelog": "Nouveautés",
+      "status": "État du service"
+    },
+    "signIn": "Se connecter",
+    "start": "Commencer gratuitement",
+    "terms": "Conditions",
+    "privacy": "Confidentialité",
+    "dataDeletion": "Suppression des données",
+    "home": {
+      "title": "Planifiez, publiez et mesurez chaque réseau avec {product}",
+      "subtitle": "Un seul calendrier pour toutes les pages et tous les profils de vos clients : programmez, répondez aux commentaires et envoyez des rapports clairs.",
+      "cta": "Créer votre espace",
+      "seePricing": "Voir les tarifs",
+      "features": {
+        "plan": {
+          "title": "Planifiez à l’avance",
+          "body": "Un calendrier partagé et une file par canal, avec horaires suggérés et validation avant publication."
+        },
+        "networks": {
+          "title": "Tous les réseaux",
+          "body": "Facebook, Instagram, Bluesky, Mastodon, LinkedIn, Threads, X, Pinterest et d’autres depuis un seul éditeur."
+        },
+        "inbox": {
+          "title": "Une seule boîte de réception",
+          "body": "Commentaires et réponses dans un même flux, attribués au bon collègue et marqués traités ensemble."
+        },
+        "analytics": {
+          "title": "Des statistiques claires",
+          "body": "Portée, engagement et croissance sur les canaux choisis, avec des totaux justes."
+        },
+        "team": {
+          "title": "Pensé pour les équipes",
+          "body": "Rôles, accès par canal et liens de validation client sans compte."
+        },
+        "reports": {
+          "title": "Des rapports lus par vos clients",
+          "body": "Rapports à votre image, envoyés par e-mail à date fixe ou partagés par lien."
+        }
+      }
+    },
+    "pricing": {
+      "title": "Tarifs",
+      "subtitle": "Choisissez une formule ; changez-la ou résiliez-la à tout moment.",
+      "none": "Les formules ne sont pas encore publiées.",
+      "free": "Gratuit",
+      "perMonth": "{price} / mois",
+      "perYear": "ou {price} / an",
+      "channels": "{count, plural, one {# canal} other {# canaux}}",
+      "channelsUnlimited": "Canaux illimités",
+      "members": "{count, plural, one {# membre d’équipe} other {# membres d’équipe}}",
+      "membersUnlimited": "Membres illimités",
+      "posts": "{count, plural, one {# publication programmée par mois} other {# publications programmées par mois}}",
+      "postsUnlimited": "Publications programmées illimitées",
+      "extraChannel": "Canal supplémentaire : {price} / mois",
+      "feature": {
+        "clients": "Accès clients et liens de validation",
+        "whiteLabel": "Votre logo et votre domaine",
+        "api": "API et intégrations"
+      },
+      "choose": "Commencer"
+    },
+    "help": {
+      "title": "Aide",
+      "connect": {
+        "q": "Comment connecter mes pages et profils ?",
+        "a": "Après l’inscription, ouvrez Canaux et choisissez un réseau. Facebook et Instagram se connectent avec votre compte Facebook ; les autres réseaux demandent leur propre connexion."
+      },
+      "schedule": {
+        "q": "Comment fonctionne la programmation ?",
+        "a": "Rédigez la publication une fois, choisissez les canaux et l’heure, ou ajoutez-la à la file d’un canal. L’application la publie à l’heure prévue, même si personne n’est connecté."
+      },
+      "networks": {
+        "q": "Quels réseaux sont pris en charge ?",
+        "a": "Pages et groupes Facebook, Instagram, Bluesky, Mastodon, LinkedIn, Threads, X, Pinterest, Telegram, YouTube et TikTok, selon ce que l’installation a activé."
+      },
+      "team": {
+        "q": "Mon équipe peut-elle travailler ensemble ?",
+        "a": "Oui. Invitez vos collègues avec un rôle (admin, éditeur, contributeur, lecteur) et choisissez les canaux de chacun."
+      },
+      "clients": {
+        "q": "Mes clients peuvent-ils valider les publications ?",
+        "a": "Envoyez un lien de validation : le client voit la publication et l’approuve ou demande des changements, sans créer de compte."
+      },
+      "analytics": {
+        "q": "D’où viennent les chiffres ?",
+        "a": "Directement de l’API de chaque réseau, lus régulièrement en arrière-plan et conservés pour garder l’historique."
+      },
+      "data": {
+        "q": "Comment récupérer ou supprimer mes données ?",
+        "a": "Les propriétaires d’un espace peuvent tout exporter en ZIP depuis Paramètres. La page Suppression des données explique comment supprimer un compte."
+      }
+    },
+    "changelog": {
+      "title": "Nouveautés",
+      "empty": "Rien de publié pour l’instant."
+    },
+    "status": {
+      "title": "État du service",
+      "allUp": "Tous les services fonctionnent",
+      "degraded": "Un service rencontre un problème ; nous nous en occupons.",
+      "app": "Application web",
+      "scheduler": "Programmation des publications",
+      "up": "En service",
+      "down": "Problème"
+    }
   }
 }

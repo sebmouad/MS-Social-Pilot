@@ -2425,3 +2425,15 @@ model OAuthCode {
 
   client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
+
+/// One entry on the public changelog (S7), written by root.
+model ChangelogEntry {
+  id          String   @id @default(cuid())
+  publishedOn DateTime @db.Date
+  title       String
+  body        String   @default("")
+  createdAt   DateTime @default(now())
+
+  @@index([publishedOn])
+  @@map("changelog_entries")
+}

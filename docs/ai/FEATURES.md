@@ -225,3 +225,11 @@ only) that `/api/oauth/token` swaps for an API key named "<assistant>
 API keys. Same rules as other keys: only root, and only in a workspace where root
 switched developer features on (the consent screen 404s otherwise).
 Not signed in yet: the link is remembered for ten minutes, and signing in comes back to it.
+
+## Public product site (2026-10-13)
+Root › Configuration › Operator › "Public product site" (off by default). When on,
+visitors who are not signed in see a home page, Pricing (the plans from
+Root › Plans, prices in each plan's currency), Help, Changelog (Root › Changelog
+adds and deletes entries) and Status (web app and scheduler, nothing else).
+The header uses the product name and logo root set. When off, `/` goes to sign-in
+and the four pages answer 404.

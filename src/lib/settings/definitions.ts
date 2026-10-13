@@ -163,6 +163,15 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     default: 'MS Social Pilot',
   },
   {
+    key: 'site.public',
+    group: 'operator',
+    type: 'boolean',
+    label: 'Public product site',
+    description: 'Visitors who are not signed in see a home page, pricing, help, status and changelog instead of the sign-in form.',
+    default: false,
+    hint: 'Pricing lists the plans from Root › Plans; the changelog is written in Root › Changelog.',
+  },
+  {
     key: 'operator.logoUrl',
     group: 'operator',
     type: 'string',
