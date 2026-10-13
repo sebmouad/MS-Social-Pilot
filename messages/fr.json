@@ -774,7 +774,9 @@
     "sheetNoRight": "Demandez à un propriétaire ou un administrateur de cet espace de le connecter.",
     "sheetHint_page": "Connectez-vous avec Facebook et choisissez les Pages que vous gérez. Chaque Page autorisée devient un canal.",
     "sheetHint_group": "Les groupes Facebook que vous administrez arrivent avec la connexion Facebook, dès que l’application peut y publier.",
-    "sheetHint_instagram": "Les comptes Instagram professionnels liés à vos Pages Facebook arrivent avec la connexion Facebook."
+    "sheetHint_instagram": "Les comptes Instagram professionnels liés à vos Pages Facebook arrivent avec la connexion Facebook.",
+    "needsReconnectHint": "Cette connexion ne fonctionne plus. Reconnectez-la pour continuer à publier.",
+    "blockedGeneric": "Impossible de publier ici pour le moment. Essayez de reconnecter."
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -2674,7 +2676,8 @@
       "groupSetup": "Mise en place",
       "groupPeople": "Personnes",
       "groupHealth": "Santé",
-      "groupHistory": "Historique"
+      "groupHistory": "Historique",
+      "connections": "Connexions"
     },
     "overview": {
       "title": "Vue d’ensemble de l’installation",
@@ -3112,6 +3115,34 @@
       "deleteTitle": "Supprimer cette entrée ?",
       "deleteBody": "« {title} » disparaît de la page publique des nouveautés.",
       "failed": "Enregistrement impossible. Réessayez."
+    },
+    "connections": {
+      "title": "Connexions",
+      "subtitle": "Chaque canal de chaque espace de travail, par plateforme, avec ses détails techniques et une vérification en direct.",
+      "jumpTo": "Aller à une plateforme",
+      "none": "Aucun canal n'est encore connecté.",
+      "count": "{count, plural, one {# canal} other {# canaux}}",
+      "problems": "{count, plural, one {# problème} other {# problèmes}}",
+      "orphan": "Aucun compte : sa connexion a été supprimée",
+      "ownToken": "Jeton propre",
+      "userToken": "Jeton du compte",
+      "expires": "expire {when}",
+      "noExpiry": "aucune expiration enregistrée",
+      "status": {
+        "ok": "Connecté",
+        "paused": "En pause",
+        "blocked": "Publication impossible",
+        "reconnect": "À reconnecter"
+      },
+      "field": {
+        "type": "Type",
+        "providerId": "ID plateforme",
+        "account": "Compte",
+        "token": "Jeton",
+        "scopes": "Autorisations (scopes)",
+        "accountError": "Erreur du compte",
+        "blocker": "Publication bloquée"
+      }
     }
   },
   "twoStep": {

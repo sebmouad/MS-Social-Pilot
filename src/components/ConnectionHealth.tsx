@@ -55,10 +55,11 @@ interface WorkspaceHealth {
  * 2. **Problems sort to the top.** A working connection needs one line; a
  *    broken one needs the detail.
  * 3. **Facebook's vocabulary is secondary.** `pages_manage_posts` is shown, but
- *    small and after "Publish and schedule posts on your Pages" — the person
- *    deciding whether they meant to refuse it does not know the scope names.
+ *    small and after "Publish and schedule posts on your Pages".
+ *
+ * Root only (`/root/connections`): workspace screens show a plain status.
  */
-export function ConnectionHealth({ canManage }: { canManage: boolean }) {
+export function ConnectionHealth({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('connections');
   const locale = useLocale();
   const [running, setRunning] = useState(false);
@@ -69,7 +70,11 @@ export function ConnectionHealth({ canManage }: { canManage: boolean }) {
     setRunning(true);
     setError(null);
     try {
-      const response = await fetch('/api/connections/health', { method: 'POST' });
+      const response = await fetch('/api/root/connections/health', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId }),
+      });
       const payload = (await response.json().catch(() => ({}))) as WorkspaceHealth & {
         error?: string;
       };
@@ -84,8 +89,6 @@ export function ConnectionHealth({ canManage }: { canManage: boolean }) {
       setRunning(false);
     }
   }
-
-  if (!canManage) return null;
 
   const tone = (verdict: Verdict) =>
     verdict === 'ok'
@@ -105,7 +108,7 @@ export function ConnectionHealth({ canManage }: { canManage: boolean }) {
           : 'ok';
 
   return (
-    <section className="card p-5">
+    <section className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
@@ -174,8 +177,9 @@ export function ConnectionHealth({ canManage }: { canManage: boolean }) {
                           }`}
                         />
                         <span className="min-w-0">
-                          {/* Plain words only: Meta's permission names are root's business. */}
                           <span className="text-slate-800">{state.label}</span>
+                          {/* Root only: the raw permission name, for diagnosing with Meta's docs. */}
+                          <code className="ms-1.5 text-xs text-slate-500">{state.permission}</code>
                           {state.status !== 'granted' && (
                             <span className="block text-xs text-slate-500">
                               {state.status === 'declined'

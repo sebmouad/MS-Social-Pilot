@@ -28,6 +28,7 @@ export function RootShell({ userName, children }: { userName: string; children: 
     { href: '/root/privileges', label: t('nav.privileges'), icon: 'key', group: t('nav.groupPeople') },
     { href: '/root/sessions', label: t('nav.sessions'), icon: 'globe', group: t('nav.groupPeople') },
     { href: '/root/status', label: t('nav.status'), icon: 'check', group: t('nav.groupHealth') },
+    { href: '/root/connections', label: t('nav.connections'), icon: 'connections', group: t('nav.groupHealth') },
     { href: '/root/worker', label: t('nav.worker'), icon: 'refresh', group: t('nav.groupHealth') },
     { href: '/root/errors', label: t('nav.errors'), icon: 'warning', group: t('nav.groupHealth') },
     { href: '/root/alerts', label: t('nav.alerts'), icon: 'bell', group: t('nav.groupHealth') },

@@ -3,7 +3,6 @@ import { planUsage } from '@/lib/plans';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { getTranslations } from 'next-intl/server';
 
-import { ConnectionHealth } from '@/components/ConnectionHealth';
 import { ConnectionsClient } from '@/components/ConnectionsClient';
 import { Icon } from '@/components/Icon';
 import { OtherNetworks } from '@/components/OtherNetworks';
@@ -17,7 +16,6 @@ import { env } from '@/lib/env';
 import { TargetType } from '@prisma/client';
 import { targetScope } from '@/lib/page-access';
 import { formatInZone } from '@/lib/time';
-import { abilitiesOf } from '@/lib/scope-abilities';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +24,6 @@ export function generateMetadata() {
   return screenMetadata('connections.title');
 }
 
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Every connection this workspace has, and the health of each.
@@ -48,7 +44,6 @@ export default async function ConnectionsPage({
   const t = await getTranslations('connections');
   const params = await searchParams;
   const timezone = auth.workspace.timezone;
-  const now = Date.now();
 
   const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
@@ -85,9 +80,7 @@ export default async function ConnectionsPage({
     pictureUrl: target.pictureUrl,
     enabled: target.enabled,
     canPublish: target.canPublish,
-    publishBlocker: target.publishBlocker,
     publishBlockerCode: target.publishBlockerCode,
-    hasOwnToken: target.accessToken !== null,
     followers: target.followersCount ?? target.fanCount,
     lastSyncedLabel: target.lastSyncedAt ? formatInZone(target.lastSyncedAt, timezone) : null,
   });
@@ -143,7 +136,6 @@ export default async function ConnectionsPage({
         {[
           ...(accounts.length > 0
             ? [
-                { href: '#health', label: t('jump_health') },
                 { href: '#facebook', label: t('jump_facebook') },
                 { href: '#instagram', label: t('jump_instagram') },
                 { href: '#ads', label: t('jump_ads') },
@@ -204,14 +196,6 @@ export default async function ConnectionsPage({
         </div>
       ) : (
         <>
-        {/* Above the list: the answer to "is it working" comes before the
-            inventory of what is connected. */}
-        {accounts.length > 0 && (
-          <div id="health" className="scroll-mt-20">
-            <ConnectionHealth canManage={canManage} />
-          </div>
-        )}
-
         <ConnectionsClient
           canManage={canManage}
           instagramEnabled={env.instagramEnabled}
@@ -221,20 +205,7 @@ export default async function ConnectionsPage({
             id: account.id,
             name: account.name,
             pictureUrl: account.pictureUrl,
-            providerUserId: account.providerUserId,
-            abilities: abilitiesOf(
-              account.scopes.split(',').map((scope) => scope.trim()).filter(Boolean),
-              env.facebookScopes,
-            ),
-            tokenExpiresAt: account.tokenExpiresAt?.toISOString() ?? null,
-            // Days rather than a date: "expires 14 Sep" makes the reader do
-            // the arithmetic before they know whether to act.
-            daysLeft: account.tokenExpiresAt
-              ? Math.max(0, Math.ceil((account.tokenExpiresAt.getTime() - now) / DAY_MS))
-              : null,
-            invalidReason: account.invalidatedAt
-              ? account.invalidReason ?? t('reconnectRequired')
-              : null,
+            needsReconnect: account.invalidatedAt !== null,
             lastSyncedLabel: account.lastSyncedAt
               ? formatInZone(account.lastSyncedAt, timezone)
               : null,
@@ -254,7 +225,7 @@ export default async function ConnectionsPage({
           ads={ads.map((account) => ({
             id: account.id,
             label: account.name,
-            detail: [account.actId, account.currency].filter(Boolean).join(' · '),
+            detail: account.currency ?? null,
             enabled: account.enabled,
             lastSyncedLabel: account.lastSyncedAt
               ? formatInZone(account.lastSyncedAt, timezone)
@@ -280,7 +251,7 @@ export default async function ConnectionsPage({
           network: account.provider as NetworkKey,
           name: account.name,
           pictureUrl: account.pictureUrl,
-          invalidReason: account.invalidatedAt ? account.invalidReason ?? t('reconnectRequired') : null,
+          invalidReason: account.invalidatedAt ? t('reconnectRequired') : null,
           targets: account.targets.map((target) => ({ id: target.id, name: target.name, category: target.category, enabled: target.enabled })),
         }))}
       />

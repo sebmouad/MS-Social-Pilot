@@ -240,7 +240,7 @@ const CONTRIBUTOR_MUST_NOT: Array<[Method, string]> = [
   ['POST', 'feeds'],
   ['PATCH', 'feeds/[id]'],
   ['DELETE', 'feeds/[id]'],
-  ['POST', 'connections/health'],
+  ['POST', 'root/connections/health'],
   ['PATCH', 'connections/instagram/[id]'],
   ['DELETE', 'connections/instagram/[id]'],
   ['PATCH', 'connections/ads/[id]'],

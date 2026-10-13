@@ -8,7 +8,6 @@ import { useLocale, useTranslations } from 'next-intl';
 import { Icon, type IconName } from './Icon';
 import { useConfirm } from './ConfirmProvider';
 import { blockerMessage } from './blockerMessage';
-import type { Ability } from '@/lib/scope-abilities';
 
 export interface TargetView {
   id: string;
@@ -17,10 +16,7 @@ export interface TargetView {
   pictureUrl: string | null;
   enabled: boolean;
   canPublish: boolean;
-  publishBlocker: string | null;
   publishBlockerCode: string | null;
-  /** Whether a Page token of its own is stored, rather than borrowing the user's. */
-  hasOwnToken: boolean;
   followers: number | null;
   lastSyncedLabel: string | null;
 }
@@ -29,13 +25,8 @@ export interface ConnectionView {
   id: string;
   name: string;
   pictureUrl: string | null;
-  providerUserId: string;
-  /** What the connection can do, in plain words (never Meta's scope names). */
-  abilities: Array<{ ability: Ability; granted: boolean }>;
-  tokenExpiresAt: string | null;
-  /** Days until expiry, or null when the token does not expire. */
-  daysLeft: number | null;
-  invalidReason: string | null;
+  /** Plain status only: technical details (tokens, permissions, raw errors) live in /root/connections. */
+  needsReconnect: boolean;
   lastSyncedLabel: string | null;
   targets: TargetView[];
 }
@@ -158,42 +149,10 @@ export function ConnectionsClient({
     else setNotice(t('targetRemoved', { name: target.name }));
   }
 
-  async function check(accountId: string) {
-    const body = (await call(accountId, `/api/accounts/${accountId}`, 'GET')) as {
-      health?: { valid: boolean; message: string | null; expiresAt: string | null };
-    } | null;
-    if (body?.health) {
-      setNotice(
-        body.health.message ??
-          (body.health.expiresAt
-            ? t('tokenValidUntil', {
-                when: new Date(body.health.expiresAt).toLocaleDateString(locale),
-              })
-            : t('tokenValid')),
-      );
-    }
-  }
-
-  /** Expiry as a state, not a date: the reader should not have to subtract. */
-  function tokenBadge(connection: ConnectionView) {
-    if (connection.invalidReason) {
-      return { tone: 'bg-red-100 text-red-700', icon: 'error' as IconName, text: t('tokenDead') };
-    }
-    if (connection.daysLeft === null) {
-      return { tone: 'bg-slate-100 text-slate-600', icon: 'key' as IconName, text: t('tokenNoExpiry') };
-    }
-    if (connection.daysLeft <= 7) {
-      return {
-        tone: 'bg-amber-100 text-amber-800',
-        icon: 'warning' as IconName,
-        text: t('tokenDays', { count: connection.daysLeft }),
-      };
-    }
-    return {
-      tone: 'bg-emerald-100 text-emerald-800',
-      icon: 'check' as IconName,
-      text: t('tokenDays', { count: connection.daysLeft }),
-    };
+  function statusBadge(connection: ConnectionView) {
+    return connection.needsReconnect
+      ? { tone: 'bg-red-100 text-red-700', icon: 'error' as IconName, text: t('tokenDead') }
+      : { tone: 'bg-emerald-100 text-emerald-800', icon: 'check' as IconName, text: t('tokenNoExpiry') };
   }
 
   return (
@@ -211,7 +170,7 @@ export function ConnectionsClient({
 
       <div id="facebook" className="scroll-mt-20" />
       {connections.map((connection) => {
-        const badge = tokenBadge(connection);
+        const badge = statusBadge(connection);
         const pages = connection.targets.filter((target) => target.type === 'page');
         const groups = connection.targets.filter((target) => target.type === 'group');
         const instagramTargets = connection.targets.filter(
@@ -237,10 +196,9 @@ export function ConnectionsClient({
 
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-900">{connection.name}</p>
-                  <p className="text-xs text-slate-500">
-                    {t('facebookUser', { id: connection.providerUserId })}
-                    {connection.lastSyncedLabel && ` · ${t('synced', { when: connection.lastSyncedLabel })}`}
-                  </p>
+                  {connection.lastSyncedLabel && (
+                    <p className="text-xs text-slate-500">{t('synced', { when: connection.lastSyncedLabel })}</p>
+                  )}
                 </div>
               </div>
 
@@ -250,46 +208,12 @@ export function ConnectionsClient({
               </span>
             </header>
 
-            {connection.invalidReason && (
-              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                {connection.invalidReason}
-              </p>
+            {connection.needsReconnect && (
+              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{t('needsReconnectHint')}</p>
             )}
-
-            {/* Scopes are the other half of a broken connection: a token can be
-                alive and still be missing the permission a job needs. */}
-            <div className="mt-3">
-              <p className="text-[13px] font-semibold text-slate-600">
-                {t('permissions')}
-              </p>
-              <ul className="mt-1 flex flex-wrap gap-1">
-                {connection.abilities.length === 0 ? (
-                  <li className="text-xs text-slate-500">{t('noScopes')}</li>
-                ) : (
-                  connection.abilities.map(({ ability, granted }) => (
-                    <li
-                      key={ability}
-                      className={`badge ${granted ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}
-                    >
-                      <Icon name={granted ? 'check' : 'warning'} size={12} />
-                      {t(`ability.${ability}`)}
-                      {!granted && ` · ${t('abilityMissing')}`}
-                    </li>
-                  ))
-                )}
-              </ul>
-            </div>
 
             {canManage && (
               <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={busy === connection.id}
-                  onClick={() => check(connection.id)}
-                >
-                  <Icon name="key" size={15} /> {t('checkToken')}
-                </button>
                 {/* A full navigation, not fetch: the route redirects to Facebook. */}
                 <a href="/api/facebook/connect" className="btn-secondary">
                   <Icon name="link" size={15} /> {t('reconnect')}
@@ -439,10 +363,11 @@ function TargetList({
           {targets.map((target) => {
             const blocked = blockerMessage(
               target.publishBlockerCode,
-              target.publishBlocker,
+              // Never the stored technical sentence: root sees that in /root/connections.
+              null,
               (key) => t(key as Parameters<typeof t>[0]),
               (key) => t.has(key as Parameters<typeof t>[0]),
-            );
+            ) ?? t('blockedGeneric');
 
             return (
             <li key={target.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
@@ -460,10 +385,7 @@ function TargetList({
                 <div className="min-w-0">
                   <p className="truncate text-[15px] font-semibold text-slate-900">{target.name}</p>
                   <p className="text-xs text-slate-500">
-                    {/* Which credential publishes this: a Page with its own
-                        token keeps working when the user token is re-scoped. */}
-                    {target.hasOwnToken ? t('ownToken') : t('userToken')}
-                    {target.followers !== null && ` · ${t('followers', { count: target.followers })}`}
+                    {target.followers !== null && t('followers', { count: target.followers })}
                   </p>
                   {!target.canPublish && blocked && (
                     <p className="mt-0.5 flex items-center gap-1 text-xs text-amber-700">

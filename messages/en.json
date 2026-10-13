@@ -774,7 +774,9 @@
     "sheetNoRight": "Ask an owner or admin of this workspace to connect it.",
     "sheetHint_page": "Sign in with Facebook and pick the Pages you manage. Every Page you allow becomes a channel.",
     "sheetHint_group": "Facebook Groups you administer come with the Facebook sign-in, once the app is allowed to post to them.",
-    "sheetHint_instagram": "Instagram professional accounts linked to your Facebook Pages come with the Facebook sign-in."
+    "sheetHint_instagram": "Instagram professional accounts linked to your Facebook Pages come with the Facebook sign-in.",
+    "needsReconnectHint": "This connection stopped working. Reconnect to keep publishing.",
+    "blockedGeneric": "Can't publish here right now. Try reconnecting."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -2674,7 +2676,8 @@
       "groupSetup": "Set up",
       "groupPeople": "People",
       "groupHealth": "Health",
-      "groupHistory": "History"
+      "groupHistory": "History",
+      "connections": "Connections"
     },
     "overview": {
       "title": "Installation overview",
@@ -3112,6 +3115,34 @@
       "deleteTitle": "Delete this entry?",
       "deleteBody": "“{title}” disappears from the public changelog.",
       "failed": "Could not save. Try again."
+    },
+    "connections": {
+      "title": "Connections",
+      "subtitle": "Every channel in every workspace, by platform, with its technical details and a live connection check.",
+      "jumpTo": "Jump to a platform",
+      "none": "No channels are connected yet.",
+      "count": "{count, plural, one {# channel} other {# channels}}",
+      "problems": "{count, plural, one {# problem} other {# problems}}",
+      "orphan": "No account: its connection was removed",
+      "ownToken": "Own token",
+      "userToken": "Account token",
+      "expires": "expires {when}",
+      "noExpiry": "no expiry recorded",
+      "status": {
+        "ok": "Connected",
+        "paused": "Paused",
+        "blocked": "Can't publish",
+        "reconnect": "Needs reconnecting"
+      },
+      "field": {
+        "type": "Type",
+        "providerId": "Platform ID",
+        "account": "Account",
+        "token": "Token",
+        "scopes": "Scopes",
+        "accountError": "Account error",
+        "blocker": "Publishing blocked"
+      }
     }
   },
   "twoStep": {
