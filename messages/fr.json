@@ -279,7 +279,8 @@
     "colRejected": "Renvoyées",
     "colRejectedHint": "Le validateur a demandé des modifications.",
     "colEmpty": "Rien ici",
-    "countLine": "{count, plural, =0 {Rien en attente de validation} one {# publication en attente de validation} other {# publications en attente de validation}} · {profiles, plural, one {# profil} other {# profils}}"
+    "countLine": "{count, plural, =0 {Rien en attente de validation} one {# publication en attente de validation} other {# publications en attente de validation}} · {profiles, plural, one {# profil} other {# profils}}",
+    "approvedBy": "Approuvée par {name} le {at}"
   },
   "auth": {
     "signIn": "Se connecter",

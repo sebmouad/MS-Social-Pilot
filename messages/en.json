@@ -279,7 +279,8 @@
     "colRejected": "Sent back",
     "colRejectedHint": "The reviewer asked for changes.",
     "colEmpty": "Nothing here",
-    "countLine": "{count, plural, =0 {Nothing waiting for review} one {# post waiting for review} other {# posts waiting for review}} · {profiles, plural, one {# profile} other {# profiles}}"
+    "countLine": "{count, plural, =0 {Nothing waiting for review} one {# post waiting for review} other {# posts waiting for review}} · {profiles, plural, one {# profile} other {# profiles}}",
+    "approvedBy": "Approved by {name} on {at}"
   },
   "auth": {
     "signIn": "Sign in",

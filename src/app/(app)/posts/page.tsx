@@ -120,6 +120,7 @@ export default async function PostsPage({
     include: {
       targets: { include: { target: { select: { name: true, type: true, pictureUrl: true } } } },
       labels: { select: { labelId: true } },
+      reviewer: { select: { name: true } },
     },
     // `id` last, and not for tidiness: without a unique tiebreaker two posts
     // sharing a timestamp can land in a different order on each query, and
@@ -308,6 +309,11 @@ export default async function PostsPage({
           // Only a rejected post's note is still the reviewer's last word:
           // resubmitting clears it, and an approval never sets one.
           reviewNote: post.status === 'rejected' ? post.reviewNote : null,
+          // The audit line: who signed it off, and when.
+          approvedBy:
+            post.approvalStatus === 'approved' && post.reviewer && post.reviewedAt
+              ? { name: post.reviewer.name, at: formatInZone(post.reviewedAt, timezone, 'd MMM yyyy, HH:mm') }
+              : null,
           labels: post.labels.flatMap((row) => {
             const label = labelById.get(row.labelId);
             return label ? [label] : [];

@@ -45,6 +45,8 @@ export interface PostView {
   results: { reach: number; reactions: number; comments: number; shares: number } | null;
   /** Why a reviewer sent it back; only set while the post is rejected. */
   reviewNote: string | null;
+  /** Who approved it and when, once it is approved. */
+  approvedBy?: { name: string; at: string } | null;
   /** The post's labels, in name order. */
   labels?: Array<{ id: string; name: string; color: string }>;
   /** The viewer wrote it, or may manage other people's posts. */
@@ -438,6 +440,10 @@ export function PostList({
                 <p className="text-xs font-semibold">{tApprovals('reviewNote')}</p>
                 <p className="mt-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{post.reviewNote}</p>
               </div>
+            )}
+
+            {post.approvedBy && (
+              <p className="mx-4 mb-3 text-xs text-emerald-700">{tApprovals('approvedBy', { name: post.approvedBy.name, at: post.approvedBy.at })}</p>
             )}
 
             {showTargets && (
