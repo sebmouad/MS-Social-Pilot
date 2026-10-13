@@ -148,6 +148,8 @@ test('a search narrows the list and survives switching tabs', async ({ page }) =
   const failures = collectFailures(page);
 
   await open(page, '/posts');
+  // On a wide screen the search moves into the left column once the page is live.
+  await expect(page.locator('#shell-filters').getByRole('search')).toBeVisible();
   await page.getByLabel(/search posts/i).fill('rye loaves');
   await page.getByRole('button', { name: /^search$/i }).click();
   await page.waitForURL(/q=rye/);

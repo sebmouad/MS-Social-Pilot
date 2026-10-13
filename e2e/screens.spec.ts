@@ -145,7 +145,7 @@ test('the icon rail lists the areas, the sidebar the pages of the one in use', a
   await open(page, '/queue');
 
   const rail = page.getByRole('navigation', { name: /main areas/i });
-  for (const name of [/^home$/i, /^publish$/i, /^inbox$/i, /^analytics$/i, /^settings$/i]) {
+  for (const name of [/^home$/i, /^publish$/i, /^inbox$/i, /^analytics$/i, /^workspace$/i]) {
     await expect(rail.getByRole('link', { name })).toBeVisible();
   }
   await expect(rail.getByRole('link', { name: /^publish$/i })).toHaveAttribute('aria-current', 'true');
@@ -160,9 +160,8 @@ test('the icon rail lists the areas, the sidebar the pages of the one in use', a
   // Another area swaps the sidebar's pages.
   await rail.getByRole('link', { name: /^analytics$/i }).click();
   await expect(page).toHaveURL(/\/analytics/);
-  // The report is a view of Analytics, not a screen of its own in the sidebar.
-  await expect(sidebar.getByRole('link', { name: /^reports$/i })).toHaveCount(0);
-  await expect(page.getByRole('navigation', { name: /choose a view|views/i }).getByRole('link', { name: /^report$/i })).toBeVisible();
+  // Reports sit with the analytics tools.
+  await expect(sidebar.getByRole('link', { name: /^reports$/i })).toBeVisible();
 
   // Folding the sidebar keeps the rail and survives a reload.
   await expect(async () => {

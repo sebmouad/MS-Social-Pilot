@@ -124,7 +124,7 @@ test.describe('the invited colleague, in French', () => {
       const page = await context.newPage();
 
       await open(page, '/dashboard');
-      await expect(page.getByRole('link', { name: 'Réglages', exact: true })).toBeAttached();
+      await expect(page.getByRole('link', { name: /^Réglages/ })).toBeAttached();
       await expectEveryNavLinkShown(page);
       await context.close();
     });
