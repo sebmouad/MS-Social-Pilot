@@ -157,3 +157,27 @@ export function totalChannels(channels: ChannelFigures[]): Omit<ChannelFigures, 
     engagementRate: rate(interactions, reach),
   };
 }
+
+/**
+ * Whether an Instagram account belongs in the selection. Linked accounts
+ * follow their Page; unlinked ones have no Page to pick, so they show when
+ * nothing is picked and the network filter is unset, Instagram or Meta — and
+ * only to members who see every Page. Always inside the member's access.
+ */
+export function instagramInSelection(
+  account: { targetId: string | null },
+  selection: {
+    memberScope: { all: true } | { all: false; ids: string[] };
+    picked: boolean;
+    ids: string[];
+    net: string | null;
+    platform: string | null;
+  },
+): boolean {
+  const { memberScope, picked, ids, net, platform } = selection;
+  const networkAllows = net ? net === 'instagram' : platform === null || platform === 'meta';
+  if (!networkAllows) return false;
+  if (account.targetId === null) return memberScope.all && !picked;
+  if (memberScope.all === false && !memberScope.ids.includes(account.targetId)) return false;
+  return !picked || ids.includes(account.targetId);
+}

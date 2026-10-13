@@ -2,7 +2,7 @@ import { env } from './env';
 import { listInstagramAccounts, readInstagramInsights, readInstagramMedia } from './instagram';
 import { readNetworkPosts } from './network-analytics';
 import type { PageScope } from './page-access';
-import { instagramChannel, instagramPosts, networkChannels, networkPosts, type ChannelFigures, type ChannelPost } from './channel-figures';
+import { instagramChannel, instagramInSelection, instagramPosts, networkChannels, networkPosts, type ChannelFigures, type ChannelPost } from './channel-figures';
 
 /**
  * Instagram accounts (linked to a selected Page) and other-network channels in
@@ -12,12 +12,14 @@ import { instagramChannel, instagramPosts, networkChannels, networkPosts, type C
 export async function readChannelFigures(options: {
   workspaceId: string;
   scope: PageScope;
+  /** Selection details for Instagram accounts, which are not Pages. */
+  instagram: Parameters<typeof instagramInSelection>[1];
   from: Date;
   to: Date;
 }): Promise<{ channels: ChannelFigures[]; posts: ChannelPost[] }> {
-  const { workspaceId, scope, from, to } = options;
+  const { workspaceId, scope, instagram: igSelection, from, to } = options;
   const accounts = env.instagramEnabled
-    ? (await listInstagramAccounts(workspaceId)).filter((account) => scope.all || (account.targetId !== null && scope.ids.includes(account.targetId)))
+    ? (await listInstagramAccounts(workspaceId)).filter((account) => instagramInSelection(account, igSelection))
     : [];
   const instagram = await Promise.all(
     accounts.map(async (account) => {

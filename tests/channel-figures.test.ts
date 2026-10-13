@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { instagramChannel, instagramPosts, networkChannels, networkPosts, rate, sumKnown, totalChannels } from '../src/lib/channel-figures';
+import { instagramChannel, instagramInSelection, instagramPosts, networkChannels, networkPosts, rate, sumKnown, totalChannels } from '../src/lib/channel-figures';
 
 const from = new Date('2026-09-01T00:00:00Z');
 const to = new Date('2026-10-01T00:00:00Z');
@@ -53,5 +53,32 @@ describe('channel figures', () => {
     expect(total).toEqual({ followers: 100, posts: 3, reach: null, impressions: null, interactions: 15, engagementRate: null });
     const single = totalChannels([{ ...base, followers: 1, posts: 1, reach: 200, interactions: 5, engagementRate: 2.5 }]);
     expect(single.engagementRate).toBe(2.5);
+  });
+});
+
+describe('instagramInSelection', () => {
+  const base = { memberScope: { all: true } as const, picked: false, ids: ['p1', 'p2'], net: null, platform: null };
+  const linked = { targetId: 'p1' };
+  const unlinked = { targetId: null };
+
+  it('includes unlinked accounts when nothing is picked and the network is unset, Instagram or Meta', () => {
+    expect(instagramInSelection(unlinked, base)).toBe(true);
+    expect(instagramInSelection(unlinked, { ...base, net: 'instagram', platform: 'meta' })).toBe(true);
+    expect(instagramInSelection(unlinked, { ...base, platform: 'meta' })).toBe(true);
+    expect(instagramInSelection(unlinked, { ...base, net: 'bluesky', platform: 'bluesky' })).toBe(false);
+    expect(instagramInSelection(unlinked, { ...base, net: 'facebook', platform: 'meta' })).toBe(false);
+    expect(instagramInSelection(unlinked, { ...base, picked: true })).toBe(false);
+  });
+
+  it('keeps unlinked accounts from members limited to some Pages', () => {
+    expect(instagramInSelection(unlinked, { ...base, memberScope: { all: false, ids: ['p1'] } })).toBe(false);
+  });
+
+  it('follows the linked Page, clamped to the member', () => {
+    expect(instagramInSelection(linked, base)).toBe(true);
+    expect(instagramInSelection(linked, { ...base, picked: true, ids: ['p2'] })).toBe(false);
+    expect(instagramInSelection(linked, { ...base, picked: true, ids: ['p1'] })).toBe(true);
+    expect(instagramInSelection(linked, { ...base, net: 'instagram' })).toBe(true);
+    expect(instagramInSelection(linked, { ...base, memberScope: { all: false, ids: ['p2'] } })).toBe(false);
   });
 });

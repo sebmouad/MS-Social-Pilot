@@ -247,7 +247,8 @@
     "moreViews": "Plus",
     "oneChannelHint": "Affichage de {name}. Pour un autre canal, ouvrez le sélecteur de canaux et choisissez « Seulement » à côté.",
     "tabsMain": "Vues",
-    "summaryDetail": "Ce canal en détail"
+    "summaryDetail": "Ce canal en détail",
+    "noPagesOtherChannels": "Aucune Page Facebook dans cette sélection : chiffres d’Instagram et des autres réseaux."
   },
   "app": {
     "name": "MS Social Pilot",
@@ -4571,6 +4572,7 @@
     "total": "Total",
     "open": "Ouvrir",
     "noText": "(sans texte)",
-    "note": "Un tiret signifie que le réseau ne fournit pas ce chiffre, ou qu’il n’est pas encore lu. La couverture ne s’additionne pas entre canaux, car les mêmes personnes peuvent en voir plusieurs."
+    "note": "Un tiret signifie que le réseau ne fournit pas ce chiffre, ou qu’il n’est pas encore lu. La couverture ne s’additionne pas entre canaux, car les mêmes personnes peuvent en voir plusieurs.",
+    "empty": "Aucun chiffre pour ces canaux sur cette période"
   }
 }

@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 
+import { EmptyState } from '@/components/EmptyState';
 import { ExternalLink } from '@/components/ExternalLink';
 import { NetworkMark } from '@/components/NetworkMark';
 import { totalChannels } from '@/lib/channel-figures';
@@ -16,20 +17,26 @@ export async function ChannelFiguresSection({
   view,
   workspaceId,
   scope,
+  instagram,
   from,
   to,
   timezone,
+  emptyWhenNone = false,
 }: {
   view: 'summary' | 'posts' | 'audience' | 'compare';
   workspaceId: string;
   scope: PageScope;
+  instagram: Parameters<typeof readChannelFigures>[0]['instagram'];
   from: Date;
   to: Date;
   timezone: string;
+  /** Show an empty state rather than nothing (no Facebook Pages above it). */
+  emptyWhenNone?: boolean;
 }) {
-  const { channels, posts } = await readChannelFigures({ workspaceId, scope, from, to });
-  if (channels.length === 0) return null;
+  const { channels, posts } = await readChannelFigures({ workspaceId, scope, instagram, from, to });
   const t = await getTranslations('channelFigures');
+  const empty = emptyWhenNone ? <EmptyState icon="analytics" title={t('empty')} /> : null;
+  if (channels.length === 0) return empty;
   const number = (value: number | null) => (value === null ? '—' : value.toLocaleString(appLocale()));
   const percent = (value: number | null) => (value === null ? '—' : `${value.toLocaleString(appLocale())}%`);
   const label = (network: string, name: string) => (
@@ -40,7 +47,7 @@ export async function ChannelFiguresSection({
   );
 
   if (view === 'posts') {
-    if (posts.length === 0) return null;
+    if (posts.length === 0) return empty;
     return (
       <section aria-label={t('postsTitle')} className="space-y-2">
         <h2 className="text-[17px] font-bold text-slate-900">{t('postsTitle')}</h2>

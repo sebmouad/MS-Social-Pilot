@@ -247,7 +247,8 @@
     "moreViews": "More",
     "oneChannelHint": "Showing {name}. For another channel, open the channel selector and choose “Only” next to it.",
     "tabsMain": "Views",
-    "summaryDetail": "This channel in detail"
+    "summaryDetail": "This channel in detail",
+    "noPagesOtherChannels": "No Facebook Page in this selection: figures for Instagram and the other networks."
   },
   "app": {
     "name": "MS Social Pilot",
@@ -4571,6 +4572,7 @@
     "total": "Total",
     "open": "Open",
     "noText": "(no text)",
-    "note": "A dash means the network does not report that figure, or it is not read yet. Reach is not added across channels, since the same people can see several."
+    "note": "A dash means the network does not report that figure, or it is not read yet. Reach is not added across channels, since the same people can see several.",
+    "empty": "No figures for these channels in this period"
   }
 }

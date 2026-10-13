@@ -23,7 +23,7 @@ import { targetScope } from '@/lib/page-access';
 import { listPageGroups } from '@/lib/page-groups';
 import { screenMetadata } from '@/lib/metadata';
 import { atLeast, canDeleteComments, canModerateComments } from '@/lib/constants';
-import { INBOX_VIEW_PATHS, UNWINDOWED_VIEWS, defaultAnalyticsView, parseAnalyticsView, type AnalyticsView } from '@/lib/analytics-views';
+import { INBOX_VIEW_PATHS, PRIMARY_ANALYTICS_VIEWS, UNWINDOWED_VIEWS, defaultAnalyticsView, parseAnalyticsView, type AnalyticsView } from '@/lib/analytics-views';
 import { isPinnable, readPinnedFigures } from '@/lib/pinned-metrics';
 import { PinnedTiles } from '@/components/analysis/PinnedTiles';
 import { SummaryView } from '@/components/analysis/SummaryView';
@@ -89,16 +89,56 @@ export async function AnalyticsScreen({
     orderBy: { name: 'asc' },
   });
 
-  // Only other networks connected: their view still opens, without the Page tools.
-  if (pages.length === 0 && first(params.view) === 'networks') {
+  // Instagram accounts are not Pages: the selection reaches them through these.
+  const igSelection = {
+    memberScope: auth.pageScope,
+    picked: selection.picked,
+    ids: selection.ids,
+    net: selection.net,
+    platform: selection.platform,
+  };
+
+  // No Facebook Page in the selection, but other channels: the four views
+  // still open, with the Instagram and other-network figures only.
+  const otherChannels =
+    pages.length === 0 &&
+    (selection.pages.length > 0 || (env.instagramEnabled && (await prisma.instagramAccount.count({ where: { workspaceId: auth.workspace.id } })) > 0));
+  if (otherChannels && !only) {
     const range = parseRange({ range: first(params.range), from: first(params.from), to: first(params.to), days: first(params.days) }, timezone);
+    const asked = parseAnalyticsView(first(params.view));
+    const channelView = asked === 'networks' ? 'networks' : PRIMARY_ANALYTICS_VIEWS.includes(asked) ? asked : 'summary';
     return (
-      <div className="space-y-6">
-        <header>
-          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('view.networks')}</h1>
-        </header>
-        <NetworksView workspaceId={auth.workspace.id} scope={pageScope} from={range.from} to={range.to} timezone={timezone} />
-      </div>
+      <ChannelsLayout
+        auth={auth}
+        selection={selection}
+        tools={
+          <>
+            <AnalyticsTabs current={channelView} />
+            <DateRangePicker range={range} path="/analytics" keep={{ view: channelView }} />
+          </>
+        }
+      >
+        <div className="min-w-0 flex-1 space-y-6">
+          <header>
+            <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{channelView === 'networks' ? t('view.networks') : t('title')}</h1>
+            <p className="mt-1 text-sm text-slate-600">{t('noPagesOtherChannels')}</p>
+          </header>
+          {channelView === 'networks' ? (
+            <NetworksView workspaceId={auth.workspace.id} scope={pageScope} from={range.from} to={range.to} timezone={timezone} />
+          ) : (
+            <ChannelFiguresSection
+              view={channelView as 'summary' | 'posts' | 'audience' | 'compare'}
+              workspaceId={auth.workspace.id}
+              scope={pageScope}
+              instagram={igSelection}
+              from={range.from}
+              to={range.to}
+              timezone={timezone}
+              emptyWhenNone
+            />
+          )}
+        </div>
+      </ChannelsLayout>
     );
   }
 
@@ -390,7 +430,7 @@ export async function AnalyticsScreen({
 
       {/* Instagram and the other networks in the selection, in each primary view. */}
       {(view === 'summary' || view === 'posts' || view === 'audience' || view === 'compare') && (
-        <ChannelFiguresSection view={view} workspaceId={auth.workspace.id} scope={pageScope} from={from} to={to} timezone={timezone} />
+        <ChannelFiguresSection view={view} workspaceId={auth.workspace.id} scope={pageScope} instagram={igSelection} from={from} to={to} timezone={timezone} />
       )}
 
 

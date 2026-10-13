@@ -41,6 +41,8 @@ export interface PageFilter {
   narrowed: boolean;
   /** `where` for posts that reach at least one of `ids`. */
   postWhere: Prisma.PostWhereInput;
+  /** True when Pages or a group were picked (not only a network). */
+  picked: boolean;
   /** The network the selection is narrowed to, if any. */
   net: SelectionNetwork | null;
   /** The platform the selection is narrowed to (`meta`, `linkedin`…), if any. */
@@ -112,6 +114,7 @@ export async function loadPageFilter(
     visible,
     ids,
     narrowed,
+    picked: picked !== null && picked.length > 0,
     net,
     platform,
     networks,
