@@ -4212,7 +4212,25 @@
       "player": "Le texte lu",
       "download": "Télécharger le MP3",
       "hint": "2 000 caractères au maximum. Une publication Facebook ne peut pas contenir de l’audio seul : il est à écouter ou à ajouter à une vidéo dans votre propre éditeur. Décompté de vos crédits IA."
-    }
+    },
+    "shape": "Forme",
+    "shapeColor": "Couleur de la forme",
+    "shape_none": "Aucune",
+    "shape_band": "Bandeau",
+    "shape_frame": "Cadre",
+    "shape_circle": "Cercle",
+    "brandColor": "Couleur de la marque",
+    "addLogo": "Ajouter le logo",
+    "removeLogo": "Retirer le logo",
+    "logoFailed": "Le logo n’a pas pu être ajouté : son site n’autorise pas son affichage ici. Importez-le dans la médiathèque et utilisez-le comme photo.",
+    "templates": "Partir d’un modèle",
+    "template_quote": "Citation",
+    "template_announcement": "Annonce",
+    "template_banner": "Bannière",
+    "templateQuoteText": "Votre citation ici",
+    "templateQuoteAuthor": "Nom de l’auteur",
+    "templateAnnouncementText": "Grande nouvelle",
+    "templateBannerText": "Lancement de produit"
   },
   "campaigns": {
     "title": "Campagnes",

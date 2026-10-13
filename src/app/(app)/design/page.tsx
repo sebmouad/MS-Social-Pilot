@@ -22,12 +22,12 @@ export function generateMetadata() {
 export default async function DesignPage() {
   const auth = await requirePage();
   const t = await getTranslations('design');
-  const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: auth.workspace.id }, select: { aiEnabled: true } });
+  const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: auth.workspace.id }, select: { aiEnabled: true, accentColor: true, logoUrl: true } });
   const videos = workspace.aiEnabled && videoAvailable() && canCompose(auth.role) ? await listVideos(auth.workspace.id) : null;
   return (
     <div className="space-y-6">
       <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
-      <DesignEditor canGenerate={workspace.aiEnabled && imageAvailable()} />
+      <DesignEditor canGenerate={workspace.aiEnabled && imageAvailable()} brand={{ color: workspace.accentColor, logo: workspace.logoUrl }} />
       {workspace.aiEnabled && voiceAvailable() && canCompose(auth.role) && <AiVoicePanel />}
       {videos && (
         <AiVideoPanel

@@ -143,7 +143,14 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
   const needle = query.trim().toLowerCase();
   const listed = needle ? universe.filter((page) => page.name.toLowerCase().includes(needle)) : universe;
 
-  if (pages.length === 0) return null;
+  // No channels yet: nothing to pick, but the screen's own tools (views, downloads) still belong here.
+  if (pages.length === 0) {
+    return tools ? (
+      <aside aria-label={t('label')} className="min-w-0 lg:sticky lg:top-20 lg:w-[264px] lg:shrink-0 lg:self-start">
+        <div className="card space-y-3 p-3">{tools}</div>
+      </aside>
+    ) : null;
+  }
 
   const body = (
     <div className="space-y-2">

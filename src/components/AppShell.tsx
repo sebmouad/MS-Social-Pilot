@@ -226,7 +226,7 @@ export function AppShell({
       rail: t('rail_analyse'),
       icon: 'analytics',
       items: [
-        { href: '/analytics', label: t('pages'), icon: 'analytics' },
+        { href: '/analytics', label: t('pages'), icon: 'analytics', also: ['/reports'] },
         { href: '/analytics/tests', label: t('captionTests'), icon: 'trendUp' },
         { href: '/analytics/links', label: t('linkClicks'), icon: 'link' },
         { href: '/analytics/campaigns', label: t('campaigns'), icon: 'tag' },

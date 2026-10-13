@@ -4212,7 +4212,25 @@
       "player": "The spoken text",
       "download": "Download MP3",
       "hint": "Up to 2,000 characters. Facebook posts cannot carry audio alone, so this is for you to play or add to a video in your own editor. Counts against your AI credits."
-    }
+    },
+    "shape": "Shape",
+    "shapeColor": "Shape colour",
+    "shape_none": "None",
+    "shape_band": "Band",
+    "shape_frame": "Frame",
+    "shape_circle": "Circle",
+    "brandColor": "Brand colour",
+    "addLogo": "Add logo",
+    "removeLogo": "Remove logo",
+    "logoFailed": "The logo could not be added: its website does not allow it to be drawn here. Upload it to the media library and use it as a photo instead.",
+    "templates": "Start from a template",
+    "template_quote": "Quote",
+    "template_announcement": "Announcement",
+    "template_banner": "Banner",
+    "templateQuoteText": "Your quote here",
+    "templateQuoteAuthor": "Author name",
+    "templateAnnouncementText": "Big news",
+    "templateBannerText": "Product launch"
   },
   "campaigns": {
     "title": "Campaigns",

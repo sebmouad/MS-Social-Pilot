@@ -11,6 +11,8 @@ const SIZES = {
   landscape: { w: 1200, h: 630 },
 } as const;
 type SizeKey = keyof typeof SIZES;
+const SHAPES = ['none', 'band', 'frame', 'circle'] as const;
+type Shape = (typeof SHAPES)[number];
 
 interface Layer {
   text: string;
@@ -27,7 +29,14 @@ interface Layer {
  * background, lay some text on it, and save the result to the media library,
  * ready for a post. Everything happens in the browser.
  */
-export function DesignEditor({ canGenerate = false }: { canGenerate?: boolean }) {
+export function DesignEditor({
+  canGenerate = false,
+  brand = { color: null, logo: null },
+}: {
+  canGenerate?: boolean;
+  /** The workspace's report colour and logo (Settings › Reports), offered as one click here. */
+  brand?: { color: string | null; logo: string | null };
+}) {
   const t = useTranslations('design');
   const tCommon = useTranslations('common');
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -39,6 +48,9 @@ export function DesignEditor({ canGenerate = false }: { canGenerate?: boolean })
   const [saving, setSaving] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [shape, setShape] = useState<Shape>('none');
+  const [shapeColor, setShapeColor] = useState('#000000');
+  const [logo, setLogo] = useState<HTMLImageElement | null>(null);
 
   const draw = useCallback(() => {
     const element = canvas.current;
@@ -55,6 +67,28 @@ export function DesignEditor({ canGenerate = false }: { canGenerate?: boolean })
       const dw = photo.width * scale;
       const dh = photo.height * scale;
       context.drawImage(photo, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    }
+    // A shape sits between the background and the text, so text stays readable on a photo.
+    context.fillStyle = shapeColor;
+    context.strokeStyle = shapeColor;
+    if (shape === 'band') {
+      context.globalAlpha = 0.75;
+      context.fillRect(0, h * 0.65, w, h * 0.3);
+      context.globalAlpha = 1;
+    } else if (shape === 'frame') {
+      context.lineWidth = w * 0.03;
+      context.strokeRect(w * 0.05, h * 0.05, w * 0.9, h * 0.9);
+    } else if (shape === 'circle') {
+      context.globalAlpha = 0.75;
+      context.beginPath();
+      context.arc(w / 2, h / 2, Math.min(w, h) * 0.38, 0, Math.PI * 2);
+      context.fill();
+      context.globalAlpha = 1;
+    }
+    if (logo) {
+      const side = Math.min(w, h) * 0.14;
+      const scale = Math.min(side / logo.width, side / logo.height);
+      context.drawImage(logo, w - logo.width * scale - w * 0.04, h - logo.height * scale - h * 0.04, logo.width * scale, logo.height * scale);
     }
     for (const layer of layers) {
       if (!layer.text.trim()) continue;
@@ -76,7 +110,7 @@ export function DesignEditor({ canGenerate = false }: { canGenerate?: boolean })
       const lineHeight = layer.size * 1.2;
       lines.forEach((text, index) => context.fillText(text, (layer.x / 100) * w, (layer.y / 100) * h + (index - (lines.length - 1) / 2) * lineHeight));
     }
-  }, [size, background, photo, layers]);
+  }, [size, background, photo, layers, shape, shapeColor, logo]);
 
   useEffect(draw, [draw]);
 
@@ -85,6 +119,38 @@ export function DesignEditor({ canGenerate = false }: { canGenerate?: boolean })
     const image = new Image();
     image.onload = () => setPhoto(image);
     image.src = URL.createObjectURL(file);
+  }
+
+  function toggleLogo() {
+    if (logo || !brand.logo) return setLogo(null);
+    const image = new Image();
+    // Without CORS the canvas could not be saved, so a logo that refuses it is not added.
+    image.crossOrigin = 'anonymous';
+    image.onload = () => setLogo(image);
+    image.onerror = () => setStatus({ ok: false, text: t('logoFailed') });
+    image.src = brand.logo;
+  }
+
+  /** Starting points: a layout, then the user edits the words. */
+  function applyTemplate(name: 'quote' | 'announcement' | 'banner') {
+    const accent = brand.color ?? '#1877f2';
+    setPhoto(null);
+    if (name === 'quote') {
+      setBackground('#111827');
+      setShape('frame');
+      setShapeColor(accent);
+      setLayers([{ text: t('templateQuoteText'), size: 84, color: '#ffffff', x: 50, y: 45, bold: false }, { text: t('templateQuoteAuthor'), size: 48, color: accent, x: 50, y: 75, bold: true }]);
+    } else if (name === 'announcement') {
+      setBackground(accent);
+      setShape('circle');
+      setShapeColor('#ffffff');
+      setLayers([{ text: t('templateAnnouncementText'), size: 110, color: '#111827', x: 50, y: 50, bold: true }]);
+    } else {
+      setBackground('#f0f2f5');
+      setShape('band');
+      setShapeColor(accent);
+      setLayers([{ text: t('templateBannerText'), size: 96, color: '#ffffff', x: 50, y: 80, bold: true }]);
+    }
   }
 
   const setLayer = (index: number, patch: Partial<Layer>) => setLayers((current) => current.map((layer, i) => (i === index ? { ...layer, ...patch } : layer)));
@@ -160,6 +226,42 @@ export function DesignEditor({ canGenerate = false }: { canGenerate?: boolean })
                 {t('removePhoto')}
               </button>
             )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              {t('shape')}
+              <select className="input w-auto" value={shape} onChange={(event) => setShape(event.target.value as Shape)}>
+                {SHAPES.map((key) => (
+                  <option key={key} value={key}>{t(`shape_${key}`)}</option>
+                ))}
+              </select>
+            </label>
+            {shape !== 'none' && <input type="color" value={shapeColor} onChange={(event) => setShapeColor(event.target.value)} aria-label={t('shapeColor')} />}
+          </div>
+          {(brand.color || brand.logo) && (
+            <div className="flex flex-wrap items-center gap-3">
+              {brand.color && (
+                <button type="button" className="btn-secondary" onClick={() => setBackground(brand.color!)}>
+                  <span aria-hidden className="h-4 w-4 rounded-full ring-1 ring-slate-300" style={{ background: brand.color }} />
+                  {t('brandColor')}
+                </button>
+              )}
+              {brand.logo && (
+                <button type="button" className="btn-secondary" aria-pressed={!!logo} onClick={toggleLogo}>
+                  {logo ? t('removeLogo') : t('addLogo')}
+                </button>
+              )}
+            </div>
+          )}
+        </section>
+        <section className="card space-y-2 p-4">
+          <p className="label">{t('templates')}</p>
+          <div className="flex flex-wrap gap-2">
+            {(['quote', 'announcement', 'banner'] as const).map((name) => (
+              <button key={name} type="button" className="btn-secondary" onClick={() => applyTemplate(name)}>
+                {t(`template_${name}`)}
+              </button>
+            ))}
           </div>
         </section>
         {canGenerate && (
