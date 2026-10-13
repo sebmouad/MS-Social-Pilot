@@ -192,6 +192,41 @@ export default async function PostsPage({
         </div>
       </header>
 
+      {/* A plain GET form, so a search is a URL like every other filter here:
+          it pages, bookmarks and survives a refresh. */}
+      <form method="get" action="/posts" role="search" className="card flex flex-wrap items-end gap-2 p-3 lg:flex-col lg:items-stretch">
+        {raw && <input type="hidden" name="status" value={raw} />}
+        {/* The other filters ride along with a search, so typing a word does
+            not throw away the Pages and the label already picked. */}
+        {['group', 'pages', 'label'].map((key) =>
+          first(params[key]) ? <input key={key} type="hidden" name={key} value={first(params[key])} /> : null,
+        )}
+
+        <div className="min-w-[12rem] flex-1 lg:min-w-0">
+          <label className="label" htmlFor="posts-q">
+            {t('searchLabel')}
+          </label>
+          <input
+            id="posts-q"
+            name="q"
+            type="search"
+            className="input"
+            defaultValue={search}
+            maxLength={MAX_SEARCH}
+            placeholder={t('searchPlaceholder')}
+          />
+        </div>
+
+        <button type="submit" className="btn-secondary">
+          {tCommon('search')}
+        </button>
+        {filtered && (
+          <Link href={pageHref('/posts', { status: raw }, 1)} className="btn-secondary">
+            {t('clearFilters')}
+          </Link>
+        )}
+      </form>
+
       <nav className="flex flex-wrap gap-2 lg:card lg:flex-col lg:gap-0.5 lg:p-2" aria-label={t('statusFilter')}>
         {FILTERS.map((value) => {
           const active = (raw ?? '') === value;
@@ -236,40 +271,6 @@ export default async function PostsPage({
         inline
       />
 
-      {/* A plain GET form, so a search is a URL like every other filter here:
-          it pages, bookmarks and survives a refresh. */}
-      <form method="get" action="/posts" role="search" className="card flex flex-wrap items-end gap-2 p-3 lg:flex-col lg:items-stretch">
-        {raw && <input type="hidden" name="status" value={raw} />}
-        {/* The other filters ride along with a search, so typing a word does
-            not throw away the Pages and the label already picked. */}
-        {['group', 'pages', 'label'].map((key) =>
-          first(params[key]) ? <input key={key} type="hidden" name={key} value={first(params[key])} /> : null,
-        )}
-
-        <div className="min-w-[12rem] flex-1 lg:min-w-0">
-          <label className="label" htmlFor="posts-q">
-            {t('searchLabel')}
-          </label>
-          <input
-            id="posts-q"
-            name="q"
-            type="search"
-            className="input"
-            defaultValue={search}
-            maxLength={MAX_SEARCH}
-            placeholder={t('searchPlaceholder')}
-          />
-        </div>
-
-        <button type="submit" className="btn-secondary">
-          {tCommon('search')}
-        </button>
-        {filtered && (
-          <Link href={pageHref('/posts', { status: raw }, 1)} className="btn-secondary">
-            {t('clearFilters')}
-          </Link>
-        )}
-      </form>
       </aside>
 
       <div className="min-w-0 space-y-4">

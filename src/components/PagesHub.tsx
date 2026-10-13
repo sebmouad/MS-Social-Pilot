@@ -130,7 +130,7 @@ export async function PagesHub({
           <p className="max-w-md text-sm text-slate-600">{t('noPagesHint')}</p>
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
           {cards.map(({ page, waiting, next, last, unread, unanswered }) => {
             const state = health(page);
             const followers = page.followersCount ?? page.fanCount;
@@ -208,7 +208,7 @@ export async function PagesHub({
       )}
 
       {adAccounts.length > 0 && (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label={t('adAccounts')}>
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3" aria-label={t('adAccounts')}>
           {adAccounts.map((account) => (
             <li key={account.id}>
               <Link
