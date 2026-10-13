@@ -23,7 +23,8 @@ test('shows likes, reposts and replies per network and per post', async ({ page 
   const target = await prisma.target.create({
     data: { workspaceId: workspace.id, socialAccountId: account.id, type: 'bluesky', providerId: PROVIDER_ID, name: '@client-a.example' },
   });
-  await prisma.post.create({
+  const post = await prisma.post.create({
+    include: { targets: true },
     data: {
       workspaceId: workspace.id,
       authorId: author.id,
@@ -34,6 +35,7 @@ test('shows likes, reposts and replies per network and per post', async ({ page 
           status: 'published',
           publishedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
           remotePostId: 'at://did:plc:e2e-analytics/app.bsky.feed.post/1',
+          remoteUrl: 'https://bsky.app/profile/client-a.example/post/1',
           insights: { impressions: null, reach: null, engagedUsers: null, reactions: 7, comments: 2, shares: 3, clicks: null },
         },
       },
@@ -47,5 +49,14 @@ test('shows likes, reposts and replies per network and per post', async ({ page 
   await expect(row).toContainText('7');
   await expect(row).toContainText('3');
   await expect(row).toContainText('2');
+  expect(failures).toEqual([]);
+
+  // A reply read from Bluesky waits in the Inbox, answered on Bluesky.
+  await prisma.postComment.create({
+    data: { postTargetId: post.targets[0]!.id, remoteId: 'at://did:plc:fan/app.bsky.feed.post/9', message: 'e2e network reply', fromName: 'fan.example', fromId: 'did:plc:fan', createdTime: new Date() },
+  });
+  await open(page, '/inbox');
+  const item = page.getByRole('listitem').filter({ hasText: 'e2e network reply' });
+  await expect(item.getByRole('link', { name: 'Open to reply' })).toHaveAttribute('href', 'https://bsky.app/profile/client-a.example/post/1');
   expect(failures).toEqual([]);
 });

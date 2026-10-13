@@ -121,6 +121,8 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
   one stream, newest first; filter by type and by open / done / all; "Mark done"
   is shared by the team and a new message from the other person reopens it;
   Reply opens the thread in Analytics. Dashboard shortcut shows the open count.
+  Replies to Bluesky and Mastodon posts come in with the edge sync (public
+  thread / status context); "Open to reply" answers them on the network.
 - **Saved replies** `/inbox/replies` (editor+): the workspace's reusable answers;
   in every comment and Messenger reply box, type `/` (filters by name or text,
   Enter picks the first) or use the button; `{first_name}` and `{page}` are

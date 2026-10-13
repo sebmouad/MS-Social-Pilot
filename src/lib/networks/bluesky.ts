@@ -1,6 +1,6 @@
 import { GraphError } from '../facebook/graph';
 import { NETWORK_RULES } from '../network-rules';
-import { failureFor, netJson, type NetworkConnector, type NetworkPost } from './types';
+import { failureFor, netJson, type NetworkConnector, type NetworkPost, type NetworkReply } from './types';
 
 /**
  * Bluesky, over the AT Protocol.
@@ -160,4 +160,44 @@ export const bluesky: NetworkConnector = {
     if (!post) throw failureFor(404, 'the post is gone', 'Bluesky');
     return { likes: post.likeCount ?? 0, reposts: post.repostCount ?? 0, replies: post.replyCount ?? 0, quotes: post.quoteCount ?? 0 };
   },
+  async replies(remotePostId) {
+    // The thread is public too: no sign-in, no app password spent.
+    const { data } = await netJson<{ thread: ThreadNode }>(
+      'Bluesky',
+      `${PUBLIC_APPVIEW}/xrpc/app.bsky.feed.getPostThread?uri=${encodeURIComponent(remotePostId)}&depth=6&parentHeight=0`,
+    );
+    const out: NetworkReply[] = [];
+    const walk = (node: ThreadNode, parent: string | null) => {
+      for (const child of node.replies ?? []) {
+        // Blocked or deleted replies come back without a post.
+        if (!child.post) continue;
+        out.push({
+          remoteId: child.post.uri,
+          parentRemoteId: parent,
+          message: child.post.record?.text ?? '',
+          fromName: child.post.author.displayName || child.post.author.handle,
+          fromId: child.post.author.did,
+          likeCount: child.post.likeCount ?? 0,
+          replyCount: child.post.replyCount ?? 0,
+          isHidden: false,
+          createdTime: new Date(child.post.record?.createdAt ?? child.post.indexedAt ?? Date.now()),
+        });
+        walk(child, child.post.uri);
+      }
+    };
+    walk(data.thread, null);
+    return out;
+  },
 };
+
+interface ThreadNode {
+  post?: {
+    uri: string;
+    author: { did: string; handle: string; displayName?: string };
+    record?: { text?: string; createdAt?: string };
+    indexedAt?: string;
+    likeCount?: number;
+    replyCount?: number;
+  };
+  replies?: ThreadNode[];
+}

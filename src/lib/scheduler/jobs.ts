@@ -10,7 +10,7 @@ import { pollDueSources } from '../rss/poll';
 import { refreshPostStatus, runSchedulerTick } from './runner';
 import { probeAllLevels, syncPostInsights, syncTargetAnalytics, syncWorkspaceAnalytics } from '../analytics';
 import { syncAccountTargets } from '../accounts';
-import { syncTargetEdges } from '../engagement';
+import { syncNetworkReplies, syncTargetEdges } from '../engagement';
 import { discoverInstagramAccounts, syncWorkspaceInstagram } from '../instagram';
 import { discoverAdAccounts, syncWorkspaceAds } from '../ads';
 import { deleteUnusedMedia } from '../media';
@@ -400,6 +400,11 @@ export async function runEdgeSync(context: JobContext): Promise<string | null> {
 
   failed += pass.failures.length;
   for (const failure of pass.failures) context.logger(`Page ${failure.id}: ${failure.message}`);
+
+  // Replies on the other networks land in the same inbox.
+  const networks = await syncNetworkReplies();
+  comments += networks.comments;
+  failed += networks.failed;
 
   if (comments + reviews + conversations + external + failed === 0) return null;
   return `comments=${comments} reviews=${reviews} threads=${conversations} external=${external} failed=${failed}`;

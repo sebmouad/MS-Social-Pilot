@@ -160,12 +160,21 @@ export default async function InboxPage({
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:flex-col sm:items-end">
-                <Link
-                  className="btn-secondary"
-                  href={`/analytics?view=${item.kind === 'comment' ? 'comments' : 'inbox'}&target=${item.targetId}`}
-                >
-                  {t('reply')}
-                </Link>
+                {item.networkUrl != null ? (
+                  // Replying on other networks happens there for now.
+                  item.networkUrl && (
+                    <a className="btn-secondary" href={item.networkUrl} target="_blank" rel="noreferrer">
+                      {t('replyOnNetwork')}
+                    </a>
+                  )
+                ) : (
+                  <Link
+                    className="btn-secondary"
+                    href={`/analytics?view=${item.kind === 'comment' ? 'comments' : 'inbox'}&target=${item.targetId}`}
+                  >
+                    {t('reply')}
+                  </Link>
+                )}
                 <InboxAssign kind={item.kind} id={item.id} assigneeId={item.assigneeId} members={team} />
                 <InboxResolveButton kind={item.kind} id={item.id} resolved={item.resolvedAt !== null} />
               </div>

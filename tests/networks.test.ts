@@ -168,6 +168,41 @@ describe('post counters', () => {
     expect(await youtube.stats!('abc', ctx)).toEqual({ likes: null, reposts: null, replies: 4, views: 1200 });
   });
 
+  it('Bluesky: reads the reply thread, nested replies under their parent', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      seen.push(url);
+      const author = { did: 'did:plc:a', handle: 'a.bsky.social', displayName: 'Alex' };
+      return new Response(JSON.stringify({ thread: { post: { uri: 'at://me/1', author }, replies: [
+        { post: { uri: 'at://a/2', author, record: { text: 'Nice', createdAt: '2026-10-01T10:00:00Z' }, likeCount: 2, replyCount: 1 },
+          replies: [{ post: { uri: 'at://b/3', author: { did: 'did:plc:b', handle: 'b.bsky.social' }, record: { text: 'Agreed', createdAt: '2026-10-01T11:00:00Z' } } }] },
+        { blocked: true },
+      ] } }));
+    }));
+    const replies = await bluesky.replies!('at://me/1', context());
+    expect(seen[0]).toContain('/xrpc/app.bsky.feed.getPostThread?uri=at%3A%2F%2Fme%2F1');
+    expect(replies.map((reply) => [reply.remoteId, reply.parentRemoteId, reply.message, reply.fromName])).toEqual([
+      ['at://a/2', null, 'Nice', 'Alex'],
+      ['at://b/3', 'at://a/2', 'Agreed', 'b.bsky.social'],
+    ]);
+    expect(replies[0]!.likeCount).toBe(2);
+  });
+
+  it('Mastodon: reads descendants as plain text', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ descendants: [
+      { id: '50', in_reply_to_id: '42', content: '<p>Hello &amp; welcome</p>', created_at: '2026-10-01T10:00:00Z', account: { id: '7', acct: 'sam@example.social', display_name: '' } },
+      { id: '51', in_reply_to_id: '50', content: '<p>Thanks</p>', created_at: '2026-10-01T11:00:00Z', favourites_count: 1, account: { id: '8', acct: 'kim', display_name: 'Kim' } },
+    ] }))));
+    vi.doMock('../src/lib/safe-fetch', async (original) => ({ ...(await original<object>()), assertResolvesPublicly: async () => undefined }));
+    const { mastodon: fresh } = await import('../src/lib/networks/mastodon');
+    const replies = await fresh.replies!('42', context({ meta: { instance: 'https://example.social' } }));
+    expect(replies.map((reply) => [reply.remoteId, reply.parentRemoteId, reply.message, reply.fromName])).toEqual([
+      ['50', null, 'Hello & welcome', 'sam@example.social'],
+      ['51', '50', 'Thanks', 'Kim'],
+    ]);
+    vi.doUnmock('../src/lib/safe-fetch');
+  });
+
   it('store as reactions, comments and shares', async () => {
     const { networkInsights } = await import('../src/lib/analytics');
     const stored = networkInsights({ likes: 4, reposts: 2, replies: 1, quotes: 1 });

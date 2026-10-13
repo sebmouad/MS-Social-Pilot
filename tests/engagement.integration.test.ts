@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { WorkspaceRole } from '@prisma/client';
@@ -2758,6 +2758,33 @@ describe('the inbox', () => {
     ]);
     expect(await inbox.countOpenInbox(scope)).toEqual({ comments: 1, messages: 1 });
     expect(await inbox.readInbox({ ...scope, kind: 'comment', state: 'open', limit: 50 })).toHaveLength(1);
+  });
+
+  it('brings Bluesky replies into the inbox, without the account’s own, and never sends its credential to Facebook', async () => {
+    const { workspace, user, target, postTarget } = await seedWorkspace();
+    await prisma.target.update({ where: { id: target.id }, data: { type: 'bluesky', providerId: 'did:plc:me' } });
+    await prisma.postTarget.update({ where: { id: postTarget.id }, data: { remotePostId: 'at://did:plc:me/app.bsky.feed.post/1', remoteUrl: 'https://bsky.app/profile/me/post/1' } });
+    const author = (did: string, handle: string) => ({ did, handle });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ thread: { post: { uri: 'at://me/1', author: author('did:plc:me', 'me') }, replies: [
+      { post: { uri: 'at://a/2', author: author('did:plc:a', 'alex.example'), record: { text: 'Where can I buy it?', createdAt: '2026-10-01T10:00:00Z' } },
+        replies: [{ post: { uri: 'at://me/3', author: author('did:plc:me', 'me'), record: { text: 'Link in bio', createdAt: '2026-10-01T11:00:00Z' } } }] },
+    ] } }))));
+    try {
+      expect(await engagement.syncNetworkReplies()).toEqual({ comments: 2, failed: 0 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    const items = await inbox.readInbox({ workspaceId: workspace.id, targetIds: [target.id], state: 'open', limit: 50 });
+    expect(items.map((item) => [item.author, item.text, item.networkUrl])).toEqual([
+      ['alex.example', 'Where can I buy it?', 'https://bsky.app/profile/me/post/1'],
+    ]);
+
+    received = [];
+    const comment = await prisma.postComment.findFirstOrThrow({ where: { remoteId: 'at://a/2' } });
+    const outcome = await engagement.replyToCommentAs({ commentId: comment.id, workspaceId: workspace.id, userId: user.id, role: 'owner', message: 'Hi' });
+    expect(outcome.outcome).toBe('not_found');
+    expect(received).toEqual([]);
   });
 
   it('marks done and reopens only inside the member’s Pages and workspace', async () => {

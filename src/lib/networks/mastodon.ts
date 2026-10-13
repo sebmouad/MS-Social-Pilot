@@ -1,6 +1,7 @@
 import { GraphError } from '../facebook/graph';
 import { NETWORK_RULES } from '../network-rules';
 import { netJson, textWithLink, type NetworkConnector } from './types';
+import { stripHtml } from '../rss/parse';
 
 /**
  * Mastodon, and the servers that speak its API.
@@ -119,5 +120,36 @@ export const mastodon: NetworkConnector = {
       { untrustedHost: true, headers: { authorization: `Bearer ${credentials.accessToken}` } },
     );
     return { likes: data.favourites_count ?? 0, reposts: data.reblogs_count ?? 0, replies: data.replies_count ?? 0 };
+  },
+  async replies(remotePostId, { credentials }) {
+    const instance = (credentials.meta as { instance?: string }).instance;
+    if (!instance) throw new GraphError({ message: 'Mastodon: reconnect the account.', kind: 'auth' });
+    const { data } = await netJson<{ descendants: Array<{
+      id: string;
+      in_reply_to_id: string | null;
+      content: string;
+      created_at: string;
+      favourites_count?: number;
+      replies_count?: number;
+      account: { id: string; acct: string; display_name?: string };
+    }> }>(
+      'Mastodon',
+      `${instance}/api/v1/statuses/${encodeURIComponent(remotePostId)}/context`,
+      { untrustedHost: true, headers: { authorization: `Bearer ${credentials.accessToken}` } },
+    );
+    // Ids are local to this server; the account's own target id is `id@host`.
+    const host = new URL(instance).host;
+    return data.descendants.map((status) => ({
+      remoteId: status.id,
+      // A direct answer to the post is a top-level comment.
+      parentRemoteId: status.in_reply_to_id === remotePostId ? null : status.in_reply_to_id,
+      message: stripHtml(status.content),
+      fromName: status.account.display_name || status.account.acct,
+      fromId: `${status.account.id}@${host}`,
+      likeCount: status.favourites_count ?? 0,
+      replyCount: status.replies_count ?? 0,
+      isHidden: false,
+      createdTime: new Date(status.created_at),
+    }));
   },
 };

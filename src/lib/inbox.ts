@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
+import { isNetworkKey } from './networks/types';
+
 import { prisma } from './prisma';
 
 /**
@@ -28,6 +30,8 @@ export interface InboxItem {
   resolvedAt: Date | null;
   /** The member it is assigned to, if anyone. */
   assigneeId: string | null;
+  /** For a reply on another network: where to answer it (replying from here is Facebook-only). */
+  networkUrl?: string | null;
 }
 
 /** Who an inbox list is narrowed to: everything, what nobody has taken, or one member's. */
@@ -84,7 +88,7 @@ export async function readInbox(
           where: commentWhere(pages, scope.state, scope.assignee),
           include: {
             postTarget: {
-              select: { targetId: true, target: { select: { name: true, pictureUrl: true } }, post: { select: { message: true } } },
+              select: { targetId: true, remoteUrl: true, target: { select: { name: true, pictureUrl: true, type: true } }, post: { select: { message: true } } },
             },
           },
           orderBy: [{ createdTime: 'desc' }, { id: 'desc' }],
@@ -114,6 +118,7 @@ export async function readInbox(
       isReply: comment.parentRemoteId !== null,
       resolvedAt: comment.resolvedAt,
       assigneeId: comment.assigneeId,
+      networkUrl: isNetworkKey(comment.postTarget.target.type) ? comment.postTarget.remoteUrl ?? '' : null,
     })),
     ...conversations.map((conversation) => ({
       kind: 'message' as const,

@@ -3291,7 +3291,8 @@
     "saveNote": "Enregistrer",
     "deleteNote": "Supprimer",
     "notesPrivate": "Seule votre équipe voit les notes. Elles ne sont jamais envoyées à la personne.",
-    "noteFailed": "La note n’a pas pu être enregistrée. Réessayez."
+    "noteFailed": "La note n’a pas pu être enregistrée. Réessayez.",
+    "replyOnNetwork": "Ouvrir pour répondre"
   },
   "sessions": {
     "listLabel": "Navigateurs connectés",

@@ -36,7 +36,7 @@ live in the owner's Chrome.
   TikTok connectors (TikTok needs an audit; unaudited apps post privately).
 - AI images (needs an image-generation provider + key; add as a Configuration
   setting, generate into the media library, never publish directly).
-- Unified inbox across networks (after Meta step 2).
+- Unified inbox across networks: Bluesky and Mastodon replies are read into the Inbox (answered on the network for now); Facebook Messenger/Instagram DMs after Meta step 2.
 - Competitor tracking (public Page benchmarks) — needs Meta Page Public Content
   Access; Ad Library search.
 - Location tags and @mentions of Pages — need Meta features the app does not have.

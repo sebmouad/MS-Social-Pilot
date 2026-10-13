@@ -3291,7 +3291,8 @@
     "saveNote": "Save",
     "deleteNote": "Delete",
     "notesPrivate": "Only your team sees notes. They are never sent to the person.",
-    "noteFailed": "The note could not be saved. Try again."
+    "noteFailed": "The note could not be saved. Try again.",
+    "replyOnNetwork": "Open to reply"
   },
   "sessions": {
     "listLabel": "Signed-in browsers",

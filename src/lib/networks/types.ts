@@ -60,6 +60,20 @@ export interface NetworkPostStats {
   views?: number | null;
 }
 
+/** A reply to a published post, shaped like a Facebook comment so the inbox stores it the same way. */
+export interface NetworkReply {
+  remoteId: string;
+  /** The reply it answers; null when it answers the post itself. */
+  parentRemoteId: string | null;
+  message: string;
+  fromName: string | null;
+  fromId: string | null;
+  likeCount: number;
+  replyCount: number;
+  isHidden: boolean;
+  createdTime: Date;
+}
+
 export interface NetworkContext {
   credentials: NetworkCredentials;
   /** Store credentials a refresh produced, before anything else can fail. */
@@ -77,6 +91,8 @@ export interface NetworkConnector {
   publish: (target: { providerId: string; name: string }, post: NetworkPost, context: NetworkContext) => Promise<NetworkPublishResult>;
   /** Read a published post's counters; absent where this app cannot read them yet. */
   stats?: (remotePostId: string, context: NetworkContext) => Promise<NetworkPostStats>;
+  /** Read the replies to a published post; absent where this app cannot read them yet. */
+  replies?: (remotePostId: string, context: NetworkContext) => Promise<NetworkReply[]>;
 }
 
 /** Turn an HTTP answer into the failure kind the scheduler understands. */

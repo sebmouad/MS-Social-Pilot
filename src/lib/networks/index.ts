@@ -23,7 +23,7 @@ import {
   type NetworkCredentials,
   type NetworkKey,
   type NetworkMedia,
-  type NetworkPostStats,
+  type NetworkPostStats, type NetworkReply,
   type NetworkPublishResult,
 } from './types';
 
@@ -112,6 +112,12 @@ function contextFor(account: StoredAccount): NetworkContext {
 export async function readNetworkStats(key: NetworkKey, account: StoredAccount, remotePostId: string): Promise<NetworkPostStats | null> {
   const connector = CONNECTORS[key];
   return connector.stats ? connector.stats(remotePostId, contextFor(account)) : null;
+}
+
+/** A published post's replies, or null where the network's reader is not built yet. */
+export async function readNetworkReplies(key: NetworkKey, account: StoredAccount, remotePostId: string): Promise<NetworkReply[] | null> {
+  const connector = CONNECTORS[key];
+  return connector.replies ? connector.replies(remotePostId, contextFor(account)) : null;
 }
 
 /** Publish one destination on a network other than Facebook. */

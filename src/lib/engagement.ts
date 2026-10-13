@@ -11,6 +11,8 @@ import { logActivity } from './scheduler/runner';
 import { applyModerationRules } from './moderation';
 import { emitWebhook } from './webhooks';
 import { syncExternalPostInsights } from './analytics';
+import { readNetworkReplies } from './networks';
+import { NETWORK_KEYS, isNetworkKey, type NetworkKey } from './networks/types';
 import {
   deleteComment,
   fetchComments,
@@ -111,6 +113,37 @@ export async function markRemoteMissing(postTargetId: string, now: Date = new Da
   });
 }
 
+/**
+ * Replies to posts on other networks (Bluesky, Mastodon…), for the inbox.
+ *
+ * The Facebook pass walks Pages; these destinations are not Pages, so they get
+ * their own walk over recent published posts. One failing post does not stop
+ * the rest.
+ */
+export async function syncNetworkReplies(): Promise<{ comments: number; failed: number }> {
+  const posts = await prisma.postTarget.findMany({
+    where: {
+      status: 'published',
+      remotePostId: { not: null },
+      remoteMissingAt: null,
+      target: { enabled: true, type: { in: NETWORK_KEYS as unknown as TargetType[] } },
+    },
+    orderBy: { publishedAt: 'desc' },
+    take: env.commentPostLimit * 4,
+    select: { id: true },
+  });
+  let comments = 0;
+  let failed = 0;
+  for (const post of posts) {
+    try {
+      comments += await syncCommentsFor(post.id);
+    } catch {
+      failed += 1;
+    }
+  }
+  return { comments, failed };
+}
+
 /** How old a newly read comment can be and still be sent to webhooks. */
 const COMMENT_WEBHOOK_MAX_AGE_MS = 48 * 3_600_000;
 
@@ -121,8 +154,10 @@ export async function syncCommentsFor(postTargetId: string): Promise<number> {
   });
 
   if (!row.remotePostId) return 0;
-  const token = tokenFor(row.target);
-  if (!token) return 0;
+  // Another network: its replies, read whole (threads there are small).
+  const network = isNetworkKey(row.target.type);
+  const token = network ? null : tokenFor(row.target);
+  if (!network && !token) return 0;
 
   const newest = await prisma.postComment.findFirst({
     where: { postTargetId },
@@ -130,10 +165,14 @@ export async function syncCommentsFor(postTargetId: string): Promise<number> {
     select: { createdTime: true },
   });
 
-  const comments = await fetchComments(row.remotePostId, token, {
-    // Nothing stored yet means a first sync, which reads the history it can.
-    since: newest ? new Date(newest.createdTime.getTime() - COMMENT_SYNC_OVERLAP_MS) : undefined,
-  });
+  const comments = network
+    ? row.target.socialAccount
+      ? (await readNetworkReplies(row.target.type as NetworkKey, row.target.socialAccount, row.remotePostId)) ?? []
+      : []
+    : await fetchComments(row.remotePostId, token!, {
+        // Nothing stored yet means a first sync, which reads the history it can.
+        since: newest ? new Date(newest.createdTime.getTime() - COMMENT_SYNC_OVERLAP_MS) : undefined,
+      });
 
   if (comments.length === 0) return 0;
 
@@ -484,6 +523,9 @@ async function tokenForComment(commentId: string, workspaceId: string) {
   });
 
   if (!comment) return null;
+  // Replies read from another network: no Facebook action applies, and its
+  // stored credential must never be sent to Graph.
+  if (isNetworkKey(comment.postTarget.target.type)) return null;
   const token = tokenFor(comment.postTarget.target);
   return token ? { comment, token } : null;
 }
