@@ -25,7 +25,10 @@ export function StatTile({
   trend,
   hero = false,
   definition,
+  note,
 }: {
+  /** One plain line under the figure: what it means. */
+  note?: string;
   /** What the figure counts, behind an ⓘ. */
   definition?: string;
   label: string;
@@ -77,6 +80,7 @@ export function StatTile({
 
         {trend && trend.length > 1 && <Sparkline values={trend} width={72} height={22} />}
       </div>
+      {note && <p className="mt-1 text-xs text-slate-500">{note}</p>}
     </div>
   );
 }

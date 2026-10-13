@@ -27,13 +27,16 @@ test('picking a platform header narrows the screen to its channels', async ({ pa
 
   await open(page, '/posts');
   const sidebar = page.locator('.shell-sidebar');
-  await sidebar.getByRole('button', { name: /Mastodon/ }).first().click();
-  await page.waitForURL(/net=mastodon/);
+  // A click before hydration does nothing: click until the URL follows.
+  await expect(async () => {
+    await sidebar.getByRole('button', { name: /^Mastodon/ }).click();
+    await page.waitForURL(/net=mastodon/, { timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
   await expect(sidebar.getByText('@client-c@example.social').first()).toBeVisible();
   await expect(sidebar.getByText('@client-b.example')).toHaveCount(0);
 
-  await sidebar.getByRole('button', { name: /Mastodon/ }).first().click();
-  await page.waitForURL((url) => !url.searchParams.has('net'));
+  await sidebar.getByRole('button', { name: /^Mastodon/ }).click();
+  await expect(page).not.toHaveURL(/net=/, { timeout: 30_000 });
   await expect(sidebar.getByText('@client-b.example').first()).toBeVisible();
   expect(failures).toEqual([]);
 });

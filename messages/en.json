@@ -119,7 +119,7 @@
     "footnote": "Figures come from Facebook for {name}. They are kept here, so your history goes back further than Facebook’s own two years.",
     "view": {
       "overview": "Overview",
-      "posts": "By post",
+      "posts": "Posts",
       "interactions": "Interaction",
       "audience": "Audience",
       "videos": "Video",
@@ -130,11 +130,12 @@
       "instagram": "Instagram",
       "ads": "Ads",
       "analysis": "Analysis",
-      "compare": "Compare channels",
+      "compare": "Compare",
       "total": "All channels",
       "responseTime": "Response time",
       "report": "Report",
-      "networks": "Other networks"
+      "networks": "Other networks",
+      "summary": "Summary"
     },
     "byPost": "Impressions and interaction per post",
     "byPostHint": "One row per post per destination — the same post can perform very differently on two channels, and averaging that away hides the signal.",
@@ -246,7 +247,7 @@
     "moreViews": "More",
     "oneChannelHint": "Showing {name}. For another channel, open the channel selector and choose “Only” next to it.",
     "tabsMain": "Views",
-    "tabsMore": "Detailed figures"
+    "summaryDetail": "This channel in detail"
   },
   "app": {
     "name": "MS Social Pilot",
@@ -4475,5 +4476,69 @@
       "up": "Running",
       "down": "Problem"
     }
+  },
+  "analyticsSummary": {
+    "none": "No channels to summarise yet.",
+    "changed": "What changed",
+    "figures": "Key figures",
+    "intro": "{count, plural, one {Totals for # channel} other {Totals for # channels}} over {days, plural, one {the last day} other {the last # days}}.",
+    "vsPrevious": "{days, plural, one {vs previous day} other {vs previous # days}}",
+    "vsYear": "vs same period last year",
+    "upTo": "up to {value}",
+    "kpi": {
+      "reach": "People reached",
+      "interactions": "Interactions",
+      "followers": "Followers",
+      "rate": "Interaction rate",
+      "posts": "Posts",
+      "perPost": "Interactions per post"
+    },
+    "meaning": {
+      "reach": "How many people saw your posts.",
+      "reachSeveral": "Added up across channels; one person may be counted on several.",
+      "interactions": "Reactions, comments and shares on your posts.",
+      "followers": "People following your channels today.",
+      "rate": "Interactions for every 100 people reached.",
+      "posts": "Posts published in the period.",
+      "perPost": "How much each post earned on average."
+    },
+    "followersNet": "{net} net",
+    "followersParts": "{gained, plural, one {# gained} other {# gained}}, {lost, plural, one {# lost} other {# lost}}",
+    "trend": {
+      "title": "Trend",
+      "hintDay": "Day by day, with the comparison period dashed.",
+      "hintWeek": "Week by week, with the comparison period dashed.",
+      "thisPeriod": "This period",
+      "previous": "{days, plural, one {Previous day} other {Previous # days}}",
+      "lastYear": "Same period last year",
+      "figure": "Figure",
+      "step": "Step",
+      "day": "Day",
+      "week": "Week from",
+      "figures": {
+        "reach": "People reached",
+        "interactions": "Interactions",
+        "posts": "Posts"
+      },
+      "steps": {
+        "day": "Daily",
+        "week": "Weekly"
+      },
+      "reachNote": "Day by day, people reached is the sum over that day's posts."
+    },
+    "bestPosts": "Best posts",
+    "allPosts": "All posts",
+    "noPosts": "No posts in this period.",
+    "interactionCount": "{count, plural, one {# interaction} other {# interactions}}",
+    "channels": "Channels",
+    "compareChannels": "Compare channels",
+    "channelFigure": {
+      "interactions": "{value} interactions",
+      "reach": "{value} reached"
+    },
+    "noChange": "No comparison",
+    "whenToPost": "When to post",
+    "rawFigures": "Raw figures",
+    "report": "Report"
   }
 }

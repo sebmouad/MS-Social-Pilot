@@ -4,10 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
-import { ANALYTICS_VIEWS, INBOX_VIEW_PATHS, PRIMARY_ANALYTICS_VIEWS, VIEW_SCOPED_PARAMS } from '@/lib/analytics-views';
-
-// Engagement views open from the Inbox sidebar, not from here.
-const VIEWS = ANALYTICS_VIEWS.filter((view) => !INBOX_VIEW_PATHS[view]);
+import { PRIMARY_ANALYTICS_VIEWS, VIEW_SCOPED_PARAMS, type AnalyticsView } from '@/lib/analytics-views';
 
 /**
  * View switcher for the analytics screen.
@@ -15,13 +12,13 @@ const VIEWS = ANALYTICS_VIEWS.filter((view) => !INBOX_VIEW_PATHS[view]);
  * Links rather than client state, so each view is a server render against the
  * data it needs — and so a particular view can be linked to or bookmarked.
  *
- * Four main views, then the rest below a divider. Views
- * do not fit across a phone. Rather than wrapping them into four
+ * Four views: Summary, Posts, Audience, Compare. The detailed views still open
+ * from links and bookmarks but are not listed. Views do not fit across a phone. Rather than wrapping them into four
  * ragged rows that push the content below the fold, small screens get a select
  * — one tap, the full list, no horizontal hunting — and the tab strip appears
  * from `sm` up where there is room for it.
  */
-export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidden?: string[] }) {
+export function AnalyticsTabs({ current }: { current: string; hidden?: string[] }) {
   const t = useTranslations('analytics');
   const pathname = usePathname();
   const params = useSearchParams();
@@ -52,12 +49,14 @@ export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidde
           value={current}
           onChange={(event) => router.push(hrefFor(event.target.value))}
         >
-          {VIEWS.filter((view) => !hidden.includes(view) || view === current).map((view) => (
-            <option key={view} value={view}>
-              {t(`view.${view}`)}
-            </option>
-          ))}
-          <option value="report">{t('view.report')}</option>
+          {/* A view reached by a bookmark stays selectable while it is open. */}
+          {(PRIMARY_ANALYTICS_VIEWS.includes(current as AnalyticsView) ? PRIMARY_ANALYTICS_VIEWS : [...PRIMARY_ANALYTICS_VIEWS, current]).map(
+            (view) => (
+              <option key={view} value={view}>
+                {t(`view.${view}`)}
+              </option>
+            ),
+          )}
         </select>
       </label>
 
@@ -77,33 +76,6 @@ export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidde
               </Link>
             </li>
           ))}
-        </ul>
-        <p className="border-t border-slate-200 px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('tabsMore')}</p>
-        <ul className="space-y-0.5">
-          {VIEWS.filter((view) => !PRIMARY_ANALYTICS_VIEWS.includes(view) && (!hidden.includes(view) || view === current)).map((view) => (
-            <li key={view}>
-              <Link
-                href={hrefFor(view)}
-                aria-current={view === current ? 'page' : undefined}
-                className={`block rounded-lg px-3 py-2 text-sm font-semibold ${
-                  view === current ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {t(`view.${view}`)}
-              </Link>
-            </li>
-          ))}
-          <li>
-            <Link
-              href={hrefFor('report')}
-              aria-current={current === 'report' ? 'page' : undefined}
-              className={`block rounded-lg px-3 py-2 text-sm font-semibold ${
-                current === 'report' ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {t('view.report')}
-            </Link>
-          </li>
         </ul>
       </nav>
     </>

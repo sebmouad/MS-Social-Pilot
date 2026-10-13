@@ -45,15 +45,16 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-test('an unknown view opens the analysis rather than an empty screen', async ({ page }) => {
+test('an unknown view opens the Summary rather than an empty screen', async ({ page }) => {
   const failures = collectFailures(page);
 
   await open(page, '/analytics?view=no-such-view');
 
-  // The tab strip marks the analysis as current, and there is something
-  // under it — not a tab strip over nothing.
+  // The menu marks the Summary as current, and lists the four views only.
   const tabs = page.getByRole('navigation', { name: /choose a view/i });
-  await expect(tabs.getByRole('link', { name: /^analysis$/i })).toHaveAttribute('aria-current', 'page');
+  await expect(tabs.getByRole('link', { name: /^summary$/i })).toHaveAttribute('aria-current', 'page');
+  await expect(tabs.getByRole('link')).toHaveCount(4);
+  await expect(tabs.getByText(/detailed figures/i)).toHaveCount(0);
 
   expect(failures).toEqual([]);
 });
@@ -64,7 +65,7 @@ test('switching tabs keeps the Page and window but drops one view’s filters', 
   await open(page, `/analytics?view=interactions&target=${targetId}&days=7&q=delivery&shown=hidden&page=2`);
 
   const tabs = page.getByRole('navigation', { name: /choose a view/i });
-  const href = await tabs.getByRole('link', { name: /^by post$/i }).getAttribute('href');
+  const href = await tabs.getByRole('link', { name: /^posts$/i }).getAttribute('href');
   const next = new URL(href!, 'http://localhost');
 
   expect(next.searchParams.get('view')).toBe('posts');

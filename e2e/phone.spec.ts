@@ -280,8 +280,8 @@ test('on a phone the sidebar is a drawer behind the menu, with the composer one 
 
   // Settings lives in the top bar only, not in the menu.
   await expect(drawer.getByRole('link', { name: /^settings$/i })).toHaveCount(0);
-  await drawer.getByRole('link', { name: /^channels$/i }).click();
-  await page.waitForURL(/\/channels/);
+  await drawer.getByRole('link', { name: /^connections$/i }).click();
+  await page.waitForURL(/\/connections/);
 
   // And it closes on the way, rather than covering the screen it navigated to.
   await expect(page.locator('#main-menu')).toHaveCount(0);

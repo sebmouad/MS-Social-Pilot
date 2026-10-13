@@ -26,7 +26,7 @@ import { atLeast, canDeleteComments, canModerateComments } from '@/lib/constants
 import { INBOX_VIEW_PATHS, UNWINDOWED_VIEWS, defaultAnalyticsView, parseAnalyticsView, type AnalyticsView } from '@/lib/analytics-views';
 import { isPinnable, readPinnedFigures } from '@/lib/pinned-metrics';
 import { PinnedTiles } from '@/components/analysis/PinnedTiles';
-import { TotalProfilesView } from '@/components/analysis/TotalProfilesView';
+import { SummaryView } from '@/components/analysis/SummaryView';
 import { ResponseTimeView } from '@/components/analysis/ResponseTimeView';
 import { Pagination } from '@/components/Pagination';
 import { pageHref, pageNumber, paginate } from '@/lib/paging';
@@ -157,6 +157,8 @@ export async function AnalyticsScreen({
 
   // The post table covers every selected profile until one Page is picked.
   const postsScope = requested ? { targetId: selected.id } : { targetIds: pages.map((page) => page.id) };
+  // The Summary reads the whole selection, or the one Page asked for.
+  const summaryIds = requested || pages.length === 1 ? [selected.id] : pages.map((page) => page.id);
 
   return (
     <ChannelsLayout
@@ -171,7 +173,7 @@ export async function AnalyticsScreen({
               range={range}
               path={only ? INBOX_VIEW_PATHS[only]! : '/analytics'}
               keep={{ view, target: selected.id }}
-              compare={view === 'analysis' || view === 'compare' || view === 'total' ? compare : undefined}
+              compare={view === 'summary' || view === 'compare' ? compare : undefined}
             />
           )}
           <ExportMenu targetId={selected.id} from={from.toISOString()} to={to.toISOString()} />
@@ -186,46 +188,45 @@ export async function AnalyticsScreen({
         </div>
       </header>
 
-      {pages.length > 1 && !requested && !['total', 'compare', 'posts', 'responseTime', 'instagram', 'networks'].includes(view) && (
+      {pages.length > 1 && !requested && !['summary', 'total', 'compare', 'posts', 'responseTime', 'instagram', 'networks'].includes(view) && (
         <p className="rounded-xl bg-brand-50 px-4 py-2 text-sm text-brand-800">{t('oneChannelHint', { name: selected.name })}</p>
       )}
 
-      {(view === 'total' || view === 'analysis') && (
+      {view === 'summary' && (
         <PinnedTiles
           overviewHref={`/analytics?view=overview&target=${selected.id}&${periodQuery}`}
-          figures={await readPinnedFigures({
-            keys: pinnedKeys,
-            targetIds: view === 'total' ? pages.map((page) => page.id) : [selected.id],
-            from,
-            to,
-          })}
+          figures={await readPinnedFigures({ keys: pinnedKeys, targetIds: summaryIds, from, to })}
         />
       )}
 
-      {view === 'total' && (
-        <TotalProfilesView
+      {view === 'summary' && (
+        <SummaryView
           workspaceId={auth.workspace.id}
+          targetIds={summaryIds}
           from={from}
           to={to}
           days={window}
           timeZone={timezone}
           compare={compare}
-          targetIds={pageScope.all ? undefined : pageScope.ids}
-          rangeQuery={periodQuery}
+          rangeQuery={summaryIds.length === 1 ? `target=${selected.id}&${periodQuery}` : periodQuery}
+          reportHref={`/reports?target=${selected.id}&${periodQuery}`}
         />
       )}
 
-      {view === 'analysis' && (
-        <PageAnalysisView
-          workspaceId={auth.workspace.id}
-          targetId={selected.id}
-          from={from}
-          to={to}
-          days={window}
-          timeZone={timezone}
-          compare={compare}
-          notesAccess={{ canEdit: atLeast(auth.role, WorkspaceRole.editor), canNoteAllPages: auth.pageScope.all }}
-        />
+      {/* One channel: the full reading of it follows the summary. */}
+      {view === 'summary' && summaryIds.length === 1 && (
+        <section className="space-y-3 border-t border-slate-200 pt-6" aria-label={t('summaryDetail')}>
+          <PageAnalysisView
+            workspaceId={auth.workspace.id}
+            targetId={selected.id}
+            from={from}
+            to={to}
+            days={window}
+            timeZone={timezone}
+            compare={compare}
+            notesAccess={{ canEdit: atLeast(auth.role, WorkspaceRole.editor), canNoteAllPages: auth.pageScope.all }}
+          />
+        </section>
       )}
 
       {view === 'compare' && (

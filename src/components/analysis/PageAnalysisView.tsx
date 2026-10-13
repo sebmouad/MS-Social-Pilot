@@ -29,7 +29,7 @@ import { appLocale, formatInZone } from '@/lib/time';
 import { VIZ, compact, seriesColor } from '@/lib/viz';
 
 /** Localised weekday names, 0 = Sunday, from a known Sunday. */
-function weekdayNames(locale: string, style: 'long' | 'short'): string[] {
+export function weekdayNames(locale: string, style: 'long' | 'short'): string[] {
   const format = new Intl.DateTimeFormat(locale, { weekday: style, timeZone: 'UTC' });
   return Array.from({ length: 7 }, (_, day) => format.format(new Date(Date.UTC(2024, 0, 7 + day))));
 }
@@ -103,23 +103,32 @@ async function HealthCard({ health }: { health: Health }) {
   );
 }
 
+/**
+ * A finding's parameters in the reader's words: format keys become names,
+ * a weekday number a day, an hour a time range. Shared with the Summary.
+ */
+export function findingWords(
+  t: (key: string) => string,
+  finding: Finding,
+  weekdays: string[],
+): Record<string, string | number> {
+  const params = { ...finding.params };
+  for (const key of ['best', 'worst', 'format'] as const) {
+    if (typeof params[key] === 'string') params[key] = t(`format.${params[key]}`);
+  }
+  if (finding.key === 'bestTime') {
+    const hour = Number(params.hour);
+    params.weekday = weekdays[Number(params.weekday)] ?? '';
+    params.start = `${String(hour).padStart(2, '0')}:00`;
+    params.end = `${String((hour + BLOCK_HOURS) % 24).padStart(2, '0')}:00`;
+  }
+  return params;
+}
+
 async function FindingsList({ findings, weekdays }: { findings: Finding[]; weekdays: string[] }) {
   const t = await getTranslations('pageAnalysis');
 
-  // Parameters that are keys become words here, in the reader's language.
-  const words = (finding: Finding): Record<string, string | number> => {
-    const params = { ...finding.params };
-    for (const key of ['best', 'worst', 'format'] as const) {
-      if (typeof params[key] === 'string') params[key] = t(`format.${params[key]}`);
-    }
-    if (finding.key === 'bestTime') {
-      const hour = Number(params.hour);
-      params.weekday = weekdays[Number(params.weekday)] ?? '';
-      params.start = `${String(hour).padStart(2, '0')}:00`;
-      params.end = `${String((hour + BLOCK_HOURS) % 24).padStart(2, '0')}:00`;
-    }
-    return params;
-  };
+  const words = (finding: Finding) => findingWords(t, finding, weekdays);
 
   return (
     <section className="card-viz">

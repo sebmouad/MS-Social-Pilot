@@ -16,6 +16,8 @@ export interface TimeSeriesLine {
   points: TimeSeriesPoint[];
   /** Position in the categorical order. Follows the entity, not its rank. */
   colorIndex: number;
+  /** Drawn dashed: a reference such as the previous period. */
+  dashed?: boolean;
 }
 
 /** A dated mark on the chart (NEXT_PHASES H13): "Campaign started". */
@@ -234,7 +236,7 @@ export function TimeSeries({
                 />
               )}
 
-              <path d={path} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+              <path d={path} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" strokeDasharray={line.dashed ? '5 4' : undefined} />
 
               {last && !dimmed && (
                 <>

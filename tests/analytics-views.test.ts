@@ -1,21 +1,32 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { WorkspaceRole } from '@prisma/client';
 
-import { ANALYTICS_VIEWS, parseAnalyticsView } from '../src/lib/analytics-views';
+import { ANALYTICS_VIEWS, PRIMARY_ANALYTICS_VIEWS, parseAnalyticsView } from '../src/lib/analytics-views';
 import { canRefreshAnalytics, throttleAnalyticsRefresh } from '../src/lib/analytics';
 import { AppError } from '../src/lib/errors';
 import { reset } from '../src/lib/rate-limit';
 
 describe('parseAnalyticsView', () => {
-  it('keeps every known view', () => {
-    for (const view of ANALYTICS_VIEWS) expect(parseAnalyticsView(view)).toBe(view);
+  it('keeps every known view, except those the Summary replaced', () => {
+    for (const view of ANALYTICS_VIEWS) {
+      expect(parseAnalyticsView(view)).toBe(view === 'analysis' || view === 'total' ? 'summary' : view);
+    }
   });
 
-  it('falls back to the analysis for a missing or unknown view', () => {
-    expect(parseAnalyticsView(undefined)).toBe('analysis');
-    expect(parseAnalyticsView('nonsense')).toBe('analysis');
+  it('opens old analysis and total bookmarks on the Summary', () => {
+    expect(parseAnalyticsView('analysis')).toBe('summary');
+    expect(parseAnalyticsView('total')).toBe('summary');
+  });
+
+  it('lists exactly four views in the menu', () => {
+    expect(PRIMARY_ANALYTICS_VIEWS).toEqual(['summary', 'posts', 'audience', 'compare']);
+  });
+
+  it('falls back to the summary for a missing or unknown view', () => {
+    expect(parseAnalyticsView(undefined)).toBe('summary');
+    expect(parseAnalyticsView('nonsense')).toBe('summary');
     // Inherited object keys are not views either.
-    expect(parseAnalyticsView('constructor')).toBe('analysis');
+    expect(parseAnalyticsView('constructor')).toBe('summary');
   });
 });
 

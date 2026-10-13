@@ -119,7 +119,7 @@
     "footnote": "Chiffres fournis par Facebook pour {name}. Ils sont conservés ici : votre historique remonte plus loin que les deux ans de Facebook.",
     "view": {
       "overview": "Vue d'ensemble",
-      "posts": "Par publication",
+      "posts": "Publications",
       "interactions": "Interactions",
       "audience": "Audience",
       "videos": "Vidéo",
@@ -130,11 +130,12 @@
       "instagram": "Instagram",
       "ads": "Publicités",
       "analysis": "Analyse",
-      "compare": "Comparer les canaux",
+      "compare": "Comparer",
       "total": "Tous les canaux",
       "responseTime": "Temps de réponse",
       "report": "Rapport",
-      "networks": "Autres réseaux"
+      "networks": "Autres réseaux",
+      "summary": "Synthèse"
     },
     "byPost": "Impressions et interactions par publication",
     "byPostHint": "Une ligne par publication et par destination : une même publication peut réagir très différemment sur deux canaux, et faire la moyenne masquerait l'information utile.",
@@ -246,7 +247,7 @@
     "moreViews": "Plus",
     "oneChannelHint": "Affichage de {name}. Pour un autre canal, ouvrez le sélecteur de canaux et choisissez « Seulement » à côté.",
     "tabsMain": "Vues",
-    "tabsMore": "Chiffres détaillés"
+    "summaryDetail": "Ce canal en détail"
   },
   "app": {
     "name": "MS Social Pilot",
@@ -4475,5 +4476,69 @@
       "up": "En service",
       "down": "Problème"
     }
+  },
+  "analyticsSummary": {
+    "none": "Aucun canal à résumer pour l’instant.",
+    "changed": "Ce qui a changé",
+    "figures": "Chiffres clés",
+    "intro": "{count, plural, one {Totaux pour # canal} other {Totaux pour # canaux}} sur {days, plural, one {le dernier jour} other {les # derniers jours}}.",
+    "vsPrevious": "{days, plural, one {par rapport au jour précédent} other {par rapport aux # jours précédents}}",
+    "vsYear": "par rapport à la même période l’an dernier",
+    "upTo": "jusqu’à {value}",
+    "kpi": {
+      "reach": "Personnes touchées",
+      "interactions": "Interactions",
+      "followers": "Abonnés",
+      "rate": "Taux d’interaction",
+      "posts": "Publications",
+      "perPost": "Interactions par publication"
+    },
+    "meaning": {
+      "reach": "Combien de personnes ont vu vos publications.",
+      "reachSeveral": "Additionné sur les canaux : une personne peut être comptée sur plusieurs.",
+      "interactions": "Réactions, commentaires et partages sur vos publications.",
+      "followers": "Personnes qui suivent vos canaux aujourd’hui.",
+      "rate": "Interactions pour 100 personnes touchées.",
+      "posts": "Publications parues sur la période.",
+      "perPost": "Ce que chaque publication a rapporté en moyenne."
+    },
+    "followersNet": "{net} au net",
+    "followersParts": "{gained, plural, one {# gagné} other {# gagnés}}, {lost, plural, one {# perdu} other {# perdus}}",
+    "trend": {
+      "title": "Tendance",
+      "hintDay": "Jour par jour, la période de comparaison en pointillés.",
+      "hintWeek": "Semaine par semaine, la période de comparaison en pointillés.",
+      "thisPeriod": "Cette période",
+      "previous": "{days, plural, one {Jour précédent} other {# jours précédents}}",
+      "lastYear": "Même période l’an dernier",
+      "figure": "Chiffre",
+      "step": "Pas",
+      "day": "Jour",
+      "week": "Semaine du",
+      "figures": {
+        "reach": "Personnes touchées",
+        "interactions": "Interactions",
+        "posts": "Publications"
+      },
+      "steps": {
+        "day": "Par jour",
+        "week": "Par semaine"
+      },
+      "reachNote": "Jour par jour, les personnes touchées sont la somme sur les publications du jour."
+    },
+    "bestPosts": "Meilleures publications",
+    "allPosts": "Toutes les publications",
+    "noPosts": "Aucune publication sur cette période.",
+    "interactionCount": "{count, plural, one {# interaction} other {# interactions}}",
+    "channels": "Canaux",
+    "compareChannels": "Comparer les canaux",
+    "channelFigure": {
+      "interactions": "{value} interactions",
+      "reach": "{value} touchées"
+    },
+    "noChange": "Pas de comparaison",
+    "whenToPost": "Quand publier",
+    "rawFigures": "Chiffres bruts",
+    "report": "Rapport"
   }
 }

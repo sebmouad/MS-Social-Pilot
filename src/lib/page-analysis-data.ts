@@ -21,6 +21,11 @@ import {
   cadence,
   dailySeries,
   type DailySeries,
+  findings,
+  formatBreakdown,
+  bestTimes,
+  median,
+  type Finding,
 } from './page-analysis';
 
 /**
@@ -317,6 +322,23 @@ export interface PageComparisonRow {
   health: Health;
   /** Day by day over the window, for the chart with one line per Page. */
   daily: Pick<DailySeries, 'days' | 'posts' | 'interactions' | 'reach'>;
+  /** Follows gained and lost over the window; null where Meta serves none. */
+  follows: number | null;
+  unfollows: number | null;
+  /** The same figures over the comparison window (previous period or last year). */
+  previous: {
+    posts: number;
+    interactions: number;
+    reach: number | null;
+    netFollows: number | null;
+    daily: Pick<DailySeries, 'days' | 'posts' | 'interactions' | 'reach'>;
+  };
+  /** The Page's three strongest posts of the window, by interactions. */
+  top: AnalysedPost[];
+  /** Every post of the window, for a combined time-of-day grid. */
+  postList: AnalysedPost[];
+  /** What the numbers say about this Page (see `findings()`). */
+  findings: Finding[];
 }
 
 /**
@@ -347,13 +369,14 @@ export async function comparePages(options: {
   // One Page at a time: a workspace has a handful, and each is a few queries.
   const rows: PageComparisonRow[] = [];
   for (const page of pages) {
-    const [current, previous, totals] = await Promise.all([
+    const [current, previous, totals, syncedAt] = await Promise.all([
       loadPagePosts(page.id, options.from, options.to),
       loadPagePosts(page.id, previousFrom, new Date(baseline.to.getTime() - 1)),
       loadPageTotals(page.id, [
         { from: options.from, to: options.to },
         { from: previousFrom, to: baseline.to },
       ]),
+      lastSynced(page.id, page.profileSyncedAt),
     ]);
 
     const now = summarise(current);
@@ -366,6 +389,9 @@ export async function comparePages(options: {
     });
     const rhythm = cadence(current, options.from, options.to, options.timeZone);
     const followers = page.followersCount ?? page.fanCount;
+    const ranked = [...current].sort(
+      (a, b) => b.interactions - a.interactions || b.publishedAt.getTime() - a.publishedAt.getTime(),
+    );
 
     rows.push({
       targetId: page.id,
@@ -382,6 +408,27 @@ export async function comparePages(options: {
       netFollows: netFollows(totals[0]!),
       health: healthScore({ cadence: rhythm, kpis, followers }),
       daily: dailySeries(current, options.from, options.to, options.timeZone),
+      follows: totals[0]!.follows,
+      unfollows: totals[0]!.unfollows,
+      previous: {
+        posts: before.posts,
+        interactions: before.interactions,
+        reach: kpis.find((kpi) => kpi.key === 'reach')?.previous ?? null,
+        netFollows: netFollows(totals[1]!),
+        daily: dailySeries(previous, previousFrom, new Date(baseline.to.getTime() - 1), options.timeZone),
+      },
+      top: ranked.slice(0, 3),
+      postList: current,
+      findings: findings({
+        kpis,
+        cadence: rhythm,
+        formats: formatBreakdown(current),
+        times: bestTimes(current, options.timeZone),
+        top: ranked.slice(0, 5),
+        medianInteractions: median(current.map((post) => post.interactions)),
+        lastSyncedAt: syncedAt,
+        now: new Date(),
+      }),
     });
   }
 

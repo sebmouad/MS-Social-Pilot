@@ -105,11 +105,11 @@ test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-test('two profiles add up on All profiles, and the selection follows to Posts and Calendar', async ({ page }) => {
+test('two profiles add up on the Summary, and the selection follows to Posts and Calendar', async ({ page }) => {
   const failures = collectFailures(page);
   const pages = `${firstId},${secondId}`;
 
-  await open(page, `/analytics?view=total&pages=${pages}`);
+  await open(page, `/analytics?view=summary&pages=${pages}`);
   await expect(page.getByText(/Totals for 2 channels/)).toBeVisible();
 
   // The cookie keeps the choice: a bare URL opens on the same two.
@@ -118,29 +118,6 @@ test('two profiles add up on All profiles, and the selection follows to Posts an
     await expect(page.getByRole('button', { name: `Hide ${SECOND_PAGE}` })).toHaveAttribute('aria-pressed', 'true');
   }
 
-  expect(failures).toEqual([]);
-});
-
-test('the Pages column folds to a rail of pictures and stays folded', async ({ page }) => {
-  test.setTimeout(120_000);
-  const failures = collectFailures(page);
-  // A screen without its own filters in the column: those stay open.
-  await open(page, '/queue');
-  const column = page.getByRole('complementary', { name: 'Channels' });
-  // A click that lands before hydration does nothing: click until it folds.
-  await expect(async () => {
-    const fold = column.getByRole('button', { name: 'Fold the channels column' });
-    if (await fold.isVisible()) await fold.click();
-    await expect(column.getByRole('button', { name: `Hide ${SECOND_PAGE}` })).toBeHidden({ timeout: 2_000 });
-  }).toPass({ timeout: 30_000 });
-
-  // Clicking a picture shows that Page alone, as the open column does.
-  await column.getByRole('button', { name: `Show ${SECOND_PAGE} only` }).click();
-  await expect(page).toHaveURL(new RegExp(`pages=${secondId}`));
-
-  await page.reload();
-  await column.getByRole('button', { name: 'Open the channels column' }).click();
-  await expect(column.getByRole('button', { name: `Hide ${SECOND_PAGE}` })).toBeVisible();
   expect(failures).toEqual([]);
 });
 

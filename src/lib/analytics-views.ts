@@ -7,6 +7,7 @@
  * reaches the server as a reference, not as the array.
  */
 export const ANALYTICS_VIEWS = [
+  'summary',
   'total',
   'analysis',
   'compare',
@@ -27,7 +28,7 @@ export const ANALYTICS_VIEWS = [
 export type AnalyticsView = (typeof ANALYTICS_VIEWS)[number];
 
 /** The view a bare /analytics, or an unknown `?view=`, opens on. */
-export const DEFAULT_ANALYTICS_VIEW: AnalyticsView = 'analysis';
+export const DEFAULT_ANALYTICS_VIEW: AnalyticsView = 'summary';
 
 /**
  * Views that read everything stored rather than a date window.
@@ -42,16 +43,19 @@ export const UNWINDOWED_VIEWS: ReadonlySet<AnalyticsView> = new Set([
 ]);
 
 /**
- * The view /analytics opens on with no `?view=`: the total of the selection
- * when it holds several profiles, one profile's analysis otherwise
- * (NEXT_PHASES B1).
+ * The view /analytics opens on with no `?view=`: the Summary, which reads one
+ * profile or the whole selection alike.
  */
-export function defaultAnalyticsView(profiles: number): AnalyticsView {
-  return profiles > 1 ? 'total' : DEFAULT_ANALYTICS_VIEW;
+export function defaultAnalyticsView(_profiles?: number): AnalyticsView {
+  return DEFAULT_ANALYTICS_VIEW;
 }
+
+/** Views the Summary replaced; their bookmarks open it. */
+const MERGED_INTO_SUMMARY: ReadonlySet<string> = new Set(['analysis', 'total']);
 
 /** Narrow a `?view=` value to a known view, falling back to the default. */
 export function parseAnalyticsView(value: string | undefined): AnalyticsView {
+  if (MERGED_INTO_SUMMARY.has(value ?? '')) return 'summary';
   return (ANALYTICS_VIEWS as readonly string[]).includes(value ?? '')
     ? (value as AnalyticsView)
     : DEFAULT_ANALYTICS_VIEW;
@@ -65,8 +69,11 @@ export function parseAnalyticsView(value: string | undefined): AnalyticsView {
  */
 export const VIEW_SCOPED_PARAMS = ['page', 'q', 'shown', 'sort', 'order'] as const;
 
-/** The tabs always on show; the rest sit under "More" (Simplified keeps four). */
-export const PRIMARY_ANALYTICS_VIEWS: readonly AnalyticsView[] = ['total', 'analysis', 'posts', 'audience'];
+/**
+ * The four views the menu lists (Simplified keeps four). The others still
+ * open from a link or a bookmark, but are not offered.
+ */
+export const PRIMARY_ANALYTICS_VIEWS: readonly AnalyticsView[] = ['summary', 'posts', 'audience', 'compare'];
 
 /**
  * Engagement views that belong to the Inbox module and open there, from its
