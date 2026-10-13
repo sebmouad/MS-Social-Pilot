@@ -394,6 +394,18 @@
     @apply text-start font-medium;
   }
 
+  /* The calendar's day cells and their small round actions: one class each,
+     so a month of 42 cells does not repeat the same long list 42 times. */
+  .day-cell {
+    @apply min-h-[8rem] min-w-0 border-b border-e border-slate-200 p-1 sm:p-2;
+  }
+  .day-action {
+    @apply flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-brand-50 hover:text-brand-600 focus-visible:bg-brand-50;
+  }
+  .day-action-hover {
+    @apply [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:focus-visible:opacity-100 [@media(hover:hover)]:group-hover/day:opacity-100;
+  }
+
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
   }

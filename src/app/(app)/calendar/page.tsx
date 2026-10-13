@@ -613,7 +613,7 @@ export default async function CalendarPage({
               <div
                 key={key}
                 data-drop-day={key}
-                className={`group/day min-h-[8rem] min-w-0 border-b border-e border-slate-200 p-1 sm:p-2 ${
+                className={`day-cell group/day ${
                   key === todayKey ? 'bg-brand-50/60' : inMonth ? (key < todayKey ? 'bg-slate-50' : 'bg-white') : 'bg-slate-100/70'
                 }`}
               >
@@ -636,7 +636,7 @@ export default async function CalendarPage({
                     {/* Day actions: shown on hover or keyboard focus where there is a pointer, always on touch. */}
                     <Link
                       href={linkWith({ view: 'week', week: key, month: null })}
-                      className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 hover:bg-brand-50 hover:text-brand-600 focus-visible:bg-brand-50 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:focus-visible:opacity-100 [@media(hover:hover)]:group-hover/day:opacity-100"
+                      className="day-action day-action-hover"
                       aria-label={t('openWeekOf', { date: dayLabel.format(day) })}
                       title={t('openWeekOf', { date: dayLabel.format(day) })}
                     >
@@ -645,7 +645,7 @@ export default async function CalendarPage({
                     {key >= todayKey && (
                       <Link
                         href={newPostHref(key)}
-                        className="flex h-6 w-6 items-center justify-center rounded-full text-base leading-none text-slate-500 hover:bg-brand-50 hover:text-brand-600 focus-visible:bg-brand-50"
+                        className="day-action text-base leading-none"
                         aria-label={t('newPostOn', { date: dayLabel.format(day) })}
                         title={t('newPostOn', { date: dayLabel.format(day) })}
                       >
