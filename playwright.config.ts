@@ -63,10 +63,14 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npx tsx e2e/prepare.ts && npx next dev --port ${port} --hostname 127.0.0.1`,
+    // E2E_PROD=1 walks a production build: no first-visit compile of each page,
+    // so a full run is faster and does not stall on the development server.
+    command: process.env.E2E_PROD
+      ? `npx tsx e2e/prepare.ts && npx next build && npx next start --port ${port} --hostname 127.0.0.1`
+      : `npx tsx e2e/prepare.ts && npx next dev --port ${port} --hostname 127.0.0.1`,
     url: baseURL,
     reuseExistingServer: false,
-    timeout: 180_000,
+    timeout: process.env.E2E_PROD ? 900_000 : 180_000,
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
