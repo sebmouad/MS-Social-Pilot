@@ -118,7 +118,7 @@
     "unavailableHint": "Facebook ne fournit plus ces chiffres. Ils sont listés pour indiquer qu’ils manquent, pas qu’ils valent zéro.",
     "footnote": "Chiffres fournis par Facebook pour {name}. Ils sont conservés ici : votre historique remonte plus loin que les deux ans de Facebook.",
     "view": {
-      "overview": "Vue d'ensemble",
+      "overview": "Vue d’ensemble",
       "posts": "Publications",
       "interactions": "Interactions",
       "audience": "Audience",
@@ -1524,7 +1524,18 @@
       "mastodon": "Mastodon",
       "youtube": "YouTube",
       "tiktok": "TikTok"
-    }
+    },
+    "group_plan": "Planifier",
+    "group_create": "Créer",
+    "group_conversations": "Conversations",
+    "group_tools": "Outils",
+    "group_results": "Résultats",
+    "group_agency": "Agence",
+    "contentSources": "Sources de contenu",
+    "inboxAll": "Tout",
+    "overview": "Vue d’ensemble",
+    "channels": "Canaux",
+    "teamRoles": "Équipe et rôles"
   },
   "notifications": {
     "title": "Notifications",
@@ -2652,13 +2663,17 @@
       "back": "Retour à l’application",
       "backups": "Sauvegardes",
       "alerts": "Alertes",
-      "worker": "Worker et quotas Meta",
+      "worker": "Tâches de fond",
       "sessions": "Sessions",
       "status": "État",
       "errors": "Erreurs",
       "agency": "Vue d’agence",
       "plans": "Formules",
-      "changelog": "Nouveautés"
+      "changelog": "Nouveautés",
+      "groupSetup": "Mise en place",
+      "groupPeople": "Personnes",
+      "groupHealth": "Santé",
+      "groupHistory": "Historique"
     },
     "overview": {
       "title": "Vue d’ensemble de l’installation",

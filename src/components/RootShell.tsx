@@ -17,41 +17,45 @@ export function RootShell({ userName, children }: { userName: string; children: 
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const items: Array<{ href: string; label: string; icon: IconName }> = [
+  const items: Array<{ href: string; label: string; icon: IconName; group?: string; danger?: boolean }> = [
     { href: '/root', label: t('nav.overview'), icon: 'dashboard' },
-    { href: '/root/status', label: t('nav.status'), icon: 'check' },
-    { href: '/root/config', label: t('nav.config'), icon: 'config' },
-    { href: '/root/agency', label: t('nav.agency'), icon: 'analytics' },
-    { href: '/root/workspaces', label: t('nav.workspaces'), icon: 'folders' },
-    { href: '/root/users', label: t('nav.users'), icon: 'team' },
-    { href: '/root/plans', label: t('nav.plans'), icon: 'tag' },
-    { href: '/root/changelog', label: t('nav.changelog'), icon: 'pencil' },
-    { href: '/root/sessions', label: t('nav.sessions'), icon: 'globe' },
-    { href: '/root/registration', label: t('nav.registration'), icon: 'mail' },
-    { href: '/root/privileges', label: t('nav.privileges'), icon: 'key' },
-    { href: '/root/worker', label: t('nav.worker'), icon: 'refresh' },
-    { href: '/root/errors', label: t('nav.errors'), icon: 'warning' },
-    { href: '/root/alerts', label: t('nav.alerts'), icon: 'bell' },
-    { href: '/root/backups', label: t('nav.backups'), icon: 'download' },
-    { href: '/root/activity', label: t('nav.activity'), icon: 'clock' },
-    { href: '/root/danger', label: t('nav.danger'), icon: 'warning' },
+    { href: '/root/config', label: t('nav.config'), icon: 'config', group: t('nav.groupSetup') },
+    { href: '/root/plans', label: t('nav.plans'), icon: 'tag', group: t('nav.groupSetup') },
+    { href: '/root/registration', label: t('nav.registration'), icon: 'mail', group: t('nav.groupSetup') },
+    { href: '/root/workspaces', label: t('nav.workspaces'), icon: 'folders', group: t('nav.groupPeople') },
+    { href: '/root/users', label: t('nav.users'), icon: 'team', group: t('nav.groupPeople') },
+    { href: '/root/agency', label: t('nav.agency'), icon: 'analytics', group: t('nav.groupPeople') },
+    { href: '/root/privileges', label: t('nav.privileges'), icon: 'key', group: t('nav.groupPeople') },
+    { href: '/root/sessions', label: t('nav.sessions'), icon: 'globe', group: t('nav.groupPeople') },
+    { href: '/root/status', label: t('nav.status'), icon: 'check', group: t('nav.groupHealth') },
+    { href: '/root/worker', label: t('nav.worker'), icon: 'refresh', group: t('nav.groupHealth') },
+    { href: '/root/errors', label: t('nav.errors'), icon: 'warning', group: t('nav.groupHealth') },
+    { href: '/root/alerts', label: t('nav.alerts'), icon: 'bell', group: t('nav.groupHealth') },
+    { href: '/root/backups', label: t('nav.backups'), icon: 'download', group: t('nav.groupHealth') },
+    { href: '/root/activity', label: t('nav.activity'), icon: 'clock', group: t('nav.groupHistory') },
+    { href: '/root/changelog', label: t('nav.changelog'), icon: 'pencil', group: t('nav.groupHistory') },
+    { href: '/root/danger', label: t('nav.danger'), icon: 'warning', danger: true },
   ];
   const active = (href: string) => (href === '/root' ? pathname === href : pathname.startsWith(href));
 
   const nav = (
     <nav aria-label={t('nav.label')} className="space-y-0.5">
-      {items.map((item) => (
+      {items.map((item, index) => (
+        <div key={item.href} className={item.danger ? 'mt-3 border-t border-slate-200 pt-3' : undefined}>
+          {item.group && item.group !== items[index - 1]?.group && (
+            <p className="mb-1 mt-3 px-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{item.group}</p>
+          )}
         <Link
-          key={item.href}
           href={item.href}
           aria-current={active(item.href) ? 'page' : undefined}
           className={`flex h-10 items-center gap-3 rounded-lg px-2.5 text-[15px] font-semibold ${
-            active(item.href) ? 'bg-amber-100 text-amber-900' : 'text-slate-700 hover:bg-slate-100'
+            active(item.href) ? 'bg-amber-100 text-amber-900' : item.danger ? 'text-red-700 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-100'
           }`}
         >
-          <Icon name={item.icon} size={20} className={active(item.href) ? 'text-amber-700' : 'text-slate-500'} />
+          <Icon name={item.icon} size={20} className={active(item.href) ? 'text-amber-700' : item.danger ? 'text-red-600' : 'text-slate-500'} />
           <span className="truncate">{item.label}</span>
         </Link>
+        </div>
       ))}
     </nav>
   );

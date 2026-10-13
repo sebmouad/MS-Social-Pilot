@@ -7,6 +7,7 @@ import { BreakdownBars } from '@/components/BreakdownBars';
 import { StatTile } from '@/components/charts/StatTile';
 import { Icon, type IconName } from '@/components/Icon';
 import { QuerySelect } from '@/components/QuerySelect';
+import { SidebarDock } from '@/components/SidebarDock';
 import { AutoSyncNote } from '@/components/AutoSyncNote';
 import { requirePage } from '@/lib/auth';
 import { listAdAccounts, readAdSummary, readCampaigns, syncedSince, type CampaignRow } from '@/lib/ads';
@@ -227,13 +228,39 @@ export default async function AdsPage({
     <div className="space-y-6">
       {header}
 
+      {/* Period and breakdown level sit in the left menu on a laptop, above
+          the table on a phone. */}
+      <SidebarDock>
+        <aside className="space-y-4">
+          <DateRangePicker
+            range={range}
+            path="/ads"
+            keep={{ account: account.id, level, sort, dir }}
+            maxDays={syncWindow}
+          />
+          <nav aria-label={t('breakdownTitle')}>
+            <p className="mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('breakdownTitle')}</p>
+            <ul className="flex gap-1 lg:block lg:space-y-0.5">
+              {(['campaign', 'adset', 'ad'] as const).map((option) => (
+                <li key={option}>
+                  <Link
+                    href={hrefWith({ level: option })}
+                    aria-current={option === level ? 'page' : undefined}
+                    scroll={false}
+                    className={`flex h-9 items-center rounded-lg px-2.5 text-sm font-semibold ${
+                      option === level ? 'bg-brand-50 text-brand-700' : 'text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {t(`level_${option}`)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </aside>
+      </SidebarDock>
+
       <div className="filter-row">
-        <DateRangePicker
-          range={range}
-          path="/ads"
-          keep={{ account: account.id, level, sort, dir }}
-          maxDays={syncWindow}
-        />
 
         {accounts.length > 1 && (
           <QuerySelect
@@ -335,17 +362,7 @@ export default async function AdsPage({
       <section className="card overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 sm:px-5">
           <h2 className="text-sm font-semibold text-slate-900">{t('breakdownTitle')}</h2>
-          <div className="segmented">
-            {(['campaign', 'adset', 'ad'] as const).map((option) => (
-              <Link
-                key={option}
-                href={hrefWith({ level: option })}
-                className={`segmented-item ${option === level ? 'segmented-item-active' : ''}`}
-              >
-                {t(`level_${option}`)}
-              </Link>
-            ))}
-          </div>
+          <span className="text-xs font-semibold text-slate-500">{t(`level_${level}`)}</span>
         </div>
 
         {rows.length === 0 ? (

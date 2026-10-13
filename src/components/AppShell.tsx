@@ -59,6 +59,8 @@ interface Item {
   icon: IconName;
   also?: string[];
   badge?: number;
+  /** A small heading shown above the first link of each run of the same group. */
+  group?: string;
   /** Matched for highlighting but not listed: reached from the top bar instead. */
   hidden?: boolean;
 }
@@ -226,27 +228,41 @@ export function AppShell({
       icon: 'calendar',
       also: ['/compose'],
       items: [
-        { href: '/calendar', label: t('calendar'), icon: 'calendar' },
-        { href: '/calendar/dates', label: t('keyDates'), icon: 'star' },
-        { href: '/queue', label: t('queue'), icon: 'clock' },
-        { href: '/templates', label: t('templates'), icon: 'compose' },
-        { href: '/design', label: t('design'), icon: 'image' },
-        { href: '/posts', label: t('posts'), icon: 'posts' },
-        ...(showApprovals ? [{ href: '/approvals', label: t('approvals'), icon: 'approvals' as IconName, badge: pendingApprovals }] : []),
-        { href: '/feeds', label: t('feeds'), icon: 'feeds' },
+        { href: '/calendar', label: t('calendar'), icon: 'calendar', group: t('group_plan') },
+        { href: '/queue', label: t('queue'), icon: 'clock', group: t('group_plan') },
+        { href: '/posts', label: t('posts'), icon: 'posts', group: t('group_plan') },
+        ...(showApprovals ? [{ href: '/approvals', label: t('approvals'), icon: 'approvals' as IconName, badge: pendingApprovals, group: t('group_plan') }] : []),
+        { href: '/templates', label: t('templates'), icon: 'compose', group: t('group_create') },
+        { href: '/design', label: t('design'), icon: 'image', group: t('group_create') },
+        { href: '/feeds', label: t('contentSources'), icon: 'feeds', group: t('group_create') },
+        { href: '/calendar/dates', label: t('keyDates'), icon: 'star', group: t('group_create') },
       ],
     },
-    { key: 'inbox', label: t('inbox'), rail: t('rail_inbox'), icon: 'inbox', items: [{ href: '/inbox', label: t('inbox'), icon: 'inbox' }, { href: '/inbox/comments', label: t('comments'), icon: 'comment' }, { href: '/inbox/reviews', label: t('reviews'), icon: 'star' }, { href: '/inbox/response-time', label: t('responseTime'), icon: 'clock' }, { href: '/inbox/replies', label: t('savedReplies'), icon: 'comment' }, { href: '/inbox/rules', label: t('moderation'), icon: 'shield' }] },
+    {
+      key: 'inbox',
+      label: t('inbox'),
+      rail: t('rail_inbox'),
+      icon: 'inbox',
+      items: [
+        { href: '/inbox', label: t('inboxAll'), icon: 'inbox', group: t('group_conversations') },
+        { href: '/inbox/comments', label: t('comments'), icon: 'comment', group: t('group_conversations') },
+        { href: '/inbox/reviews', label: t('reviews'), icon: 'star', group: t('group_conversations') },
+        { href: '/inbox/replies', label: t('savedReplies'), icon: 'comment', group: t('group_tools') },
+        { href: '/inbox/rules', label: t('moderation'), icon: 'shield', group: t('group_tools') },
+        { href: '/inbox/response-time', label: t('responseTime'), icon: 'clock', group: t('group_results') },
+      ],
+    },
     {
       key: 'analyse',
       label: t('section_analyse'),
       rail: t('rail_analyse'),
       icon: 'analytics',
       items: [
-        { href: '/analytics', label: t('pages'), icon: 'analytics', also: ['/reports'] },
-        { href: '/analytics/tests', label: t('captionTests'), icon: 'trendUp' },
-        { href: '/analytics/links', label: t('linkClicks'), icon: 'link' },
-        { href: '/analytics/campaigns', label: t('campaigns'), icon: 'tag' },
+        { href: '/analytics', label: t('overview'), icon: 'analytics' },
+        { href: '/analytics/tests', label: t('captionTests'), icon: 'trendUp', group: t('group_tools') },
+        { href: '/analytics/links', label: t('linkClicks'), icon: 'link', group: t('group_tools') },
+        { href: '/analytics/campaigns', label: t('campaigns'), icon: 'tag', group: t('group_tools') },
+        { href: '/reports', label: t('reports'), icon: 'posts', group: t('group_tools') },
       ],
     },
     { key: 'ads', label: t('module.ads'), rail: t('rail_ads'), icon: 'megaphone', items: [{ href: '/ads', label: t('module.ads'), icon: 'megaphone' }] },
@@ -256,10 +272,11 @@ export function AppShell({
       rail: t('rail_workspace'),
       icon: 'folders',
       items: [
-        { href: '/connections', label: t('connections'), icon: 'connections', also: ['/accounts'] },
-        { href: '/tasks', label: t('tasks'), icon: 'approvals' },
-        { href: '/settings/sharing', label: t('clientLinks'), icon: 'link' },
-        ...(role === 'owner' ? [{ href: '/agency', label: t('agency'), icon: 'folders' as IconName }] : []),
+        { href: '/connections', label: t('channels'), icon: 'connections', also: ['/accounts'], group: t('section_workspace') },
+        { href: '/settings/team', label: t('teamRoles'), icon: 'team', group: t('section_workspace') },
+        { href: '/tasks', label: t('tasks'), icon: 'approvals', group: t('section_workspace') },
+        { href: '/settings/sharing', label: t('clientLinks'), icon: 'link', group: t('section_workspace') },
+        ...(role === 'owner' ? [{ href: '/agency', label: t('agency'), icon: 'folders' as IconName, group: t('group_agency') }] : []),
         { href: '/settings', label: t('settings'), icon: 'settings', also: ['/setup'], hidden: true },
       ],
     },
@@ -284,10 +301,14 @@ export function AppShell({
 
   const pageLinks = (items: Item[]) => (
     <ul className="space-y-0.5">
-      {items.filter((item) => !item.hidden).map((item) => {
+      {items.filter((item) => !item.hidden).map((item, index, shown) => {
         const active = item.href === activeHref;
+        const heading = item.group && item.group !== shown[index - 1]?.group ? item.group : null;
         return (
           <li key={item.href}>
+            {heading && (
+              <p className={`mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 ${index > 0 ? 'mt-3' : ''}`}>{heading}</p>
+            )}
             <Link
               href={item.href}
               aria-current={active ? 'page' : undefined}

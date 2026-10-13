@@ -1524,7 +1524,18 @@
       "mastodon": "Mastodon",
       "youtube": "YouTube",
       "tiktok": "TikTok"
-    }
+    },
+    "group_plan": "Plan",
+    "group_create": "Create",
+    "group_conversations": "Conversations",
+    "group_tools": "Tools",
+    "group_results": "Results",
+    "group_agency": "Agency",
+    "contentSources": "Content sources",
+    "inboxAll": "All",
+    "overview": "Overview",
+    "channels": "Channels",
+    "teamRoles": "Team and roles"
   },
   "notifications": {
     "title": "Notifications",
@@ -2652,13 +2663,17 @@
       "back": "Back to the app",
       "backups": "Backups",
       "alerts": "Alerts",
-      "worker": "Worker & Meta usage",
+      "worker": "Background jobs",
       "sessions": "Sessions",
       "status": "Status",
       "errors": "Errors",
       "agency": "Agency overview",
       "plans": "Plans",
-      "changelog": "Changelog"
+      "changelog": "Changelog",
+      "groupSetup": "Set up",
+      "groupPeople": "People",
+      "groupHealth": "Health",
+      "groupHistory": "History"
     },
     "overview": {
       "title": "Installation overview",
