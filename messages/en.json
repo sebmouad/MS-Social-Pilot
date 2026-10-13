@@ -1475,7 +1475,8 @@
     "reviews": "Reviews",
     "responseTime": "Response time",
     "agency": "Agency",
-    "tasks": "Tasks"
+    "tasks": "Tasks",
+    "design": "Design"
   },
   "notifications": {
     "title": "Notifications",
@@ -4135,5 +4136,29 @@
     "moveTo_doing": "Start",
     "moveTo_done": "Done",
     "delete": "Delete the task"
+  },
+  "design": {
+    "title": "Design",
+    "subtitle": "Make a picture for a post: pick a size, add a colour or a photo and some text, then save it to your library.",
+    "preview": "Preview of your picture",
+    "size": "Size",
+    "size_square": "Square",
+    "size_portrait": "Portrait",
+    "size_story": "Story",
+    "size_landscape": "Link",
+    "background": "Background",
+    "photo": "Use a photo",
+    "removePhoto": "Remove the photo",
+    "text": "Text",
+    "textSize": "Size",
+    "textColor": "Colour",
+    "horizontal": "Left to right",
+    "vertical": "Top to bottom",
+    "bold": "Bold",
+    "removeText": "Remove this text",
+    "addText": "Add more text",
+    "save": "Save to the library",
+    "saved": "Saved to your library.",
+    "useInPost": "Use it in a post"
   }
 }

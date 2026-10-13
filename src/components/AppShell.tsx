@@ -213,6 +213,7 @@ export function AppShell({
         { href: '/calendar/dates', label: t('keyDates'), icon: 'star' },
         { href: '/queue', label: t('queue'), icon: 'clock' },
         { href: '/templates', label: t('templates'), icon: 'compose' },
+        { href: '/design', label: t('design'), icon: 'image' },
         { href: '/posts', label: t('posts'), icon: 'posts' },
         ...(showApprovals ? [{ href: '/approvals', label: t('approvals'), icon: 'approvals' as IconName, badge: pendingApprovals }] : []),
         { href: '/feeds', label: t('feeds'), icon: 'feeds' },

@@ -1475,7 +1475,8 @@
     "reviews": "Avis",
     "responseTime": "Temps de réponse",
     "agency": "Agence",
-    "tasks": "Tâches"
+    "tasks": "Tâches",
+    "design": "Création"
   },
   "notifications": {
     "title": "Notifications",
@@ -4135,5 +4136,29 @@
     "moveTo_doing": "Commencer",
     "moveTo_done": "Terminé",
     "delete": "Supprimer la tâche"
+  },
+  "design": {
+    "title": "Création",
+    "subtitle": "Créez une image pour une publication : choisissez un format, une couleur ou une photo et du texte, puis enregistrez-la dans votre bibliothèque.",
+    "preview": "Aperçu de votre image",
+    "size": "Format",
+    "size_square": "Carré",
+    "size_portrait": "Portrait",
+    "size_story": "Story",
+    "size_landscape": "Lien",
+    "background": "Fond",
+    "photo": "Utiliser une photo",
+    "removePhoto": "Retirer la photo",
+    "text": "Texte",
+    "textSize": "Taille",
+    "textColor": "Couleur",
+    "horizontal": "De gauche à droite",
+    "vertical": "De haut en bas",
+    "bold": "Gras",
+    "removeText": "Retirer ce texte",
+    "addText": "Ajouter du texte",
+    "save": "Enregistrer dans la bibliothèque",
+    "saved": "Enregistrée dans votre bibliothèque.",
+    "useInPost": "L’utiliser dans une publication"
   }
 }

@@ -54,6 +54,7 @@ const CLIENT_WRITES: Record<'base' | ClientSwitch, RegExp[]> = {
 const VIEWER_HIDDEN: Rule[] = [
   { path: '/compose' },
   { path: '/templates' },
+  { path: '/design' },
   { path: '/queue/mix' },
   { path: '/inbox/replies' },
   { path: '/inbox/rules' },
