@@ -110,7 +110,7 @@ test('two profiles add up on All profiles, and the selection follows to Posts an
   const pages = `${firstId},${secondId}`;
 
   await open(page, `/analytics?view=total&pages=${pages}`);
-  await expect(page.getByText(/Totals for 2 profiles/)).toBeVisible();
+  await expect(page.getByText(/Totals for 2 channels/)).toBeVisible();
 
   // The cookie keeps the choice: a bare URL opens on the same two.
   for (const path of ['/posts', '/calendar']) {
@@ -148,10 +148,10 @@ test('the comparison draws a line per profile that the legend hides and shows', 
   const failures = collectFailures(page);
 
   await open(page, `/analytics?view=compare&pages=${firstId},${secondId}`);
-  const chart = page.getByRole('region', { name: 'Day by day, one line per profile' });
+  const chart = page.getByRole('region', { name: 'Day by day, one line per channel' });
   await expect(chart).toBeVisible();
 
-  const legend = chart.getByRole('list', { name: 'Profiles on the chart' });
+  const legend = chart.getByRole('list', { name: 'Channels on the chart' });
   const deli = legend.getByRole('button', { name: SECOND_PAGE });
   await expect(deli).toHaveAttribute('aria-pressed', 'true');
   await expect(async () => {
@@ -275,10 +275,10 @@ test('approvals follow the selection, and the headings say how many', async ({ p
 
   await open(page, `/approvals?pages=${secondId}`);
   await expect(page.getByText(`${MARK}: waiting on the second Page`).first()).toBeVisible();
-  await expect(page.getByText('1 post waiting for review · 1 profile')).toBeVisible();
+  await expect(page.getByText('1 post waiting for review · 1 channel')).toBeVisible();
 
   await open(page, `/posts?pages=${secondId}&q=${encodeURIComponent(`${MARK}: waiting`)}`);
-  await expect(page.getByText('1 post · 1 profile')).toBeVisible();
+  await expect(page.getByText('1 post · 1 channel')).toBeVisible();
   expect(failures).toEqual([]);
 });
 
