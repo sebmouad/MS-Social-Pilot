@@ -9,7 +9,7 @@ import { EmptyState } from './EmptyState';
 import { Icon } from './Icon';
 
 /** The MCP clients the setup guide covers, each with its own steps. */
-const ASSISTANTS = ['claudeCode', 'claudeDesktop', 'cursor', 'vscode'] as const;
+const ASSISTANTS = ['claudeCode', 'claudeDesktop', 'codex', 'cursor', 'vscode', 'windsurf', 'other'] as const;
 type Assistant = (typeof ASSISTANTS)[number];
 
 interface TokenRow {
@@ -120,6 +120,17 @@ export function ApiTokensClient({ tokens, baseUrl, showOwner }: { tokens: TokenR
       snippet: JSON.stringify({ mcpServers: { 'ms-social-pilot': { url: mcpUrl, headers: { Authorization: `Bearer ${key}` } } } }, null, 2),
       steps: 3,
     },
+    // Codex (the CLI and the ChatGPT desktop app read the same file).
+    codex: {
+      snippet: `[mcp_servers.ms-social-pilot]\nurl = "${mcpUrl}"\nhttp_headers = { Authorization = "Bearer ${key}" }`,
+      steps: 3,
+    },
+    windsurf: {
+      snippet: JSON.stringify({ mcpServers: { 'ms-social-pilot': { serverUrl: mcpUrl, headers: { Authorization: `Bearer ${key}` } } } }, null, 2),
+      steps: 3,
+    },
+    // Any other MCP client: the address and the header are all it needs.
+    other: { snippet: `URL: ${mcpUrl}\nHeader: Authorization: Bearer ${key}\nTransport: streamable HTTP`, steps: 2 },
     vscode: {
       snippet: JSON.stringify(
         { servers: { 'ms-social-pilot': { type: 'http', url: mcpUrl, headers: { Authorization: `Bearer ${key}` } } } },

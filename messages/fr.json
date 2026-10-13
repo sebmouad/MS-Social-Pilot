@@ -2519,7 +2519,15 @@
     "mcpStep_cursor_1": "Dans Cursor, ouvrez Settings → MCP → Add new global MCP server, et collez ceci dans ~/.cursor/mcp.json :",
     "mcpStep_cursor_2": "Enregistrez le fichier : ms-social-pilot passe au vert dans la liste MCP.",
     "mcpStep_vscode_1": "Créez .vscode/mcp.json dans votre projet avec :",
-    "mcpStep_vscode_2": "Ouvrez Copilot Chat en mode Agent et activez les outils ms-social-pilot."
+    "mcpStep_vscode_2": "Ouvrez Copilot Chat en mode Agent et activez les outils ms-social-pilot.",
+    "mcpName_codex": "Codex / ChatGPT bureau",
+    "mcpName_windsurf": "Windsurf",
+    "mcpName_other": "Autre",
+    "mcpStep_codex_1": "Ajoutez ceci à ~/.codex/config.toml (la ligne de commande Codex et l’application de bureau ChatGPT lisent le même fichier) :",
+    "mcpStep_codex_2": "Redémarrez Codex : ms-social-pilot apparaît dans sa liste d’outils.",
+    "mcpStep_windsurf_1": "Dans Windsurf, ouvrez Paramètres → Cascade → Serveurs MCP → Voir la configuration brute, puis collez ceci dans mcp_config.json :",
+    "mcpStep_windsurf_2": "Enregistrez et actualisez la liste des serveurs : ms-social-pilot passe au vert.",
+    "mcpStep_other_1": "Dans tout assistant qui gère MCP en HTTP, ajoutez un serveur avec ces informations :"
   },
   "networks": {
     "title": "Autres réseaux",
