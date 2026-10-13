@@ -34,7 +34,7 @@ export default async function RootPlatformPage({ params }: { params: Promise<{ p
         <p className="mt-1 text-sm text-slate-600">{t('subtitle', { network: label })}</p>
       </header>
 
-      <ConfigClient settings={settings} groupLabels={{ ...GROUP_LABELS, networks: t('settingsTitle') }} groupOrder={GROUP_ORDER} />
+      <ConfigClient key={platform} settings={settings} groupLabels={{ ...GROUP_LABELS, networks: t('settingsTitle') }} groupOrder={GROUP_ORDER} />
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-slate-900">{t('channelsTitle')}</h2>

@@ -343,27 +343,30 @@ export async function writeSetting(
   raw: unknown,
   userId: string | null,
 ): Promise<void> {
-  const definition = SETTINGS_BY_KEY.get(key);
-  if (!definition) throw new SettingError(`Unknown setting "${key}".`);
+  await writeSettings({ [key]: raw }, userId);
+}
 
-  const value = validate(definition, raw);
-  const isSecret = definition.type === 'secret';
-
-  // Clearing a secret removes the row rather than storing an empty string, so
-  // the environment can take over again.
-  if (isSecret && String(value).length === 0) {
-    await clearSetting(key);
-    return;
-  }
-
-  const stored = isSecret ? encryptSecret(String(value)) : value;
-
-  await prisma.appSetting.upsert({
-    where: { key },
-    create: { key, value: stored as never, encrypted: isSecret, updatedById: userId },
-    update: { value: stored as never, encrypted: isSecret, updatedById: userId },
+/** Validate the complete batch before committing any override. */
+export async function writeSettings(
+  values: Record<string, unknown>,
+  userId: string | null,
+): Promise<void> {
+  const prepared = Object.entries(values).map(([key, raw]) => {
+    const definition = SETTINGS_BY_KEY.get(key);
+    if (!definition) throw new SettingError(`Unknown setting "${key}".`);
+    if (raw === null) return { key, clear: true as const };
+    const value = validate(definition, raw);
+    const encrypted = definition.type === 'secret';
+    if (encrypted && String(value).length === 0) return { key, clear: true as const };
+    return { key, clear: false as const, encrypted, value: encrypted ? encryptSecret(String(value)) : value };
   });
-
+  await prisma.$transaction(prepared.map((entry) => entry.clear
+    ? prisma.appSetting.deleteMany({ where: { key: entry.key } })
+    : prisma.appSetting.upsert({
+      where: { key: entry.key },
+      create: { key: entry.key, value: entry.value as never, encrypted: entry.encrypted, updatedById: userId },
+      update: { value: entry.value as never, encrypted: entry.encrypted, updatedById: userId },
+    })));
   invalidateSettings();
 }
 

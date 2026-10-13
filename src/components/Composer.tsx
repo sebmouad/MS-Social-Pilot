@@ -32,10 +32,9 @@ import { VersionHistory } from './VersionHistory';
 import { PostNotes } from './PostNotes';
 import { TranslationFields, type Translation } from './TranslationFields';
 import AltTextSuggest from './AltTextSuggest';
-import { registerNavigationGuard } from '@/lib/navigation-guard';
+import { useUnsavedChanges } from './useUnsavedChanges';
 import { onRadioGroupKeyDown } from '@/lib/segmented-radio';
 import { MediaPicker } from './MediaPicker';
-import { useConfirm } from './ConfirmProvider';
 import { composerFieldErrors, destinationContent, stableFields } from '@/lib/composer-state';
 
 interface Props {
@@ -159,7 +158,6 @@ export function Composer({
   const tCommon = useTranslations('common');
   const tAuth = useTranslations('auth');
   const router = useRouter();
-  const confirm = useConfirm();
   const [recovery, setRecovery] = useState<Record<string, unknown> | null>(null);
   const [recoveryLoaded, setRecoveryLoaded] = useState(false);
   const sessionSaved = useRef(false);
@@ -344,36 +342,7 @@ export function Composer({
 
   const dirty = changed && snapshot !== committedSnapshot.current;
 
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      // Older browsers show the prompt only when this is set.
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
-
-  useEffect(() => {
-    if (!dirty) return;
-    let asking = false;
-    const guard = (event: globalThis.MouseEvent) => {
-      const anchor = (event.target as Element).closest<HTMLAnchorElement>('a[href]');
-      if (!anchor || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
-      const destination = new URL(anchor.href, location.href);
-      if (destination.origin !== location.origin || (destination.pathname === location.pathname && destination.search === location.search)) return;
-      event.preventDefault(); event.stopPropagation();
-      if (asking) return;
-      asking = true;
-      void confirm({ title: t('leaveDraftTitle'), body: t(sessionSaved.current ? 'leaveDraftBody' : 'leaveDraftUnsaved'), confirmLabel: t('leaveDraft'), cancelLabel: t('keepWriting') }).then((leave) => {
-        asking = false;
-        if (leave) router.push(destination.pathname + destination.search + destination.hash);
-      });
-    };
-    document.addEventListener('click', guard, true);
-    return () => document.removeEventListener('click', guard, true);
-  }, [dirty, confirm, router, t]);
+  useUnsavedChanges(dirty, () => ({ title: t('leaveDraftTitle'), body: t(sessionSaved.current ? 'leaveDraftBody' : 'leaveDraftUnsaved'), confirmLabel: t('leaveDraft'), cancelLabel: t('keepWriting') }));
 
 
   useEffect(() => {
@@ -422,25 +391,6 @@ export function Composer({
     setMoreOpen(true);
     setRecovery(null);
   };
-
-  useEffect(() => {
-    if (!dirty) return;
-    let question: Promise<boolean> | null = null;
-    const ask = () => question ??= confirm({ title: t('leaveDraftTitle'), body: t(sessionSaved.current ? 'leaveDraftBody' : 'leaveDraftUnsaved'), confirmLabel: t('leaveDraft'), cancelLabel: t('keepWriting') }).finally(() => { question = null; });
-    const unregister = registerNavigationGuard(ask);
-    type TraverseEvent = Event & { navigationType: string; destination: { key: string }; };
-    const navigation = (window as unknown as { navigation?: EventTarget & { traverseTo: (key: string) => unknown } }).navigation;
-    let approved = false;
-    const traverse = (raw: Event) => {
-      const event = raw as TraverseEvent;
-      if (event.navigationType !== 'traverse' || !event.cancelable) return;
-      if (approved) { approved = false; return; }
-      event.preventDefault();
-      void ask().then((leave) => { if (leave) { approved = true; navigation?.traverseTo(event.destination.key); } });
-    };
-    navigation?.addEventListener('navigate', traverse);
-    return () => { unregister(); navigation?.removeEventListener('navigate', traverse); };
-  }, [dirty, confirm, t]);
 
   const loadPreview = useCallback(
     async (url: string, refresh = false) => {

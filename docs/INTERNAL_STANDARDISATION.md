@@ -9,6 +9,7 @@ This document owns cross-screen UI contracts. `DESIGN.md` owns visual tokens and
 | Browser JSON mutations | `src/lib/client-request.ts` | Preserve HTTP status, fields, trace ID and transport uncertainty; never automatically retry a write. |
 | Modal and drawer focus | `src/components/useModalFocus.ts`, `Dialog.tsx` | Focus containment, Escape, inert background, body locking, opener restoration. Close mobile drawer at desktop breakpoint. |
 | Confirmation | `ConfirmProvider.tsx` | Shared translated confirmation; no browser confirm prompts for app actions. |
+| Unsaved forms | `useUnsavedChanges.ts`, `config-draft.ts` | Composer and root settings share link/reload/history protection. Reverted root values become clean; credentials remain only in component memory. |
 | Editor navigation | `src/lib/navigation-guard.ts`, `Composer.tsx` | Confirm links, workspace changes, sign-out, Chrome history traversal; session recovery scoped by user/workspace/post. |
 | Media reuse | `MediaPicker.tsx` | Authenticated workspace listing, explicit selection, no implicit upload or publish. Composer enforces attachment limits. |
 | Destination content | `src/lib/composer-state.ts` | Nonblank destination override replaces common caption; text-only excludes attachments. Server remains authoritative. |
@@ -33,3 +34,5 @@ Implemented targeted fixes for composer reset/dirty state/recovery/preview/valid
 Scope limits: no configured support address exists, so password recovery directs users to their administrator/inviter without inventing an address. Non-Facebook previews represent destination content rather than pixel-exact native network rendering. Session recovery requires browser storage; ordinary links and workspace changes still confirm when storage is unavailable. Browsers without the Navigation API use session recovery for Back/Forward. No production data or secrets are persisted by new shared helpers.
 
 Existing unrelated mutations retain their established request handling; the shared request helper is the migration contract, not a claim that every fetch has been rewritten. Future migrations need the same pending/error/uncertainty checks and real behavior tests.
+
+Root settings and administrative actions use the browser request contract and immediate pending locks. Root navigation has skip-to-main and closes its phone menu after changing screens. Operator setup warnings point to General settings; missing operator information and off-site backup setup require actual owner data/configuration.

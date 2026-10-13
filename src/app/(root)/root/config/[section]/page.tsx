@@ -75,6 +75,9 @@ export default async function RootConfigSectionPage({
       )}
 
       <ConfigClient
+        hideGroupHeading={section}
+        hideSingleGroupHeading
+        key={section}
         settings={settings}
         groupLabels={GROUP_LABELS}
         groupOrder={GROUP_ORDER}

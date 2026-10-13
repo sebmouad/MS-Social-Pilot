@@ -278,3 +278,20 @@ describe('root creates and deletes', () => {
     expect(await prisma.post.findUnique({ where: { id: post.id } })).toMatchObject({ authorId: theRoot.user.id });
   });
 });
+
+ describe('atomic root configuration API', () => {
+  it('rejects an invalid batch without applying earlier valid changes', async () => {
+    const config = await import('../src/app/api/root/config/route');
+    const settings = await import('../src/lib/settings');
+    const owner = await person({ root: true });
+    cookieJar.set('msp_session', owner.token);
+    await settings.writeSetting('scheduler.pollSeconds', 60, owner.user.id);
+    const response = await config.POST(new Request('http://localhost/api/root/config', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ values: { 'scheduler.pollSeconds': 90, 'scheduler.concurrency': 999 } }),
+    }));
+    expect(response.status).toBe(422);
+    await settings.ensureSettings();
+    expect(settings.setting('scheduler.pollSeconds')).toBe(60);
+  });
+});

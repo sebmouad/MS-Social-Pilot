@@ -707,7 +707,12 @@
         "title": "Général",
         "subtitle": "Tout le reste : coordonnées de l’opérateur, langue, publication, statistiques et alertes."
       }
-    }
+    },
+    "leaveTitle": "Quitter les paramètres non enregistrés ?",
+    "leaveBody": "Vos modifications seront perdues. Continuez à modifier ou enregistrez avant de quitter.",
+    "leave": "Quitter les paramètres",
+    "keepEditing": "Continuer à modifier",
+    "actionUnconfirmed": "L’action n’a pas pu être confirmée. Actualisez cet écran et vérifiez l’état actuel avant de la répéter."
   },
   "connections": {
     "active": "Actif",
@@ -2754,7 +2759,8 @@
         "email": "E-mail",
         "security": "Sécurité",
         "general": "Général"
-      }
+      },
+      "skipToContent": "Aller au contenu principal"
     },
     "overview": {
       "title": "Vue d’ensemble de l’installation",
@@ -2767,7 +2773,7 @@
       "failed": "Publications échouées, 30 jours",
       "setupMissing": "{count, plural, one {# étape de configuration obligatoire manque. Ouvrez la liste de configuration.} other {# étapes de configuration obligatoires manquent. Ouvrez la liste de configuration.}}",
       "disabled": "{count, plural, one {# compte est désactivé.} other {# comptes sont désactivés.}}",
-      "operatorMissing": "{count, plural, one {Il manque # information sur l’exploitant aux pages Conditions et Confidentialité} other {Il manque # informations sur l’exploitant aux pages Conditions et Confidentialité}} : renseignez-les dans Configuration › Exploitant et pages légales."
+      "operatorMissing": "{count, plural, one {Il manque # information sur l’exploitant aux pages Conditions et Confidentialité} other {Il manque # informations sur l’exploitant aux pages Conditions et Confidentialité}} : complétez-les dans les paramètres généraux."
     },
     "workspaces": {
       "title": "Espaces de travail",
@@ -3240,7 +3246,8 @@
       "subtitle": "Les réglages d’app de {network} et chaque canal qui y est connecté.",
       "settingsTitle": "Réglages de l’app",
       "channelsTitle": "Canaux"
-    }
+    },
+    "actionUnconfirmed": "L’action n’a pas pu être confirmée. Actualisez cet écran et vérifiez l’état actuel avant de la répéter."
   },
   "twoStep": {
     "title": "Connexion en deux étapes",

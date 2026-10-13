@@ -367,3 +367,27 @@ describe('registry hygiene', () => {
     }
   });
 });
+
+ describe('atomic configuration batches', () => {
+  it('does not write or clear earlier settings when a later value is invalid', async () => {
+    await settings.writeSetting('scheduler.pollSeconds', 60, null);
+    await expect(settings.writeSettings({
+      'scheduler.pollSeconds': null,
+      'scheduler.concurrency': 999,
+    }, null)).rejects.toThrow();
+    await settings.ensureSettings();
+    expect(settings.setting('scheduler.pollSeconds')).toBe(60);
+    await expect(settings.writeSettings({
+      'scheduler.pollSeconds': 90,
+      'scheduler.concurrency': 999,
+    }, null)).rejects.toThrow();
+    await settings.ensureSettings();
+    expect(settings.setting('scheduler.pollSeconds')).toBe(60);
+  });
+  it('applies a valid batch together', async () => {
+    await settings.writeSettings({ 'scheduler.pollSeconds': 90, 'scheduler.concurrency': 2 }, null);
+    await settings.ensureSettings();
+    expect(settings.setting('scheduler.pollSeconds')).toBe(90);
+    expect(settings.setting('scheduler.concurrency')).toBe(2);
+  });
+});

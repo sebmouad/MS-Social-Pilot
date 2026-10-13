@@ -707,7 +707,12 @@
         "title": "General",
         "subtitle": "Everything else: operator details, language, publishing, analytics and alerts."
       }
-    }
+    },
+    "leaveTitle": "Leave unsaved settings?",
+    "leaveBody": "Your changes will be lost. Keep editing or save before leaving.",
+    "leave": "Leave settings",
+    "keepEditing": "Keep editing",
+    "actionUnconfirmed": "The action could not be confirmed. Refresh this screen and check the current state before repeating it."
   },
   "connections": {
     "active": "Active",
@@ -2754,7 +2759,8 @@
         "email": "Email",
         "security": "Security",
         "general": "General"
-      }
+      },
+      "skipToContent": "Skip to main content"
     },
     "overview": {
       "title": "Installation overview",
@@ -2767,7 +2773,7 @@
       "failed": "Failed publications, 30 days",
       "setupMissing": "{count, plural, one {# required setup step is missing. Open the setup checklist.} other {# required setup steps are missing. Open the setup checklist.}}",
       "disabled": "{count, plural, one {# account is disabled.} other {# accounts are disabled.}}",
-      "operatorMissing": "{count, plural, one {The Terms and Privacy pages lack # operator detail} other {The Terms and Privacy pages lack # operator details}}: fill them in Configuration › Operator and legal pages."
+      "operatorMissing": "{count, plural, one {The Terms and Privacy pages lack # operator detail} other {The Terms and Privacy pages lack # operator details}}: complete them in General settings."
     },
     "workspaces": {
       "title": "Workspaces",
@@ -3240,7 +3246,8 @@
       "subtitle": "{network}’s app settings and every channel connected to it.",
       "settingsTitle": "App settings",
       "channelsTitle": "Channels"
-    }
+    },
+    "actionUnconfirmed": "The action could not be confirmed. Refresh this screen and check the current state before repeating it."
   },
   "twoStep": {
     "title": "Two-step sign-in",

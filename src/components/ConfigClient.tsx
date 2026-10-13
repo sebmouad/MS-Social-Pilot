@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFormatter, useTranslations } from 'next-intl';
 
 import type { AiSpendView, ModelPrice } from '@/lib/ai-prices';
+import { requestJson } from '@/lib/client-request';
+import { configText as asText, updateConfigDraft } from '@/lib/config-draft';
+import { useUnsavedChanges } from './useUnsavedChanges';
 import { Icon } from './Icon';
 
 export interface SettingView {
@@ -30,12 +33,6 @@ export interface SettingView {
 
 type Draft = Record<string, unknown>;
 
-function asText(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ');
-  if (value === undefined || value === null) return '';
-  return String(value);
-}
-
 /**
  * The configuration screen.
  *
@@ -60,17 +57,22 @@ export function ConfigClient({
   groupLabels,
   groupOrder,
   aiSpend,
+  hideSingleGroupHeading = false,
+  hideGroupHeading,
 }: {
   settings: SettingView[];
   groupLabels: Record<string, string>;
   groupOrder: string[];
   aiSpend?: AiSpendView;
+  hideSingleGroupHeading?: boolean;
+  hideGroupHeading?: string;
 }) {
   const t = useTranslations('config');
   const tCommon = useTranslations('common');
   const router = useRouter();
 
   const [draft, setDraft] = useState<Draft>({});
+  const saveLock = useRef(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -89,31 +91,33 @@ export function ConfigClient({
   }, [settings, groupOrder]);
 
   const dirty = Object.keys(draft).length;
+  useUnsavedChanges(dirty > 0, { title: t('leaveTitle'), body: t('leaveBody'), confirmLabel: t('leave'), cancelLabel: t('keepEditing') });
 
   function set(key: string, value: unknown) {
-    setDraft((current) => ({ ...current, [key]: value }));
+    const entry = settings.find(setting => setting.key === key);
+    setDraft(current => updateConfigDraft(current, key, value, entry?.value, entry?.isSecret));
   }
 
   async function submit(values: Draft) {
+    if (saveLock.current) return;
+    saveLock.current = true;
     setSaving(true);
     setError(null);
     setMessage(null);
 
     try {
-      const response = await fetch('/api/root/config', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ values }),
-      });
-      const body = (await response.json()) as { error?: string; changed?: number };
-      if (!response.ok) throw new Error(body.error ?? tCommon('genericError'));
+      const outcome = await requestJson<{ changed: number }>('/api/root/config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ values }) });
+      if (!outcome.ok) { setError(outcome.error ?? t('actionUnconfirmed')); return; }
+      const body = outcome.data;
+      if (typeof body?.changed !== 'number') { setError(t('actionUnconfirmed')); return; }
 
       setDraft({});
       setMessage(t('saved', { count: body.changed ?? 0 }));
       router.refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(t('actionUnconfirmed'));
     } finally {
+      saveLock.current = false;
       setSaving(false);
     }
   }
@@ -135,19 +139,23 @@ export function ConfigClient({
   const fromEnvironment = settings.filter((entry) => entry.source === 'environment');
 
   async function adopt() {
+    if (saveLock.current) return;
+    saveLock.current = true;
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      const response = await fetch('/api/root/config/adopt', { method: 'POST' });
-      const body = (await response.json()) as { error?: string; moved?: number; invalid?: number };
-      if (!response.ok) throw new Error(body.error ?? tCommon('genericError'));
+      const outcome = await requestJson<{ moved: number; invalid?: number }>('/api/root/config/adopt', { method: 'POST' });
+      if (!outcome.ok) { setError(outcome.error ?? t('actionUnconfirmed')); return; }
+      const body = outcome.data;
+      if (typeof body?.moved !== 'number') { setError(t('actionUnconfirmed')); return; }
       setMessage(t('adopted', { count: body.moved ?? 0 }));
       if (body.invalid) setError(t('adoptInvalid', { count: body.invalid }));
       router.refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(t('actionUnconfirmed'));
     } finally {
+      saveLock.current = false;
       setSaving(false);
     }
   }
@@ -161,28 +169,28 @@ export function ConfigClient({
           <p className="break-words font-mono text-xs text-slate-600">
             {fromEnvironment.map((entry) => entry.envVar).join(' · ')}
           </p>
-          <button type="button" className="btn-secondary" disabled={saving} onClick={adopt}>
+          <button type="button" className="btn-secondary" disabled={saving || dirty > 0} onClick={adopt}>
             <Icon name="download" size={14} /> {saving ? t('adopting') : t('adopt')}
           </button>
         </section>
       )}
       {error && (
-        <p className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           <Icon name="error" /> {error}
         </p>
       )}
       {message && (
-        <p className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+        <p role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           <Icon name="check" /> {message}
         </p>
       )}
 
       {grouped.map(([group, entries]) => (
-        <section key={group} className="card p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+        <fieldset disabled={saving} key={group} className="card min-w-0 p-4 sm:p-5">
+          {!(group === hideGroupHeading || (hideSingleGroupHeading && grouped.length === 1)) && <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Icon name={groupIcon(group)} className="text-slate-400" />
             {groupLabels[group] ?? group}
-          </h2>
+          </h2>}
 
           <div className="mt-4 divide-y divide-slate-100">
             {entries.map((entry) => {
@@ -314,7 +322,7 @@ export function ConfigClient({
           </div>
           {group === 'email' && <TestEmailButton />}
           {group === 'ai' && aiSpend && <AiSpendPanel spend={aiSpend} />}
-        </section>
+        </fieldset>
       ))}
 
       {/* A sticky bar rather than a button at the bottom of a very long form:

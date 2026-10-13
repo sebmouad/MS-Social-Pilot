@@ -41,7 +41,7 @@ export default async function RootMetaPage() {
         <MetaAppSettings settings={metaAppSettings()} open />
       </div>
 
-      <ConfigClient settings={settings} groupLabels={GROUP_LABELS} groupOrder={GROUP_ORDER} />
+      <ConfigClient key="meta" settings={settings} groupLabels={GROUP_LABELS} groupOrder={GROUP_ORDER} />
     </div>
   );
 }

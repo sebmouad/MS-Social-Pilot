@@ -1,44 +1,40 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFormatter, useTranslations } from 'next-intl';
 
+import { requestJson } from '@/lib/client-request';
 import { useConfirm } from './ConfirmProvider';
 import { Icon } from './Icon';
 
 /** One call to a root API route; the error text comes from the server, already translated. */
 async function call(url: string, method: string, body?: unknown): Promise<string | null> {
-  try {
-    const response = await fetch(url, {
-      method,
-      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    if (response.ok) return null;
-    const data = (await response.json().catch(() => ({}))) as { error?: string };
-    return data.error ?? `HTTP ${response.status}`;
-  } catch {
-    return 'network';
-  }
+  const result = await requestJson(url, { method, headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  if (result.ok) return null;
+  return result.error ?? (result.fields ? Object.values(result.fields)[0] : undefined) ?? 'unconfirmed';
 }
 
 function useAction() {
   const router = useRouter();
   const t = useTranslations('root');
+  const lock = useRef(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
   async function run(key: string, url: string, method: string, body?: unknown, success?: string) {
+    if (lock.current) return false;
+    lock.current = true;
     setBusy(key);
     setError(null);
     setDone(null);
     const failure = await call(url, method, body);
+    lock.current = false;
     setBusy(null);
     if (failure) {
-      setError(failure === 'network' ? t('networkError') : failure);
+      setError(failure === 'unconfirmed' ? t('actionUnconfirmed') : failure);
       return false;
     }
     if (success) setDone(success);
@@ -104,7 +100,7 @@ export function WorkspacesTable({ workspaces }: { workspaces: RootWorkspace[] })
           <span className="font-medium text-slate-700">{t('workspaces.ownerEmail')}</span>
           <input className="input mt-1" type="email" required value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} />
         </label>
-        <button type="submit" className="btn-primary h-10" disabled={busy === 'create'}>
+        <button type="submit" className="btn-primary h-10" disabled={busy !== null}>
           {t('workspaces.create')}
         </button>
       </form>
@@ -144,7 +140,7 @@ export function WorkspacesTable({ workspaces }: { workspaces: RootWorkspace[] })
                         autoComplete="off"
                         onChange={(event) => setName(event.target.value)}
                       />
-                      <button type="submit" className="btn-primary h-9" disabled={busy === workspace.id || !name.trim()}>
+                      <button type="submit" className="btn-primary h-9" disabled={busy !== null || !name.trim()}>
                         {t('save')}
                       </button>
                       <button type="button" className="btn-ghost h-9" onClick={() => setEditing(null)}>
@@ -250,7 +246,7 @@ export function UsersTable({ users }: { users: RootUser[] }) {
                       <button
                         type="button"
                         className="btn-ghost h-9 whitespace-nowrap"
-                        disabled={busy === user.id}
+                        disabled={busy !== null}
                         onClick={async () => {
                           const ok = await confirm({
                             title: t('users.signOutQuestion', { name: user.name }),
@@ -265,7 +261,7 @@ export function UsersTable({ users }: { users: RootUser[] }) {
                       <button
                         type="button"
                         className="btn-ghost h-9 whitespace-nowrap"
-                        disabled={busy === user.id}
+                        disabled={busy !== null}
                         onClick={async () => {
                           const ok = await confirm({
                             title: t('users.resetQuestion', { name: user.name }),
@@ -281,7 +277,7 @@ export function UsersTable({ users }: { users: RootUser[] }) {
                         <button
                           type="button"
                           className="btn-secondary h-9 whitespace-nowrap"
-                          disabled={busy === user.id}
+                          disabled={busy !== null}
                           onClick={() => void run(user.id, `/api/root/users/${user.id}`, 'PATCH', { disabled: false }, t('users.enabled', { name: user.name }))}
                         >
                           {t('users.enable')}
@@ -290,7 +286,7 @@ export function UsersTable({ users }: { users: RootUser[] }) {
                         <button
                           type="button"
                           className="btn-ghost h-9 whitespace-nowrap text-red-700"
-                          disabled={busy === user.id}
+                          disabled={busy !== null}
                           onClick={async () => {
                             const ok = await confirm({
                               title: t('users.disableQuestion', { name: user.name }),
@@ -307,7 +303,7 @@ export function UsersTable({ users }: { users: RootUser[] }) {
                       <button
                         type="button"
                         className="btn-ghost h-9 whitespace-nowrap text-red-700"
-                        disabled={busy === user.id}
+                        disabled={busy !== null}
                         onClick={async () => {
                           const ok = await confirm({
                             title: t('users.deleteQuestion', { name: user.name }),
@@ -410,7 +406,7 @@ export function InvitationsTable({ invitations }: { invitations: RootInvitation[
                   <button
                     type="button"
                     className="btn-ghost h-9 text-red-700"
-                    disabled={busy === invitation.id}
+                    disabled={busy !== null}
                     onClick={async () => {
                       const ok = await confirm({
                         title: t('registration.revokeQuestion', { email: invitation.email }),
@@ -582,7 +578,7 @@ export function InviteClient({ invitations }: { invitations: RootClientInvitatio
               <button
                 type="button"
                 className="btn-ghost h-9 text-red-700"
-                disabled={busy === invitation.id}
+                disabled={busy !== null}
                 onClick={async () => {
                   const ok = await confirm({ title: t('revokeQuestion', { email: invitation.email }), body: t('revokeBody'), confirmLabel: t('revoke'), danger: true });
                   if (ok) await run(invitation.id, `/api/root/client-invitations/${invitation.id}`, 'DELETE');
@@ -679,7 +675,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
           <button
             type="button"
             className="btn-primary h-10"
-            disabled={busy === 'visit'}
+            disabled={busy !== null}
             onClick={async () => {
               if (await run('visit', `${base}/visit`, 'POST')) router.push('/dashboard');
             }}
@@ -695,7 +691,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
               <button
                 type="button"
                 className="btn-secondary h-10"
-                disabled={busy === 'suspend'}
+                disabled={busy !== null}
                 onClick={() => void run('suspend', base, 'PATCH', { suspended: false }, t('workspace.resumed'))}
               >
                 {t('workspace.resume')}
@@ -705,7 +701,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
             <button
               type="button"
               className="btn-ghost h-10 text-red-700"
-              disabled={busy === 'suspend'}
+              disabled={busy !== null}
               onClick={async () => {
                 const ok = await confirm({
                   title: t('workspace.suspendQuestion', { name: workspace.name }),
@@ -722,7 +718,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
           <button
             type="button"
             className="btn-ghost h-10 text-red-700"
-            disabled={busy === 'delete'}
+            disabled={busy !== null}
             onClick={async () => {
               const ok = await confirm({
                 title: t('workspace.deleteQuestion', { name: workspace.name }),
@@ -745,7 +741,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
           id="workspace-modules"
           moduleKeys={moduleKeys}
           off={workspace.disabledModules}
-          disabled={busy === 'modules'}
+          disabled={busy !== null}
           onChange={(off) => void run('modules', base, 'PATCH', { disabledModules: off }, t('workspace.modulesSaved'))}
         />
         <label className="flex items-start gap-2 border-t border-slate-100 pt-3 text-sm text-slate-700">
@@ -754,7 +750,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
             type="checkbox"
             className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600"
             checked={workspace.developerFeatures}
-            disabled={busy === 'developer'}
+            disabled={busy !== null}
             onChange={(event) =>
               void run('developer', base, 'PATCH', { developerFeatures: event.target.checked }, t('workspace.developerSaved'))
             }
@@ -797,7 +793,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
                       id={`role-${member.id}`}
                       className="input h-9 w-auto"
                       value={member.role}
-                      disabled={busy === member.id}
+                      disabled={busy !== null}
                       onChange={(event) =>
                         void run(member.id, `/api/root/members/${member.id}`, 'PATCH', { role: event.target.value }, t('workspace.roleSaved', { name: member.name }))
                       }
@@ -813,7 +809,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
                       moduleKeys={moduleKeys}
                       off={member.disabledModules}
                       locked={workspace.disabledModules}
-                      disabled={busy === member.id}
+                      disabled={busy !== null}
                       onChange={(off) =>
                         void run(member.id, `/api/root/members/${member.id}`, 'PATCH', { disabledModules: off }, t('workspace.modulesSaved'))
                       }
@@ -823,7 +819,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
                     <button
                       type="button"
                       className="btn-ghost h-9 whitespace-nowrap text-red-700"
-                      disabled={busy === member.id}
+                      disabled={busy !== null}
                       onClick={async () => {
                         const ok = await confirm({
                           title: t('workspace.removeQuestion', { name: member.name, workspace: workspace.name }),
@@ -861,7 +857,7 @@ export function WorkspaceDetail({ workspace, moduleKeys }: { workspace: RootWork
               ))}
             </select>
           </label>
-          <button type="submit" className="btn-primary h-10" disabled={busy === 'add' || !email.trim()}>
+          <button type="submit" className="btn-primary h-10" disabled={busy !== null || !email.trim()}>
             {t('workspace.add')}
           </button>
           <p className="w-full text-xs text-slate-500">{t('workspace.addHelp')}</p>

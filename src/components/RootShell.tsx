@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { CONFIG_SECTIONS, type ConfigSection } from '@/lib/root-config-sections';
@@ -27,6 +27,7 @@ export function RootShell({ userName, children }: { userName: string; children: 
   const t = useTranslations('root');
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [pathname]);
 
   type Item = { href: string; label: string; icon: IconName; group?: string; danger?: boolean; exact?: boolean; sub?: boolean };
   const settings = t('nav.groupSettings');
@@ -87,6 +88,7 @@ export function RootShell({ userName, children }: { userName: string; children: 
 
   return (
     <div className="min-h-screen lg:flex">
+      <a href="#root-content" className="sr-only fixed start-3 top-3 z-[100] rounded bg-white px-4 py-3 shadow focus:not-sr-only">{t('nav.skipToContent')}</a>
       <header className="border-b border-slate-200 bg-white lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-e">
         <div className="flex items-center gap-2.5 px-3 py-3 lg:pt-4">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
@@ -123,7 +125,7 @@ export function RootShell({ userName, children }: { userName: string; children: 
         <p role="note" className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 sm:px-6">
           <Icon name="shield" size={16} className="shrink-0" /> {t('banner')}
         </p>
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        <main id="root-content" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
       </div>
     </div>
   );

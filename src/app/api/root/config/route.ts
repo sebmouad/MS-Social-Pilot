@@ -6,9 +6,8 @@ import { logRootActivity } from '@/lib/root';
 import {
   SETTINGS_BY_KEY,
   SettingError,
-  clearSetting,
   describeSettings,
-  writeSetting,
+  writeSettings,
 } from '@/lib/settings';
 
 /**
@@ -37,17 +36,10 @@ export const POST = route(async (request: Request) => {
   const unknown = Object.keys(input.values).filter((key) => !SETTINGS_BY_KEY.has(key));
   if (unknown.length > 0) return fail(`Unknown setting: ${unknown.join(', ')}.`, 400);
 
-  const changed: string[] = [];
+  const changed = Object.keys(input.values);
 
   try {
-    for (const [key, value] of Object.entries(input.values)) {
-      if (value === null) {
-        await clearSetting(key);
-      } else {
-        await writeSetting(key, value, auth.user.id);
-      }
-      changed.push(key);
-    }
+    await writeSettings(input.values, auth.user.id);
   } catch (error) {
     if (error instanceof SettingError) return fail(error.message, 422);
     throw error;
