@@ -66,6 +66,8 @@ interface Props {
   /** The workspace's labels. */
   labels?: LabelOption[];
   canEditLabels?: boolean;
+  /** Admins may save the ticked channels as a new group, right from here. */
+  canSaveGroup?: boolean;
   /** The workspace's custom fields, to fill in beside the labels. */
   customFields?: Array<{ id: string; name: string; kind: string; options: string[] }>;
 }
@@ -137,6 +139,7 @@ export function Composer({
   groups = [],
   labels = [],
   canEditLabels = false,
+  canSaveGroup = false,
   customFields = [],
 }: Props) {
   const t = useTranslations('compose');
@@ -169,6 +172,9 @@ export function Composer({
   const backgroundAllowed = format === 'post' && !link.trim() && media.length === 0 && message.length <= BACKGROUND_MAX_CHARS;
   const [naturalSizes, setNaturalSizes] = useState<Record<string, { width: number; height: number }>>({});
   const [selected, setSelected] = useState<string[]>(editing?.targetIds ?? initialTargetIds ?? []);
+  const [savedGroups, setSavedGroups] = useState<PageGroupView[]>([]);
+  const [groupName, setGroupName] = useState<string | null>(null);
+  const [groupStatus, setGroupStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [timing, setTiming] = useState<Timing>('schedule');
   const [handler, setHandler] = useState<Handler>(
     editing?.publishMode === 'native' ? 'native' : 'worker',
@@ -1044,8 +1050,42 @@ export function Composer({
               startedNext();
               setSelected(next);
             }}
-            groups={groups}
+            groups={[...groups, ...savedGroups]}
           />
+          {canSaveGroup && selected.length >= 2 && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              {groupName === null ? (
+                <button type="button" className="text-brand-700 underline" onClick={() => { setGroupName(''); setGroupStatus(null); }}>
+                  {t('saveAsGroup')}
+                </button>
+              ) : (
+                <>
+                  <input className="input w-48" aria-label={t('groupName')} placeholder={t('groupName')} maxLength={60} value={groupName} onChange={(event) => setGroupName(event.target.value)} />
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={!groupName.trim()}
+                    onClick={async () => {
+                      const response = await fetch('/api/page-groups', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ name: groupName.trim(), targetIds: selected }),
+                      }).catch(() => null);
+                      const body = (await response?.json().catch(() => ({}))) as { group?: PageGroupView; error?: string } | undefined;
+                      if (!response?.ok || !body?.group) return setGroupStatus({ ok: false, text: body?.error ?? tCommon('genericError') });
+                      setSavedGroups((current) => [...current, body.group!]);
+                      setGroupName(null);
+                      setGroupStatus({ ok: true, text: t('groupSaved', { name: body.group.name }) });
+                    }}
+                  >
+                    {t('saveGroup')}
+                  </button>
+                  <button type="button" className="text-slate-600 underline" onClick={() => setGroupName(null)}>{tCommon('cancel')}</button>
+                </>
+              )}
+              {groupStatus && <span role="status" className={groupStatus.ok ? 'text-emerald-700' : 'text-red-700'}>{groupStatus.text}</span>}
+            </div>
+          )}
           {switchedOff.length > 0 && (
             <p className="mt-2 text-xs text-amber-700">
               {t('untickSwitchedOff', { names: switchedOff.map((target) => target.name).join(', ') })}

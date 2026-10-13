@@ -586,7 +586,11 @@
     "backgroundRed": "Rouge",
     "backgroundRedBlue": "Rouge vers bleu",
     "backgroundHint": "Un arrière-plan coloré pour une courte publication texte, comme Facebook le propose sur son site. Il ne fait pas partie de l’API publiée de Facebook et peut cesser de fonctionner ; si Facebook refuse la publication, vous verrez pourquoi.",
-    "backgroundBlocked": "Uniquement pour une courte publication texte : sans lien, image ni vidéo, et {max} caractères au maximum."
+    "backgroundBlocked": "Uniquement pour une courte publication texte : sans lien, image ni vidéo, et {max} caractères au maximum.",
+    "saveAsGroup": "Enregistrer ces canaux comme groupe",
+    "groupName": "Nom du groupe",
+    "saveGroup": "Enregistrer le groupe",
+    "groupSaved": "Groupe « {name} » enregistré. Choisissez-le la prochaine fois pour cocher ces canaux en un clic."
   },
   "config": {
     "title": "Configuration",

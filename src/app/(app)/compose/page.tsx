@@ -15,7 +15,7 @@ import { parseMedia } from '@/lib/json';
 import { localInputToUtc, utcToLocalInput } from '@/lib/time';
 import { loadPagePosts } from '@/lib/page-analysis-data';
 import { nextGoodTimes, suggestSlots } from '@/lib/queue-suggestions';
-import { postIsEditable, canCompose, canManageOthersPosts, canPublishWithoutApproval } from '@/lib/constants';
+import { postIsEditable, canCompose, canManageOthersPosts, canPublishWithoutApproval, canManageSettings } from '@/lib/constants';
 import { aiAvailable } from '@/lib/ai';
 
 export const dynamic = 'force-dynamic';
@@ -147,6 +147,7 @@ export default async function ComposePage({
         labels={labels}
         customFields={customFields.map((field) => ({ id: field.id, name: field.name, kind: field.kind, options: field.options }))}
         canEditLabels={canPublishWithoutApproval(auth.role)}
+        canSaveGroup={canManageSettings(auth.role)}
         aiEnabled={aiAvailable() && workspace.aiEnabled}
         requiresApproval={auth.workspace.requiresApproval}
         canPublishDirectly={canPublishWithoutApproval(auth.role)}
