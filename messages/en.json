@@ -4168,7 +4168,11 @@
     "addText": "Add more text",
     "save": "Save to the library",
     "saved": "Saved to your library.",
-    "useInPost": "Use it in a post"
+    "useInPost": "Use it in a post",
+    "generate": "Make a picture from a description",
+    "generatePlaceholder": "For example, a loaf of bread on a wooden table, morning light",
+    "generateButton": "Make the picture",
+    "generateHint": "It becomes the background, and is kept in your library. Counts toward your AI allowance."
   },
   "campaigns": {
     "title": "Campaigns",

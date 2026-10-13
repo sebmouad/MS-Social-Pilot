@@ -50,7 +50,7 @@ export function aiAvailable(): boolean {
  * Note the related trade in `complete`: a failed audit write is swallowed so
  * nobody loses their draft, which also means that generation is never counted.
  */
-async function assertWithinRateLimit(workspaceId: string): Promise<void> {
+export async function assertWithinRateLimit(workspaceId: string): Promise<void> {
   const since = new Date(Date.now() - 60 * 60 * 1000);
   const used = await prisma.aiGeneration.count({
     where: { workspaceId, createdAt: { gte: since } },
@@ -76,7 +76,7 @@ async function monthSpendUsd(now: Date): Promise<number> {
  * key that gets billed. Same check-then-record trade as the rate limit: calls
  * already in flight when the budget is reached can overshoot it by their cost.
  */
-async function assertWithinBudget(): Promise<void> {
+export async function assertWithinBudget(): Promise<void> {
   const budget = env.aiMonthlyBudgetUsd;
   if (budget > 0 && (await monthSpendUsd(new Date())) >= budget) throw errors.aiBudgetReached();
 }

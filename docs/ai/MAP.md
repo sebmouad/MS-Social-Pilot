@@ -29,7 +29,7 @@ FEATURES.md (what exists) and NEXT_PHASES.md (specs).
 | Link-in-bio page | M | ✅ Settings › Link in bio, public /bio/<slug>, click counts |
 | Custom fields on posts | M | ✅ Settings › Custom fields, composer inputs, shown on the post list |
 | Design editor (basic) | L | ✅ size, colour or photo, text layers, save to library; ⬜ shapes, templates |
-| AI image / video / voice (root-activated provider, models fetched) | M | ⬜ |
+| AI image / video / voice (root-activated provider, models fetched) | M | ✅ images in Design (OpenAI key from Root, newest image model fetched); ⬜ video, voice |
 | AI agent with schedules | M | ⬜ |
 | Tasks and workflows | L | ✅ board (to do, doing, done, assignee, due date); ⬜ workflows |
 | Location tags and @mentions | M | ⬜ (Meta permission review) |

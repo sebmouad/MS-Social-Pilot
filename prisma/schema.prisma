@@ -121,6 +121,8 @@ enum AiGenerationKind {
   sentiment
   /// A description of a photo for screen readers (H5).
   altText
+  /// A picture made from a description.
+  image
 }
 
 // ---------------------------------------------------------------------------

@@ -27,7 +27,7 @@ interface Layer {
  * background, lay some text on it, and save the result to the media library,
  * ready for a post. Everything happens in the browser.
  */
-export function DesignEditor() {
+export function DesignEditor({ canGenerate = false }: { canGenerate?: boolean }) {
   const t = useTranslations('design');
   const tCommon = useTranslations('common');
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -37,6 +37,8 @@ export function DesignEditor() {
   const [layers, setLayers] = useState<Layer[]>([{ text: '', size: 96, color: '#ffffff', x: 50, y: 50, bold: true }]);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [prompt, setPrompt] = useState('');
+  const [generating, setGenerating] = useState(false);
 
   const draw = useCallback(() => {
     const element = canvas.current;
@@ -87,6 +89,32 @@ export function DesignEditor() {
 
   const setLayer = (index: number, patch: Partial<Layer>) => setLayers((current) => current.map((layer, i) => (i === index ? { ...layer, ...patch } : layer)));
 
+  async function generate() {
+    setGenerating(true);
+    setStatus(null);
+    const shape = size === 'portrait' || size === 'story' ? 'portrait' : size === 'landscape' ? 'landscape' : 'square';
+    const response = await fetch('/api/ai/image', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt, size: shape }),
+    }).catch(() => null);
+    const body = (await response?.json().catch(() => ({}))) as { url?: string; error?: string } | undefined;
+    if (!response?.ok || !body?.url) {
+      setGenerating(false);
+      return setStatus({ ok: false, text: body?.error ?? tCommon('genericError') });
+    }
+    const image = new Image();
+    image.onload = () => {
+      setPhoto(image);
+      setGenerating(false);
+    };
+    image.onerror = () => {
+      setGenerating(false);
+      setStatus({ ok: false, text: tCommon('genericError') });
+    };
+    image.src = body.url;
+  }
+
   async function save() {
     const element = canvas.current;
     if (!element) return;
@@ -134,6 +162,16 @@ export function DesignEditor() {
             )}
           </div>
         </section>
+        {canGenerate && (
+          <section className="card space-y-2 p-4">
+            <label className="label" htmlFor="design-prompt">{t('generate')}</label>
+            <textarea id="design-prompt" className="input" rows={2} maxLength={1000} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={t('generatePlaceholder')} />
+            <button type="button" className="btn-secondary w-full" disabled={generating || prompt.trim().length < 3} onClick={() => void generate()}>
+              {generating ? tCommon('working') : t('generateButton')}
+            </button>
+            <p className="hint">{t('generateHint')}</p>
+          </section>
+        )}
         {layers.map((layer, index) => (
           <section key={index} className="card space-y-3 p-4">
             <label className="label" htmlFor={`layer-${index}`}>{t('text')}</label>

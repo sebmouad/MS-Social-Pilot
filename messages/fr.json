@@ -4168,7 +4168,11 @@
     "addText": "Ajouter du texte",
     "save": "Enregistrer dans la bibliothèque",
     "saved": "Enregistrée dans votre bibliothèque.",
-    "useInPost": "L’utiliser dans une publication"
+    "useInPost": "L’utiliser dans une publication",
+    "generate": "Créer une image à partir d’une description",
+    "generatePlaceholder": "Par exemple, un pain sur une table en bois, lumière du matin",
+    "generateButton": "Créer l’image",
+    "generateHint": "Elle devient le fond et est conservée dans votre bibliothèque. Compte dans votre quota d’IA."
   },
   "campaigns": {
     "title": "Campagnes",
