@@ -62,6 +62,7 @@ test('resizing open phone drawer releases desktop focus and scrolling', async ({
 test('CSV publishing has a scoped Publish screen and a settings entry link', async ({ page }) => {
   await open(page, '/compose/import');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bulk schedule from CSV');
+  await expect(page.getByRole('heading', { name: 'Bulk schedule from CSV', exact: true })).toHaveCount(1);
   await expect(page.getByRole('checkbox').first()).toBeVisible();
   await open(page, '/settings');
   await expect(page.getByRole('link', { name: 'Open CSV import in Publish', exact: true })).toHaveAttribute('href', '/compose/import');

@@ -57,8 +57,6 @@ export function BulkUpload({
 
   return (
     <section className="card p-5">
-      <h2 className="text-sm font-semibold text-slate-900">{t('bulk')}</h2>
-      <p className="mt-1 text-sm text-slate-600">{t('bulkColumns', { timezone })}</p>
 
       <details className="mt-3">
         <summary className="cursor-pointer text-xs font-medium text-brand-600">{t('showExample')}</summary>
