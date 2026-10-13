@@ -1274,7 +1274,8 @@
         "updated": "edited a post",
         "withdrawn": "took a post back out of review",
         "bulkAction": "acted on several posts at once",
-        "undone": "took back a post just before it went out"
+        "undone": "took back a post just before it went out",
+        "teamApproved": "cleared a post for the client"
       },
       "settings": {
         "changed": "changed the workspace settings"
@@ -1308,8 +1309,7 @@
       },
       "target": {
         "removed": "removed a channel from the workspace"
-      },
-      "post.teamApproved": "cleared a post for the client"
+      }
     },
     "byDeparted": "Someone no longer in this workspace",
     "bySystem": "The app",

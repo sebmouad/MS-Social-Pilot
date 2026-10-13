@@ -1274,7 +1274,8 @@
         "updated": "a modifié une publication",
         "withdrawn": "a retiré une publication de la validation",
         "bulkAction": "a agi sur plusieurs publications à la fois",
-        "undone": "a repris une publication juste avant son envoi"
+        "undone": "a repris une publication juste avant son envoi",
+        "teamApproved": "a validé une publication pour le client"
       },
       "settings": {
         "changed": "a modifié les réglages de l’espace de travail"
@@ -1308,8 +1309,7 @@
       },
       "target": {
         "removed": "a retiré un canal de l’espace de travail"
-      },
-      "post.teamApproved": "a validé une publication pour le client"
+      }
     },
     "byDeparted": "Une personne qui n’est plus dans cet espace",
     "bySystem": "L’application",
