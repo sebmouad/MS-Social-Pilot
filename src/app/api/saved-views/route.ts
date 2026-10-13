@@ -4,7 +4,7 @@ import { ok, readJson, route } from '@/lib/api';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-export const SAVED_VIEW_SCREENS = ['calendar', 'posts'] as const;
+const SAVED_VIEW_SCREENS = ['calendar', 'posts'] as const;
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(60),
