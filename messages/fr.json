@@ -2656,7 +2656,7 @@
       "config": "Configuration",
       "workspaces": "Espaces de travail",
       "users": "Utilisateurs",
-      "registration": "Inscriptions et invitations",
+      "registration": "Inscriptions",
       "privileges": "Privilèges",
       "activity": "Activité root",
       "danger": "Zone sensible",
@@ -4555,5 +4555,22 @@
     "whenToPost": "Quand publier",
     "rawFigures": "Chiffres bruts",
     "report": "Rapport"
+  },
+  "channelFigures": {
+    "title": "Instagram et autres réseaux",
+    "postsTitle": "Publications sur Instagram et les autres réseaux",
+    "audienceTitle": "Abonnés sur Instagram et les autres réseaux",
+    "channel": "Canal",
+    "post": "Publication",
+    "followers": "Abonnés",
+    "posts": "Publications",
+    "reach": "Couverture",
+    "impressions": "Vues",
+    "interactions": "Interactions",
+    "engagementRate": "Taux d’engagement",
+    "total": "Total",
+    "open": "Ouvrir",
+    "noText": "(sans texte)",
+    "note": "Un tiret signifie que le réseau ne fournit pas ce chiffre, ou qu’il n’est pas encore lu. La couverture ne s’additionne pas entre canaux, car les mêmes personnes peuvent en voir plusieurs."
   }
 }

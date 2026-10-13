@@ -2656,7 +2656,7 @@
       "config": "Configuration",
       "workspaces": "Workspaces",
       "users": "Users",
-      "registration": "Registration & invitations",
+      "registration": "Sign-ups",
       "privileges": "Privileges",
       "activity": "Root activity",
       "danger": "Danger zone",
@@ -4555,5 +4555,22 @@
     "whenToPost": "When to post",
     "rawFigures": "Raw figures",
     "report": "Report"
+  },
+  "channelFigures": {
+    "title": "Instagram and other networks",
+    "postsTitle": "Posts on Instagram and other networks",
+    "audienceTitle": "Followers on Instagram and other networks",
+    "channel": "Channel",
+    "post": "Post",
+    "followers": "Followers",
+    "posts": "Posts",
+    "reach": "Reach",
+    "impressions": "Views",
+    "interactions": "Interactions",
+    "engagementRate": "Engagement rate",
+    "total": "Total",
+    "open": "Open",
+    "noText": "(no text)",
+    "note": "A dash means the network does not report that figure, or it is not read yet. Reach is not added across channels, since the same people can see several."
   }
 }
