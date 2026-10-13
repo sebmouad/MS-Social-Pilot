@@ -1183,7 +1183,9 @@
     "planFeature_whiteLabel": "Votre offre n’inclut pas la marque blanche. Demandez une offre supérieure pour utiliser votre logo et votre habillage de rapports.",
     "soleOwner": "Cette personne est la seule propriétaire d’un espace. Donnez-lui un autre propriétaire ou supprimez-le d’abord.",
     "noUserWithEmail": "Aucun compte n’existe avec cet e-mail. Invitez d’abord la personne.",
-    "bioSlugTaken": "Cette adresse est prise. Choisissez-en une autre."
+    "bioSlugTaken": "Cette adresse est prise. Choisissez-en une autre.",
+    "fieldExists": "Un champ portant ce nom existe déjà.",
+    "fieldChoice": "Choisissez l’une des options proposées."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -4175,5 +4177,22 @@
     "emptyTitle": "Rien à additionner pour l’instant",
     "emptyHint": "Mettez une étiquette sur vos publications dans l’éditeur. Les publications publiées avec une étiquette apparaissent ici avec leurs résultats.",
     "reachNote": "La portée est additionnée par canal : une personne touchée sur deux canaux compte deux fois."
+  },
+  "customFields": {
+    "title": "Champs personnalisés",
+    "subtitle": "Ajoutez des champs à vos publications, comme un code de campagne ou un produit, et remplissez-les quand vous écrivez une publication.",
+    "name": "Nom",
+    "namePlaceholder": "Par exemple, Code de campagne",
+    "kind": "Type",
+    "kind_text": "Texte libre",
+    "kind_choice": "Un choix dans une liste",
+    "options": "Options, séparées par des virgules",
+    "optionsPlaceholder": "Lancement, Soldes, Événement",
+    "add": "Ajouter le champ",
+    "delete": "Supprimer",
+    "deleteTitle": "Supprimer le champ « {name} » ?",
+    "deleteBody": "Sa valeur est retirée de toutes les publications. Les publications restent.",
+    "emptyTitle": "Aucun champ personnalisé pour l’instant",
+    "emptyHint": "Ajoutez le premier ci-dessus. Il apparaît ensuite quand vous écrivez une publication."
   }
 }

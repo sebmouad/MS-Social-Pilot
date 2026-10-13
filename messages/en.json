@@ -1183,7 +1183,9 @@
     "planFeature_whiteLabel": "Your plan does not include white label. Ask for a bigger plan to use your own logo and report branding.",
     "soleOwner": "This person is the only owner of a workspace. Give it another owner or delete it first.",
     "noUserWithEmail": "Nobody has an account with that email yet. Invite them first.",
-    "bioSlugTaken": "That address is taken. Choose another."
+    "bioSlugTaken": "That address is taken. Choose another.",
+    "fieldExists": "A field with that name already exists.",
+    "fieldChoice": "Pick one of the listed options."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -4175,5 +4177,22 @@
     "emptyTitle": "Nothing to add up yet",
     "emptyHint": "Put a label on your posts in the composer. Published posts with a label appear here with their results.",
     "reachNote": "Reach is added up per channel: someone reached on two channels counts twice."
+  },
+  "customFields": {
+    "title": "Custom fields",
+    "subtitle": "Add fields to your posts, such as a campaign code or a product, and fill them in when you write a post.",
+    "name": "Name",
+    "namePlaceholder": "For example, Campaign code",
+    "kind": "Type",
+    "kind_text": "Free text",
+    "kind_choice": "One of a list",
+    "options": "Options, separated by commas",
+    "optionsPlaceholder": "Launch, Sale, Event",
+    "add": "Add the field",
+    "delete": "Delete",
+    "deleteTitle": "Delete the field “{name}”?",
+    "deleteBody": "Its value is removed from every post. The posts stay.",
+    "emptyTitle": "No custom fields yet",
+    "emptyHint": "Add the first one above. It then appears when you write a post."
   }
 }

@@ -336,6 +336,7 @@ model Workspace {
   inboxNotes           InboxNote[]
   bioPage              BioPage?
   tasks                Task[]
+  customFields         CustomField[]
   captionTests         CaptionTest[]
   shareLinks           ShareLink[]
   reportTemplates      ReportTemplate[]
@@ -604,6 +605,7 @@ model Post {
   reviewer        User?            @relation("PostReviewer", fields: [reviewedById], references: [id])
   targets         PostTarget[]
   shortLinks      ShortLink[]
+  fieldValues PostFieldValue[]
   labels          PostLabel[]
   reviewDecisions ReviewDecision[]
   feedItem        FeedItem?        @relation(fields: [sourceFeedItemId], references: [id])
@@ -722,6 +724,38 @@ model Task {
 
   @@index([workspaceId, status])
   @@map("tasks")
+}
+
+/// A field the workspace adds to its posts (campaign code, product, owner…).
+model CustomField {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  /// `text` or `choice`.
+  kind        String   @default("text")
+  options     String[] @default([])
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  values    PostFieldValue[]
+
+  @@unique([workspaceId, name])
+  @@map("custom_fields")
+}
+
+model PostFieldValue {
+  id      String @id @default(cuid())
+  postId  String
+  fieldId String
+  value   String
+
+  post  Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  field CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, fieldId])
+  @@index([fieldId])
+  @@map("post_field_values")
 }
 
 model PostNote {

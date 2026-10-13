@@ -47,6 +47,8 @@ export interface PostView {
   reviewNote: string | null;
   /** Who approved it and when, once it is approved. */
   approvedBy?: { name: string; at: string } | null;
+  /** The workspace's custom fields this post has a value for. */
+  fields?: Array<{ name: string; value: string }>;
   /** The post's labels, in name order. */
   labels?: Array<{ id: string; name: string; color: string }>;
   /** The viewer wrote it, or may manage other people's posts. */
@@ -440,6 +442,16 @@ export function PostList({
                 <p className="text-xs font-semibold">{tApprovals('reviewNote')}</p>
                 <p className="mt-0.5 whitespace-pre-wrap [overflow-wrap:anywhere]">{post.reviewNote}</p>
               </div>
+            )}
+
+            {post.fields && post.fields.length > 0 && (
+              <ul className="mx-4 mb-3 flex flex-wrap gap-1.5">
+                {post.fields.map((field) => (
+                  <li key={field.name} className="badge bg-slate-100 text-slate-700">
+                    {field.name}: {field.value}
+                  </li>
+                ))}
+              </ul>
             )}
 
             {post.approvedBy && (

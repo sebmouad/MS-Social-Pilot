@@ -165,6 +165,8 @@ export const createPostSchema = z
     variants: z.record(z.string(), z.string().trim().max(70_000)).optional(),
     /** Destinations that publish without the post's pictures or video. */
     textOnly: z.array(z.string()).max(200).optional(),
+    /** Custom field values, by field id. */
+    fields: z.record(z.string(), z.string().max(500)).optional(),
     publishMode: z.nativeEnum(PublishMode).default(PublishMode.worker),
     /** Wall-clock time as typed by the user, interpreted in `timezone`. */
     scheduledAtLocal: z.string().min(10).nullish(),
@@ -252,6 +254,7 @@ export const updatePostSchema = z
     targetIds: postTargetIds.optional(),
     variants: z.record(z.string(), z.string().trim().max(70_000)).optional(),
     textOnly: z.array(z.string()).max(200).optional(),
+    fields: z.record(z.string(), z.string().max(500)).optional(),
     scheduledAtLocal: z.string().min(10).nullish(),
     timezone: timezone.optional(),
     publishMode: z.nativeEnum(PublishMode).optional(),

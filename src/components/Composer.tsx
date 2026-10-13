@@ -65,6 +65,8 @@ interface Props {
   /** The workspace's labels. */
   labels?: LabelOption[];
   canEditLabels?: boolean;
+  /** The workspace's custom fields, to fill in beside the labels. */
+  customFields?: Array<{ id: string; name: string; kind: string; options: string[] }>;
 }
 
 export interface EditingPost {
@@ -79,6 +81,8 @@ export interface EditingPost {
   targetIds: string[];
   /** Text written for single destinations, by destination id. */
   variants?: Record<string, string>;
+  /** Custom field values, by field id. */
+  fields?: Record<string, string>;
   /** Destinations that publish without the pictures or video. */
   textOnly?: string[];
   /** `datetime-local` value in the workspace's zone, or null for a draft. */
@@ -130,6 +134,7 @@ export function Composer({
   groups = [],
   labels = [],
   canEditLabels = false,
+  customFields = [],
 }: Props) {
   const t = useTranslations('compose');
   const tErrors = useTranslations('errors');
@@ -144,6 +149,7 @@ export function Composer({
   const commentBox = useRef<HTMLTextAreaElement>(null);
   const [firstComment, setFirstComment] = useState(editing?.firstComment ?? '');
   const [variants, setVariants] = useState<Record<string, string>>(editing?.variants ?? {});
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(editing?.fields ?? {});
   const [textOnly, setTextOnly] = useState<string[]>(editing?.textOnly ?? []);
   const [commentDelay, setCommentDelay] = useState(editing?.firstCommentDelayMinutes ?? 0);
   const [labelIds, setLabelIds] = useState<string[]>(editing?.labelIds ?? []);
@@ -414,6 +420,7 @@ export function Composer({
               targetIds: selected,
               variants: variantsFor(selected),
               textOnly: textOnly.filter((id) => selected.includes(id)),
+              fields: fieldValues,
               publishMode: effectiveHandler,
               scheduledAtLocal: saveAsDraft ? null : scheduledAt,
               timezone,
@@ -431,6 +438,7 @@ export function Composer({
               link: format === 'post' && link.trim() ? link.trim() : null,
               media,
               targetIds: selected,
+              fields: fieldValues,
               variants: testing || translating ? undefined : variantsFor(selected),
               textOnly: testing || translating ? undefined : textOnly.filter((id) => selected.includes(id)),
               publishMode,
@@ -994,6 +1002,29 @@ export function Composer({
           </h2>
           <p className="mb-3 text-xs text-slate-500">{t('labelsHint')}</p>
           <LabelPicker labels={labels} selected={labelIds} onChange={setLabelIds} />
+          {customFields.length > 0 && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {customFields.map((field) => (
+                <div key={field.id}>
+                  <label className="label" htmlFor={`field-${field.id}`}>
+                    {field.name}
+                  </label>
+                  {field.kind === 'choice' ? (
+                    <select id={`field-${field.id}`} className="input" value={fieldValues[field.id] ?? ''} onChange={(event) => setFieldValues((current) => ({ ...current, [field.id]: event.target.value }))}>
+                      <option value="">—</option>
+                      {field.options.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input id={`field-${field.id}`} className="input" maxLength={500} value={fieldValues[field.id] ?? ''} onChange={(event) => setFieldValues((current) => ({ ...current, [field.id]: event.target.value }))} />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="card p-5">

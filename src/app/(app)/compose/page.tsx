@@ -1,3 +1,4 @@
+import { listCustomFields, readPostFields } from '@/lib/custom-fields';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { notFound, redirect } from 'next/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
@@ -101,7 +102,7 @@ export default async function ComposePage({
   const params = await searchParams;
   const postId = Array.isArray(params.post) ? params.post[0] : params.post;
 
-  const [targets, queueSlots, workspace, groups, labels] = await Promise.all([
+  const [targets, queueSlots, workspace, groups, labels, customFields] = await Promise.all([
     prisma.target.findMany({
       where: { workspaceId: auth.workspace.id, ...targetScope(auth.pageScope) },
       include: { socialAccount: { select: { name: true } } },
@@ -114,6 +115,7 @@ export default async function ComposePage({
     }),
     listPageGroups(auth.workspace.id, auth.pageScope),
     listLabels(auth.workspace.id),
+    listCustomFields(auth.workspace.id),
   ]);
 
   const [editing, goodTimes, selection] = await Promise.all([
@@ -143,6 +145,7 @@ export default async function ComposePage({
         goodTimes={goodTimes}
         groups={groups.filter((group) => group.targetIds.length > 0)}
         labels={labels}
+        customFields={customFields.map((field) => ({ id: field.id, name: field.name, kind: field.kind, options: field.options }))}
         canEditLabels={canPublishWithoutApproval(auth.role)}
         aiEnabled={aiAvailable() && workspace.aiEnabled}
         requiresApproval={auth.workspace.requiresApproval}
@@ -234,6 +237,7 @@ async function loadForEditing(postId: string, auth: Auth): Promise<EditingPost |
     link: post.link,
     media: parseMedia(post.media),
     targetIds: post.targets.map((target) => target.targetId),
+    fields: Object.fromEntries((await readPostFields(auth.workspace.id, [post.id])).get(post.id)?.map((entry) => [entry.fieldId, entry.value]) ?? []),
     textOnly: post.targets.filter((target) => target.skipMedia).map((target) => target.targetId),
     variants: Object.fromEntries(post.targets.flatMap((target) => (target.messageOverride ? [[target.targetId, target.messageOverride]] : []))),
     // The workspace's zone, not the post's own. The composer sends back

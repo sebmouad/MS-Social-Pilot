@@ -1,3 +1,4 @@
+import { setPostFields } from './custom-fields';
 import { assertMonthlyRoom } from './plans';
 import { NETWORK_LABELS, networkProblems } from './networks';
 import { ownLabels } from './page-groups';
@@ -390,6 +391,7 @@ export async function createPost(
 
   const { post, schedule, status } = written;
   await recordVersion(post.id, context.userId);
+  if (input.fields) await setPostFields(context.workspaceId, post.id, input.fields);
 
   await logActivity(context.workspaceId, 'post.created', {
     postId: post.id,
@@ -1169,6 +1171,8 @@ export async function updatePost(
   ) {
     nativeFallback = await handOffOrKeep(postId, scheduledAfter, now);
   }
+
+  if (input.fields) await setPostFields(context.workspaceId, postId, input.fields);
 
   await logActivity(
     context.workspaceId,

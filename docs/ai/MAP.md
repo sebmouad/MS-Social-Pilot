@@ -27,7 +27,7 @@ FEATURES.md (what exists) and NEXT_PHASES.md (specs).
 |---|---|---|
 | Brand book beyond voice (words to avoid, colours, logo) | S | ✅ voice per workspace and channel, words to avoid; ⬜ colours, logo |
 | Link-in-bio page | M | ✅ Settings › Link in bio, public /bio/<slug>, click counts |
-| Custom fields on posts | M | ⬜ |
+| Custom fields on posts | M | ✅ Settings › Custom fields, composer inputs, shown on the post list |
 | Design editor (basic) | L | ✅ size, colour or photo, text layers, save to library; ⬜ shapes, templates |
 | AI image / video / voice (root-activated provider, models fetched) | M | ⬜ |
 | AI agent with schedules | M | ⬜ |

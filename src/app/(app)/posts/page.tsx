@@ -1,3 +1,4 @@
+import { readPostFields } from '@/lib/custom-fields';
 import { SavedViews } from '@/components/SavedViews';
 import Link from 'next/link';
 import type { Prisma } from '@prisma/client';
@@ -138,6 +139,7 @@ export default async function PostsPage({
   // Day headings, as Facebook's planner groups a schedule: today, tomorrow,
   // yesterday by name, other days by date, in the workspace's own zone.
   const now = new Date();
+  const fieldsByPost = await readPostFields(auth.workspace.id, posts.map((post) => post.id));
   const dayKey = (date: Date) => formatInZone(date, timezone, 'yyyy-MM-dd');
   const near = new Map([
     [dayKey(now), t('dayToday')],
@@ -309,6 +311,7 @@ export default async function PostsPage({
           // Only a rejected post's note is still the reviewer's last word:
           // resubmitting clears it, and an approval never sets one.
           reviewNote: post.status === 'rejected' ? post.reviewNote : null,
+          fields: (fieldsByPost.get(post.id) ?? []).map((entry) => ({ name: entry.name, value: entry.value })),
           // The audit line: who signed it off, and when.
           approvedBy:
             post.approvalStatus === 'approved' && post.reviewer && post.reviewedAt
