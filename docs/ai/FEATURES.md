@@ -86,6 +86,7 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
   for approval when auto-approve is off. UTM per Page applies at publish time.
 
 ## Analytics
+- **Other networks** `/analytics?view=networks`: posts sent to Bluesky, Mastodon and the other networks in the window and selection, with likes, reposts and replies per network and per post (Bluesky and Mastodon counters read by the analytics job; other networks show a dash until their reader exists). Opens even when no Facebook Page is connected.
 - **Pages** `/analytics?view=…`: All profiles (default with 2+ selected: summed
   tiles, reach "up to", top profiles), Analysis (health score, what stands out, best
   day/frequency, KPI cards with sparklines + ⓘ definitions, day-by-day chart with dated notes (H13, editors add/remove; shown in reports),

@@ -120,6 +120,9 @@ async function embedFor(post: NetworkPost, pds: string, token: string) {
   return undefined;
 }
 
+/** Bluesky's public read-only service. */
+const PUBLIC_APPVIEW = 'https://public.api.bsky.app';
+
 export const bluesky: NetworkConnector = {
   key: 'bluesky',
   label: 'Bluesky',
@@ -146,5 +149,15 @@ export const bluesky: NetworkConnector = {
     });
     const rkey = data.uri.split('/').pop();
     return { remotePostId: data.uri, remoteUrl: `https://bsky.app/profile/${session.handle}/post/${rkey}` };
+  },
+  async stats(remotePostId) {
+    // Counters are public: the AppView answers without signing in.
+    const { data } = await netJson<{ posts: Array<{ likeCount?: number; repostCount?: number; replyCount?: number; quoteCount?: number }> }>(
+      'Bluesky',
+      `${PUBLIC_APPVIEW}/xrpc/app.bsky.feed.getPosts?uris=${encodeURIComponent(remotePostId)}`,
+    );
+    const post = data.posts[0];
+    if (!post) throw failureFor(404, 'the post is gone', 'Bluesky');
+    return { likes: post.likeCount ?? 0, reposts: post.repostCount ?? 0, replies: post.replyCount ?? 0, quotes: post.quoteCount ?? 0 };
   },
 };

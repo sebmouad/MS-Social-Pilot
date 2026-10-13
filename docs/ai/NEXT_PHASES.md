@@ -960,6 +960,12 @@ Anthropic / OpenAI / Gemini keys (after Phase 0); LinkedIn / Threads
 `ROADMAP.md`.
 
 ## Phase F — Later
+*Started 2026-10-13:* other-network analytics, first Bluesky and Mastodon post
+counters (likes, reposts, replies) through an optional `stats` on each
+connector (`src/lib/networks/types.ts`), stored in `PostTarget.insights` by the
+analytics job and shown in Analytics → Other networks
+(`src/lib/network-analytics.ts`). AI images and the GDPR export are already
+built (MAP.md).
 Analytics for non-Meta networks (into the same selection and aggregation rules),
 competitor tracking, unified inbox, AI images, YouTube/TikTok, GDPR export —
 details in `ROADMAP.md`.

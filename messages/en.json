@@ -133,7 +133,8 @@
       "compare": "Compare channels",
       "total": "All channels",
       "responseTime": "Response time",
-      "report": "Report"
+      "report": "Report",
+      "networks": "Other networks"
     },
     "byPost": "Impressions and interaction per post",
     "byPostHint": "One row per post per destination — the same post can perform very differently on two channels, and averaging that away hides the signal.",
@@ -4319,5 +4320,18 @@
     "allow": "Allow",
     "deny": "Deny",
     "invalid": "This connection link is incomplete or out of date. Start connecting again from the assistant."
+  },
+  "networkAnalytics": {
+    "empty": "No posts on other networks in this period",
+    "emptyHint": "Posts published to Bluesky, Mastodon and the other networks appear here with their likes, reposts and replies.",
+    "posts": "Posts",
+    "likes": "Likes",
+    "reposts": "Reposts",
+    "replies": "Replies",
+    "post": "Post",
+    "channel": "Channel",
+    "open": "Open",
+    "noText": "(no text)",
+    "note": "Counters are read again regularly. Bluesky and Mastodon report them; a dash means the network’s counters are not read yet."
   }
 }

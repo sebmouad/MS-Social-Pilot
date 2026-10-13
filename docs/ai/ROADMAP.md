@@ -25,8 +25,11 @@ live in the owner's Chrome.
 5. **First live Bluesky / Mastodon posts** (owner connects an account, OKs a test).
 
 ## Product gaps vs. competitors
-- Analytics for the other networks (Bluesky/Mastodon/LinkedIn/X/Threads/Pinterest
-  insights) — currently publish-only.
+- Analytics for the other networks: **started 2026-10-13** — Bluesky (public
+  AppView) and Mastodon (the account's server) post counters are read by the
+  analytics job and shown under Analytics → Other networks. LinkedIn, X,
+  Threads, Pinterest, YouTube, TikTok counters still to add (each needs its
+  developer app's read scope).
 - Video for Bluesky, X (chunked upload), Pinterest (video pins); YouTube and
   TikTok connectors (TikTok needs an audit; unaudited apps post privately).
 - AI images (needs an image-generation provider + key; add as a Configuration

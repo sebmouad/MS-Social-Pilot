@@ -110,4 +110,14 @@ export const mastodon: NetworkConnector = {
     });
     return { remotePostId: data.id, remoteUrl: data.url };
   },
+  async stats(remotePostId, { credentials }) {
+    const instance = (credentials.meta as { instance?: string }).instance;
+    if (!instance) throw new GraphError({ message: 'Mastodon: reconnect the account.', kind: 'auth' });
+    const { data } = await netJson<{ favourites_count?: number; reblogs_count?: number; replies_count?: number }>(
+      'Mastodon',
+      `${instance}/api/v1/statuses/${encodeURIComponent(remotePostId)}`,
+      { untrustedHost: true, headers: { authorization: `Bearer ${credentials.accessToken}` } },
+    );
+    return { likes: data.favourites_count ?? 0, reposts: data.reblogs_count ?? 0, replies: data.replies_count ?? 0 };
+  },
 };

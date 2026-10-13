@@ -26,6 +26,8 @@ import {
 } from './facebook/metrics';
 import { logActivity } from './scheduler/runner';
 import { formatInZone } from './time';
+import { readNetworkStats } from './networks';
+import { isNetworkKey, type NetworkPostStats } from './networks/types';
 
 /** A day, for placing Facebook's daily values on a calendar. */
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -640,6 +642,23 @@ export async function readPostCatalogue(options: {
   };
 }
 
+/** Another network's counters in the stored PostInsights shape: likes count as reactions, reposts and quotes as shares. */
+export function networkInsights(stats: NetworkPostStats) {
+  const metrics: Record<string, number> = {};
+  for (const [name, value] of Object.entries(stats)) if (typeof value === 'number') metrics[name] = value;
+  return {
+    impressions: null,
+    reach: null,
+    engagedUsers: null,
+    reactions: stats.likes,
+    comments: stats.replies,
+    shares: stats.reposts === null ? null : stats.reposts + (stats.quotes ?? 0),
+    clicks: null,
+    metrics,
+    syncedAt: new Date().toISOString(),
+  };
+}
+
 /** Flatten a Graph series list into the stored PostInsights shape. */
 function buildPostInsights(
   series: MetricSeries[],
@@ -707,6 +726,17 @@ export async function syncPostInsights(postTargetId: string): Promise<{
     });
 
     if (!row.remotePostId) return { ok: false, metrics: 0, error: 'Post has no Facebook id.' };
+
+    // Another network: its own public counters, not Graph.
+    if (isNetworkKey(row.target.type)) {
+      const stats = row.target.socialAccount ? await readNetworkStats(row.target.type, row.target.socialAccount, row.remotePostId) : null;
+      await prisma.postTarget.update({
+        where: { id: postTargetId },
+        // Stamped even without a reader, so these rows sink to the end of the batch.
+        data: { insightsSyncedAt: new Date(), ...(stats ? { insights: toJson(networkInsights(stats)) } : {}) },
+      });
+      return stats ? { ok: true, metrics: Object.keys(stats).length } : { ok: false, metrics: 0 };
+    }
 
     const token = tokenFor(row.target);
     if (!token) return { ok: false, metrics: 0, error: 'No access token stored.' };

@@ -49,6 +49,15 @@ export interface NetworkPublishResult {
   remoteUrl: string;
 }
 
+/** A published post's public counters, as the network reports them. */
+export interface NetworkPostStats {
+  likes: number | null;
+  reposts: number | null;
+  replies: number | null;
+  /** Quote posts, where the network has them. */
+  quotes?: number | null;
+}
+
 export interface NetworkContext {
   credentials: NetworkCredentials;
   /** Store credentials a refresh produced, before anything else can fail. */
@@ -64,6 +73,8 @@ export interface NetworkConnector {
   rules: NetworkRules;
   /** Publish to one destination: an account, a company Page, a board. */
   publish: (target: { providerId: string; name: string }, post: NetworkPost, context: NetworkContext) => Promise<NetworkPublishResult>;
+  /** Read a published post's counters; absent where this app cannot read them yet. */
+  stats?: (remotePostId: string, context: NetworkContext) => Promise<NetworkPostStats>;
 }
 
 /** Turn an HTTP answer into the failure kind the scheduler understands. */

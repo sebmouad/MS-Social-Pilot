@@ -133,7 +133,8 @@
       "compare": "Comparer les canaux",
       "total": "Tous les canaux",
       "responseTime": "Temps de réponse",
-      "report": "Rapport"
+      "report": "Rapport",
+      "networks": "Autres réseaux"
     },
     "byPost": "Impressions et interactions par publication",
     "byPostHint": "Une ligne par publication et par destination : une même publication peut réagir très différemment sur deux canaux, et faire la moyenne masquerait l'information utile.",
@@ -4319,5 +4320,18 @@
     "allow": "Autoriser",
     "deny": "Refuser",
     "invalid": "Ce lien de connexion est incomplet ou expiré. Relancez la connexion depuis l’assistant."
+  },
+  "networkAnalytics": {
+    "empty": "Aucune publication sur les autres réseaux sur cette période",
+    "emptyHint": "Les publications envoyées sur Bluesky, Mastodon et les autres réseaux apparaissent ici avec leurs j’aime, partages et réponses.",
+    "posts": "Publications",
+    "likes": "J’aime",
+    "reposts": "Partages",
+    "replies": "Réponses",
+    "post": "Publication",
+    "channel": "Canal",
+    "open": "Ouvrir",
+    "noText": "(sans texte)",
+    "note": "Les compteurs sont relus régulièrement. Bluesky et Mastodon les fournissent ; un tiret signifie que les compteurs de ce réseau ne sont pas encore lus."
   }
 }

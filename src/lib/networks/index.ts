@@ -19,9 +19,11 @@ import {
   isNetworkKey,
   NETWORK_KEYS,
   type NetworkConnector,
+  type NetworkContext,
   type NetworkCredentials,
   type NetworkKey,
   type NetworkMedia,
+  type NetworkPostStats,
   type NetworkPublishResult,
 } from './types';
 
@@ -87,11 +89,36 @@ function credentialsOf(account: {
   };
 }
 
+type StoredAccount = { id: string; accessToken: string; refreshToken: string | null; tokenExpiresAt: Date | null; meta: Prisma.JsonValue | null };
+
+function contextFor(account: StoredAccount): NetworkContext {
+  return {
+    credentials: credentialsOf(account),
+    saveCredentials: async (next) => {
+      await prisma.socialAccount.update({
+        where: { id: account.id },
+        data: {
+          accessToken: encryptSecret(next.accessToken),
+          refreshToken: next.refreshToken ? encryptSecret(next.refreshToken) : null,
+          tokenExpiresAt: next.expiresAt,
+          meta: next.meta as Prisma.InputJsonValue,
+        },
+      });
+    },
+  };
+}
+
+/** A published post's counters, or null where the network's reader is not built yet. */
+export async function readNetworkStats(key: NetworkKey, account: StoredAccount, remotePostId: string): Promise<NetworkPostStats | null> {
+  const connector = CONNECTORS[key];
+  return connector.stats ? connector.stats(remotePostId, contextFor(account)) : null;
+}
+
 /** Publish one destination on a network other than Facebook. */
 export async function publishToNetwork(options: {
   key: NetworkKey;
   target: { providerId: string; name: string };
-  account: { id: string; accessToken: string; refreshToken: string | null; tokenExpiresAt: Date | null; meta: Prisma.JsonValue | null };
+  account: StoredAccount;
   text: string;
   link: string | null;
   media: PostMedia[];
@@ -112,20 +139,7 @@ export async function publishToNetwork(options: {
       linkPreview: options.linkPreview ?? null,
       idempotencyKey: options.idempotencyKey,
     },
-    {
-      credentials: credentialsOf(options.account),
-      saveCredentials: async (next) => {
-        await prisma.socialAccount.update({
-          where: { id: options.account.id },
-          data: {
-            accessToken: encryptSecret(next.accessToken),
-            refreshToken: next.refreshToken ? encryptSecret(next.refreshToken) : null,
-            tokenExpiresAt: next.expiresAt,
-            meta: next.meta as Prisma.InputJsonValue,
-          },
-        });
-      },
-    },
+    contextFor(options.account),
   );
 }
 

@@ -54,6 +54,7 @@ import { pageRatingsAvailable } from '@/lib/facebook/graph';
 import { ExternalLink } from '@/components/ExternalLink';
 import { FeedPost } from '@/components/FeedPost';
 import { EmptyState } from '@/components/EmptyState';
+import { NetworksView } from './NetworksView';
 import type { IconName } from '@/components/Icon';
 import { formatOfStatusType } from '@/lib/page-analysis';
 import { feedMediaOfPicture } from '@/lib/feed';
@@ -87,6 +88,19 @@ export async function AnalyticsScreen({
     where: { workspaceId: auth.workspace.id, type: TargetType.page, ...targetScope(pageScope) },
     orderBy: { name: 'asc' },
   });
+
+  // Only other networks connected: their view still opens, without the Page tools.
+  if (pages.length === 0 && first(params.view) === 'networks') {
+    const range = parseRange({ range: first(params.range), from: first(params.from), to: first(params.to), days: first(params.days) }, timezone);
+    return (
+      <div className="space-y-6">
+        <header>
+          <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('view.networks')}</h1>
+        </header>
+        <NetworksView workspaceId={auth.workspace.id} scope={pageScope} from={range.from} to={range.to} timezone={timezone} />
+      </div>
+    );
+  }
 
   if (pages.length === 0) {
     return (
@@ -172,7 +186,7 @@ export async function AnalyticsScreen({
         </div>
       </header>
 
-      {pages.length > 1 && !requested && !['total', 'compare', 'posts', 'responseTime', 'instagram'].includes(view) && (
+      {pages.length > 1 && !requested && !['total', 'compare', 'posts', 'responseTime', 'instagram', 'networks'].includes(view) && (
         <p className="rounded-xl bg-brand-50 px-4 py-2 text-sm text-brand-800">{t('oneChannelHint', { name: selected.name })}</p>
       )}
 
@@ -367,6 +381,10 @@ export async function AnalyticsScreen({
           to={to}
           timezone={timezone}
         />
+      )}
+
+      {view === 'networks' && (
+        <NetworksView workspaceId={auth.workspace.id} scope={pageScope} from={from} to={to} timezone={timezone} />
       )}
 
       {view === 'instagram' && (

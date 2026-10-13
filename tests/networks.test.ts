@@ -119,3 +119,37 @@ describe('publishing', () => {
     expect(mastodon.key).toBe('mastodon');
   });
 });
+
+describe('post counters', () => {
+  it('Bluesky: reads likes, reposts, replies and quotes from the public AppView', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      seen.push(url);
+      return new Response(JSON.stringify({ posts: [{ likeCount: 4, repostCount: 2, replyCount: 1, quoteCount: 1 }] }));
+    }));
+    const stats = await bluesky.stats!('at://did:plc:me/app.bsky.feed.post/1', context());
+    expect(stats).toEqual({ likes: 4, reposts: 2, replies: 1, quotes: 1 });
+    expect(seen[0]).toBe('https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=at%3A%2F%2Fdid%3Aplc%3Ame%2Fapp.bsky.feed.post%2F1');
+  });
+
+  it('Mastodon: reads the status from the account’s own server', async () => {
+    const seen: Array<{ url: string; headers: Record<string, string> }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      seen.push({ url, headers: init.headers as Record<string, string> });
+      return new Response(JSON.stringify({ favourites_count: 3, reblogs_count: 1, replies_count: 0 }));
+    }));
+    vi.doMock('../src/lib/safe-fetch', async (original) => ({ ...(await original<object>()), assertResolvesPublicly: async () => undefined }));
+    const { mastodon: fresh } = await import('../src/lib/networks/mastodon');
+    const stats = await fresh.stats!('42', context({ meta: { instance: 'https://piaille.fr' } }));
+    expect(stats).toEqual({ likes: 3, reposts: 1, replies: 0 });
+    expect(seen[0]!.url).toBe('https://piaille.fr/api/v1/statuses/42');
+    expect(seen[0]!.headers.authorization).toBe('Bearer secret');
+    vi.doUnmock('../src/lib/safe-fetch');
+  });
+
+  it('store as reactions, comments and shares', async () => {
+    const { networkInsights } = await import('../src/lib/analytics');
+    const stored = networkInsights({ likes: 4, reposts: 2, replies: 1, quotes: 1 });
+    expect(stored).toMatchObject({ reactions: 4, comments: 1, shares: 3, impressions: null, reach: null });
+  });
+});

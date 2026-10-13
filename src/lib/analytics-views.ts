@@ -21,6 +21,7 @@ export const ANALYTICS_VIEWS = [
   'responseTime',
   'external',
   'instagram',
+  'networks',
 ] as const;
 
 export type AnalyticsView = (typeof ANALYTICS_VIEWS)[number];
