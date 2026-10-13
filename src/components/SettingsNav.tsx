@@ -64,7 +64,7 @@ export function SettingsNav({
     // A strip of tabs on a phone; Facebook's left menu from a laptop up.
     <nav
       aria-label={t('settings.title')}
-      className="scroll-x flex gap-1 border-b border-slate-200 pb-3 lg:card lg:flex-col lg:gap-0.5 lg:border-b-0 lg:p-2"
+      className="scroll-x flex gap-1 border-b border-slate-200 pb-3 [mask-image:linear-gradient(to_right,black_88%,transparent)] lg:[mask-image:none] lg:card lg:flex-col lg:gap-0.5 lg:border-b-0 lg:p-2"
     >
       {tabs.map((tab) => {
         // Exact match for /settings so it does not light up on its children.

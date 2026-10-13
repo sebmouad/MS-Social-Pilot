@@ -425,7 +425,8 @@
     "seeMore": "See more",
     "continue": "Continue",
     "remove": "Remove",
-    "confirmNoUndo": "Check before you go on."
+    "confirmNoUndo": "Check before you go on.",
+    "moreOptions": "More options"
   },
   "compose": {
     "addToQueue": "Add to the next queue slot",

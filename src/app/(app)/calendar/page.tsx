@@ -22,6 +22,7 @@ import { formatInZone, monthGrid, weekGrid } from '@/lib/time';
 import { keyDaysBetween, type KeyDay } from '@/lib/calendar-days';
 import { StatusBadge } from '@/components/StatusBadge';
 import { parseMedia } from '@/lib/json';
+import { PhoneFold } from '@/components/PhoneFold';
 import { Icon } from '@/components/Icon';
 import { CalendarFeedButton } from '@/components/CalendarFeedButton';
 
@@ -444,6 +445,7 @@ export default async function CalendarPage({
             </span>
             {t('showDrafts')}
           </Link>
+          <PhoneFold>
           <LabelFilter labels={labels} active={activeLabel?.id ?? null} />
           {aiOn && (
             <AiPlanner
@@ -464,6 +466,7 @@ export default async function CalendarPage({
             }
           />
       <SavedViews screen="calendar" views={savedViews} />
+          </PhoneFold>
     </div>
   );
 
