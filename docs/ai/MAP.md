@@ -31,7 +31,7 @@ FEATURES.md (what exists) and NEXT_PHASES.md (specs).
 | Design editor (basic) | L | ⬜ |
 | AI image / video / voice (root-activated provider, models fetched) | M | ⬜ |
 | AI agent with schedules | M | ⬜ |
-| Tasks and workflows | L | ⬜ |
+| Tasks and workflows | L | ✅ board (to do, doing, done, assignee, due date); ⬜ workflows |
 | Location tags and @mentions | M | ⬜ (Meta permission review) |
 | Coloured text backgrounds | S | ⬜ |
 | Mobile app | L | PWA exists |

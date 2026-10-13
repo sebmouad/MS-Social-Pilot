@@ -239,6 +239,7 @@ export function AppShell({
       icon: 'settings',
       items: [
         { href: '/connections', label: t('connections'), icon: 'connections', also: ['/accounts'] },
+        { href: '/tasks', label: t('tasks'), icon: 'approvals' },
         { href: '/settings/sharing', label: t('clientLinks'), icon: 'link' },
         ...(role === 'owner' ? [{ href: '/agency', label: t('agency'), icon: 'folders' as IconName }] : []),
         { href: '/settings', label: t('settings'), icon: 'settings', also: ['/setup'] },

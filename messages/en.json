@@ -1474,7 +1474,8 @@
     "comments": "Comments",
     "reviews": "Reviews",
     "responseTime": "Response time",
-    "agency": "Agency"
+    "agency": "Agency",
+    "tasks": "Tasks"
   },
   "notifications": {
     "title": "Notifications",
@@ -4114,5 +4115,25 @@
     "remove": "Remove",
     "save": "Save",
     "saved": "Saved."
+  },
+  "tasks": {
+    "title": "Tasks",
+    "subtitle": "What your team is doing, and by when.",
+    "newTask": "New task",
+    "placeholder": "For example, Write the October newsletter",
+    "assignee": "Assigned to",
+    "nobody": "Nobody",
+    "due": "Due",
+    "add": "Add",
+    "onlyMine": "Only mine",
+    "emptyTitle": "No tasks yet",
+    "emptyHint": "Add the first one above: a task, who does it and by when.",
+    "status_todo": "To do",
+    "status_doing": "Doing",
+    "status_done": "Done",
+    "moveTo_todo": "Back to do",
+    "moveTo_doing": "Start",
+    "moveTo_done": "Done",
+    "delete": "Delete the task"
   }
 }

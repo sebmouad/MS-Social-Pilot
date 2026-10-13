@@ -1474,7 +1474,8 @@
     "comments": "Commentaires",
     "reviews": "Avis",
     "responseTime": "Temps de réponse",
-    "agency": "Agence"
+    "agency": "Agence",
+    "tasks": "Tâches"
   },
   "notifications": {
     "title": "Notifications",
@@ -4114,5 +4115,25 @@
     "remove": "Retirer",
     "save": "Enregistrer",
     "saved": "Enregistré."
+  },
+  "tasks": {
+    "title": "Tâches",
+    "subtitle": "Ce que fait votre équipe, et pour quand.",
+    "newTask": "Nouvelle tâche",
+    "placeholder": "Par exemple, Rédiger la newsletter d’octobre",
+    "assignee": "Assignée à",
+    "nobody": "Personne",
+    "due": "Échéance",
+    "add": "Ajouter",
+    "onlyMine": "Seulement les miennes",
+    "emptyTitle": "Aucune tâche pour l’instant",
+    "emptyHint": "Ajoutez la première ci-dessus : une tâche, qui la fait et pour quand.",
+    "status_todo": "À faire",
+    "status_doing": "En cours",
+    "status_done": "Terminé",
+    "moveTo_todo": "Remettre à faire",
+    "moveTo_doing": "Commencer",
+    "moveTo_done": "Terminé",
+    "delete": "Supprimer la tâche"
   }
 }

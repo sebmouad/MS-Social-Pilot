@@ -335,6 +335,7 @@ model Workspace {
   savedViews           SavedView[]
   inboxNotes           InboxNote[]
   bioPage              BioPage?
+  tasks                Task[]
   captionTests         CaptionTest[]
   shareLinks           ShareLink[]
   reportTemplates      ReportTemplate[]
@@ -699,6 +700,28 @@ model BioLink {
 
   @@index([pageId, position])
   @@map("bio_links")
+}
+
+/// A team to-do: who does what by when, optionally about one post.
+model Task {
+  id          String   @id @default(cuid())
+  workspaceId String
+  title       String
+  notes       String?
+  /// `todo`, `doing` or `done`.
+  status      String   @default("todo")
+  assigneeId  String?
+  /// A calendar day, YYYY-MM-DD, in the workspace's own time zone.
+  dueOn       String?
+  postId      String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status])
+  @@map("tasks")
 }
 
 model PostNote {
