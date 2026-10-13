@@ -519,3 +519,20 @@
   width: 100%;
   min-width: 0;
 }
+/* Docked channel list: the whole area column scrolls once, no inner scroll. */
+#shell-filters .pages-sidebar-list {
+  max-height: none;
+  overflow: visible;
+  margin-inline: 0;
+}
+/* The open date menu pushes the column down instead of covering the channels. */
+#shell-filters details > div.absolute {
+  position: static;
+  margin-top: 0.5rem;
+  box-shadow: none;
+}
+#shell-filters > *,
+#shell-filters .card {
+  min-width: 0;
+  max-width: 100%;
+}

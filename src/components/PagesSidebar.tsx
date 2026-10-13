@@ -238,9 +238,9 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
         </label>
       )}
 
-      <div className="flex items-center justify-between gap-2 px-1 text-xs text-slate-500">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 text-xs text-slate-500">
         <span className="nums whitespace-nowrap">{t('showing', { shown: shownCount, total: universe.length })}</span>
-        <span className="flex shrink-0 gap-2 whitespace-nowrap">
+        <span className="flex flex-wrap gap-x-2 gap-y-1">
           <button
             type="button"
             className="font-semibold text-brand-600 hover:underline disabled:text-slate-400 disabled:no-underline"
@@ -261,7 +261,7 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
         </span>
       </div>
 
-      <div className="-mx-1 max-h-[60vh] overflow-y-auto">
+      <div className="pages-sidebar-list -mx-1 max-h-[60vh] overflow-y-auto">
         {platforms.map(({ key, items }) => {
           const open = !platform || platform === key;
           const rows = items.filter((page) => listed.includes(page));
@@ -286,7 +286,7 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
             const on = shown.has(page.id);
             const alone = on && shownCount === 1;
             return (
-              <li key={page.id} className="group flex items-center gap-1 rounded-lg pe-1 hover:bg-slate-100">
+              <li key={page.id} className="group flex min-w-0 items-center gap-0.5 rounded-lg hover:bg-slate-100">
                 <button
                   type="button"
                   className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-start ${on ? '' : 'opacity-45'}`}
