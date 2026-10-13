@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
 import type { Page } from '@/lib/paging';
@@ -39,9 +38,9 @@ export async function Pagination({
 
       <div className="flex items-center gap-2">
         {page.hasPrevious ? (
-          <Link href={href(page.number - 1)} className="btn-secondary" rel="prev">
+          <a href={href(page.number - 1)} className="btn-secondary" rel="prev">
             {t('previous')}
-          </Link>
+          </a>
         ) : (
           <span className="btn-secondary pointer-events-none opacity-40" aria-disabled="true">
             {t('previous')}
@@ -53,9 +52,9 @@ export async function Pagination({
         </span>
 
         {page.hasNext ? (
-          <Link href={href(page.number + 1)} className="btn-secondary" rel="next">
+          <a href={href(page.number + 1)} className="btn-secondary" rel="next">
             {t('next')}
-          </Link>
+          </a>
         ) : (
           <span className="btn-secondary pointer-events-none opacity-40" aria-disabled="true">
             {t('next')}

@@ -135,7 +135,7 @@ export function DesignEditor({ canGenerate = false }: { canGenerate?: boolean })
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="card flex items-center justify-center bg-slate-100 p-4">
-        <canvas ref={canvas} className="max-h-[70vh] max-w-full rounded-lg shadow-surface" aria-label={t('preview')} role="img" />
+        <canvas ref={canvas} className="max-h-[40vh] max-w-full lg:max-h-[70vh] rounded-lg shadow-surface" aria-label={t('preview')} role="img" />
       </div>
       <div className="space-y-4">
         <section className="card space-y-3 p-4">

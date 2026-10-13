@@ -56,13 +56,13 @@ export function TasksClient({ tasks, members, myId, canEdit }: { tasks: TaskRow[
     <div className="space-y-4">
       {canEdit && (
         <form
-          className="card flex flex-wrap items-end gap-2 p-3"
+          className="card grid grid-cols-2 items-end gap-2 p-3 sm:flex sm:flex-wrap"
           onSubmit={(event) => {
             event.preventDefault();
             if (title.trim()) void add();
           }}
         >
-          <div className="min-w-0 flex-1 basis-56">
+          <div className="col-span-2 min-w-0 flex-1 sm:basis-56">
             <label className="label" htmlFor="task-title">{t('newTask')}</label>
             <input id="task-title" className="input" value={title} maxLength={200} onChange={(event) => setTitle(event.target.value)} placeholder={t('placeholder')} />
           </div>
@@ -79,7 +79,7 @@ export function TasksClient({ tasks, members, myId, canEdit }: { tasks: TaskRow[
             <label className="label" htmlFor="task-due">{t('due')}</label>
             <input id="task-due" type="date" className="input" value={due} onChange={(event) => setDue(event.target.value)} />
           </div>
-          <button type="submit" className="btn-primary" disabled={!title.trim()}>
+          <button type="submit" className="btn-primary col-span-2 sm:col-auto" disabled={!title.trim()}>
             <Icon name="plus" size={16} /> {t('add')}
           </button>
         </form>
@@ -92,7 +92,7 @@ export function TasksClient({ tasks, members, myId, canEdit }: { tasks: TaskRow[
         {error && <p role="alert" className="text-sm text-red-700">{tCommon('genericError')}</p>}
       </div>
       {tasks.length === 0 ? (
-        <EmptyState icon="approvals" title={t('emptyTitle')} hint={t('emptyHint')} />
+        <EmptyState icon="check" title={t('emptyTitle')} hint={t('emptyHint')} />
       ) : (
         <div className="grid gap-4 md:grid-cols-3">
           {COLUMNS.map((status) => {

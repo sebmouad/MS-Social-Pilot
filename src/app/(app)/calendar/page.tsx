@@ -91,7 +91,6 @@ export default async function CalendarPage({
   const auth = await requirePage();
   const locale = await getLocale();
   const t = await getTranslations('calendar');
-  const tDash = await getTranslations('dashboard');
   const tPosts = await getTranslations('posts');
   const tDays = await getTranslations('calendar.days');
   const tCommon = await getTranslations('common');
@@ -464,9 +463,6 @@ export default async function CalendarPage({
                   : t('feedAllPages')
             }
           />
-          <Link href="/compose" className="btn-primary">
-            {tDash('newPost')}
-          </Link>
       <SavedViews screen="calendar" views={savedViews} />
     </div>
   );
