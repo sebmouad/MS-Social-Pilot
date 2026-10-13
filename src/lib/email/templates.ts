@@ -1,6 +1,8 @@
 import { Locale } from '@prisma/client';
 
 import { env } from '../env';
+import { brand } from '../operator';
+import { settingString } from '../settings';
 import type { Report } from '../reports';
 import enMessages from '../../../messages/en.json';
 import frMessages from '../../../messages/fr.json';
@@ -60,13 +62,19 @@ interface Block {
   list?: { title: string; items: string[] };
 }
 
+/** Who sends these emails, as root entered it; empty until root does. */
+function senderLine(): string {
+  return [brand().name, settingString('operator.name').trim(), settingString('operator.email').trim()].filter(Boolean).join(' · ');
+}
+
 function layout(block: Block): { html: string; text: string } {
+  const sender = senderLine();
   const paragraphs = [block.body, ...(block.details ?? [])].filter(Boolean);
 
   const html = `
 <div style="margin:0;padding:24px;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <div style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:28px;">
-    <div style="font-size:13px;font-weight:600;color:#3563e9;margin-bottom:18px;">MS Social Pilot</div>
+    <div style="font-size:13px;font-weight:600;color:#3563e9;margin-bottom:18px;">${escapeHtml(brand().name)}</div>
     <h1 style="margin:0 0 14px;font-size:19px;line-height:1.35;color:#0f172a;font-weight:600;">${escapeHtml(
       block.heading,
     )}</h1>
@@ -109,6 +117,7 @@ function layout(block: Block): { html: string; text: string } {
           )}</p>`
         : ''
     }
+    <p style="margin:16px 0 0;font-size:11px;line-height:1.5;color:#94a3b8;">${escapeHtml(sender)}</p>
   </div>
 </div>`.trim();
 
@@ -120,6 +129,8 @@ function layout(block: Block): { html: string; text: string } {
     ...(block.list?.items.length ? ['', block.list.title, ...block.list.items.map((item, index) => `${index + 1}. ${item}`)] : []),
     ...(block.cta ? ['', `${block.cta.label}: ${block.cta.url}`] : []),
     ...(block.footer ? ['', block.footer] : []),
+    '',
+    sender,
   ].join('\n');
 
   return { html, text };

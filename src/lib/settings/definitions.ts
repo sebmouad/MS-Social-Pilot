@@ -163,6 +163,15 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     default: 'MS Social Pilot',
   },
   {
+    key: 'operator.logoUrl',
+    group: 'operator',
+    type: 'string',
+    label: 'Product logo',
+    description: 'A square image (https) shown at the top of the app instead of the initials.',
+    default: '',
+    pattern: { regex: /^(https:\/\/\S+)?$/, message: 'Enter an https:// address, or leave blank.' },
+  },
+  {
     key: 'operator.name',
     group: 'operator',
     type: 'string',

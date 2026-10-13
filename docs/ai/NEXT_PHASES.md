@@ -910,7 +910,7 @@ generic (CLAUDE.md rule 9). Items:
   `messages/` for a blocklist of owner-specific names.
   *Done 2026-10-12:* legal pages rewritten from root settings, no owner,
   country or host names left; `tests/generic-content.test.ts` guards it.
-- **S2. Operator details set by root** ✅ (logo and email branding still open) — in the root section: company/operator
+- **S2. Operator details set by root** ✅ — in the root section: company/operator
   name, country, address, contact email, governing law, data-protection
   authority, product name and logo, app URL. Terms, Privacy, Data deletion and
   emails read these; no hard-coded legal text naming a country. The legal
@@ -919,6 +919,10 @@ generic (CLAUDE.md rule 9). Items:
   (`operator.*` settings, `src/lib/operator.ts`); Terms and Privacy read them
   and fall back to neutral wording; root overview warns while name, email or
   governing law is empty. **After deploy, root must fill these in.**
+  *Logo and email branding done 2026-10-13:* `operator.logoUrl` (https, square)
+  replaces the initials in the app's header; emails carry the product name at
+  the top and a footer line "product · operator · contact email"
+  (`brand()` in `src/lib/operator.ts`).
 - **S3. Self-service sign-up** ◐ — open registration (root switch exists), email
   verification, onboarding wizard that asks the user's niche-free basics
   (workspace name, time zone, languages, first Pages), trial period.

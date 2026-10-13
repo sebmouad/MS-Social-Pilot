@@ -7,11 +7,14 @@ import { ErrorReporter } from '@/components/ErrorReporter';
 import { accessRefusal, getAuthContext } from '@/lib/auth';
 import { canApprove, canCompose } from '@/lib/constants';
 import { pendingApprovalCount } from '@/lib/approvals';
+import { brand } from '@/lib/operator';
+import { ensureSettings } from '@/lib/settings';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const auth = await getAuthContext();
   if (!auth) redirect('/login');
   if (!auth.user.emailVerified) redirect('/verify-email');
+  await ensureSettings();
 
   // Root's switches: a module switched off is not there; a suspended workspace
   // shows why instead of the screen.
@@ -38,6 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         modules={refusal === 'suspended' ? [] : auth.modules}
         role={auth.role}
         clientAccess={auth.workspace.clientAccess}
+        brand={brand()}
         workspaces={auth.workspaces.map((workspace) => ({
           id: workspace.id,
           name: workspace.name,

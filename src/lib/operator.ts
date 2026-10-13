@@ -35,6 +35,14 @@ export async function operatorDetails(): Promise<OperatorDetails> {
   };
 }
 
+/** The product's name and logo, for the app's header and emails. Reads the loaded settings. */
+export function brand(): { name: string; logoUrl: string | null } {
+  return {
+    name: settingString('operator.productName').trim() || 'MS Social Pilot',
+    logoUrl: settingString('operator.logoUrl').trim() || null,
+  };
+}
+
 /** The details the legal pages still lack, for root's status screen. */
 export function missingOperatorDetails(details: OperatorDetails): Array<'name' | 'email' | 'governingLaw'> {
   return (['name', 'email', 'governingLaw'] as const).filter((key) => !details[key]);

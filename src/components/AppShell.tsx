@@ -36,7 +36,20 @@ interface Props {
   /** The member's role, and what this workspace opens to its clients: a viewer or client sees a shorter list. */
   role?: string;
   clientAccess?: string[];
+  /** The product's name and logo, as root set them. */
+  brand?: { name: string; logoUrl: string | null };
   children: ReactNode;
+}
+
+/** The product's logo, or its initials when root has not set one. */
+function BrandMark({ brand, size }: { brand: { name: string; logoUrl: string | null }; size: 'sm' | 'md' }) {
+  const box = size === 'md' ? 'h-10 w-10 rounded-xl text-[15px]' : 'h-8 w-8 rounded-lg text-xs';
+  if (brand.logoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element -- any host root chooses; not optimised
+    return <img src={brand.logoUrl} alt="" className={`${box} shrink-0 object-cover`} />;
+  }
+  const initials = brand.name.split(/\s+/).filter(Boolean).slice(-2).map((word) => word[0]!.toUpperCase()).join('') || 'SP';
+  return <span className={`flex ${box} shrink-0 items-center justify-center bg-brand-500 font-bold text-white shadow-sm`}>{initials}</span>;
 }
 
 interface Item {
@@ -82,6 +95,7 @@ export function AppShell({
   modules = MODULE_KEYS,
   role = 'owner',
   clientAccess = [],
+  brand = { name: 'MS Social Pilot', logoUrl: null },
   children,
 }: Props) {
   const t = useTranslations('nav');
@@ -341,7 +355,7 @@ export function AppShell({
         {/* Laptop and up: the icon rail with the main areas… */}
         <div className="rail hidden w-[76px] flex-col items-center border-e py-3 lg:flex">
           <Link href="/dashboard" className="mb-3" aria-label={t('home')}>
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-[15px] font-bold text-white shadow-sm">SP</span>
+            <BrandMark brand={brand} size="md" />
           </Link>
           <nav aria-label={t('areas')} className="min-h-0 w-full flex-1 overflow-y-auto px-1.5">
             <ul className="space-y-1">
@@ -407,7 +421,7 @@ export function AppShell({
             <span className="sr-only">{t('menu')}</span>
           </button>
           <Link href="/dashboard" className="flex min-w-0 items-center gap-2" aria-label={t('home')}>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-xs font-bold text-white">SP</span>
+            <BrandMark brand={brand} size="sm" />
             <span className="truncate text-[15px] font-bold text-slate-900">{workspaceName}</span>
           </Link>
           {canCompose && (
@@ -429,8 +443,8 @@ export function AppShell({
               className="absolute inset-y-0 start-0 flex w-[17rem] max-w-[85vw] flex-col bg-white shadow-xl"
             >
               <div className="flex items-center gap-2.5 px-3 pb-2 pt-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-[15px] font-bold text-white shadow-sm">SP</span>
-                <span className="text-[15px] font-bold text-slate-900">Social Pilot</span>
+                <BrandMark brand={brand} size="md" />
+                <span className="text-[15px] font-bold text-slate-900">{brand.name}</span>
                 <button
                   type="button"
                   className="ms-auto flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
