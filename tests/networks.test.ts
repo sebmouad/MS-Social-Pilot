@@ -147,9 +147,31 @@ describe('post counters', () => {
     vi.doUnmock('../src/lib/safe-fetch');
   });
 
+  it('X: reads public metrics with a token still valid', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      seen.push(url);
+      return new Response(JSON.stringify({ data: { public_metrics: { like_count: 5, retweet_count: 1, reply_count: 2, quote_count: 0, impression_count: 90 } } }));
+    }));
+    const { x } = await import('../src/lib/networks/x');
+    const ctx = context();
+    ctx.credentials.expiresAt = new Date(Date.now() + 60 * 60 * 1000) as never;
+    expect(await x.stats!('123', ctx)).toEqual({ likes: 5, reposts: 1, replies: 2, quotes: 0, views: 90 });
+    expect(seen).toEqual(['https://api.x.com/2/tweets/123?tweet.fields=public_metrics']);
+  });
+
+  it('YouTube: reads the video statistics, a hidden like count as null', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ items: [{ statistics: { viewCount: '1200', commentCount: '4' } }] }))));
+    const { youtube } = await import('../src/lib/networks/youtube');
+    const ctx = context();
+    ctx.credentials.expiresAt = new Date(Date.now() + 60 * 60 * 1000) as never;
+    expect(await youtube.stats!('abc', ctx)).toEqual({ likes: null, reposts: null, replies: 4, views: 1200 });
+  });
+
   it('store as reactions, comments and shares', async () => {
     const { networkInsights } = await import('../src/lib/analytics');
     const stored = networkInsights({ likes: 4, reposts: 2, replies: 1, quotes: 1 });
     expect(stored).toMatchObject({ reactions: 4, comments: 1, shares: 3, impressions: null, reach: null });
+    expect(networkInsights({ likes: 1, reposts: null, replies: 0, views: 50 })).toMatchObject({ impressions: 50, shares: null });
   });
 });

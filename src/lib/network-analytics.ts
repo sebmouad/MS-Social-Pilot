@@ -14,6 +14,7 @@ export interface NetworkPostRow {
   likes: number | null;
   reposts: number | null;
   replies: number | null;
+  views: number | null;
 }
 
 export interface NetworkTotal {
@@ -23,6 +24,7 @@ export interface NetworkTotal {
   likes: number | null;
   reposts: number | null;
   replies: number | null;
+  views: number | null;
 }
 
 /** Totals per network, in the order the rows name them; a counter no post has stays null. */
@@ -30,11 +32,12 @@ export function totalsByNetwork(rows: NetworkPostRow[]): NetworkTotal[] {
   const totals = new Map<NetworkKey, NetworkTotal>();
   const add = (sum: number | null, value: number | null) => (value === null ? sum : (sum ?? 0) + value);
   for (const row of rows) {
-    const total = totals.get(row.network) ?? { network: row.network, posts: 0, likes: null, reposts: null, replies: null };
+    const total = totals.get(row.network) ?? { network: row.network, posts: 0, likes: null, reposts: null, replies: null, views: null };
     total.posts += 1;
     total.likes = add(total.likes, row.likes);
     total.reposts = add(total.reposts, row.reposts);
     total.replies = add(total.replies, row.replies);
+    total.views = add(total.views, row.views);
     totals.set(row.network, total);
   }
   return [...totals.values()];
@@ -72,6 +75,7 @@ export async function readNetworkPosts(options: { workspaceId: string; scope: Pa
       likes: insights?.reactions ?? null,
       reposts: insights?.shares ?? null,
       replies: insights?.comments ?? null,
+      views: insights?.impressions ?? null,
     };
   });
 }

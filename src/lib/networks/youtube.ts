@@ -115,4 +115,17 @@ export const youtube: NetworkConnector = {
     });
     return { remotePostId: data.id, remoteUrl: `https://www.youtube.com/watch?v=${data.id}` };
   },
+  async stats(remotePostId, context) {
+    const token = await freshToken(context);
+    const { data } = await netJson<{ items?: Array<{ statistics?: { viewCount?: string; likeCount?: string; commentCount?: string } }> }>(
+      'YouTube',
+      `${API}/videos?part=statistics&id=${encodeURIComponent(remotePostId)}`,
+      { headers: { authorization: `Bearer ${token}` } },
+    );
+    const statistics = data.items?.[0]?.statistics;
+    if (!statistics) throw failureFor(404, 'the video is gone', 'YouTube');
+    // Counts arrive as strings; a hidden like count is simply absent.
+    const count = (value?: string) => (value === undefined ? null : Number(value));
+    return { likes: count(statistics.likeCount), reposts: null, replies: count(statistics.commentCount), views: count(statistics.viewCount) };
+  },
 };

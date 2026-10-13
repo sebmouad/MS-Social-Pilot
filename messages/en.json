@@ -4332,6 +4332,7 @@
     "channel": "Channel",
     "open": "Open",
     "noText": "(no text)",
-    "note": "Counters are read again regularly. Bluesky and Mastodon report them; a dash means the network’s counters are not read yet."
+    "note": "Counters are read again regularly. Bluesky, Mastodon, X and YouTube report them; a dash means the network does not report that counter, or its counters are not read yet.",
+    "views": "Views"
   }
 }

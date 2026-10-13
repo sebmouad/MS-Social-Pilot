@@ -642,12 +642,12 @@ export async function readPostCatalogue(options: {
   };
 }
 
-/** Another network's counters in the stored PostInsights shape: likes count as reactions, reposts and quotes as shares. */
+/** Another network's counters in the stored PostInsights shape: likes count as reactions, reposts and quotes as shares, views as impressions. */
 export function networkInsights(stats: NetworkPostStats) {
   const metrics: Record<string, number> = {};
   for (const [name, value] of Object.entries(stats)) if (typeof value === 'number') metrics[name] = value;
   return {
-    impressions: null,
+    impressions: stats.views ?? null,
     reach: null,
     engagedUsers: null,
     reactions: stats.likes,

@@ -4332,6 +4332,7 @@
     "channel": "Canal",
     "open": "Ouvrir",
     "noText": "(sans texte)",
-    "note": "Les compteurs sont relus régulièrement. Bluesky et Mastodon les fournissent ; un tiret signifie que les compteurs de ce réseau ne sont pas encore lus."
+    "note": "Les compteurs sont relus régulièrement. Bluesky, Mastodon, X et YouTube les fournissent ; un tiret signifie que le réseau ne fournit pas ce compteur, ou que ses compteurs ne sont pas encore lus.",
+    "views": "Vues"
   }
 }

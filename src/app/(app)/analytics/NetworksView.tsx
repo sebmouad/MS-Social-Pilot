@@ -36,11 +36,12 @@ export async function NetworksView({
       {totalsByNetwork(rows).map((total) => (
         <section key={total.network} aria-label={NETWORK_LABELS[total.network]} className="space-y-2">
           <h2 className="text-[17px] font-bold text-slate-900">{NETWORK_LABELS[total.network]}</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <StatTile label={t('posts')} value={total.posts} />
             <StatTile label={t('likes')} value={total.likes} />
             <StatTile label={t('reposts')} value={total.reposts} />
             <StatTile label={t('replies')} value={total.replies} />
+            <StatTile label={t('views')} value={total.views} />
           </div>
         </section>
       ))}
@@ -55,6 +56,7 @@ export async function NetworksView({
               <th className="px-4 py-3 text-end">{t('likes')}</th>
               <th className="px-4 py-3 text-end">{t('reposts')}</th>
               <th className="px-4 py-3 text-end">{t('replies')}</th>
+              <th className="px-4 py-3 text-end">{t('views')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -80,6 +82,7 @@ export async function NetworksView({
                 <td className="px-4 py-2.5 text-end">{number(row.likes)}</td>
                 <td className="px-4 py-2.5 text-end">{number(row.reposts)}</td>
                 <td className="px-4 py-2.5 text-end">{number(row.replies)}</td>
+                <td className="px-4 py-2.5 text-end">{number(row.views)}</td>
               </tr>
             ))}
           </tbody>

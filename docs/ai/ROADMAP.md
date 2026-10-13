@@ -26,10 +26,12 @@ live in the owner's Chrome.
 
 ## Product gaps vs. competitors
 - Analytics for the other networks: **started 2026-10-13** — Bluesky (public
-  AppView) and Mastodon (the account's server) post counters are read by the
-  analytics job and shown under Analytics → Other networks. LinkedIn, X,
-  Threads, Pinterest, YouTube, TikTok counters still to add (each needs its
-  developer app's read scope).
+  AppView), Mastodon (the account's server), X (`tweet.read` public metrics)
+  and YouTube (`youtube.readonly` statistics) post counters are read by the
+  analytics job and shown under Analytics → Other networks. Still to add, each
+  needing a scope the app does not ask for yet: Threads
+  (`threads_manage_insights`), LinkedIn (`r_member_social`, restricted),
+  TikTok (`video.list`, and the post's video id), Pinterest (pin analytics).
 - Video for Bluesky, X (chunked upload), Pinterest (video pins); YouTube and
   TikTok connectors (TikTok needs an audit; unaudited apps post privately).
 - AI images (needs an image-generation provider + key; add as a Configuration

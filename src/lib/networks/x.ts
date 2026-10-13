@@ -1,7 +1,7 @@
 import { GraphError } from '../facebook/graph';
 import { NETWORK_RULES } from '../network-rules';
 import { env } from '../env';
-import { netJson, textWithLink, type NetworkConnector, type NetworkContext } from './types';
+import { failureFor, netJson, textWithLink, type NetworkConnector, type NetworkContext } from './types';
 
 /**
  * X, through its v2 API with OAuth 2.0 (PKCE).
@@ -83,5 +83,22 @@ export const x: NetworkConnector = {
       body: JSON.stringify({ text: textWithLink(post), ...(mediaIds.length ? { media: { media_ids: mediaIds } } : {}) }),
     });
     return { remotePostId: data.data.id, remoteUrl: `https://x.com/${target.name.replace(/^@/, '')}/status/${data.data.id}` };
+  },
+  async stats(remotePostId, context) {
+    const token = await freshToken(context);
+    const { data } = await netJson<{ data?: { public_metrics?: { like_count?: number; retweet_count?: number; reply_count?: number; quote_count?: number; impression_count?: number } } }>(
+      'X',
+      `${API}/tweets/${encodeURIComponent(remotePostId)}?tweet.fields=public_metrics`,
+      { headers: { authorization: `Bearer ${token}` } },
+    );
+    const metrics = data.data?.public_metrics;
+    if (!metrics) throw failureFor(404, 'the post is gone', 'X');
+    return {
+      likes: metrics.like_count ?? 0,
+      reposts: metrics.retweet_count ?? 0,
+      replies: metrics.reply_count ?? 0,
+      quotes: metrics.quote_count ?? 0,
+      views: metrics.impression_count ?? null,
+    };
   },
 };

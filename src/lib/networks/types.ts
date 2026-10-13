@@ -56,6 +56,8 @@ export interface NetworkPostStats {
   replies: number | null;
   /** Quote posts, where the network has them. */
   quotes?: number | null;
+  /** Views or impressions, where the network reports them. */
+  views?: number | null;
 }
 
 export interface NetworkContext {
