@@ -1,5 +1,6 @@
 import { readPostFields } from '@/lib/custom-fields';
 import { SavedViews } from '@/components/SavedViews';
+import { SidebarDock } from '@/components/SidebarDock';
 import type { AnchorHTMLAttributes } from 'react';
 import type { Prisma } from '@prisma/client';
 import { getTranslations } from 'next-intl/server';
@@ -171,15 +172,14 @@ export default async function PostsPage({
   };
 
   return (
-    <div className="mx-auto grid max-w-[1040px] items-start gap-6 lg:grid-cols-[280px_minmax(0,680px)] lg:justify-center">
-      {/* Facebook's left menu: it stays put while the feed scrolls beside it. */}
-      <aside className="space-y-4">
-      <header className="flex items-center justify-between gap-3 lg:block">
+    <div className="mx-auto grid max-w-[680px] items-start gap-6">
+      {/* The filters move into the left menu on a laptop. */}
+      <header className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
           <p className="mt-1 text-sm text-slate-600">{t('countLine', { count: page.total, profiles: filter.ids.length })}</p>
         </div>
-        <div className="flex gap-2 lg:mt-4 lg:flex-col">
+        <div className="flex gap-2">
           {/* What is on screen, filters and all, as a spreadsheet. */}
           <a
             href={`/api/posts/export?${new URLSearchParams(
@@ -187,7 +187,7 @@ export default async function PostsPage({
                 key === 'page' || value === undefined ? [] : [[key, Array.isArray(value) ? value[0]! : value]],
               ),
             ).toString()}`}
-            className="btn-secondary lg:w-full"
+            className="btn-secondary"
             download
           >
             <Icon name="download" size={16} />
@@ -195,6 +195,8 @@ export default async function PostsPage({
           </a>
         </div>
       </header>
+      <SidebarDock>
+      <aside className="space-y-4">
 
       {/* A plain GET form, so a search is a URL like every other filter here:
           it pages, bookmarks and survives a refresh. */}
@@ -231,6 +233,18 @@ export default async function PostsPage({
         )}
       </form>
 
+      <PagesSidebar
+        workspaceId={auth.workspace.id}
+        pages={filter.pages}
+        groups={filter.groups}
+        group={filter.group}
+        visible={filter.visible}
+        platform={filter.platform}
+        canManageGroups={canManageSettings(auth.role)}
+        canManageQueue={canManageOthersPosts(auth.role)}
+        inline
+      />
+
       <nav className="flex flex-wrap gap-1.5" aria-label={t('statusFilter')}>
         {FILTERS.map((value) => {
           const active = (raw ?? '') === value;
@@ -260,20 +274,9 @@ export default async function PostsPage({
         <SavedViews screen="posts" views={savedViews} />
       </div>
 
-      <PagesSidebar
-        workspaceId={auth.workspace.id}
-        pages={filter.pages}
-        groups={filter.groups}
-        group={filter.group}
-        visible={filter.visible}
-        net={filter.net}
-        networks={filter.networks}
-        canManageGroups={canManageSettings(auth.role)}
-        canManageQueue={canManageOthersPosts(auth.role)}
-        inline
-      />
 
       </aside>
+      </SidebarDock>
 
       <div className="min-w-0 space-y-4">
       {/* Facebook's "What's on your mind?": the way into a new post sits at

@@ -27,9 +27,14 @@ export const PLATFORMS: ReadonlyArray<{ key: string; networks: readonly Selectio
   { key: 'mastodon', networks: ['mastodon'] },
 ];
 
-/** The platforms that have at least one of these networks. */
-export function platformsOf(networks: readonly string[]): string[] {
-  return PLATFORMS.filter((platform) => platform.networks.some((network) => networks.includes(network))).map((platform) => platform.key);
+/** The platform a network belongs to: Meta for Facebook, Instagram and Threads, else the network itself. */
+export function platformOf(network: string): string {
+  return PLATFORMS.find((platform) => (platform.networks as readonly string[]).includes(network))?.key ?? network;
+}
+
+/** The networks a platform key stands for. */
+export function networksOfPlatform(key: string): string[] {
+  return [...(PLATFORMS.find((platform) => platform.key === key)?.networks ?? [key])];
 }
 
 /** Target types each network value stands for. */

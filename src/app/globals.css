@@ -489,3 +489,13 @@
     }
   }
 }
+
+/* Screen filters docked in the area menu: a narrow column. */
+#shell-filters .segmented {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+}
+#shell-filters .segmented-item {
+  flex: 1 1 auto;
+}

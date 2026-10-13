@@ -8,12 +8,12 @@ import { useTranslations } from 'next-intl';
 import { FeedAvatar } from './FeedPost';
 import { Icon } from './Icon';
 import { PageMenu } from './PageMenu';
-import { NetworkGroups } from './NetworkGroups';
 import { NetworkMark } from './NetworkMark';
 import { paletteOf } from '@/lib/palette';
 import type { PageGroupView } from '@/lib/page-groups';
 import type { SidebarPage } from '@/lib/page-filter';
-import { networkOfType, rememberSelection, selectionQuery, type SelectionNetwork } from '@/lib/selection';
+import { networkOfType, networksOfPlatform, platformOf, rememberSelection, selectionQuery } from '@/lib/selection';
+import { useDocked } from './SidebarDock';
 
 interface Props {
   pages: SidebarPage[];
@@ -29,9 +29,8 @@ interface Props {
   canManageQueue?: boolean;
   /** Remembers the selection for this workspace (src/lib/selection.ts). */
   workspaceId?: string;
-  /** The network the column is narrowed to, and those on offer. */
-  net?: SelectionNetwork | null;
-  networks?: SelectionNetwork[];
+  /** The platform (`meta`, `linkedin`…) the column is narrowed to. */
+  platform?: string | null;
   /** The screen's own filters and actions, shown above the channels. */
   tools?: ReactNode;
 }
@@ -50,9 +49,10 @@ interface Props {
  */
 const FOLD_KEY = 'msp_pages_column_folded';
 
-export function PagesSidebar({ pages, groups, group, visible, canManageGroups, inline = false, canManageQueue = false, workspaceId, net = null, networks = [], tools }: Props) {
+export function PagesSidebar({ pages, groups, group, visible, canManageGroups, inline = false, canManageQueue = false, workspaceId, platform = null, tools }: Props) {
   const t = useTranslations('pagesSidebar');
-  const tScope = useTranslations('profileScope');
+  const tNav = useTranslations('nav');
+  const docked = useDocked();
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
@@ -81,9 +81,9 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
   const universe = useMemo(
     () =>
       pages.filter(
-        (page) => (!activeGroup || activeGroup.targetIds.includes(page.id)) && (!net || networkOfType(page.type) === net),
+        (page) => (!activeGroup || activeGroup.targetIds.includes(page.id)) && (!platform || networksOfPlatform(platform).includes(networkOfType(page.type))),
       ),
-    [activeGroup, pages, net],
+    [activeGroup, pages, platform],
   );
   const shown = new Set(visible ?? universe.map((page) => page.id));
   const shownCount = universe.filter((page) => shown.has(page.id)).length;
@@ -102,7 +102,7 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
     };
   }, [menuOpen]);
 
-  function navigate(next: { group?: string | null; pages?: string[] | null; net?: SelectionNetwork | null }) {
+  function navigate(next: { group?: string | null; pages?: string[] | null; net?: string | null }) {
     const params = new URLSearchParams(search.toString());
     // Paging through a filtered list starts again from its first page.
     params.delete('page');
@@ -139,6 +139,17 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
     const alone = shownCount === 1 && shown.has(id);
     setShown(alone ? universe.map((page) => page.id) : [id]);
   }
+
+  // Channels by platform, Meta holding Facebook, Instagram and Threads.
+  const platforms = useMemo(() => {
+    const byKey = new Map<string, SidebarPage[]>();
+    for (const page of pages) {
+      if (activeGroup && !activeGroup.targetIds.includes(page.id)) continue;
+      const key = platformOf(networkOfType(page.type));
+      byKey.set(key, [...(byKey.get(key) ?? []), page]);
+    }
+    return [...byKey].map(([key, items]) => ({ key, items }));
+  }, [pages, activeGroup]);
 
   const needle = query.trim().toLowerCase();
   const listed = needle ? universe.filter((page) => page.name.toLowerCase().includes(needle)) : universe;
@@ -227,25 +238,6 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
         </label>
       )}
 
-      {networks.length > 1 && (
-        <div className="flex flex-wrap gap-1" role="group" aria-label={t('networks')}>
-          {[null, ...networks].map((network) => (
-            <button
-              key={network ?? 'all'}
-              type="button"
-              aria-pressed={net === network}
-              title={network ? tScope(`network.${network}`) : tScope('allNetworks')}
-              className={`flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-semibold ${
-                net === network ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-              onClick={() => navigate({ net: network, pages: null })}
-            >
-              {network ? <NetworkMark network={network === 'facebook' ? 'page' : network} size={14} /> : tScope('allNetworks')}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="flex items-center justify-between gap-2 px-1 text-xs text-slate-500">
         <span className="nums">{t('showing', { shown: shownCount, total: universe.length })}</span>
         <span className="flex gap-3">
@@ -270,8 +262,27 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
       </div>
 
       <div className="-mx-1 max-h-[60vh] overflow-y-auto">
-        <NetworkGroups items={listed} className="space-y-0.5">
-          {(page) => {
+        {platforms.map(({ key, items }) => {
+          const open = !platform || platform === key;
+          const rows = items.filter((page) => listed.includes(page));
+          return (
+            <section key={key} aria-label={tNav(`platform.${key}` as 'platform.meta')} className="pt-1 first:pt-0">
+              <button
+                type="button"
+                aria-expanded={open && platform === key}
+                className={`flex h-9 w-full items-center gap-2 rounded-lg px-1.5 text-start text-sm font-semibold ${
+                  platform === key ? 'bg-brand-50 text-brand-700' : 'text-slate-800 hover:bg-slate-100'
+                }`}
+                onClick={() => navigate({ net: platform === key ? null : key, pages: null })}
+              >
+                <NetworkMark network={key === 'meta' ? 'page' : key} size={18} />
+                <span className="min-w-0 flex-1 truncate">{tNav(`platform.${key}` as 'platform.meta')}</span>
+                <span className="nums text-xs font-normal text-slate-500">{items.length}</span>
+                <Icon name={platform === key ? 'chevronDown' : 'chevronRight'} size={15} className="text-slate-400" />
+              </button>
+              {open && rows.length > 0 && (
+                <ul className="space-y-0.5 ps-2">
+                  {rows.map((page) => {
             const on = shown.has(page.id);
             const alone = on && shownCount === 1;
             return (
@@ -312,8 +323,12 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
                 <PageMenu page={page} canManageQueue={canManageQueue} canSettings={canManageGroups} />
               </li>
             );
-          }}
-        </NetworkGroups>
+          })}
+                </ul>
+              )}
+            </section>
+          );
+        })}
         {listed.length === 0 && <p className="px-2 py-3 text-sm text-slate-500">{t('noMatch')}</p>}
       </div>
     </div>
@@ -322,6 +337,15 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
   // A column carrying the screen's filters stays open: folding would hide them.
   const collapsible = !inline && !tools;
   const isFolded = collapsible && folded;
+
+  if (docked) {
+    return (
+      <aside aria-label={t('label')} className="space-y-3">
+        {body}
+        {tools && <div className="space-y-3 border-t border-slate-200 pt-3">{tools}</div>}
+      </aside>
+    );
+  }
 
   return (
     <aside

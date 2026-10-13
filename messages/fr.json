@@ -1512,15 +1512,15 @@
     "tasks": "Tâches",
     "design": "Création",
     "campaigns": "Campagnes",
-    "byPlatform": "Par plateforme",
-    "allPlatforms": "Toutes les plateformes",
     "platform": {
       "meta": "Meta",
       "linkedin": "LinkedIn",
       "x": "X",
       "pinterest": "Pinterest",
       "bluesky": "Bluesky",
-      "mastodon": "Mastodon"
+      "mastodon": "Mastodon",
+      "youtube": "YouTube",
+      "tiktok": "TikTok"
     }
   },
   "notifications": {

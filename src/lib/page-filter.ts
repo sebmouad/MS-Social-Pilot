@@ -9,7 +9,8 @@ import {
   SELECTION_KEYS,
   SELECTION_NETWORKS,
   networkOfType,
-  PLATFORMS,
+  networksOfPlatform,
+  platformOf,
   selectionCookieName,
   selectionQuery,
   typesOfNetwork,
@@ -42,6 +43,8 @@ export interface PageFilter {
   postWhere: Prisma.PostWhereInput;
   /** The network the selection is narrowed to, if any. */
   net: SelectionNetwork | null;
+  /** The platform the selection is narrowed to (`meta`, `linkedin`…), if any. */
+  platform: string | null;
   /** Networks present among the member's Pages, for the network pills. */
   networks: SelectionNetwork[];
   /** The selection as a query string (`group=…&pages=…&net=…`), for links. */
@@ -88,8 +91,9 @@ export async function loadPageFilter(
     ? (netParam as SelectionNetwork)
     : null;
   // A platform (Meta: Facebook, Instagram, Threads) narrows to all of its networks.
-  const platform = net ? null : PLATFORMS.find((entry) => entry.key === netParam && entry.networks.length > 1) ?? null;
-  const netTypes = net ? typesOfNetwork(net) : platform ? platform.networks.flatMap(typesOfNetwork) : null;
+  const present = targets.map((target) => networkOfType(target.type) as string);
+  const platform = net ? platformOf(net) : netParam && present.some((network) => platformOf(network) === netParam) ? netParam : null;
+  const netTypes = net ? typesOfNetwork(net) : platform ? networksOfPlatform(platform).flatMap((network) => typesOfNetwork(network as SelectionNetwork)) : null;
   const inNetwork = netTypes ? targets.filter((target) => netTypes.includes(target.type)) : targets;
 
   const allIds = inNetwork.map((target) => target.id);
@@ -109,8 +113,9 @@ export async function loadPageFilter(
     ids,
     narrowed,
     net,
+    platform,
     networks,
-    query: selectionQuery({ group: knownGroup ?? undefined, pages: first(source.pages), net: net ?? platform?.key ?? undefined }),
+    query: selectionQuery({ group: knownGroup ?? undefined, pages: first(source.pages), net: net ?? platform ?? undefined }),
     // A limited member is always narrowed to their own Pages, sidebar or not.
     postWhere: narrowed || !auth.pageScope.all ? { targets: { some: { targetId: { in: ids } } } } : {},
   };

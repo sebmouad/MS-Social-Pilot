@@ -13,6 +13,8 @@ const MARKS: Record<string, { text: string; background: string; color?: string }
   threads: { text: '@', background: '#101010' },
   x: { text: 'X', background: '#0f1419' },
   pinterest: { text: 'P', background: '#e60023' },
+  youtube: { text: '▶', background: '#ff0000' },
+  tiktok: { text: '♪', background: '#010101' },
 };
 
 export function NetworkMark({ network, size = 20, className = '' }: { network: string; size?: number; className?: string }) {

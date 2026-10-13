@@ -9,9 +9,6 @@ import { canApprove, canCompose } from '@/lib/constants';
 import { pendingApprovalCount } from '@/lib/approvals';
 import { brand } from '@/lib/operator';
 import { ensureSettings } from '@/lib/settings';
-import { prisma } from '@/lib/prisma';
-import { targetScope } from '@/lib/page-access';
-import { networkOfType, platformsOf } from '@/lib/selection';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const auth = await getAuthContext();
@@ -27,12 +24,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const showApprovals = canApprove(auth.role) && auth.workspace.requiresApproval && auth.modules.includes('schedule');
   const pendingApprovals = showApprovals && !refusal ? await pendingApprovalCount(auth.workspace.id, auth.pageScope) : 0;
-
-  const types = refusal ? [] : await prisma.target.findMany({
-    where: { workspaceId: auth.workspace.id, ...targetScope(auth.pageScope) },
-    distinct: ['type'],
-    select: { type: true },
-  });
 
   return (
     <ConfirmProvider>
@@ -51,7 +42,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         role={auth.role}
         clientAccess={auth.workspace.clientAccess}
         brand={brand()}
-        platforms={platformsOf(types.map((row) => networkOfType(row.type)))}
         workspaces={auth.workspaces.map((workspace) => ({
           id: workspace.id,
           name: workspace.name,
