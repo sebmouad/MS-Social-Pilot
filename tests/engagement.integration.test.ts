@@ -2808,6 +2808,32 @@ describe('the inbox', () => {
     expect((await prisma.postComment.findFirstOrThrow()).assigneeId).toBeNull();
   });
 
+  it('keeps private notes on an item, visible only through a Page the caller may see', async () => {
+    const mine = await seedWorkspace('mine');
+    const theirs = await seedWorkspace('theirs');
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: mine.target.id });
+    const comment = await prisma.postComment.findFirstOrThrow();
+    const notes = await import('../src/lib/inbox-notes');
+    const author = await prisma.membership.findFirstOrThrow({ where: { workspaceId: mine.workspace.id } });
+    const scope = { workspaceId: mine.workspace.id, targetIds: [mine.target.id] };
+
+    expect(await notes.addInboxNote({ ...scope, kind: 'comment', id: comment.id, authorId: author.userId, body: '  Regular customer  ' })).toBe(true);
+    // Not on the caller's Pages, or from another workspace: nothing to see, nothing to add.
+    expect(await notes.listInboxNotes({ ...scope, targetIds: [], kind: 'comment', id: comment.id })).toBeNull();
+    expect(await notes.listInboxNotes({ workspaceId: theirs.workspace.id, targetIds: [theirs.target.id], kind: 'comment', id: comment.id })).toBeNull();
+    expect(await notes.addInboxNote({ workspaceId: theirs.workspace.id, targetIds: [theirs.target.id], kind: 'comment', id: comment.id, authorId: author.userId, body: 'x' })).toBe(false);
+
+    const listed = await notes.listInboxNotes({ ...scope, kind: 'comment', id: comment.id });
+    expect(listed?.map((note) => note.body)).toEqual(['Regular customer']);
+    expect((await notes.countInboxNotes(mine.workspace.id, [{ kind: 'comment', id: comment.id }])).get(`comment:${comment.id}`)).toBe(1);
+
+    // Only the author deletes, unless a manager does.
+    const noteId = listed![0]!.id;
+    expect(await notes.deleteInboxNote({ workspaceId: mine.workspace.id, id: noteId, userId: 'someone-else', manager: false })).toBe(false);
+    expect(await notes.deleteInboxNote({ workspaceId: mine.workspace.id, id: noteId, userId: 'someone-else', manager: true })).toBe(true);
+  });
+
   it('opens a thread again when the other person writes, not when the Page answers', async () => {
     const { workspace, target } = await seedWorkspace();
     const scope = { workspaceId: workspace.id, targetIds: [target.id] };

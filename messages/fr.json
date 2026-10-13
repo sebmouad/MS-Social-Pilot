@@ -3239,7 +3239,14 @@
     "assigneeLabel": "Assigné à",
     "assigneeAll": "Tout le monde",
     "assigneeMine": "À moi",
-    "assigneeNobody": "Non assignés"
+    "assigneeNobody": "Non assignés",
+    "addNote": "Ajouter une note privée",
+    "notesCount": "{count, plural, one {# note privée} other {# notes privées}}",
+    "notePlaceholder": "Une note pour votre équipe",
+    "saveNote": "Enregistrer",
+    "deleteNote": "Supprimer",
+    "notesPrivate": "Seule votre équipe voit les notes. Elles ne sont jamais envoyées à la personne.",
+    "noteFailed": "La note n’a pas pu être enregistrée. Réessayez."
   },
   "sessions": {
     "listLabel": "Navigateurs connectés",

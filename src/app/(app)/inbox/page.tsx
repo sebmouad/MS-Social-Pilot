@@ -7,6 +7,8 @@ import { FeedAvatar } from '@/components/FeedPost';
 import { Icon } from '@/components/Icon';
 import { InboxResolveButton } from '@/components/InboxResolveButton';
 import { ChannelsLayout } from '@/components/ChannelsLayout';
+import { InboxNotes } from '@/components/InboxNotes';
+import { countInboxNotes } from '@/lib/inbox-notes';
 import { InboxAssign } from '@/components/InboxAssign';
 import { requirePage } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -60,6 +62,7 @@ export default async function InboxPage({
     }),
   ]);
   const team = members.map((member) => member.user);
+  const noteCounts = await countInboxNotes(auth.workspace.id, items);
 
   const href = (next: { type?: string; state?: string; assignee?: string; limit?: number }) => {
     const query = new URLSearchParams(selection.query);
@@ -147,6 +150,9 @@ export default async function InboxPage({
                 </p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">{item.author || t('someone')}</p>
                 <p className="mt-0.5 whitespace-pre-line break-words text-sm text-slate-800">{item.text || t('noText')}</p>
+                <div className="mt-2">
+                  <InboxNotes kind={item.kind} id={item.id} count={noteCounts.get(`${item.kind}:${item.id}`) ?? 0} />
+                </div>
                 {item.postMessage && (
                   <p className="mt-2 line-clamp-2 border-s-2 border-slate-200 ps-2 text-xs text-slate-500">
                     {t('onPost', { post: item.postMessage })}

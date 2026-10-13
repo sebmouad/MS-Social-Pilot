@@ -185,6 +185,7 @@ model User {
   settingChanges       AppSetting[]
   apiTokens            ApiToken[]
   savedViews           SavedView[]
+  inboxNotes           InboxNote[]
   rootActions          RootActivity[]
   recoveryCodes        RecoveryCode[]
   trustedDevices       TrustedDevice[]
@@ -330,6 +331,7 @@ model Workspace {
   postTemplates        PostTemplate[]
   savedReplies         SavedReply[]
   savedViews           SavedView[]
+  inboxNotes           InboxNote[]
   captionTests         CaptionTest[]
   shareLinks           ShareLink[]
   reportTemplates      ReportTemplate[]
@@ -645,6 +647,24 @@ model PostVersion {
 
 /// A team-only note on a post (NEXT_PHASES H8). Never published; members it
 /// @mentions are emailed.
+/// A private note on an inbox item (comment or conversation), for the team only.
+model InboxNote {
+  id          String   @id @default(cuid())
+  workspaceId String
+  /// "comment" or "message", with the id of that row.
+  kind        String
+  itemId      String
+  authorId    String?
+  body        String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author    User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, kind, itemId])
+  @@map("inbox_notes")
+}
+
 model PostNote {
   id         String   @id @default(cuid())
   postId     String

@@ -3239,7 +3239,14 @@
     "assigneeLabel": "Assigned to",
     "assigneeAll": "Everyone",
     "assigneeMine": "Mine",
-    "assigneeNobody": "Unassigned"
+    "assigneeNobody": "Unassigned",
+    "addNote": "Add a private note",
+    "notesCount": "{count, plural, one {# private note} other {# private notes}}",
+    "notePlaceholder": "A note for your team",
+    "saveNote": "Save",
+    "deleteNote": "Delete",
+    "notesPrivate": "Only your team sees notes. They are never sent to the person.",
+    "noteFailed": "The note could not be saved. Try again."
   },
   "sessions": {
     "listLabel": "Signed-in browsers",
