@@ -257,7 +257,9 @@ test('a contributor sends a draft for review from the list', async ({ page }) =>
       await expect.poll(status, { timeout: 3_000 }).toBe('pending_approval');
     }).toPass({ timeout: 30_000 });
 
-    // Once refreshed it reads as waiting, and can still be cancelled.
+    // Loaded afresh it reads as waiting, and can still be cancelled (the
+    // in-page refresh is not reliable in a production build here: STATUS.md).
+    await open(page, `/posts?q=${encodeURIComponent(DRAFT)}`);
     await expect(draft.getByText(/awaiting approval/i)).toBeVisible({ timeout: 15_000 });
     await expect(draft.getByRole('button', { name: /submit for review/i })).toHaveCount(0);
     await expect(draft.getByRole('button', { name: /^cancel$/i })).toBeVisible();

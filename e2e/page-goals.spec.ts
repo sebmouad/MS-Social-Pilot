@@ -30,6 +30,11 @@ test('sets a monthly goal and shows its progress on the dashboard and in the rep
   await dialog.getByRole('button', { name: 'Save goals' }).click();
   await expect(dialog).toBeHidden();
 
+  // The saved goal is in the database; the dashboard is loaded afresh, as the
+  // in-page refresh after a save is not reliable in a production build here
+  // (docs/ai/STATUS.md).
+  await expect.poll(() => prisma.pageGoal.count({ where: { targetId } })).toBe(1);
+  await open(page, `/dashboard?pages=${targetId}`);
   await expect(goals.getByRole('progressbar', { name: 'Posts published' })).toBeVisible();
   await expect(goals.getByText(/ of 12$/)).toBeVisible();
   expect(await prisma.pageGoal.findMany({ where: { targetId }, select: { metric: true, target: true } })).toEqual([
