@@ -4073,5 +4073,12 @@
   "planMeter": {
     "members": "{used} places d’équipe utilisées sur {limit}",
     "channels": "{used} canaux utilisés sur {limit}"
+  },
+  "palette": {
+    "open": "Aller à un écran",
+    "hint": "Aller à…",
+    "title": "Aller à un écran",
+    "placeholder": "Tapez le nom d’un écran",
+    "none": "Aucun résultat."
   }
 }

@@ -13,7 +13,7 @@ FEATURES.md (what exists) and NEXT_PHASES.md (specs).
 | **Team & clients** | Roles (owner/admin/editor/contributor/viewer/client), per-member channel access, multi-email invites, seat meter, Agency screen, client approval links and portal | ⬜ Visibility levels for client spaces (Simplified teamspaces; needs owner audit) |
 | **Assistants** | REST API, webhooks, MCP server with 12 tools, setup guides for 7 assistants | ⬜ Claude web connector (needs OAuth) · ⬜ MCP tools for templates, hashtags, reports |
 | **Root** | Config, plans, modules, supervision, workspace create/delete, status | — |
-| **Navigation / UX** | Icon rail + area sidebar, channel column with filters and tools, ScreenHeader, SubTabs, EmptyState, one table style | ⬜ Command palette (Planable, Sprout) · ⬜ Composer "More options" fold · ⬜ One shared select / filter-bar style |
+| **Navigation / UX** | Icon rail + area sidebar, channel column with filters and tools, ScreenHeader, SubTabs, EmptyState, one table style | ✅ Command palette, Ctrl K (Planable, Sprout) · ⬜ Composer "More options" fold · ⬜ One shared select / filter-bar style |
 
 ## Order of work
 1. Fans / reached toggle (small, data exists).

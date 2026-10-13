@@ -1,5 +1,6 @@
 'use client';
 
+import { CommandPalette } from './CommandPalette';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -379,7 +380,10 @@ export function AppShell({
         {/* …and beside it the sidebar with the pages of the area in use. */}
         {!collapsed && activeArea && (
           <div className="shell-sidebar hidden w-60 flex-col border-e border-slate-200 lg:flex">
-            <p className="px-5 pb-1 pt-5 text-[17px] font-bold text-slate-900">{activeArea.label}</p>
+            <div className="px-3 pt-4">
+              <CommandPalette items={allItems.map((item) => ({ href: item.href, label: item.label }))} />
+            </div>
+            <p className="px-5 pb-1 pt-3 text-[17px] font-bold text-slate-900">{activeArea.label}</p>
             <div className="px-3 py-2">{workspacePicker}</div>
             {composeButton && <div className="px-3 pb-2 pt-1">{composeButton}</div>}
             <nav aria-label={t('modules')} className="min-h-0 flex-1 overflow-y-auto px-3 py-2">

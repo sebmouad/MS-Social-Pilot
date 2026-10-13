@@ -4073,5 +4073,12 @@
   "planMeter": {
     "members": "{used} of {limit} team seats used",
     "channels": "{used} of {limit} channels used"
+  },
+  "palette": {
+    "open": "Go to a screen",
+    "hint": "Go to…",
+    "title": "Go to a screen",
+    "placeholder": "Type a screen name",
+    "none": "Nothing matches."
   }
 }
