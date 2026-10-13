@@ -559,6 +559,8 @@ model Post {
   format                   String   @default("post")
   /// A Facebook place (a Page id) the post is tagged at; feed posts only.
   place                    String?
+  /// A Facebook text background preset (src/lib/text-backgrounds.ts); text-only feed posts.
+  textBackground           String?
   link                     String?
   /// Cached Open Graph metadata for `link`.
   linkPreview              Json?

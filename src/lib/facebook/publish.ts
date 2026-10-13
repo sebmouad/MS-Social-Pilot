@@ -69,6 +69,8 @@ export interface PublishRequest {
   format?: PostFormat;
   /** A Facebook place (a Page id) to tag; used by feed and multi-photo posts. */
   place?: string | null;
+  /** A text background preset: sent only on a text-only feed post (src/lib/text-backgrounds.ts). */
+  textBackground?: string | null;
 }
 
 export type PostFormat = 'post' | 'reel' | 'story';
@@ -184,6 +186,7 @@ export function buildFeedBody(request: {
   scheduledPublishTime?: Date | null;
   attachedMediaIds?: string[];
   place?: string | null;
+  textBackground?: string | null;
   now?: Date;
 }): Record<string, string | number | boolean | object> {
   const body: Record<string, string | number | boolean | object> = {};
@@ -191,6 +194,7 @@ export function buildFeedBody(request: {
   if (request.message.trim()) body.message = request.message;
   if (request.link) body.link = request.link;
   if (request.place) body.place = request.place;
+  if (request.textBackground && !request.link && !request.attachedMediaIds?.length) body.text_format_preset_id = request.textBackground;
 
   request.attachedMediaIds?.forEach((mediaId, index) => {
     // Graph expects indexed fields: attached_media[0], attached_media[1], …
@@ -308,6 +312,7 @@ export async function publishPost(request: PublishRequest): Promise<PublishResul
           message: request.message,
           link: request.link,
           place: request.place,
+          textBackground: request.textBackground,
           scheduledPublishTime: request.scheduledPublishTime,
         }),
       });

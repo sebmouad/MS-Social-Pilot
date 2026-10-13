@@ -199,3 +199,6 @@ Owners and admins give a channel a standing brief, a weekday and a number of pos
 
 ## Place tag (composer)
 Optional "Place" under the first comment: the number of a Facebook place Page. It is stored on the post (`posts.place`) and sent as `place` when a feed or multi-photo post goes out (immediate, native or worker). Page mentions are written `@[page-id]` in the text. Searching places by name needs Meta's Page Public Content Access review.
+
+## Text background (composer)
+A row of swatches under the text: black, purple, red, red-to-blue. For a text-only post of at most 130 characters on a Page; chosen with a link, pictures or video, a Reel or Story, it is refused with a plain message. Sent as `text_format_preset_id`, which Facebook's published reference does not list (ids from Facebook's own site; list in `src/lib/text-backgrounds.ts`). Not yet tested on a live Page.

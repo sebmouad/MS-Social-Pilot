@@ -79,6 +79,12 @@ describe('planPublish', () => {
 });
 
 describe('buildFeedBody', () => {
+  it('sends a text background only on a post that is text alone', () => {
+    expect(buildFeedBody({ message: 'Hi', textBackground: '1881421442117417' })).toMatchObject({ text_format_preset_id: '1881421442117417' });
+    expect(buildFeedBody({ message: 'Hi', link: 'https://example.com', textBackground: '1881421442117417' })).not.toHaveProperty('text_format_preset_id');
+    expect(buildFeedBody({ message: 'Hi', attachedMediaIds: ['1'], textBackground: '1881421442117417' })).not.toHaveProperty('text_format_preset_id');
+  });
+
   it('tags a place when one is given, and leaves the field out otherwise', () => {
     expect(buildFeedBody({ message: 'Hi', place: '1234567890' })).toMatchObject({ message: 'Hi', place: '1234567890' });
     expect(buildFeedBody({ message: 'Hi', place: null })).not.toHaveProperty('place');

@@ -1,3 +1,4 @@
+import { isTextBackground } from './text-backgrounds';
 import { z } from 'zod';
 
 import { LIMITS, Locale, PublishMode } from './constants';
@@ -149,6 +150,13 @@ const place = z
   .regex(/^(\d{5,20})?$/, 'A place is the number in the place Page’s address.')
   .transform((value) => value || null);
 
+/** A background preset from the list; blank means none. */
+const textBackground = z
+  .string()
+  .trim()
+  .refine((value) => value === '' || isTextBackground(value), 'Choose one of the backgrounds offered.')
+  .transform((value) => value || null);
+
 /** How long the first comment waits after the post: up to a week. */
 const firstCommentDelay = z.number().int().min(0).max(7 * 24 * 60);
 
@@ -163,6 +171,7 @@ export const createPostSchema = z
     message: postMessage.default(''),
     firstComment: firstComment.nullish(),
     place: place.nullish(),
+    textBackground: textBackground.nullish(),
     firstCommentDelayMinutes: firstCommentDelay.default(0),
     labelIds: labelIds.default([]),
     format: postFormat.default('post'),
@@ -255,6 +264,7 @@ export const updatePostSchema = z
     message: postMessage.optional(),
     firstComment: firstComment.nullish(),
     place: place.nullish(),
+    textBackground: textBackground.nullish(),
     firstCommentDelayMinutes: firstCommentDelay.optional(),
     labelIds: labelIds.optional(),
     format: postFormat.optional(),

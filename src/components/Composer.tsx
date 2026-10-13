@@ -1,5 +1,6 @@
 'use client';
 
+import { BACKGROUND_MAX_CHARS, TEXT_BACKGROUNDS } from '@/lib/text-backgrounds';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
@@ -74,6 +75,7 @@ export interface EditingPost {
   message: string;
   firstComment: string | null;
   place: string | null;
+  textBackground: string | null;
   firstCommentDelayMinutes: number;
   labelIds: string[];
   format: 'post' | 'reel' | 'story';
@@ -150,6 +152,7 @@ export function Composer({
   const commentBox = useRef<HTMLTextAreaElement>(null);
   const [firstComment, setFirstComment] = useState(editing?.firstComment ?? '');
   const [place, setPlace] = useState(editing?.place ?? '');
+  const [background, setBackground] = useState(editing?.textBackground ?? '');
   const [variants, setVariants] = useState<Record<string, string>>(editing?.variants ?? {});
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(editing?.fields ?? {});
   const [textOnly, setTextOnly] = useState<string[]>(editing?.textOnly ?? []);
@@ -163,6 +166,7 @@ export function Composer({
   const [preview, setPreview] = useState<LinkPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [media, setMedia] = useState<PostMedia[]>(editing?.media ?? []);
+  const backgroundAllowed = format === 'post' && !link.trim() && media.length === 0 && message.length <= BACKGROUND_MAX_CHARS;
   const [naturalSizes, setNaturalSizes] = useState<Record<string, { width: number; height: number }>>({});
   const [selected, setSelected] = useState<string[]>(editing?.targetIds ?? initialTargetIds ?? []);
   const [timing, setTiming] = useState<Timing>('schedule');
@@ -293,6 +297,7 @@ export function Composer({
     ? message !== editing.message ||
       firstComment !== (editing.firstComment ?? '') ||
       place.trim() !== (editing.place ?? '') ||
+      background !== (editing.textBackground ?? '') ||
       commentDelay !== editing.firstCommentDelayMinutes ||
       format !== editing.format ||
       [...labelIds].sort().join() !== [...editing.labelIds].sort().join() ||
@@ -416,6 +421,7 @@ export function Composer({
               message,
               firstComment,
               place: place.trim(),
+              textBackground: backgroundAllowed ? background : '',
               firstCommentDelayMinutes: commentDelay,
               labelIds,
               format,
@@ -437,6 +443,7 @@ export function Composer({
               message,
               firstComment,
               place: place.trim(),
+              textBackground: backgroundAllowed ? background : '',
               firstCommentDelayMinutes: commentDelay,
               labelIds,
               format,
@@ -740,6 +747,37 @@ export function Composer({
             </p>
             {firstComment.trim() && <CommentDelay value={commentDelay} onChange={setCommentDelay} />}
           </div>
+
+          <fieldset className={`mt-5 ${format === 'post' ? '' : 'hidden'}`} disabled={!backgroundAllowed}>
+            <legend className="label">
+              {t('backgroundLabel')} <span className="font-normal text-slate-400">{tAuth('optional')}</span>
+            </legend>
+            <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label={t('backgroundLabel')}>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={background === ''}
+                className={`rounded-full px-3 py-1 text-sm font-semibold ${background === '' ? 'bg-brand-50 text-brand-700' : 'bg-white text-slate-700 shadow-surface'}`}
+                onClick={() => setBackground('')}
+              >
+                {t('backgroundNone')}
+              </button>
+              {TEXT_BACKGROUNDS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={background === option.id}
+                  aria-label={t(`background${option.name[0]!.toUpperCase()}${option.name.slice(1)}` as 'backgroundBlack')}
+                  title={t(`background${option.name[0]!.toUpperCase()}${option.name.slice(1)}` as 'backgroundBlack')}
+                  className={`h-8 w-8 rounded-full ring-offset-2 ${background === option.id ? 'ring-2 ring-brand-500' : 'ring-1 ring-slate-300'}`}
+                  style={{ background: option.css }}
+                  onClick={() => setBackground(option.id)}
+                />
+              ))}
+            </div>
+            <p className="hint">{backgroundAllowed ? t('backgroundHint') : t('backgroundBlocked', { max: BACKGROUND_MAX_CHARS })}</p>
+          </fieldset>
 
           <div className={`mt-5 ${format === 'post' ? '' : 'hidden'}`}>
             <label className="label" htmlFor="post-place">

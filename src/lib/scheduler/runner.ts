@@ -425,6 +425,7 @@ async function publishClaimed(
           scheduledPublishTime: null,
           format: post.format as PostFormat,
           place: post.place,
+          textBackground: post.textBackground,
         });
 
     const kept = await writeIfStillOurs(postTargetId, options.workerId, {

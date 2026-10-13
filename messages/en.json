@@ -578,7 +578,15 @@
     "textOnly": "Publish this one without the pictures or video",
     "place": "Place",
     "placePlaceholder": "For example, 123456789012345",
-    "placeHint": "Tags the post at a place. Paste the number from the place Page’s address on Facebook. Facebook tags text, link and multi-photo posts on Pages; other networks ignore it."
+    "placeHint": "Tags the post at a place. Paste the number from the place Page’s address on Facebook. Facebook tags text, link and multi-photo posts on Pages; other networks ignore it.",
+    "backgroundLabel": "Background",
+    "backgroundNone": "None",
+    "backgroundBlack": "Black",
+    "backgroundPurple": "Purple",
+    "backgroundRed": "Red",
+    "backgroundRedBlue": "Red to blue",
+    "backgroundHint": "A coloured background for a short text post, as Facebook offers on its own site. It is not part of Facebook’s published API and could stop working; if Facebook refuses the post you will see why.",
+    "backgroundBlocked": "Only for a short text post: no link, pictures or video, and at most {max} characters."
   },
   "config": {
     "title": "Configuration",
@@ -1191,7 +1199,8 @@
     "noUserWithEmail": "Nobody has an account with that email yet. Invite them first.",
     "bioSlugTaken": "That address is taken. Choose another.",
     "fieldExists": "A field with that name already exists.",
-    "fieldChoice": "Pick one of the listed options."
+    "fieldChoice": "Pick one of the listed options.",
+    "textBackgroundNeedsText": "A coloured background is for a short text post: no link, pictures or video, and at most 130 characters."
   },
   "feeds": {
     "title": "Website auto-share",

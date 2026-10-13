@@ -39,6 +39,7 @@ import { notifyApprovalRequest } from './email/notify';
 import { ApprovalStatus, PostStatus, Prisma, WorkspaceRole } from '@prisma/client';
 import { prepareLinks } from './links';
 import { hasPostContent } from './validation';
+import { BACKGROUND_MAX_CHARS } from './text-backgrounds';
 import { emitWebhook } from './webhooks';
 import { recordVersion } from './post-versions';
 
@@ -296,6 +297,12 @@ export async function createPost(
   await assertMonthlyRoom(context.workspaceId, 'postsPerMonth', now);
   const targets = await loadTargets(context.workspaceId, input.targetIds);
   const labelIds = await ownLabels(context.workspaceId, input.labelIds ?? []);
+  if (
+    input.textBackground &&
+    (input.link || (input.media?.length ?? 0) > 0 || input.message.length > BACKGROUND_MAX_CHARS || (input.format ?? 'post') !== 'post')
+  ) {
+    throw errors.textBackgroundNeedsText();
+  }
 
   // Decided once, here, and stored on the row: recomputing it later from
   // settings that may since have changed would let a post slip through.
@@ -360,6 +367,7 @@ export async function createPost(
         firstCommentDelayMinutes: input.firstComment ? input.firstCommentDelayMinutes ?? 0 : 0,
         format: input.format ?? 'post',
         place: input.place ?? null,
+        textBackground: input.textBackground ?? null,
         labels: { create: labelIds.map((labelId) => ({ labelId })) },
         link: input.link ?? null,
         linkPreview: toJsonOrNull(linkPreview),
@@ -520,6 +528,7 @@ async function handOffToFacebook(postId: string, scheduledAt: Date): Promise<voi
         media,
         scheduledPublishTime: scheduledAt,
         place: post.place,
+        textBackground: post.textBackground,
       });
 
       await prisma.postTarget.update({
@@ -938,6 +947,11 @@ export async function updatePost(
   const nextLink = input.link !== undefined ? (input.link ?? null) : post.link;
   const nextMediaCount = input.media !== undefined ? input.media.length : parseMedia(post.media).length;
   if (!hasPostContent(nextMessage, nextLink, nextMediaCount)) throw errors.emptyPost();
+  const nextBackground = input.textBackground !== undefined ? (input.textBackground ?? null) : post.textBackground;
+  const nextFormat = input.format ?? post.format;
+  if (nextBackground && (nextLink || nextMediaCount > 0 || nextMessage.length > BACKGROUND_MAX_CHARS || nextFormat !== 'post')) {
+    throw errors.textBackgroundNeedsText();
+  }
 
   const data: Record<string, unknown> = {};
   if (input.message !== undefined) data.message = input.message;
@@ -945,6 +959,7 @@ export async function updatePost(
   if (input.firstCommentDelayMinutes !== undefined) data.firstCommentDelayMinutes = input.firstCommentDelayMinutes;
   if (input.format !== undefined) data.format = input.format;
   if (input.place !== undefined) data.place = input.place;
+  if (input.textBackground !== undefined) data.textBackground = input.textBackground;
   const labelIds = input.labelIds ? await ownLabels(context.workspaceId, input.labelIds) : null;
   if (input.media !== undefined) {
     // Both columns or neither: stale keys would let a file in use be swept.

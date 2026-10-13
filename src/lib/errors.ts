@@ -450,6 +450,13 @@ export const errors = {
       status: 403,
     }),
 
+  textBackgroundNeedsText: () =>
+    new AppError({
+      key: 'errors.textBackgroundNeedsText',
+      fallback: 'A coloured background is for a short text post: no link, pictures or video, and at most 130 characters.',
+      status: 422,
+    }),
+
   emptyPost: () =>
     new AppError({
       key: 'errors.emptyPost',
