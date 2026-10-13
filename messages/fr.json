@@ -2135,7 +2135,7 @@
     "title": "Équipe",
     "subtitle": "Qui peut accéder à ce client, et avec quels droits.",
     "invite": "Inviter quelqu'un",
-    "inviteEmail": "Adresse e-mail",
+    "inviteEmail": "Adresses e-mail",
     "role": "Rôle",
     "sendInvite": "Envoyer l'invitation",
     "inviteSent": "Invitation envoyée à {email}.",
@@ -2214,7 +2214,10 @@
       "switch_libraryHint": "Envoyer des photos et des vidéos à votre équipe.",
       "saved": "Enregistré. Les clients voient le changement à la page suivante.",
       "failed": "Rien n’a été enregistré. Vérifiez votre connexion et réessayez."
-    }
+    },
+    "invitePlaceholder": "collegue@exemple.com, autre@exemple.com",
+    "inviteSentMany": "{count, plural, one {# invitation envoyée.} other {# invitations envoyées.}}",
+    "inviteSomeFailed": "Ces personnes n’ont pas pu être invitées : {emails}. Elles restent dans le champ pour que vous puissiez corriger."
   },
   "dateRange": {
     "preset": {

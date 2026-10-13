@@ -2135,7 +2135,7 @@
     "title": "Team",
     "subtitle": "Who can access this client, and what they can do.",
     "invite": "Invite someone",
-    "inviteEmail": "Email address",
+    "inviteEmail": "Email addresses",
     "role": "Role",
     "sendInvite": "Send invitation",
     "inviteSent": "Invitation sent to {email}.",
@@ -2214,7 +2214,10 @@
       "switch_libraryHint": "Upload photos and videos for your team to use.",
       "saved": "Saved. Clients see the change on their next page.",
       "failed": "That was not saved. Check your connection and try again."
-    }
+    },
+    "invitePlaceholder": "colleague@example.com, another@example.com",
+    "inviteSentMany": "{count, plural, one {# invitation sent.} other {# invitations sent.}}",
+    "inviteSomeFailed": "These could not be invited: {emails}. They stay in the box so you can correct them."
   },
   "dateRange": {
     "preset": {

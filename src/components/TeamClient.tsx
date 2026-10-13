@@ -128,38 +128,53 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
     setNotice(null);
     setManualLink(null);
 
-    try {
-      const response = await fetch('/api/team', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, role }),
-      });
-      const body = (await response.json().catch(() => ({}))) as {
-        error?: string;
-        fields?: Record<string, string>;
-        emailSent?: boolean;
-        acceptUrl?: string;
-      };
+    // Several addresses at once, separated by commas, spaces or new lines.
+    const emails = [...new Set(email.split(/[\s,;]+/).map((entry) => entry.trim()).filter(Boolean))];
 
-      if (!response.ok) {
-        // The server's field message is English whatever the reader's language,
-        // and only the address can be wrong here, so say so in our own words
-        // next to the field rather than "correct the highlighted fields" with
-        // nothing highlighted.
-        if (body.fields?.email) {
-          setEmailError(true);
-        } else {
-          setError(body.error ?? t('inviteFailed'));
+    try {
+      const sent: string[] = [];
+      const refused: string[] = [];
+      let lastLink: string | null = null;
+      let firstError: string | null = null;
+      for (const address of emails) {
+        const response = await fetch('/api/team', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ email: address, role }),
+        });
+        const body = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          fields?: Record<string, string>;
+          emailSent?: boolean;
+          acceptUrl?: string;
+        };
+        if (!response.ok) {
+          // The server's field message is English whatever the reader's
+          // language, and only the address can be wrong here, so say so in our
+          // own words rather than "correct the highlighted fields".
+          if (body.fields?.email) setEmailError(true);
+          else firstError ??= body.error ?? t('inviteFailed');
+          refused.push(address);
+          continue;
         }
-        return;
+        sent.push(address);
+        // Without a mail provider the invitation still exists, so surface the
+        // link rather than leaving the admin with no way to pass it on.
+        if (!body.emailSent && body.acceptUrl) lastLink = body.acceptUrl;
       }
 
-      setNotice(t('inviteSent', { email }));
-      // Without a mail provider the invitation still exists, so surface the
-      // link rather than leaving the admin with no way to pass it on.
-      if (!body.emailSent && body.acceptUrl) setManualLink(body.acceptUrl);
-      setEmail('');
-      router.refresh();
+      if (sent.length > 0) {
+        setNotice(sent.length === 1 ? t('inviteSent', { email: sent[0]! }) : t('inviteSentMany', { count: sent.length }));
+        if (lastLink && sent.length === 1) setManualLink(lastLink);
+        router.refresh();
+      }
+      if (refused.length > 0) {
+        if (firstError) setError(emails.length > 1 ? t('inviteSomeFailed', { emails: refused.join(', ') }) : firstError);
+        // Keep what was not sent, to correct and try again.
+        setEmail(refused.join(', '));
+      } else {
+        setEmail('');
+      }
     } catch {
       setError(t('networkError'));
     } finally {
@@ -262,14 +277,16 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
               </label>
               <input
                 id="inviteEmail"
-                type="email"
+                type="text"
+                inputMode="email"
+                autoComplete="off"
                 className="input"
                 value={email}
                 onChange={(event) => {
                   setEmail(event.target.value);
                   setEmailError(false);
                 }}
-                placeholder="colleague@example.com"
+                placeholder={t('invitePlaceholder')}
                 aria-invalid={emailError || undefined}
                 aria-describedby={emailError ? 'inviteEmail-error' : undefined}
               />
