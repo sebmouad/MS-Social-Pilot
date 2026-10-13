@@ -2510,7 +2510,7 @@
     "mcpTitle": "Use with Claude (MCP)",
     "mcpHint": "Ask Claude to list your channels, read how they are doing, and draft or schedule posts — the workspace’s approval rules still apply.",
     "mcpCode": "Claude Code",
-    "mcpTools": "Your assistant can: list channels and posts, create, edit, reschedule and cancel posts, approve or send back posts waiting for review, read and answer the inbox (mark done, assign), see what needs attention, and read a channel’s analytics. Tools: list_pages, list_posts, create_post, update_post, cancel_post, approve_post, request_changes, list_inbox, resolve_inbox_item, assign_inbox_item, get_attention, get_page_analytics.",
+    "mcpTools": "Your assistant can: list channels and posts, create, edit, reschedule and cancel posts, approve or send back posts waiting for review, read and answer the inbox (mark done, assign), see what needs attention, and read a channel’s analytics. Tools: list_pages, list_posts, create_post, update_post, cancel_post, approve_post, request_changes, list_inbox, resolve_inbox_item, assign_inbox_item, list_queue, list_templates, get_attention, get_page_analytics.",
     "restTitle": "REST API",
     "restHint": "JSON over HTTPS, with the key in the Authorization header.",
     "mcpAssistant": "Assistant",

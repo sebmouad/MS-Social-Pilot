@@ -11,7 +11,7 @@ FEATURES.md (what exists) and NEXT_PHASES.md (specs).
 | **Analytics** | Channel analysis, all-channels totals, compare, by post, audience, video, links, tests, KPI explorer, reports (PDF, schedules, templates) | ⬜ Fans / reached toggle on countries and cities (Simplified) · ⬜ Best day and best frequency cards (Simplified) · ⬜ Link clicks tile (Metricool) · ⬜ Live shareable report link (Metricool) |
 | **Channels** | Facebook Pages/Groups, Instagram, Bluesky, Mastodon, LinkedIn, Threads, X, Pinterest, YouTube, TikTok; groups; plan meter | ⬜ Per-platform "Not connected / N connected" list with connect sheet (Publora) · ⬜ Google Business Profile |
 | **Team & clients** | Roles (owner/admin/editor/contributor/viewer/client), per-member channel access, multi-email invites, seat meter, Agency screen, client approval links and portal | ⬜ Visibility levels for client spaces (Simplified teamspaces; needs owner audit) |
-| **Assistants** | REST API, webhooks, MCP server with 12 tools, setup guides for 7 assistants | ⬜ Claude web connector (needs OAuth) · ⬜ MCP tools for templates, hashtags, reports |
+| **Assistants** | REST API, webhooks, MCP server with 15 tools, setup guides for 7 assistants | ⬜ Claude web connector (needs OAuth) |
 | **Root** | Config, plans, modules, supervision, workspace create/delete, status | — |
 | **Navigation / UX** | Icon rail + area sidebar, channel column with filters and tools, ScreenHeader, SubTabs, EmptyState, one table style | ✅ Command palette, Ctrl K (Planable, Sprout) · ⬜ Composer "More options" fold · ⬜ One shared select / filter-bar style |
 

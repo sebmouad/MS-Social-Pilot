@@ -232,3 +232,30 @@ export async function apiAttention(ctx: ApiContext) {
     tokensExpiringSoon: connections.expiring,
   };
 }
+
+/** The posting times in the queue: the ones every channel shares and each channel's own. */
+export async function apiListQueue(ctx: ApiContext) {
+  assertApiModule(ctx, 'schedule');
+  const slots = await prisma.queueSlot.findMany({
+    where: { workspaceId: ctx.workspace.id, OR: [{ targetId: null }, { target: targetScope(ctx.pageScope) }] },
+    include: { target: { select: { name: true } } },
+    orderBy: [{ dayOfWeek: 'asc' }, { hour: 'asc' }, { minute: 'asc' }],
+  });
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return slots.map((slot) => ({
+    day: days[slot.dayOfWeek],
+    time: `${String(slot.hour).padStart(2, '0')}:${String(slot.minute).padStart(2, '0')}`,
+    channel: slot.target?.name ?? null,
+  }));
+}
+
+/** Post templates, to start a post from. */
+export async function apiListTemplates(ctx: ApiContext) {
+  assertApiModule(ctx, 'schedule');
+  const templates = await prisma.postTemplate.findMany({
+    where: { workspaceId: ctx.workspace.id },
+    select: { id: true, name: true, category: true, body: true, hashtags: true, firstComment: true },
+    orderBy: { name: 'asc' },
+  });
+  return templates;
+}

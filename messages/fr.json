@@ -2510,7 +2510,7 @@
     "mcpTitle": "Utiliser avec Claude (MCP)",
     "mcpHint": "Demandez à Claude de lister vos canaux, d’analyser leurs résultats, de préparer ou programmer des publications — les règles de validation s’appliquent.",
     "mcpCode": "Claude Code",
-    "mcpTools": "Votre assistant peut : lister les canaux et les publications, créer, modifier, reprogrammer et annuler des publications, approuver ou renvoyer celles en attente de relecture, lire la boîte de réception (marquer comme traité, assigner), voir ce qui demande de l’attention et lire les statistiques d’un canal. Outils : list_pages, list_posts, create_post, update_post, cancel_post, approve_post, request_changes, list_inbox, resolve_inbox_item, assign_inbox_item, get_attention, get_page_analytics.",
+    "mcpTools": "Votre assistant peut : lister les canaux et les publications, créer, modifier, reprogrammer et annuler des publications, approuver ou renvoyer celles en attente de relecture, lire la boîte de réception (marquer comme traité, assigner), voir ce qui demande de l’attention et lire les statistiques d’un canal. Outils : list_pages, list_posts, create_post, update_post, cancel_post, approve_post, request_changes, list_inbox, resolve_inbox_item, assign_inbox_item, list_queue, list_templates, get_attention, get_page_analytics.",
     "restTitle": "API REST",
     "restHint": "JSON sur HTTPS, avec la clé dans l’en-tête Authorization.",
     "mcpAssistant": "Assistant",

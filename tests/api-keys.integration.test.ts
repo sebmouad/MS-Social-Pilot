@@ -199,6 +199,8 @@ describe('the MCP server', () => {
     const attention = (await tool(read.token, 'get_attention')).result.structuredContent;
     expect(attention).toMatchObject({ failedPosts: 0, awaitingApproval: 0, openComments: 0, openMessages: 0 });
     expect((await tool(read.token, 'list_inbox')).result.isError).toBeUndefined();
+    expect((await tool(read.token, 'list_queue')).result.isError).toBeUndefined();
+    expect((await tool(read.token, 'list_templates')).result.isError).toBeUndefined();
 
     expect((await tool(write.token, 'cancel_post', { postId: post.id })).result.isError).toBeUndefined();
     expect((await prisma.post.findUniqueOrThrow({ where: { id: post.id } })).status).toBe('cancelled');

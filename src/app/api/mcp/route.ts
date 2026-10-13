@@ -11,6 +11,8 @@ import {
   apiCancelPost,
   apiCreatePost,
   apiListPages,
+  apiListQueue,
+  apiListTemplates,
   apiListPosts,
   apiPageAnalytics,
   apiReadInbox,
@@ -193,6 +195,18 @@ const TOOLS: Tool[] = [
       additionalProperties: false,
     },
     run: (ctx, args) => apiAssignInbox(ctx, args),
+  },
+  {
+    name: 'list_queue',
+    description: 'The posting times in the queue: shared by every channel, or one channel’s own. create_post with useQueue takes the next free one.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    run: (ctx) => apiListQueue(ctx),
+  },
+  {
+    name: 'list_templates',
+    description: 'Saved post templates (text, hashtags, first comment) to start a post from.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    run: (ctx) => apiListTemplates(ctx),
   },
   {
     name: 'get_attention',
