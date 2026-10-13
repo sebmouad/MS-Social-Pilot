@@ -142,6 +142,13 @@ const firstComment = z
   .max(8000, 'A first comment can be at most 8,000 characters.')
   .transform((value) => value.trim() || null);
 
+/** A Facebook place: the numeric id of its Page. Blank means none. */
+const place = z
+  .string()
+  .trim()
+  .regex(/^(\d{5,20})?$/, 'A place is the number in the place Page’s address.')
+  .transform((value) => value || null);
+
 /** How long the first comment waits after the post: up to a week. */
 const firstCommentDelay = z.number().int().min(0).max(7 * 24 * 60);
 
@@ -155,6 +162,7 @@ export const createPostSchema = z
   .object({
     message: postMessage.default(''),
     firstComment: firstComment.nullish(),
+    place: place.nullish(),
     firstCommentDelayMinutes: firstCommentDelay.default(0),
     labelIds: labelIds.default([]),
     format: postFormat.default('post'),
@@ -246,6 +254,7 @@ export const updatePostSchema = z
   .object({
     message: postMessage.optional(),
     firstComment: firstComment.nullish(),
+    place: place.nullish(),
     firstCommentDelayMinutes: firstCommentDelay.optional(),
     labelIds: labelIds.optional(),
     format: postFormat.optional(),

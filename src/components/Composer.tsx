@@ -73,6 +73,7 @@ export interface EditingPost {
   id: string;
   message: string;
   firstComment: string | null;
+  place: string | null;
   firstCommentDelayMinutes: number;
   labelIds: string[];
   format: 'post' | 'reel' | 'story';
@@ -148,6 +149,7 @@ export function Composer({
   const messageBox = useRef<HTMLTextAreaElement>(null);
   const commentBox = useRef<HTMLTextAreaElement>(null);
   const [firstComment, setFirstComment] = useState(editing?.firstComment ?? '');
+  const [place, setPlace] = useState(editing?.place ?? '');
   const [variants, setVariants] = useState<Record<string, string>>(editing?.variants ?? {});
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(editing?.fields ?? {});
   const [textOnly, setTextOnly] = useState<string[]>(editing?.textOnly ?? []);
@@ -290,6 +292,7 @@ export function Composer({
   const dirty = editing
     ? message !== editing.message ||
       firstComment !== (editing.firstComment ?? '') ||
+      place.trim() !== (editing.place ?? '') ||
       commentDelay !== editing.firstCommentDelayMinutes ||
       format !== editing.format ||
       [...labelIds].sort().join() !== [...editing.labelIds].sort().join() ||
@@ -412,6 +415,7 @@ export function Composer({
             body: JSON.stringify({
               message,
               firstComment,
+              place: place.trim(),
               firstCommentDelayMinutes: commentDelay,
               labelIds,
               format,
@@ -432,6 +436,7 @@ export function Composer({
             body: JSON.stringify({
               message,
               firstComment,
+              place: place.trim(),
               firstCommentDelayMinutes: commentDelay,
               labelIds,
               format,
@@ -734,6 +739,26 @@ export function Composer({
               {t('firstCommentHint')}
             </p>
             {firstComment.trim() && <CommentDelay value={commentDelay} onChange={setCommentDelay} />}
+          </div>
+
+          <div className={`mt-5 ${format === 'post' ? '' : 'hidden'}`}>
+            <label className="label" htmlFor="post-place">
+              {t('place')} <span className="font-normal text-slate-400">{tAuth('optional')}</span>
+            </label>
+            <input
+              id="post-place"
+              className="input"
+              inputMode="numeric"
+              pattern="\d*"
+              maxLength={20}
+              placeholder={t('placePlaceholder')}
+              value={place}
+              onChange={(event) => setPlace(event.target.value.replace(/\D/g, ''))}
+              aria-describedby="post-place-hint"
+            />
+            <p id="post-place-hint" className="hint">
+              {t('placeHint')}
+            </p>
           </div>
 
           {/* Instagram's limit is a fifth of Facebook's and genuinely

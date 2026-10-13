@@ -557,6 +557,8 @@ model Post {
   firstCommentDelayMinutes Int      @default(0)
   /// `post` (a feed post), `reel` or `story`. See `src/lib/facebook/publish.ts`.
   format                   String   @default("post")
+  /// A Facebook place (a Page id) the post is tagged at; feed posts only.
+  place                    String?
   link                     String?
   /// Cached Open Graph metadata for `link`.
   linkPreview              Json?

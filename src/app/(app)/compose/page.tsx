@@ -231,6 +231,7 @@ async function loadForEditing(postId: string, auth: Auth): Promise<EditingPost |
     id: post.id,
     message: post.message,
     firstComment: post.firstComment,
+    place: post.place,
     firstCommentDelayMinutes: post.firstCommentDelayMinutes,
     labelIds: labelRows.map((row) => row.labelId),
     format: (['post', 'reel', 'story'].includes(post.format) ? post.format : 'post') as 'post' | 'reel' | 'story',

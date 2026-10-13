@@ -424,6 +424,7 @@ async function publishClaimed(
           // over at creation time instead (see src/lib/posts.ts).
           scheduledPublishTime: null,
           format: post.format as PostFormat,
+          place: post.place,
         });
 
     const kept = await writeIfStillOurs(postTargetId, options.workerId, {

@@ -32,6 +32,6 @@ FEATURES.md (what exists) and NEXT_PHASES.md (specs).
 | AI image / video / voice (root-activated provider, models fetched) | M | ✅ images in Design (OpenAI key from Root, newest image model fetched); ⏸ video, voice: need a root-activated provider with a model list to fetch; no provider is configured, so there is nothing to build against yet |
 | AI agent with schedules | M | ✅ `/settings/agents`, drafts only |
 | Tasks and workflows | L | ✅ board (to do, doing, done, assignee, due date); ⬜ workflows |
-| Location tags and @mentions | M | ⏸ blocked outside the code: a place tag needs Meta's review of the page-metadata permission, and Graph no longer takes @-mention markup for Pages; build once the app is approved |
-| Coloured text backgrounds | S | ⏸ blocked outside the code: Graph's Page posting API takes no text-post background preset, so nothing could be sent; the Design editor already makes a coloured picture |
+| Location tags and @mentions | M | ✅ place (a Facebook place Page's id) in the composer, sent as `place` on feed and multi-photo posts; `@[page-id]` typed in the text is mentioned by Facebook as Graph documents (checked 2026-10-13). ⬜ searching places and Pages by name: that needs Meta's Page Public Content Access review |
+| Coloured text backgrounds | S | ⏸ the Page feed publish reference (checked 2026-10-13) lists no text-background parameter, so nothing can be sent; the Design editor makes a coloured picture instead |
 | Mobile app | L | PWA exists |

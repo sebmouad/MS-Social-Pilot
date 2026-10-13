@@ -575,7 +575,10 @@
     "variantsTitle": "Texte différent pour certains canaux",
     "variantsHint": "Laissez un champ vide et ce canal publie le texte principal. Les médias, le lien et l’heure restent les mêmes.",
     "variantsPlaceholder": "Identique au texte principal",
-    "textOnly": "Publier celui-ci sans les images ni la vidéo"
+    "textOnly": "Publier celui-ci sans les images ni la vidéo",
+    "place": "Lieu",
+    "placePlaceholder": "Par exemple, 123456789012345",
+    "placeHint": "Associe la publication à un lieu. Collez le numéro de l’adresse de la Page du lieu sur Facebook. Facebook l’applique aux publications texte, lien et multi-photos des Pages ; les autres réseaux l’ignorent."
   },
   "config": {
     "title": "Configuration",

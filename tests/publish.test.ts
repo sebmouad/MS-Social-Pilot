@@ -79,6 +79,11 @@ describe('planPublish', () => {
 });
 
 describe('buildFeedBody', () => {
+  it('tags a place when one is given, and leaves the field out otherwise', () => {
+    expect(buildFeedBody({ message: 'Hi', place: '1234567890' })).toMatchObject({ message: 'Hi', place: '1234567890' });
+    expect(buildFeedBody({ message: 'Hi', place: null })).not.toHaveProperty('place');
+  });
+
   it('includes the message and link', () => {
     expect(buildFeedBody({ message: 'Hi', link: 'https://example.com' })).toEqual({
       message: 'Hi',

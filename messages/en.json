@@ -575,7 +575,10 @@
     "variantsTitle": "Different text for some channels",
     "variantsHint": "Leave a box empty and that channel publishes the main text. Media, link and time stay the same.",
     "variantsPlaceholder": "Same as the main text",
-    "textOnly": "Publish this one without the pictures or video"
+    "textOnly": "Publish this one without the pictures or video",
+    "place": "Place",
+    "placePlaceholder": "For example, 123456789012345",
+    "placeHint": "Tags the post at a place. Paste the number from the place Page’s address on Facebook. Facebook tags text, link and multi-photo posts on Pages; other networks ignore it."
   },
   "config": {
     "title": "Configuration",

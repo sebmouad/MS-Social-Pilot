@@ -196,3 +196,6 @@ or page being looked at is not part of a view. `/api/saved-views`.
 
 ## AI agents (`/settings/agents`)
 Owners and admins give a channel a standing brief, a weekday and a number of posts. On that day (workspace time zone) the hourly `aiAgents` worker job writes the next seven days as drafts, under the role of whoever set the agent up. An agent never schedules or publishes; it is skipped when AI is not configured, the creator left or can no longer compose, or the channel is gone, and a failed run is tried again the next hour.
+
+## Place tag (composer)
+Optional "Place" under the first comment: the number of a Facebook place Page. It is stored on the post (`posts.place`) and sent as `place` when a feed or multi-photo post goes out (immediate, native or worker). Page mentions are written `@[page-id]` in the text. Searching places by name needs Meta's Page Public Content Access review.

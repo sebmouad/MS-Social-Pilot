@@ -359,6 +359,7 @@ export async function createPost(
         firstComment: input.firstComment ?? null,
         firstCommentDelayMinutes: input.firstComment ? input.firstCommentDelayMinutes ?? 0 : 0,
         format: input.format ?? 'post',
+        place: input.place ?? null,
         labels: { create: labelIds.map((labelId) => ({ labelId })) },
         link: input.link ?? null,
         linkPreview: toJsonOrNull(linkPreview),
@@ -518,6 +519,7 @@ async function handOffToFacebook(postId: string, scheduledAt: Date): Promise<voi
         link: prepared.link,
         media,
         scheduledPublishTime: scheduledAt,
+        place: post.place,
       });
 
       await prisma.postTarget.update({
@@ -942,6 +944,7 @@ export async function updatePost(
   if (input.firstComment !== undefined) data.firstComment = input.firstComment;
   if (input.firstCommentDelayMinutes !== undefined) data.firstCommentDelayMinutes = input.firstCommentDelayMinutes;
   if (input.format !== undefined) data.format = input.format;
+  if (input.place !== undefined) data.place = input.place;
   const labelIds = input.labelIds ? await ownLabels(context.workspaceId, input.labelIds) : null;
   if (input.media !== undefined) {
     // Both columns or neither: stale keys would let a file in use be swept.
