@@ -1,3 +1,4 @@
+import { SubTabs } from '@/components/SubTabs';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { getTranslations } from 'next-intl/server';
 
@@ -23,6 +24,7 @@ export function generateMetadata() {
 export default async function ContentMixPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const auth = await requirePage();
   const t = await getTranslations('mix');
+  const tNav = await getTranslations('nav');
   const selection = await loadSelection(auth, await searchParams);
   const workspaceId = auth.workspace.id;
 
@@ -47,7 +49,7 @@ export default async function ContentMixPage({ searchParams }: { searchParams: P
   return (
     <ChannelsLayout auth={auth} selection={selection}>
     <div className="min-w-0 flex-1 space-y-6">
-      <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
+      <ScreenHeader title={t('title')} subtitle={t('subtitle')} actions={<SubTabs label={tNav('contentMix')} current="/queue/mix" items={[{ href: '/queue', label: tNav('queue') }, { href: '/queue/mix', label: tNav('contentMix') }]} />} />
       <ContentMixClient
         canEdit={canManageSettings(auth.role)}
         autoFill={workspace.mixAutoFill}

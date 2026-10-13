@@ -1,3 +1,4 @@
+import { SubTabs } from '@/components/SubTabs';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { TargetType } from '@prisma/client';
@@ -56,6 +57,7 @@ export default async function QueuePage({
   const pageScope = selection.scope;
   const requested = Array.isArray(params.for) ? params.for[0] : params.for;
   const t = await getTranslations('queue');
+  const tNav = await getTranslations('nav');
   const locale = await getLocale();
   const timeZone = auth.workspace.timezone;
   const now = new Date();
@@ -186,7 +188,7 @@ export default async function QueuePage({
   return (
     <ChannelsLayout auth={auth} selection={selection}>
     <div className="min-w-0 flex-1 space-y-6">
-      <ScreenHeader title={t('title')} subtitle={t('subtitle', { timezone: timeZone })} />
+      <ScreenHeader title={t('title')} subtitle={t('subtitle', { timezone: timeZone })} actions={<SubTabs label={tNav('contentMix')} current="/queue" items={[{ href: '/queue', label: tNav('queue') }, { href: '/queue/mix', label: tNav('contentMix') }]} />} />
 
       {recentlyAdded.length > 0 && (
         <section className="card p-4" aria-labelledby="best-times-added">

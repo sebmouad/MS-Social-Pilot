@@ -1,3 +1,4 @@
+import { SubTabs } from '@/components/SubTabs';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
@@ -28,6 +29,7 @@ export function generateMetadata() {
 export default async function TrendsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const auth = await requirePage();
   const t = await getTranslations('trends');
+  const tNav = await getTranslations('nav');
   const locale = await getLocale();
   const params = await searchParams;
   const filter = await loadPageFilter(auth, params);
@@ -62,7 +64,7 @@ export default async function TrendsPage({ searchParams }: { searchParams: Promi
   return (
     <ChannelsLayout auth={auth} selection={filter}>
     <div className="min-w-0 flex-1 space-y-6">
-      <ScreenHeader title={t('title')} subtitle={t('intro')} />
+      <ScreenHeader title={t('title')} subtitle={t('intro')} actions={<SubTabs label={tNav('keyDates')} current="/calendar/trends" items={[{ href: '/calendar/dates', label: tNav('keyDates') }, { href: '/calendar/trends', label: tNav('trends') }]} />} />
 
       <TrendKeywords keywords={keywords} canEdit={canManageSettings(auth.role)} />
 

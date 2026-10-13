@@ -1,3 +1,4 @@
+import { SubTabs } from '@/components/SubTabs';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { getLocale, getTranslations } from 'next-intl/server';
 
@@ -30,6 +31,7 @@ const AHEAD_DAYS = 90;
 export default async function KeyDatesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const auth = await requirePage();
   const t = await getTranslations('keyDates');
+  const tNav = await getTranslations('nav');
   const tDays = await getTranslations('calendar.days');
   const locale = await getLocale();
   const filter = await loadPageFilter(auth, await searchParams);
@@ -76,7 +78,7 @@ export default async function KeyDatesPage({ searchParams }: { searchParams: Pro
   return (
     <ChannelsLayout auth={auth} selection={filter}>
     <div className="min-w-0 flex-1 space-y-6">
-      <ScreenHeader title={t('title')} subtitle={t('intro')} />
+      <ScreenHeader title={t('title')} subtitle={t('intro')} actions={<SubTabs label={tNav('keyDates')} current="/calendar/dates" items={[{ href: '/calendar/dates', label: tNav('keyDates') }, { href: '/calendar/trends', label: tNav('trends') }]} />} />
       <KeyDatesClient
         canEdit={canManageSettings(auth.role)}
         pages={filter.pages.map((page) => ({ id: page.id, name: page.name }))}
