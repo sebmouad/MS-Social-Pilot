@@ -6,8 +6,11 @@ import { errors } from '@/lib/errors';
 
 type Context = { params: Promise<{ id: string }> };
 
+// Token health carries raw platform errors and scopes: root only, like the
+// connection check on /root/connections.
 export const GET = route(async (_request: Request, context: Context) => {
   const auth = await requireAuth();
+  if (!auth.isInstanceOwner) throw errors.notFound();
   const { id } = await context.params;
 
   // The scoping lives in the service, so this cannot be got wrong by a caller
