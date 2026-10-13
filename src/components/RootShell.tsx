@@ -5,7 +5,18 @@ import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { CONFIG_SECTIONS, type ConfigSection } from '@/lib/root-config-sections';
+import { OTHER_PLATFORMS, PLATFORM_NAMES } from '@/lib/root-platforms';
 import { Icon, type IconName } from './Icon';
+
+const CONFIG_ICONS: Record<ConfigSection, IconName> = {
+  url: 'link',
+  ai: 'sparkles',
+  storage: 'image',
+  email: 'mail',
+  security: 'shield',
+  general: 'config',
+};
 
 /**
  * The root section's frame: its own sidebar, apart from the workspace app, and
@@ -17,18 +28,31 @@ export function RootShell({ userName, children }: { userName: string; children: 
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const items: Array<{ href: string; label: string; icon: IconName; group?: string; danger?: boolean }> = [
-    { href: '/root', label: t('nav.overview'), icon: 'dashboard' },
-    { href: '/root/config', label: t('nav.config'), icon: 'config', group: t('nav.groupSetup') },
-    { href: '/root/plans', label: t('nav.plans'), icon: 'tag', group: t('nav.groupSetup') },
-    { href: '/root/registration', label: t('nav.registration'), icon: 'mail', group: t('nav.groupSetup') },
+  type Item = { href: string; label: string; icon: IconName; group?: string; danger?: boolean; exact?: boolean; sub?: boolean };
+  const settings = t('nav.groupSettings');
+  const platforms = t('nav.groupPlatforms');
+  const inMeta = pathname.startsWith('/root/meta');
+  const items: Item[] = [
+    { href: '/root', label: t('nav.overview'), icon: 'dashboard', exact: true },
+    ...CONFIG_SECTIONS.map((section): Item => ({ href: `/root/config/${section}`, label: t(`nav.configSections.${section}`), icon: CONFIG_ICONS[section], group: settings })),
+    { href: '/root/plans', label: t('nav.plans'), icon: 'tag', group: settings },
+    { href: '/root/registration', label: t('nav.registration'), icon: 'mail', group: settings },
+    { href: '/root/platforms', label: t('nav.platformsOverview'), icon: 'connections', group: platforms, exact: true },
+    { href: '/root/meta', label: t('nav.meta'), icon: 'globe', group: platforms, exact: inMeta },
+    ...(inMeta
+      ? [
+          { href: '/root/meta/usage', label: t('nav.metaUsage'), icon: 'analytics', group: platforms, sub: true },
+          { href: '/root/meta/connections', label: t('nav.metaConnections'), icon: 'connections', group: platforms, sub: true },
+        ] satisfies Item[]
+      : []),
+    ...OTHER_PLATFORMS.map((platform): Item => ({ href: `/root/platforms/${platform}`, label: PLATFORM_NAMES[platform], icon: 'share', group: platforms })),
+    { href: '/root/connections', label: t('nav.connections'), icon: 'connections', group: platforms },
     { href: '/root/workspaces', label: t('nav.workspaces'), icon: 'folders', group: t('nav.groupPeople') },
     { href: '/root/users', label: t('nav.users'), icon: 'team', group: t('nav.groupPeople') },
     { href: '/root/agency', label: t('nav.agency'), icon: 'analytics', group: t('nav.groupPeople') },
     { href: '/root/privileges', label: t('nav.privileges'), icon: 'key', group: t('nav.groupPeople') },
     { href: '/root/sessions', label: t('nav.sessions'), icon: 'globe', group: t('nav.groupPeople') },
     { href: '/root/status', label: t('nav.status'), icon: 'check', group: t('nav.groupHealth') },
-    { href: '/root/connections', label: t('nav.connections'), icon: 'connections', group: t('nav.groupHealth') },
     { href: '/root/worker', label: t('nav.worker'), icon: 'refresh', group: t('nav.groupHealth') },
     { href: '/root/errors', label: t('nav.errors'), icon: 'warning', group: t('nav.groupHealth') },
     { href: '/root/alerts', label: t('nav.alerts'), icon: 'bell', group: t('nav.groupHealth') },
@@ -37,7 +61,7 @@ export function RootShell({ userName, children }: { userName: string; children: 
     { href: '/root/changelog', label: t('nav.changelog'), icon: 'pencil', group: t('nav.groupHistory') },
     { href: '/root/danger', label: t('nav.danger'), icon: 'warning', danger: true },
   ];
-  const active = (href: string) => (href === '/root' ? pathname === href : pathname.startsWith(href));
+  const active = (item: Item) => (item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`));
 
   const nav = (
     <nav aria-label={t('nav.label')} className="space-y-0.5">
@@ -48,12 +72,12 @@ export function RootShell({ userName, children }: { userName: string; children: 
           )}
         <Link
           href={item.href}
-          aria-current={active(item.href) ? 'page' : undefined}
-          className={`flex h-10 items-center gap-3 rounded-lg px-2.5 text-[15px] font-semibold ${
-            active(item.href) ? 'bg-amber-100 text-amber-900' : item.danger ? 'text-red-700 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-100'
+          aria-current={active(item) ? 'page' : undefined}
+          className={`flex items-center gap-3 rounded-lg px-2.5 font-semibold ${item.sub ? 'ms-6 h-9 text-sm' : 'h-10 text-[15px]'} ${
+            active(item) ? 'bg-amber-100 text-amber-900' : item.danger ? 'text-red-700 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-100'
           }`}
         >
-          <Icon name={item.icon} size={20} className={active(item.href) ? 'text-amber-700' : item.danger ? 'text-red-600' : 'text-slate-500'} />
+          <Icon name={item.icon} size={item.sub ? 16 : 20} className={active(item) ? 'text-amber-700' : item.danger ? 'text-red-600' : 'text-slate-500'} />
           <span className="truncate">{item.label}</span>
         </Link>
         </div>
@@ -63,7 +87,7 @@ export function RootShell({ userName, children }: { userName: string; children: 
 
   return (
     <div className="min-h-screen lg:flex">
-      <header className="border-b border-slate-200 bg-white lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-e">
+      <header className="border-b border-slate-200 bg-white lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-e">
         <div className="flex items-center gap-2.5 px-3 py-3 lg:pt-4">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
             <Icon name="shield" size={20} />

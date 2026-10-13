@@ -46,7 +46,7 @@ export default async function RootOverviewPage() {
       )}
 
       {legalGaps > 0 && (
-        <Link href="/root/config" className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100">
+        <Link href="/root/config/general" className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100">
           <Icon name="warning" size={16} /> {t('overview.operatorMissing', { count: legalGaps })}
         </Link>
       )}

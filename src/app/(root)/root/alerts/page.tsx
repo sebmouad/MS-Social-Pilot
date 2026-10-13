@@ -51,7 +51,7 @@ export default async function RootAlertsPage() {
         <h2 className="text-sm font-semibold text-slate-900">{t('whereTitle')}</h2>
         <p className="text-sm text-slate-600">
           {t('whereHint')}{' '}
-          <Link href="/root/config" className="font-semibold text-brand-600 hover:underline">{t('whereLink')}</Link>
+          <Link href="/root/config/general" className="font-semibold text-brand-600 hover:underline">{t('whereLink')}</Link>
         </p>
         <AlertTestButton />
       </section>

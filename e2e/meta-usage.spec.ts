@@ -21,7 +21,7 @@ test('root sees calls per Page and per job from the worker’s saved usage', asy
   };
   await prisma.graphUsage.upsert({ where: { key: 'worker' }, create: { key: 'worker', snapshot }, update: { snapshot, savedAt: new Date() } });
 
-  await open(page, '/root/worker');
+  await open(page, '/root/meta/usage');
   const pages = page.getByRole('table', { name: 'Heaviest channels and accounts, last hour' });
   await expect(pages.getByRole('row', { name: new RegExp(target.name) })).toContainText('7');
   const jobs = page.getByRole('table', { name: 'Calls by job, last hour' });

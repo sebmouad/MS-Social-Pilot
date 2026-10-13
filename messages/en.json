@@ -660,7 +660,35 @@
     "adopt": "Move into the database",
     "adopting": "Moving…",
     "adopted": "{count, plural, =0 {Nothing to move.} one {# setting moved. Remove its line from .env.} other {# settings moved. Remove their lines from .env.}}",
-    "adoptInvalid": "{count, plural, one {# value in .env is not valid and stayed there. Correct it below.} other {# values in .env are not valid and stayed there. Correct them below.}}"
+    "adoptInvalid": "{count, plural, one {# value in .env is not valid and stayed there. Correct it below.} other {# values in .env are not valid and stayed there. Correct them below.}}",
+    "platformsMoved": "Meta and the other social networks are set up in their own sections.",
+    "platformsLink": "Open Platforms",
+    "sections": {
+      "url": {
+        "title": "Site address",
+        "subtitle": "The address this installation answers on, the public site and the link shortener."
+      },
+      "ai": {
+        "title": "AI providers",
+        "subtitle": "Which AI provider writes captions, its keys, model, limits and spend."
+      },
+      "storage": {
+        "title": "Storage",
+        "subtitle": "Where uploads are kept, how large they can be, and how long data is kept."
+      },
+      "email": {
+        "title": "Email",
+        "subtitle": "How this installation sends email."
+      },
+      "security": {
+        "title": "Security",
+        "subtitle": "Sign-up, sign-in limits, two-step verification and request limits."
+      },
+      "general": {
+        "title": "General",
+        "subtitle": "Everything else: operator details, language, publishing, analytics and alerts."
+      }
+    }
   },
   "connections": {
     "active": "Active",
@@ -2677,7 +2705,21 @@
       "groupPeople": "People",
       "groupHealth": "Health",
       "groupHistory": "History",
-      "connections": "Connections"
+      "connections": "All connections",
+      "groupSettings": "Settings",
+      "groupPlatforms": "Platforms",
+      "platformsOverview": "All platforms",
+      "meta": "Meta",
+      "metaUsage": "API usage",
+      "metaConnections": "Connections",
+      "configSections": {
+        "url": "Site address",
+        "ai": "AI providers",
+        "storage": "Storage",
+        "email": "Email",
+        "security": "Security",
+        "general": "General"
+      }
     },
     "overview": {
       "title": "Installation overview",
@@ -3001,7 +3043,8 @@
       "heaviestJobs": "Calls by job, last hour",
       "job": "Job",
       "calls": "Calls",
-      "otherCalls": "Outside a job"
+      "otherCalls": "Outside a job",
+      "usageMoved": "Meta API usage is now in the Meta section"
     },
     "sessions": {
       "title": "Sessions",
@@ -3143,6 +3186,25 @@
         "accountError": "Account error",
         "blocker": "Publishing blocked"
       }
+    },
+    "meta": {
+      "title": "Meta",
+      "subtitle": "The Meta app behind Facebook and Instagram: what to paste in Meta’s app dashboard, its credentials, Graph API settings and Meta-only features.",
+      "checkTitle": "Check the app",
+      "usageTitle": "Meta API usage",
+      "usageSubtitle": "How much of Meta’s call allowance this installation uses, and which channels and jobs use the most.",
+      "connectionsTitle": "Facebook and Instagram",
+      "connectionsSubtitle": "Every Facebook and Instagram channel in every workspace, with its technical details and a live connection check."
+    },
+    "platforms": {
+      "title": "Platforms",
+      "overviewSubtitle": "Each social network’s app settings and connected channels, in its own section.",
+      "meta": "Meta (Facebook and Instagram)",
+      "channels": "{count, plural, =0 {No channels} one {# channel} other {# channels}}",
+      "allConnections": "See every connection on one screen",
+      "subtitle": "{network}’s app settings and every channel connected to it.",
+      "settingsTitle": "App settings",
+      "channelsTitle": "Channels"
     }
   },
   "twoStep": {

@@ -94,7 +94,7 @@ test('an invitation that never reaches the server gives the button back', async 
 });
 
 test('root sees AI spend and can only save prices written as model=input/output', async ({ page }) => {
-  await open(page, '/root/config');
+  await open(page, '/root/config/ai');
   await expect(page.getByRole('heading', { name: /AI spend|Dépenses IA/ })).toBeVisible();
   await expect(page.getByText(/No AI generations in the last 30 days|Aucune génération IA/)).toBeVisible();
 

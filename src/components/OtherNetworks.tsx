@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 
 import { Dialog } from './Dialog';
 import { FeedAvatar } from './FeedPost';
+import { platformSettingsHref } from '@/lib/root-platforms';
 import { Icon } from './Icon';
 import { NetworkMark } from './NetworkMark';
 
@@ -209,7 +210,7 @@ export function OtherNetworks({
                     {isOwner ? (
                       <>
                         {t('needsApp', { network: network.label })}{' '}
-                        <Link href="/root/config" className="font-semibold text-brand-600 hover:underline">
+                        <Link href={platformSettingsHref(network.key)} className="font-semibold text-brand-600 hover:underline">
                           {t('openConfig')}
                         </Link>
                       </>

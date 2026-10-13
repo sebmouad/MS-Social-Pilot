@@ -1,45 +1,12 @@
-import { getTranslations } from 'next-intl/server';
+import { redirect } from 'next/navigation';
 
-import { ConfigClient } from '@/components/ConfigClient';
-import { MetaAppSettings } from '@/components/MetaAppSettings';
-import { aiSpend } from '@/lib/ai';
 import { requireRoot } from '@/lib/auth';
-import { metaAppSettings } from '@/lib/meta-app';
-import { screenMetadata } from '@/lib/metadata';
-import { GROUP_LABELS, GROUP_ORDER, describeSettings } from '@/lib/settings';
+import { CONFIG_SECTIONS } from '@/lib/root-config-sections';
 
 export const dynamic = 'force-dynamic';
 
-export function generateMetadata() {
-  return screenMetadata('config.title');
-}
-
-/**
- * Instance configuration: every integration key and app-wide setting. Root
- * only, and not scoped to a workspace — these settings are the whole
- * installation's.
- */
+/** The old single Configuration screen: now one screen per area, starting with the first. */
 export default async function RootConfigPage() {
   await requireRoot();
-  const t = await getTranslations('config');
-  const [settings, spend] = await Promise.all([describeSettings(), aiSpend()]);
-
-  return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{t('title')}</h1>
-        <p className="mt-1 text-sm text-slate-600">{t('subtitle')}</p>
-      </header>
-
-      {/* The values Meta's app dashboard asks for. Technical, so root's alone
-          (agencies and their clients never see them). */}
-      <div id="meta-app" className="scroll-mt-20">
-        <MetaAppSettings settings={metaAppSettings()} open={false} />
-      </div>
-
-      <ConfigClient settings={settings} groupLabels={GROUP_LABELS} groupOrder={GROUP_ORDER} aiSpend={spend} />
-
-      <p className="text-xs text-slate-500">{t('footnote')}</p>
-    </div>
-  );
+  redirect(`/root/config/${CONFIG_SECTIONS[0]}`);
 }

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Dialog } from './Dialog';
+import { platformSettingsHref } from '@/lib/root-platforms';
 import { Icon } from './Icon';
 
 export interface SummaryRow {
@@ -80,7 +81,7 @@ export function ConnectSummary({ rows, isRoot }: { rows: SummaryRow[]; isRoot: b
                 {isRoot ? (
                   <>
                     {tNetworks('needsApp', { network: open.label })}{' '}
-                    <Link href="/root/config" className="font-semibold text-brand-600 hover:underline">
+                    <Link href={platformSettingsHref(open.type)} className="font-semibold text-brand-600 hover:underline">
                       {tNetworks('openConfig')}
                     </Link>
                   </>

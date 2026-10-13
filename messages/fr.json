@@ -660,7 +660,35 @@
     "adopt": "Déplacer dans la base de données",
     "adopting": "Déplacement…",
     "adopted": "{count, plural, =0 {Rien à déplacer.} one {# réglage déplacé. Retirez sa ligne du fichier .env.} other {# réglages déplacés. Retirez leurs lignes du fichier .env.}}",
-    "adoptInvalid": "{count, plural, one {# valeur du fichier .env n’est pas valide et y est restée. Corrigez-la ci-dessous.} other {# valeurs du fichier .env ne sont pas valides et y sont restées. Corrigez-les ci-dessous.}}"
+    "adoptInvalid": "{count, plural, one {# valeur du fichier .env n’est pas valide et y est restée. Corrigez-la ci-dessous.} other {# valeurs du fichier .env ne sont pas valides et y sont restées. Corrigez-les ci-dessous.}}",
+    "platformsMoved": "Meta et les autres réseaux sociaux se configurent dans leurs propres sections.",
+    "platformsLink": "Ouvrir Plateformes",
+    "sections": {
+      "url": {
+        "title": "Adresse du site",
+        "subtitle": "L’adresse de cette installation, le site public et le raccourcisseur de liens."
+      },
+      "ai": {
+        "title": "Fournisseurs d’IA",
+        "subtitle": "Le fournisseur d’IA qui rédige les légendes, ses clés, son modèle, ses limites et ses dépenses."
+      },
+      "storage": {
+        "title": "Stockage",
+        "subtitle": "Où sont gardés les fichiers envoyés, leur taille maximale et la durée de conservation des données."
+      },
+      "email": {
+        "title": "E-mail",
+        "subtitle": "Comment cette installation envoie les e-mails."
+      },
+      "security": {
+        "title": "Sécurité",
+        "subtitle": "Inscriptions, limites de connexion, vérification en deux étapes et limites de requêtes."
+      },
+      "general": {
+        "title": "Général",
+        "subtitle": "Tout le reste : coordonnées de l’opérateur, langue, publication, statistiques et alertes."
+      }
+    }
   },
   "connections": {
     "active": "Actif",
@@ -2677,7 +2705,21 @@
       "groupPeople": "Personnes",
       "groupHealth": "Santé",
       "groupHistory": "Historique",
-      "connections": "Connexions"
+      "connections": "Toutes les connexions",
+      "groupSettings": "Réglages",
+      "groupPlatforms": "Plateformes",
+      "platformsOverview": "Toutes les plateformes",
+      "meta": "Meta",
+      "metaUsage": "Usage de l’API",
+      "metaConnections": "Connexions",
+      "configSections": {
+        "url": "Adresse du site",
+        "ai": "Fournisseurs d’IA",
+        "storage": "Stockage",
+        "email": "E-mail",
+        "security": "Sécurité",
+        "general": "Général"
+      }
     },
     "overview": {
       "title": "Vue d’ensemble de l’installation",
@@ -3001,7 +3043,8 @@
       "heaviestJobs": "Appels par tâche, dernière heure",
       "job": "Tâche",
       "calls": "Appels",
-      "otherCalls": "Hors tâche"
+      "otherCalls": "Hors tâche",
+      "usageMoved": "L’usage de l’API Meta se trouve maintenant dans la section Meta"
     },
     "sessions": {
       "title": "Sessions",
@@ -3143,6 +3186,25 @@
         "accountError": "Erreur du compte",
         "blocker": "Publication bloquée"
       }
+    },
+    "meta": {
+      "title": "Meta",
+      "subtitle": "L’app Meta derrière Facebook et Instagram : ce qu’il faut coller dans le tableau de bord de l’app Meta, ses identifiants, les réglages de l’API Graph et les fonctions propres à Meta.",
+      "checkTitle": "Vérifier l’app",
+      "usageTitle": "Usage de l’API Meta",
+      "usageSubtitle": "La part du quota d’appels Meta utilisée par cette installation, et les canaux et tâches qui en consomment le plus.",
+      "connectionsTitle": "Facebook et Instagram",
+      "connectionsSubtitle": "Chaque canal Facebook et Instagram de chaque espace, avec ses détails techniques et une vérification en direct de la connexion."
+    },
+    "platforms": {
+      "title": "Plateformes",
+      "overviewSubtitle": "Les réglages d’app et les canaux connectés de chaque réseau social, chacun dans sa section.",
+      "meta": "Meta (Facebook et Instagram)",
+      "channels": "{count, plural, =0 {Aucun canal} one {# canal} other {# canaux}}",
+      "allConnections": "Voir toutes les connexions sur un seul écran",
+      "subtitle": "Les réglages d’app de {network} et chaque canal qui y est connecté.",
+      "settingsTitle": "Réglages de l’app",
+      "channelsTitle": "Canaux"
     }
   },
   "twoStep": {

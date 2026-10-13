@@ -37,6 +37,8 @@ const INHERITS: Record<string, string> = {
   'src/app/(app)/analytics/post/[postTargetId]/page.tsx':
     'Titled by the post it shows, which is not known until it is fetched.',
   'src/app/bio/[slug]/page.tsx': 'Titled by the page owner’s own title, which is not known until it is fetched.',
+  'src/app/(root)/root/config/page.tsx': 'Redirects to the first settings screen before rendering.',
+  'src/app/(root)/root/config/[section]/page.tsx': 'Titled per screen from config.sections.<section>.title, a key built from the address.',
   'src/app/(app)/e2e-slow/page.tsx': 'Exists only for the browser walk.',
   'src/app/(app)/e2e-throw/page.tsx': 'Exists only for the browser walk.',
 };
