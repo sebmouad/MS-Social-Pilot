@@ -1,6 +1,6 @@
 import { readPostFields } from '@/lib/custom-fields';
 import { SavedViews } from '@/components/SavedViews';
-import Link from 'next/link';
+import type { AnchorHTMLAttributes } from 'react';
 import type { Prisma } from '@prisma/client';
 import { getTranslations } from 'next-intl/server';
 
@@ -19,6 +19,15 @@ import { formatInZone } from '@/lib/time';
 import { canManageOthersPosts, canManageSettings, canPublishWithoutApproval, postStatusFilter } from '@/lib/constants';
 import { Pagination } from '@/components/Pagination';
 import { pageHref, pageNumber, paginate } from '@/lib/paging';
+
+/**
+ * Plain links on this screen: a status tab or a page of posts is a new page of
+ * the same screen, and in a production build the router's in-page navigation
+ * here was found to stall (docs/ai/STATUS.md), so these load the ordinary way.
+ */
+function Link({ scroll: _scroll, prefetch: _prefetch, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { scroll?: boolean; prefetch?: boolean }) {
+  return <a {...props} />;
+}
 
 export const dynamic = 'force-dynamic';
 

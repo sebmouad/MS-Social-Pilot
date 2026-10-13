@@ -166,3 +166,10 @@ Not resolved. Check it in a real browser on the live site after a deploy
 (Calendar › Next month, and a status filter). If it reproduces there, shrinking
 the day-cell markup in `calendar/page.tsx` (about 1.6 KB per day) is the first
 thing to try.
+
+Update (2026-10-13): the Posts screen showed the same stall on its status tabs in
+a production build (`posts.spec.ts` "every status a post can sit in has a tab…"),
+so `posts/page.tsx` also uses plain links. Full production-build browser run on
+the latest code: 411 passed, that one failure, now fixed. One other Posts test
+("a contributor sends a draft for review from the list") fails intermittently
+in the same mode, passing on most runs.
