@@ -12,6 +12,7 @@ import type { TargetOption } from './TargetPicker';
 
 export interface WorkspaceOptions {
   requiresApproval: boolean;
+  clientApprovalAfterTeam: boolean;
   /** 0 Sunday … 6 Saturday. */
   weekStartsOn: number;
   /** Inbox response time counts only these days and hours; no days = all the time. */
@@ -330,6 +331,20 @@ export function SettingsClient({
             <span className="block text-xs text-slate-500">{t('requireApprovalHint')}</span>
           </span>
         </label>
+        {settings.requiresApproval && (
+          <label className="mt-3 ms-6 flex items-start gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500"
+              checked={settings.clientApprovalAfterTeam}
+              onChange={(event) => setSettings({ ...settings, clientApprovalAfterTeam: event.target.checked })}
+            />
+            <span>
+              {t('clientAfterTeam')}
+              <span className="block text-xs text-slate-500">{t('clientAfterTeamHint')}</span>
+            </span>
+          </label>
+        )}
 
         <button type="button" className="btn-primary mt-4" onClick={saveWorkspace} disabled={pending}>
           {t('saveWorkspace')}

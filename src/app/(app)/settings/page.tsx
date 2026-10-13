@@ -46,6 +46,7 @@ export default async function SettingsPage() {
         shortLinkBase={env.shortLinkBase}
         options={{
           requiresApproval: workspace.requiresApproval,
+          clientApprovalAfterTeam: workspace.clientApprovalAfterTeam,
           weekStartsOn: workspace.weekStartsOn,
           businessDays: workspace.businessDays,
           businessStart: workspace.businessStart,

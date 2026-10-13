@@ -280,7 +280,8 @@
     "colRejectedHint": "The reviewer asked for changes.",
     "colEmpty": "Nothing here",
     "countLine": "{count, plural, =0 {Nothing waiting for review} one {# post waiting for review} other {# posts waiting for review}} · {profiles, plural, one {# channel} other {# channels}}",
-    "approvedBy": "Approved by {name} on {at}"
+    "approvedBy": "Approved by {name} on {at}",
+    "waitingForClient": "Cleared by the team, waiting for the client."
   },
   "auth": {
     "signIn": "Sign in",
@@ -1307,7 +1308,8 @@
       },
       "target": {
         "removed": "removed a channel from the workspace"
-      }
+      },
+      "post.teamApproved": "cleared a post for the client"
     },
     "byDeparted": "Someone no longer in this workspace",
     "bySystem": "The app",
@@ -2018,7 +2020,9 @@
     "watchNegativeComments": "Alert me when negative comments spike",
     "watchNegativeCommentsHint": "AI reads the mood of new comments every hour and emails the team when a channel gets at least twice its usual negative comments. Uses the AI allowance; comments hidden by moderation rules are skipped.",
     "aiAvoidWords": "Words to avoid",
-    "aiAvoidWordsHint": "Separated by commas. The AI will not use them in anything it writes for this workspace."
+    "aiAvoidWordsHint": "Separated by commas. The AI will not use them in anything it writes for this workspace.",
+    "clientAfterTeam": "Then ask the client",
+    "clientAfterTeamHint": "When a team member approves a post, it goes on to the client’s review link and is cleared only when the client approves it. Needs a review link that lets the client decide."
   },
   "setup": {
     "title": "Set up MS Social Pilot",

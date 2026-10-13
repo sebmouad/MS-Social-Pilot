@@ -147,6 +147,7 @@ export default async function ApprovalsPage({
           // and this is the screen where somebody decides that.
           overdue: post.scheduledAt !== null && post.scheduledAt.getTime() <= Date.now(),
           submittedBy: post.submitter?.name ?? post.author.name,
+          waitingForClient: post.teamApprovedAt !== null,
           submittedLabel: post.submittedAt ? formatInZone(post.submittedAt, timezone) : null,
           targets: post.targets.map((postTarget) => postTarget.target.name),
           pictureUrl: post.targets[0]?.target.pictureUrl ?? null,

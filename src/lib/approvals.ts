@@ -163,6 +163,8 @@ export async function withdrawFromReview(options: {
 }
 
 export interface ApproveResult {
+  /** The team's approval was recorded, and the post now waits for the client's. */
+  awaitingClient?: boolean;
   /**
    * Set when the post was meant for Facebook to hold, but its time had
    * drifted outside the window Facebook accepts, so our worker publishes it.
@@ -200,6 +202,17 @@ export async function approvePost(options: {
   const reviewer = options.viaLink
     ? { name: options.viaLink.authorName }
     : await prisma.user.findUniqueOrThrow({ where: { id: options.reviewerId } });
+
+  // A client step: the team clears it first, then the client's review link
+  // answers. The team's approval is recorded and the post stays in review.
+  if (!options.viaLink && !post.teamApprovedAt) {
+    const workspace = await prisma.workspace.findUnique({ where: { id: options.workspaceId }, select: { clientApprovalAfterTeam: true } });
+    if (workspace?.clientApprovalAfterTeam) {
+      await prisma.post.update({ where: { id: options.postId }, data: { teamApprovedById: options.reviewerId, teamApprovedAt: new Date() } });
+      await logActivity(options.workspaceId, 'post.teamApproved', { postId: options.postId }, options.reviewerId);
+      return { nativeFallback: null, awaitingClient: true };
+    }
+  }
 
   // A post with no time set has nothing for the scheduler to act on, so
   // approving it returns it to draft rather than to a scheduled state it

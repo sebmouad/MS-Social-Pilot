@@ -31,6 +31,7 @@ export const PATCH = route(async (request: Request) => {
   assign('businessStart', input.businessStart);
   assign('businessEnd', input.businessEnd);
   assign('requiresApproval', input.requiresApproval);
+  assign('clientApprovalAfterTeam', input.clientApprovalAfterTeam);
   assign('utmSource', input.utmSource);
   assign('utmMedium', input.utmMedium);
   assign('utmCampaignTemplate', input.utmCampaignTemplate);

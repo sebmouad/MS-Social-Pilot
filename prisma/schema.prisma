@@ -258,6 +258,8 @@ model Workspace {
 
   /// Turns the approval workflow on for this client.
   requiresApproval Boolean @default(false)
+  /// A team approval sends the post on to the client's review link instead of clearing it.
+  clientApprovalAfterTeam Boolean @default(false)
 
   /// Set by root: members cannot use the workspace (root still can).
   suspendedAt     DateTime?
@@ -573,6 +575,9 @@ model Post {
   submittedById  String?
   submittedAt    DateTime?
   reviewedById   String?
+  /// With a client step: who on the team cleared it first, and when. The post still waits for the client.
+  teamApprovedById String?
+  teamApprovedAt   DateTime?
   reviewedAt     DateTime?
   reviewNote     String?
 

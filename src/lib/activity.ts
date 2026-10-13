@@ -23,6 +23,7 @@ export const ACTIVITY_ACTIONS = [
   'moderation.undone',
   'captionTest.learned',
   'post.approved',
+  'post.teamApproved',
   'post.bulkAction',
   'post.bulkUploaded',
   'post.cancelled',

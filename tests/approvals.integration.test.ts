@@ -319,6 +319,48 @@ describe('approval gating in the scheduler', () => {
   });
 });
 
+/** The client step: the team clears a post first, then the client's answer clears it. */
+describe('the client step after the team', () => {
+  async function seedHeldPost(state: ApprovalStatus) {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Client', ownerId: owner.id, requiresApproval: true });
+    const post = await prisma.post.create({
+      data: {
+        workspaceId: workspace.id,
+        authorId: owner.id,
+        submittedById: owner.id,
+        message: 'Held for review',
+        status: PostStatus.pending_approval,
+        approvalStatus: state,
+        scheduledAt: new Date(Date.now() + 60 * 60 * 1000),
+        targets: { create: { targetId: target.id } },
+      },
+    });
+    return { post, workspace, owner };
+  }
+
+  it('records the team approval and keeps the post in review until the client approves', async () => {
+    const { post, workspace, owner } = await seedHeldPost(ApprovalStatus.pending);
+    await prisma.workspace.update({ where: { id: workspace.id }, data: { clientApprovalAfterTeam: true } });
+
+    const team = await approvals.approvePost({ workspaceId: workspace.id, postId: post.id, reviewerId: owner.id, reviewerRole: WorkspaceRole.owner });
+    expect(team.awaitingClient).toBe(true);
+    const waiting = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    expect([waiting.approvalStatus, waiting.status, waiting.teamApprovedById]).toEqual([ApprovalStatus.pending, PostStatus.pending_approval, owner.id]);
+    expect(waiting.teamApprovedAt).not.toBeNull();
+
+    // The client's review link finishes it.
+    await approvals.approvePost({
+      workspaceId: workspace.id,
+      postId: post.id,
+      reviewerId: owner.id,
+      reviewerRole: WorkspaceRole.owner,
+      viaLink: { title: 'Client link', authorName: 'The client' },
+    });
+    expect((await prisma.post.findUniqueOrThrow({ where: { id: post.id } })).approvalStatus).toBe(ApprovalStatus.approved);
+  });
+});
+
 /**
  * The workflow is a per-workspace switch, so it can be turned off while posts
  * are still queued behind it.

@@ -21,6 +21,8 @@ export interface PendingPost {
   /** Its scheduled moment has gone, so approving publishes it immediately. */
   overdue: boolean;
   submittedBy: string;
+  /** The team has cleared it and it waits for the client's answer. */
+  waitingForClient?: boolean;
   submittedLabel: string | null;
   targets: string[];
   /** The first destination's photo, for the post's header. */
@@ -141,6 +143,7 @@ export function ApprovalsClient({ posts }: { posts: PendingPost[] }) {
             {post.submittedLabel ? ` · ${post.submittedLabel}` : ''}
             {post.media.length > 0 ? ` · ${tPosts('attachments', { count: post.media.length })}` : ''}
           </p>
+          {post.waitingForClient && <p className="mt-1 text-xs font-medium text-amber-700">{t('waitingForClient')}</p>}
 
           {rejecting === post.id ? (
             <div className="mt-4 space-y-2">

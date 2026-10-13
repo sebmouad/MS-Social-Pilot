@@ -298,6 +298,7 @@ export const workspaceSettingsSchema = z.object({
   businessStart: z.number().int().min(0).max(23).optional(),
   businessEnd: z.number().int().min(1).max(24).optional(),
   requiresApproval: z.boolean().optional(),
+  clientApprovalAfterTeam: z.boolean().optional(),
 
   // Link tagging. Empty string means "clear it", so these are nullable rather
   // than merely optional.

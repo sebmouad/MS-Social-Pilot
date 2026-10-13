@@ -280,3 +280,13 @@ contributor or viewer) in another workspace they own, change it, or remove it.
 It never adds strangers (they are still invited from Team), never touches owner
 or client memberships, and goes through the same `changeRole` / `removeMember`
 rules and plan seat limits as the Team screen.
+
+## Client step after the team (owner request, 2026-10-13)
+
+Settings › Workspace: with approval switched on, an owner or admin can turn on
+"Then ask the client". A team member's approval is then recorded (who and when,
+`teamApprovedById` / `teamApprovedAt`) and the post stays in review; it is
+cleared only when the client answers through a review link that decides. No role
+gains or loses a privilege: who may approve is unchanged, and the client's
+power is the one the review link already gave it. A workspace without such a
+link would leave posts waiting, which the setting's hint says.

@@ -280,7 +280,8 @@
     "colRejectedHint": "Le validateur a demandé des modifications.",
     "colEmpty": "Rien ici",
     "countLine": "{count, plural, =0 {Rien en attente de validation} one {# publication en attente de validation} other {# publications en attente de validation}} · {profiles, plural, one {# canal} other {# canaux}}",
-    "approvedBy": "Approuvée par {name} le {at}"
+    "approvedBy": "Approuvée par {name} le {at}",
+    "waitingForClient": "Validée par l’équipe, en attente du client."
   },
   "auth": {
     "signIn": "Se connecter",
@@ -1307,7 +1308,8 @@
       },
       "target": {
         "removed": "a retiré un canal de l’espace de travail"
-      }
+      },
+      "post.teamApproved": "a validé une publication pour le client"
     },
     "byDeparted": "Une personne qui n’est plus dans cet espace",
     "bySystem": "L’application",
@@ -2018,7 +2020,9 @@
     "watchNegativeComments": "M’alerter quand les commentaires négatifs augmentent",
     "watchNegativeCommentsHint": "L’IA lit l’humeur des nouveaux commentaires chaque heure et prévient l’équipe par e-mail quand un canal reçoit au moins deux fois plus de commentaires négatifs que d’habitude. Utilise le quota d’IA ; les commentaires masqués par les règles de modération sont ignorés.",
     "aiAvoidWords": "Mots à éviter",
-    "aiAvoidWordsHint": "Séparés par des virgules. L’IA ne les utilisera dans rien de ce qu’elle écrit pour cet espace."
+    "aiAvoidWordsHint": "Séparés par des virgules. L’IA ne les utilisera dans rien de ce qu’elle écrit pour cet espace.",
+    "clientAfterTeam": "Puis demander au client",
+    "clientAfterTeamHint": "Quand un membre de l’équipe approuve une publication, elle passe au lien de relecture du client et n’est validée que lorsque le client l’approuve. Nécessite un lien de relecture qui laisse le client décider."
   },
   "setup": {
     "title": "Configurer MS Social Pilot",
