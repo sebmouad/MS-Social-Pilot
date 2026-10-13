@@ -454,11 +454,12 @@ The owner will **host and sell the app as a service**. On 2026-10-11 the owner
 moved **billing / plans / usage limits** and **custom domain (white-label)**
 back in, **as the final step** (Phase S4, S6).
 
-### Decided out (owner, 2026-10-11)
-AI agent with schedules, AI image/video/voice hub, workspace brand book, agents
-catalogue, link-in-bio, design editor, Facebook coloured text backgrounds,
-location tags and @mentions, tasks & workflows, custom fields, mobile app /
-Chrome extension. (Billing/plans and custom domain moved to Phase S.)
+### Previously "decided out" — reopened (owner, 2026-10-13)
+The 2026-10-11 list (AI agent with schedules, AI image/video/voice hub, brand
+book, link-in-bio, design editor, coloured text backgrounds, location tags and
+@mentions, tasks & workflows, custom fields, mobile app) was written by an
+earlier session; the owner says they did not rule these out. They are back in
+the plan, tracked in `docs/ai/MAP.md`.
 
 ## Phase G — Owner-approved additions (2026-10-11)
 

@@ -21,3 +21,17 @@ FEATURES.md (what exists) and NEXT_PHASES.md (specs).
 3. Command palette.
 4. Two-step approval chain.
 5. Campaigns, report links.
+
+## Reopened ideas (owner, 2026-10-13: "I did not rule out")
+| Idea | Size | Status |
+|---|---|---|
+| Brand book beyond voice (words to avoid, colours, logo) | S | Brand voice per workspace and per channel exists; ⬜ words to avoid |
+| Link-in-bio page | M | ⬜ |
+| Custom fields on posts | M | ⬜ |
+| Design editor (basic) | L | ⬜ |
+| AI image / video / voice (root-activated provider, models fetched) | M | ⬜ |
+| AI agent with schedules | M | ⬜ |
+| Tasks and workflows | L | ⬜ |
+| Location tags and @mentions | M | ⬜ (Meta permission review) |
+| Coloured text backgrounds | S | ⬜ |
+| Mobile app | L | PWA exists |
