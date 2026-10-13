@@ -43,6 +43,8 @@ test('lists today’s topics, filters them by subject and starts a post', async 
     await page.getByRole('button', { name: 'Save subjects' }).click();
     await expect(page.getByText('Subjects saved.')).toBeVisible({ timeout: 2_000 });
   }).toPass();
+  // Saved on the server; reload rather than wait on the in-page refresh, which can stall in a production build.
+  await page.reload();
   await expect(country.getByText('e2e weather')).toBeHidden();
   await expect(page.getByText('1 topic does not mention your subjects.')).toBeVisible();
 
