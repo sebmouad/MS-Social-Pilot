@@ -1,6 +1,6 @@
 import { SavedViews } from '@/components/SavedViews';
 import { EmptyState } from '@/components/EmptyState';
-import Link from 'next/link';
+import type { AnchorHTMLAttributes } from 'react';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import { requirePage } from '@/lib/auth';
@@ -24,6 +24,16 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { parseMedia } from '@/lib/json';
 import { Icon } from '@/components/Icon';
 import { CalendarFeedButton } from '@/components/CalendarFeedButton';
+
+/**
+ * Plain links on this screen. A month, a week or a status filter is a new page
+ * of the same screen, and in a production build the router's in-page navigation
+ * on this page was found to stall (docs/ai/STATUS.md), so these load the page
+ * the ordinary way. `scroll` and `prefetch` belong to the router and are ignored.
+ */
+function Link({ scroll: _scroll, prefetch: _prefetch, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { scroll?: boolean; prefetch?: boolean }) {
+  return <a {...props} />;
+}
 
 export const dynamic = 'force-dynamic';
 
