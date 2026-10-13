@@ -36,6 +36,7 @@ const INHERITS: Record<string, string> = {
   'src/app/invite/[token]/page.tsx': 'Shown before the invitee belongs to any workspace.',
   'src/app/(app)/analytics/post/[postTargetId]/page.tsx':
     'Titled by the post it shows, which is not known until it is fetched.',
+  'src/app/bio/[slug]/page.tsx': 'Titled by the page owner’s own title, which is not known until it is fetched.',
   'src/app/(app)/e2e-slow/page.tsx': 'Exists only for the browser walk.',
   'src/app/(app)/e2e-throw/page.tsx': 'Exists only for the browser walk.',
 };

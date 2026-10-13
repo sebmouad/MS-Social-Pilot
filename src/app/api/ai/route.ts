@@ -1,3 +1,4 @@
+import { voiceWithAvoid } from '@/lib/brand';
 import { z } from 'zod';
 
 import { requireAuth } from '@/lib/auth';
@@ -69,6 +70,7 @@ export const POST = route(async (request: Request) => {
       aiEnabled: true,
       aiTone: true,
       aiBrandVoice: true,
+      aiAvoidWords: true,
       audienceCountries: true,
       audienceLanguages: true,
       audienceTimezone: true,
@@ -102,7 +104,7 @@ export const POST = route(async (request: Request) => {
     // The post is written for the audience of this client, so the workspace
     // language wins over the user's own interface language.
     locale: auth.workspace.defaultLocale,
-    brandVoice: page?.brandVoice?.trim() || workspace.aiBrandVoice,
+    brandVoice: voiceWithAvoid(page?.brandVoice?.trim() || workspace.aiBrandVoice, workspace.aiAvoidWords),
     // The Page's audience (H0), or the workspace's default when several are picked.
     audience: effectiveAudience(page ? audienceOf(page) : EMPTY_AUDIENCE, audienceOf(workspace), auth.workspace.timezone),
   };
@@ -141,7 +143,7 @@ export const POST = route(async (request: Request) => {
               text: input.text,
               language: group.language,
               countries: audiences.get(first.id)!.countries,
-              brandVoice: (group.targetIds.length === 1 && first.brandVoice?.trim()) || workspace.aiBrandVoice,
+              brandVoice: voiceWithAvoid((group.targetIds.length === 1 && first.brandVoice?.trim()) || workspace.aiBrandVoice, workspace.aiAvoidWords),
             })
           ).text
         : input.text;

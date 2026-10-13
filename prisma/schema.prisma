@@ -308,6 +308,8 @@ model Workspace {
   aiEnabled    Boolean @default(true)
   aiTone       String?
   aiBrandVoice String?
+  /// Words and phrases the AI must never use for this workspace.
+  aiAvoidWords String?
   /// Negative-comment alert (H15): the worker reads the mood of new comments with AI.
   watchNegativeComments Boolean @default(false)
   /// Trending topics (H7): words that keep the list to the team's subjects; empty shows every topic.

@@ -65,6 +65,7 @@ export default async function SettingsPage() {
           watchNegativeComments: workspace.watchNegativeComments,
           aiTone: workspace.aiTone ?? '',
           aiBrandVoice: workspace.aiBrandVoice ?? '',
+          aiAvoidWords: workspace.aiAvoidWords ?? '',
         }}
         targets={targets.map((target) => ({
           id: target.id,

@@ -308,6 +308,7 @@ export const workspaceSettingsSchema = z.object({
   trendKeywords: z.array(z.string().trim().min(1).max(60)).max(30).optional(),
   aiTone: z.string().trim().max(50).nullish(),
   aiBrandVoice: z.string().trim().max(2000).nullish(),
+  aiAvoidWords: z.string().trim().max(1000).nullish(),
 
   // Report branding: the logo on the cover, and the words around it.
   logoUrl: z.union([httpUrl, z.literal('')]).nullish(),

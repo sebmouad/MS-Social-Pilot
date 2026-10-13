@@ -38,6 +38,7 @@ export interface WorkspaceOptions {
   watchNegativeComments: boolean;
   aiTone: string;
   aiBrandVoice: string;
+  aiAvoidWords: string;
 }
 
 interface Props {
@@ -464,6 +465,19 @@ export function SettingsClient({
               onChange={(event) => setSettings({ ...settings, aiBrandVoice: event.target.value })}
             />
             <p className="hint">{t('aiBrandVoiceHint')}</p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="aiAvoidWords">
+              {t('aiAvoidWords')}
+            </label>
+            <input
+              id="aiAvoidWords"
+              className="input"
+              value={settings.aiAvoidWords}
+              maxLength={1000}
+              onChange={(event) => setSettings({ ...settings, aiAvoidWords: event.target.value })}
+            />
+            <p className="hint">{t('aiAvoidWordsHint')}</p>
           </div>
         </div>
 

@@ -1,3 +1,4 @@
+import { voiceWithAvoid } from './brand';
 import type { Locale, WorkspaceRole } from '@prisma/client';
 
 import { aiAvailable, improveCaption } from './ai';
@@ -63,12 +64,12 @@ export async function createStaggered(
 
 async function pageVoices(workspaceId: string, targetIds: string[]) {
   const [workspace, pages] = await Promise.all([
-    prisma.workspace.findUnique({ where: { id: workspaceId }, select: { aiEnabled: true, aiTone: true, aiBrandVoice: true } }),
+    prisma.workspace.findUnique({ where: { id: workspaceId }, select: { aiEnabled: true, aiTone: true, aiBrandVoice: true, aiAvoidWords: true } }),
     prisma.target.findMany({ where: { workspaceId, id: { in: targetIds } }, select: { id: true, brandVoice: true } }),
   ]);
   if (!workspace?.aiEnabled) return null;
   return new Map(
-    pages.map((page) => [page.id, { tone: workspace.aiTone, brandVoice: page.brandVoice?.trim() || workspace.aiBrandVoice }]),
+    pages.map((page) => [page.id, { tone: workspace.aiTone, brandVoice: voiceWithAvoid(page.brandVoice?.trim() || workspace.aiBrandVoice, workspace.aiAvoidWords) }]),
   );
 }
 

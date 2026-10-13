@@ -2009,7 +2009,9 @@
     "businessTo": "à",
     "businessHoursHint": "Les temps de réponse ne comptent que ces jours et ces heures, à l’heure de l’espace de travail. Ne cochez aucun jour pour compter toutes les heures.",
     "watchNegativeComments": "M’alerter quand les commentaires négatifs augmentent",
-    "watchNegativeCommentsHint": "L’IA lit l’humeur des nouveaux commentaires chaque heure et prévient l’équipe par e-mail quand un canal reçoit au moins deux fois plus de commentaires négatifs que d’habitude. Utilise le quota d’IA ; les commentaires masqués par les règles de modération sont ignorés."
+    "watchNegativeCommentsHint": "L’IA lit l’humeur des nouveaux commentaires chaque heure et prévient l’équipe par e-mail quand un canal reçoit au moins deux fois plus de commentaires négatifs que d’habitude. Utilise le quota d’IA ; les commentaires masqués par les règles de modération sont ignorés.",
+    "aiAvoidWords": "Mots à éviter",
+    "aiAvoidWordsHint": "Séparés par des virgules. L’IA ne les utilisera dans rien de ce qu’elle écrit pour cet espace."
   },
   "setup": {
     "title": "Configurer MS Social Pilot",
@@ -2571,7 +2573,10 @@
     "telegramHint": "Créez un bot avec @BotFather dans Telegram, puis ajoutez-le à votre chaîne comme administrateur autorisé à publier. Collez ici le jeton du bot et la chaîne.",
     "telegramToken": "Jeton du bot",
     "telegramChannel": "Chaîne",
-    "telegramChannelHint": "Le @nom de la chaîne, ou son identifiant numérique (commençant par -100) pour une chaîne privée."
+    "telegramChannelHint": "Le @nom de la chaîne, ou son identifiant numérique (commençant par -100) pour une chaîne privée.",
+    "hint_youtube": "Votre chaîne YouTube. Vidéos uniquement.",
+    "hint_tiktok": "Votre compte TikTok. Vidéos uniquement.",
+    "hint_telegram": "Un canal ou un groupe dont votre bot est administrateur."
   },
   "root": {
     "title": "Root",

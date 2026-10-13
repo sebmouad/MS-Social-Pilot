@@ -2009,7 +2009,9 @@
     "businessTo": "to",
     "businessHoursHint": "Response times count only these days and hours, on the workspace's clock. Pick no day to count every hour.",
     "watchNegativeComments": "Alert me when negative comments spike",
-    "watchNegativeCommentsHint": "AI reads the mood of new comments every hour and emails the team when a channel gets at least twice its usual negative comments. Uses the AI allowance; comments hidden by moderation rules are skipped."
+    "watchNegativeCommentsHint": "AI reads the mood of new comments every hour and emails the team when a channel gets at least twice its usual negative comments. Uses the AI allowance; comments hidden by moderation rules are skipped.",
+    "aiAvoidWords": "Words to avoid",
+    "aiAvoidWordsHint": "Separated by commas. The AI will not use them in anything it writes for this workspace."
   },
   "setup": {
     "title": "Set up MS Social Pilot",
@@ -2571,7 +2573,10 @@
     "telegramHint": "Make a bot with @BotFather in Telegram, then add it to your channel as an administrator allowed to post messages. Paste the bot’s token and the channel here.",
     "telegramToken": "Bot token",
     "telegramChannel": "Channel",
-    "telegramChannelHint": "The channel’s @name, or its numeric id (starting with -100) for a private channel."
+    "telegramChannelHint": "The channel’s @name, or its numeric id (starting with -100) for a private channel.",
+    "hint_youtube": "Your YouTube channel. Videos only.",
+    "hint_tiktok": "Your TikTok account. Videos only.",
+    "hint_telegram": "A channel or group where your bot is an administrator."
   },
   "root": {
     "title": "Root",

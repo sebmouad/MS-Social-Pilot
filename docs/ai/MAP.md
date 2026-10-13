@@ -25,7 +25,7 @@ FEATURES.md (what exists) and NEXT_PHASES.md (specs).
 ## Reopened ideas (owner, 2026-10-13: "I did not rule out")
 | Idea | Size | Status |
 |---|---|---|
-| Brand book beyond voice (words to avoid, colours, logo) | S | Brand voice per workspace and per channel exists; ⬜ words to avoid |
+| Brand book beyond voice (words to avoid, colours, logo) | S | ✅ voice per workspace and channel, words to avoid; ⬜ colours, logo |
 | Link-in-bio page | M | ✅ Settings › Link in bio, public /bio/<slug>, click counts |
 | Custom fields on posts | M | ⬜ |
 | Design editor (basic) | L | ⬜ |
