@@ -15,7 +15,7 @@ const TONE: Record<Prediction['outlook'], string> = {
 };
 
 /**
- * Engagement prediction (NEXT_PHASES H6), in the composer: "likely above /
+ * Engagement prediction, in the composer: "likely above /
  * around / below this Page's usual", with the reasons. Never a number.
  */
 export function EngagementOutlook({

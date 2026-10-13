@@ -7,7 +7,7 @@ import { prisma } from './prisma';
 import { ZIP_MAX_BYTES, ZipWriter } from './zip';
 
 /**
- * Export everything (NEXT_PHASES G17): one workspace's posts, schedule,
+ * Export everything: one workspace's posts, schedule,
  * analytics, comments and media as a ZIP of JSON, CSV and files, built by the
  * worker and downloadable for a week. Never includes tokens or secrets.
  * Database and disk only, no Graph call.

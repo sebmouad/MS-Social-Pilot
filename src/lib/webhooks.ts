@@ -8,7 +8,7 @@ import { prisma } from './prisma';
 import { assertPublicUrl, assertResolvesPublicly, UnsafeUrlError } from './safe-fetch';
 
 /**
- * Outgoing webhooks (NEXT_PHASES H18): what happens in a workspace, POSTed as
+ * Outgoing webhooks: what happens in a workspace, POSTed as
  * JSON to an address its admins chose — Zapier, n8n, Make or their own server.
  *
  * An event never waits on the receiver: `emitWebhook` only writes one delivery

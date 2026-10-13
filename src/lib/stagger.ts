@@ -9,7 +9,7 @@ import { utcToLocalInput } from './time';
 import type { CreatePostInput } from './validation';
 
 /**
- * The fix the spam-risk guard offers (NEXT_PHASES G6): the same post becomes
+ * The fix the spam-risk guard offers: the same post becomes
  * one post per Page, `staggerMinutes` apart, starting at the time picked (or
  * now). With `aiVariants`, every Page after the first gets the caption reworded
  * in its own voice, so no two Pages carry identical text either.

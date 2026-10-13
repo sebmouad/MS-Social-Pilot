@@ -649,7 +649,7 @@ test('what a phone shares to the app arrives in the composer', async ({ page }) 
 });
 
 test('the same post to many Pages at once is flagged, and can go out one Page at a time', async ({ page }) => {
-  // Spam-risk guard (NEXT_PHASES G6): warn, never block, and offer the stagger.
+  // Spam-risk guard: warn, never block, and offer the stagger.
   const failures = collectFailures(page);
   const target = await prisma.target.findFirstOrThrow({ where: { name: PAGE_NAME } });
   const extra = await Promise.all(

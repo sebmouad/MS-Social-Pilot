@@ -1,5 +1,5 @@
 /**
- * Image rules applied at publish time (NEXT_PHASES G13): the per-Page
+ * Image rules applied at publish time: the per-Page
  * watermark and the aspect ratios each destination accepts. Plain module, so
  * the Page settings preview can use the same rules as the worker.
  */

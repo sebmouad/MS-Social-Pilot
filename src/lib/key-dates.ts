@@ -1,5 +1,5 @@
 /**
- * Dates worth a post (NEXT_PHASES H2), from the calendars a Page's audience
+ * Dates worth a post, from the calendars a Page's audience
  * follows (H0). Nothing is on by default and no calendar is favoured: each
  * Page ticks the ones its audience keeps.
  *

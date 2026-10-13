@@ -1,5 +1,5 @@
 /**
- * @mentions in internal notes (NEXT_PHASES H8), the parts the note box and the
+ * @mentions in internal notes, the parts the note box and the
  * server share. Plain module: no database.
  */
 

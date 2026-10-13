@@ -4,7 +4,7 @@ import { WorkspaceRole } from '@prisma/client';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Internal notes (NEXT_PHASES H8): a note emails only the members it really
+ * Internal notes: a note emails only the members it really
  * mentions who may see the post, never its author; only its author or an
  * editor removes it.
  */

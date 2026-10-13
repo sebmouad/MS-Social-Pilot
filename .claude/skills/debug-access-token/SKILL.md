@@ -20,4 +20,4 @@ description: Diagnose expired, revoked or under-scoped Facebook tokens in MS Soc
 5. Fix = the owner reconnects Facebook (Connections → Reconnect). Never ask for or
    handle the owner's password or tokens.
 6. Server logs for the failure: `journalctl -u social-pilot-worker -n 200`
-   (see `docs/ai/RELEASE.md` for access).
+   (see `docs/OPERATIONS.md` for access).

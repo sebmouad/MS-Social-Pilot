@@ -4,7 +4,7 @@ import { WorkspaceRole } from '@prisma/client';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Post version history (NEXT_PHASES H9): creating and editing a post each keep
+ * Post version history: creating and editing a post each keep
  * a version, a save that changes nothing versioned keeps none, and a post keeps
  * at most MAX_VERSIONS.
  */

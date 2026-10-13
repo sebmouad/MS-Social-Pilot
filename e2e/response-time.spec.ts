@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
-/** Inbox response time (NEXT_PHASES H11): business hours in Settings, the figures under Analytics. */
+/** Inbox response time: business hours in Settings, the figures under Analytics. */
 
 let postId = '';
 let workspaceId = '';

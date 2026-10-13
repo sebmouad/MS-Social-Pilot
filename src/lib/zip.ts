@@ -2,7 +2,7 @@ import { createWriteStream, type WriteStream } from 'node:fs';
 import { deflateRawSync } from 'node:zlib';
 
 /**
- * A small ZIP writer for the workspace export (NEXT_PHASES G17): entries are
+ * A small ZIP writer for the workspace export: entries are
  * added one at a time and written straight to disk, so only one file is in
  * memory at once. No ZIP64: the export stops adding media before 4 GB.
  */

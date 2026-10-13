@@ -10,7 +10,7 @@ import { fetchPublic, readCapped, readCappedBytes } from './safe-fetch';
 import { parseStructuredData, type StructuredItem } from './structured-data';
 
 /**
- * The server half of NEXT_PHASES H3: fetch a page for its JSON-LD, and copy
+ * The server half of posts from structured data: fetch a page for its JSON-LD, and copy
  * the pictures a template uses into the media library, so they publish like
  * any upload. Both fetch user-supplied addresses, through `fetchPublic`.
  */

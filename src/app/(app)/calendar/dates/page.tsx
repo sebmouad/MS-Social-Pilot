@@ -24,7 +24,7 @@ export function generateMetadata() {
 const AHEAD_DAYS = 90;
 
 /**
- * Key dates and seasons (NEXT_PHASES H2): what is coming up for the Pages in
+ * Key dates and seasons: what is coming up for the Pages in
  * the selection, the team's own dates, and the seasonal modes that change
  * when the queue posts.
  */

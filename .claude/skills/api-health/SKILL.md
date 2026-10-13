@@ -10,7 +10,7 @@ description: Inspect Graph API rate limits, usage and deprecation warnings affec
    when it is high — check worker logs for "stood aside").
 2. Deprecations: `devtools_api_changelog` for the pinned version
    (`FACEBOOK_GRAPH_VERSION`) and the next ones; cross-check every metric in
-   `src/lib/facebook/metrics.ts` (`deprecatedFrom`) and `docs/ai/META_API_NOTES.md`.
+   `src/lib/facebook/metrics.ts` (`deprecatedFrom`) and `docs/META_API_NOTES.md`.
 3. Live coverage: Analytics → Overview → Technical details shows which metrics
    Facebook still serves for a real Page (probed by the worker's first read).
 4. Version bump plan: change `FACEBOOK_GRAPH_VERSION` in Configuration, run the

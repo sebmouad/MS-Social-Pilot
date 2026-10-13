@@ -4,7 +4,7 @@ import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
 /**
- * Undo send (NEXT_PHASES H10): "Publish now" waits with an Undo; pressing it
+ * Undo send: "Publish now" waits with an Undo; pressing it
  * brings the post back as a draft, open in the composer. Nothing reaches
  * Facebook: the post is taken back before the worker's time.
  */

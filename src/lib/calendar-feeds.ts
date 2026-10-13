@@ -1,5 +1,5 @@
 /**
- * Private calendar feeds (NEXT_PHASES H19): a member subscribes Google
+ * Private calendar feeds: a member subscribes Google
  * Calendar or Outlook to their planned posts. The address carries a random
  * token (stored hashed, shown once); reading it narrows to the Pages the feed
  * was made for and, every time, to the Pages the member may still see. A

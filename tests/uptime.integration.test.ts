@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
-/** Uptime history for the root status page (NEXT_PHASES G15). */
+/** Uptime history for the root status page. */
 
 let database: TestDatabase;
 let prisma: typeof import('../src/lib/prisma')['prisma'];

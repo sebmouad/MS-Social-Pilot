@@ -4,7 +4,7 @@ import { collectFailures, open, OWNER } from './helpers';
 import { prisma } from './fixtures';
 
 /**
- * Key dates and seasons (NEXT_PHASES H2): a key date added on its screen shows
+ * Key dates and seasons: a key date added on its screen shows
  * there and on the calendar; a seasonal mode is added and removed. Database only.
  */
 

@@ -1,5 +1,5 @@
 /**
- * Internal notes on posts (NEXT_PHASES H8): a team-only thread under each
+ * Internal notes on posts: a team-only thread under each
  * post, never published. A note can @mention members who may see the post,
  * and they are emailed.
  */

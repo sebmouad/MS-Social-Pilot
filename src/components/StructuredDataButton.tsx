@@ -43,7 +43,7 @@ function amount(value: number, currency: string | null, locale: string): string 
 }
 
 /**
- * "Use page details" (NEXT_PHASES H3): read the linked page's schema.org data
+ * "Use page details": read the linked page's schema.org data
  * and turn a product, event, recipe, job… into a ready post, pictures included.
  */
 export function StructuredDataButton({

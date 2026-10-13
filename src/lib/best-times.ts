@@ -4,7 +4,7 @@ import { suggestSlots, type QueueSlotLike } from './queue-suggestions';
 import { logActivity } from './scheduler/runner';
 
 /**
- * Best time per Page, automatically (NEXT_PHASES G10).
+ * Best time per Page, automatically.
  *
  * Once a week, for workspaces that chose "apply", each Page's own posts are
  * read again and its strongest new times are added to the queue as that Page's

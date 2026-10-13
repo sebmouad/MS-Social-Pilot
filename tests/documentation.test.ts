@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
  * part a machine can answer.
  */
 
-const DOCS = ['docs/ARCHITECTURE.md', 'docs/DEPLOYMENT.md', 'docs/PROJECT_SCHEMA.md'];
+const DOCS = ['docs/README.md', 'docs/ARCHITECTURE.md', 'docs/OPERATIONS.md', 'docs/FEATURES.md', 'docs/PERMISSIONS.md', 'docs/DESIGN.md', 'docs/META_API_NOTES.md', 'docs/PLAN.md'];
 
 /**
  * Names that are deliberately not in the source: things the documents discuss

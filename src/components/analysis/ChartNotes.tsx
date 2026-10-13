@@ -9,7 +9,7 @@ import { NOTE_LABEL_MAX, type ChartNoteView } from '@/lib/chart-note-colors';
 import { PALETTE, PALETTE_KEYS, type PaletteKey } from '@/lib/palette';
 
 /**
- * The notes on a Page's timelines (NEXT_PHASES H13), listed under the chart,
+ * The notes on a Page's timelines, listed under the chart,
  * with a form to add one for those who may.
  */
 export function ChartNotes({

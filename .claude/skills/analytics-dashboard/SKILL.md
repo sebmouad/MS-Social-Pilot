@@ -5,8 +5,8 @@ description: Build or change MS Social Pilot analytics — KPI cards, charts, mu
 
 # Analytics dashboards
 
-Read first: `docs/ai/NEXT_PHASES.md` Phase B, `docs/ai/META_API_NOTES.md`
-(verified real-data facts), `docs/inspiration/simplified/PATTERNS.md §2`.
+Read first: `docs/ARCHITECTURE.md` (selection, aggregation), `docs/META_API_NOTES.md`
+(verified real-data facts), `docs/DESIGN.md`.
 Also load `dataviz` before designing a chart and `profile-selection` for scope.
 
 ## Data
@@ -23,7 +23,7 @@ Also load `dataviz` before designing a chart and `profile-selection` for scope.
   country/city need `period=day`; impressions/reach retired → `*_media_view`;
   age/gender and locale gone.
 
-## Aggregation across profiles (must match NEXT_PHASES §B2)
+## Aggregation across profiles (must match `src/lib/aggregate.ts`)
 Sum counts · unique people not additive (label "up to N", show per profile) ·
 followers = sum of latest values · rates recomputed from summed parts · money
 grouped by currency. Put each rule in a pure function in `src/lib/` with unit

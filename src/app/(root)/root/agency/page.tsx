@@ -13,7 +13,7 @@ export function generateMetadata() {
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
-/** Every workspace's health side by side, sortable, each row opening the workspace (NEXT_PHASES H14). */
+/** Every workspace's health side by side, sortable, each row opening the workspace. */
 export default async function RootAgencyPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireRoot();
   const t = await getTranslations('root.agency');

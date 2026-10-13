@@ -4,7 +4,7 @@ import { WorkspaceRole } from '@prisma/client';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * AI translation (NEXT_PHASES G11): a translated post becomes one post per
+ * AI translation: a translated post becomes one post per
  * language, each to its own Pages, plus one in the original for the rest.
  */
 

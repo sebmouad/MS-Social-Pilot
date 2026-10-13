@@ -9,7 +9,7 @@ import { SidebarDock } from './SidebarDock';
 
 /**
  * A screen with the channel column on its left: the one way to choose which
- * channels every screen shows (the shared selection, NEXT_PHASES Phase A).
+ * channels every screen shows (the shared selection).
  */
 export function ChannelsLayout({ auth, selection, tools, children }: { auth: AuthContext; selection: PageFilter; tools?: ReactNode; children: ReactNode }) {
   return (

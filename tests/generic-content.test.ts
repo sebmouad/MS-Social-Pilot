@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Generic product (NEXT_PHASES S1): no owner-, country- or niche-specific
+ * Generic product: no owner-, country- or niche-specific
  * names in code or copy. Operator details come from root's configuration.
  * The time-zone list is the one place a city name belongs.
  */

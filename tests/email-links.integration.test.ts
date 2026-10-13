@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Email links (NEXT_PHASES S3): a self-service sign-up proves its address
+ * Email links: a self-service sign-up proves its address
  * before using the app, and a forgotten password is reset by a one-time link.
  */
 const cookieJar = new Map<string, string>();

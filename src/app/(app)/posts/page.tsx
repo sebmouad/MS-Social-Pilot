@@ -24,7 +24,7 @@ import { pageHref, pageNumber, paginate } from '@/lib/paging';
 /**
  * Plain links on this screen: a status tab or a page of posts is a new page of
  * the same screen, and in a production build the router's in-page navigation
- * here was found to stall (docs/ai/STATUS.md), so these load the ordinary way.
+ * here was found to stall (docs/PLAN.md), so these load the ordinary way.
  */
 function Link({ scroll: _scroll, prefetch: _prefetch, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { scroll?: boolean; prefetch?: boolean }) {
   return <a {...props} />;

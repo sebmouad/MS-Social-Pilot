@@ -1,5 +1,5 @@
 /**
- * One-time links sent by email (NEXT_PHASES S3): prove the address after a
+ * One-time links sent by email: prove the address after a
  * self-service sign-up, or choose a new password. Only the token's sha256 is
  * stored; a link works once, and a newer one replaces the older.
  */

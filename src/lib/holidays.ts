@@ -1,7 +1,7 @@
 import { prisma } from './prisma';
 
 /**
- * Public holidays of every country an audience names (NEXT_PHASES H2), from
+ * Public holidays of every country an audience names, from
  * the open Nager.Date dataset (over 100 countries, no key). Fetched by the
  * worker for the countries in use, one country-year at a time, stored and
  * shared by every workspace; screens read the database only.

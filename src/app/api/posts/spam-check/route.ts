@@ -19,7 +19,7 @@ const schema = z.object({
 });
 
 /**
- * Spam-risk guard (NEXT_PHASES G6): would this post put the same link or text
+ * Spam-risk guard: would this post put the same link or text
  * on too many Pages at once? Advice only — creating the post never asks.
  */
 export const POST = route(async (request: Request) => {

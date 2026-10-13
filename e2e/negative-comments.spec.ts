@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
-/** Negative-comment alert (NEXT_PHASES H15): switched on in Settings › AI. */
+/** Negative-comment alert: switched on in Settings › AI. */
 
 let workspaceId = '';
 

@@ -9,7 +9,7 @@ import { Locale } from '@prisma/client';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * AI alt text for photos (NEXT_PHASES H5): only this workspace's own uploads
+ * AI alt text for photos: only this workspace's own uploads
  * are read, shrunk before they are sent, and the answer is plain alt text.
  */
 

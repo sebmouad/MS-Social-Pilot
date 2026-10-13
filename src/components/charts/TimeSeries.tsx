@@ -20,7 +20,7 @@ export interface TimeSeriesLine {
   dashed?: boolean;
 }
 
-/** A dated mark on the chart (NEXT_PHASES H13): "Campaign started". */
+/** A dated mark on the chart: "Campaign started". */
 export interface TimeSeriesNote {
   /** yyyy-MM-dd, matched against the start of each point's `x`. */
   day: string;

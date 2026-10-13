@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Short-link click analytics (NEXT_PHASES G14): clicks per day, Page, article
+ * Short-link click analytics: clicks per day, Page, article
  * and post, following the selected Pages.
  */
 

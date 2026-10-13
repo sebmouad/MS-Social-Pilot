@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
-/** Meta API usage per Page (NEXT_PHASES H16): root sees the heaviest Pages and jobs of the last hour. */
+/** Meta API usage per Page: root sees the heaviest Pages and jobs of the last hour. */
 
 test.afterAll(async () => {
   await prisma.graphUsage.deleteMany({ where: { key: 'worker' } });

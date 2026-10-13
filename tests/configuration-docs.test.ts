@@ -15,7 +15,7 @@ import { SETTING_DEFINITIONS } from '../src/lib/settings/definitions';
  */
 
 const envExample = readFileSync('.env.example', 'utf8');
-const schemaNotes = readFileSync('docs/PROJECT_SCHEMA.md', 'utf8');
+const schemaNotes = readFileSync('docs/OPERATIONS.md', 'utf8');
 
 /**
  * Variables that cannot be settings, and so will never be in the registry.

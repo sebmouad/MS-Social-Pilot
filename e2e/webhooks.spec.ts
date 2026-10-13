@@ -4,7 +4,7 @@ import { collectFailures, open } from './helpers';
 import { prisma } from './fixtures';
 
 /**
- * Outgoing webhooks (NEXT_PHASES H18): add one, see its secret once, send a
+ * Outgoing webhooks: add one, see its secret once, send a
  * test (the address does not exist, so it is reported as not delivered and
  * logged), then remove it through the confirmation dialog.
  */

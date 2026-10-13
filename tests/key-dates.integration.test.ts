@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Key dates and seasons (NEXT_PHASES H2): public holidays fetched by the
+ * Key dates and seasons: public holidays fetched by the
  * worker for the countries in use, the calendar's key days for the Pages in
  * view, and seasonal modes in the queue.
  */

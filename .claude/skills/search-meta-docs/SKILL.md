@@ -12,4 +12,4 @@ description: Search Meta developer documentation (Graph API, Pages API, Instagra
    https://developers.facebook.com/documentation/pages-api/platforminsights/page.md).
 3. Trust live behaviour over docs: confirm a metric or field with the app's
    coverage probe or a read-only call through the app before relying on it.
-4. Record anything surprising in `docs/ai/META_API_NOTES.md` with the date.
+4. Record anything surprising in `docs/META_API_NOTES.md` with the date.

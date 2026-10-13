@@ -36,7 +36,7 @@ interface Delivery {
 const key = (event: string) => event.replace('.', '_');
 
 /**
- * Outgoing webhooks (NEXT_PHASES H18). The secret is shown once, right after
+ * Outgoing webhooks. The secret is shown once, right after
  * adding; the log lists the last deliveries with a way to send one again.
  */
 export function WebhooksClient({ webhooks }: { webhooks: Webhook[] }) {

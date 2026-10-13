@@ -4,7 +4,7 @@ import { computedDaysBetween, customDatesBetween } from './key-dates';
 import { prisma } from './prisma';
 
 /**
- * The days worth a post on the calendar (NEXT_PHASES H2), for the Pages being
+ * The days worth a post on the calendar, for the Pages being
  * looked at: the calendars and countries their audiences follow, plus the
  * team's own key dates. Nothing shows for a Page whose audience ticks nothing.
  */

@@ -177,7 +177,7 @@ export async function approvePost(options: {
   postId: string;
   reviewerId: string;
   reviewerRole: WorkspaceRole;
-  /** Answered by a client through a review link that decides (NEXT_PHASES A5). */
+  /** Answered by a client through a review link that decides. */
   viaLink?: { title: string; authorName: string };
 }): Promise<ApproveResult> {
   if (!options.viaLink && !canApprove(options.reviewerRole)) throw errors.noPermission();
@@ -268,7 +268,7 @@ export async function rejectPost(options: {
   postId: string;
   reviewerId: string;
   reviewerRole: WorkspaceRole;
-  /** Answered by a client through a review link that decides (NEXT_PHASES A5). */
+  /** Answered by a client through a review link that decides. */
   viaLink?: { title: string; authorName: string };
   note: string;
 }): Promise<void> {

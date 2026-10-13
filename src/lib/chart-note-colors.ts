@@ -1,5 +1,5 @@
 /**
- * Notes on charts (NEXT_PHASES H13), the parts the browser needs. Plain
+ * Notes on charts, the parts the browser needs. Plain
  * module: no database.
  */
 import type { PaletteKey } from './palette';

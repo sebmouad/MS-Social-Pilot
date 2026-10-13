@@ -4,7 +4,7 @@ import { WorkspaceRole } from '@prisma/client';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Negative-comment alert (NEXT_PHASES H15): new comments' mood is read in one
+ * Negative-comment alert: new comments' mood is read in one
  * AI batch, the Page's own replies and hidden comments are skipped, and the
  * team hears once when a Page's negative comments spike.
  */

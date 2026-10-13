@@ -10,7 +10,7 @@ import { utcToLocalInput } from './time';
 import type { CreatePostInput } from './validation';
 
 /**
- * Caption A/B tests (NEXT_PHASES G9).
+ * Caption A/B tests.
  *
  * The same content goes out with two to four captions. With at least as many
  * Pages as captions, the Pages are shared out between the captions and every

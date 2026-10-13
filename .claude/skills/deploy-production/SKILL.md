@@ -5,7 +5,7 @@ description: Deploy MS Social Pilot to production (social.newsgeet.com) safely, 
 
 # Deploy to production
 
-Full detail: `docs/ai/RELEASE.md`.
+Full detail: `docs/OPERATIONS.md`.
 
 1. Tests green (`run-tests` skill). Known failing unit test: the old
    daylight-saving one only.

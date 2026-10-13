@@ -4,7 +4,7 @@
 // Json, so the database rejects invalid values rather than trusting application
 // code to have validated them.
 //
-// See docs/PROJECT_SCHEMA.md for the design this implements.
+// See docs/ARCHITECTURE.md for an overview.
 
 generator client {
   provider = "prisma-client-js"
@@ -256,7 +256,7 @@ model Workspace {
   defaultLocale Locale @default(en)
   /// First column of the calendar and first day of a reporting week: 0 Sunday … 6 Saturday.
   weekStartsOn  Int    @default(1)
-  /// Business hours (NEXT_PHASES H11): inbox response times count only these.
+  /// Business hours: inbox response times count only these.
   /// Days 0 Sunday … 6 Saturday; empty counts every hour.
   businessDays  Int[]  @default([])
   businessStart Int    @default(9)
@@ -290,7 +290,7 @@ model Workspace {
   utmCampaignTemplate String?
   shortenerEnabled    Boolean @default(false)
 
-  /// Spam-risk guard (NEXT_PHASES G6): the same link or near-identical text
+  /// Spam-risk guard: the same link or near-identical text
   /// should not reach several Pages of one network closer together than this.
   /// 0 turns the warning off.
   spamGapMinutes Int @default(20)
@@ -608,7 +608,7 @@ model Post {
   /// Set when this post was created from an RSS item.
   sourceFeedItemId String?
 
-  /// Caption A/B test (NEXT_PHASES G9): the test this post is one caption of,
+  /// Caption A/B test: the test this post is one caption of,
   /// and which one ("A", "B", …).
   captionTestId String?
   captionLabel  String?
@@ -643,7 +643,7 @@ model Post {
   @@map("posts")
 }
 
-/// A post as it stood after one save (NEXT_PHASES H9): what it said, where and
+/// A post as it stood after one save: what it said, where and
 /// when it was going, and who saved it. Compared and restored from Compose.
 model PostVersion {
   id           String    @id @default(cuid())
@@ -668,7 +668,7 @@ model PostVersion {
   @@map("post_versions")
 }
 
-/// A team-only note on a post (NEXT_PHASES H8). Never published; members it
+/// A team-only note on a post. Never published; members it
 /// @mentions are emailed.
 /// A private note on an inbox item (comment or conversation), for the team only.
 model InboxNote {
@@ -815,10 +815,10 @@ model PostNote {
   @@map("post_notes")
 }
 
-/// A member's private calendar subscription (NEXT_PHASES H19): an ICS address
+/// A member's private calendar subscription: an ICS address
 /// for Google Calendar or Outlook, narrowed to some Pages or a group, and
 /// always to what the member may still see when it is read.
-/// A Page's monthly target for one figure (NEXT_PHASES H12): followers
+/// A Page's monthly target for one figure: followers
 /// gained, views, engagement or posts. The same target applies every month
 /// until it is changed.
 model PageGoal {
@@ -839,7 +839,7 @@ model PageGoal {
   @@map("page_goals")
 }
 
-/// An annotation on analytics timelines (NEXT_PHASES H13): "Campaign
+/// An annotation on analytics timelines: "Campaign
 /// started", "Page renamed". For one Page, or every Page when targetId is null.
 model ChartNote {
   id          String   @id @default(cuid())
@@ -1711,7 +1711,7 @@ model Snippet {
   @@map("snippets")
 }
 
-/// A post structure kept for reuse (NEXT_PHASES H4): a category the team
+/// A post structure kept for reuse: a category the team
 /// names, text with `{placeholders}` filled when it is picked, hashtags, a
 /// first comment and a label. Shared per workspace.
 model PostTemplate {
@@ -1733,7 +1733,7 @@ model PostTemplate {
   @@map("post_templates")
 }
 
-/// A reusable answer for comments and Messenger (NEXT_PHASES G8), with
+/// A reusable answer for comments and Messenger, with
 /// `{first_name}` and `{page}` filled when it is picked. Shared per workspace.
 /// A named combination of channels, filters and status on the calendar or the
 /// post list, reopened in one click. Per person: `query` is the address's own
@@ -1769,7 +1769,7 @@ model SavedReply {
   @@map("saved_replies")
 }
 
-/// Caption A/B test (NEXT_PHASES G9): the same content posted with two to four
+/// Caption A/B test: the same content posted with two to four
 /// captions, on comparable Pages or at the same hour on following days. After
 /// `hours` the worker compares engagement per view and names a winner, or says
 /// there were not enough views to tell.
@@ -1944,7 +1944,7 @@ model ChatChannel {
   @@map("chat_channels")
 }
 
-/// Outgoing webhook (NEXT_PHASES H18): events POSTed, signed, to a URL the
+/// Outgoing webhook: events POSTed, signed, to a URL the
 /// workspace's admins chose (Zapier, n8n, Make, their own server).
 model WebhookEndpoint {
   id          String    @id @default(cuid())
@@ -2107,7 +2107,7 @@ model ClientInvitation {
   @@map("client_invitations")
 }
 
-/// Comment moderation rule (NEXT_PHASES G7): what to look for in new comments
+/// Comment moderation rule: what to look for in new comments
 /// on a workspace's Facebook Pages, and what the worker does when it finds it.
 model ModerationRule {
   id          String   @id @default(cuid())
@@ -2319,7 +2319,7 @@ model SeasonalMode {
   @@map("seasonal_modes")
 }
 
-/// Content mix (NEXT_PHASES H1): how many posts with a label a Page, or each
+/// Content mix: how many posts with a label a Page, or each
 /// Page of a group, should have in any coming week. Rules set on a Page
 /// replace its groups' rules for that Page.
 model ContentMixRule {

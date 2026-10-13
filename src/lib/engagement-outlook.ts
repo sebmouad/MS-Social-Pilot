@@ -1,5 +1,5 @@
 /**
- * Engagement prediction (NEXT_PHASES H6), the server side: the Page's last
+ * Engagement prediction, the server side: the Page's last
  * year of posts from what the sync stored, compared with the draft.
  */
 import { formatInZone } from './time';

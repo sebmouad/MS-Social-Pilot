@@ -7,7 +7,7 @@ import { assertRoom } from './plans';
 import { logActivity } from './scheduler/runner';
 
 /**
- * The agency level (NEXT_PHASES A7): everything one person owns, side by side,
+ * The agency level: everything one person owns, side by side,
  * and who on their team reaches which client, with a role in each.
  *
  * An agency is simply the workspaces a person owns; each is one client. The

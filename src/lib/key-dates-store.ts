@@ -4,7 +4,7 @@ import { AppError } from './errors';
 import { prisma } from './prisma';
 import { SEASON_RULES } from './seasons';
 
-/** The team's own key dates and seasonal modes (NEXT_PHASES H2): validation and storage. */
+/** The team's own key dates and seasonal modes: validation and storage. */
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);

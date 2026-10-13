@@ -4,7 +4,7 @@ import { logActivity } from '@/lib/scheduler/runner';
 import { requestExport } from '@/lib/workspace-export';
 
 /**
- * Ask for a ZIP of everything the workspace holds (NEXT_PHASES G17). The
+ * Ask for a ZIP of everything the workspace holds. The
  * workspace owner only: it contains every Page's posts, comments and media.
  */
 export const POST = route(async () => {

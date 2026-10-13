@@ -25,7 +25,7 @@ export function reportBrowserError(error: unknown): void {
 
 /**
  * Catches the errors no boundary sees — event handlers, timers, promises — and
- * reports them (NEXT_PHASES G16). Renders nothing.
+ * reports them. Renders nothing.
  */
 export function ErrorReporter() {
   useEffect(() => {

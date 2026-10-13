@@ -95,7 +95,7 @@ export function coversEveryTarget(link: { pageIds: string[] }, targetIds: string
 }
 
 /**
- * "Publish anyway" (NEXT_PHASES A5): posts a deciding link still holds this
+ * "Publish anyway": posts a deciding link still holds this
  * many hours before their time are approved, as the agency chose for that
  * client. Database only; the publish job sends them on time.
  */

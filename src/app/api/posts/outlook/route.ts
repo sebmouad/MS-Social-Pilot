@@ -19,7 +19,7 @@ const schema = z.object({
 });
 
 /**
- * Engagement prediction (NEXT_PHASES H6): how the draft compares with the
+ * Engagement prediction: how the draft compares with the
  * Page's own past posts. Advice only; reads stored posts, no Graph call.
  */
 export const POST = route(async (request: Request) => {

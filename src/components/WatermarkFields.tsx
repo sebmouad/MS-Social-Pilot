@@ -41,7 +41,7 @@ const PLACE: Record<WatermarkPosition, string> = {
 };
 
 /**
- * A Page's watermark (NEXT_PHASES G13): a library image or a line of text,
+ * A Page's watermark: a library image or a line of text,
  * where it sits, how strong and how big — with a preview of where it lands.
  */
 export function WatermarkFields({

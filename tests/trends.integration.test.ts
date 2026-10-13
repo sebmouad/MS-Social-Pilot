@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
-/** Trending topics (NEXT_PHASES H7): read from Google Trends' daily feed for the countries audiences name. */
+/** Trending topics: read from Google Trends' daily feed for the countries audiences name. */
 
 const FEED = `<?xml version="1.0"?>
 <rss xmlns:ht="https://trends.google.com/trending/rss" version="2.0"><channel>

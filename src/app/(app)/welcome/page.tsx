@@ -14,7 +14,7 @@ export function generateMetadata() {
 }
 
 /**
- * First steps after creating a workspace (NEXT_PHASES S3): the basics every
+ * First steps after creating a workspace: the basics every
  * other screen depends on — its name, its time zone, who it speaks to — and
  * then the Pages. Nothing here is niche or country-specific; each answer is
  * the user's own, and all of it can be changed later in Settings.

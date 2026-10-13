@@ -52,7 +52,7 @@ for (const name of [EXTRA, ORPHAN]) {
 
     await expect(page.getByRole('status')).toContainText(`${name} was removed.`);
     expect(await prisma.target.count({ where: { name } })).toBe(0);
-    // Loaded afresh: the in-page refresh is not reliable in a production build here (docs/ai/STATUS.md).
+    // Loaded afresh: the in-page refresh is not reliable in a production build here (docs/PLAN.md).
     await open(page, '/connections');
     await expect(page.getByRole('button', { name: `Remove ${name}` })).toHaveCount(0);
     expect(failures).toEqual([]);

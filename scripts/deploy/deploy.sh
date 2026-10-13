@@ -6,7 +6,7 @@
 #   scripts/deploy/deploy.sh --status   # what is live       (npm run deploy:status)
 #
 # Requirements on this machine: git, ssh, curl, and the SSH key below.
-# Override with DEPLOY_HOST / DEPLOY_KEY. See docs/ai/RELEASE.md.
+# Override with DEPLOY_HOST / DEPLOY_KEY. See docs/OPERATIONS.md.
 set -euo pipefail
 HOST="${DEPLOY_HOST:-root@213.246.45.75}"
 KEY="${DEPLOY_KEY:-$HOME/.ssh/SebMouadSSH}"

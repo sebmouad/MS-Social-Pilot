@@ -17,7 +17,7 @@ const WINDOW_MS = 10 * 60 * 1000;
 const recent = new Map<string, number[]>();
 
 /**
- * Browser errors for root's error list (NEXT_PHASES G16). Signed-in people
+ * Browser errors for root's error list. Signed-in people
  * only, a few at a time, so the endpoint cannot be used to fill the table.
  */
 export const POST = route(async (request: Request) => {

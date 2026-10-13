@@ -5,7 +5,7 @@ description: Make a screen, query, export or API route obey MS Social Pilot's sh
 
 # Shared profile selection
 
-Spec: `docs/ai/NEXT_PHASES.md` Phase A. Patterns: `docs/inspiration/simplified/PATTERNS.md §1`.
+Spec: `docs/ARCHITECTURE.md` (selection model). UI rules: `docs/DESIGN.md`.
 
 ## Rules
 1. **One selection for the whole app.** URL params `group`, `pages` (comma ids),
@@ -23,7 +23,7 @@ Spec: `docs/ai/NEXT_PHASES.md` Phase A. Patterns: `docs/inspiration/simplified/P
    posts — same state) and say it in headings ("12 posts · 3 profiles").
 6. **Never empty**: at least one profile; "Only" shortcut selects one.
 7. Analytics with 2+ profiles follows the aggregation rules in
-   NEXT_PHASES §B2 (unique reach is not additive; recompute rates; group money
+   `src/lib/aggregate.ts` (unique reach is not additive; recompute rates; group money
    by currency) — see the `analytics-dashboard` skill.
 
 ## Checklist for a screen

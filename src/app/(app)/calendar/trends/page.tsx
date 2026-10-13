@@ -22,7 +22,7 @@ export function generateMetadata() {
 }
 
 /**
- * Trending topics (NEXT_PHASES H7): today's searches in each country the
+ * Trending topics: today's searches in each country the
  * selected Pages' audiences name, kept to the team's words when it set some.
  * Reads what the worker stored; "Make a post" opens Compose with the topic.
  */

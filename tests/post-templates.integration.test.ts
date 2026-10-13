@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
-/** Post templates (NEXT_PHASES H4): names unique per workspace, labels only from it. */
+/** Post templates: names unique per workspace, labels only from it. */
 
 let database: TestDatabase;
 let prisma: typeof import('../src/lib/prisma')['prisma'];

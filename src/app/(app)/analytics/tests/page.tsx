@@ -17,7 +17,7 @@ export function generateMetadata() {
 }
 
 /**
- * Caption A/B tests (NEXT_PHASES G9): each test with its captions, where they
+ * Caption A/B tests: each test with its captions, where they
  * went, and — once the worker has read them — views, engagements and the
  * winner, or why there is none.
  */

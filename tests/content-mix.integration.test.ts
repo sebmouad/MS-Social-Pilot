@@ -4,7 +4,7 @@ import { ApprovalStatus, PostStatus, WorkspaceRole } from '@prisma/client';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Content mix (NEXT_PHASES H1): the worker fills a Page's week from labelled
+ * Content mix: the worker fills a Page's week from labelled
  * drafts when the workspace allows it, never sends a draft that still needs
  * approval, and tells admins once when a label runs dry.
  */

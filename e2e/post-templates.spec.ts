@@ -4,7 +4,7 @@ import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
 /**
- * Post templates (NEXT_PHASES H4): an editor saves a structure with a blank,
+ * Post templates: an editor saves a structure with a blank,
  * hashtags, a first comment and a label; the composer fills it in.
  */
 

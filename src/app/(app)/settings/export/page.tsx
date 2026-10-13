@@ -24,7 +24,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 /**
- * Export everything (NEXT_PHASES G17): the workspace owner asks for a ZIP of
+ * Export everything: the workspace owner asks for a ZIP of
  * posts, schedule, analytics, comments and media; the worker builds it and the
  * download stays available for a week.
  */

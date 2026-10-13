@@ -4,7 +4,7 @@ import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
 /**
- * Saved replies (NEXT_PHASES G8): written once on their screen, then picked
+ * Saved replies: written once on their screen, then picked
  * with `/` in a comment's reply box, with the person's first name filled in.
  * Nothing is sent: the walk stops at the filled box.
  */

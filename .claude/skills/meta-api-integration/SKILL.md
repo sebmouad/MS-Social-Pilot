@@ -5,9 +5,9 @@ description: Build or change anything that calls the Facebook/Instagram Graph AP
 
 # Meta Graph API integration
 
-1. Read `docs/ai/META_API_NOTES.md` (verified facts: reactions edge, follows
+1. Read `docs/META_API_NOTES.md` (verified facts: reactions edge, follows
    breakdowns need period=day, retired metrics, appsecret_proof, Page can't hide its
-   own comments) and `docs/META_APP_SETUP.md`.
+   own comments) (app setup and troubleshooting are in it too).
 2. Always go through `src/lib/facebook/graph.ts` (`graphRequest`, `graphPaged`):
    it adds `appsecret_proof`, version, timeouts, budget accounting and maps errors
    to `GraphError` kinds (`auth`, `permission`, `rate_limit`, `transient`,

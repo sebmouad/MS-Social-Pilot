@@ -26,7 +26,7 @@ export function byCategory<T extends { category: string }>(templates: T[]): Arra
 }
 
 /**
- * Post templates in the composer (NEXT_PHASES H4): pick one, fill its
+ * Post templates in the composer: pick one, fill its
  * placeholders, and it writes the text, hashtags, first comment and label.
  */
 export function TemplatePicker({

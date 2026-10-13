@@ -13,7 +13,7 @@ export function generateMetadata() {
   return screenMetadata('agency.title');
 }
 
-/** Every client this person owns, and who on their team reaches which (NEXT_PHASES A7). */
+/** Every client this person owns, and who on their team reaches which. */
 export default async function AgencyPage() {
   const auth = await requirePage();
   const t = await getTranslations('agency');

@@ -1,5 +1,5 @@
 /**
- * Post version history (NEXT_PHASES H9): every save of a post keeps a copy of
+ * Post version history: every save of a post keeps a copy of
  * what it said, where and when it was going, and who saved it. Compose lists
  * them, compares them and loads one back; restoring is an ordinary save, so
  * every check and the approval rules apply to it.

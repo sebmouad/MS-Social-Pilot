@@ -10,7 +10,7 @@ import { prisma } from './prisma';
 import { logActivity } from './scheduler/runner';
 
 /**
- * Content mix (NEXT_PHASES H1).
+ * Content mix.
  *
  * Admins say, per Page or per group, how many posts of each label the coming
  * week should hold ("4 × Product · 1 × Tip"). Labels are the categories:

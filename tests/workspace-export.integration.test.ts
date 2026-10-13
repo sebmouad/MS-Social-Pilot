@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
-/** Export everything (NEXT_PHASES G17): a ZIP that unzips, holds everything, and no secrets. */
+/** Export everything: a ZIP that unzips, holds everything, and no secrets. */
 
 let database: TestDatabase;
 let prisma: typeof import('../src/lib/prisma')['prisma'];

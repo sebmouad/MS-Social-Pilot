@@ -3,7 +3,7 @@ import { countriesInUse } from './holidays';
 import { tagText } from './rss/parse';
 
 /**
- * Trending topics (NEXT_PHASES H7): what people search for today in each
+ * Trending topics: what people search for today in each
  * country an audience names, from Google Trends' public daily feed (no key).
  * The worker fetches it for the countries in use and stores it, shared by
  * every workspace; screens read the database only.

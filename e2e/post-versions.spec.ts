@@ -4,7 +4,7 @@ import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
 /**
- * Post version history (NEXT_PHASES H9): Compose lists a post's saves, shows
+ * Post version history: Compose lists a post's saves, shows
  * what changed, and loads an earlier one back into the form.
  */
 

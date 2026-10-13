@@ -4,7 +4,7 @@ import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
 /**
- * Target audience per Page (NEXT_PHASES H0): a country and a language set in
+ * Target audience per Page: a country and a language set in
  * the Page's dialog are saved and shown again. Database only.
  */
 

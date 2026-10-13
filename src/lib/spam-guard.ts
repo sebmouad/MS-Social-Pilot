@@ -3,7 +3,7 @@ import { PostStatus, type TargetType } from '@prisma/client';
 import { prisma } from './prisma';
 
 /**
- * Spam-risk guard (NEXT_PHASES G6).
+ * Spam-risk guard.
  *
  * Facebook treats the same link or the same words landing on many Pages at
  * once as coordinated spam, and the Pages pay for it in reach. This finds that

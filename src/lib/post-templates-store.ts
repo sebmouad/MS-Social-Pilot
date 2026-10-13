@@ -5,7 +5,7 @@ import { AppError, errors } from './errors';
 import { normaliseHashtags, TEMPLATE_LIMITS } from './post-templates';
 import { prisma } from './prisma';
 
-/** Post templates (NEXT_PHASES H4): saving and listing, workspace by workspace. */
+/** Post templates: saving and listing, workspace by workspace. */
 
 export const templateSchema = z.object({
   name: z.string().trim().min(1).max(TEMPLATE_LIMITS.name),

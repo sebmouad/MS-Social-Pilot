@@ -1,7 +1,7 @@
 import { isRightToLeft } from './translation';
 
 /**
- * Interface languages (NEXT_PHASES G12). A plain module, so client components
+ * Interface languages. A plain module, so client components
  * can use it. The list itself is the Prisma `Locale` enum plus one
  * `messages/<code>.json` per value; tests/locale.test.ts keeps them in step.
  */

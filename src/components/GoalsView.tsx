@@ -10,7 +10,7 @@ const PACE_TONE: Record<GoalPace, { bar: string; text: string }> = {
   noData: { bar: 'bg-slate-300', text: 'text-slate-500' },
 };
 
-/** Each Page's monthly goals as progress bars with their pace (NEXT_PHASES H12). */
+/** Each Page's monthly goals as progress bars with their pace. */
 export async function GoalsView({ pages, showNames = true }: { pages: PageGoals[]; showNames?: boolean }) {
   const t = await getTranslations('goals');
   const format = await getFormatter();

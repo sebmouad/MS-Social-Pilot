@@ -10,7 +10,7 @@ import { GOAL_MAX, GOAL_METRICS, type GoalMetric } from '@/lib/goals';
 type Values = Record<GoalMetric, string>;
 const EMPTY: Values = { followers: '', views: '', engagements: '', posts: '' };
 
-/** Set a Page's monthly targets (NEXT_PHASES H12). Admins only, like the Page's other settings. */
+/** Set a Page's monthly targets. Admins only, like the Page's other settings. */
 export function GoalsEditor({ pages }: { pages: Array<{ id: string; name: string }> }) {
   const t = useTranslations('goals');
   const tCommon = useTranslations('common');

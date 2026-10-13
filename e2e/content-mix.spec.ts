@@ -4,7 +4,7 @@ import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, PAGE_NAME, prisma } from './fixtures';
 
 /**
- * Content mix (NEXT_PHASES H1): an admin sets how many posts of a label a
+ * Content mix: an admin sets how many posts of a label a
  * Page should get per week, and the coming week shows how far it falls short.
  */
 

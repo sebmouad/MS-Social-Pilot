@@ -15,7 +15,7 @@ export function generateMetadata() {
   return screenMetadata('webhooks.title');
 }
 
-/** Outgoing webhooks (NEXT_PHASES H18): owners and admins. */
+/** Outgoing webhooks: owners and admins. */
 export default async function WebhooksPage() {
   const auth = await requirePage();
   if (!canManageSettings(auth.role)) notFound();

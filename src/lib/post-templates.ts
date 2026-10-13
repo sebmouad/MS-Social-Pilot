@@ -1,5 +1,5 @@
 /**
- * Post templates (NEXT_PHASES H4), the parts the composer and the server
+ * Post templates, the parts the composer and the server
  * share. Plain module: no database.
  *
  * A template's text holds `{placeholders}` ("New in store: {product} from

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Best time per Page, automatically (NEXT_PHASES G10): once a week, for
+ * Best time per Page, automatically: once a week, for
  * workspaces that chose "apply", each Page's strongest new times go into its
  * own queue, and the history says so.
  */

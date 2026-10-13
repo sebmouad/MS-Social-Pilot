@@ -15,7 +15,7 @@ const HOURS = [24, 48, 72, 168] as const;
 const LABELS = ['B', 'C', 'D'];
 
 /**
- * Caption A/B test (NEXT_PHASES G9), in the composer: the same content with up
+ * Caption A/B test, in the composer: the same content with up
  * to three more captions. Says how the Pages will be shared out, so nobody is
  * surprised by posts on later days.
  */

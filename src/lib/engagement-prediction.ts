@@ -1,5 +1,5 @@
 /**
- * Engagement prediction (NEXT_PHASES H6): how a draft compares with the
+ * Engagement prediction: how a draft compares with the
  * Page's own past posts, as "above / around / below this Page's usual" with
  * the reasons. Never a number: a Page's history is too small and too noisy
  * for one to be honest. Plain module, no database.

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Goals per Page (NEXT_PHASES H12): targets stay inside the member's Pages,
+ * Goals per Page: targets stay inside the member's Pages,
  * and progress is read from stored insights and posts.
  */
 

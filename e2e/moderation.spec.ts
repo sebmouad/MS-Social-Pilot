@@ -4,7 +4,7 @@ import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
 /**
- * Comment moderation rules (NEXT_PHASES G7): a rule is written, paused and
+ * Comment moderation rules: a rule is written, paused and
  * deleted from its screen, and what a rule did is listed with a way to undo it.
  */
 

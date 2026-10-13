@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Signed-in browsers (NEXT_PHASES G4): each session remembers what it was
+ * Signed-in browsers: each session remembers what it was
  * opened from, a new browser after the first gets an email, and a person can
  * end their own sessions but nobody else's.
  */

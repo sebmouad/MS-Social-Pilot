@@ -1,5 +1,5 @@
 /**
- * Inbox response time (NEXT_PHASES H11), the arithmetic. Plain module: no
+ * Inbox response time, the arithmetic. Plain module: no
  * database, so it is tested on its own.
  *
  * A *wait* starts when someone other than the Page writes (a top-level

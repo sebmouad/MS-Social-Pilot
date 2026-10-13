@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
-/** Calendar feed (NEXT_PHASES H19): a private ICS address, shown once, revocable. */
+/** Calendar feed: a private ICS address, shown once, revocable. */
 
 const MESSAGE = 'Calendar feed E2E post';
 

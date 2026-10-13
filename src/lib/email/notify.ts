@@ -568,7 +568,7 @@ export async function notifyDraftUpdated(options: {
 }
 
 /**
- * Members @mentioned in a post's internal note (NEXT_PHASES H8). The caller
+ * Members @mentioned in a post's internal note. The caller
  * has already kept only members who may see the post.
  */
 export async function notifyNoteMention(options: {

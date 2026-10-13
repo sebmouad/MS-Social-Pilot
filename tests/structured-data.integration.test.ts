@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * NEXT_PHASES H3, server half: a page is fetched for its JSON-LD and the
+ * Server half: a page is fetched for its JSON-LD and the
  * pictures a template uses are copied into the media library; private
  * addresses and non-pictures are refused, one at a time.
  */

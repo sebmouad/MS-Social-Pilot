@@ -171,7 +171,7 @@ describe('every API endpoint', () => {
         // 401 is the honest answer; a 3xx to the sign-in screen is the same
         // refusal in a different dialect and a couple of routes use it. The
         // root section answers 404 to everybody but root, so it is not
-        // advertised (docs/ai/PERMISSIONS.md).
+        // advertised (docs/PERMISSIONS.md).
         const rootOnly = isRootOnly(routePath);
         const refused = rootOnly
           ? response.status === 404

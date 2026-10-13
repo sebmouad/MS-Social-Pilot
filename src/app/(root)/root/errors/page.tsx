@@ -17,7 +17,7 @@ const SOURCES = ['server', 'worker', 'browser'] as const;
 
 /**
  * Errors from the server, the worker and people's browsers, grouped by kind
- * (NEXT_PHASES G16). Stored in this database only, scrubbed of tokens,
+ *. Stored in this database only, scrubbed of tokens,
  * secrets and email addresses. Root only.
  */
 export default async function RootErrorsPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {

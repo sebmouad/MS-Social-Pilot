@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 // The app is sold as a generic service (CLAUDE.md rule 9): nothing in the
 // shipped code or interface text may name the owner's own Pages, sites or
 // country. Legal pages are the known exception until the operator details move
-// to the root section (NEXT_PHASES S1/S2) — remove them from ALLOWED then.
+// to the root section — remove them from ALLOWED then.
 const BLOCKED = [/newsgeet/i, /desomemes/i, /goltaf/i, /d[ée]lices rapides/i, /for lady/i, /\bmaroc\b/i, /morocc/i];
 const ALLOWED = new Set(['src/app/privacy-policy/page.tsx', 'src/app/terms/page.tsx']);
 

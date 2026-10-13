@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { MIN_HISTORY, hourBucket, lengthBucket, predictEngagement, type PastPost } from '../src/lib/engagement-prediction';
 
-/** Engagement prediction (NEXT_PHASES H6): a verdict against the Page's own history, never a number. */
+/** Engagement prediction: a verdict against the Page's own history, never a number. */
 
 const post = (overrides: Partial<PastPost>): PastPost => ({ format: 'photo', length: 120, hour: 10, weekday: 2, interactions: 50, ...overrides });
 

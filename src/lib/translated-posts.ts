@@ -4,7 +4,7 @@ import { createPost, type CreatePostResult } from './posts';
 import type { CreatePostInput } from './validation';
 
 /**
- * A post translated for its Pages' audiences (NEXT_PHASES G11): one post per
+ * A post translated for its Pages' audiences: one post per
  * translation, each to its own Pages, and one more for the Pages left in the
  * original. Same time, media, link and options for all.
  */

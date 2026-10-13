@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
-/** Notes on charts (NEXT_PHASES H13): added under the analysis chart, shown in the report, removable. */
+/** Notes on charts: added under the analysis chart, shown in the report, removable. */
 
 const MESSAGE = 'Chart notes E2E post';
 const LABEL = 'Product launch';

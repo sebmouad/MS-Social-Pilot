@@ -18,7 +18,7 @@ export function generateMetadata() {
 }
 
 /**
- * Content mix (NEXT_PHASES H1): how many posts of each label the coming week
+ * Content mix: how many posts of each label the coming week
  * should hold per Page or group, and how far the plan is from it.
  */
 export default async function ContentMixPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {

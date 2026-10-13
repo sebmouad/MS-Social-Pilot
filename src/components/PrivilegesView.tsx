@@ -6,7 +6,7 @@ import type { privilegesByMember } from '@/lib/root';
 /**
  * Who may do what, printed from the same `CAPABILITIES` table the permission
  * checks read, then every member with their role, Page access and last
- * sign-in. For the owner's audit (docs/ai/PERMISSIONS.md).
+ * sign-in. For the owner's audit (docs/PERMISSIONS.md).
  */
 export async function PrivilegesView({
   members,

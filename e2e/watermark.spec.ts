@@ -4,7 +4,7 @@ import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
 /**
- * Watermark per Page (NEXT_PHASES G13): a text watermark set in the Page's
+ * Watermark per Page: a text watermark set in the Page's
  * dialog is saved, previewed and shown again; "None" removes it. Database only.
  */
 

@@ -18,8 +18,8 @@ Framework: `src/lib/networks/` (`types.ts` contract, `index.ts` registry,
    (`connect.ts`), PKCE if supported, state in the encrypted cookie; targets
    returned = the destinations (accounts, pages, boards, channels).
 5. Settings: client id/secret in `src/lib/settings/definitions.ts` (group
-   `networks`) + getters in `src/lib/env.ts` + `networkAvailable()`; document env
-   vars in `.env.example` and `docs/PROJECT_SCHEMA.md`.
+   `networks`) + getters in `src/lib/env.ts` + `networkAvailable()`; list the env
+   vars in the settings block of `docs/OPERATIONS.md` (not in `.env.example`).
 6. UI: card text in `messages/*.json → networks.hint_<key>`, label in
    `targets.<key>` and `pagesSidebar.type.<key>`, mark in `NetworkMark.tsx`.
 7. Tests: unit (text transforms, request shapes with stubbed fetch) +

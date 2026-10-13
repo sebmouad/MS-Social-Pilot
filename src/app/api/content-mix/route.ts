@@ -7,7 +7,7 @@ import { mixUpdateSchema, saveMix } from '@/lib/content-mix';
 import { prisma } from '@/lib/prisma';
 import { logActivity } from '@/lib/scheduler/runner';
 
-/** Replace the weekly mix of one Page or group (NEXT_PHASES H1). */
+/** Replace the weekly mix of one Page or group. */
 export const PUT = route(async (request: Request) => {
   const auth = await requireCapability(canManageSettings);
   const input = mixUpdateSchema.parse(await readJson(request));

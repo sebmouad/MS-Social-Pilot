@@ -4,7 +4,7 @@ import { computedDays, computedDaysBetween, customDatesBetween, orthodoxEaster, 
 import { adjustDaySlots, adjustmentFor, type Season } from '../src/lib/seasons';
 import { nextAvailableSlot } from '../src/lib/time';
 
-/** Key dates and seasonal modes (NEXT_PHASES H2). */
+/** Key dates and seasonal modes. */
 
 const iso = (date: Date) => date.toISOString().slice(0, 10);
 const dateOf = (year: number, calendar: string, key: string) =>

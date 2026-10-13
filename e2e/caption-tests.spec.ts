@@ -4,7 +4,7 @@ import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
 /**
- * Caption A/B tests (NEXT_PHASES G9): the composer offers a second caption,
+ * Caption A/B tests: the composer offers a second caption,
  * and a finished test shows its winner and adds it to the Page voice. Nothing
  * is published: the finished test is seeded.
  */

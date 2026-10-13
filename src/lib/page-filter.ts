@@ -133,7 +133,7 @@ export interface Selection extends PageFilter {
   scope: PageScope;
 }
 
-/** The shared profile selection for a screen (NEXT_PHASES Phase A). */
+/** The shared profile selection for a screen. */
 export async function loadSelection(
   auth: AuthContext,
   params: Record<string, string | string[] | undefined>,

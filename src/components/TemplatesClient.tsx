@@ -19,7 +19,7 @@ interface LabelOption {
 
 const BLANK = { name: '', category: '', body: '', hashtags: '', firstComment: '', labelId: null as string | null };
 
-/** Post templates (NEXT_PHASES H4): list by category; editors add, change and remove. */
+/** Post templates: list by category; editors add, change and remove. */
 export function TemplatesClient({
   templates,
   labels,

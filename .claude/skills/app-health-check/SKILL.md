@@ -12,7 +12,7 @@ Meta side (DevTools MCP, app 699780715171676):
 - `devtools_compliance` — open violations or required actions.
 - `devtools_api_usage` — rate limits.
 
-Production side (see `docs/ai/RELEASE.md`):
+Production side (see `docs/OPERATIONS.md`):
 - `https://social.newsgeet.com/api/health` → web and worker ok.
 - `systemctl is-active social-pilot social-pilot-worker`, recent errors in
   `journalctl -u social-pilot-worker --since -1h`.

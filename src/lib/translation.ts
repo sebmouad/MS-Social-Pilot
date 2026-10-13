@@ -1,5 +1,5 @@
 /**
- * AI translation helpers (NEXT_PHASES G11). A plain module, so the composer
+ * AI translation helpers. A plain module, so the composer
  * can use it too.
  */
 

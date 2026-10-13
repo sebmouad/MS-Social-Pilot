@@ -1,5 +1,5 @@
 /**
- * Target audience per Page (NEXT_PHASES H0): where the people are, which
+ * Target audience per Page: where the people are, which
  * languages they read, their time zone and the cultural calendars to follow.
  * Nothing here is a default: every list starts empty and the user decides. A
  * Page with nothing set follows the workspace's defaults.

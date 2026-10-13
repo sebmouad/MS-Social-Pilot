@@ -34,7 +34,7 @@ function everyDay(fromDay: string, toDay: string, clicks: Array<{ day: string; c
 }
 
 /**
- * Short-link clicks (NEXT_PHASES G14): per day, Page, article and post, with
+ * Short-link clicks: per day, Page, article and post, with
  * clicks per 1,000 views. Follows the shared profile selection and the period.
  */
 export default async function LinkClicksPage({

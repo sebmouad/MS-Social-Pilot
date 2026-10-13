@@ -13,7 +13,7 @@ export interface StaggerChoice {
 }
 
 /**
- * Spam-risk guard (NEXT_PHASES G6), in the composer: asks the server whether
+ * Spam-risk guard, in the composer: asks the server whether
  * the post as it stands puts the same link or text on too many Pages at once,
  * says so with the numbers, and offers the fix — one Page at a time, and AI
  * rewording per Page. Never blocks: the person can send it as it is.

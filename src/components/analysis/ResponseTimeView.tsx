@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { durationParts, type ResponseSummary } from '@/lib/response-time';
 
 /**
- * How fast the team answers comments and messages (NEXT_PHASES H11), per
+ * How fast the team answers comments and messages, per
  * Page and per member, read from what the sync stored.
  */
 export async function ResponseTimeView(props: {

@@ -17,4 +17,4 @@ and only handles the deauthorize/data-deletion callbacks. To add webhooks:
 3. Handle events idempotently: upsert comments/conversations by id; enqueue work,
    answer 200 fast.
 4. Test: `devtools_webhook_test`, then a live comment on DIY Page 3 with the owner's OK.
-5. Document in `docs/ai/META_API_NOTES.md`.
+5. Document in `docs/META_API_NOTES.md`.

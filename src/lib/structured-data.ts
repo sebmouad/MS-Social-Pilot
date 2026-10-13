@@ -1,5 +1,5 @@
 /**
- * Posts from a page's structured data (NEXT_PHASES H3).
+ * Posts from a page's structured data.
  *
  * Most sites describe their pages to search engines with schema.org JSON-LD:
  * an article's author, a product's price, an event's date and place, a

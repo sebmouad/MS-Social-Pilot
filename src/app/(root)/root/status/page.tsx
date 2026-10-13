@@ -22,7 +22,7 @@ function barColour(share: number | null) {
 }
 
 /**
- * The installation's status at a glance (NEXT_PHASES G15): app, database,
+ * The installation's status at a glance: app, database,
  * worker, last publish and last backup now, and 90 days of uptime. Root only.
  */
 export default async function RootStatusPage() {

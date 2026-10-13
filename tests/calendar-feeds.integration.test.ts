@@ -4,7 +4,7 @@ import { PostStatus, WorkspaceRole } from '@prisma/client';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Calendar feeds (NEXT_PHASES H19): a feed shows the Pages it was made for,
+ * Calendar feeds: a feed shows the Pages it was made for,
  * never more than the member may see now, and dies with a revoke or with the
  * membership.
  */

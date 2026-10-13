@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildCaption, daysUntil, durationMinutes, parseStructuredData, templatesFor, type CaptionFormat } from '../src/lib/structured-data';
 
-/** NEXT_PHASES H3: schema.org JSON-LD from any niche, turned into captions. */
+/** Schema.org JSON-LD from any niche, turned into captions. */
 
 const ld = (...blocks: unknown[]) =>
   `<html><head><title>x</title>${blocks.map((block) => `<script type="application/ld+json">${typeof block === 'string' ? block : JSON.stringify(block)}</script>`).join('')}</head><body></body></html>`;

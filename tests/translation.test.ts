@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { groupByLanguage, isRightToLeft, keepTokens } from '../src/lib/translation';
 import { createPostSchema } from '../src/lib/validation';
 
-/** AI translation (NEXT_PHASES G11): the parts that need no model. */
+/** AI translation: the parts that need no model. */
 
 describe('translation helpers', () => {
   it('knows which languages read right to left', () => {

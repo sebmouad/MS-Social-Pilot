@@ -28,7 +28,7 @@ const SHOTS: Array<{ path: string; file: string }> = [
   { path: '/settings/team', file: 'team' },
 ];
 
-const OUTPUT = 'docs/images';
+const OUTPUT = 'test-results/screenshots';
 
 test.use({ viewport: { width: 1280, height: 900 } });
 

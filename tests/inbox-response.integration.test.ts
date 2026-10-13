@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Inbox response time (NEXT_PHASES H11) read from stored comments and
+ * Inbox response time read from stored comments and
  * messages: per Page, per member, and only the asked Pages of the workspace.
  */
 

@@ -1,5 +1,5 @@
 /**
- * Which worker job is making a Graph call (NEXT_PHASES H16), carried through
+ * Which worker job is making a Graph call, carried through
  * every await without passing it down, so root can see the heaviest jobs.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';

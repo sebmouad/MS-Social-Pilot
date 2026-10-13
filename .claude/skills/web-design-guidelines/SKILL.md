@@ -26,7 +26,7 @@ without someone reviewing it first.
 
 ## MS Social Pilot overrides
 
-The project's own rules win where they differ (CLAUDE.md, docs/ai/DESIGN.md,
+The project's own rules win where they differ (CLAUDE.md, docs/DESIGN.md,
 the `ux-copy-house` skill):
 - Headings and buttons use sentence case, not Title Case.
 - Every string lives in `messages/en.json` and `messages/fr.json`.

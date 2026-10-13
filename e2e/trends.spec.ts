@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
-/** Trending topics (NEXT_PHASES H7): today's searches for the audience's country, kept to the team's subjects. */
+/** Trending topics: today's searches for the audience's country, kept to the team's subjects. */
 
 let workspaceId = '';
 let countries: string[] = [];

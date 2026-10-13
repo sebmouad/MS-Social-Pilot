@@ -1,5 +1,5 @@
 /**
- * How figures add up across several profiles (NEXT_PHASES §B2).
+ * How figures add up across several profiles.
  *
  * Pure, so the rules are tested once and every screen that totals profiles —
  * the Total view, the compare table's totals row, reports — says the same.

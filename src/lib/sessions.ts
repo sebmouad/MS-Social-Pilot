@@ -7,7 +7,7 @@ import { sendEmail } from './email/send';
 import { newSignInEmail } from './email/templates';
 
 /**
- * Signed-in devices (NEXT_PHASES G4): what each session was opened from, the
+ * Signed-in devices: what each session was opened from, the
  * list a person sees in Settings → Account and root sees for everybody, and
  * the email when someone signs in from a browser this account has not used.
  */

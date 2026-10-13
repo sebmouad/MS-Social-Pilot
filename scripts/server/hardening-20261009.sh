@@ -1,5 +1,5 @@
 #!/bin/bash
-# RECORD ONLY: already applied on 2026-10-09. Do not re-run (see docs/ai/RELEASE.md).
+# RECORD ONLY: already applied on 2026-10-09. Do not re-run (see docs/OPERATIONS.md).
 # Server hardening fixes from the 2026-10-09 audit of 213.246.45.75.
 # Run with:  ssh -i ~/.ssh/SebMouadSSH root@213.246.45.75 'bash -s' < server-fixes.sh
 # Everything touched is backed up to /root/audit-fix-20261009 first.

@@ -5,7 +5,7 @@ import { canonicalLanguage, effectiveAudience, EMPTY_AUDIENCE } from '../src/lib
 import { workspaceSettingsSchema } from '../src/lib/validation';
 
 /**
- * Target audience per Page (NEXT_PHASES H0): nothing assumed, the workspace's
+ * Target audience per Page: nothing assumed, the workspace's
  * defaults where a Page sets nothing, and suggestions from its own followers.
  */
 

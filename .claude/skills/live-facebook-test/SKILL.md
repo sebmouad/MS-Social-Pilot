@@ -24,6 +24,6 @@ messages. Agreed sandbox: **DIY Page 3** (1 follower).
 3. Clean up: Posts → each test post → **Delete from Facebook**; confirm the old
    URLs say "Ce contenu n'est pas disponible".
 4. Connections → untick DIY Page 3 (Paused).
-5. Write findings into `docs/ai/TESTING.md` (live log) and fix bugs found.
+5. Write findings into `docs/OPERATIONS.md` (live log) and fix bugs found.
 Test image: create one locally (e.g. Playwright screenshot of a gradient) inside
 the session folder and upload with the Chrome `file_upload` tool.

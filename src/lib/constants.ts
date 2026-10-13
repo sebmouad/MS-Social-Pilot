@@ -123,7 +123,7 @@ export function atLeast(role: WorkspaceRole, minimum: WorkspaceRole): boolean {
  * below read, and the one the privileges screen (root and Settings →
  * Permissions) prints for the owner's audit, so what is shown is what is
  * enforced. Changing a row changes who may do what — owner's audit first
- * (docs/ai/PERMISSIONS.md).
+ * (docs/PERMISSIONS.md).
  */
 export const CAPABILITIES = {
   manageAccounts: WorkspaceRole.admin,
@@ -255,7 +255,7 @@ export function canDeleteMedia(role: WorkspaceRole): boolean {
   return allows(role, 'deleteMedia');
 }
 
-/** Create, change and remove the workspace's post templates (NEXT_PHASES H4). */
+/** Create, change and remove the workspace's post templates. */
 export function canManageTemplates(role: WorkspaceRole): boolean {
   return allows(role, 'manageTemplates');
 }

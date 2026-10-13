@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
-/** Engagement prediction (NEXT_PHASES H6), read from the posts the sync stored. */
+/** Engagement prediction, read from the posts the sync stored. */
 
 let database: TestDatabase;
 let prisma: typeof import('../src/lib/prisma')['prisma'];

@@ -34,7 +34,7 @@ export function forgetSavedReplies(): void {
 }
 
 /**
- * Saved replies for a reply box (NEXT_PHASES G8). Typing `/` at the start of
+ * Saved replies for a reply box. Typing `/` at the start of
  * the box, or the button, lists them; picking one puts it in the box with the
  * person's first name and the Page's name filled in, ready to edit and send.
  *

@@ -12,7 +12,7 @@ import { readStoredFile, resolveStoragePath } from './media';
 import { prisma } from './prisma';
 
 /**
- * Publish-time copies of a post's images (NEXT_PHASES G13): cropped to the
+ * Publish-time copies of a post's images: cropped to the
  * shape the destination accepts and stamped with the Page's watermark. The
  * original stays untouched in the library; each copy is a hidden Media row
  * (`derivedFromId`), made once per source and variant and reused, so a post

@@ -43,7 +43,7 @@ function Chips({ items, label, onRemove, removeLabel }: { items: string[]; label
 }
 
 /**
- * Target audience (NEXT_PHASES H0): countries, languages, time zone and
+ * Target audience: countries, languages, time zone and
  * cultural calendars. Used for a Page (with the workspace's defaults shown as
  * what it follows) and for the workspace's defaults themselves.
  */

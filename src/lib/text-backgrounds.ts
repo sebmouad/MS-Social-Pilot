@@ -3,7 +3,7 @@
  *
  * Facebook's Page feed reference does not document this: the preset ids are the
  * ones Facebook's own site sends and other scheduling tools copy (checked
- * 2026-10-13, docs/ai/MAP.md). They can change without notice, so this is a
+ * 2026-10-13, docs/META_API_NOTES.md). They can change without notice, so this is a
  * short list that is easy to correct, and a post that Facebook refuses says so
  * in its own words like any other refusal.
  *

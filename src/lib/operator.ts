@@ -1,5 +1,5 @@
 /**
- * Who runs this installation (NEXT_PHASES S2), as root entered it in the
+ * Who runs this installation, as root entered it in the
  * configuration. The legal pages read this; nothing about the operator is
  * written in code.
  */

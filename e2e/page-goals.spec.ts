@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
-/** Goals per Page (NEXT_PHASES H12): set on the dashboard, shown with their pace there and in the report. */
+/** Goals per Page: set on the dashboard, shown with their pace there and in the report. */
 
 let targetId = '';
 
@@ -32,7 +32,7 @@ test('sets a monthly goal and shows its progress on the dashboard and in the rep
 
   // The saved goal is in the database; the dashboard is loaded afresh, as the
   // in-page refresh after a save is not reliable in a production build here
-  // (docs/ai/STATUS.md).
+  // (docs/PLAN.md).
   await expect.poll(() => prisma.pageGoal.count({ where: { targetId } })).toBe(1);
   await open(page, `/dashboard?pages=${targetId}`);
   await expect(goals.getByRole('progressbar', { name: 'Posts published' })).toBeVisible();

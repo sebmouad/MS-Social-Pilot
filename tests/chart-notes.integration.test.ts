@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
-/** Notes on charts (NEXT_PHASES H13): a Page's own and the workspace-wide ones, inside the member's Pages. */
+/** Notes on charts: a Page's own and the workspace-wide ones, inside the member's Pages. */
 
 let database: TestDatabase;
 let prisma: typeof import('../src/lib/prisma')['prisma'];

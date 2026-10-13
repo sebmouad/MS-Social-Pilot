@@ -306,7 +306,7 @@ export function mixDryEmail(options: {
   return { subject: t('email.mixDry.subject', { page: options.page, label: options.label }), ...block };
 }
 
-/** A new comment matched a moderation rule set to alert (NEXT_PHASES G7). */
+/** A new comment matched a moderation rule set to alert. */
 export function moderationAlertEmail(options: {
   locale: Locale;
   workspace: string;
@@ -610,7 +610,7 @@ export function newSignInEmail(options: {
   return { subject: t('email.newSignIn.subject'), ...block };
 }
 
-/** A teammate @mentioned the reader in a post's internal notes (NEXT_PHASES H8). */
+/** A teammate @mentioned the reader in a post's internal notes. */
 export function noteMentionEmail(options: {
   locale: Locale;
   workspace: string;
@@ -630,7 +630,7 @@ export function noteMentionEmail(options: {
   return { subject: t('email.noteMention.subject', { author: options.author }), ...block };
 }
 
-/** A Page got clearly more negative comments than usual (NEXT_PHASES H15). */
+/** A Page got clearly more negative comments than usual. */
 export function negativeSpikeEmail(options: {
   locale: Locale;
   workspace: string;

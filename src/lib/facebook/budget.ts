@@ -44,7 +44,7 @@ const objects = new Map<string, ObjectUsage>();
 const callMinutes = new Map<number, number>();
 /**
  * The same calls by who they were about and which worker job made them
- * (NEXT_PHASES H16), keyed `minute|object|job`; empty object or job means
+ *, keyed `minute|object|job`; empty object or job means
  * none could be told.
  */
 const callSources = new Map<string, number>();

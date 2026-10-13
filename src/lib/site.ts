@@ -1,5 +1,5 @@
 /**
- * The public product site (NEXT_PHASES S7): home, pricing, help, status and
+ * The public product site: home, pricing, help, status and
  * changelog for visitors who are not signed in. Off until root switches it on,
  * so an installation used privately still opens on the sign-in form.
  */

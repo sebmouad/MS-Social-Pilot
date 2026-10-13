@@ -1,5 +1,5 @@
 /**
- * Agency overview for root (NEXT_PHASES H14): every workspace's health in one
+ * Agency overview for root: every workspace's health in one
  * table. Read from what is stored — no Graph calls.
  */
 import { PostStatus, TargetType } from '@prisma/client';

@@ -1,7 +1,7 @@
 import { prisma } from './prisma';
 
 /**
- * Uptime history for the root status page (NEXT_PHASES G15). The web server
+ * Uptime history for the root status page. The web server
  * calls `recordUptimeMinute` once a minute: one minute for itself, and one for
  * the worker when its heartbeat is fresh. A day's uptime is the minutes seen
  * over the minutes that day has had since recording began. Database only.

@@ -14,7 +14,7 @@ interface Feed {
 }
 
 /**
- * Calendar feed (NEXT_PHASES H19): a private address that Google Calendar or
+ * Calendar feed: a private address that Google Calendar or
  * Outlook subscribes to, for the Pages picked in the sidebar. Shown once;
  * revoking it stops it working.
  */

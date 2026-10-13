@@ -3,7 +3,7 @@
  * other networks — in one shape, so the Summary, Posts, Audience and Compare
  * views can list them next to the Pages.
  *
- * Pure: no server imports. Aggregation rules (docs/ai, analytics skill):
+ * Pure: no server imports. Aggregation rules (analytics-dashboard skill):
  * reach is not additive (people overlap across posts and channels), rates are
  * recomputed from their parts, and a figure a network does not report stays
  * null — shown as a dash — rather than 0.

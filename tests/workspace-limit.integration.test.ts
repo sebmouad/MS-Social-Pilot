@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Requests per workspace (NEXT_PHASES S5): one workspace's members share a
+ * Requests per workspace: one workspace's members share a
  * budget per minute, and running it out does not touch any other workspace.
  */
 const cookieJar = new Map<string, string>();

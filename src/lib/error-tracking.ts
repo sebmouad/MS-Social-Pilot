@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { prisma } from './prisma';
 
 /**
- * Error tracking (NEXT_PHASES G16), self-hosted in the app's own database:
+ * Error tracking, self-hosted in the app's own database:
  * server, worker and browser errors grouped by kind, with the release they were
  * seen on, for root to read at /root/errors. Nothing leaves the server, and
  * the text is scrubbed before it is stored.

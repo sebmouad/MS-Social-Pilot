@@ -34,7 +34,7 @@ interface MixLine {
 const MAX_PER_WEEK = 50;
 
 /**
- * Content mix (NEXT_PHASES H1): the coming week per Page against its mix,
+ * Content mix: the coming week per Page against its mix,
  * and, for admins, the mix of a Page or group and the auto-fill switch.
  */
 export function ContentMixClient({

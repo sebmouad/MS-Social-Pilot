@@ -1,6 +1,6 @@
 /**
- * A minimal iCalendar (RFC 5545) writer for the calendar feed (NEXT_PHASES
- * H19). Plain module: no database.
+ * A minimal iCalendar (RFC 5545) writer for the calendar feed.
+ * Plain module: no database.
  */
 
 export interface IcsEvent {

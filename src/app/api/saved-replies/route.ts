@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { savedReplySchema } from '@/lib/validation';
 import { ok, readJson, route } from '@/lib/api';
 
-/** Saved replies (NEXT_PHASES G8): for the people who answer comments and messages. */
+/** Saved replies: for the people who answer comments and messages. */
 export const GET = route(async () => {
   const auth = await requireCapability(canModerateComments);
   const replies = await prisma.savedReply.findMany({

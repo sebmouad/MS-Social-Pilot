@@ -1,5 +1,5 @@
 /**
- * Negative-comment alert (NEXT_PHASES H15). For workspaces that switch it on,
+ * Negative-comment alert. For workspaces that switch it on,
  * the worker reads the mood of new comments with AI, a batch at a time, and
  * emails the team when a Page gets clearly more negative comments than usual.
  * Reads stored comments only: no Graph call. AI cost goes through the usual

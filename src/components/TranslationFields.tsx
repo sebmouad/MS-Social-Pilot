@@ -10,7 +10,7 @@ import { Icon } from './Icon';
 export type Translation = TranslationGroup & { rtl: boolean };
 
 /**
- * AI translation (NEXT_PHASES G11): the post in each language the picked
+ * AI translation: the post in each language the picked
  * Pages' audiences read, as one editable version per language. Pages with no
  * audience language keep the original. Nothing goes out until Schedule.
  */

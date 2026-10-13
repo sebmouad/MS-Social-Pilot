@@ -14,7 +14,7 @@ export function generateMetadata() {
   return screenMetadata('templates.title');
 }
 
-/** Post templates (NEXT_PHASES H4): the team's saved post structures. */
+/** Post templates: the team's saved post structures. */
 export default async function TemplatesPage() {
   const auth = await requirePage();
   const t = await getTranslations('templates');

@@ -7,7 +7,7 @@ import { importImages, MAX_IMPORT_IMAGES } from '@/lib/structured-data-fetch';
 const schema = z.object({ urls: z.array(z.string().trim().min(1).max(2000)).min(1).max(MAX_IMPORT_IMAGES) });
 
 /**
- * Copy pictures from the web into the media library (NEXT_PHASES H3). Open to
+ * Copy pictures from the web into the media library. Open to
  * every member, as uploading is; the media quota bounds it.
  */
 export const POST = route(async (request: Request) => {

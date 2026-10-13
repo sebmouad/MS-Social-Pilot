@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ratio, sumByCurrency, sumKnown, topBy, topSeries, totalProfiles } from '../src/lib/aggregate';
 
-/** NEXT_PHASES §B2: how figures add up across several profiles. */
+/** How figures add up across several profiles. */
 
 describe('adding up profiles', () => {
   const rows = [

@@ -8,7 +8,7 @@ import { useConfirm } from './ConfirmProvider';
 import { changedFields, wordDiff, type PostVersionView } from '@/lib/post-version-diff';
 
 /**
- * Version history in Compose (NEXT_PHASES H9): every save of the post, what it
+ * Version history in Compose: every save of the post, what it
  * changed, its text compared with what is in the composer now, and a way to
  * load it back. Loading only fills the form; saving it is an ordinary save.
  */

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 /**
- * Undo send (NEXT_PHASES H10): right after "Publish now", the post waits a few
+ * Undo send: right after "Publish now", the post waits a few
  * seconds with a way to take it back. Taken back, it opens again as a draft.
  */
 export function UndoSendBar({ postId, until }: { postId: string; until: string }) {

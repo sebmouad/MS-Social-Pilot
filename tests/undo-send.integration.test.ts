@@ -4,7 +4,7 @@ import { WorkspaceRole } from '@prisma/client';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Undo send (NEXT_PHASES H10): "Publish now" is held for the workspace's
+ * Undo send: "Publish now" is held for the workspace's
  * delay as a worker post; until then it can go back to the drafts, after
  * that it cannot.
  */

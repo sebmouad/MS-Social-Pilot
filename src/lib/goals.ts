@@ -1,5 +1,5 @@
 /**
- * Monthly goals per Page (NEXT_PHASES H12), the parts the dashboard, the
+ * Monthly goals per Page, the parts the dashboard, the
  * editor and reports share. Plain module: no database.
  */
 

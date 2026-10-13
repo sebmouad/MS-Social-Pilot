@@ -675,7 +675,7 @@ export async function requireAuth(requestedWorkspaceId?: string): Promise<AuthCo
 }
 
 /**
- * One workspace's share of the server (NEXT_PHASES S5): every signed-in API
+ * One workspace's share of the server: every signed-in API
  * call counts against its members' common budget for the minute, so one
  * customer's script cannot slow the app for the others. Root sets the size.
  */

@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { collectFailures, open, OWNER } from './helpers';
 import { connectPretendPage, prisma } from './fixtures';
 
-/** Internal notes (NEXT_PHASES H8): a team-only thread on a post, with @mentions. */
+/** Internal notes: a team-only thread on a post, with @mentions. */
 
 const MESSAGE = 'Post with notes E2E';
 

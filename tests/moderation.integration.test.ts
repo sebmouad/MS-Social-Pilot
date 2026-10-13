@@ -4,7 +4,7 @@ import { WorkspaceRole } from '@prisma/client';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Comment moderation rules (NEXT_PHASES G7): every new comment the sync reads
+ * Comment moderation rules: every new comment the sync reads
  * goes through the workspace's rules once; hides and replies can be undone.
  */
 

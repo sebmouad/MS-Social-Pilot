@@ -4,7 +4,7 @@ import { WorkspaceRole, type PostTargetStatus } from '@prisma/client';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Caption A/B tests (NEXT_PHASES G9): one post per caption, read by the worker
+ * Caption A/B tests: one post per caption, read by the worker
  * from stored insights once every caption has had its time.
  */
 

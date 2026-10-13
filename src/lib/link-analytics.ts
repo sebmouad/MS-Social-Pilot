@@ -4,7 +4,7 @@ import { parseInsights } from './json';
 import { prisma } from './prisma';
 
 /**
- * Short-link click analytics (NEXT_PHASES G14): clicks per day, Page, post
+ * Short-link click analytics: clicks per day, Page, post
  * and article, from the clicks the shortener already records. Database only.
  *
  * Each link counts for one Page: the one it went out on, or — for links made

@@ -3,7 +3,7 @@ import { canManageTemplates } from '@/lib/constants';
 import { createTemplate, listTemplates, templateSchema } from '@/lib/post-templates-store';
 import { ok, readJson, route } from '@/lib/api';
 
-/** Post templates (NEXT_PHASES H4): everyone who writes posts picks them. */
+/** Post templates: everyone who writes posts picks them. */
 export const GET = route(async () => {
   const auth = await requireAuth();
   return ok({ templates: await listTemplates(auth.workspace.id) });

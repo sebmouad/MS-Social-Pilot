@@ -1,5 +1,5 @@
 /**
- * Seasonal posting modes (NEXT_PHASES H2): between two dates, a Page's queue
+ * Seasonal posting modes: between two dates, a Page's queue
  * pauses, moves its times, keeps fewer of them or adds more. Defined by the
  * user per Page; none exist by default. A plain module, shared by the queue
  * and the screens.

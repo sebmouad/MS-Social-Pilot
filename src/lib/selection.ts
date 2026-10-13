@@ -1,5 +1,5 @@
 /**
- * The one profile selection the whole app follows (NEXT_PHASES Phase A).
+ * The one profile selection the whole app follows.
  *
  * The address is the source of truth — `group`, `pages` (comma ids) and `net`
  * (a network) — so a filtered screen can be bookmarked or sent. When a screen

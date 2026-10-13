@@ -5,7 +5,7 @@ import { sumKnown } from './aggregate';
 
 /**
  * Page metrics a person pins from the full list (analytics → Overview) so they
- * show as tiles on the Analysis and All profiles views (NEXT_PHASES B3).
+ * show as tiles on the Analysis and All profiles views.
  * Stored on the user as `metric::period` keys.
  */
 

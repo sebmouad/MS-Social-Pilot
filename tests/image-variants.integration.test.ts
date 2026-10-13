@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
-/** Publish-time copies (NEXT_PHASES G13): made once, hidden from the library, gone with their source. */
+/** Publish-time copies: made once, hidden from the library, gone with their source. */
 
 let database: TestDatabase;
 let prisma: typeof import('../src/lib/prisma')['prisma'];

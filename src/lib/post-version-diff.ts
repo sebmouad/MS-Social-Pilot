@@ -1,5 +1,5 @@
 /**
- * Post version history (NEXT_PHASES H9), the parts the composer shows. Plain
+ * Post version history, the parts the composer shows. Plain
  * module: no database.
  */
 

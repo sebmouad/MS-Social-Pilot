@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { collectFailures, open } from './helpers';
 
 /**
- * Posts from page details (NEXT_PHASES H3). The server fetches the page, so a
+ * Posts from page details. The server fetches the page, so a
  * test cannot serve it JSON-LD; this checks the way in and the honest answer
  * for a page that describes nothing. The parser and captions are unit-tested.
  */

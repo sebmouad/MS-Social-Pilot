@@ -150,7 +150,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     hint: 'Leave blank to disable the HTTP trigger entirely and run the worker as a process.',
   },
 
-  // --- Operator (NEXT_PHASES S2) -------------------------------------------------
+  // --- Operator -------------------------------------------------
   // Who runs this installation, as the Terms, Privacy and Data deletion pages
   // say it. Nothing here is hard-coded in the pages: each operator enters their
   // own, and has the legal wording reviewed for their country.

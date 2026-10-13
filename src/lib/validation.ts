@@ -432,7 +432,7 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
   return result;
 }
 
-/** A saved reply for comments and Messenger (NEXT_PHASES G8). */
+/** A saved reply for comments and Messenger. */
 export const savedReplySchema = z.object({
   name: z.string().trim().min(1).max(80),
   body: z.string().trim().min(1).max(2000),

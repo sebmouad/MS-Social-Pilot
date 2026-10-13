@@ -21,7 +21,7 @@ interface Member {
 }
 
 /**
- * Internal notes on a post (NEXT_PHASES H8): a team-only thread, never
+ * Internal notes on a post: a team-only thread, never
  * published. Typing `@` offers the members who may see the post; the ones
  * mentioned are emailed.
  */

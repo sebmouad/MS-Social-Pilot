@@ -7,7 +7,7 @@ import { PALETTE_KEYS, type PaletteKey } from './palette';
 import { prisma } from './prisma';
 
 /**
- * Notes on charts (NEXT_PHASES H13): a dated label on a Page's analytics
+ * Notes on charts: a dated label on a Page's analytics
  * timelines ("Campaign started"), or on every Page's. Shown in reports too.
  */
 

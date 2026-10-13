@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
-/** Self-hosted error tracking (NEXT_PHASES G16): scrubbed, grouped, pruned. */
+/** Self-hosted error tracking: scrubbed, grouped, pruned. */
 
 let database: TestDatabase;
 let prisma: typeof import('../src/lib/prisma')['prisma'];

@@ -4,7 +4,7 @@ import { PostStatus, WorkspaceRole } from '@prisma/client';
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Spam-risk guard (NEXT_PHASES G6): the same link or text on many Pages at
+ * Spam-risk guard: the same link or text on many Pages at
  * once is spotted before scheduling, and the offered fix — one Page at a time,
  * optionally reworded — creates one post per Page, the right distance apart.
  */

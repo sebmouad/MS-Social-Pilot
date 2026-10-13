@@ -1,5 +1,5 @@
 /**
- * Inbox response time (NEXT_PHASES H11), read from what the sync stored:
+ * Inbox response time, read from what the sync stored:
  * comments on the Pages' posts and Messenger threads. Nothing here asks
  * Facebook anything, so the screen costs no Graph calls.
  */

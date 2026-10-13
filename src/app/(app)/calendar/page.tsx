@@ -29,7 +29,7 @@ import { CalendarFeedButton } from '@/components/CalendarFeedButton';
 /**
  * Plain links on this screen. A month, a week or a status filter is a new page
  * of the same screen, and in a production build the router's in-page navigation
- * on this page was found to stall (docs/ai/STATUS.md), so these load the page
+ * on this page was found to stall (docs/PLAN.md), so these load the page
  * the ordinary way. `scroll` and `prefetch` belong to the router and are ignored.
  */
 function Link({ scroll: _scroll, prefetch: _prefetch, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { scroll?: boolean; prefetch?: boolean }) {

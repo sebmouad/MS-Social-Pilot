@@ -10,7 +10,7 @@ import { logActivity } from './scheduler/runner';
 import { fillReply } from './reply-template';
 
 /**
- * Comment moderation rules (NEXT_PHASES G7).
+ * Comment moderation rules.
  *
  * The worker reads new comments on published posts; every one of them goes
  * through the workspace's rules here, once. A rule looks for links, phone

@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
 
 /**
- * Outgoing webhooks (NEXT_PHASES H18): events queue one delivery per listening
+ * Outgoing webhooks: events queue one delivery per listening
  * endpoint; the worker signs and sends them, retries with backoff, gives up
  * after the last delay; private addresses are refused.
  */

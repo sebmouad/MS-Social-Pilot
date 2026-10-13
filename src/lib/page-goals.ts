@@ -9,7 +9,7 @@ import { prisma } from './prisma';
 import { formatInZone, localInputToUtc } from './time';
 
 /**
- * Monthly goals per Page (NEXT_PHASES H12): a target for followers gained,
+ * Monthly goals per Page: a target for followers gained,
  * views, engagement and posts, and how the month is going against it.
  *
  * Progress is read from what the worker already stored (Page insights and
