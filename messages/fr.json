@@ -4066,5 +4066,9 @@
     "namePlaceholder": "Nom, par exemple « Client A, cette semaine »",
     "remove": "Supprimer la vue {name}",
     "saveFailed": "Impossible d’enregistrer la vue. Réessayez."
+  },
+  "planMeter": {
+    "members": "{used} places d’équipe utilisées sur {limit}",
+    "channels": "{used} canaux utilisés sur {limit}"
   }
 }

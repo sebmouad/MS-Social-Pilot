@@ -4066,5 +4066,9 @@
     "namePlaceholder": "Name, for example “Client A, this week”",
     "remove": "Remove the view {name}",
     "saveFailed": "The view could not be saved. Try again."
+  },
+  "planMeter": {
+    "members": "{used} of {limit} team seats used",
+    "channels": "{used} of {limit} channels used"
   }
 }

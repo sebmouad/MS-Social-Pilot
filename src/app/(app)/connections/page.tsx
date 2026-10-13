@@ -1,3 +1,5 @@
+import { PlanMeter } from '@/components/PlanMeter';
+import { planUsage } from '@/lib/plans';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { getTranslations } from 'next-intl/server';
 
@@ -38,6 +40,8 @@ export default async function ConnectionsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const auth = await requirePage();
+  const meter = await planUsage(auth.workspace.id, 'channels');
+  const tPlan = await getTranslations('planMeter');
   const t = await getTranslations('connections');
   const params = await searchParams;
   const timezone = auth.workspace.timezone;
@@ -104,6 +108,7 @@ export default async function ConnectionsPage({
           )
         }
       />
+      {meter.limit !== null && <PlanMeter label={tPlan('channels', { used: meter.used, limit: meter.limit })} used={meter.used} limit={meter.limit} />}
 
       {(['connected', 'warning', 'error'] as const).map((kind) => {
         const value = first(params[kind]);

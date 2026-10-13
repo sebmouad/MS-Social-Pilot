@@ -61,6 +61,14 @@ async function room(subscriber: Subscriber | null, kind: PlanLimit): Promise<num
   return Math.max(0, limit - (await usageOf(subscriber.id))[kind]);
 }
 
+/** Used and allowed of one kind for a workspace's subscriber; `limit` is null when the plan has none. */
+export async function planUsage(workspaceId: string, kind: Exclude<PlanLimit, 'workspaces'>): Promise<{ used: number; limit: number | null }> {
+  const subscriber = await subscriberOf(workspaceId);
+  if (!subscriber) return { used: 0, limit: null };
+  const limit = limitOf(subscriber, kind);
+  return { used: (await usageOf(subscriber.id))[kind], limit: limit === Infinity ? null : limit };
+}
+
 export async function channelRoom(workspaceId: string): Promise<number> {
   return room(await subscriberOf(workspaceId), 'channels');
 }

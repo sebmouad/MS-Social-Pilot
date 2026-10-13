@@ -1,3 +1,5 @@
+import { PlanMeter } from '@/components/PlanMeter';
+import { planUsage } from '@/lib/plans';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { getTranslations } from 'next-intl/server';
 
@@ -23,6 +25,8 @@ export function generateMetadata() {
 
 export default async function TeamPage() {
   const auth = await requirePage();
+  const meter = await planUsage(auth.workspace.id, 'members');
+  const tPlan = await getTranslations('planMeter');
   const t = await getTranslations('team');
   const timezone = auth.workspace.timezone;
 
@@ -50,6 +54,7 @@ export default async function TeamPage() {
   return (
     <div className="space-y-6">
       <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
+      {meter.limit !== null && <PlanMeter label={tPlan('members', { used: meter.used, limit: meter.limit })} used={meter.used} limit={meter.limit} />}
 
       <TeamClient
         canManage={canManageTeam(auth.role)}
