@@ -567,7 +567,10 @@
     "focusHint": "Click the subject to keep it in frame when the image is cropped for Instagram or a story",
     "undoSendWaiting": "{seconds, plural, one {Publishing in # second.} other {Publishing in # seconds.}}",
     "undoSend": "Undo",
-    "undoSendGone": "Sent to the channels: it appears within a minute."
+    "undoSendGone": "Sent to the channels: it appears within a minute.",
+    "variantsTitle": "Different text for some channels",
+    "variantsHint": "Leave a box empty and that channel publishes the main text. Media, link and time stay the same.",
+    "variantsPlaceholder": "Same as the main text"
   },
   "config": {
     "title": "Configuration",

@@ -109,6 +109,30 @@ describe('the queue, per Page', () => {
   });
 });
 
+describe('text per destination', () => {
+  it('stores a destination’s own text and leaves the others on the post’s text', async () => {
+    const { owner, workspace, bakery, garage } = await seed();
+    const created = await posts.createPost(
+      context(workspace.id, owner.id),
+      { ...queued([bakery.id, garage.id]), useQueue: false, saveAsDraft: true, variants: { [garage.id]: '  Short version  ' } },
+      now,
+    );
+    const rows = await prisma.postTarget.findMany({ where: { postId: created.postId } });
+    const byTarget = Object.fromEntries(rows.map((row) => [row.targetId, row.messageOverride]));
+    expect(byTarget).toEqual({ [bakery.id]: null, [garage.id]: 'Short version' });
+
+    // Editing sets and clears it.
+    await posts.updatePost(
+      { workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner, requiresApproval: false },
+      created.postId,
+      { variants: { [garage.id]: '', [bakery.id]: 'Bakery only' } },
+      now,
+    );
+    const after = await prisma.postTarget.findMany({ where: { postId: created.postId } });
+    expect(Object.fromEntries(after.map((row) => [row.targetId, row.messageOverride]))).toEqual({ [bakery.id]: 'Bakery only', [garage.id]: null });
+  });
+});
+
 describe('labels', () => {
   it('saves a post’s labels, ignoring ids from elsewhere', async () => {
     const { owner, workspace, bakery } = await seed();

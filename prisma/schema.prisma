@@ -735,6 +735,8 @@ model PostTarget {
   postId   String
   targetId String
   status   PostTargetStatus @default(pending)
+  /// Text written for this destination alone; null publishes the post's own text.
+  messageOverride String?
 
   remotePostId       String?
   remoteUrl          String?

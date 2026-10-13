@@ -77,6 +77,8 @@ export interface EditingPost {
   link: string | null;
   media: PostMedia[];
   targetIds: string[];
+  /** Text written for single destinations, by destination id. */
+  variants?: Record<string, string>;
   /** `datetime-local` value in the workspace's zone, or null for a draft. */
   scheduledAtLocal: string | null;
   publishMode: string;
@@ -139,6 +141,7 @@ export function Composer({
   const messageBox = useRef<HTMLTextAreaElement>(null);
   const commentBox = useRef<HTMLTextAreaElement>(null);
   const [firstComment, setFirstComment] = useState(editing?.firstComment ?? '');
+  const [variants, setVariants] = useState<Record<string, string>>(editing?.variants ?? {});
   const [commentDelay, setCommentDelay] = useState(editing?.firstCommentDelayMinutes ?? 0);
   const [labelIds, setLabelIds] = useState<string[]>(editing?.labelIds ?? []);
   const [format, setFormat] = useState<'post' | 'reel' | 'story'>(editing?.format ?? 'post');
@@ -250,6 +253,9 @@ export function Composer({
   }, []);
 
   const selectedTargets = targets.filter((target) => selected.includes(target.id));
+  /** Only the texts of channels still selected, and only those that differ. */
+  const variantsFor = (ids: string[]) =>
+    Object.fromEntries(ids.flatMap((id) => (variants[id]?.trim() ? [[id, variants[id]!.trim()]] : [])));
   const hasGroupSelected = selectedTargets.some((target) => target.type === 'group');
   const hasInstagramSelected = selectedTargets.some((target) => target.type === 'instagram');
   // Facebook's own scheduler holds Page posts only: a Group has no such API
@@ -403,6 +409,7 @@ export function Composer({
               link: format === 'post' && link.trim() ? link.trim() : null,
               media,
               targetIds: selected,
+              variants: variantsFor(selected),
               publishMode: effectiveHandler,
               scheduledAtLocal: saveAsDraft ? null : scheduledAt,
               timezone,
@@ -420,6 +427,7 @@ export function Composer({
               link: format === 'post' && link.trim() ? link.trim() : null,
               media,
               targetIds: selected,
+              variants: testing || translating ? undefined : variantsFor(selected),
               publishMode,
               scheduledAtLocal: timing === 'schedule' ? scheduledAt : null,
               timezone,
@@ -1021,6 +1029,30 @@ export function Composer({
               <Icon name="sparkles" size={15} className="mt-px shrink-0 text-slate-400" />
               {needsApproval ? t('nowNeedsApproval') : t('nowExplain')}
             </p>
+          )}
+
+          {selectedTargets.length > 1 && !testing && !translating && (
+            <details className="mt-4 rounded-lg border border-slate-200 p-3" open={Object.values(variants).some((text) => text.trim())}>
+              <summary className="cursor-pointer text-sm font-semibold text-slate-900">{t('variantsTitle')}</summary>
+              <p className="mt-1 text-xs text-slate-600">{t('variantsHint')}</p>
+              <ul className="mt-3 space-y-3">
+                {selectedTargets.map((target) => (
+                  <li key={target.id}>
+                    <label className="label" htmlFor={`variant-${target.id}`}>
+                      {target.name}
+                    </label>
+                    <textarea
+                      id={`variant-${target.id}`}
+                      className="input min-h-[64px]"
+                      rows={2}
+                      value={variants[target.id] ?? ''}
+                      placeholder={t('variantsPlaceholder')}
+                      onChange={(event) => setVariants((current) => ({ ...current, [target.id]: event.target.value }))}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
 
           <SpamGuard

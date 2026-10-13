@@ -161,6 +161,8 @@ export const createPostSchema = z
     link: httpUrl.nullish(),
     media: postMedia.default([]),
     targetIds: postTargetIds,
+    /** Text for single destinations, by destination id; the others publish the post's text. */
+    variants: z.record(z.string(), z.string().trim().max(70_000)).optional(),
     publishMode: z.nativeEnum(PublishMode).default(PublishMode.worker),
     /** Wall-clock time as typed by the user, interpreted in `timezone`. */
     scheduledAtLocal: z.string().min(10).nullish(),
@@ -246,6 +248,7 @@ export const updatePostSchema = z
     link: httpUrl.nullish(),
     media: postMedia.optional(),
     targetIds: postTargetIds.optional(),
+    variants: z.record(z.string(), z.string().trim().max(70_000)).optional(),
     scheduledAtLocal: z.string().min(10).nullish(),
     timezone: timezone.optional(),
     publishMode: z.nativeEnum(PublishMode).optional(),

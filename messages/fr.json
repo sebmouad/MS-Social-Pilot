@@ -567,7 +567,10 @@
     "focusHint": "Cliquez sur le sujet pour le garder dans le cadre quand l’image est recadrée pour Instagram ou une story",
     "undoSendWaiting": "{seconds, plural, one {Publication dans # seconde.} other {Publication dans # secondes.}}",
     "undoSend": "Annuler",
-    "undoSendGone": "Envoyée aux canaux : elle apparaît d’ici une minute."
+    "undoSendGone": "Envoyée aux canaux : elle apparaît d’ici une minute.",
+    "variantsTitle": "Texte différent pour certains canaux",
+    "variantsHint": "Laissez un champ vide et ce canal publie le texte principal. Les médias, le lien et l’heure restent les mêmes.",
+    "variantsPlaceholder": "Identique au texte principal"
   },
   "config": {
     "title": "Configuration",

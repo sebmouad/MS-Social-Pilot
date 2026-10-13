@@ -370,7 +370,7 @@ export async function createPost(
         scheduledAt: schedule.scheduledAt,
         timezone: schedule.timezone,
         targets: {
-          create: targets.map((target) => ({ targetId: target.id, status: 'pending' })),
+          create: targets.map((target) => ({ targetId: target.id, status: 'pending', messageOverride: input.variants?.[target.id]?.trim() || null })),
         },
       },
       include: { targets: true },
@@ -1076,6 +1076,7 @@ export async function updatePost(
   // it will have. Both halves can change in the same request.
   const nextMode = input.publishMode ?? post.publishMode;
   const nextTargets = input.targetIds ? valid : post.targets.map((row) => row.target);
+  const nextTargetIds = input.targetIds ? valid.map((target) => target.id) : post.targets.map((row) => row.targetId);
   if (nextMode === 'native') assertNativeSupported(nextTargets);
 
   const nextStatus = (data.status as PostStatus | undefined) ?? post.status;
@@ -1116,9 +1117,19 @@ export async function updatePost(
       // `skipDuplicates` for the same reason: a destination whose row survived
       // the narrowed delete must not gain a second one.
       await tx.postTarget.createMany({
-        data: valid.map((target) => ({ postId, targetId: target.id, status: 'pending' })),
+        data: valid.map((target) => ({ postId, targetId: target.id, status: 'pending', messageOverride: input.variants?.[target.id]?.trim() || null })),
         skipDuplicates: true,
       });
+    }
+
+    // Per-destination text: set for the destinations still waiting to go out.
+    if (input.variants) {
+      for (const targetId of nextTargetIds) {
+        await tx.postTarget.updateMany({
+          where: { postId, targetId, status: { in: ['pending', 'failed', 'cancelled'] } },
+          data: { messageOverride: input.variants[targetId]?.trim() || null },
+        });
+      }
     }
 
     // A rescheduled post starts from a clean slate on every destination —

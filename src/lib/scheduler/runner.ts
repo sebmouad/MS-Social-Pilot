@@ -367,7 +367,7 @@ async function publishClaimed(
     const prepared = await prepareLinks({
       workspaceId: post.workspaceId,
       postId: post.id,
-      message: post.message,
+      message: row.messageOverride ?? post.message,
       link: post.link,
       settings: {
         // A Page's own tags win over the workspace's, one by one.
