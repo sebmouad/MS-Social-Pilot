@@ -80,6 +80,7 @@ const BODY: Record<string, unknown> = {
   'moderation/rules/[id]': { enabled: false },
   'saved-replies/[id]': { name: 'Hijacked' },
   'tasks/[id]': { title: 'Hijacked' },
+  'ai-agents/[id]': { brief: 'Hijacked' },
   'custom-fields/[id]': { name: 'Hijacked', kind: 'text', options: [] },
   'post-templates/[id]': { name: 'Hijacked', body: 'x' },
   'chat-channels/[id]': { enabled: false },
@@ -156,6 +157,7 @@ beforeAll(async () => {
   const savedView = await prisma.savedView.create({ data: { workspaceId: w, userId: ownerA.id, name: 'A view', screen: 'posts', query: 'status=failed' } });
   const inboxNote = await prisma.inboxNote.create({ data: { workspaceId: w, kind: 'comment', itemId: 'c-a', authorId: ownerA.id, body: 'A note' } });
   const task = await prisma.task.create({ data: { workspaceId: w, title: 'A task' } });
+  const agent = await prisma.aiAgent.create({ data: { workspaceId: w, userId: 'u', targetId: 't', brief: 'A brief', weekday: 1 } });
   const customField = await prisma.customField.create({ data: { workspaceId: w, name: 'A field' } });
   const postTemplate = await prisma.postTemplate.create({ data: { workspaceId: w, name: 'A template', body: 'x' } });
   const postNote = await prisma.postNote.create({ data: { postId: post.id, body: 'A note' } });
@@ -193,6 +195,7 @@ beforeAll(async () => {
     'saved-replies/[id]': savedReply.id,
     'saved-views/[id]': savedView.id,
     'tasks/[id]': task.id,
+    'ai-agents/[id]': agent.id,
     'custom-fields/[id]': customField.id,
     'inbox/notes/[id]': inboxNote.id,
     'post-templates/[id]': postTemplate.id,
@@ -232,7 +235,7 @@ afterAll(async () => {
 /** Everything A owns, as a fingerprint: counts and the fields a hijack would change. */
 async function snapshot() {
   const w = A.workspace;
-  const [posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes, calendarFeeds, chartNotes, savedViews, inboxNotes, tasks, customFields] = await Promise.all([
+  const [posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes, calendarFeeds, chartNotes, savedViews, inboxNotes, tasks, aiAgents, customFields] = await Promise.all([
     prisma.post.findMany({ where: { workspaceId: w }, select: { id: true, message: true, status: true } }),
     prisma.target.findMany({ where: { workspaceId: w }, select: { id: true, enabled: true, name: true } }),
     prisma.label.findMany({ where: { workspaceId: w }, select: { id: true, name: true } }),
@@ -259,9 +262,10 @@ async function snapshot() {
     prisma.savedView.findMany({ where: { workspaceId: w }, select: { id: true, name: true } }),
     prisma.inboxNote.findMany({ where: { workspaceId: w }, select: { id: true, body: true } }),
     prisma.task.findMany({ where: { workspaceId: w }, select: { id: true, title: true, status: true } }),
+    prisma.aiAgent.findMany({ where: { workspaceId: w }, select: { id: true, brief: true } }),
     prisma.customField.findMany({ where: { workspaceId: w }, select: { id: true, name: true, kind: true } }),
   ]);
-  return { posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes, calendarFeeds, chartNotes, savedViews, inboxNotes, tasks, customFields };
+  return { posts, targets, labels, groups, snippets, feeds, rules, savedReplies, moderated, captionTests, shares, tokens, chats, templates, schedules, members, media, webhooks, deliveries, postTemplates, postNotes, calendarFeeds, chartNotes, savedViews, inboxNotes, tasks, aiAgents, customFields };
 }
 
 describe("another client's owner", () => {

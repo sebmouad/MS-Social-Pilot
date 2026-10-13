@@ -29,6 +29,7 @@ import { runContentMix } from '../content-mix';
 import { watchNegativeComments } from '../negative-comments';
 import { refreshTrends } from '../trends';
 import { approveUnanswered } from '../share-links';
+import { runDueAgents } from '../ai-agents';
 
 /**
  * The worker's job set.
@@ -60,6 +61,7 @@ export type JobName =
   | 'negativeComments'
   | 'trends'
   | 'contentMix'
+  | 'aiAgents'
   | 'captionTests'
   | 'bestTimes'
   | 'alerts'
@@ -779,6 +781,15 @@ export function jobDefinitions(): JobDefinition[] {
         const { scheduled, dry } = await runContentMix(now);
         const parts = [scheduled > 0 ? `${scheduled} draft(s) scheduled for the mix` : null, dry > 0 ? `${dry} label(s) ran dry` : null].filter(Boolean);
         return parts.length ? parts.join('; ') : null;
+      },
+    },
+    {
+      // Writes each agent's week of drafts on its day (AI call, no Graph).
+      name: 'aiAgents',
+      intervalMs: 60 * 60 * 1000,
+      run: async ({ now }) => {
+        const drafts = await runDueAgents(now);
+        return drafts > 0 ? `${drafts} draft(s) written by AI agents` : null;
       },
     },
     {

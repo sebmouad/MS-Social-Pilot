@@ -4202,5 +4202,32 @@
     "deleteBody": "Sa valeur est retirée de toutes les publications. Les publications restent.",
     "emptyTitle": "Aucun champ personnalisé pour l’instant",
     "emptyHint": "Ajoutez le premier ci-dessus. Il apparaît ensuite quand vous écrivez une publication."
+  },
+  "agents": {
+    "title": "Agents IA",
+    "subtitle": "Une consigne permanente qui rédige une semaine de brouillons pour un canal, le jour choisi. Vous relisez, modifiez et planifiez chaque brouillon.",
+    "unavailable": "L’IA n’est pas encore configurée : les agents attendent. Demandez à la personne qui gère cette application de connecter un fournisseur d’IA.",
+    "brief": "Consigne",
+    "briefPlaceholder": "De quoi doivent parler les publications chaque semaine ?",
+    "page": "Canal",
+    "day": "Jour",
+    "count": "Nombre de publications",
+    "add": "Ajouter l’agent",
+    "failed": "Enregistrement impossible. Réessayez.",
+    "empty": "Aucun agent pour l’instant. Ajoutez une consigne et choisissez un jour.",
+    "summary": "{count, plural, one {# brouillon} other {# brouillons}} pour {page} chaque {day}",
+    "on": "Actif",
+    "delete": "Supprimer",
+    "deleteTitle": "Supprimer cet agent ?",
+    "deleteBody": "Il cesse d’écrire des brouillons. Ceux déjà écrits restent.",
+    "days": {
+      "sunday": "dimanche",
+      "monday": "lundi",
+      "tuesday": "mardi",
+      "wednesday": "mercredi",
+      "thursday": "jeudi",
+      "friday": "vendredi",
+      "saturday": "samedi"
+    }
   }
 }

@@ -4202,5 +4202,32 @@
     "deleteBody": "Its value is removed from every post. The posts stay.",
     "emptyTitle": "No custom fields yet",
     "emptyHint": "Add the first one above. It then appears when you write a post."
+  },
+  "agents": {
+    "title": "AI agents",
+    "subtitle": "A standing brief that drafts a week of posts for a channel on its day. You still read, edit and schedule every draft.",
+    "unavailable": "AI is not set up yet, so agents wait. Ask the person who runs this app to connect an AI provider.",
+    "brief": "Brief",
+    "briefPlaceholder": "What should the posts be about each week?",
+    "page": "Channel",
+    "day": "Day",
+    "count": "Number of posts",
+    "add": "Add agent",
+    "failed": "Could not save that. Try again.",
+    "empty": "No agents yet. Add a brief and pick a day.",
+    "summary": "{count, plural, one {# draft} other {# drafts}} for {page} every {day}",
+    "on": "On",
+    "delete": "Delete",
+    "deleteTitle": "Delete this agent?",
+    "deleteBody": "It stops writing drafts. Drafts it already wrote stay.",
+    "days": {
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday"
+    }
   }
 }

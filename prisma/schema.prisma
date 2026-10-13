@@ -341,6 +341,7 @@ model Workspace {
   bioPage              BioPage?
   tasks                Task[]
   customFields         CustomField[]
+  aiAgents             AiAgent[]
   captionTests         CaptionTest[]
   shareLinks           ShareLink[]
   reportTemplates      ReportTemplate[]
@@ -763,6 +764,30 @@ model PostFieldValue {
   @@unique([postId, fieldId])
   @@index([fieldId])
   @@map("post_field_values")
+}
+
+/// An AI agent with a schedule: every week, on one weekday, it drafts a few
+/// posts for one channel from a standing brief. Drafts only; people still read,
+/// edit and schedule them.
+model AiAgent {
+  id          String   @id @default(cuid())
+  workspaceId String
+  /// Who set it up; the drafts are written as them, with their role.
+  userId      String
+  targetId    String
+  brief       String
+  /// 0 = Sunday … 6 = Saturday, in the workspace's time zone.
+  weekday     Int
+  count       Int      @default(5)
+  enabled     Boolean  @default(true)
+  /// The day (yyyy-MM-dd, workspace zone) it last ran, so it runs once a week.
+  lastRunOn   String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("ai_agents")
 }
 
 model PostNote {

@@ -41,6 +41,7 @@ export function SettingsNav({
     { href: '/settings/sharing', label: t('sharing.title'), icon: 'link' },
     { href: '/settings/bio', label: t('bio.title'), icon: 'link' },
     { href: '/settings/fields', label: t('customFields.title'), icon: 'tag' },
+    { href: '/settings/agents', label: t('agents.title'), icon: 'sparkles' },
     ...(showApi ? [{ href: '/settings/api', label: t('apiKeys.title'), icon: 'code' as IconName }] : []),
     { href: '/settings/notifications', label: t('notifications.title'), icon: 'bell' },
     ...(showWebhooks ? [{ href: '/settings/webhooks', label: t('webhooks.title'), icon: 'share' as IconName }] : []),
