@@ -61,7 +61,7 @@ test('an unknown view opens the analysis rather than an empty screen', async ({ 
 test('switching tabs keeps the Page and window but drops one view’s filters', async ({ page }) => {
   const failures = collectFailures(page);
 
-  await open(page, `/analytics?view=comments&target=${targetId}&days=7&q=delivery&shown=hidden&page=2`);
+  await open(page, `/analytics?view=interactions&target=${targetId}&days=7&q=delivery&shown=hidden&page=2`);
 
   const tabs = page.getByRole('navigation', { name: /choose a view/i });
   const href = await tabs.getByRole('link', { name: /^by post$/i }).getAttribute('href');

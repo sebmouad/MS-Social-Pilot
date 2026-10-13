@@ -84,7 +84,7 @@ test('a feed shows what it imported, and can be edited in place', async ({ page 
   await expect(card.getByTestId('feed-template-preview')).toHaveText('New on the journal: Rye week starts Monday');
   await card.getByLabel(/schedule new items automatically/i).uncheck();
   await card.getByLabel(/^hashtags$/i).fill('#journal');
-  await card.getByLabel(/spread over the pages/i).selectOption('20');
+  await card.getByLabel(/spread over the channels/i).selectOption('20');
 
   await card.getByRole('button', { name: /^save$/i }).click();
   await expect(page.getByRole('status')).toHaveText(/feed saved/i);

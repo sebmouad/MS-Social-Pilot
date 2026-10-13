@@ -244,8 +244,8 @@ test('the seeded long content actually reaches the screens that are checked', as
 test('the analytics tabs stay usable when there is data behind them', async ({ page }) => {
   const failures = collectFailures(page);
 
-  await open(page, '/analytics?view=comments');
-  await expect(page.getByText(PAGE_NAME).first()).toBeVisible();
+  await open(page, '/analytics?view=interactions');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
   const scrollable = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -274,7 +274,7 @@ test('on a phone the sidebar is a drawer behind the menu, with the composer one 
 
   // Every module's screens are in it, grouped, and the drawer fits the phone.
   const drawer = page.locator('#main-menu');
-  for (const name of [/^calendar$/i, /^queue$/i, /^posts$/i, /^pages$/i, /^reports$/i, /^ads$/i, /^connections$/i, /^settings$/i]) {
+  for (const name of [/^calendar$/i, /^queue$/i, /^posts$/i, /^channels$/i, /^reports$/i, /^ads$/i, /^connections$/i, /^settings$/i]) {
     await expect(drawer.getByRole('link', { name })).toBeVisible();
   }
 

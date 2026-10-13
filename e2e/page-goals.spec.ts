@@ -25,7 +25,7 @@ test('sets a monthly goal and shows its progress on the dashboard and in the rep
     if (!(await dialog.isVisible())) await goals.getByRole('button', { name: 'Set goals' }).click();
     await expect(dialog).toBeVisible({ timeout: 1_500 });
   }).toPass();
-  await dialog.getByLabel('Page').selectOption(targetId);
+  await dialog.getByLabel('Channel').selectOption(targetId);
   await dialog.getByLabel('Posts published').fill('12');
   await dialog.getByRole('button', { name: 'Save goals' }).click();
   await expect(dialog).toBeHidden();

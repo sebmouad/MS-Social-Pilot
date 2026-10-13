@@ -23,11 +23,10 @@ test('sets a Page’s weekly mix and shows the week against it', async ({ page }
     update: {},
   });
 
-  await open(page, '/queue/mix');
+  await open(page, `/queue/mix?pages=${target.id}`);
   await expect(page.getByRole('heading', { level: 1, name: 'Content mix' })).toBeVisible();
   await expect(page.locator('nav a[aria-current="page"]', { hasText: 'Content mix' })).toBeVisible();
 
-  await page.getByLabel('Page or group').selectOption({ label: PAGE_NAME });
   // Clicked again until the page has hydrated and the row appears.
   const perWeek = page.getByRole('spinbutton', { name: `Posts per week for ${LABEL}` });
   await expect(async () => {

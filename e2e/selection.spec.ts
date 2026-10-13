@@ -124,7 +124,8 @@ test('two profiles add up on All profiles, and the selection follows to Posts an
 test('the Pages column folds to a rail of pictures and stays folded', async ({ page }) => {
   test.setTimeout(120_000);
   const failures = collectFailures(page);
-  await open(page, '/calendar');
+  // A screen without its own filters in the column: those stay open.
+  await open(page, '/queue');
   const column = page.getByRole('complementary', { name: 'Channels' });
   // A click that lands before hydration does nothing: click until it folds.
   await expect(async () => {
