@@ -32,6 +32,11 @@ import { VersionHistory } from './VersionHistory';
 import { PostNotes } from './PostNotes';
 import { TranslationFields, type Translation } from './TranslationFields';
 import AltTextSuggest from './AltTextSuggest';
+import { registerNavigationGuard } from '@/lib/navigation-guard';
+import { onRadioGroupKeyDown } from '@/lib/segmented-radio';
+import { MediaPicker } from './MediaPicker';
+import { useConfirm } from './ConfirmProvider';
+import { composerFieldErrors, destinationContent, stableFields } from '@/lib/composer-state';
 
 interface Props {
   targets: TargetOption[];
@@ -58,6 +63,8 @@ interface Props {
   editing?: EditingPost;
   /** Destinations ticked to start with: a Page's card opens the composer for it. */
   initialTargetIds?: string[];
+  initialTiming?: Timing;
+  draftScope: string;
   /** Text and link handed over by the phone's share sheet, or a bookmarklet. */
   initialMessage?: string;
   initialLink?: string;
@@ -134,6 +141,8 @@ export function Composer({
   canPublishDirectly,
   editing,
   initialTargetIds,
+  initialTiming = 'schedule',
+  draftScope,
   initialMessage,
   initialLink,
   groups = [],
@@ -150,6 +159,15 @@ export function Composer({
   const tCommon = useTranslations('common');
   const tAuth = useTranslations('auth');
   const router = useRouter();
+  const confirm = useConfirm();
+  const [recovery, setRecovery] = useState<Record<string, unknown> | null>(null);
+  const [recoveryLoaded, setRecoveryLoaded] = useState(false);
+  const sessionSaved = useRef(false);
+  const submitLock = useRef(false);
+  const committedSnapshot = useRef<string | null>(null);
+  const recoveryKey = `msp-composer:${draftScope}`;
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const fileInput = useRef<HTMLInputElement>(null);
   const messageBox = useRef<HTMLTextAreaElement>(null);
   const commentBox = useRef<HTMLTextAreaElement>(null);
@@ -172,11 +190,13 @@ export function Composer({
   const backgroundAllowed = format === 'post' && !link.trim() && media.length === 0 && message.length <= BACKGROUND_MAX_CHARS;
   const [naturalSizes, setNaturalSizes] = useState<Record<string, { width: number; height: number }>>({});
   const [selected, setSelected] = useState<string[]>(editing?.targetIds ?? initialTargetIds ?? []);
+  const [previewTargetId, setPreviewTargetId] = useState('');
+  const previewTarget = targets.find((target) => target.id === previewTargetId && selected.includes(target.id)) ?? targets.find((target) => selected.includes(target.id));
   const [moreOpen, setMoreOpen] = useState(Boolean(editing?.firstComment || editing?.place || editing?.textBackground));
   const [savedGroups, setSavedGroups] = useState<PageGroupView[]>([]);
   const [groupName, setGroupName] = useState<string | null>(null);
   const [groupStatus, setGroupStatus] = useState<{ ok: boolean; text: string } | null>(null);
-  const [timing, setTiming] = useState<Timing>('schedule');
+  const [timing, setTiming] = useState<Timing>(initialTiming);
   const [handler, setHandler] = useState<Handler>(
     editing?.publishMode === 'native' ? 'native' : 'worker',
   );
@@ -186,12 +206,15 @@ export function Composer({
   const [pending, setPending] = useState(false);
   const [stagger, setStagger] = useState<StaggerChoice>({ minutes: 0, aiVariants: false });
   const [captionTest, setCaptionTest] = useState<CaptionTestChoice>(NO_CAPTION_TEST);
+  const restoredTranslations = useRef<Translation[] | null>(null);
   const [translations, setTranslations] = useState<Translation[] | null>(null);
   const testing = captionTest.on && !editing && timing !== 'queue';
   // Translations are for the Pages picked when they were made.
   const selectedKey = selected.join(',');
-  useEffect(() => setTranslations(null), [selectedKey]);
+  useEffect(() => { setTranslations(restoredTranslations.current); restoredTranslations.current = null; }, [selectedKey]);
   const translating = translations !== null && !editing && !testing;
+  const translatedPreview = translating ? translations?.find((translation) => translation.language && translation.targetIds.includes(previewTarget?.id ?? ''))?.text : undefined;
+  const previewContent = destinationContent(previewTarget?.id ?? '', translatedPreview ?? message, media, testing || translating ? {} : variants, testing || translating ? [] : textOnly);
   const pageNames = new Map(targets.map((target) => [target.id, target.name]));
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -300,7 +323,8 @@ export function Composer({
    * a new post — they are two clicks to redo, and warning over them would make
    * the guard fire on every visit.
    */
-  const dirty = editing
+  const snapshot = JSON.stringify({ message, link, firstComment, place, background, variants, fieldValues, textOnly, commentDelay, labelIds, format, media, selected, timing, handler, scheduledAt, stagger, captionTest, translations });
+  const changed = editing
     ? message !== editing.message ||
       firstComment !== (editing.firstComment ?? '') ||
       place.trim() !== (editing.place ?? '') ||
@@ -311,8 +335,14 @@ export function Composer({
       link !== (editing.link ?? '') ||
       mediaKey(media) !== mediaKey(editing.media) ||
       [...selected].sort().join() !== [...editing.targetIds].sort().join() ||
-      scheduledAt !== (editing.scheduledAtLocal ?? defaultScheduledAt)
-    : message.trim().length > 0 || firstComment.trim().length > 0 || link.trim().length > 0 || media.length > 0;
+      scheduledAt !== (editing.scheduledAtLocal ?? defaultScheduledAt) ||
+      stableFields(variants) !== stableFields(editing.variants ?? {}) ||
+      stableFields(fieldValues) !== stableFields(editing.fields ?? {}) ||
+      [...textOnly].sort().join() !== [...(editing.textOnly ?? [])].sort().join() ||
+      handler !== (editing.publishMode === 'native' ? 'native' : 'worker')
+    : message.trim().length > 0 || firstComment.trim().length > 0 || link.trim().length > 0 || media.length > 0 || stableFields(variants) !== '[]' || stableFields(fieldValues) !== '[]' || textOnly.length > 0 || place.trim().length > 0 || Boolean(background);
+
+  const dirty = changed && snapshot !== committedSnapshot.current;
 
   useEffect(() => {
     if (!dirty) return;
@@ -324,6 +354,93 @@ export function Composer({
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    let asking = false;
+    const guard = (event: globalThis.MouseEvent) => {
+      const anchor = (event.target as Element).closest<HTMLAnchorElement>('a[href]');
+      if (!anchor || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+      const destination = new URL(anchor.href, location.href);
+      if (destination.origin !== location.origin || (destination.pathname === location.pathname && destination.search === location.search)) return;
+      event.preventDefault(); event.stopPropagation();
+      if (asking) return;
+      asking = true;
+      void confirm({ title: t('leaveDraftTitle'), body: t(sessionSaved.current ? 'leaveDraftBody' : 'leaveDraftUnsaved'), confirmLabel: t('leaveDraft'), cancelLabel: t('keepWriting') }).then((leave) => {
+        asking = false;
+        if (leave) router.push(destination.pathname + destination.search + destination.hash);
+      });
+    };
+    document.addEventListener('click', guard, true);
+    return () => document.removeEventListener('click', guard, true);
+  }, [dirty, confirm, router, t]);
+
+
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(recoveryKey);
+      if (saved) setRecovery(JSON.parse(saved) as Record<string, unknown>);
+    } catch { /* Storage can be unavailable; the navigation guard still protects edits. */ }
+    setRecoveryLoaded(true);
+  }, [recoveryKey]);
+  useEffect(() => {
+    if (!recoveryLoaded || recovery) return;
+    try {
+      if (dirty) { sessionStorage.setItem(recoveryKey, snapshot); sessionSaved.current = true; }
+      else sessionStorage.removeItem(recoveryKey);
+    } catch { sessionSaved.current = false; /* Never prevent writing when storage is full or blocked. */ }
+  }, [snapshot, dirty, recovery, recoveryKey, recoveryLoaded]);
+  const restoreRecovery = () => {
+    if (!recovery) return;
+    const saved = recovery;
+    // Session storage is untrusted: only use fields with the expected shape.
+    if (typeof saved.message === 'string') writeMessage(saved.message);
+    if (typeof saved.link === 'string') writeLink(saved.link);
+    if (typeof saved.firstComment === 'string') { setFirstComment(saved.firstComment); if (commentBox.current) commentBox.current.value = saved.firstComment; }
+    if (typeof saved.place === 'string') setPlace(saved.place);
+    if (typeof saved.background === 'string') setBackground(saved.background);
+    const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string');
+    const fields = (value: unknown): value is Record<string, string> => Boolean(value) && typeof value === 'object' && !Array.isArray(value) && Object.values(value as object).every((item) => typeof item === 'string');
+    if (fields(saved.variants)) setVariants(saved.variants);
+    if (fields(saved.fieldValues)) setFieldValues(saved.fieldValues);
+    if (strings(saved.textOnly)) setTextOnly(saved.textOnly.filter((id) => targets.some((target) => target.id === id)));
+    if (Array.isArray(saved.translations)) {
+      const recovered = saved.translations.filter((item): item is Translation => Boolean(item) && (typeof item.language === 'string' || item.language === null) && typeof item.text === 'string' && typeof item.rtl === 'boolean' && strings(item.targetIds)).map((item) => ({ ...item, targetIds: item.targetIds.filter((id) => targets.some((target) => target.id === id)) }));
+      if (strings(saved.selected) && saved.selected.join(',') !== selectedKey) restoredTranslations.current = recovered;
+      else setTranslations(recovered);
+    }
+    if (strings(saved.selected)) setSelected(saved.selected.filter((id) => targets.some((target) => target.id === id)));
+    if (strings(saved.labelIds)) setLabelIds(saved.labelIds.filter((id) => labels.some((label) => label.id === id)));
+    if (typeof saved.commentDelay === 'number') setCommentDelay(saved.commentDelay);
+    if (saved.format === 'post' || saved.format === 'reel' || saved.format === 'story') setFormat(saved.format);
+    if (saved.timing === 'now' || saved.timing === 'schedule' || (saved.timing === 'queue' && hasQueueSlots)) setTiming(saved.timing);
+    if (saved.handler === 'worker' || saved.handler === 'native') setHandler(saved.handler);
+    if (typeof saved.scheduledAt === 'string') setScheduledAt(saved.scheduledAt);
+    if (saved.stagger && typeof saved.stagger === 'object' && 'minutes' in saved.stagger && 'aiVariants' in saved.stagger && typeof saved.stagger.minutes === 'number' && typeof saved.stagger.aiVariants === 'boolean') setStagger({ minutes: saved.stagger.minutes, aiVariants: saved.stagger.aiVariants });
+    if (saved.captionTest && typeof saved.captionTest === 'object' && 'on' in saved.captionTest && 'captions' in saved.captionTest && 'hours' in saved.captionTest && typeof saved.captionTest.on === 'boolean' && strings(saved.captionTest.captions) && [24, 48, 72, 168].includes(Number(saved.captionTest.hours))) setCaptionTest({ on: saved.captionTest.on, captions: saved.captionTest.captions, hours: saved.captionTest.hours as CaptionTestChoice['hours'] });
+    if (Array.isArray(saved.media)) setMedia(saved.media.filter((item): item is PostMedia => Boolean(item) && typeof item.id === 'string' && typeof item.url === 'string' && ['image', 'video'].includes(item.kind)));
+    setMoreOpen(true);
+    setRecovery(null);
+  };
+
+  useEffect(() => {
+    if (!dirty) return;
+    let question: Promise<boolean> | null = null;
+    const ask = () => question ??= confirm({ title: t('leaveDraftTitle'), body: t(sessionSaved.current ? 'leaveDraftBody' : 'leaveDraftUnsaved'), confirmLabel: t('leaveDraft'), cancelLabel: t('keepWriting') }).finally(() => { question = null; });
+    const unregister = registerNavigationGuard(ask);
+    type TraverseEvent = Event & { navigationType: string; destination: { key: string }; };
+    const navigation = (window as unknown as { navigation?: EventTarget & { traverseTo: (key: string) => unknown } }).navigation;
+    let approved = false;
+    const traverse = (raw: Event) => {
+      const event = raw as TraverseEvent;
+      if (event.navigationType !== 'traverse' || !event.cancelable) return;
+      if (approved) { approved = false; return; }
+      event.preventDefault();
+      void ask().then((leave) => { if (leave) { approved = true; navigation?.traverseTo(event.destination.key); } });
+    };
+    navigation?.addEventListener('navigate', traverse);
+    return () => { unregister(); navigation?.removeEventListener('navigate', traverse); };
+  }, [dirty, confirm, t]);
 
   const loadPreview = useCallback(
     async (url: string, refresh = false) => {
@@ -358,6 +475,7 @@ export function Composer({
 
   async function uploadFiles(files: FileList) {
     setError(null);
+    setFieldErrors({});
     setUploading(true);
     // Every refusal names its file. Several can go wrong in one pick, and
     // "File too large" on its own leaves the author guessing which one.
@@ -406,8 +524,11 @@ export function Composer({
   }
 
   async function submit(saveAsDraft: boolean) {
+    if (submitLock.current) return;
+    submitLock.current = true;
     setPending(true);
     setError(null);
+    setFieldErrors({});
     setResult(null);
     setPartial(null);
     setPublished([]);
@@ -492,7 +613,10 @@ export function Composer({
 
       if (!response.ok) {
         const fieldError = body.fields ? Object.values(body.fields)[0] : undefined;
-        setError(fieldError ?? body.error ?? t('couldNotSave'));
+        const fields = composerFieldErrors(body.fields);
+        setFieldErrors(fields);
+        setError(body.error ?? fieldError ?? t('couldNotSave'));
+        requestAnimationFrame(() => (document.getElementById(Object.keys(fields)[0] ?? 'message') ?? messageBox.current)?.focus());
         return;
       }
 
@@ -503,7 +627,12 @@ export function Composer({
       // Unless the save came back with something to say — Facebook would have
       // refused the time, so this app holds the post instead. The list would
       // not repeat that, so it is said here, with the way on to the list.
+      if (!editing && !body.postId) { setError(t('saveUncertain')); return; }
+      committedSnapshot.current = snapshot;
+      try { sessionStorage.removeItem(recoveryKey); } catch {}
+      setRecovery(null);
       if (editing && body.notice) {
+        committedSnapshot.current = JSON.stringify({ ...JSON.parse(snapshot), handler: 'worker' });
         setResult(body.notice);
         // What the server did, so saving again does not ask for it once more.
         setHandler('worker');
@@ -525,6 +654,18 @@ export function Composer({
           .filter((item) => item.status === 'published' && item.url)
           .map((item) => ({ name: item.targetName, url: item.url! })),
       );
+      try { sessionStorage.removeItem(recoveryKey); } catch {}
+      setRecovery(null);
+      const tested = testing;
+      const translated = translating;
+      setVariants({});
+      setTextOnly([]);
+      setFieldValues({});
+      setPlace('');
+      setBackground('');
+      setStagger({ minutes: 0, aiVariants: false });
+      setCaptionTest(NO_CAPTION_TEST);
+      setTranslations(null);
       writeMessage('');
       writeLink('');
       setFirstComment('');
@@ -558,11 +699,7 @@ export function Composer({
           : null;
 
       const staggered = !saveAsDraft && (body.posts ?? 1) > 1 ? body.posts! : 0;
-      setStagger({ minutes: 0, aiVariants: false });
-      const tested = testing;
-      setCaptionTest(NO_CAPTION_TEST);
-      const translated = translating;
-      setTranslations(null);
+
 
       if (body.undoUntil && body.postId) {
         setUndo({ postId: body.postId, until: body.undoUntil });
@@ -587,8 +724,9 @@ export function Composer({
                 : t('scheduledOk'),
       );
     } catch {
-      setError(t('couldNotSave'));
+      setError(t('saveUncertain'));
     } finally {
+      submitLock.current = false;
       setPending(false);
     }
   }
@@ -652,7 +790,10 @@ export function Composer({
               : formatProblem ?? networkMessage;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
+    <div className="grid gap-6 pb-28 lg:grid-cols-3 lg:pb-0">
+      {recovery && <div role="status" className="card flex flex-wrap items-center gap-3 p-4 lg:col-span-3"><p>{t('draftRecovery')}</p><button type="button" className="btn-primary" onClick={restoreRecovery}>{t('restoreDraft')}</button><button type="button" className="btn-secondary" onClick={() => { try { sessionStorage.removeItem(recoveryKey); } catch {} setRecovery(null); }}>{t('discardRecovery')}</button></div>}
+      <MediaPicker open={libraryOpen} onClose={() => setLibraryOpen(false)} selectedIds={media.map((item) => item.id)} onSelect={(items) => { if (media.length + items.length > LIMITS.mediaPerPost) { setError(t('maxFiles', { count: LIMITS.mediaPerPost })); return; } setMedia((current) => [...current, ...items]); setLibraryOpen(false); startedNext(); }} />
+      {Object.entries(fieldErrors).length > 0 && <ul role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800 lg:col-span-3">{Object.entries(fieldErrors).map(([field, text]) => <li key={field} id={`${field}-error`}><a href={`#${field}`} className="underline">{text}</a></li>)}</ul>}
       {/* `min-w-0` on both columns, and it is load-bearing. A grid track sizes
           itself to its content's minimum width, and a destination row carrying
           a long name, an account and the note saying why it is switched off
@@ -663,13 +804,14 @@ export function Composer({
       <div className="min-w-0 space-y-6 lg:col-span-2">
         <section className="card p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div className="segmented" role="radiogroup" aria-label={t('formatLabel')}>
+            <div className="segmented" role="radiogroup" onKeyDown={onRadioGroupKeyDown} aria-label={t('formatLabel')}>
               {(['post', 'reel', 'story'] as const).map((value) => (
                 <button
                   key={value}
                   type="button"
                   role="radio"
                   aria-checked={format === value}
+                  tabIndex={format === value ? 0 : -1}
                   className={`segmented-item ${format === value ? 'segmented-item-active' : ''}`}
                   onClick={() => setFormat(value)}
                 >
@@ -722,6 +864,8 @@ export function Composer({
           </label>
           <textarea
             id="message"
+            aria-invalid={Boolean(fieldErrors.message)}
+            aria-describedby={fieldErrors.message ? 'message-error' : undefined}
             ref={messageBox}
             className="input min-h-[160px] resize-y"
             placeholder={t('placeholder')}
@@ -748,12 +892,13 @@ export function Composer({
             </label>
             <textarea
               id="first-comment"
+              aria-invalid={Boolean(fieldErrors['first-comment'])}
               ref={commentBox}
               className="input min-h-[72px] resize-y"
               placeholder={t('firstCommentPlaceholder')}
               defaultValue={editing?.firstComment ?? ''}
               maxLength={8000}
-              aria-describedby="first-comment-hint"
+              aria-describedby={`first-comment-hint${fieldErrors['first-comment'] ? ' first-comment-error' : ''}`}
               onChange={(event) => setFirstComment(event.target.value)}
             />
             <p id="first-comment-hint" className="hint">
@@ -766,11 +911,12 @@ export function Composer({
             <legend className="label">
               {t('backgroundLabel')} <span className="font-normal text-slate-400">{tAuth('optional')}</span>
             </legend>
-            <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label={t('backgroundLabel')}>
+            <div className="flex flex-wrap items-center gap-2" role="radiogroup" onKeyDown={onRadioGroupKeyDown} aria-label={t('backgroundLabel')}>
               <button
                 type="button"
                 role="radio"
                 aria-checked={background === ''}
+                tabIndex={background === '' ? 0 : -1}
                 className={`rounded-full px-3 py-1 text-sm font-semibold ${background === '' ? 'bg-brand-50 text-brand-700' : 'bg-white text-slate-700 shadow-surface'}`}
                 onClick={() => setBackground('')}
               >
@@ -782,6 +928,7 @@ export function Composer({
                   type="button"
                   role="radio"
                   aria-checked={background === option.id}
+                  tabIndex={background === option.id ? 0 : -1}
                   aria-label={t(`background${option.name[0]!.toUpperCase()}${option.name.slice(1)}` as 'backgroundBlack')}
                   title={t(`background${option.name[0]!.toUpperCase()}${option.name.slice(1)}` as 'backgroundBlack')}
                   className={`h-8 w-8 rounded-full ring-offset-2 ${background === option.id ? 'ring-2 ring-brand-500' : 'ring-1 ring-slate-300'}`}
@@ -799,6 +946,7 @@ export function Composer({
             </label>
             <input
               id="post-place"
+              aria-invalid={Boolean(fieldErrors['post-place'])}
               className="input"
               inputMode="numeric"
               pattern="\d*"
@@ -806,7 +954,7 @@ export function Composer({
               placeholder={t('placePlaceholder')}
               value={place}
               onChange={(event) => setPlace(event.target.value.replace(/\D/g, ''))}
-              aria-describedby="post-place-hint"
+              aria-describedby={`post-place-hint${fieldErrors['post-place'] ? ' post-place-error' : ''}`}
             />
             <p id="post-place-hint" className="hint">
               {t('placeHint')}
@@ -852,6 +1000,8 @@ export function Composer({
             <div className="flex gap-2">
               <input
                 id="link"
+            aria-invalid={Boolean(fieldErrors.link)}
+            aria-describedby={fieldErrors.link ? 'link-error' : undefined}
                 ref={linkBox}
                 className="input"
                 placeholder={t('linkPlaceholder')}
@@ -914,6 +1064,7 @@ export function Composer({
             <label className="label" htmlFor="media">
               {t('media')}
             </label>
+            <button type="button" className="btn-secondary mb-3" disabled={uploading || pending} onClick={() => setLibraryOpen(true)}>{t('chooseLibrary')}</button>
             {/* The browser's own "Choose Files / No file chosen" control looked
                 like no other control here. The input stays — visually hidden,
                 still focusable and labelled — and the zone is its label, so a
@@ -1037,21 +1188,25 @@ export function Composer({
           </div>
         </section>
 
+        <div>
+          {selectedTargets.length > 1 && <label className="mb-3 block text-sm font-medium">{t('previewDestination')}<select className="input mt-1 w-full" value={previewTarget?.id ?? ''} onChange={(event) => setPreviewTargetId(event.target.value)}>{selectedTargets.map((target) => <option key={target.id} value={target.id}>{target.name}</option>)}</select></label>}
         <PostPreview
-          page={selectedTargets[0] ?? null}
-          message={message}
-          media={media}
+          page={previewTarget ?? null}
+          message={previewContent.message}
+          media={previewContent.media}
           link={preview}
           firstComment={firstComment}
           timing={timing}
           scheduledAt={scheduledAt}
           format={format}
         />
+        </div>
       </div>
 
       <div className="min-w-0 space-y-6">
         <section className="card p-5">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">{t('whereToPost')}</h2>
+          <h2 id="compose-targets-label" className="mb-3 text-sm font-semibold text-slate-900">{t('whereToPost')}</h2>
+          <div id="targetIds" tabIndex={-1} role="group" aria-labelledby="compose-targets-label" aria-describedby={fieldErrors.targetIds ? 'targetIds-error' : undefined}>
           <TargetPicker
             targets={targets}
             selected={selected}
@@ -1061,6 +1216,7 @@ export function Composer({
             }}
             groups={[...groups, ...savedGroups]}
           />
+          </div>
           {canSaveGroup && selected.length >= 2 && (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
               {groupName === null ? (
@@ -1147,13 +1303,14 @@ export function Composer({
           {editing ? (
             <p className="text-sm text-slate-600">{t('scheduleForTime')}</p>
           ) : (
-            <div className="segmented w-full" role="radiogroup" aria-label={t('whenToPost')}>
+            <div className="segmented w-full" role="radiogroup" onKeyDown={onRadioGroupKeyDown} aria-label={t('whenToPost')}>
               {timingOptions.map((option) => (
                 <button
                   key={option.value}
                   type="button"
                   role="radio"
                   aria-checked={timing === option.value}
+                  tabIndex={timing === option.value ? 0 : -1}
                   disabled={option.disabled}
                   title={option.disabled ? option.reason : undefined}
                   className={`segmented-item flex-1 disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -1252,6 +1409,8 @@ export function Composer({
               </label>
               <input
                 id="scheduledAt"
+            aria-invalid={Boolean(fieldErrors.scheduledAt)}
+            aria-describedby={fieldErrors.scheduledAt ? 'scheduledAt-error' : undefined}
                 type="datetime-local"
                 className="input"
                 value={scheduledAt}
@@ -1380,7 +1539,7 @@ export function Composer({
           </div>
         )}
 
-        <div>
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:static lg:border-0 lg:bg-transparent lg:p-0">
           <div className="flex gap-2">
             <button type="button" className="btn-secondary" disabled={pending || uploading || testing} onClick={() => submit(true)}>
               {editing ? t('moveToDrafts') : t('saveDraft')}

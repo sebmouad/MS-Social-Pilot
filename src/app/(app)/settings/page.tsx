@@ -7,7 +7,6 @@ import { requirePage } from '@/lib/auth';
 import { timezoneOptions } from '@/lib/time';
 import { screenMetadata } from '@/lib/metadata';
 import { prisma } from '@/lib/prisma';
-import { bulkCsvTemplate } from '@/lib/csv';
 import { aiAvailable } from '@/lib/ai';
 import { env } from '@/lib/env';
 
@@ -23,14 +22,7 @@ export default async function SettingsPage() {
   const auth = await requirePage();
   const t = await getTranslations('settings');
 
-  const [targets, workspace] = await Promise.all([
-    prisma.target.findMany({
-      where: { workspaceId: auth.workspace.id },
-      include: { socialAccount: { select: { name: true } } },
-      orderBy: [{ type: 'asc' }, { name: 'asc' }],
-    }),
-    prisma.workspace.findUniqueOrThrow({ where: { id: auth.workspace.id } }),
-  ]);
+  const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: auth.workspace.id } });
 
   return (
     <div className="space-y-6">
@@ -41,7 +33,6 @@ export default async function SettingsPage() {
         workspaceName={auth.workspace.name}
         timezone={auth.workspace.timezone}
         timezones={timezoneOptions()}
-        csvTemplate={bulkCsvTemplate()}
         aiConfigured={aiAvailable()}
         shortLinkBase={env.shortLinkBase}
         options={{
@@ -68,16 +59,7 @@ export default async function SettingsPage() {
           aiBrandVoice: workspace.aiBrandVoice ?? '',
           aiAvoidWords: workspace.aiAvoidWords ?? '',
         }}
-        targets={targets.map((target) => ({
-          id: target.id,
-          name: target.name,
-          type: target.type,
-          pictureUrl: target.pictureUrl,
-          canPublish: target.canPublish && target.enabled,
-          publishBlocker: target.publishBlocker,
-          publishBlockerCode: target.publishBlockerCode,
-          accountName: target.socialAccount?.name ?? null,
-        }))}
+
       />
     </div>
   );

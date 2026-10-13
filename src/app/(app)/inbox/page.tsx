@@ -170,7 +170,7 @@ export default async function InboxPage({
                 ) : (
                   <Link
                     className="btn-secondary"
-                    href={`/analytics?view=${item.kind === 'comment' ? 'comments' : 'inbox'}&target=${item.targetId}`}
+                    href={`/inbox/${item.kind === 'comment' ? 'comments' : 'messages'}?target=${item.targetId}`}
                   >
                     {t('reply')}
                   </Link>

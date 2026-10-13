@@ -114,7 +114,7 @@ export function WeekGrid<P extends WeekPost>({
                       <Link
                         href={`/compose?at=${key}T${String(hour).padStart(2, '0')}:00`}
                         aria-label={`${newPostLabel(day)} · ${String(hour).padStart(2, '0')}:00`}
-                        className="absolute end-1 top-1 hidden h-6 w-6 items-center justify-center rounded-full bg-white text-base leading-none text-slate-500 shadow-surface hover:text-brand-600 focus-visible:flex group-hover:flex"
+                        className="absolute end-1 top-1 flex h-10 w-10 items-center justify-center rounded-full bg-white text-base leading-none text-slate-500 shadow-surface hover:text-brand-600 opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
                       >
                         +
                       </Link>

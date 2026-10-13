@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { stubReportEmailProvider } from './helpers/report-email';
 import { WorkspaceRole } from '@prisma/client';
 
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
@@ -179,6 +180,8 @@ describe('taking a published post down', () => {
 });
 
 describe('emailed reports', () => {
+  beforeEach(stubReportEmailProvider);
+  afterEach(() => vi.restoreAllMocks());
   it('go to every recipient when due, then move to the next run', async () => {
     const { workspace, bakery } = await seed();
     const schedule = await reports.createReportSchedule(workspace.id, {

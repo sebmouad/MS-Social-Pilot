@@ -233,11 +233,7 @@ export async function PagesHub({
         </ul>
       )}
 
-      {/* Said where somebody looks for them, rather than leaving a gap. */}
-      <p className="flex items-center gap-1.5 px-1 text-xs text-slate-500">
-        <Icon name="group" size={14} />
-        {t('groupsNote')}
-      </p>
+
     </section>
   );
 }

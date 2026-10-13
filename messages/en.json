@@ -163,7 +163,7 @@
     "newLikes": "New likes",
     "lostLikes": "Lost likes",
     "netChange": "Net change",
-    "audienceHint": "Demographics are lifetime snapshots from Facebook, so they show the audience as it stands now. New and lost likes are counted over the selected range.",
+    "audienceHint": "Audience breakdowns are the latest available snapshots. Gains and losses cover the selected range; historical Page likes are labelled separately from follows.",
     "probeAll": "Test coverage",
     "probed": "Checked {checked} metric names; Facebook serves {available}.",
     "coverageTitle": "Catalogue coverage",
@@ -231,9 +231,12 @@
       "fans": "People who like the channel, today.",
       "followers": "People who follow the channel, today. Following is what puts posts in their feed.",
       "talkingAbout": "People who interacted with the channel or its posts over the last 7 days, as Facebook reports it.",
-      "newLikes": "People who started following the channel in the period.",
-      "lostLikes": "People who stopped following the channel in the period.",
-      "netChange": "New followers minus lost followers in the period."
+      "newLikes": "People who liked the Page in the period, from stored historical Page likes.",
+      "lostLikes": "People who stopped liking the Page in the period, from stored historical Page likes.",
+      "netChange": "New followers minus lost followers in the period.",
+      "newFollowers": "People who started following the channel in the period.",
+      "lostFollowers": "People who stopped following the channel in the period.",
+      "netLikesChange": "New Page likes minus lost Page likes in the period. Unavailable when gains and losses come from different metric types."
     },
     "mapLabel": "Map of followers by country",
     "technicalDetails": "Technical details: which metrics Facebook serves this channel",
@@ -248,7 +251,9 @@
     "oneChannelHint": "Showing {name}. For another channel, open the channel selector and choose “Only” next to it.",
     "tabsMain": "Views",
     "summaryDetail": "This channel in detail",
-    "noPagesOtherChannels": "No Facebook Page in this selection: figures for Instagram and the other networks."
+    "noPagesOtherChannels": "No Facebook Page in this selection: figures for Instagram and the other networks.",
+    "historicalAudienceTrend": "Audience gains and losses",
+    "historicalAudienceTrendHint": "Includes stored historical Page likes. Likes and follows are separate metrics; each series names its source."
   },
   "app": {
     "name": "MS Social Pilot",
@@ -595,7 +600,21 @@
     "saveAsGroup": "Save these channels as a group",
     "groupName": "Group name",
     "saveGroup": "Save group",
-    "groupSaved": "Group “{name}” saved. Pick it next time to tick these channels in one click."
+    "groupSaved": "Group “{name}” saved. Pick it next time to tick these channels in one click.",
+    "previewDestination": "Preview destination",
+    "chooseLibrary": "Choose from media library",
+    "leaveDraftTitle": "Leave this post?",
+    "leaveDraftBody": "Your unsaved post can be restored when you return during this session.",
+    "leaveDraft": "Leave post",
+    "keepWriting": "Keep writing",
+    "draftRecovery": "An unsaved post is available from this session.",
+    "restoreDraft": "Restore post",
+    "discardRecovery": "Discard saved copy",
+    "previewContentTitle": "Destination content preview",
+    "maxFiles": "{count, plural, one {Use at most # media file per post.} other {Use at most # media files per post.}}",
+    "previewApproximation": "Content preview for {network}. Its final layout is controlled by the network.",
+    "leaveDraftUnsaved": "Your unsaved changes will be lost because browser recovery storage is unavailable.",
+    "saveUncertain": "The save could not be confirmed. Check the post list before retrying to avoid creating a duplicate."
   },
   "config": {
     "title": "Configuration",
@@ -700,7 +719,7 @@
     "disconnectConfirm": "Disconnect {name}? Scheduled posts to its channels will stop until it is reconnected.",
     "discover": "Find accounts",
     "facebookUser": "Facebook user {id}",
-    "featureOff": "Turned off in Configuration. Meta reviews this permission separately, and requesting it before approval fails the whole login.",
+    "featureOff": "This feature is unavailable. Ask the service administrator to enable it once the platform approves access.",
     "followers": "{count, plural, one {# follower} other {# followers}}",
     "groups": "Groups",
     "groupsOff": "Posting to Facebook Groups isn’t possible; channels work as normal. Meta removed Group posting for every app on 22 April 2024.",
@@ -757,7 +776,7 @@
       "group_app": "Add this app to the Group before publishing to it.",
       "inaccessible": "This destination is no longer reachable with the connected Facebook account.",
       "disconnected": "The Facebook account for this destination was disconnected.",
-      "instagram_permission": "Publishing to Instagram needs Meta to grant instagram_content_publish. Turn this destination on once it is approved."
+      "instagram_permission": "Instagram publishing is awaiting platform approval. Ask the service administrator to check access before turning this destination on."
     },
     "networkError": "Could not reach the server. Check your connection and try again.",
     "toggleDestination": "Publish to {name}",
@@ -804,20 +823,22 @@
     "sheetHint_group": "Facebook Groups you administer come with the Facebook sign-in, once the app is allowed to post to them.",
     "sheetHint_instagram": "Instagram professional accounts linked to your Facebook Pages come with the Facebook sign-in.",
     "needsReconnectHint": "This connection stopped working. Reconnect to keep publishing.",
-    "blockedGeneric": "Can't publish here right now. Try reconnecting."
+    "blockedGeneric": "Can't publish here right now. Try reconnecting.",
+    "connectionReference": "Connection reference: {id}",
+    "accountReference": "Account reference: {id}"
   },
   "dashboard": {
     "title": "Dashboard",
     "newPost": "New post",
     "scheduled": "Scheduled",
-    "published": "Published",
+    "published": "Published through this app",
     "drafts": "Drafts",
     "destinations": "Destinations",
     "goingOutNext": "Going out next",
-    "recentlyPublished": "Recently published",
+    "recentlyPublished": "Recently published through this app",
     "nothingScheduled": "Nothing scheduled.",
     "writeAPost": "Write a post",
-    "nothingPublished": "Nothing published yet.",
+    "nothingPublished": "No posts published through this app yet.",
     "reachAndEngagement": "Reach and engagement",
     "reachSubtitle": "Totals across published posts, from the last analytics refresh.",
     "impressions": "Impressions",
@@ -1248,7 +1269,8 @@
     "bioSlugTaken": "That address is taken. Choose another.",
     "fieldExists": "A field with that name already exists.",
     "fieldChoice": "Pick one of the listed options.",
-    "textBackgroundNeedsText": "A coloured background is for a short text post: no link, pictures or video, and at most 130 characters."
+    "textBackgroundNeedsText": "A coloured background is for a short text post: no link, pictures or video, and at most 130 characters.",
+    "reportEmailUnavailable": "Report email is unavailable. Ask a workspace admin to contact the instance owner."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -1428,7 +1450,14 @@
     "untitledPost": "Untitled post",
     "usageNearlyFull": "Nearly full. Delete what is no longer needed, or raise the allowance in Configuration.",
     "usageOf": "{used} of {total}",
-    "usageTitle": "Storage used"
+    "usageTitle": "Storage used",
+    "deleteUncertain": "The connection was lost. The file may have been removed. Retry to check its status before another removal.",
+    "deleted": "File removed from the library.",
+    "pickerTitle": "Choose from media library",
+    "pickerAdd": "{count, plural, one {Add # file} other {Add # files}}",
+    "pickerRetry": "Try loading again",
+    "pickerSearch": "Search filenames",
+    "pickerLimit": "Showing the 100 newest files."
   },
   "metaApp": {
     "copied": "Copied",
@@ -1566,7 +1595,10 @@
     "inboxAll": "All",
     "overview": "Overview",
     "channels": "Channels",
-    "teamRoles": "Team and roles"
+    "teamRoles": "Team and roles",
+    "skipToContent": "Skip to main content",
+    "messages": "Messages",
+    "importCsv": "Import CSV"
   },
   "notifications": {
     "title": "Notifications",
@@ -1984,7 +2016,7 @@
     "section_destinations": "By destination",
     "section_topPosts": "Top posts",
     "sectionHint_analysis": "Health, findings, headline figures, rhythm, formats, best times.",
-    "sectionHint_audience": "Followers, countries, cities, age and gender.",
+    "sectionHint_audience": "Followers and available country and city breakdowns.",
     "sectionHint_published": "Posts, reach, engagement and clicks from this app.",
     "sectionHint_destinations": "The same figures, channel by channel.",
     "sectionHint_topPosts": "The best posts, as followers saw them.",
@@ -2020,7 +2052,9 @@
     "section_goals": "Goals",
     "sectionHint_goals": "Monthly targets and the pace towards them",
     "section_responseTime": "Response time",
-    "sectionHint_responseTime": "How fast comments and messages were answered"
+    "sectionHint_responseTime": "How fast comments and messages were answered",
+    "scheduleEmailUnavailable": "Report email is unavailable. Ask a workspace admin to contact the instance owner.",
+    "scheduleLastAttempted": "last attempted {when}"
   },
   "settings": {
     "addTime": "Add time",
@@ -2041,7 +2075,7 @@
     "openQueue": "Open the queue",
     "pasteOrUpload": "Or paste the rows",
     "queue": "Publishing queue",
-    "queueMoved": "The posting queue now lives in Schedule → Queue, with suggested times from your channels’ results.",
+    "queueMoved": "The posting queue lives in Publish → Queue, with suggested times from your channels’ results.",
     "queueSubtitle": "Recurring times for \"add to the next queue slot\". Each new post takes the earliest free slot.",
     "queueUpdated": "Publishing times updated.",
     "readOnly": "Only workspace owners and admins can change these settings. You can still upload posts below.",
@@ -2059,7 +2093,7 @@
     "shortenHint": "Replaces links with short ones you control, so clicks can be counted.",
     "shortenLinks": "Shorten links",
     "showExample": "Show an example",
-    "subtitle": "Workspace, publishing queue and bulk scheduling.",
+    "subtitle": "Workspace preferences and publishing rules.",
     "time": "Time",
     "timezone": "Timezone",
     "timezoneHint": "Every scheduled time you enter is interpreted in this timezone, and stays correct across daylight saving changes.",
@@ -2072,7 +2106,7 @@
     "utmSource": "UTM source",
     "workspace": "Workspace",
     "networkError": "Could not reach the server. Check your connection and try again.",
-    "aiNotConfigured": "No ANTHROPIC_API_KEY is set on this server, so the composer hides these tools.",
+    "aiNotConfigured": "Writing help is unavailable until the service administrator connects a supported provider. These are your saved workspace preferences.",
     "tones": {
       "friendly": "Friendly",
       "professional": "Professional",
@@ -2105,7 +2139,8 @@
     "aiAvoidWords": "Words to avoid",
     "aiAvoidWordsHint": "Separated by commas. The AI will not use them in anything it writes for this workspace.",
     "clientAfterTeam": "Then ask the client",
-    "clientAfterTeamHint": "When a team member approves a post, it goes on to the client’s review link and is cleared only when the client approves it. Needs a review link that lets the client decide."
+    "clientAfterTeamHint": "When a team member approves a post, it goes on to the client’s review link and is cleared only when the client approves it. Needs a review link that lets the client decide.",
+    "openBulkImport": "Open CSV import in Publish"
   },
   "setup": {
     "title": "Set up MS Social Pilot",
@@ -3414,8 +3449,8 @@
     "reopen": "Reopen",
     "failed": "Could not save. Try again.",
     "showMore": "Show more",
-    "emptyOpenTitle": "Nothing waiting",
-    "emptyOpenHint": "Every comment and message on these channels is marked done. New ones appear here as they arrive.",
+    "emptyOpenTitle": "No captured items need attention",
+    "emptyOpenHint": "This inbox shows comments and messages captured for the selected channels. If you expect items, check channel selection, connection permissions and the latest sync.",
     "emptyTitle": "Nothing here",
     "emptyHint": "No comments or messages match these filters for the selected channels. Try another type or state, or select more channels.",
     "assignTo": "Assign to",
@@ -4188,7 +4223,7 @@
     "failed": "That did not work. Check your connection and try again.",
     "forgotTitle": "Forgot your password?",
     "forgotBody": "Enter your email address and we’ll send you a link to choose a new password.",
-    "noEmail": "This server cannot send email yet, so ask the person who runs it to reset your password.",
+    "noEmail": "Password reset email is unavailable. Contact your workspace administrator or the person who invited you to request account recovery.",
     "sendResetLink": "Send the link",
     "resetSent": "If an account uses that address, a link is on its way. It works for one hour. Check your spam folder if it does not arrive.",
     "backToSignIn": "Back to sign in",
@@ -4319,7 +4354,16 @@
     "workflowPlaceholder": "Write the brief\nGet the client’s OK\nSchedule the posts",
     "workflowStart": "First step due",
     "workflowGap": "Days between steps",
-    "workflowStartButton": "Create the tasks"
+    "workflowStartButton": "Create the tasks",
+    "workflowRowLimit": "Use at most 30 steps. No tasks were created.",
+    "workflowTitleLimit": "Each step must be 200 characters or fewer. No tasks were created.",
+    "workflowRetry": "Retry remaining tasks",
+    "workflowEditRemaining": "Edit remaining steps",
+    "workflow_created": "Created",
+    "workflow_failed": "Failed — retained for retry",
+    "workflow_unattempted": "Not attempted",
+    "workflow_uncertain": "Outcome unknown — check the board before recreating",
+    "createUncertain": "The connection was lost. This task may have been created. Check the board before trying to create it again."
   },
   "design": {
     "title": "Design",

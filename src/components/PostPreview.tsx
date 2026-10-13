@@ -2,13 +2,14 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 
+import { isRuledNetwork, NETWORK_RULES } from '@/lib/network-rules';
 import { Icon } from './Icon';
 import { LARGE_TEXT_MAX, LinkCard, MediaGrid, richText } from './FeedPost';
 import type { LinkPreview, PostMedia } from '@/lib/json';
 
 interface Props {
   /** The first destination ticked, or null before any is. */
-  page: { name: string; pictureUrl: string | null } | null;
+  page: { type?: string; name: string; pictureUrl: string | null } | null;
   message: string;
   media: PostMedia[];
   link: LinkPreview | null;
@@ -34,12 +35,26 @@ export function PostPreview({ page, message, media, link, firstComment, timing, 
   const t = useTranslations('compose');
   const locale = useLocale();
 
+  if (page?.type && page.type !== 'page' && page.type !== 'group') {
+    const network = page.type === 'instagram' ? 'Instagram' : isRuledNetwork(page.type) ? NETWORK_RULES[page.type].label : page.type;
+    return <section aria-labelledby="post-preview-title">
+      <h2 id="post-preview-title" className="mb-2 text-sm font-semibold text-slate-600">{t('previewContentTitle')} · {network}</h2>
+      <article className="card overflow-hidden">
+        <h3 className="px-4 pt-4 font-semibold">{page.name}</h3>
+        <p className="whitespace-pre-wrap break-words px-4 py-4 text-sm">{message ? richText(message) : t('previewEmpty')}</p>
+        {media.length > 0 && <MediaGrid media={media.map((item) => ({ kind: item.kind, url: item.url, alt: item.altText }))} />}
+        {link && <LinkCard preview={link} />}
+      </article>
+      <p className="hint mt-2">{t('previewApproximation', { network })}</p>
+    </section>;
+  }
+
   if (format !== 'post') {
     const item = media[0];
     return (
       <section aria-labelledby="post-preview-title">
         <h2 id="post-preview-title" className="mb-2 text-sm font-semibold text-slate-600">
-          {t('previewTitle')}
+          {page?.type && page.type !== 'page' && page.type !== 'group' ? t('previewContentTitle') : t('previewTitle')}
         </h2>
         <div className="mx-auto w-[260px] overflow-hidden rounded-[28px] bg-black p-2 shadow-xl ring-1 ring-black/10">
           <div className="relative aspect-[9/16] overflow-hidden rounded-[22px] bg-slate-900">
@@ -92,7 +107,7 @@ export function PostPreview({ page, message, media, link, firstComment, timing, 
   return (
     <section aria-labelledby="post-preview-title">
       <h2 id="post-preview-title" className="mb-2 text-sm font-semibold text-slate-600">
-        {t('previewTitle')}
+        {page?.type && page.type !== 'page' && page.type !== 'group' ? t('previewContentTitle') : t('previewTitle')}
       </h2>
 
       <div className="card overflow-hidden">

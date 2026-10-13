@@ -255,7 +255,8 @@ export async function AnalyticsScreen({
 
       {/* One channel: the full reading of it follows the summary. */}
       {view === 'summary' && summaryIds.length === 1 && (
-        <section className="space-y-3 border-t border-slate-200 pt-6" aria-label={t('summaryDetail')}>
+        <details className="space-y-3 border-t border-slate-200 pt-6">
+          <summary className="cursor-pointer text-sm font-semibold text-brand-600">{t('summaryDetail')}</summary>
           <PageAnalysisView
             workspaceId={auth.workspace.id}
             targetId={selected.id}
@@ -266,7 +267,7 @@ export async function AnalyticsScreen({
             compare={compare}
             notesAccess={{ canEdit: atLeast(auth.role, WorkspaceRole.editor), canNoteAllPages: auth.pageScope.all }}
           />
-        </section>
+        </details>
       )}
 
       {view === 'compare' && (
@@ -393,6 +394,7 @@ export async function AnalyticsScreen({
 
       {view === 'inbox' && (
         <InboxView
+          userId={auth.user.id}
           workspaceId={auth.workspace.id}
           targetId={selected.id}
           timezone={timezone}
@@ -831,6 +833,7 @@ async function ReviewsView({
 
 /** Page inbox threads. */
 async function InboxView({
+  userId,
   workspaceId,
   targetId,
   timezone,
@@ -839,6 +842,7 @@ async function InboxView({
   params,
   pageName,
 }: {
+  userId: string;
   workspaceId: string;
   targetId: string;
   timezone: string;
@@ -876,6 +880,7 @@ async function InboxView({
       </div>
 
       <InboxPanel
+        draftScope={`${userId}:${workspaceId}:${targetId}`}
         canReply={canReply}
         pageName={pageName}
         threads={conversations.map((thread) => ({
@@ -895,7 +900,7 @@ async function InboxView({
           })),
           reply:
             thread.reply.state === 'open'
-              ? { state: 'open' as const, untilLabel: formatInZone(thread.reply.until, timezone) }
+              ? { state: 'open' as const, untilLabel: formatInZone(thread.reply.until, timezone), until: thread.reply.until.toISOString() }
               : { state: thread.reply.state },
         }))}
       />

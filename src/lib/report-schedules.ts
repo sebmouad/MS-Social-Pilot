@@ -4,9 +4,9 @@ import { z } from 'zod';
 import { aiAvailable, writeReportRecap, type RecapFigures } from './ai';
 import { prisma } from './prisma';
 import { buildReport } from './reports';
-import { sendEmail } from './email/send';
+import { emailEnabled, sendEmail } from './email/send';
 import { scheduledReportEmail } from './email/templates';
-import { errors } from './errors';
+import { AppError, errors } from './errors';
 import { formatInZone, localInputToUtc } from './time';
 import { REPORT_SECTIONS } from './report-sections';
 import { RANGE_PRESETS } from './date-range';
@@ -114,6 +114,11 @@ export async function createReportSchedule(
   input: z.infer<typeof reportScheduleSchema>,
   createdById: string | null = null,
 ) {
+  if (!emailEnabled()) throw new AppError({
+    key: 'errors.reportEmailUnavailable',
+    fallback: 'Report email is unavailable. Ask a workspace admin to contact the instance owner.',
+    status: 503,
+  });
   const [workspace, target] = await Promise.all([
     prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { timezone: true, weekStartsOn: true } }),
     prisma.target.findFirst({ where: { id: input.targetId, workspaceId, type: TargetType.page } }),
@@ -192,8 +197,13 @@ export async function sendDueReports(now: Date): Promise<{ sent: number; failed:
           sendEmail({ to, ...email, template: 'scheduledReport', workspaceId: schedule.workspaceId }),
         ),
       );
-      const bad = outcomes.find((outcome) => outcome.status === 'failed');
-      if (bad) lastError = bad.error ?? 'Sending failed.';
+      const bad = outcomes.find((outcome) => outcome.status !== 'sent');
+      if (bad) {
+        const delivered = outcomes.filter((outcome) => outcome.status === 'sent').length;
+        const skipped = outcomes.filter((outcome) => outcome.status === 'skipped').length;
+        const failed = outcomes.filter((outcome) => outcome.status === 'failed').length;
+        lastError = `${delivered}/${outcomes.length} emails sent; ${skipped} skipped; ${failed} failed. ${bad.error ?? 'Email delivery was unsuccessful.'}`;
+      }
       else
         await emitWebhook(schedule.workspaceId, 'report.ready', {
           reportScheduleId: schedule.id,

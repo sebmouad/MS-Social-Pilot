@@ -76,7 +76,7 @@ export function KpiExplorer({
             <>
               <span className="flex items-center text-[13px] font-semibold text-slate-600">
                 {card.label}
-                {card.definition && <InfoTip text={card.definition} />}
+                {!pressable && card.definition && <InfoTip text={card.definition} />}
               </span>
               <span className="mt-1 flex flex-wrap items-center gap-2">
                 <span className="text-xl font-bold text-slate-900 sm:text-2xl">{display}</span>
@@ -105,17 +105,19 @@ export function KpiExplorer({
             </>
           );
           return pressable ? (
+            <div key={card.key} className="relative">
             <button
-              key={card.key}
               type="button"
               aria-pressed={on}
               onClick={() => setSelected(card.key)}
-              className={`card relative block p-4 text-start transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+              className={`card relative block h-full w-full p-4 text-start transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
                 on ? 'ring-2 ring-brand-500' : ''
               }`}
             >
               {body}
             </button>
+            {card.definition && <span className="absolute end-4 top-4"><InfoTip text={card.definition} /></span>}
+            </div>
           ) : (
             <div key={card.key} className="card relative p-4">
               {body}

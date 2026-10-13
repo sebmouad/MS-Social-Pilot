@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import { Icon, type IconName } from './Icon';
@@ -33,6 +33,7 @@ export function SettingsNav({
 }) {
   const t = useTranslations();
   const pathname = usePathname();
+  const router = useRouter();
 
   const all: Array<{ href: string; label: string; icon: IconName }> = [
     { href: '/settings', label: t('settings.workspace'), icon: 'settings' },
@@ -61,10 +62,17 @@ export function SettingsNav({
   return (
     // Named, because the page already has a main navigation: two unnamed
     // landmarks read as "navigation, navigation" to a screen reader.
-    // A strip of tabs on a phone; Facebook's left menu from a laptop up.
+    // Compact screen selector on a phone; left menu from a laptop up.
+    <>
+      <label className="block lg:hidden">
+        <span className="sr-only">{t('settings.title')}</span>
+        <select className="input" value={tabs.filter((tab) => pathname === tab.href || pathname.startsWith(`${tab.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]?.href ?? tabs[0]?.href ?? ''} onChange={(event) => router.push(event.target.value)}>
+          {tabs.map((tab) => <option key={tab.href} value={tab.href}>{tab.label}</option>)}
+        </select>
+      </label>
     <nav
       aria-label={t('settings.title')}
-      className="scroll-x flex gap-1 border-b border-slate-200 pb-3 [mask-image:linear-gradient(to_right,black_88%,transparent)] lg:[mask-image:none] lg:card lg:flex-col lg:gap-0.5 lg:border-b-0 lg:p-2"
+      className="hidden lg:card lg:flex lg:flex-col lg:gap-0.5 lg:p-2"
     >
       {tabs.map((tab) => {
         // Exact match for /settings so it does not light up on its children.
@@ -91,5 +99,6 @@ export function SettingsNav({
         );
       })}
     </nav>
+    </>
   );
 }

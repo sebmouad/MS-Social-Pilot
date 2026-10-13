@@ -44,6 +44,7 @@ export function OtherNetworks({
   initialDialog?: string | null;
 }) {
   const t = useTranslations('networks');
+  const tConnections = useTranslations('connections');
   const tCommon = useTranslations('common');
   const router = useRouter();
   const [dialog, setDialog] = useState<'bluesky' | 'mastodon' | 'telegram' | null>(
@@ -164,7 +165,7 @@ export function OtherNetworks({
                           </button>
                         )}
                       </div>
-                      {account.invalidReason && <p className="mt-1 text-xs text-red-600">{account.invalidReason}</p>}
+                      {account.invalidReason && <p className="mt-1 text-xs text-red-600">{tConnections('needsReconnectHint')}</p>}
                       <ul className="mt-2 space-y-1">
                         {account.targets.map((target) => (
                           <li key={target.id} className="flex items-center gap-2 text-xs text-slate-700">

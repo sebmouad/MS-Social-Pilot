@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { BreakdownBars } from '@/components/BreakdownBars';
 import { FollowerTrend } from '@/components/FollowerTrend';
 import { StatTile } from '@/components/charts/StatTile';
+import { audienceGrowthIdentity } from '@/lib/audience-growth-metrics';
 import { readAudience, readFollowerTrend } from '@/lib/analytics';
 import { countryLabel, genderAgeLabel, languageLabel } from '@/lib/audience-labels';
 
@@ -30,13 +31,17 @@ export async function AudienceView({
     other: (age: string) => t('genderOther', { age }),
   };
 
+  const gained = audienceGrowthIdentity(audience.addsMetric, 'gained');
+  const lost = audienceGrowthIdentity(audience.removesMetric, 'lost');
+  const legacy = gained.kind === 'likes' || lost.kind === 'likes';
+  const comparableGrowth = audience.addsMetric !== null && audience.removesMetric !== null && gained.kind === lost.kind;
   const cards = [
     { label: t('fans'), value: audience.fans, definition: t('def.fans') },
     { label: t('followers'), value: audience.followers, definition: t('def.followers') },
     { label: t('talkingAbout'), value: audience.talkingAbout, definition: t('def.talkingAbout') },
-    { label: t('newLikes'), value: audience.adds, definition: t('def.newLikes') },
-    { label: t('lostLikes'), value: audience.removes, definition: t('def.lostLikes') },
-    { label: t('netChange'), value: audience.net, definition: t('def.netChange') },
+    { label: t(gained.labelKey), value: audience.adds, definition: t(gained.definitionKey) },
+    { label: t(lost.labelKey), value: audience.removes, definition: t(lost.definitionKey) },
+    { label: t('netChange'), value: audience.net, definition: t(legacy ? 'def.netLikesChange' : 'def.netChange') },
   ];
 
   return (
@@ -48,19 +53,19 @@ export async function AudienceView({
             key={card.label}
             label={card.label}
             value={card.value}
-            upIsGood={card.label !== t('lostLikes')}
+            upIsGood={card.label !== t(lost.labelKey)}
             definition={card.definition}
           />
         ))}
       </section>
 
-      {trend.length > 1 && (
+      {comparableGrowth && trend.length > 1 && (
         <FollowerTrend
-          title={t('followerTrend')}
-          description={t('followerTrendHint')}
+          title={t(legacy ? 'historicalAudienceTrend' : 'followerTrend')}
+          description={t(legacy ? 'historicalAudienceTrendHint' : 'followerTrendHint')}
           dateLabel={t('date')}
-          gainedLabel={t('newFollowers')}
-          lostLabel={t('lostFollowers')}
+          gainedLabel={t(gained.labelKey)}
+          lostLabel={t(lost.labelKey)}
           netLabel={t('netChange')}
           points={trend}
         />

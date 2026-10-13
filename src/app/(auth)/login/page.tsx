@@ -2,10 +2,11 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { AuthForm } from '@/components/AuthForm';
-import { getAuthContext } from '@/lib/auth';
+import { getAuthContext, mayRegister } from '@/lib/auth';
 
 import { afterAuthPath, RETURN_COOKIE } from '@/lib/invite-path';
 import { isFirstRun } from '@/lib/setup';
+import { findInvitation } from '@/lib/team';
 import { screenMetadata } from '@/lib/metadata';
 
 /** The tab says which screen and which client, so several open at once stay apart. */
@@ -29,5 +30,7 @@ export default async function LoginPage({
   // which is where the accept button is.
   if (await getAuthContext()) redirect(afterAuthPath(invite, (await cookies()).get(RETURN_COOKIE)?.value ?? ''));
 
-  return <AuthForm mode="login" inviteToken={invite} />;
+  const invitation = invite ? await findInvitation(invite) : null;
+  const registrationAllowed = await mayRegister(invitation?.email ?? '');
+  return <AuthForm mode="login" inviteToken={invite} registrationAllowed={registrationAllowed} />;
 }

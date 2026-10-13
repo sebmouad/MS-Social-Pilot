@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 
 import { Icon } from './Icon';
+import { useModalFocus } from './useModalFocus';
 
 /**
  * A centred dialog over a dimmed screen, as Facebook draws "Create post":
@@ -31,21 +32,7 @@ export function Dialog({
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
-  useEffect(() => {
-    if (!open) return;
-    const opener = document.activeElement as HTMLElement | null;
-    const first = panel.current?.querySelector<HTMLElement>('input, select, textarea, button:not([data-close])');
-    first?.focus();
-    const key = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
-    document.addEventListener('keydown', key);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', key);
-      document.body.style.overflow = overflow;
-      opener?.focus?.();
-    };
-  }, [open, onClose]);
+  useModalFocus(panel, open, onClose);
 
   if (!open) return null;
 
@@ -56,6 +43,7 @@ export function Dialog({
     >
       <div
         ref={panel}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

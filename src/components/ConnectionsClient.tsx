@@ -196,6 +196,7 @@ export function ConnectionsClient({
 
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-900">{connection.name}</p>
+                  <p className="text-xs text-slate-500">{t('connectionReference', { id: connection.id.slice(-8) })}</p>
                   {connection.lastSyncedLabel && (
                     <p className="text-xs text-slate-500">{t('synced', { when: connection.lastSyncedLabel })}</p>
                   )}
@@ -244,7 +245,7 @@ export function ConnectionsClient({
               onRemove={removeTarget}
             />
 
-            <TargetList
+            {groups.length > 0 && <TargetList
               title={t('groups')}
               icon="group"
               targets={groups}
@@ -253,7 +254,7 @@ export function ConnectionsClient({
               busy={busy}
               onToggle={(id, enabled) => toggleTarget(id, enabled)}
               onRemove={removeTarget}
-            />
+            />}
 
             {/* Only once there is one: a workspace with no linked Instagram
                 account should not be shown an empty section explaining a
@@ -494,6 +495,7 @@ function LinkedAccounts({
                 <p className="truncate text-sm font-medium text-slate-900">{account.label}</p>
                 <p className="text-xs text-slate-500">
                   {account.detail}
+                  {` · ${t('accountReference', { id: account.id.slice(-8) })}`}
                   {account.lastSyncedLabel && ` · ${t('synced', { when: account.lastSyncedLabel })}`}
                 </p>
               </div>

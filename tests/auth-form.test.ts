@@ -24,12 +24,12 @@ vi.mock('next-intl', async () => {
   };
 });
 
-async function renderForm(mode: 'login' | 'register'): Promise<string> {
+async function renderForm(mode: 'login' | 'register', registrationAllowed = true): Promise<string> {
   const { renderToStaticMarkup } = await import('react-dom/server');
   const { createElement } = await import('react');
   const { AuthForm } = await import('../src/components/AuthForm');
 
-  return renderToStaticMarkup(createElement(AuthForm, { mode }));
+  return renderToStaticMarkup(createElement(AuthForm, { mode, registrationAllowed }));
 }
 
 describe('the sign-in form before the JavaScript arrives', () => {
@@ -67,4 +67,9 @@ describe('the sign-in form before the JavaScript arrives', () => {
     expect(html).not.toContain('name="workspaceName"');
     expect(html).toContain('name="email"');
   });
+});
+
+it('does not offer registration when the instance is closed', async () => {
+  expect(await renderForm('login', false)).not.toContain('href="/register"');
+  expect(await renderForm('login', true)).toContain('href="/register"');
 });

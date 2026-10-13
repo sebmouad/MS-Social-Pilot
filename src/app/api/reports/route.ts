@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { requireAuth } from '@/lib/auth';
 import { buildReport, csvFilename, parseReportRange, reportToCsv } from '@/lib/reports';
+import { loadSelection } from '@/lib/page-filter';
 import { ok, route } from '@/lib/api';
 
 /** Report data as JSON, or `?format=csv` for a spreadsheet download. */
@@ -18,12 +19,21 @@ export const GET = route(async (request: Request) => {
   if (!range.ok) throw range.error;
   const { from, to } = range;
 
+  // Explicit export scope takes precedence over the remembered sidebar selection.
+  const requested = url.searchParams.get('pages') ?? url.searchParams.get('target');
+  const selection = requested === null
+    ? await loadSelection(auth, Object.fromEntries(url.searchParams))
+    : null;
+  const targetIds = requested === null
+    ? selection!.ids
+    : [...new Set(requested.split(',').filter(Boolean))].filter((id) => auth.pageScope.all || auth.pageScope.ids.includes(id));
+
   const report = await buildReport({
     workspaceId: auth.workspace.id,
     timezone: auth.workspace.timezone,
     from,
     to,
-    ...(auth.pageScope.all ? {} : { targetIds: auth.pageScope.ids }),
+    targetIds,
   });
 
   if (url.searchParams.get('format') === 'csv') {

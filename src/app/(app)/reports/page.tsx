@@ -14,6 +14,8 @@ import { parseRange } from '@/lib/date-range';
 import { formatInZone, appLocale } from '@/lib/time';
 import { AnalyticsTabs } from '@/components/AnalyticsTabs';
 import { PhoneFold } from '@/components/PhoneFold';
+import { emailEnabled } from '@/lib/email/send';
+
 import { ReportControls } from '@/components/ReportControls';
 import { ReportBuilder } from '@/components/ReportBuilder';
 import { GoalsView } from '@/components/GoalsView';
@@ -167,6 +169,7 @@ export default async function ReportsPage({
   return (
     <ChannelsLayout auth={auth} selection={selection} tools={<><AnalyticsTabs current="report" /><PhoneFold><div className="flex flex-col gap-2">{selected && canEdit && (
             <ReportSchedules
+              key={`${auth.workspace.id}:${selected.id}`}
               targetId={selected.id}
               pageName={selected.name}
               templateId={activeTemplate?.id ?? null}
@@ -179,16 +182,19 @@ export default async function ReportsPage({
                 lastError: row.lastError,
                 aiRecap: row.aiRecap,
               }))}
+              emailOn={emailEnabled()}
               aiOn={aiAvailable() && branding.aiEnabled}
             />
           )}
           <ReportControls
+            targetIds={selection.ids}
             from={range.fromDay}
             to={range.toDay}
             downloadable={!rangeError}
             pdfName={`${selected?.name ?? branding.name} – ${range.fromDay} – ${range.toDay}`}
           />
           <ReportBuilder
+            key={`${auth.workspace.id}:${selected?.id ?? 'all'}`}
             sections={sections}
             canBrand={canManageSettings(auth.role)}
             branding={{

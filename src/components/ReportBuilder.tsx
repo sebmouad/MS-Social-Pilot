@@ -45,9 +45,10 @@ export function ReportBuilder({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const close = useCallback(() => {
+    if (pending) return;
     setOpen(false);
     setError(null);
-  }, []);
+  }, [pending]);
 
   async function apply() {
     setPending(true);
@@ -83,7 +84,12 @@ export function ReportBuilder({
 
   return (
     <>
-      <button type="button" className="btn-primary print:hidden" onClick={() => setOpen(true)}>
+      <button type="button" className="btn-primary print:hidden" onClick={() => {
+        setChosen([...sections]);
+        setBrand({ ...branding });
+        setError(null);
+        setOpen(true);
+      }}>
         <Icon name="settings" size={16} />
         {t('customise')}
       </button>
@@ -96,7 +102,7 @@ export function ReportBuilder({
         wide
         footer={
           <>
-            <button type="button" className="btn-secondary" onClick={close}>
+            <button type="button" className="btn-secondary" disabled={pending} onClick={close}>
               {tCommon('cancel')}
             </button>
             <button type="button" className="btn-primary" disabled={pending || chosen.length === 0} onClick={() => void apply()}>

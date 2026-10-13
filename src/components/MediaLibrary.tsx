@@ -3,9 +3,10 @@
 import { EmptyState } from '@/components/EmptyState';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { requestJson } from '@/lib/client-request';
 import { useConfirm } from './ConfirmProvider';
 
 import { Icon } from './Icon';
@@ -51,25 +52,38 @@ export function MediaLibrary({ files, usage, truncated, canDelete }: Props) {
   const confirm = useConfirm();
   const router = useRouter();
 
+  const removeLock = useRef(false);
+  const uncertain = useRef(new Set<string>());
+  const [removed, setRemoved] = useState<string[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function remove(file: MediaFileView) {
-    if (!(await confirm({ title: t('deleteConfirm', { filename: file.filename }), danger: true, confirmLabel: tCommon('delete') }))) return;
-
-    setBusy(file.id);
-    setError(null);
+    if (removeLock.current || file.heldBy.length || !canDelete) return;
+    removeLock.current = true;
     try {
-      const response = await fetch(`/api/media/${file.id}`, { method: 'DELETE' });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? t('deleteFailed'));
+      if (!(await confirm({ title: t('deleteConfirm', { filename: file.filename }), danger: true, confirmLabel: tCommon('delete') }))) return;
+      setBusy(file.id); setError(null); setNotice(null);
+      if (uncertain.current.has(file.id)) {
+        // A lost DELETE response can mean deletion succeeded. Reconcile before another write.
+        const listing = await requestJson<{ media: Array<{ id: string }> }>('/api/media');
+        if (!listing.ok || !Array.isArray(listing.data?.media)) { setError(t('deleteUncertain')); return; }
+        if (!listing.data.media.some(entry => entry.id === file.id)) {
+          const check = await requestJson(`/api/media/${file.id}/raw`, { method: 'HEAD' });
+          if (!check.ok && check.status === 404) { setRemoved(current => [...current, file.id]); setNotice(t('deleted')); router.refresh(); return; }
+          if (!check.ok) { setError(t('deleteUncertain')); return; }
+        }
+        uncertain.current.delete(file.id);
+      }
+      const result = await requestJson(`/api/media/${file.id}`, { method: 'DELETE' });
+      if (!result.ok) {
+        if (result.kind !== 'http') { uncertain.current.add(file.id); setError(t('deleteUncertain')); }
+        else setError(result.error ?? t('deleteFailed'));
         return;
       }
-      router.refresh();
-    } finally {
-      setBusy(null);
-    }
+      setRemoved(current => [...current, file.id]); setNotice(t('deleted')); router.refresh();
+    } finally { setBusy(null); removeLock.current = false; }
   }
 
   const nearlyFull = usage.percent >= 80;
@@ -105,16 +119,17 @@ export function MediaLibrary({ files, usage, truncated, canDelete }: Props) {
       </section>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {files.length === 0 ? (
+      {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
+      {files.filter(file => !removed.includes(file.id)).length === 0 ? (
         <EmptyState title={t('empty')} />
       ) : (
         <ul className="space-y-2">
-          {files.map((file) => {
+          {files.filter(file => !removed.includes(file.id)).map((file) => {
             const held = file.heldBy.length > 0;
 
             return (
@@ -160,7 +175,7 @@ export function MediaLibrary({ files, usage, truncated, canDelete }: Props) {
                   <button
                     type="button"
                     className="btn-danger shrink-0"
-                    disabled={held || busy === file.id}
+                    disabled={held || busy !== null}
                     title={held ? t('heldTooltip') : undefined}
                     onClick={() => void remove(file)}
                   >

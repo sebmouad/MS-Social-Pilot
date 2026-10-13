@@ -13,7 +13,15 @@ export function PhoneFold({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
-    if (ref.current && !window.matchMedia('(min-width: 1024px)').matches) ref.current.open = false;
+    const wide = window.matchMedia('(min-width: 1024px)');
+    let phoneOpen = false;
+    const update = () => { if (ref.current) ref.current.open = wide.matches || phoneOpen; };
+    const remember = () => { if (!wide.matches && ref.current) phoneOpen = ref.current.open; };
+    update();
+    const element = ref.current;
+    element?.addEventListener('toggle', remember);
+    wide.addEventListener('change', update);
+    return () => { element?.removeEventListener('toggle', remember); wide.removeEventListener('change', update); };
   }, []);
 
   return (

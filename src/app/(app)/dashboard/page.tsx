@@ -154,7 +154,7 @@ export default async function DashboardPage({
         </div>
       )}
 
-      {!(setup && !setup.complete) && <GettingStarted workspaceId={workspaceId} developer={mayUseDeveloperFeatures(auth)} />}
+      {!(setup && !setup.complete) && <GettingStarted workspaceId={workspaceId} developer={mayUseDeveloperFeatures(auth)} role={auth.role} modules={auth.modules} clientAccess={auth.workspace.clientAccess} />}
 
       {staleAccounts.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

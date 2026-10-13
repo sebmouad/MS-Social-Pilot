@@ -58,6 +58,7 @@ connecting Pages.
   results, shuffle, clear; optional weekly job adding each Page's best new
   times. **Content mix** `/queue/mix`: posts per label per week per Page or
   group, planned against target, optional automatic filling from drafts.
+- **CSV import** `/compose/import`: shared channel picker, CSV template, per-row scheduling results; available from Publish and linked from Settings. Author permissions and selected Page scope apply.
 - **Posts** `/posts`: status tabs, search, filters, saved views, bulk actions,
   CSV export; per post: edit, duplicate, publish now, retry, retry first
   comment, cancel (removes Facebook-held copies), delete from Facebook.

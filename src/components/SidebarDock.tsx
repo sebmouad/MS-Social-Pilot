@@ -26,7 +26,10 @@ export function SidebarDock({ children }: { children: ReactNode }) {
     const update = () => setTarget(wide.matches ? document.getElementById(SIDEBAR_DOCK_ID) : null);
     update();
     wide.addEventListener('change', update);
-    return () => wide.removeEventListener('change', update);
+    // The shell removes and recreates the dock when its area menu collapses.
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => { wide.removeEventListener('change', update); observer.disconnect(); };
   }, []);
 
   if (target) return createPortal(<DockedContext.Provider value>{children}</DockedContext.Provider>, target);

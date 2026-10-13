@@ -139,6 +139,9 @@ export default async function ComposePage({
       <ScreenHeader title={editing ? t('editTitle') : t('title')} subtitle={editing ? t('editSubtitle') : t('subtitle')} />
 
       <Composer
+        key={`${auth.user.id}:${auth.workspace.id}:${editing?.id ?? "new"}`}
+        draftScope={`${auth.user.id}:${auth.workspace.id}:${editing?.id ?? "new"}`}
+        initialTiming={params.intent === 'queue' && queueSlots > 0 ? 'queue' : 'schedule'}
         timezone={auth.workspace.timezone}
         hasQueueSlots={queueSlots > 0}
         defaultScheduledAt={defaultScheduledAt}

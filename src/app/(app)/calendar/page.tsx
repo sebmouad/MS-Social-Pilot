@@ -626,7 +626,7 @@ export default async function CalendarPage({
                   key === todayKey ? 'bg-brand-50/60' : inMonth ? (key < todayKey ? 'bg-slate-50' : 'bg-white') : 'bg-slate-100/70'
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between sm:flex-nowrap">
                   <span
                     className={`text-[13px] font-semibold ${
                       key === todayKey
@@ -638,9 +638,9 @@ export default async function CalendarPage({
                   >
                     {formatInZone(day, timezone, 'd')}
                   </span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex w-full items-center justify-end sm:w-auto sm:gap-1">
                     {dayPosts.length > 2 && (
-                      <span className="text-[10px] text-slate-400">{dayPosts.length}</span>
+                      <span className="sr-only text-[10px] text-slate-400 sm:not-sr-only">{dayPosts.length}</span>
                     )}
                     {/* Day actions: shown on hover or keyboard focus where there is a pointer, always on touch. */}
                     <Link

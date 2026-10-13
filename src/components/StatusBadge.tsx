@@ -23,7 +23,7 @@ const TARGET_COLOURS: Record<string, string> = {
   pending: 'bg-slate-100 text-slate-600',
   processing: 'bg-amber-50 text-amber-700',
   published: 'bg-emerald-50 text-emerald-700',
-  scheduled_remote: 'bg-violet-50 text-violet-700',
+  scheduled_remote: 'bg-brand-50 text-brand-600',
   failed: 'bg-red-50 text-red-700',
   cancelled: 'bg-slate-100 text-slate-500',
   skipped: 'bg-slate-100 text-slate-500',

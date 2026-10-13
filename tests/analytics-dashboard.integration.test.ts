@@ -124,6 +124,23 @@ describe('publishedTotals', () => {
 });
 
 describe('readAudience', () => {
+  it('retains historical likes provenance and never invents missing growth', async () => {
+    const { page } = await seed();
+    const from = new Date('2026-06-01T00:00:00Z');
+    const to = new Date('2026-06-30T23:59:59Z');
+    const empty = await analytics.readAudience({ targetId: page.id, from, to });
+    expect(empty).toMatchObject({ adds: null, removes: null, net: null, addsMetric: null, removesMetric: null });
+    await prisma.pageInsight.createMany({ data: [
+      { targetId: page.id, metric: 'page_fan_adds_unique', period: 'day', endTime: new Date('2026-06-15T00:00:00Z'), value: 9, numeric: 9 },
+      { targetId: page.id, metric: 'page_daily_unfollows_unique', period: 'day', endTime: new Date('2026-06-15T00:00:00Z'), value: 3, numeric: 3 },
+    ] });
+    const mixed = await analytics.readAudience({ targetId: page.id, from, to });
+    expect(mixed).toMatchObject({ adds: 9, removes: 3, net: null, addsMetric: 'page_fan_adds_unique', removesMetric: 'page_daily_unfollows_unique' });
+    await prisma.pageInsight.create({ data: { targetId: page.id, metric: 'page_daily_follows_unique', period: 'day', endTime: new Date('2026-06-15T00:00:00Z'), value: 0, numeric: 0 } });
+    const current = await analytics.readAudience({ targetId: page.id, from, to });
+    expect(current).toMatchObject({ adds: 0, removes: 3, net: -3, addsMetric: 'page_daily_follows_unique' });
+  });
+
   it('takes the newest snapshot of the newest metric name that has one', async () => {
     const { page } = await seed();
     const at = (day: number) => new Date(Date.UTC(2026, 5, day));

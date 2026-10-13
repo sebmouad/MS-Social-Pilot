@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
+import { canManageAccounts, canManageSettings, canManageTeam, type WorkspaceRole } from '@/lib/constants';
+import { moduleOfPath, type ModuleKey } from '@/lib/modules';
+import { mayOpenScreen } from '@/lib/role-access';
 import { prisma } from '@/lib/prisma';
 import { DismissibleCard } from './DismissibleCard';
 import { Icon, type IconName } from './Icon';
@@ -19,9 +22,16 @@ const STEPS: Array<{ id: string; href: string; icon: IconName }> = [
  * ticked off from what the workspace has actually done. It goes away once
  * everything is done, or when someone closes it.
  */
-export async function GettingStarted({ workspaceId, developer }: { workspaceId: string; developer: boolean }) {
+export async function GettingStarted({ workspaceId, developer, role, modules, clientAccess }: { workspaceId: string; developer: boolean; role: WorkspaceRole; modules: ModuleKey[]; clientAccess: string[] }) {
   // API keys only exist for a workspace root has switched developer features on for.
-  const steps = developer ? STEPS : STEPS.filter((step) => step.id !== 'claude');
+  const steps = STEPS.filter((step) => {
+    if (step.id === 'claude' && !developer) return false;
+    if (step.id === 'connect' && !canManageAccounts(role)) return false;
+    if (step.id === 'team' && !canManageTeam(role)) return false;
+    if ((step.id === 'queue' || step.id === 'client') && !canManageSettings(role)) return false;
+    const module = moduleOfPath(step.href);
+    return (!module || modules.includes(module)) && mayOpenScreen(role, clientAccess, step.href);
+  });
   const t = await getTranslations('dashboard');
   const [pages, posts, slots, members, links, reports, keys] = await Promise.all([
     prisma.target.count({ where: { workspaceId } }),
@@ -49,13 +59,13 @@ export async function GettingStarted({ workspaceId, developer }: { workspaceId: 
       <div className="flex flex-wrap items-center gap-4 border-b border-slate-100 px-5 py-4">
         <div className="relative h-12 w-12 shrink-0" aria-hidden>
           <svg viewBox="0 0 36 36" className="h-12 w-12 -rotate-90">
-            <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e4e6eb" strokeWidth="4" />
+            <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" className="text-slate-200" strokeWidth="4" />
             <circle
               cx="18"
               cy="18"
               r="15.5"
               fill="none"
-              stroke="#1877f2"
+              stroke="currentColor" className="text-brand-500"
               strokeWidth="4"
               strokeLinecap="round"
               strokeDasharray={`${(count / steps.length) * 97.4} 97.4`}

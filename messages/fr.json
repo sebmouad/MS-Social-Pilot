@@ -163,7 +163,7 @@
     "newLikes": "Nouveaux J'aime",
     "lostLikes": "J'aime perdus",
     "netChange": "Variation nette",
-    "audienceHint": "Les données démographiques sont des relevés cumulés fournis par Facebook : elles décrivent l'audience actuelle. Les J'aime gagnés et perdus sont comptés sur la période sélectionnée.",
+    "audienceHint": "Les répartitions d’audience sont les derniers instantanés disponibles. Les gains et pertes couvrent la période sélectionnée ; les J’aime historiques de la Page sont distingués des abonnements.",
     "probeAll": "Tester la couverture",
     "probed": "{checked} indicateurs testés ; Facebook en fournit {available}.",
     "coverageTitle": "Couverture du catalogue",
@@ -231,9 +231,12 @@
       "fans": "Personnes qui aiment le canal, aujourd’hui.",
       "followers": "Personnes abonnées au canal, aujourd’hui. C’est l’abonnement qui place les publications dans leur fil.",
       "talkingAbout": "Personnes ayant interagi avec le canal ou ses publications ces 7 derniers jours, selon Facebook.",
-      "newLikes": "Personnes qui se sont abonnées au canal pendant la période.",
-      "lostLikes": "Personnes qui se sont désabonnées pendant la période.",
-      "netChange": "Nouveaux abonnés moins abonnés perdus sur la période."
+      "newLikes": "Personnes ayant aimé la Page durant la période, selon les données historiques enregistrées.",
+      "lostLikes": "Personnes ayant cessé d’aimer la Page durant la période, selon les données historiques enregistrées.",
+      "netChange": "Nouveaux abonnés moins abonnés perdus sur la période.",
+      "newFollowers": "Personnes ayant commencé à suivre le canal durant la période.",
+      "lostFollowers": "Personnes ayant cessé de suivre le canal durant la période.",
+      "netLikesChange": "Nouveaux J’aime de Page moins les J’aime perdus durant la période. Indisponible si les gains et les pertes proviennent de types de métriques différents."
     },
     "mapLabel": "Carte des abonnés par pays",
     "technicalDetails": "Détails techniques : métriques que Facebook fournit pour ce canal",
@@ -248,7 +251,9 @@
     "oneChannelHint": "Affichage de {name}. Pour un autre canal, ouvrez le sélecteur de canaux et choisissez « Seulement » à côté.",
     "tabsMain": "Vues",
     "summaryDetail": "Ce canal en détail",
-    "noPagesOtherChannels": "Aucune Page Facebook dans cette sélection : chiffres d’Instagram et des autres réseaux."
+    "noPagesOtherChannels": "Aucune Page Facebook dans cette sélection : chiffres d’Instagram et des autres réseaux.",
+    "historicalAudienceTrend": "Gains et pertes d’audience",
+    "historicalAudienceTrendHint": "Inclut les J’aime historiques de la Page. Les J’aime et les abonnements sont des métriques distinctes ; chaque série indique sa source."
   },
   "app": {
     "name": "MS Social Pilot",
@@ -595,7 +600,21 @@
     "saveAsGroup": "Enregistrer ces canaux comme groupe",
     "groupName": "Nom du groupe",
     "saveGroup": "Enregistrer le groupe",
-    "groupSaved": "Groupe « {name} » enregistré. Choisissez-le la prochaine fois pour cocher ces canaux en un clic."
+    "groupSaved": "Groupe « {name} » enregistré. Choisissez-le la prochaine fois pour cocher ces canaux en un clic.",
+    "previewDestination": "Destination de l’aperçu",
+    "chooseLibrary": "Choisir dans la bibliothèque",
+    "leaveDraftTitle": "Quitter cette publication ?",
+    "leaveDraftBody": "Vous pourrez restaurer cette publication en revenant pendant cette session.",
+    "leaveDraft": "Quitter",
+    "keepWriting": "Continuer à écrire",
+    "draftRecovery": "Une publication non enregistrée est disponible dans cette session.",
+    "restoreDraft": "Restaurer",
+    "discardRecovery": "Supprimer la copie",
+    "previewContentTitle": "Aperçu du contenu pour cette destination",
+    "maxFiles": "{count, plural, one {Utilisez au maximum # fichier par publication.} other {Utilisez au maximum # fichiers par publication.}}",
+    "previewApproximation": "Aperçu du contenu pour {network}. La mise en page finale dépend du réseau.",
+    "leaveDraftUnsaved": "Vos modifications non enregistrées seront perdues car le stockage de récupération est indisponible.",
+    "saveUncertain": "L’enregistrement n’a pas pu être confirmé. Vérifiez la liste des publications avant de réessayer afin d’éviter un doublon."
   },
   "config": {
     "title": "Configuration",
@@ -700,7 +719,7 @@
     "disconnectConfirm": "Déconnecter {name} ? Les publications programmées sur ses canaux s’arrêteront jusqu’à la reconnexion.",
     "discover": "Rechercher les comptes",
     "facebookUser": "Utilisateur Facebook {id}",
-    "featureOff": "Désactivé dans la Configuration. Meta examine cette autorisation séparément, et la demander avant approbation fait échouer toute la connexion.",
+    "featureOff": "Cette fonctionnalité n’est pas disponible. Demandez à l’administrateur du service de l’activer une fois l’accès approuvé par la plateforme.",
     "followers": "{count, plural, one {# abonné} other {# abonnés}}",
     "groups": "Groupes",
     "groupsOff": "La publication dans les groupes Facebook n’est plus possible ; les canaux fonctionnent normalement. Meta l’a retirée pour toutes les applications le 22 avril 2024.",
@@ -757,7 +776,7 @@
       "group_app": "Ajoutez cette application au groupe avant d’y publier.",
       "inaccessible": "Cette destination n’est plus accessible avec le compte Facebook connecté.",
       "disconnected": "Le compte Facebook de cette destination a été déconnecté.",
-      "instagram_permission": "Publier sur Instagram nécessite l’autorisation instagram_content_publish de Meta. Réactivez cette destination une fois qu’elle est accordée."
+      "instagram_permission": "La publication Instagram attend l’approbation de la plateforme. Demandez à l’administrateur du service de vérifier l’accès avant d’activer cette destination."
     },
     "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
     "toggleDestination": "Publier sur {name}",
@@ -804,20 +823,22 @@
     "sheetHint_group": "Les groupes Facebook que vous administrez arrivent avec la connexion Facebook, dès que l’application peut y publier.",
     "sheetHint_instagram": "Les comptes Instagram professionnels liés à vos Pages Facebook arrivent avec la connexion Facebook.",
     "needsReconnectHint": "Cette connexion ne fonctionne plus. Reconnectez-la pour continuer à publier.",
-    "blockedGeneric": "Impossible de publier ici pour le moment. Essayez de reconnecter."
+    "blockedGeneric": "Impossible de publier ici pour le moment. Essayez de reconnecter.",
+    "connectionReference": "Référence de connexion : {id}",
+    "accountReference": "Référence de compte : {id}"
   },
   "dashboard": {
     "title": "Tableau de bord",
     "newPost": "Nouvelle publication",
     "scheduled": "Planifiées",
-    "published": "Publiées",
+    "published": "Publiés via cette application",
     "drafts": "Brouillons",
     "destinations": "Destinations",
     "goingOutNext": "Prochaines publications",
-    "recentlyPublished": "Publiées récemment",
+    "recentlyPublished": "Récemment publiés via cette application",
     "nothingScheduled": "Rien de planifié.",
     "writeAPost": "Rédiger une publication",
-    "nothingPublished": "Aucune publication pour le moment.",
+    "nothingPublished": "Aucune publication via cette application pour le moment.",
     "reachAndEngagement": "Portée et engagement",
     "reachSubtitle": "Totaux sur les publications parues, depuis la dernière actualisation des statistiques.",
     "impressions": "Impressions",
@@ -1248,7 +1269,8 @@
     "bioSlugTaken": "Cette adresse est prise. Choisissez-en une autre.",
     "fieldExists": "Un champ portant ce nom existe déjà.",
     "fieldChoice": "Choisissez l’une des options proposées.",
-    "textBackgroundNeedsText": "Un arrière-plan coloré est réservé aux courtes publications texte : sans lien, image ni vidéo, et 130 caractères au maximum."
+    "textBackgroundNeedsText": "Un arrière-plan coloré est réservé aux courtes publications texte : sans lien, image ni vidéo, et 130 caractères au maximum.",
+    "reportEmailUnavailable": "L’envoi des rapports par e-mail est indisponible. Demandez à un administrateur de l’espace de contacter le propriétaire de l’instance."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -1428,7 +1450,14 @@
     "untitledPost": "Publication sans texte",
     "usageNearlyFull": "Presque plein. Supprimez ce qui n’est plus utile, ou augmentez l’allocation dans la configuration.",
     "usageOf": "{used} sur {total}",
-    "usageTitle": "Stockage utilisé"
+    "usageTitle": "Stockage utilisé",
+    "deleteUncertain": "La connexion a été perdue. Le fichier a peut-être été supprimé. Réessayez pour vérifier son état avant une nouvelle suppression.",
+    "deleted": "Fichier supprimé de la bibliothèque.",
+    "pickerTitle": "Choisir dans la bibliothèque de médias",
+    "pickerAdd": "{count, plural, one {Ajouter # fichier} other {Ajouter # fichiers}}",
+    "pickerRetry": "Réessayer le chargement",
+    "pickerSearch": "Rechercher des noms de fichiers",
+    "pickerLimit": "Affichage des 100 fichiers les plus récents."
   },
   "metaApp": {
     "copied": "Copié",
@@ -1566,7 +1595,10 @@
     "inboxAll": "Tout",
     "overview": "Vue d’ensemble",
     "channels": "Canaux",
-    "teamRoles": "Équipe et rôles"
+    "teamRoles": "Équipe et rôles",
+    "skipToContent": "Aller au contenu principal",
+    "messages": "Messages",
+    "importCsv": "Importer un CSV"
   },
   "notifications": {
     "title": "Notifications",
@@ -1984,7 +2016,7 @@
     "section_destinations": "Par destination",
     "section_topPosts": "Meilleures publications",
     "sectionHint_analysis": "Santé, constats, chiffres clés, rythme, formats, meilleurs moments.",
-    "sectionHint_audience": "Abonnés, pays, villes, âge et genre.",
+    "sectionHint_audience": "Abonnés et répartitions disponibles par pays et ville.",
     "sectionHint_published": "Publications, portée, engagement et clics depuis l’application.",
     "sectionHint_destinations": "Les mêmes chiffres, canal par canal.",
     "sectionHint_topPosts": "Les meilleures publications, telles que vues par les abonnés.",
@@ -2020,7 +2052,9 @@
     "section_goals": "Objectifs",
     "sectionHint_goals": "Objectifs mensuels et rythme pour les atteindre",
     "section_responseTime": "Temps de réponse",
-    "sectionHint_responseTime": "La rapidité des réponses aux commentaires et aux messages"
+    "sectionHint_responseTime": "La rapidité des réponses aux commentaires et aux messages",
+    "scheduleEmailUnavailable": "L’envoi des rapports par e-mail est indisponible. Demandez à un administrateur de l’espace de contacter le propriétaire de l’instance.",
+    "scheduleLastAttempted": "dernière tentative {when}"
   },
   "settings": {
     "addTime": "Ajouter un créneau",
@@ -2041,7 +2075,7 @@
     "openQueue": "Ouvrir la file",
     "pasteOrUpload": "Ou collez les lignes",
     "queue": "File de publication",
-    "queueMoved": "La file de publication se trouve désormais dans Planification → File d’attente, avec des horaires suggérés d’après les résultats de vos canaux.",
+    "queueMoved": "La file de publication se trouve dans Publier → File, avec des horaires suggérés à partir des résultats de vos canaux.",
     "queueSubtitle": "Créneaux récurrents pour « ajouter au prochain créneau ». Chaque publication prend le premier créneau libre.",
     "queueUpdated": "Créneaux mis à jour.",
     "readOnly": "Seuls les propriétaires et les administrateurs de l’espace peuvent modifier ces réglages. Vous pouvez toujours importer des publications ci-dessous.",
@@ -2059,7 +2093,7 @@
     "shortenHint": "Remplace les liens par des liens courts que vous contrôlez, afin de compter les clics.",
     "shortenLinks": "Raccourcir les liens",
     "showExample": "Voir un exemple",
-    "subtitle": "Espace de travail, file de publication et planification en masse.",
+    "subtitle": "Préférences de l’espace et règles de publication.",
     "time": "Heure",
     "timezone": "Fuseau horaire",
     "timezoneHint": "Chaque heure que vous saisissez est interprétée dans ce fuseau, et reste correcte lors des changements d'heure.",
@@ -2072,7 +2106,7 @@
     "utmSource": "Source UTM",
     "workspace": "Espace de travail",
     "networkError": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
-    "aiNotConfigured": "Aucune clé ANTHROPIC_API_KEY n’est définie sur ce serveur : l’éditeur masque donc ces outils.",
+    "aiNotConfigured": "L’aide à la rédaction sera disponible lorsque l’administrateur du service aura connecté un fournisseur compatible. Vos préférences d’espace restent enregistrées.",
     "tones": {
       "friendly": "Amical",
       "professional": "Professionnel",
@@ -2105,7 +2139,8 @@
     "aiAvoidWords": "Mots à éviter",
     "aiAvoidWordsHint": "Séparés par des virgules. L’IA ne les utilisera dans rien de ce qu’elle écrit pour cet espace.",
     "clientAfterTeam": "Puis demander au client",
-    "clientAfterTeamHint": "Quand un membre de l’équipe approuve une publication, elle passe au lien de relecture du client et n’est validée que lorsque le client l’approuve. Nécessite un lien de relecture qui laisse le client décider."
+    "clientAfterTeamHint": "Quand un membre de l’équipe approuve une publication, elle passe au lien de relecture du client et n’est validée que lorsque le client l’approuve. Nécessite un lien de relecture qui laisse le client décider.",
+    "openBulkImport": "Ouvrir l’import CSV dans Publier"
   },
   "setup": {
     "title": "Configurer MS Social Pilot",
@@ -3414,8 +3449,8 @@
     "reopen": "Rouvrir",
     "failed": "Enregistrement impossible. Réessayez.",
     "showMore": "Afficher plus",
-    "emptyOpenTitle": "Rien en attente",
-    "emptyOpenHint": "Tous les commentaires et messages de ces canaux sont traités. Les nouveaux apparaissent ici dès leur arrivée.",
+    "emptyOpenTitle": "Aucun élément reçu ne nécessite une action",
+    "emptyOpenHint": "Cette boîte affiche les commentaires et messages reçus pour les canaux sélectionnés. Si des éléments manquent, vérifiez la sélection, les autorisations et la dernière synchronisation.",
     "emptyTitle": "Rien ici",
     "emptyHint": "Aucun commentaire ni message ne correspond à ces filtres pour les canaux sélectionnés. Essayez un autre type ou état, ou sélectionnez plus de canaux.",
     "assignTo": "Assigner à",
@@ -4188,7 +4223,7 @@
     "failed": "Cela n’a pas marché. Vérifiez votre connexion et réessayez.",
     "forgotTitle": "Mot de passe oublié ?",
     "forgotBody": "Saisissez votre adresse e-mail et nous vous enverrons un lien pour choisir un nouveau mot de passe.",
-    "noEmail": "Ce serveur ne peut pas encore envoyer d’e-mails : demandez à la personne qui l’administre de réinitialiser votre mot de passe.",
+    "noEmail": "L’e-mail de réinitialisation est indisponible. Contactez l’administrateur de votre espace ou la personne qui vous a invité pour récupérer votre compte.",
     "sendResetLink": "Envoyer le lien",
     "resetSent": "Si un compte utilise cette adresse, un lien est en route. Il est valable une heure. Regardez dans vos indésirables s’il n’arrive pas.",
     "backToSignIn": "Retour à la connexion",
@@ -4319,7 +4354,16 @@
     "workflowPlaceholder": "Rédiger le brief\nObtenir l’accord du client\nProgrammer les publications",
     "workflowStart": "Première étape pour le",
     "workflowGap": "Jours entre les étapes",
-    "workflowStartButton": "Créer les tâches"
+    "workflowStartButton": "Créer les tâches",
+    "workflowRowLimit": "Utilisez au maximum 30 étapes. Aucune tâche n’a été créée.",
+    "workflowTitleLimit": "Chaque étape doit contenir 200 caractères ou moins. Aucune tâche n’a été créée.",
+    "workflowRetry": "Réessayer les tâches restantes",
+    "workflowEditRemaining": "Modifier les étapes restantes",
+    "workflow_created": "Créée",
+    "workflow_failed": "Échec — conservée pour réessayer",
+    "workflow_unattempted": "Non tentée",
+    "workflow_uncertain": "Résultat inconnu — vérifiez le tableau avant de recréer",
+    "createUncertain": "La connexion a été perdue. Cette tâche a peut-être été créée. Vérifiez le tableau avant de la recréer."
   },
   "design": {
     "title": "Création",

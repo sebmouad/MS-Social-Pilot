@@ -29,6 +29,7 @@ export default async function TasksPage() {
     <div className="space-y-6">
       <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
       <TasksClient
+        key={`${auth.user.id}:${auth.workspace.id}`}
         canEdit={auth.role !== 'viewer'}
         myId={auth.user.id}
         members={members.map((member) => member.user)}

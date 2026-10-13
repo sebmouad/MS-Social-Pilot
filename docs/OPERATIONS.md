@@ -26,7 +26,7 @@ psql -h 127.0.0.1 -p 55432 -U postgres -c "alter user postgres password 'postgre
 ### Typecheck
 
 ```bash
-npx tsc --noEmit -p . | grep -v "^.next/"
+npm run typecheck
 ```
 
 There is no ESLint configuration.
@@ -34,13 +34,12 @@ There is no ESLint configuration.
 ### Unit and integration (Vitest)
 
 ```bash
-env TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/social_pilot_test npx vitest run
+env TZ=UTC TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55432/social_pilot_test npx vitest run
 ```
 
 - Integration tests (`*.integration.test.ts`) create their own database through
   `tests/helpers/database.ts`.
-- The whole suite passed on 2026-10-13 (1,814 tests in 173 files); the old
-  daylight-saving test that used to fail now passes.
+- Use `TZ=UTC` for deterministic test wall clocks. The timeout HTTP-fixture suite can emit an Undici stream abort error on Node 24 even when every assertion passes; verify `tests/graph-timeout.test.ts` separately under Node 22 LTS when this occurs. Do not suppress unhandled errors.
 - Convention guards, keep them green: `tests/locale.test.ts` (same keys,
   placeholders and ICU plurals in both catalogues), `tests/metadata.test.ts`
   (every page has a title), `tests/api-routes.integration.test.ts` (every API

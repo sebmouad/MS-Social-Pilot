@@ -85,5 +85,5 @@ export const INBOX_VIEW_PATHS: Partial<Record<AnalyticsView, string>> = {
   comments: '/inbox/comments',
   reviews: '/inbox/reviews',
   responseTime: '/inbox/response-time',
-  inbox: '/inbox',
+  inbox: '/inbox/messages',
 };

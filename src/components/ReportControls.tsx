@@ -16,9 +16,12 @@ export function ReportControls({
   to,
   downloadable = true,
   pdfName,
+  targetIds,
 }: {
   /** What the saved PDF is called: the browser names it after the tab. */
   pdfName?: string;
+  /** Resolved channel scope of the report on screen. */
+  targetIds: string[];
   /** The range the report on screen covers, as calendar days. */
   from: string;
   to: string;
@@ -29,7 +32,7 @@ export function ReportControls({
 
   // The download is the report on screen: built from the range that was
   // applied, never from a picker still being changed.
-  const applied = new URLSearchParams({ from, to, format: 'csv' }).toString();
+  const applied = new URLSearchParams({ from, to, format: 'csv', pages: targetIds.join(',') }).toString();
 
   return (
     <div className="flex flex-wrap items-center gap-2 print:hidden">

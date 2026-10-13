@@ -1,5 +1,7 @@
 'use client';
 
+import { mayLeaveEditor } from '@/lib/navigation-guard';
+import { useModalFocus } from './useModalFocus';
 import { CommandPalette } from './CommandPalette';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -108,6 +110,8 @@ export function AppShell({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [drawer, setDrawer] = useState(false);
+  const drawerPanel = useRef<HTMLDivElement>(null);
+  useModalFocus(drawerPanel, drawer, () => setDrawer(false));
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [account, setAccount] = useState(false);
@@ -146,6 +150,13 @@ export function AppShell({
     return () => document.removeEventListener('keydown', escape);
   }, [drawer]);
 
+  useEffect(() => {
+    const wide = window.matchMedia('(min-width: 1024px)');
+    const closeOnDesktop = () => { if (wide.matches) setDrawer(false); };
+    closeOnDesktop(); wide.addEventListener('change', closeOnDesktop);
+    return () => wide.removeEventListener('change', closeOnDesktop);
+  }, []);
+
   function toggleCollapsed() {
     const next = !collapsed;
     setCollapsed(next);
@@ -157,6 +168,7 @@ export function AppShell({
   }
 
   async function signOut() {
+    if (!(await mayLeaveEditor())) return;
     setError(null);
     try {
       const response = await fetch('/api/auth/logout', { method: 'POST' });
@@ -172,6 +184,7 @@ export function AppShell({
   }
 
   async function switchTo(id: string) {
+    if (!(await mayLeaveEditor())) return;
     if (id === workspaceId) return;
     setSwitching(true);
     setError(null);
@@ -228,6 +241,7 @@ export function AppShell({
       icon: 'calendar',
       also: ['/compose'],
       items: [
+        ...(canCompose ? [{ href: '/compose/import', label: t('importCsv'), icon: 'plus' as IconName, group: t('group_create') }] : []),
         { href: '/calendar', label: t('calendar'), icon: 'calendar', group: t('group_plan') },
         { href: '/queue', label: t('queue'), icon: 'clock', group: t('group_plan') },
         { href: '/posts', label: t('posts'), icon: 'posts', group: t('group_plan') },
@@ -245,6 +259,7 @@ export function AppShell({
       icon: 'inbox',
       items: [
         { href: '/inbox', label: t('inboxAll'), icon: 'inbox', group: t('group_conversations') },
+        { href: '/inbox/messages', label: t('messages'), icon: 'inbox', group: t('group_conversations') },
         { href: '/inbox/comments', label: t('comments'), icon: 'comment', group: t('group_conversations') },
         { href: '/inbox/reviews', label: t('reviews'), icon: 'star', group: t('group_conversations') },
         { href: '/inbox/replies', label: t('savedReplies'), icon: 'comment', group: t('group_tools') },
@@ -461,6 +476,8 @@ export function AppShell({
           <div className="fixed inset-0 z-50 lg:hidden">
             <button type="button" className="absolute inset-0 bg-slate-900/40" aria-label={t('closeMenu')} onClick={() => setDrawer(false)} />
             <div
+              ref={drawerPanel}
+              tabIndex={-1}
               id="main-menu"
               role="dialog"
               aria-modal="true"
@@ -615,7 +632,8 @@ export function AppShell({
             </button>
           </div>
         )}
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        <a href="#main-content" className="sr-only fixed start-3 top-3 z-[100] rounded bg-white px-4 py-3 shadow focus:not-sr-only">{t('skipToContent')}</a>
+        <main id="main-content" tabIndex={-1} className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
       </div>
     </div>
   );

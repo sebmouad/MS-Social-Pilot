@@ -117,7 +117,7 @@ export async function ConnectionsList({ platforms, linkSections = false }: { pla
                     </span>
                     <span className={`badge ${STATUS_STYLE[row.status]}`}>{t(`status.${row.status}`)}</span>
                   </summary>
-                  <dl className="mt-3 grid gap-x-4 gap-y-1.5 text-sm sm:grid-cols-[max-content_1fr]">
+                  <dl className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm sm:grid-cols-[max-content_minmax(0,1fr)] [&>dd]:min-w-0 [&>dd]:break-words">
                     <dt className="text-slate-500">{t('field.type')}</dt>
                     <dd className="text-slate-800">{row.type}</dd>
                     <dt className="text-slate-500">{t('field.providerId')}</dt>

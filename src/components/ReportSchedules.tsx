@@ -33,6 +33,7 @@ export function ReportSchedules({
   schedules,
   templateId,
   aiOn,
+  emailOn,
 }: {
   targetId: string;
   pageName: string;
@@ -40,6 +41,8 @@ export function ReportSchedules({
   templateId: string | null;
   /** AI is set up and on for this workspace: offer the summary. */
   aiOn: boolean;
+  /** Server-side provider readiness, without exposing provider settings. */
+  emailOn: boolean;
 }) {
   const t = useTranslations('reports');
   const tCommon = useTranslations('common');
@@ -52,9 +55,10 @@ export function ReportSchedules({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const close = useCallback(() => {
+    if (pending) return;
     setOpen(false);
     setError(null);
-  }, []);
+  }, [pending]);
 
   const list = recipients
     .split(/[\s,;]+/)
@@ -63,6 +67,7 @@ export function ReportSchedules({
   const invalid = list.filter((value) => !EMAIL.test(value));
 
   async function create() {
+    if (!emailOn || pending) return;
     setPending(true);
     setError(null);
     const response = await fetch('/api/report-schedules', {
@@ -81,8 +86,17 @@ export function ReportSchedules({
   }
 
   async function remove(row: ScheduleRow) {
+    if (pending) return;
     if (!(await confirm({ title: t('scheduleDeleteConfirm'), danger: true, confirmLabel: t('scheduleDelete') }))) return;
-    await fetch(`/api/report-schedules/${row.id}`, { method: 'DELETE' }).catch(() => null);
+    setPending(true);
+    setError(null);
+    const response = await fetch(`/api/report-schedules/${row.id}`, { method: 'DELETE' }).catch(() => null);
+    setPending(false);
+    if (!response?.ok) {
+      const body = (await response?.json().catch(() => ({}))) as { error?: string } | undefined;
+      setError(body?.error ?? tCommon('genericError'));
+      return;
+    }
     router.refresh();
   }
 
@@ -104,13 +118,13 @@ export function ReportSchedules({
         wide
         footer={
           <>
-            <button type="button" className="btn-secondary" onClick={close}>
+            <button type="button" className="btn-secondary" disabled={pending} onClick={close}>
               {tCommon('close')}
             </button>
             <button
               type="button"
               className="btn-primary"
-              disabled={pending || list.length === 0 || invalid.length > 0}
+              disabled={!emailOn || pending || list.length === 0 || invalid.length > 0}
               onClick={() => void create()}
             >
               {pending ? tCommon('working') : t('scheduleCreate')}
@@ -137,7 +151,7 @@ export function ReportSchedules({
                     </span>
                     <span className="block text-xs text-slate-500">
                       {t('scheduleNext', { when: row.nextLabel })}
-                      {row.lastLabel && ` · ${t('scheduleLast', { when: row.lastLabel })}`}
+                      {row.lastLabel && ` · ${t(row.lastError ? 'scheduleLastAttempted' : 'scheduleLast', { when: row.lastLabel })}`}
                     </span>
                     {row.lastError && <span className="block text-xs text-red-600">{row.lastError}</span>}
                   </span>
@@ -145,6 +159,7 @@ export function ReportSchedules({
                     type="button"
                     className="btn-ghost px-2 py-1 text-xs hover:text-red-600"
                     onClick={() => void remove(row)}
+                    disabled={pending}
                     aria-label={t('scheduleDelete')}
                   >
                     <Icon name="trash" size={14} />
@@ -155,7 +170,7 @@ export function ReportSchedules({
           )}
 
           <div className="space-y-3">
-            <p className="text-sm text-slate-600">{t('scheduleHint')}</p>
+            <p className="text-sm text-slate-600">{emailOn ? t('scheduleHint') : t('scheduleEmailUnavailable')}</p>
             {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
             <div className="segmented w-fit" role="radiogroup" aria-label={t('frequency')}>
               {(['weekly', 'monthly'] as const).map((value) => (

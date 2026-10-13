@@ -1,5 +1,6 @@
 'use client';
 
+import { mayLeaveEditor } from '@/lib/navigation-guard';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -43,9 +44,9 @@ export function CommandPalette({ items }: { items: Array<{ href: string; label: 
     setActive(0);
   }
 
-  function go(href: string) {
+  async function go(href: string) {
     close();
-    router.push(href);
+    if (await mayLeaveEditor()) router.push(href);
   }
 
   return (

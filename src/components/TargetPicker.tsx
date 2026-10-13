@@ -172,7 +172,7 @@ export function TargetPicker({ targets, selected, onChange, groups = [] }: Props
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-slate-900">{target.name}</span>
-                  <span className="block truncate text-xs text-slate-500">
+                  <span className="block break-words text-xs text-slate-500">
                     {t(targetTypeKey(target.type))}
                     {target.accountName ? ` · ${target.accountName}` : ''}
                     {disabled && blocked ? ` · ${blocked}` : ''}

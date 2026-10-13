@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { stubReportEmailProvider } from './helpers/report-email';
 import { AiGenerationKind, Locale } from '@prisma/client';
 
 import { setTestEnv, setupTestDatabase, type TestDatabase } from './helpers/database';
@@ -367,6 +368,8 @@ describe('the hourly limit', () => {
 });
 
 describe('the recap on a scheduled report', () => {
+  beforeEach(stubReportEmailProvider);
+  afterEach(() => vi.restoreAllMocks());
   it('opens the email with a summary of the figures, billed to whoever set it up', async () => {
     const { user, workspace } = await seed();
     await prisma.membership.create({ data: { userId: user.id, workspaceId: workspace.id, role: 'owner' } });

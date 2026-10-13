@@ -9,6 +9,7 @@ import { afterAuthPath, withInviteParam } from '@/lib/invite-path';
 
 interface Props {
   mode: 'login' | 'register';
+  registrationAllowed?: boolean;
   /**
    * An invitation the visitor arrived with.
    *
@@ -22,7 +23,7 @@ interface Props {
   defaults?: { email?: string; workspaceName?: string };
 }
 
-export function AuthForm({ mode, inviteToken, defaults }: Props) {
+export function AuthForm({ mode, inviteToken, defaults, registrationAllowed = true }: Props) {
   const t = useTranslations('auth');
   const tApp = useTranslations('app');
   const router = useRouter();
@@ -210,14 +211,14 @@ export function AuthForm({ mode, inviteToken, defaults }: Props) {
               {t('signIn')}
             </Link>
           </>
-        ) : (
+        ) : registrationAllowed ? (
           <>
             {t('noAccount')}{' '}
             <Link href={withInvite('/register')} className="font-medium text-brand-600 hover:underline">
               {t('createOne')}
             </Link>
           </>
-        )}
+        ) : t('registrationClosedBody')}
       </p>
     </div>
   );

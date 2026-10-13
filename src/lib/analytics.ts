@@ -1116,9 +1116,11 @@ export interface AudienceSummary {
   byLocale: Record<string, number>;
   byGenderAge: Record<string, number>;
   /** Daily gains and losses over the window. */
-  adds: number;
-  removes: number;
-  net: number;
+  adds: number | null;
+  removes: number | null;
+  net: number | null;
+  addsMetric: string | null;
+  removesMetric: string | null;
 }
 
 /**
@@ -1170,7 +1172,7 @@ export async function readAudience(options: {
   // withdrew `page_fan_adds` and `page_fan_removes` in favour of the follow
   // metrics, so a Page connected since then holds only the newer names, and
   // asking for the old ones alone read zero gained and zero lost for ever.
-  const sumOf = async (...metrics: string[]): Promise<number> => {
+  const sumOf = async (...metrics: string[]): Promise<{ value: number | null; metric: string | null }> => {
     for (const metric of metrics) {
       const where = {
         targetId: options.targetId,
@@ -1179,9 +1181,9 @@ export async function readAudience(options: {
         endTime: { gte: options.from, lte: options.to },
       };
       const result = await prisma.pageInsight.aggregate({ where, _sum: { numeric: true }, _count: true });
-      if (result._count > 0) return Math.round(result._sum.numeric ?? 0);
+      if (result._count > 0 && result._sum.numeric !== null) return { value: Math.round(result._sum.numeric), metric };
     }
-    return 0;
+    return { value: null, metric: null };
   };
 
   const [latest, adds, removes] = await Promise.all([
@@ -1202,9 +1204,11 @@ export async function readAudience(options: {
     byCity,
     byLocale,
     byGenderAge,
-    adds,
-    removes,
-    net: adds - removes,
+    adds: adds.value,
+    removes: removes.value,
+    addsMetric: adds.metric,
+    removesMetric: removes.metric,
+    net: adds.value !== null && removes.value !== null && (adds.metric?.startsWith('page_fan_') === removes.metric?.startsWith('page_fan_')) ? adds.value - removes.value : null,
   };
 }
 

@@ -402,7 +402,7 @@ export function QueueClient({
                           />
                         ) : (
                           <Link
-                            href={scope ? `/compose?to=${scope.id}` : '/compose'}
+                            href={scope ? `/compose?intent=queue&to=${scope.id}` : '/compose?intent=queue'}
                             className="flex items-center gap-3 rounded-lg border-2 border-dashed border-slate-200 px-3 py-3 text-sm text-slate-600 hover:border-brand-300 hover:bg-brand-50/40 hover:text-brand-700"
                           >
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">

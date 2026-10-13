@@ -77,6 +77,8 @@ export function CalendarDrag({ timeZone, todayKey, children }: { timeZone: strin
           }
           setMessage({ tone: 'ok', text: t('moved', { when: at.replace('T', ' ') }) });
           router.refresh();
+        } catch {
+          setMessage({ tone: 'error', text: t('moveFailed') });
         } finally {
           setBusy(false);
         }

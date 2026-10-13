@@ -32,6 +32,7 @@ export function QuerySelect({
         onChange={(event) => {
           const next = new URLSearchParams(params.toString());
           next.set(param, event.target.value);
+          if (param !== 'page') next.delete('page');
           router.push(`${pathname}?${next.toString()}`);
         }}
       >

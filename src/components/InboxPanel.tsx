@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
+import { requestJson } from '@/lib/client-request';
 import { Icon } from './Icon';
 import { useSavedReplies } from './SavedReplies';
 
@@ -26,7 +27,7 @@ export interface ThreadView {
     timeLabel?: string;
   }>;
   /** 'open' carries when Facebook's 24-hour window shuts, already formatted. */
-  reply: { state: 'open'; untilLabel: string } | { state: 'closed' | 'no_recipient' };
+  reply: { state: 'open'; untilLabel: string; until?: string } | { state: 'closed' | 'no_recipient' };
 }
 
 /**
@@ -45,51 +46,44 @@ export function InboxPanel({
   threads,
   canReply,
   pageName,
+  draftScope,
 }: {
   threads: ThreadView[];
   canReply: boolean;
   /** For `{page}` in saved replies. */
   pageName: string;
+  /** Authenticated user, workspace and Page identity; drafts stay in memory only. */
+  draftScope: string;
 }) {
   const t = useTranslations('engagement');
   const tCommon = useTranslations('common');
   const router = useRouter();
 
   const [selected, setSelected] = useState<string | null>(threads[0]?.id ?? null);
-  const [text, setText] = useState('');
+  const [drafts, setDrafts] = useState<{ scope: string; values: Record<string, string> }>({ scope: draftScope, values: {} });
+  const sendLock = useRef(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => { setDrafts({ scope: draftScope, values: {} }); setError(null); }, [draftScope]);
+
   const thread = threads.find((entry) => entry.id === selected) ?? threads[0] ?? null;
+  const text = drafts.scope === draftScope && thread ? drafts.values[thread.id] ?? '' : '';
+  const setText = (value: string) => { if (thread) setDrafts(current => ({ scope: draftScope, values: { ...(current.scope === draftScope ? current.values : {}), [thread.id]: value } })); };
   const saved = useSavedReplies({ value: text, setValue: setText, name: thread?.participants ?? null, page: pageName });
 
   async function send(conversationId: string) {
-    setBusy(conversationId);
-    setError(null);
+    if (sendLock.current || thread?.id !== conversationId || thread.reply.state !== 'open' || !text.trim()) return;
+    if (thread.reply.until && Date.parse(thread.reply.until) <= Date.now()) { setError(t('replyWindowClosed')); router.refresh(); return; }
+    sendLock.current = true;
+    const sendingScope = draftScope;
+    setBusy(conversationId); setError(null);
     try {
-      const response = await fetch('/api/engagement/messages', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId, message: text.trim() }),
-      });
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
-
-      if (!response.ok) {
-        // Graph's own words when it refuses: the window, the messaging
-        // permission, a blocked Page. Each needs saying, not flattening.
-        setError(body.error ?? t('replyFailed'));
-        return;
-      }
-
-      setText('');
+      const result = await requestJson('/api/engagement/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ conversationId, message: text.trim() }) });
+      if (!result.ok) { setError(result.error ?? t('replyFailed')); return; }
+      setDrafts(current => current.scope === sendingScope ? { ...current, values: { ...current.values, [conversationId]: '' } } : current);
       router.refresh();
-    } catch {
-      // The request never arrived — offline, or the connection dropped. The
-      // text stays in the box so it can be sent again.
-      setError(tCommon('genericError'));
-    } finally {
-      setBusy(null);
-    }
+    } finally { sendLock.current = false; setBusy(null); }
   }
 
   return (
@@ -111,8 +105,8 @@ export function InboxPanel({
                 <button
                   type="button"
                   onClick={() => {
+                    if (entry.id === thread?.id) return;
                     setSelected(entry.id);
-                    setText('');
                     setError(null);
                   }}
                   aria-current={active ? 'true' : undefined}
@@ -188,7 +182,7 @@ export function InboxPanel({
                         className="input min-h-[40px] flex-1 resize-y rounded-[20px] bg-slate-100 py-2"
                         aria-label={t('replyToLabel', { author: thread.participants })}
                         aria-describedby={`reply-window-${thread.id}`}
-                        value={text}
+                        disabled={busy === thread.id} value={text}
                         onChange={(event) => setText(event.target.value)}
                         onKeyDown={saved.onKeyDown}
                         placeholder={t('replyPlaceholder')}
@@ -199,7 +193,7 @@ export function InboxPanel({
                       <button
                         type="button"
                         className="btn-primary h-10 rounded-full"
-                        disabled={busy === thread.id || text.trim().length === 0}
+                        disabled={busy !== null || text.trim().length === 0}
                         onClick={() => void send(thread.id)}
                       >
                         {busy === thread.id ? tCommon('working') : t('sendReply')}
