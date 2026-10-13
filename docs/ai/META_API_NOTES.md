@@ -71,3 +71,14 @@ that is why the extras are behind switches.
   `devtools_discovery`. App ID 699780715171676.
 - Docs: https://developers.facebook.com/docs/graph-api/ and
   https://developers.facebook.com/documentation/pages-api/platforminsights/page.md
+
+## Reach by country or city (checked 2026-10-13)
+
+The current Page Insights reference
+(developers.facebook.com/documentation/pages-api/platforminsights/page.md)
+lists no reach or impressions metric broken down by country or city; the only
+geographic breakdowns left are `page_follows_country` and `page_follows_city`.
+The deprecated-metrics page retires the whole `page_impressions*` family and
+every `*_by_country_unique` / `*_by_city_unique` click metric. So the
+"fans / reached" toggle on the audience maps cannot be built for Facebook Pages:
+there is no "reached" side to show.
