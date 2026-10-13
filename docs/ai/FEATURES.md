@@ -221,4 +221,4 @@ only) that `/api/oauth/token` swaps for an API key named "<assistant>
 (connector)". No refresh tokens: the key lasts until revoked under Settings ›
 API keys. Same rules as other keys: only root, and only in a workspace where root
 switched developer features on (the consent screen 404s otherwise).
-Not signed in yet: sign in, then start connecting again from the assistant.
+Not signed in yet: the link is remembered for ten minutes, and signing in comes back to it.

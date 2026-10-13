@@ -8,6 +8,7 @@ import { prisma } from './fixtures';
 
 let workspaceId = '';
 let before = false;
+test.describe.configure({ mode: 'serial' });
 
 test.afterAll(async () => {
   await prisma.apiToken.deleteMany({ where: { name: 'e2e connector (connector)' } });
@@ -58,4 +59,22 @@ test('allows an assistant and hands it a working key', async ({ page, request })
   expect(anonymous.headers()['www-authenticate']).toContain('oauth-protected-resource');
   // The made-up assistant host cannot load; nothing else may fail.
   expect(failures.filter((failure) => !failure.includes('assistant.example'))).toEqual([]);
+});
+
+test.describe('signed out', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('signing in comes back to the consent screen', async ({ page, request }) => {
+    await prisma.workspace.update({ where: { id: workspaceId || (await prisma.workspace.findFirstOrThrow({ where: { name: OWNER.workspace } })).id }, data: { developerFeatures: true } });
+    const registered = await request.post('/api/oauth/register', { data: { client_name: 'e2e connector', redirect_uris: ['https://assistant.example/callback'] } });
+    const { client_id } = await registered.json();
+    const challenge = createHash('sha256').update(randomBytes(40).toString('base64url')).digest('base64url');
+    await page.goto(`/oauth/authorize?response_type=code&client_id=${client_id}&redirect_uri=${encodeURIComponent('https://assistant.example/callback')}&code_challenge=${challenge}&code_challenge_method=S256`);
+    await page.waitForURL(/\/login/);
+    await page.getByLabel(/e-?mail/i).fill(OWNER.email);
+    await page.getByLabel(/^password$/i).fill(OWNER.password);
+    await page.getByRole('button', { name: /sign in/i }).click();
+    await page.waitForURL(/\/oauth\/authorize\?/, { timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Allow' })).toBeVisible();
+  });
 });

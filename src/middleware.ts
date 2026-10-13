@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { isCrossSiteWrite } from './lib/cross-site';
 import { METHOD_HEADER, PATHNAME_HEADER } from './lib/modules';
+import { RETURN_COOKIE } from './lib/invite-path';
 
 /**
  * Refuse API writes another site started. See `src/lib/cross-site.ts`.
@@ -20,7 +21,14 @@ export function middleware(request: NextRequest): NextResponse {
   const headers = new Headers(request.headers);
   headers.set(PATHNAME_HEADER, pathname);
   headers.set(METHOD_HEADER, request.method);
-  return NextResponse.next({ request: { headers } });
+  const response = NextResponse.next({ request: { headers } });
+  // An assistant's consent link opened while signed out: remember it, so
+  // signing in comes back here instead of the dashboard (`afterAuthPath`).
+  // The page itself sends the visitor to sign in.
+  if (pathname === '/oauth/authorize' && !request.cookies.has('msp_session')) {
+    response.cookies.set(RETURN_COOKIE, `${pathname}${request.nextUrl.search}`, { path: '/', maxAge: 600, sameSite: 'lax' });
+  }
+  return response;
 }
 
 export const config = {

@@ -12,8 +12,26 @@
  * module with server dependencies into the browser bundle is how a database
  * client ends up shipped to a login page.
  */
-export function afterAuthPath(inviteToken?: string | null): string {
-  return inviteToken ? `/invite/${encodeURIComponent(inviteToken)}` : '/dashboard';
+export function afterAuthPath(inviteToken?: string | null, returnCookie?: string): string {
+  if (inviteToken) return `/invite/${encodeURIComponent(inviteToken)}`;
+  return (returnCookie !== undefined ? safeReturnPath(returnCookie) : takeReturnPath()) ?? '/dashboard';
+}
+
+/** Only an assistant's consent link may be returned to: never an outside address. */
+export function safeReturnPath(raw: string): string | null {
+  const path = decodeURIComponent(raw);
+  return path.startsWith('/oauth/authorize?') ? path : null;
+}
+
+/** Set by the middleware when an assistant's consent link was opened signed out. */
+export const RETURN_COOKIE = 'msp_return';
+
+/** In the browser only: the remembered consent link; the consent answer clears it. */
+function takeReturnPath(): string | null {
+  if (typeof document === 'undefined') return null;
+  const raw = document.cookie.split('; ').find((part) => part.startsWith(`${RETURN_COOKIE}=`));
+  if (!raw) return null;
+  return safeReturnPath(raw.slice(RETURN_COOKIE.length + 1));
 }
 
 /** Keep the invitation across the "sign in instead" / "create one" links. */

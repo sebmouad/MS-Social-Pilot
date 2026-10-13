@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { route } from '@/lib/api';
 import { requireAuth } from '@/lib/auth';
+import { RETURN_COOKIE } from '@/lib/invite-path';
 import { findClient, issueCode } from '@/lib/oauth';
 
 /**
@@ -37,5 +38,8 @@ export const POST = route(async (request: Request) => {
     scope: field('scope') === 'write' ? 'write' : 'read',
   });
   back.searchParams.set('code', code);
-  return NextResponse.redirect(back, 303);
+  const response = NextResponse.redirect(back, 303);
+  // The remembered consent link has done its job.
+  response.cookies.delete(RETURN_COOKIE);
+  return response;
 });

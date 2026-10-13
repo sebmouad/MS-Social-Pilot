@@ -1,8 +1,10 @@
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { AuthForm } from '@/components/AuthForm';
 import { getAuthContext } from '@/lib/auth';
-import { afterAuthPath } from '@/lib/invite-path';
+
+import { afterAuthPath, RETURN_COOKIE } from '@/lib/invite-path';
 import { isFirstRun } from '@/lib/setup';
 import { screenMetadata } from '@/lib/metadata';
 
@@ -25,7 +27,7 @@ export default async function LoginPage({
 
   // Already signed in: go straight to the invitation rather than the dashboard,
   // which is where the accept button is.
-  if (await getAuthContext()) redirect(afterAuthPath(invite));
+  if (await getAuthContext()) redirect(afterAuthPath(invite, (await cookies()).get(RETURN_COOKIE)?.value ?? ''));
 
   return <AuthForm mode="login" inviteToken={invite} />;
 }

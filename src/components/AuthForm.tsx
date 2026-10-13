@@ -105,7 +105,10 @@ export function AuthForm({ mode, inviteToken, defaults }: Props) {
       return;
     }
     // A new workspace starts with its basics (S3); an invitation goes to the invitation.
-    router.push(isRegister && !inviteToken ? '/welcome' : afterAuthPath(inviteToken));
+    const next = isRegister && !inviteToken ? '/welcome' : afterAuthPath(inviteToken);
+    // The consent screen is a full page load, so it renders with the new session.
+    if (next.startsWith('/oauth/')) window.location.assign(next);
+    else router.push(next);
   }
 
   return (

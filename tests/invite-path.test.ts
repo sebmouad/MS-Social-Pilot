@@ -58,7 +58,7 @@ describe('the pages that carry an invitation', () => {
   });
 
   it('sends the visitor onward with the shared helper', () => {
-    expect(files.login).toContain('afterAuthPath(invite)');
+    expect(files.login).toContain('afterAuthPath(invite,');
     expect(files.register).toContain('afterAuthPath(invite)');
     expect(files.form).toContain('afterAuthPath(inviteToken)');
   });
