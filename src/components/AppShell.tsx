@@ -254,7 +254,7 @@ export function AppShell({
       key: 'workspace',
       label: t('section_workspace'),
       rail: t('rail_workspace'),
-      icon: 'settings',
+      icon: 'folders',
       items: [
         { href: '/connections', label: t('connections'), icon: 'connections', also: ['/accounts'] },
         { href: '/tasks', label: t('tasks'), icon: 'approvals' },
@@ -384,16 +384,6 @@ export function AppShell({
               })}
             </ul>
           </nav>
-          {isRoot && (
-            <Link
-              href="/root"
-              title={t('root')}
-              className="mt-2 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100"
-            >
-              <Icon name="shield" size={20} />
-              <span className="sr-only">{t('root')}</span>
-            </Link>
-          )}
         </div>
 
         {/* …and beside it the sidebar with the pages of the area in use. */}
@@ -565,6 +555,12 @@ export function AppShell({
                     <Icon name="team" size={18} />
                     {t('yourAccount')}
                   </Link>
+                  {isRoot && (
+                    <Link href="/root" className="flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm font-semibold text-amber-800 hover:bg-amber-50">
+                      <Icon name="shield" size={18} className="text-amber-700" />
+                      {t('root')}
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => void signOut()}

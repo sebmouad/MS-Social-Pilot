@@ -200,7 +200,7 @@ export default async function PostsPage({
 
       {/* A plain GET form, so a search is a URL like every other filter here:
           it pages, bookmarks and survives a refresh. */}
-      <form method="get" action="/posts" role="search" className="card flex flex-wrap items-end gap-2 p-3 lg:flex-col lg:items-stretch">
+      <form method="get" action="/posts" role="search" className="flex flex-wrap items-center gap-2">
         {raw && <input type="hidden" name="status" value={raw} />}
         {/* The other filters ride along with a search, so typing a word does
             not throw away the Pages and the label already picked. */}
@@ -208,26 +208,26 @@ export default async function PostsPage({
           first(params[key]) ? <input key={key} type="hidden" name={key} value={first(params[key])} /> : null,
         )}
 
-        <div className="min-w-[12rem] flex-1 lg:min-w-0">
-          <label className="label" htmlFor="posts-q">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <label className="sr-only" htmlFor="posts-q">
             {t('searchLabel')}
           </label>
           <input
             id="posts-q"
             name="q"
             type="search"
-            className="input"
+            className="input h-10 min-w-0 flex-1 rounded-full"
             defaultValue={search}
             maxLength={MAX_SEARCH}
             placeholder={t('searchPlaceholder')}
           />
+          <button type="submit" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" title={tCommon('search')}>
+            <Icon name="search" size={17} />
+            <span className="sr-only">{tCommon('search')}</span>
+          </button>
         </div>
-
-        <button type="submit" className="btn-secondary">
-          {tCommon('search')}
-        </button>
         {filtered && (
-          <Link href={pageHref('/posts', { status: raw }, 1)} className="btn-secondary">
+          <Link href={pageHref('/posts', { status: raw }, 1)} className="text-sm font-semibold text-brand-600 hover:underline">
             {t('clearFilters')}
           </Link>
         )}
