@@ -357,7 +357,8 @@ async function publishClaimed(
     // watermark (G13); the originals stay as they are.
     const attachments = await prepareImages({
       workspaceId: post.workspaceId,
-      media: parseMedia(post.media),
+      // A destination set to text only gets none of the post's pictures.
+      media: row.skipMedia ? [] : parseMedia(post.media),
       range: aspectRangeFor(target.type, post.format),
       watermark: parseWatermark(target.watermark),
     });

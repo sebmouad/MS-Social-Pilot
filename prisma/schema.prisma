@@ -816,6 +816,8 @@ model PostTarget {
   status   PostTargetStatus @default(pending)
   /// Text written for this destination alone; null publishes the post's own text.
   messageOverride String?
+  /// Publish this destination without the post's pictures or video (text and link only).
+  skipMedia Boolean @default(false)
 
   remotePostId       String?
   remoteUrl          String?

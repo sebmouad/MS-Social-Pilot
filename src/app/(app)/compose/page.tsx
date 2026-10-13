@@ -211,7 +211,7 @@ function requestedTime(raw: string | string[] | undefined, timeZone: string): st
 async function loadForEditing(postId: string, auth: Auth): Promise<EditingPost | null> {
   const post = await prisma.post.findFirst({
     where: { id: postId, workspaceId: auth.workspace.id },
-    include: { targets: { select: { targetId: true, status: true, messageOverride: true } } },
+    include: { targets: { select: { targetId: true, status: true, messageOverride: true, skipMedia: true } } },
   });
   if (!post) return null;
 
@@ -234,6 +234,7 @@ async function loadForEditing(postId: string, auth: Auth): Promise<EditingPost |
     link: post.link,
     media: parseMedia(post.media),
     targetIds: post.targets.map((target) => target.targetId),
+    textOnly: post.targets.filter((target) => target.skipMedia).map((target) => target.targetId),
     variants: Object.fromEntries(post.targets.flatMap((target) => (target.messageOverride ? [[target.targetId, target.messageOverride]] : []))),
     // The workspace's zone, not the post's own. The composer sends back
     // whatever zone it was given, and it is given the workspace's — so

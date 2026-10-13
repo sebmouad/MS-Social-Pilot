@@ -571,7 +571,8 @@
     "undoSendGone": "Sent to the channels: it appears within a minute.",
     "variantsTitle": "Different text for some channels",
     "variantsHint": "Leave a box empty and that channel publishes the main text. Media, link and time stay the same.",
-    "variantsPlaceholder": "Same as the main text"
+    "variantsPlaceholder": "Same as the main text",
+    "textOnly": "Publish this one without the pictures or video"
   },
   "config": {
     "title": "Configuration",

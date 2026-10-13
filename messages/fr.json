@@ -571,7 +571,8 @@
     "undoSendGone": "Envoyée aux canaux : elle apparaît d’ici une minute.",
     "variantsTitle": "Texte différent pour certains canaux",
     "variantsHint": "Laissez un champ vide et ce canal publie le texte principal. Les médias, le lien et l’heure restent les mêmes.",
-    "variantsPlaceholder": "Identique au texte principal"
+    "variantsPlaceholder": "Identique au texte principal",
+    "textOnly": "Publier celui-ci sans les images ni la vidéo"
   },
   "config": {
     "title": "Configuration",

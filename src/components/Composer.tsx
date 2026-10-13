@@ -79,6 +79,8 @@ export interface EditingPost {
   targetIds: string[];
   /** Text written for single destinations, by destination id. */
   variants?: Record<string, string>;
+  /** Destinations that publish without the pictures or video. */
+  textOnly?: string[];
   /** `datetime-local` value in the workspace's zone, or null for a draft. */
   scheduledAtLocal: string | null;
   publishMode: string;
@@ -142,6 +144,7 @@ export function Composer({
   const commentBox = useRef<HTMLTextAreaElement>(null);
   const [firstComment, setFirstComment] = useState(editing?.firstComment ?? '');
   const [variants, setVariants] = useState<Record<string, string>>(editing?.variants ?? {});
+  const [textOnly, setTextOnly] = useState<string[]>(editing?.textOnly ?? []);
   const [commentDelay, setCommentDelay] = useState(editing?.firstCommentDelayMinutes ?? 0);
   const [labelIds, setLabelIds] = useState<string[]>(editing?.labelIds ?? []);
   const [format, setFormat] = useState<'post' | 'reel' | 'story'>(editing?.format ?? 'post');
@@ -410,6 +413,7 @@ export function Composer({
               media,
               targetIds: selected,
               variants: variantsFor(selected),
+              textOnly: textOnly.filter((id) => selected.includes(id)),
               publishMode: effectiveHandler,
               scheduledAtLocal: saveAsDraft ? null : scheduledAt,
               timezone,
@@ -428,6 +432,7 @@ export function Composer({
               media,
               targetIds: selected,
               variants: testing || translating ? undefined : variantsFor(selected),
+              textOnly: testing || translating ? undefined : textOnly.filter((id) => selected.includes(id)),
               publishMode,
               scheduledAtLocal: timing === 'schedule' ? scheduledAt : null,
               timezone,
@@ -1032,7 +1037,7 @@ export function Composer({
           )}
 
           {selectedTargets.length > 1 && !testing && !translating && (
-            <details className="mt-4 rounded-lg border border-slate-200 p-3" open={Object.values(variants).some((text) => text.trim())}>
+            <details className="mt-4 rounded-lg border border-slate-200 p-3" open={Object.values(variants).some((text) => text.trim()) || textOnly.length > 0}>
               <summary className="cursor-pointer text-sm font-semibold text-slate-900">{t('variantsTitle')}</summary>
               <p className="mt-1 text-xs text-slate-600">{t('variantsHint')}</p>
               <ul className="mt-3 space-y-3">
@@ -1049,6 +1054,16 @@ export function Composer({
                       placeholder={t('variantsPlaceholder')}
                       onChange={(event) => setVariants((current) => ({ ...current, [target.id]: event.target.value }))}
                     />
+                    {media.length > 0 && !['instagram', 'pinterest', 'youtube', 'tiktok'].includes(target.type) && (
+                      <label className="mt-1.5 flex items-center gap-2 text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={textOnly.includes(target.id)}
+                          onChange={(event) => setTextOnly((current) => (event.target.checked ? [...current, target.id] : current.filter((id) => id !== target.id)))}
+                        />
+                        {t('textOnly')}
+                      </label>
+                    )}
                   </li>
                 ))}
               </ul>

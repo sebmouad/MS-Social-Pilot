@@ -114,22 +114,24 @@ describe('text per destination', () => {
     const { owner, workspace, bakery, garage } = await seed();
     const created = await posts.createPost(
       context(workspace.id, owner.id),
-      { ...queued([bakery.id, garage.id]), useQueue: false, saveAsDraft: true, variants: { [garage.id]: '  Short version  ' } },
+      { ...queued([bakery.id, garage.id]), useQueue: false, saveAsDraft: true, variants: { [garage.id]: '  Short version  ' }, textOnly: [garage.id] },
       now,
     );
     const rows = await prisma.postTarget.findMany({ where: { postId: created.postId } });
     const byTarget = Object.fromEntries(rows.map((row) => [row.targetId, row.messageOverride]));
     expect(byTarget).toEqual({ [bakery.id]: null, [garage.id]: 'Short version' });
+    expect(Object.fromEntries(rows.map((row) => [row.targetId, row.skipMedia]))).toEqual({ [bakery.id]: false, [garage.id]: true });
 
     // Editing sets and clears it.
     await posts.updatePost(
       { workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner, requiresApproval: false },
       created.postId,
-      { variants: { [garage.id]: '', [bakery.id]: 'Bakery only' } },
+      { variants: { [garage.id]: '', [bakery.id]: 'Bakery only' }, textOnly: [] },
       now,
     );
     const after = await prisma.postTarget.findMany({ where: { postId: created.postId } });
     expect(Object.fromEntries(after.map((row) => [row.targetId, row.messageOverride]))).toEqual({ [bakery.id]: 'Bakery only', [garage.id]: null });
+    expect(after.every((row) => row.skipMedia === false)).toBe(true);
   });
 });
 

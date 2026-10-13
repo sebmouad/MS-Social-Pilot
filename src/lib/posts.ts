@@ -370,7 +370,7 @@ export async function createPost(
         scheduledAt: schedule.scheduledAt,
         timezone: schedule.timezone,
         targets: {
-          create: targets.map((target) => ({ targetId: target.id, status: 'pending', messageOverride: input.variants?.[target.id]?.trim() || null })),
+          create: targets.map((target) => ({ targetId: target.id, status: 'pending', messageOverride: input.variants?.[target.id]?.trim() || null, skipMedia: input.textOnly?.includes(target.id) ?? false })),
         },
       },
       include: { targets: true },
@@ -1117,17 +1117,20 @@ export async function updatePost(
       // `skipDuplicates` for the same reason: a destination whose row survived
       // the narrowed delete must not gain a second one.
       await tx.postTarget.createMany({
-        data: valid.map((target) => ({ postId, targetId: target.id, status: 'pending', messageOverride: input.variants?.[target.id]?.trim() || null })),
+        data: valid.map((target) => ({ postId, targetId: target.id, status: 'pending', messageOverride: input.variants?.[target.id]?.trim() || null, skipMedia: input.textOnly?.includes(target.id) ?? false })),
         skipDuplicates: true,
       });
     }
 
     // Per-destination text: set for the destinations still waiting to go out.
-    if (input.variants) {
+    if (input.variants || input.textOnly) {
       for (const targetId of nextTargetIds) {
         await tx.postTarget.updateMany({
           where: { postId, targetId, status: { in: ['pending', 'failed', 'cancelled'] } },
-          data: { messageOverride: input.variants[targetId]?.trim() || null },
+          data: {
+            ...(input.variants ? { messageOverride: input.variants[targetId]?.trim() || null } : {}),
+            ...(input.textOnly ? { skipMedia: input.textOnly.includes(targetId) } : {}),
+          },
         });
       }
     }
