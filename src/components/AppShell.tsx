@@ -58,6 +58,8 @@ interface Item {
   icon: IconName;
   also?: string[];
   badge?: number;
+  /** Matched for highlighting but not listed: reached from the top bar instead. */
+  hidden?: boolean;
 }
 
 interface Area {
@@ -257,7 +259,7 @@ export function AppShell({
         { href: '/tasks', label: t('tasks'), icon: 'approvals' },
         { href: '/settings/sharing', label: t('clientLinks'), icon: 'link' },
         ...(role === 'owner' ? [{ href: '/agency', label: t('agency'), icon: 'folders' as IconName }] : []),
-        { href: '/settings', label: t('settings'), icon: 'settings', also: ['/setup'] },
+        { href: '/settings', label: t('settings'), icon: 'settings', also: ['/setup'], hidden: true },
       ],
     },
   ];
@@ -281,7 +283,7 @@ export function AppShell({
 
   const pageLinks = (items: Item[]) => (
     <ul className="space-y-0.5">
-      {items.map((item) => {
+      {items.filter((item) => !item.hidden).map((item) => {
         const active = item.href === activeHref;
         return (
           <li key={item.href}>
@@ -424,8 +426,18 @@ export function AppShell({
             <BrandMark brand={brand} size="sm" />
             <span className="truncate text-[15px] font-bold text-slate-900">{workspaceName}</span>
           </Link>
+          {usable('/settings') && (
+            <Link
+              href="/settings"
+              title={t('workspaceSettings')}
+              className="ms-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-700 hover:bg-slate-100"
+            >
+              <Icon name="settings" size={20} />
+              <span className="sr-only">{t('workspaceSettings')}</span>
+            </Link>
+          )}
           {canCompose && (
-            <Link href="/compose" className="btn-primary ms-auto h-9 px-3" aria-label={t('newPost')}>
+            <Link href="/compose" className={`btn-primary h-9 px-3 ${usable('/settings') ? '' : 'ms-auto'}`} aria-label={t('newPost')}>
               <Icon name="plus" size={18} />
               <span className="hidden sm:inline">{t('newPost')}</span>
             </Link>

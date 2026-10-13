@@ -274,12 +274,14 @@ test('on a phone the sidebar is a drawer behind the menu, with the composer one 
 
   // Every module's screens are in it, grouped, and the drawer fits the phone.
   const drawer = page.locator('#main-menu');
-  for (const name of [/^calendar$/i, /^queue$/i, /^posts$/i, /^channels$/i, /^ads$/i, /^connections$/i, /^settings$/i]) {
+  for (const name of [/^calendar$/i, /^queue$/i, /^posts$/i, /^channels$/i, /^ads$/i, /^connections$/i]) {
     await expect(drawer.getByRole('link', { name })).toBeVisible();
   }
 
-  await drawer.getByRole('link', { name: /^settings$/i }).click();
-  await page.waitForURL(/\/settings/);
+  // Settings lives in the top bar only, not in the menu.
+  await expect(drawer.getByRole('link', { name: /^settings$/i })).toHaveCount(0);
+  await drawer.getByRole('link', { name: /^channels$/i }).click();
+  await page.waitForURL(/\/channels/);
 
   // And it closes on the way, rather than covering the screen it navigated to.
   await expect(page.locator('#main-menu')).toHaveCount(0);
