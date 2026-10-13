@@ -137,7 +137,7 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
   twice the Page's usual (3 or more in 24 hours).
 
 ## Workspace
-- **Connections** `/connections`: Facebook profiles → Pages (enable/pause,
+- **Connections** `/connections`: a summary row per network ("Not connected" / "N connected") opens a connect sheet saying what it needs and starting it; Facebook profiles → Pages (enable/pause,
   remove), Pages left by a disconnected account (remove),
   token health checks, what each connection can do in plain words (Meta app settings are in Root › Configuration), Instagram and ad accounts,
   **Other networks** cards (Bluesky, Mastodon, LinkedIn, Threads, X, Pinterest).

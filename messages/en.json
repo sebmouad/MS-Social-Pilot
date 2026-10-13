@@ -761,9 +761,15 @@
       "instagramPublish": "Publish to Instagram",
       "ads": "Read ad results"
     },
-    "summaryLabel": "Networks",
+    "summaryLabel": "Networks at a glance",
     "summaryConnected": "{count, plural, one {# connected} other {# connected}}",
-    "summaryNone": "Not connected"
+    "summaryNone": "Not connected",
+    "sheetTitle": "{network}",
+    "sheetSeeConnected": "See connected",
+    "sheetNoRight": "Ask an owner or admin of this workspace to connect it.",
+    "sheetHint_page": "Sign in with Facebook and pick the Pages you manage. Every Page you allow becomes a channel.",
+    "sheetHint_group": "Facebook Groups you administer come with the Facebook sign-in, once the app is allowed to post to them.",
+    "sheetHint_instagram": "Instagram professional accounts linked to your Facebook Pages come with the Facebook sign-in."
   },
   "dashboard": {
     "title": "Dashboard",

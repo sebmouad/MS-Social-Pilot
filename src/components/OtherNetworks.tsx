@@ -32,17 +32,22 @@ export function OtherNetworks({
   canManage,
   isOwner,
   notice,
+  initialDialog,
 }: {
   networks: Array<{ key: NetworkKey; label: string; available: boolean }>;
   accounts: Account[];
   canManage: boolean;
   isOwner: boolean;
   notice: { network: NetworkKey; error: string | null; connected: string | null } | null;
+  /** `?connect=` from the connect sheet: open that network's form straight away. */
+  initialDialog?: string | null;
 }) {
   const t = useTranslations('networks');
   const tCommon = useTranslations('common');
   const router = useRouter();
-  const [dialog, setDialog] = useState<'bluesky' | 'mastodon' | 'telegram' | null>(null);
+  const [dialog, setDialog] = useState<'bluesky' | 'mastodon' | 'telegram' | null>(
+    canManage && (initialDialog === 'bluesky' || initialDialog === 'mastodon' || initialDialog === 'telegram') ? initialDialog : null,
+  );
   const [botToken, setBotToken] = useState('');
   const [channel, setChannel] = useState('');
   const [identifier, setIdentifier] = useState('');

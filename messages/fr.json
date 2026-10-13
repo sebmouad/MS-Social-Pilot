@@ -761,9 +761,15 @@
       "instagramPublish": "Publier sur Instagram",
       "ads": "Lire les résultats publicitaires"
     },
-    "summaryLabel": "Réseaux",
+    "summaryLabel": "Réseaux en un coup d’œil",
     "summaryConnected": "{count, plural, one {# connecté} other {# connectés}}",
-    "summaryNone": "Non connecté"
+    "summaryNone": "Non connecté",
+    "sheetTitle": "{network}",
+    "sheetSeeConnected": "Voir les connectés",
+    "sheetNoRight": "Demandez à un propriétaire ou un administrateur de cet espace de le connecter.",
+    "sheetHint_page": "Connectez-vous avec Facebook et choisissez les Pages que vous gérez. Chaque Page autorisée devient un canal.",
+    "sheetHint_group": "Les groupes Facebook que vous administrez arrivent avec la connexion Facebook, dès que l’application peut y publier.",
+    "sheetHint_instagram": "Les comptes Instagram professionnels liés à vos Pages Facebook arrivent avec la connexion Facebook."
   },
   "dashboard": {
     "title": "Tableau de bord",

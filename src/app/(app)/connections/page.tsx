@@ -7,6 +7,7 @@ import { ConnectionHealth } from '@/components/ConnectionHealth';
 import { ConnectionsClient } from '@/components/ConnectionsClient';
 import { Icon } from '@/components/Icon';
 import { OtherNetworks } from '@/components/OtherNetworks';
+import { ConnectSummary } from '@/components/ConnectSummary';
 import { NETWORK_KEYS, NETWORK_LABELS, isNetworkKey, networkAvailable, type NetworkKey } from '@/lib/networks';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
@@ -93,6 +94,7 @@ export default async function ConnectionsPage({
 
   const canManage = canManageAccounts(auth.role);
   const tType = await getTranslations('pagesSidebar.type');
+  const tNetworks = await getTranslations('networks');
   const typeCounts = await prisma.target.groupBy({
     by: ['type'],
     where: { workspaceId: auth.workspace.id, ...targetScope(auth.pageScope) },
@@ -160,23 +162,32 @@ export default async function ConnectionsPage({
       </nav>
 
 
-      {/* Every network at a glance: how many are connected, or that none is yet. */}
-      <section aria-label={t('summaryLabel')} className="card divide-y divide-slate-100">
-        {(Object.values(TargetType) as TargetType[])
+      {/* Every network at a glance; each row opens a sheet that starts connecting. */}
+      <ConnectSummary
+        isRoot={auth.isInstanceOwner}
+        rows={(Object.values(TargetType) as TargetType[])
           .filter((type) => (type !== 'group' || env.groupsEnabled) && (type !== 'instagram' || env.instagramEnabled))
           .map((type) => {
-            const count = typeCounts.find((row) => row.type === type)?._count._all ?? 0;
-            const anchor = type === 'page' || type === 'group' ? '#facebook' : type === 'instagram' ? '#instagram' : '#networks';
-            return (
-              <a key={type} href={anchor} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-slate-50">
-                <span className="font-semibold text-slate-900">{tType(type)}</span>
-                <span className={count > 0 ? 'font-semibold text-emerald-700' : 'text-slate-500'}>
-                  {count > 0 ? t('summaryConnected', { count }) : t('summaryNone')}
-                </span>
-              </a>
-            );
+            const facebook = type === 'page' || type === 'group' || type === 'instagram';
+            const formNetwork = type === 'bluesky' || type === 'mastodon' || type === 'telegram';
+            const available = facebook || (isNetworkKey(type) && networkAvailable(type));
+            return {
+              type,
+              label: tType(type),
+              count: typeCounts.find((row) => row.type === type)?._count._all ?? 0,
+              anchor: type === 'instagram' ? '#instagram' : facebook ? '#facebook' : '#networks',
+              hint: facebook ? t(`sheetHint_${type}`) : tNetworks(`hint_${type}`),
+              action: !canManage
+                ? null
+                : !available
+                  ? { kind: 'needsApp' as const }
+                  : {
+                      kind: 'link' as const,
+                      href: facebook ? '/api/facebook/connect' : formNetwork ? `/connections?connect=${type}#networks` : `/api/networks/${type}/connect`,
+                    },
+            };
           })}
-      </section>
+      />
 
       {accounts.length === 0 && orphans.length === 0 ? (
         <div className="card flex flex-col items-center gap-3 p-8 text-center">
@@ -257,6 +268,7 @@ export default async function ConnectionsPage({
       <OtherNetworks
         canManage={canManage}
         isOwner={auth.role === 'owner'}
+        initialDialog={first(params.connect)}
         notice={
           networkNotice && isNetworkKey(networkNotice)
             ? { network: networkNotice, error: first(params.error) ?? null, connected: first(params.connected) ?? null }
