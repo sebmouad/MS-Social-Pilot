@@ -58,6 +58,7 @@ const VIEWER_HIDDEN: Rule[] = [
   { path: '/inbox/replies' },
   { path: '/inbox/rules' },
   { path: '/settings/sharing' },
+  { path: '/settings/bio' },
   { path: '/agency' },
 ];
 

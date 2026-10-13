@@ -332,6 +332,7 @@ model Workspace {
   savedReplies         SavedReply[]
   savedViews           SavedView[]
   inboxNotes           InboxNote[]
+  bioPage              BioPage?
   captionTests         CaptionTest[]
   shareLinks           ShareLink[]
   reportTemplates      ReportTemplate[]
@@ -663,6 +664,39 @@ model InboxNote {
 
   @@index([workspaceId, kind, itemId])
   @@map("inbox_notes")
+}
+
+/// A link-in-bio page: one public address with a few links, per workspace.
+model BioPage {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique
+  /// The public address: /bio/<slug>.
+  slug        String   @unique
+  title       String
+  description String?
+  avatarUrl   String?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  links     BioLink[]
+
+  @@map("bio_pages")
+}
+
+model BioLink {
+  id       String @id @default(cuid())
+  pageId   String
+  label    String
+  url      String
+  position Int    @default(0)
+  clicks   Int    @default(0)
+
+  page BioPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, position])
+  @@map("bio_links")
 }
 
 model PostNote {

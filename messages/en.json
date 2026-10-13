@@ -1180,7 +1180,8 @@
     "planFeature_clients": "Your plan does not include client access. Ask for a bigger plan to invite clients.",
     "planFeature_whiteLabel": "Your plan does not include white label. Ask for a bigger plan to use your own logo and report branding.",
     "soleOwner": "This person is the only owner of a workspace. Give it another owner or delete it first.",
-    "noUserWithEmail": "Nobody has an account with that email yet. Invite them first."
+    "noUserWithEmail": "Nobody has an account with that email yet. Invite them first.",
+    "bioSlugTaken": "That address is taken. Choose another."
   },
   "feeds": {
     "title": "Website auto-share",
@@ -4087,5 +4088,26 @@
     "title": "Go to a screen",
     "placeholder": "Type a screen name",
     "none": "Nothing matches."
+  },
+  "bio": {
+    "title": "Link in bio",
+    "subtitle": "One public page with your most important links, for the bio of your social profiles.",
+    "slug": "Address",
+    "addressHint": "Public address: {address}",
+    "pageTitle": "Title",
+    "description": "A line about you",
+    "avatar": "Picture address",
+    "enabled": "Page is online",
+    "links": "Links",
+    "noLinks": "No links yet. Add the first one.",
+    "linkLabel": "Button text",
+    "linkUrl": "Address",
+    "addLink": "Add a link",
+    "clicks": "{count, plural, one {# click} other {# clicks}}",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove",
+    "save": "Save",
+    "saved": "Saved."
   }
 }

@@ -1180,7 +1180,8 @@
     "planFeature_clients": "Votre offre n’inclut pas l’accès client. Demandez une offre supérieure pour inviter des clients.",
     "planFeature_whiteLabel": "Votre offre n’inclut pas la marque blanche. Demandez une offre supérieure pour utiliser votre logo et votre habillage de rapports.",
     "soleOwner": "Cette personne est la seule propriétaire d’un espace. Donnez-lui un autre propriétaire ou supprimez-le d’abord.",
-    "noUserWithEmail": "Aucun compte n’existe avec cet e-mail. Invitez d’abord la personne."
+    "noUserWithEmail": "Aucun compte n’existe avec cet e-mail. Invitez d’abord la personne.",
+    "bioSlugTaken": "Cette adresse est prise. Choisissez-en une autre."
   },
   "feeds": {
     "title": "Partage automatique des sites",
@@ -4087,5 +4088,26 @@
     "title": "Aller à un écran",
     "placeholder": "Tapez le nom d’un écran",
     "none": "Aucun résultat."
+  },
+  "bio": {
+    "title": "Lien en bio",
+    "subtitle": "Une page publique avec vos liens les plus importants, pour la bio de vos profils.",
+    "slug": "Adresse",
+    "addressHint": "Adresse publique : {address}",
+    "pageTitle": "Titre",
+    "description": "Une ligne sur vous",
+    "avatar": "Adresse de l’image",
+    "enabled": "La page est en ligne",
+    "links": "Liens",
+    "noLinks": "Aucun lien pour l’instant. Ajoutez le premier.",
+    "linkLabel": "Texte du bouton",
+    "linkUrl": "Adresse",
+    "addLink": "Ajouter un lien",
+    "clicks": "{count, plural, one {# clic} other {# clics}}",
+    "moveUp": "Monter",
+    "moveDown": "Descendre",
+    "remove": "Retirer",
+    "save": "Enregistrer",
+    "saved": "Enregistré."
   }
 }
