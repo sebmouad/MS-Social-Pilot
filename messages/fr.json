@@ -132,7 +132,8 @@
       "analysis": "Analyse",
       "compare": "Comparer les canaux",
       "total": "Tous les canaux",
-      "responseTime": "Temps de réponse"
+      "responseTime": "Temps de réponse",
+      "report": "Rapport"
     },
     "byPost": "Impressions et interactions par publication",
     "byPostHint": "Une ligne par publication et par destination : une même publication peut réagir très différemment sur deux canaux, et faire la moyenne masquerait l'information utile.",

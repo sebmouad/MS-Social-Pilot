@@ -160,7 +160,9 @@ test('the icon rail lists the areas, the sidebar the pages of the one in use', a
   // Another area swaps the sidebar's pages.
   await rail.getByRole('link', { name: /^analytics$/i }).click();
   await expect(page).toHaveURL(/\/analytics/);
-  await expect(sidebar.getByRole('link', { name: /^reports$/i })).toBeVisible();
+  // The report is a view of Analytics, not a screen of its own in the sidebar.
+  await expect(sidebar.getByRole('link', { name: /^reports$/i })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: /choose a view|views/i }).getByRole('link', { name: /^report$/i })).toBeVisible();
 
   // Folding the sidebar keeps the rail and survives a reload.
   await expect(async () => {

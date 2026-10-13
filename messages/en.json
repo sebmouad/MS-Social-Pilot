@@ -132,7 +132,8 @@
       "analysis": "Analysis",
       "compare": "Compare channels",
       "total": "All channels",
-      "responseTime": "Response time"
+      "responseTime": "Response time",
+      "report": "Report"
     },
     "byPost": "Impressions and interaction per post",
     "byPostHint": "One row per post per destination — the same post can perform very differently on two channels, and averaging that away hides the signal.",

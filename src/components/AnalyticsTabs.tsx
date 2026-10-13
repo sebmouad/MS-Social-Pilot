@@ -29,11 +29,18 @@ export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidde
 
   function hrefFor(view: string): string {
     const next = new URLSearchParams(params.toString());
-    next.set('view', view);
     // The destination and the window carry over; one view's search, filter
     // and page number do not.
     for (const key of VIEW_SCOPED_PARAMS) next.delete(key);
-    return `${pathname}?${next.toString()}`;
+    // The report is the last view of this section: its own screen, same Page
+    // and window.
+    if (view === 'report') {
+      next.delete('view');
+      return `/reports?${next.toString()}`;
+    }
+    next.delete('sections');
+    next.set('view', view);
+    return `${pathname === '/reports' ? '/analytics' : pathname}?${next.toString()}`;
   }
 
   return (
@@ -50,6 +57,7 @@ export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidde
               {t(`view.${view}`)}
             </option>
           ))}
+          <option value="report">{t('view.report')}</option>
         </select>
       </label>
 
@@ -83,6 +91,17 @@ export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidde
               </Link>
             </li>
           ))}
+          <li>
+            <Link
+              href={hrefFor('report')}
+              aria-current={current === 'report' ? 'page' : undefined}
+              className={`block rounded-lg px-3 py-2 text-sm font-semibold ${
+                current === 'report' ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {t('view.report')}
+            </Link>
+          </li>
         </ul>
       </nav>
     </>

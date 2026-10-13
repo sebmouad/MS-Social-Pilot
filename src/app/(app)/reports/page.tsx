@@ -12,6 +12,8 @@ import { prisma } from '@/lib/prisma';
 import { buildReport, parseReportRange } from '@/lib/reports';
 import { parseRange } from '@/lib/date-range';
 import { formatInZone, appLocale } from '@/lib/time';
+import { AnalyticsTabs } from '@/components/AnalyticsTabs';
+import { env } from '@/lib/env';
 import { PhoneFold } from '@/components/PhoneFold';
 import { ReportControls } from '@/components/ReportControls';
 import { ReportBuilder } from '@/components/ReportBuilder';
@@ -164,7 +166,7 @@ export default async function ReportsPage({
     }).toString()}`;
 
   return (
-    <ChannelsLayout auth={auth} selection={selection} tools={<PhoneFold><div className="flex flex-col gap-2">{selected && canEdit && (
+    <ChannelsLayout auth={auth} selection={selection} tools={<><AnalyticsTabs current="report" hidden={env.instagramEnabled ? [] : ['instagram']} /><PhoneFold><div className="flex flex-col gap-2">{selected && canEdit && (
             <ReportSchedules
               targetId={selected.id}
               pageName={selected.name}
@@ -196,7 +198,7 @@ export default async function ReportsPage({
               reportSubtitle: branding.reportSubtitle ?? '',
               reportFooter: branding.reportFooter ?? '',
             }}
-          /></div></PhoneFold>}>
+          /></div></PhoneFold></>}>
     <div className="min-w-0 flex-1 space-y-6">
       <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
 

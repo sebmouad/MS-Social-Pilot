@@ -1,7 +1,6 @@
 'use client';
 
 import { EmptyState } from '@/components/EmptyState';
-import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
 import { Icon } from './Icon';
@@ -67,7 +66,7 @@ export function HistoryClient({
     <div className="space-y-4">
       <nav className="scroll-x flex gap-1">
         {tabs.map((tab) => (
-          <Link
+          <a
             key={tab.key}
             href={tab.href}
             aria-current={view === tab.key ? 'page' : undefined}
@@ -88,7 +87,7 @@ export function HistoryClient({
                 <span className="sr-only">{t('tabFailures', { count: recentFailures })}</span>
               </>
             )}
-          </Link>
+          </a>
         ))}
       </nav>
 

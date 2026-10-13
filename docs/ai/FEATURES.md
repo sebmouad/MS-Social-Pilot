@@ -111,7 +111,7 @@ behind / no data yet), read from stored insights; admins set them with "Set goal
 - **Link clicks** `/analytics/links`: clicks on the app's short links per day,
   Page, article (tracking tags ignored) and post, with clicks per 1,000 views;
   follows the selection and the period. Empty state says when the shortener is off.
-- **Reports** `/reports`: per Page, sections checklist, branding (logo, title,
+- **Reports** `/reports`: the last view of the Analytics section (same switcher, no sidebar entry of its own): per Page, sections checklist, branding (logo, title,
   subtitle, footer), saved templates, Download PDF (print), CSV, scheduled email
   (weekly/monthly to any address), optional AI recap paragraph at the top of the
   email (compares with the previous period; never invents causes).

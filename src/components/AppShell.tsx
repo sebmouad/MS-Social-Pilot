@@ -227,7 +227,6 @@ export function AppShell({
       icon: 'analytics',
       items: [
         { href: '/analytics', label: t('pages'), icon: 'analytics' },
-        { href: '/reports', label: t('reports'), icon: 'reports' },
         { href: '/analytics/tests', label: t('captionTests'), icon: 'trendUp' },
         { href: '/analytics/links', label: t('linkClicks'), icon: 'link' },
         { href: '/analytics/campaigns', label: t('campaigns'), icon: 'tag' },

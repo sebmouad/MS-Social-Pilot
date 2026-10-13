@@ -274,7 +274,7 @@ test('on a phone the sidebar is a drawer behind the menu, with the composer one 
 
   // Every module's screens are in it, grouped, and the drawer fits the phone.
   const drawer = page.locator('#main-menu');
-  for (const name of [/^calendar$/i, /^queue$/i, /^posts$/i, /^channels$/i, /^reports$/i, /^ads$/i, /^connections$/i, /^settings$/i]) {
+  for (const name of [/^calendar$/i, /^queue$/i, /^posts$/i, /^channels$/i, /^ads$/i, /^connections$/i, /^settings$/i]) {
     await expect(drawer.getByRole('link', { name })).toBeVisible();
   }
 

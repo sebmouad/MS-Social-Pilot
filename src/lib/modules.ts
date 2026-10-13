@@ -39,9 +39,8 @@ export const MODULES: AppModule[] = [
     href: '/analytics',
     icon: 'analytics',
     pages: [
-      { href: '/analytics', label: 'pages', icon: 'analytics' },
+      { href: '/analytics', label: 'pages', icon: 'analytics', also: ['/reports'] },
       { href: '/inbox', label: 'inbox', icon: 'inbox' },
-      { href: '/reports', label: 'reports', icon: 'reports' },
     ],
   },
   {
