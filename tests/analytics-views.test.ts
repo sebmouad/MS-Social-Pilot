@@ -16,6 +16,7 @@ describe('parseAnalyticsView', () => {
   it('opens old analysis and total bookmarks on the Summary', () => {
     expect(parseAnalyticsView('analysis')).toBe('summary');
     expect(parseAnalyticsView('total')).toBe('summary');
+    expect(parseAnalyticsView('instagram')).toBe('summary');
   });
 
   it('lists exactly four views in the menu', () => {

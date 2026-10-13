@@ -21,7 +21,6 @@ export const ANALYTICS_VIEWS = [
   'inbox',
   'responseTime',
   'external',
-  'instagram',
   'networks',
 ] as const;
 
@@ -50,8 +49,11 @@ export function defaultAnalyticsView(_profiles?: number): AnalyticsView {
   return DEFAULT_ANALYTICS_VIEW;
 }
 
-/** Views the Summary replaced; their bookmarks open it. */
-const MERGED_INTO_SUMMARY: ReadonlySet<string> = new Set(['analysis', 'total']);
+/**
+ * Views the Summary replaced; their bookmarks open it. Instagram's figures
+ * are now part of the four primary views.
+ */
+const MERGED_INTO_SUMMARY: ReadonlySet<string> = new Set(['analysis', 'total', 'instagram']);
 
 /** Narrow a `?view=` value to a known view, falling back to the default. */
 export function parseAnalyticsView(value: string | undefined): AnalyticsView {

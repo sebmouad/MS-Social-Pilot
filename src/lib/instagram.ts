@@ -420,6 +420,8 @@ export interface IgAccountSummary {
   mediaCount: number | null;
   lastSyncedAt: Date | null;
   linkedPage: string | null;
+  /** The linked Page's target id, for the profile selection. */
+  targetId: string | null;
 }
 
 export async function listInstagramAccounts(workspaceId: string): Promise<IgAccountSummary[]> {
@@ -439,6 +441,7 @@ export async function listInstagramAccounts(workspaceId: string): Promise<IgAcco
     mediaCount: row.mediaCount,
     lastSyncedAt: row.lastSyncedAt,
     linkedPage: row.target?.name ?? null,
+    targetId: row.targetId,
   }));
 }
 

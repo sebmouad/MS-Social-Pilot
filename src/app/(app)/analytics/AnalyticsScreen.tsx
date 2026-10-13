@@ -47,7 +47,6 @@ import {
   readReviews,
   readVideos,
 } from '@/lib/engagement';
-import { listInstagramAccounts, readInstagramInsights, readInstagramMedia } from '@/lib/instagram';
 import { formatInZone, appLocale } from '@/lib/time';
 import { env } from '@/lib/env';
 import { pageRatingsAvailable } from '@/lib/facebook/graph';
@@ -55,6 +54,7 @@ import { ExternalLink } from '@/components/ExternalLink';
 import { FeedPost } from '@/components/FeedPost';
 import { EmptyState } from '@/components/EmptyState';
 import { NetworksView } from './NetworksView';
+import { ChannelFiguresSection } from '@/components/analysis/ChannelFiguresSection';
 import type { IconName } from '@/components/Icon';
 import { formatOfStatusType } from '@/lib/page-analysis';
 import { feedMediaOfPicture } from '@/lib/feed';
@@ -167,7 +167,7 @@ export async function AnalyticsScreen({
       tools={
         <>
           {/* The view, then the window and the export: every control that scopes the screen, in the column. */}
-          {!only && <AnalyticsTabs current={view} hidden={env.instagramEnabled ? [] : ['instagram']} />}
+          {!only && <AnalyticsTabs current={view} />}
           {!UNWINDOWED_VIEWS.has(view) && (
             <DateRangePicker
               range={range}
@@ -188,7 +188,7 @@ export async function AnalyticsScreen({
         </div>
       </header>
 
-      {pages.length > 1 && !requested && !['summary', 'total', 'compare', 'posts', 'responseTime', 'instagram', 'networks'].includes(view) && (
+      {pages.length > 1 && !requested && !['summary', 'total', 'compare', 'posts', 'responseTime', 'networks'].includes(view) && (
         <p className="rounded-xl bg-brand-50 px-4 py-2 text-sm text-brand-800">{t('oneChannelHint', { name: selected.name })}</p>
       )}
 
@@ -388,14 +388,9 @@ export async function AnalyticsScreen({
         <NetworksView workspaceId={auth.workspace.id} scope={pageScope} from={from} to={to} timezone={timezone} />
       )}
 
-      {view === 'instagram' && (
-        <InstagramView
-          workspaceId={auth.workspace.id}
-          accountId={first(params.account)}
-          from={from}
-          to={to}
-          timezone={timezone}
-        />
+      {/* Instagram and the other networks in the selection, in each primary view. */}
+      {(view === 'summary' || view === 'posts' || view === 'audience' || view === 'compare') && (
+        <ChannelFiguresSection view={view} workspaceId={auth.workspace.id} scope={pageScope} from={from} to={to} timezone={timezone} />
       )}
 
 
@@ -996,158 +991,3 @@ async function EmptyEdge({
   return <EmptyState icon={icon} title={message} hint={firstReadPending ? t('firstRead') : t('emptyHint')} />;
 }
 
-// ---------------------------------------------------------------------------
-// Instagram and advertising
-// ---------------------------------------------------------------------------
-
-async function InstagramView({
-  workspaceId,
-  accountId,
-  from,
-  to,
-  timezone,
-}: {
-  workspaceId: string;
-  accountId?: string;
-  from: Date;
-  to: Date;
-  timezone: string;
-}) {
-  const t = await getTranslations('instagram');
-  const accounts = await listInstagramAccounts(workspaceId);
-
-  if (accounts.length === 0) {
-    return (
-      <div className="card flex flex-col items-center gap-3 p-8 text-center">
-        <p className="text-sm text-slate-600">{t('none')}</p>
-        <AutoSyncNote job="instagram" timezone={timezone} />
-      </div>
-    );
-  }
-
-  const selected = accounts.find((account) => account.id === accountId) ?? accounts[0]!;
-  const [series, media] = await Promise.all([
-    readInstagramInsights({ accountId: selected.id, from, to }),
-    readInstagramMedia({ accountId: selected.id, limit: 24 }),
-  ]);
-
-  const cards = [
-    { label: t('followers'), value: selected.followersCount },
-    { label: t('following'), value: selected.followsCount },
-    { label: t('posts'), value: selected.mediaCount },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-slate-900">@{selected.username}</p>
-          <p className="text-xs text-slate-500">
-            {selected.linkedPage ? t('via', { page: selected.linkedPage }) : t('unlinked')}
-            {selected.lastSyncedAt && ` · ${formatInZone(selected.lastSyncedAt, timezone)}`}
-          </p>
-        </div>
-      </div>
-
-      {accounts.length > 1 && (
-        <div className="flex flex-wrap gap-1">
-          {accounts.map((account) => (
-            <Link
-              key={account.id}
-              href={`/analytics?view=instagram&account=${account.id}`}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                account.id === selected.id
-                  ? 'bg-brand-50 text-brand-700'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              @{account.username}
-            </Link>
-          ))}
-        </div>
-      )}
-
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-        {cards.map((card) => (
-          <StatTile key={card.label} label={card.label} value={card.value} />
-        ))}
-      </section>
-
-      {series.length === 0 ? (
-        <EmptyState title={t('noInsights')} />
-      ) : (
-        <div className="card overflow-x-auto">
-          <table className="data-table w-full min-w-[620px] text-sm">
-            <thead>
-              <tr>
-                <th className="px-4 py-3">{t('metric')}</th>
-                <th className="px-4 py-3">{t('period')}</th>
-                <th className="px-4 py-3 text-end">{t('total')}</th>
-                <th className="px-4 py-3 text-end">{t('points')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {series.map((entry) => (
-                <tr key={`${entry.metric}-${entry.period}`}>
-                  <td className="px-4 py-2.5">
-                    <p className="font-medium text-slate-900">{entry.label}</p>
-                    {entry.description && (
-                      <p className="text-xs text-slate-500">{entry.description}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 text-slate-500">{entry.period}</td>
-                  <td className="px-4 py-2.5 text-end">
-                    {entry.total === null ? t('breakdown') : entry.total.toLocaleString(appLocale())}
-                  </td>
-                  <td className="px-4 py-2.5 text-end text-slate-500">{entry.points.length}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {media.length > 0 && (
-        <div className="card overflow-x-auto">
-          <table className="data-table w-full min-w-[720px] text-sm">
-            <thead>
-              <tr>
-                <th className="px-4 py-3">{t('media')}</th>
-                <th className="px-4 py-3 text-end">{t('reach')}</th>
-                <th className="px-4 py-3 text-end">{t('impressions')}</th>
-                <th className="px-4 py-3 text-end">{t('likes')}</th>
-                <th className="px-4 py-3 text-end">{t('comments')}</th>
-                <th className="px-4 py-3 text-end">{t('saved')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {media.map((item) => (
-                <tr key={item.id}>
-                  <td className="max-w-sm px-4 py-3">
-                    <p className="truncate text-slate-900" title={item.caption}>
-                      {item.permalink ? (
-                        <ExternalLink href={item.permalink} className="hover:underline">
-                          {item.caption}
-                        </ExternalLink>
-                      ) : (
-                        item.caption
-                      )}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {item.mediaType ?? '—'} · {formatInZone(item.timestamp, timezone)}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 text-end">{item.reach?.toLocaleString(appLocale()) ?? '—'}</td>
-                  <td className="px-4 py-3 text-end">{item.impressions?.toLocaleString(appLocale()) ?? '—'}</td>
-                  <td className="px-4 py-3 text-end">{item.likeCount?.toLocaleString(appLocale()) ?? '—'}</td>
-                  <td className="px-4 py-3 text-end">{item.commentsCount?.toLocaleString(appLocale()) ?? '—'}</td>
-                  <td className="px-4 py-3 text-end">{item.saved?.toLocaleString(appLocale()) ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
