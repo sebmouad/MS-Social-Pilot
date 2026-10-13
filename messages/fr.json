@@ -1511,7 +1511,17 @@
     "agency": "Agence",
     "tasks": "Tâches",
     "design": "Création",
-    "campaigns": "Campagnes"
+    "campaigns": "Campagnes",
+    "byPlatform": "Par plateforme",
+    "allPlatforms": "Toutes les plateformes",
+    "platform": {
+      "meta": "Meta",
+      "linkedin": "LinkedIn",
+      "x": "X",
+      "pinterest": "Pinterest",
+      "bluesky": "Bluesky",
+      "mastodon": "Mastodon"
+    }
   },
   "notifications": {
     "title": "Notifications",

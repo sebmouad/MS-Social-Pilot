@@ -9,6 +9,7 @@ import {
   SELECTION_KEYS,
   SELECTION_NETWORKS,
   networkOfType,
+  PLATFORMS,
   selectionCookieName,
   selectionQuery,
   typesOfNetwork,
@@ -86,13 +87,16 @@ export async function loadPageFilter(
   const net = netParam && (SELECTION_NETWORKS as readonly string[]).includes(netParam) && networks.includes(netParam as SelectionNetwork)
     ? (netParam as SelectionNetwork)
     : null;
-  const inNetwork = net ? targets.filter((target) => typesOfNetwork(net).includes(target.type)) : targets;
+  // A platform (Meta: Facebook, Instagram, Threads) narrows to all of its networks.
+  const platform = net ? null : PLATFORMS.find((entry) => entry.key === netParam && entry.networks.length > 1) ?? null;
+  const netTypes = net ? typesOfNetwork(net) : platform ? platform.networks.flatMap(typesOfNetwork) : null;
+  const inNetwork = netTypes ? targets.filter((target) => netTypes.includes(target.type)) : targets;
 
   const allIds = inNetwork.map((target) => target.id);
   const group = first(source.group) ?? null;
   const picked = visiblePages({ allIds, groups, group, pages: first(source.pages) ?? null });
   // Never empty: a selection that matches nothing any more shows everything.
-  const visible = picked && picked.length === 0 ? null : (picked ?? (net ? allIds : null));
+  const visible = picked && picked.length === 0 ? null : (picked ?? (netTypes ? allIds : null));
   const ids = visible ?? allIds;
   const narrowed = visible !== null;
   const knownGroup = groups.some((entry) => entry.id === group) ? group : null;
@@ -106,7 +110,7 @@ export async function loadPageFilter(
     narrowed,
     net,
     networks,
-    query: selectionQuery({ group: knownGroup ?? undefined, pages: first(source.pages), net: net ?? undefined }),
+    query: selectionQuery({ group: knownGroup ?? undefined, pages: first(source.pages), net: net ?? platform?.key ?? undefined }),
     // A limited member is always narrowed to their own Pages, sidebar or not.
     postWhere: narrowed || !auth.pageScope.all ? { targets: { some: { targetId: { in: ids } } } } : {},
   };

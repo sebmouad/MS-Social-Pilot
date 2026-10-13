@@ -2,11 +2,12 @@
 
 import { CommandPalette } from './CommandPalette';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Icon, type IconName } from './Icon';
+import { NetworkMark } from './NetworkMark';
 import { isPageActive, moduleOfPath, MODULE_KEYS, type ModuleKey } from '@/lib/modules';
 import { mayOpenScreen } from '@/lib/role-access';
 
@@ -38,6 +39,8 @@ interface Props {
   clientAccess?: string[];
   /** The product's name and logo, as root set them. */
   brand?: { name: string; logoUrl: string | null };
+  /** Platforms this member has channels on, for the sidebar's "By platform" list. */
+  platforms?: string[];
   children: ReactNode;
 }
 
@@ -98,10 +101,12 @@ export function AppShell({
   role = 'owner',
   clientAccess = [],
   brand = { name: 'MS Social Pilot', logoUrl: null },
+  platforms = [],
   children,
 }: Props) {
   const t = useTranslations('nav');
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [drawer, setDrawer] = useState(false);
@@ -306,6 +311,38 @@ export function AppShell({
     </ul>
   );
 
+  // Publishing, Inbox, Analytics and Ads narrow to one platform at a time.
+  const currentNet = searchParams.get('net');
+  const platformLinks =
+    platforms.length > 1 && activeArea && ['publish', 'inbox', 'analyse', 'ads'].includes(activeArea.key) ? (
+      <div className="mt-4">
+        <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('byPlatform')}</p>
+        <ul className="space-y-0.5">
+          {[null, ...platforms].map((key) => {
+            const active = key === null ? !currentNet || !platforms.includes(currentNet) : currentNet === key;
+            return (
+              <li key={key ?? 'all'}>
+                <Link
+                  href={`${pathname}?net=${key ?? 'all'}`}
+                  aria-current={active ? 'true' : undefined}
+                  className={`flex h-10 items-center gap-3 rounded-lg px-2.5 text-[15px] font-semibold transition-colors ${
+                    active ? 'bg-brand-50 text-brand-700' : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {key === null ? (
+                    <Icon name="folders" size={20} className="text-slate-500" />
+                  ) : (
+                    <NetworkMark network={key === 'meta' ? 'page' : key} size={20} />
+                  )}
+                  <span className="truncate">{key === null ? t('allPlatforms') : t(`platform.${key}`)}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    ) : null;
+
   const workspacePicker =
     workspaces.length > 1 ? (
       <label className="block">
@@ -406,6 +443,7 @@ export function AppShell({
             {composeButton && <div className="px-3 pb-2 pt-1">{composeButton}</div>}
             <nav aria-label={t('modules')} className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
               {pageLinks(activeArea.items)}
+              {platformLinks}
             </nav>
           </div>
         )}

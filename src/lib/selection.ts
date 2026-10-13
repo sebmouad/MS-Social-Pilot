@@ -17,6 +17,21 @@ export const SELECTION_KEYS = ['group', 'pages', 'net'] as const;
 export const SELECTION_NETWORKS = ['facebook', 'instagram', 'bluesky', 'mastodon', 'linkedin', 'threads', 'x', 'pinterest'] as const;
 export type SelectionNetwork = (typeof SELECTION_NETWORKS)[number];
 
+/** Platforms as the sidebar groups them: one company's networks together. */
+export const PLATFORMS: ReadonlyArray<{ key: string; networks: readonly SelectionNetwork[] }> = [
+  { key: 'meta', networks: ['facebook', 'instagram', 'threads'] },
+  { key: 'linkedin', networks: ['linkedin'] },
+  { key: 'x', networks: ['x'] },
+  { key: 'pinterest', networks: ['pinterest'] },
+  { key: 'bluesky', networks: ['bluesky'] },
+  { key: 'mastodon', networks: ['mastodon'] },
+];
+
+/** The platforms that have at least one of these networks. */
+export function platformsOf(networks: readonly string[]): string[] {
+  return PLATFORMS.filter((platform) => platform.networks.some((network) => networks.includes(network))).map((platform) => platform.key);
+}
+
 /** Target types each network value stands for. */
 export function typesOfNetwork(net: SelectionNetwork): string[] {
   return net === 'facebook' ? ['page', 'group'] : [net];
