@@ -244,7 +244,9 @@
     "pinFailed": "Les métriques épinglées n’ont pas pu être enregistrées. Réessayez.",
     "pinLimit": "Vous pouvez épingler jusqu’à 8 métriques. Retirez-en une pour en ajouter une autre.",
     "moreViews": "Plus",
-    "oneChannelHint": "Affichage de {name}. Pour un autre canal, ouvrez le sélecteur de canaux et choisissez « Seulement » à côté."
+    "oneChannelHint": "Affichage de {name}. Pour un autre canal, ouvrez le sélecteur de canaux et choisissez « Seulement » à côté.",
+    "tabsMain": "Vues",
+    "tabsMore": "Chiffres détaillés"
   },
   "app": {
     "name": "MS Social Pilot",

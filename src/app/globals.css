@@ -499,3 +499,11 @@
 #shell-filters .segmented-item {
   flex: 1 1 auto;
 }
+
+/* In the sidebar the date button spans the column; the dates themselves show in the open menu. */
+#shell-filters details > summary.btn-secondary {
+  width: 100%;
+}
+#shell-filters details > summary.btn-secondary > .truncate {
+  display: none;
+}

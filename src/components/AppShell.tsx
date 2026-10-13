@@ -374,7 +374,7 @@ export function AppShell({
                       className="rail-item relative flex flex-col items-center gap-0.5 rounded-xl px-1 py-2 text-[11px] font-semibold leading-tight transition-colors"
                     >
                       <Icon name={area.icon} size={22} />
-                      <span className="w-full text-center tracking-tight [overflow-wrap:anywhere]">{area.rail}</span>
+                      <span className="w-full whitespace-nowrap text-center text-[10px] tracking-tight">{area.rail}</span>
                       {badge > 0 && (
                         <span className="absolute end-1.5 top-1 rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-4 text-white">{badge}</span>
                       )}

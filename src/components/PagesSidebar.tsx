@@ -239,8 +239,8 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
       )}
 
       <div className="flex items-center justify-between gap-2 px-1 text-xs text-slate-500">
-        <span className="nums">{t('showing', { shown: shownCount, total: universe.length })}</span>
-        <span className="flex gap-3">
+        <span className="nums whitespace-nowrap">{t('showing', { shown: shownCount, total: universe.length })}</span>
+        <span className="flex shrink-0 gap-2 whitespace-nowrap">
           <button
             type="button"
             className="font-semibold text-brand-600 hover:underline disabled:text-slate-400 disabled:no-underline"

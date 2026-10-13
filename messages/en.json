@@ -244,7 +244,9 @@
     "pinFailed": "The pinned metrics could not be saved. Try again.",
     "pinLimit": "You can pin up to 8 metrics. Unpin one to add another.",
     "moreViews": "More",
-    "oneChannelHint": "Showing {name}. For another channel, open the channel selector and choose “Only” next to it."
+    "oneChannelHint": "Showing {name}. For another channel, open the channel selector and choose “Only” next to it.",
+    "tabsMain": "Views",
+    "tabsMore": "Detailed figures"
   },
   "app": {
     "name": "MS Social Pilot",

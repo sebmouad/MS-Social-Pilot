@@ -62,6 +62,7 @@ export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidde
       </label>
 
       <nav className="hidden space-y-1 sm:block" aria-label={t('chooseView')}>
+        <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('tabsMain')}</p>
         <ul className="space-y-0.5">
           {PRIMARY_ANALYTICS_VIEWS.map((view) => (
             <li key={view}>
@@ -77,7 +78,8 @@ export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidde
             </li>
           ))}
         </ul>
-        <ul className="space-y-0.5 border-t border-slate-200 pt-1">
+        <p className="border-t border-slate-200 px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('tabsMore')}</p>
+        <ul className="space-y-0.5">
           {VIEWS.filter((view) => !PRIMARY_ANALYTICS_VIEWS.includes(view) && (!hidden.includes(view) || view === current)).map((view) => (
             <li key={view}>
               <Link
