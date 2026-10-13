@@ -29,9 +29,9 @@ FEATURES.md (what exists) and NEXT_PHASES.md (specs).
 | Link-in-bio page | M | ✅ Settings › Link in bio, public /bio/<slug>, click counts |
 | Custom fields on posts | M | ✅ Settings › Custom fields, composer inputs, shown on the post list |
 | Design editor (basic) | L | ✅ size, colour or photo, text layers, save to library; ⬜ shapes, templates |
-| AI image / video / voice (root-activated provider, models fetched) | M | ✅ images in Design (OpenAI key from Root, newest image model fetched); ⬜ video, voice |
+| AI image / video / voice (root-activated provider, models fetched) | M | ✅ images in Design (OpenAI key from Root, newest image model fetched); ⏸ video, voice: need a root-activated provider with a model list to fetch; no provider is configured, so there is nothing to build against yet |
 | AI agent with schedules | M | ✅ `/settings/agents`, drafts only |
 | Tasks and workflows | L | ✅ board (to do, doing, done, assignee, due date); ⬜ workflows |
-| Location tags and @mentions | M | ⬜ (Meta permission review) |
-| Coloured text backgrounds | S | ⬜ |
+| Location tags and @mentions | M | ⏸ blocked outside the code: a place tag needs Meta's review of the page-metadata permission, and Graph no longer takes @-mention markup for Pages; build once the app is approved |
+| Coloured text backgrounds | S | ⏸ blocked outside the code: Graph's Page posting API takes no text-post background preset, so nothing could be sent; the Design editor already makes a coloured picture |
 | Mobile app | L | PWA exists |
