@@ -178,4 +178,29 @@ describe('the MCP server', () => {
     expect((await call(POST, { key: read.token, method: 'POST', body: { jsonrpc: '2.0', method: 'notifications/initialized' } })).status).toBe(202);
     expect((await call(POST, { method: 'POST', body: rpc('tools/list') })).status).toBe(401);
   });
+  it('edits and cancels a post, reads the inbox and summarises what needs attention', async () => {
+    const { user, workspace, bakery } = await seed();
+    const { POST } = await import('../src/app/api/mcp/route');
+    const write = await tokens.createApiToken({ workspaceId: workspace.id, userId: user.id, name: 'w', scope: 'write' });
+    const read = await tokens.createApiToken({ workspaceId: workspace.id, userId: user.id, name: 'r', scope: 'read' });
+    const tool = async (key: string, name: string, args: Record<string, unknown> = {}) =>
+      (await (await call(POST, { key, method: 'POST', body: rpc('tools/call', { name, arguments: args }) })).json()) as {
+        result: { isError?: boolean; structuredContent?: Record<string, unknown> };
+      };
+
+    await tool(write.token, 'create_post', { targetIds: [bakery.id], message: 'First draft' });
+    const post = await prisma.post.findFirstOrThrow();
+
+    expect((await tool(write.token, 'update_post', { postId: post.id, message: 'Second draft' })).result.isError).toBeUndefined();
+    expect((await prisma.post.findUniqueOrThrow({ where: { id: post.id } })).message).toBe('Second draft');
+
+    // A read key sees the read tools only.
+    expect((await tool(read.token, 'update_post', { postId: post.id, message: 'x' })).result.isError).toBe(true);
+    const attention = (await tool(read.token, 'get_attention')).result.structuredContent;
+    expect(attention).toMatchObject({ failedPosts: 0, awaitingApproval: 0, openComments: 0, openMessages: 0 });
+    expect((await tool(read.token, 'list_inbox')).result.isError).toBeUndefined();
+
+    expect((await tool(write.token, 'cancel_post', { postId: post.id })).result.isError).toBeUndefined();
+    expect((await prisma.post.findUniqueOrThrow({ where: { id: post.id } })).status).toBe('cancelled');
+  });
 });

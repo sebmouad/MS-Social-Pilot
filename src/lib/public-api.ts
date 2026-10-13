@@ -2,8 +2,12 @@ import { TargetType } from '@prisma/client';
 import { z } from 'zod';
 
 import { prisma } from './prisma';
-import { createPost } from './posts';
-import { createPostSchema } from './validation';
+import { cancelPost, createPost, updatePost } from './posts';
+import { approvePost, rejectPost } from './approvals';
+import { countOpenInbox, readInbox, setInboxResolved } from './inbox';
+import { summariseConnections } from './connections';
+import { assertPostInScope, postTargetScope } from './page-access';
+import { createPostSchema, updatePostSchema } from './validation';
 import { assertPageParam, assertPagesAllowed, mayUsePage, postScope, targetScope } from './page-access';
 import { analysePage } from './page-analysis-data';
 import { postStatusFilter } from './constants';
@@ -120,5 +124,98 @@ export async function apiPageAnalytics(ctx: ApiContext, targetId: string, raw: u
       interactions: post.reactions + post.comments + post.shares,
     })),
     findings: analysis.findings.map((finding) => ({ tone: finding.tone, key: finding.key, params: finding.params })),
+  };
+}
+
+const postContext = (ctx: ApiContext) => ({
+  workspaceId: ctx.workspace.id,
+  userId: ctx.user.id,
+  role: ctx.role,
+  requiresApproval: ctx.workspace.requiresApproval,
+});
+
+/** Change a post: text, time, destinations, or back to draft. Same rules as the editor. */
+export async function apiUpdatePost(ctx: ApiContext, postId: string, raw: unknown) {
+  assertApiModule(ctx, 'schedule');
+  const input = updatePostSchema.parse(raw);
+  await assertPostInScope(ctx.pageScope, ctx.workspace.id, postId);
+  if (input.targetIds) assertPagesAllowed(ctx.pageScope, input.targetIds);
+  await updatePost(postContext(ctx), postId, { ...input, timezone: input.timezone ?? ctx.workspace.timezone });
+  return { ok: true };
+}
+
+/** Cancel a post; copies already handed to Facebook are removed there too. */
+export async function apiCancelPost(ctx: ApiContext, postId: string) {
+  assertApiModule(ctx, 'schedule');
+  await assertPostInScope(ctx.pageScope, ctx.workspace.id, postId);
+  return cancelPost({ workspaceId: ctx.workspace.id, userId: ctx.user.id, role: ctx.role }, postId);
+}
+
+export async function apiApprovePost(ctx: ApiContext, postId: string) {
+  assertApiModule(ctx, 'schedule');
+  await assertPostInScope(ctx.pageScope, ctx.workspace.id, postId);
+  await approvePost({ workspaceId: ctx.workspace.id, postId, reviewerId: ctx.user.id, reviewerRole: ctx.role });
+  return { ok: true };
+}
+
+export async function apiRejectPost(ctx: ApiContext, postId: string, note: string) {
+  assertApiModule(ctx, 'schedule');
+  await assertPostInScope(ctx.pageScope, ctx.workspace.id, postId);
+  await rejectPost({ workspaceId: ctx.workspace.id, postId, reviewerId: ctx.user.id, reviewerRole: ctx.role, note });
+  return { ok: true };
+}
+
+const inboxSchema = z.object({
+  kind: z.enum(['comment', 'message']).optional(),
+  state: z.enum(['open', 'resolved', 'all']).default('open'),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+});
+
+async function inboxTargetIds(ctx: ApiContext): Promise<string[]> {
+  const rows = await prisma.target.findMany({ where: { workspaceId: ctx.workspace.id, ...targetScope(ctx.pageScope) }, select: { id: true } });
+  return rows.map((row) => row.id);
+}
+
+/** What people wrote to the key's Pages, newest first. */
+export async function apiReadInbox(ctx: ApiContext, raw: unknown) {
+  assertApiModule(ctx, 'analytics');
+  const query = inboxSchema.parse(raw);
+  const items = await readInbox({ workspaceId: ctx.workspace.id, targetIds: await inboxTargetIds(ctx), ...query });
+  return items.map((item) => ({
+    kind: item.kind,
+    id: item.id,
+    page: item.targetName,
+    author: item.author,
+    text: item.text,
+    at: item.at,
+    onPost: item.postMessage,
+    done: item.resolvedAt !== null,
+  }));
+}
+
+export async function apiResolveInbox(ctx: ApiContext, raw: unknown) {
+  assertApiModule(ctx, 'analytics');
+  const input = z.object({ kind: z.enum(['comment', 'message']), id: z.string().min(1), resolved: z.boolean().default(true) }).parse(raw);
+  const found = await setInboxResolved({ workspaceId: ctx.workspace.id, targetIds: await inboxTargetIds(ctx), ...input });
+  if (!found) throw errors.notFound();
+  return { ok: true };
+}
+
+/** Everything waiting on somebody, in one answer: failures, reviews, replies, connections. */
+export async function apiAttention(ctx: ApiContext) {
+  const workspaceId = ctx.workspace.id;
+  const [failedPosts, awaitingApproval, inbox, connections] = await Promise.all([
+    prisma.postTarget.count({ where: { status: 'failed', post: { workspaceId }, ...postTargetScope(ctx.pageScope) } }),
+    prisma.post.count({ where: { workspaceId, status: 'pending_approval', ...postScope(ctx.pageScope) } }),
+    countOpenInbox({ workspaceId, targetIds: await inboxTargetIds(ctx) }),
+    summariseConnections(workspaceId),
+  ]);
+  return {
+    failedPosts,
+    awaitingApproval,
+    openComments: inbox.comments,
+    openMessages: inbox.messages,
+    disconnectedAccounts: connections.broken,
+    tokensExpiringSoon: connections.expiring,
   };
 }

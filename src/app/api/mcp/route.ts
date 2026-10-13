@@ -4,7 +4,19 @@ import { ZodError } from 'zod';
 import { AuthError, ForbiddenError } from '@/lib/auth';
 import { requireApiToken, type ApiContext } from '@/lib/api-tokens';
 import { AppError } from '@/lib/errors';
-import { apiCreatePost, apiListPages, apiListPosts, apiPageAnalytics } from '@/lib/public-api';
+import {
+  apiApprovePost,
+  apiAttention,
+  apiCancelPost,
+  apiCreatePost,
+  apiListPages,
+  apiListPosts,
+  apiPageAnalytics,
+  apiReadInbox,
+  apiRejectPost,
+  apiResolveInbox,
+  apiUpdatePost,
+} from '@/lib/public-api';
 
 /**
  * A Model Context Protocol server, so Claude (or any MCP client) can read the
@@ -83,6 +95,92 @@ const TOOLS: Tool[] = [
         timezone: ctx.workspace.timezone,
       });
     },
+  },
+  {
+    name: 'update_post',
+    description:
+      'Change a post: its text, link, time (scheduledAtLocal, "YYYY-MM-DDTHH:mm" in the workspace timezone), destinations, or set status to draft, scheduled or cancelled.',
+    write: true,
+    inputSchema: {
+      type: 'object',
+      required: ['postId'],
+      properties: {
+        postId: { type: 'string' },
+        message: { type: 'string' },
+        link: { type: ['string', 'null'] },
+        firstComment: { type: ['string', 'null'] },
+        scheduledAtLocal: { type: ['string', 'null'] },
+        targetIds: { type: 'array', items: { type: 'string' } },
+        status: { type: 'string', enum: ['draft', 'scheduled', 'cancelled'] },
+      },
+      additionalProperties: false,
+    },
+    run: (ctx, args) => {
+      const { postId, ...changes } = args;
+      return apiUpdatePost(ctx, String(postId ?? ''), changes);
+    },
+  },
+  {
+    name: 'cancel_post',
+    description: 'Cancel a post. Copies already handed to Facebook are removed there too; failures are reported.',
+    write: true,
+    inputSchema: { type: 'object', required: ['postId'], properties: { postId: { type: 'string' } }, additionalProperties: false },
+    run: (ctx, args) => apiCancelPost(ctx, String(args.postId ?? '')),
+  },
+  {
+    name: 'approve_post',
+    description: 'Approve a post that is waiting for review. Needs a key whose owner may approve.',
+    write: true,
+    inputSchema: { type: 'object', required: ['postId'], properties: { postId: { type: 'string' } }, additionalProperties: false },
+    run: (ctx, args) => apiApprovePost(ctx, String(args.postId ?? '')),
+  },
+  {
+    name: 'request_changes',
+    description: 'Send a post waiting for review back to its author with a note saying what to change.',
+    write: true,
+    inputSchema: {
+      type: 'object',
+      required: ['postId', 'note'],
+      properties: { postId: { type: 'string' }, note: { type: 'string' } },
+      additionalProperties: false,
+    },
+    run: (ctx, args) => apiRejectPost(ctx, String(args.postId ?? ''), String(args.note ?? '')),
+  },
+  {
+    name: 'list_inbox',
+    description: 'Comments and messages people wrote to the Pages, newest first. state: open (default), resolved or all.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['comment', 'message'] },
+        state: { type: 'string', enum: ['open', 'resolved', 'all'] },
+        limit: { type: 'integer', minimum: 1, maximum: 100 },
+      },
+      additionalProperties: false,
+    },
+    run: (ctx, args) => apiReadInbox(ctx, args),
+  },
+  {
+    name: 'resolve_inbox_item',
+    description: 'Mark a comment or message done (or not done) for the whole team.',
+    write: true,
+    inputSchema: {
+      type: 'object',
+      required: ['kind', 'id'],
+      properties: {
+        kind: { type: 'string', enum: ['comment', 'message'] },
+        id: { type: 'string' },
+        resolved: { type: 'boolean', description: 'true (default) marks it done.' },
+      },
+      additionalProperties: false,
+    },
+    run: (ctx, args) => apiResolveInbox(ctx, args),
+  },
+  {
+    name: 'get_attention',
+    description: 'What is waiting on somebody right now: failed posts, posts awaiting review, open comments and messages, disconnected accounts, tokens expiring soon.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    run: (ctx) => apiAttention(ctx),
   },
   {
     name: 'get_page_analytics',

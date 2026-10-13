@@ -180,7 +180,7 @@ scheduled reports (every 10 min), outgoing webhooks (every 30 s), inbox digest e
 ## Integrations
 REST `/api/v1/pages`, `/api/v1/pages/:id/analytics`, `/api/v1/posts` (GET with `status`, `from`, `to`, `limit`, `pages=id,id`; POST),
 `/api/v1/webhooks` (REST-hook subscribe for Zapier / n8n / Make; owner/admin write key);
-MCP `POST /api/mcp` (tools: list_pages, list_posts, create_post,
+MCP `POST /api/mcp` (tools: list_pages, list_posts, create_post, update_post, cancel_post, approve_post, request_changes, list_inbox, resolve_inbox_item, get_attention,
 get_page_analytics); API keys read or read/write, acting as their owner. PWA
 (manifest, icons, offline page, share target, shortcuts). Slack incoming
 webhooks, Telegram bots.
