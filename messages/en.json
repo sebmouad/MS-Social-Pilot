@@ -3219,7 +3219,13 @@
     "emptyOpenTitle": "Nothing waiting",
     "emptyOpenHint": "Every comment and message on these channels is marked done. New ones appear here as they arrive.",
     "emptyTitle": "Nothing here",
-    "emptyHint": "No comments or messages match these filters for the selected channels. Try another type or state, or select more channels."
+    "emptyHint": "No comments or messages match these filters for the selected channels. Try another type or state, or select more channels.",
+    "assignTo": "Assign to",
+    "unassigned": "Unassigned",
+    "assigneeLabel": "Assigned to",
+    "assigneeAll": "Everyone",
+    "assigneeMine": "Mine",
+    "assigneeNobody": "Unassigned"
   },
   "sessions": {
     "listLabel": "Signed-in browsers",

@@ -1183,6 +1183,8 @@ model PostComment {
   firstSeenAt    DateTime  @default(now())
   /// Marked done in the inbox; null while it waits on someone.
   resolvedAt     DateTime?
+  /// The member this is assigned to; null while nobody has taken it. A plain id, like `sentById`.
+  assigneeId     String?
   /// The member who wrote this reply from the app (H11); null otherwise.
   sentById       String?
   /// negative · neutral · positive, read by AI when the workspace watches comments (H15).
@@ -1229,6 +1231,8 @@ model Conversation {
   fetchedAt    DateTime  @default(now())
   /// Marked done in the inbox; cleared when the other person writes again.
   resolvedAt   DateTime?
+  /// The member this is assigned to; null while nobody has taken it.
+  assigneeId   String?
 
   target   Target                @relation(fields: [targetId], references: [id], onDelete: Cascade)
   messages ConversationMessage[]

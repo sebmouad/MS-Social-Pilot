@@ -7,8 +7,10 @@ import { FeedAvatar } from '@/components/FeedPost';
 import { Icon } from '@/components/Icon';
 import { InboxResolveButton } from '@/components/InboxResolveButton';
 import { ChannelsLayout } from '@/components/ChannelsLayout';
+import { InboxAssign } from '@/components/InboxAssign';
 import { requirePage } from '@/lib/auth';
-import { countOpenInbox, readInbox, type InboxKind, type InboxState } from '@/lib/inbox';
+import { prisma } from '@/lib/prisma';
+import { countOpenInbox, readInbox, type InboxAssignee, type InboxKind, type InboxState } from '@/lib/inbox';
 import { screenMetadata } from '@/lib/metadata';
 import { loadSelection } from '@/lib/page-filter';
 
@@ -41,17 +43,32 @@ export default async function InboxPage({
   const kind: InboxKind | undefined = typeParam === 'comment' || typeParam === 'message' ? typeParam : undefined;
   const stateParam = first(params.state);
   const state: InboxState = stateParam === 'resolved' || stateParam === 'all' ? stateParam : 'open';
+  const assignParam = first(params.assignee);
+  const assignKey: 'mine' | 'unassigned' | undefined = assignParam === 'mine' || assignParam === 'unassigned' ? assignParam : undefined;
+  const assignee: InboxAssignee | undefined =
+    assignKey === 'mine' ? { kind: 'member', userId: auth.user.id } : assignKey === 'unassigned' ? { kind: 'unassigned' } : undefined;
   const limit = Math.min(Math.max(Number(first(params.limit)) || PAGE_SIZE, PAGE_SIZE), 500);
 
   const scope = { workspaceId: auth.workspace.id, targetIds: selection.ids };
-  const [items, open] = await Promise.all([readInbox({ ...scope, kind, state, limit }), countOpenInbox(scope)]);
+  const [items, open, members] = await Promise.all([
+    readInbox({ ...scope, kind, state, limit, assignee }),
+    countOpenInbox(scope),
+    prisma.membership.findMany({
+      where: { workspaceId: auth.workspace.id, role: { not: 'client' } },
+      select: { user: { select: { id: true, name: true } } },
+      orderBy: { user: { name: 'asc' } },
+    }),
+  ]);
+  const team = members.map((member) => member.user);
 
-  const href = (next: { type?: string; state?: string; limit?: number }) => {
+  const href = (next: { type?: string; state?: string; assignee?: string; limit?: number }) => {
     const query = new URLSearchParams(selection.query);
     const type = 'type' in next ? next.type : kind;
     const nextState = 'state' in next ? next.state : state;
     if (type) query.set('type', type);
     if (nextState && nextState !== 'open') query.set('state', nextState);
+    const nextAssignee = 'assignee' in next ? next.assignee : assignKey;
+    if (nextAssignee) query.set('assignee', nextAssignee);
     if (next.limit) query.set('limit', String(next.limit));
     const text = query.toString();
     return text ? `/inbox?${text}` : '/inbox';
@@ -96,6 +113,15 @@ export default async function InboxPage({
           ],
           state,
         )}
+        {segmented(
+          t('assigneeLabel'),
+          [
+            { key: undefined, label: t('assigneeAll'), href: href({ assignee: undefined }) },
+            { key: 'mine', label: t('assigneeMine'), href: href({ assignee: 'mine' }) },
+            { key: 'unassigned', label: t('assigneeNobody'), href: href({ assignee: 'unassigned' }) },
+          ],
+          assignKey,
+        )}
       </div>
 
       {items.length === 0 ? (
@@ -134,6 +160,7 @@ export default async function InboxPage({
                 >
                   {t('reply')}
                 </Link>
+                <InboxAssign kind={item.kind} id={item.id} assigneeId={item.assigneeId} members={team} />
                 <InboxResolveButton kind={item.kind} id={item.id} resolved={item.resolvedAt !== null} />
               </div>
             </li>

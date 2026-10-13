@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { prisma } from './prisma';
 import { cancelPost, createPost, updatePost } from './posts';
 import { approvePost, rejectPost } from './approvals';
-import { countOpenInbox, readInbox, setInboxResolved } from './inbox';
+import { countOpenInbox, readInbox, setInboxAssignee, setInboxResolved, type InboxAssignee } from './inbox';
 import { summariseConnections } from './connections';
 import { assertPostInScope, postTargetScope } from './page-access';
 import { createPostSchema, updatePostSchema } from './validation';
@@ -169,6 +169,7 @@ const inboxSchema = z.object({
   kind: z.enum(['comment', 'message']).optional(),
   state: z.enum(['open', 'resolved', 'all']).default('open'),
   limit: z.coerce.number().int().min(1).max(100).default(30),
+  assignee: z.enum(['mine', 'unassigned']).optional(),
 });
 
 async function inboxTargetIds(ctx: ApiContext): Promise<string[]> {
@@ -180,7 +181,10 @@ async function inboxTargetIds(ctx: ApiContext): Promise<string[]> {
 export async function apiReadInbox(ctx: ApiContext, raw: unknown) {
   assertApiModule(ctx, 'analytics');
   const query = inboxSchema.parse(raw);
-  const items = await readInbox({ workspaceId: ctx.workspace.id, targetIds: await inboxTargetIds(ctx), ...query });
+  const { assignee: who, ...rest } = query;
+  const assignee: InboxAssignee | undefined =
+    who === 'mine' ? { kind: 'member', userId: ctx.user.id } : who === 'unassigned' ? { kind: 'unassigned' } : undefined;
+  const items = await readInbox({ workspaceId: ctx.workspace.id, targetIds: await inboxTargetIds(ctx), ...rest, assignee });
   return items.map((item) => ({
     kind: item.kind,
     id: item.id,
@@ -190,7 +194,16 @@ export async function apiReadInbox(ctx: ApiContext, raw: unknown) {
     at: item.at,
     onPost: item.postMessage,
     done: item.resolvedAt !== null,
+    assigneeId: item.assigneeId,
   }));
+}
+
+export async function apiAssignInbox(ctx: ApiContext, raw: unknown) {
+  assertApiModule(ctx, 'analytics');
+  const input = z.object({ kind: z.enum(['comment', 'message']), id: z.string().min(1), assigneeId: z.string().min(1).nullable() }).parse(raw);
+  const found = await setInboxAssignee({ workspaceId: ctx.workspace.id, targetIds: await inboxTargetIds(ctx), ...input });
+  if (!found) throw errors.notFound();
+  return { ok: true };
 }
 
 export async function apiResolveInbox(ctx: ApiContext, raw: unknown) {

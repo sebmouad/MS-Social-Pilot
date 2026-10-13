@@ -185,6 +185,9 @@ get_page_analytics); API keys read or read/write, acting as their owner. PWA
 (manifest, icons, offline page, share target, shortcuts). Slack incoming
 webhooks, Telegram bots.
 
+## Inbox assignment (2026-10-13)
+Each comment or message in the Inbox can be assigned to a teammate (select on the item); filter All / Mine / Unassigned. MCP: `list_inbox` takes `assignee`, `assign_inbox_item`.
+
 ## Saved views (2026-10-13)
 Calendar and Posts: in the channel column, "My views" lists the person's saved
 combinations of channels, labels and filters, one click to reopen; "Save this

@@ -2784,6 +2784,30 @@ describe('the inbox', () => {
     expect(await inbox.countOpenInbox(scope)).toEqual({ comments: 1, messages: 1 });
   });
 
+  it('assigns an item to a teammate and narrows the list by who has it', async () => {
+    const mine = await seedWorkspace('mine');
+    const theirs = await seedWorkspace('theirs');
+    stubEverything();
+    await engagement.syncTargetEdges({ targetId: mine.target.id });
+    const comment = await prisma.postComment.findFirstOrThrow();
+    const scope = { workspaceId: mine.workspace.id, targetIds: [mine.target.id] };
+    const member = await prisma.membership.findFirstOrThrow({ where: { workspaceId: mine.workspace.id } });
+    const stranger = await prisma.membership.findFirstOrThrow({ where: { workspaceId: theirs.workspace.id } });
+
+    // Only a member of this workspace can take it, and only on a Page the caller may see.
+    expect(await inbox.setInboxAssignee({ ...scope, kind: 'comment', id: comment.id, assigneeId: stranger.userId })).toBe(false);
+    expect(await inbox.setInboxAssignee({ workspaceId: mine.workspace.id, targetIds: [], kind: 'comment', id: comment.id, assigneeId: member.userId })).toBe(false);
+
+    expect(await inbox.setInboxAssignee({ ...scope, kind: 'comment', id: comment.id, assigneeId: member.userId })).toBe(true);
+    const onlyMine = await inbox.readInbox({ ...scope, state: 'open', limit: 50, assignee: { kind: 'member', userId: member.userId } });
+    expect(onlyMine.map((item) => item.id)).toEqual([comment.id]);
+    const nobody = await inbox.readInbox({ ...scope, state: 'open', limit: 50, assignee: { kind: 'unassigned' } });
+    expect(nobody.map((item) => item.kind)).toEqual(['message']);
+
+    expect(await inbox.setInboxAssignee({ ...scope, kind: 'comment', id: comment.id, assigneeId: null })).toBe(true);
+    expect((await prisma.postComment.findFirstOrThrow()).assigneeId).toBeNull();
+  });
+
   it('opens a thread again when the other person writes, not when the Page answers', async () => {
     const { workspace, target } = await seedWorkspace();
     const scope = { workspaceId: workspace.id, targetIds: [target.id] };

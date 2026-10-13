@@ -3219,7 +3219,13 @@
     "emptyOpenTitle": "Rien en attente",
     "emptyOpenHint": "Tous les commentaires et messages de ces canaux sont traités. Les nouveaux apparaissent ici dès leur arrivée.",
     "emptyTitle": "Rien ici",
-    "emptyHint": "Aucun commentaire ni message ne correspond à ces filtres pour les canaux sélectionnés. Essayez un autre type ou état, ou sélectionnez plus de canaux."
+    "emptyHint": "Aucun commentaire ni message ne correspond à ces filtres pour les canaux sélectionnés. Essayez un autre type ou état, ou sélectionnez plus de canaux.",
+    "assignTo": "Assigner à",
+    "unassigned": "Non assigné",
+    "assigneeLabel": "Assigné à",
+    "assigneeAll": "Tout le monde",
+    "assigneeMine": "À moi",
+    "assigneeNobody": "Non assignés"
   },
   "sessions": {
     "listLabel": "Navigateurs connectés",

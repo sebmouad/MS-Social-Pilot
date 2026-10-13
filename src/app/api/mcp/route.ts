@@ -6,6 +6,7 @@ import { requireApiToken, type ApiContext } from '@/lib/api-tokens';
 import { AppError } from '@/lib/errors';
 import {
   apiApprovePost,
+  apiAssignInbox,
   apiAttention,
   apiCancelPost,
   apiCreatePost,
@@ -154,6 +155,7 @@ const TOOLS: Tool[] = [
       properties: {
         kind: { type: 'string', enum: ['comment', 'message'] },
         state: { type: 'string', enum: ['open', 'resolved', 'all'] },
+        assignee: { type: 'string', enum: ['mine', 'unassigned'], description: 'Only what is assigned to this key’s owner, or to nobody.' },
         limit: { type: 'integer', minimum: 1, maximum: 100 },
       },
       additionalProperties: false,
@@ -175,6 +177,22 @@ const TOOLS: Tool[] = [
       additionalProperties: false,
     },
     run: (ctx, args) => apiResolveInbox(ctx, args),
+  },
+  {
+    name: 'assign_inbox_item',
+    description: 'Give a comment or message to a teammate (assigneeId is a user id), or pass null to take it back.',
+    write: true,
+    inputSchema: {
+      type: 'object',
+      required: ['kind', 'id', 'assigneeId'],
+      properties: {
+        kind: { type: 'string', enum: ['comment', 'message'] },
+        id: { type: 'string' },
+        assigneeId: { type: ['string', 'null'] },
+      },
+      additionalProperties: false,
+    },
+    run: (ctx, args) => apiAssignInbox(ctx, args),
   },
   {
     name: 'get_attention',
