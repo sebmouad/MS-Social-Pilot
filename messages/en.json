@@ -4186,7 +4186,22 @@
     "generate": "Make a picture from a description",
     "generatePlaceholder": "For example, a loaf of bread on a wooden table, morning light",
     "generateButton": "Make the picture",
-    "generateHint": "It becomes the background, and is kept in your library. Counts toward your AI allowance."
+    "generateHint": "It becomes the background, and is kept in your library. Counts toward your AI allowance.",
+    "video": {
+      "title": "Video from a description",
+      "prompt": "Describe the video",
+      "placeholder": "For example, a slow pan over a table of fresh bread, morning light",
+      "shape": "Shape",
+      "tall": "Tall (Reels, Stories)",
+      "wide": "Wide",
+      "start": "Make the video",
+      "starting": "Starting…",
+      "hint": "Takes a few minutes. The finished video goes to your media library, ready to attach to a post. Counts against your AI credits.",
+      "list": "Your videos",
+      "working": "Being made…",
+      "failed": "Could not be made.",
+      "open": "Open"
+    }
   },
   "campaigns": {
     "title": "Campaigns",

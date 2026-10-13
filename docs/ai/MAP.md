@@ -29,7 +29,7 @@ FEATURES.md (what exists) and NEXT_PHASES.md (specs).
 | Link-in-bio page | M | ✅ Settings › Link in bio, public /bio/<slug>, click counts |
 | Custom fields on posts | M | ✅ Settings › Custom fields, composer inputs, shown on the post list |
 | Design editor (basic) | L | ✅ size, colour or photo, text layers, save to library; ⬜ shapes, templates |
-| AI image / video / voice (root-activated provider, models fetched) | M | ✅ images in Design (OpenAI key from Root, newest image model fetched); ⏸ video, voice: need a root-activated provider with a model list to fetch; no provider is configured, so there is nothing to build against yet |
+| AI image / video / voice (root-activated provider, models fetched) | M | ✅ images in Design (OpenAI key from Root, newest image model fetched); ✅ video in Design (Gemini key from Root, newest Veo model fetched, polled by the worker into the media library; Veo makes its own sound). OpenAI's Sora API was shut down on 24 Sep 2026, so it is not used. ⏸ voice-over on its own: Facebook posts cannot carry audio alone, and Veo already speaks; a TTS option (OpenAI `/v1/audio/speech`) can be added when a use for the audio file appears. Not yet tried against the live provider (needs a Gemini key in Root) |
 | AI agent with schedules | M | ✅ `/settings/agents`, drafts only |
 | Tasks and workflows | L | ✅ board (to do, doing, done, assignee, due date); ⬜ workflows |
 | Location tags and @mentions | M | ✅ place (a Facebook place Page's id) in the composer, sent as `place` on feed and multi-photo posts; `@[page-id]` typed in the text is mentioned by Facebook as Graph documents (checked 2026-10-13). ⬜ searching places and Pages by name: that needs Meta's Page Public Content Access review |

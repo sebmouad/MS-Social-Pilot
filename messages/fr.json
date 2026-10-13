@@ -4186,7 +4186,22 @@
     "generate": "Créer une image à partir d’une description",
     "generatePlaceholder": "Par exemple, un pain sur une table en bois, lumière du matin",
     "generateButton": "Créer l’image",
-    "generateHint": "Elle devient le fond et est conservée dans votre bibliothèque. Compte dans votre quota d’IA."
+    "generateHint": "Elle devient le fond et est conservée dans votre bibliothèque. Compte dans votre quota d’IA.",
+    "video": {
+      "title": "Vidéo à partir d’une description",
+      "prompt": "Décrivez la vidéo",
+      "placeholder": "Par exemple, un lent panoramique sur une table de pain frais, lumière du matin",
+      "shape": "Format",
+      "tall": "Vertical (Reels, Stories)",
+      "wide": "Horizontal",
+      "start": "Créer la vidéo",
+      "starting": "Lancement…",
+      "hint": "Quelques minutes sont nécessaires. La vidéo terminée arrive dans votre médiathèque, prête à être jointe à une publication. Décompté de vos crédits IA.",
+      "list": "Vos vidéos",
+      "working": "En cours de création…",
+      "failed": "Création impossible.",
+      "open": "Ouvrir"
+    }
   },
   "campaigns": {
     "title": "Campagnes",

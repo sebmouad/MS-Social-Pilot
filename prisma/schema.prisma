@@ -123,6 +123,8 @@ enum AiGenerationKind {
   altText
   /// A picture made from a description.
   image
+  /// A short video made from a description.
+  video
 }
 
 // ---------------------------------------------------------------------------
@@ -342,6 +344,7 @@ model Workspace {
   tasks                Task[]
   customFields         CustomField[]
   aiAgents             AiAgent[]
+  aiVideos             AiVideo[]
   captionTests         CaptionTest[]
   shareLinks           ShareLink[]
   reportTemplates      ReportTemplate[]
@@ -2365,4 +2368,28 @@ model Plan {
   users User[]
 
   @@map("plans")
+}
+
+/// A video being made from a description by the AI provider: the worker polls
+/// it and, when it is done, keeps the file in the media library.
+model AiVideo {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  prompt      String
+  /// "16:9" or "9:16".
+  aspectRatio String
+  /// The provider's operation name, polled until it is done.
+  operation   String
+  /// working | ready | failed
+  status      String   @default("working")
+  mediaId     String?
+  error       String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([status])
+  @@map("ai_videos")
 }

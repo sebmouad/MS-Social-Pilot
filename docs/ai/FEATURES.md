@@ -202,3 +202,6 @@ Optional "Place" under the first comment: the number of a Facebook place Page. I
 
 ## Text background (composer)
 A row of swatches under the text: black, purple, red, red-to-blue. For a text-only post of at most 130 characters on a Page; chosen with a link, pictures or video, a Reel or Story, it is refused with a plain message. Sent as `text_format_preset_id`, which Facebook's published reference does not list (ids from Facebook's own site; list in `src/lib/text-backgrounds.ts`). Not yet tested on a live Page.
+
+## AI video (`/design`)
+When a Gemini key is set in Root and the workspace's AI is on, Design shows "Video from a description": a prompt and a shape (tall or wide). The request is stored (`ai_videos`) and the worker (`aiVideos`, every minute) polls Google's Veo operation; the finished MP4 is kept in the media library and listed with an Open link. The model is the newest full-size Veo model the key lists. Counts against the hourly allowance, monthly AI credits and budget; a video not finished within 30 minutes is marked failed. OpenAI's video API no longer exists (shut down 24 Sep 2026).

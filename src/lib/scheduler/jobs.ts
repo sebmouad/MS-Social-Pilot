@@ -30,6 +30,7 @@ import { watchNegativeComments } from '../negative-comments';
 import { refreshTrends } from '../trends';
 import { approveUnanswered } from '../share-links';
 import { runDueAgents } from '../ai-agents';
+import { pollVideos } from '../ai-video';
 
 /**
  * The worker's job set.
@@ -62,6 +63,7 @@ export type JobName =
   | 'trends'
   | 'contentMix'
   | 'aiAgents'
+  | 'aiVideos'
   | 'captionTests'
   | 'bestTimes'
   | 'alerts'
@@ -790,6 +792,15 @@ export function jobDefinitions(): JobDefinition[] {
       run: async ({ now }) => {
         const drafts = await runDueAgents(now);
         return drafts > 0 ? `${drafts} draft(s) written by AI agents` : null;
+      },
+    },
+    {
+      // Checks the provider for videos still being made and keeps the finished ones.
+      name: 'aiVideos',
+      intervalMs: 60 * 1000,
+      run: async ({ now }) => {
+        const finished = await pollVideos(now);
+        return finished > 0 ? `${finished} AI video(s) finished` : null;
       },
     },
     {
