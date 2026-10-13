@@ -81,8 +81,8 @@ export async function DateRangePicker({
     <details className="group relative">
       <summary className="btn-secondary cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <Icon name="calendar" size={18} />
-        <span>{t(`preset.${range.key}`)}</span>
-        <span className="hidden font-normal text-slate-600 sm:inline">{span}</span>
+        <span className="whitespace-nowrap">{t(`preset.${range.key}`)}</span>
+        <span className="hidden min-w-0 truncate font-normal text-slate-600 sm:inline">{span}</span>
         {compare === 'year' && (
           <span className="hidden rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-600 md:inline">
             {t('vsYear')}

@@ -60,7 +60,6 @@ export default async function PostsPage({
 }) {
   const auth = await requirePage();
   const t = await getTranslations('posts');
-  const tDash = await getTranslations('dashboard');
   const tCommon = await getTranslations('common');
   const tStatus = await getTranslations('status.post');
   const params = await searchParams;
@@ -172,10 +171,6 @@ export default async function PostsPage({
           <p className="mt-1 text-sm text-slate-600">{t('countLine', { count: page.total, profiles: filter.ids.length })}</p>
         </div>
         <div className="flex gap-2 lg:mt-4 lg:flex-col">
-          <Link href="/compose" className="btn-primary lg:w-full">
-            <Icon name="plus" size={18} />
-            {tDash('newPost')}
-          </Link>
           {/* What is on screen, filters and all, as a spreadsheet. */}
           <a
             href={`/api/posts/export?${new URLSearchParams(
@@ -227,7 +222,7 @@ export default async function PostsPage({
         )}
       </form>
 
-      <nav className="flex flex-wrap gap-2 lg:card lg:flex-col lg:gap-0.5 lg:p-2" aria-label={t('statusFilter')}>
+      <nav className="flex flex-wrap gap-1.5" aria-label={t('statusFilter')}>
         {FILTERS.map((value) => {
           const active = (raw ?? '') === value;
           return (
@@ -237,10 +232,8 @@ export default async function PostsPage({
               // narrowing down to one Page's failures means both at once.
               href={pageHref('/posts', { ...params, status: value || undefined }, 1)}
               aria-current={active ? 'page' : undefined}
-              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors lg:justify-between lg:rounded-md lg:px-3 lg:py-2 lg:text-[15px] lg:shadow-none ${
-                active
-                  ? 'bg-brand-50 text-brand-600'
-                  : 'bg-white text-slate-700 shadow-surface hover:bg-slate-50 lg:bg-transparent lg:text-slate-900 lg:hover:bg-slate-100'
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-semibold transition-colors ${
+                active ? 'bg-brand-50 text-brand-600' : 'bg-white text-slate-700 shadow-surface hover:bg-slate-50'
               }`}
             >
               {value ? tStatus(value) : tCommon('all')}

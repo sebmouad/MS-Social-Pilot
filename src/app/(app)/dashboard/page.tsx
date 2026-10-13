@@ -133,9 +133,7 @@ export default async function DashboardPage({
               tomorrow={formatInZone(new Date(now.getTime() + 24 * 60 * 60 * 1000), auth.workspace.timezone, 'yyyy-MM-dd')}
             />
           )}
-          <Link href="/compose" className="btn-primary">
-            <Icon name="plus" size={16} /> {t('newPost')}
-          </Link></div>}>
+</div>}>
     <div className="min-w-0 flex-1 space-y-6">
       <ScreenHeader title={t('title')} subtitle={`${formatInZone(now, auth.workspace.timezone, 'EEEE d MMMM yyyy, HH:mm')} · ${auth.workspace.timezone}`} />
 

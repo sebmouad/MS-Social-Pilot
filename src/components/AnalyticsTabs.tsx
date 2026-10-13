@@ -15,7 +15,7 @@ const VIEWS = ANALYTICS_VIEWS.filter((view) => !INBOX_VIEW_PATHS[view]);
  * Links rather than client state, so each view is a server render against the
  * data it needs — and so a particular view can be linked to or bookmarked.
  *
- * Four main views as a segmented control, the rest under "More". Views
+ * Four main views, then the rest below a divider. Views
  * do not fit across a phone. Rather than wrapping them into four
  * ragged rows that push the content below the fold, small screens get a select
  * — one tap, the full list, no horizontal hunting — and the tab strip appears
@@ -69,21 +69,21 @@ export function AnalyticsTabs({ current, hidden = [] }: { current: string; hidde
             </li>
           ))}
         </ul>
-        <label className="block">
-          <span className="sr-only">{t('moreViews')}</span>
-          <select
-            className={`input w-full ${PRIMARY_ANALYTICS_VIEWS.includes(current as never) ? '' : 'border-brand-500 text-brand-600'}`}
-            value={PRIMARY_ANALYTICS_VIEWS.includes(current as never) ? '' : current}
-            onChange={(event) => event.target.value && router.push(hrefFor(event.target.value))}
-          >
-            <option value="">{t('moreViews')}</option>
-            {VIEWS.filter((view) => !PRIMARY_ANALYTICS_VIEWS.includes(view) && (!hidden.includes(view) || view === current)).map((view) => (
-              <option key={view} value={view}>
+        <ul className="space-y-0.5 border-t border-slate-200 pt-1">
+          {VIEWS.filter((view) => !PRIMARY_ANALYTICS_VIEWS.includes(view) && (!hidden.includes(view) || view === current)).map((view) => (
+            <li key={view}>
+              <Link
+                href={hrefFor(view)}
+                aria-current={view === current ? 'page' : undefined}
+                className={`block rounded-lg px-3 py-2 text-sm font-semibold ${
+                  view === current ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
                 {t(`view.${view}`)}
-              </option>
-            ))}
-          </select>
-        </label>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </nav>
     </>
   );
