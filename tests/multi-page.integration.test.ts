@@ -133,6 +133,25 @@ describe('text per destination', () => {
   });
 });
 
+describe('results by label', () => {
+  it('adds up published posts by label inside the period and the chosen Pages', async () => {
+    const { owner, workspace, bakery, garage } = await seed();
+    const { readLabelTotals } = await import('../src/lib/label-report');
+    const summer = await groups.createLabel(workspace.id, { name: 'Summer', color: 'amber' });
+    const post = await prisma.post.create({ data: { workspaceId: workspace.id, authorId: owner.id, message: 'Sale', status: 'published' } });
+    await prisma.postLabel.create({ data: { postId: post.id, labelId: summer.id } });
+    const insights = (reach: number, reactions: number) => ({ impressions: null, reach, engagedUsers: null, reactions, comments: 1, shares: 0, clicks: 2 });
+    await prisma.postTarget.create({ data: { postId: post.id, targetId: bakery.id, status: 'published', publishedAt: new Date('2026-09-20T10:00:00Z'), insights: insights(100, 5) } });
+    await prisma.postTarget.create({ data: { postId: post.id, targetId: garage.id, status: 'published', publishedAt: new Date('2026-09-21T10:00:00Z'), insights: insights(50, 2) } });
+    const window = { workspaceId: workspace.id, from: new Date('2026-09-01T00:00:00Z'), to: new Date('2026-09-30T00:00:00Z') };
+
+    const both = await readLabelTotals({ ...window, targetIds: [bakery.id, garage.id] });
+    expect(both).toEqual([{ labelId: summer.id, name: 'Summer', color: 'amber', posts: 1, reach: 150, interactions: 9, clicks: 4 }]);
+    expect((await readLabelTotals({ ...window, targetIds: [garage.id] }))[0]).toMatchObject({ posts: 1, reach: 50, interactions: 3 });
+    expect(await readLabelTotals({ ...window, from: new Date('2026-10-01T00:00:00Z'), to: new Date('2026-10-30T00:00:00Z'), targetIds: [bakery.id] })).toEqual([]);
+  });
+});
+
 describe('labels', () => {
   it('saves a post’s labels, ignoring ids from elsewhere', async () => {
     const { owner, workspace, bakery } = await seed();

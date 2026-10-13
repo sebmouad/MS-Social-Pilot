@@ -1476,7 +1476,8 @@
     "responseTime": "Response time",
     "agency": "Agency",
     "tasks": "Tasks",
-    "design": "Design"
+    "design": "Design",
+    "campaigns": "Campaigns"
   },
   "notifications": {
     "title": "Notifications",
@@ -4160,5 +4161,17 @@
     "save": "Save to the library",
     "saved": "Saved to your library.",
     "useInPost": "Use it in a post"
+  },
+  "campaigns": {
+    "title": "Campaigns",
+    "subtitle": "Results by label: give a campaign’s posts the same label and see what they did together.",
+    "label": "Label",
+    "posts": "Posts",
+    "reach": "Reach",
+    "interactions": "Interactions",
+    "clicks": "Clicks",
+    "emptyTitle": "Nothing to add up yet",
+    "emptyHint": "Put a label on your posts in the composer. Published posts with a label appear here with their results.",
+    "reachNote": "Reach is added up per channel: someone reached on two channels counts twice."
   }
 }

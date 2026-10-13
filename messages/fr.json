@@ -1476,7 +1476,8 @@
     "responseTime": "Temps de réponse",
     "agency": "Agence",
     "tasks": "Tâches",
-    "design": "Création"
+    "design": "Création",
+    "campaigns": "Campagnes"
   },
   "notifications": {
     "title": "Notifications",
@@ -4160,5 +4161,17 @@
     "save": "Enregistrer dans la bibliothèque",
     "saved": "Enregistrée dans votre bibliothèque.",
     "useInPost": "L’utiliser dans une publication"
+  },
+  "campaigns": {
+    "title": "Campagnes",
+    "subtitle": "Résultats par étiquette : donnez la même étiquette aux publications d’une campagne et voyez ce qu’elles ont fait ensemble.",
+    "label": "Étiquette",
+    "posts": "Publications",
+    "reach": "Portée",
+    "interactions": "Interactions",
+    "clicks": "Clics",
+    "emptyTitle": "Rien à additionner pour l’instant",
+    "emptyHint": "Mettez une étiquette sur vos publications dans l’éditeur. Les publications publiées avec une étiquette apparaissent ici avec leurs résultats.",
+    "reachNote": "La portée est additionnée par canal : une personne touchée sur deux canaux compte deux fois."
   }
 }
