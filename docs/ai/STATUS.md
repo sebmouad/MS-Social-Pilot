@@ -140,3 +140,29 @@ assumptions. The product stays generic (README.md).*
    automation (possibly layout shift on Connections as "Connection check" loads)
    — investigate; analytics "Reactions by type" comes from Facebook insights and
    can differ slightly from the reactions total.
+
+## Known issue (2026-10-13): calendar navigation in a production build, in the test sandbox
+
+Running the browser walk against a production build (`E2E_PROD=1`, see
+`playwright.config.ts`) shows two tests failing on the Calendar only:
+`compose.spec.ts` "the calendar opens a post for editing, and starts a new one…"
+(Next month link) and `selection.spec.ts` "the calendar filters by status…".
+After the click the server answers the page request (200, whole body read in
+about 60 ms) but the client router never commits the navigation: no
+`pushState`, no console error, URL unchanged.
+
+What was established:
+- It passes on the development server, and at commits up to `6ec9a1a`; it
+  starts at `1f0e47c` (Calendar controls moved into the channel column).
+- It depends on the size of the page, not on one component: removing the feed
+  button, the saved views or the label filter each makes it pass, and adding
+  12 KB of hidden text to a passing build makes it fail again. The page's
+  navigation payload is about 79 KB.
+- Not compression (`compress: false` changes nothing), not link prefetching,
+  not `loading.tsx`, not a missing chunk, not the sandbox proxy.
+- Other screens navigate fine in the same build.
+
+Not resolved. Check it in a real browser on the live site after a deploy
+(Calendar › Next month, and a status filter). If it reproduces there, shrinking
+the day-cell markup in `calendar/page.tsx` (about 1.6 KB per day) is the first
+thing to try.
