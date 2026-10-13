@@ -79,7 +79,7 @@ export async function DateRangePicker({
 
   return (
     <details className="group relative">
-      <summary className="btn-secondary cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+      <summary className="btn-secondary max-w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <Icon name="calendar" size={18} />
         <span className="whitespace-nowrap">{t(`preset.${range.key}`)}</span>
         <span className="hidden min-w-0 truncate font-normal text-slate-600 sm:inline">{span}</span>

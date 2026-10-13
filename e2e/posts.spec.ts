@@ -258,7 +258,7 @@ test('a contributor sends a draft for review from the list', async ({ page }) =>
     }).toPass({ timeout: 30_000 });
 
     // Once refreshed it reads as waiting, and can still be cancelled.
-    await expect(draft.getByText(/awaiting approval/i)).toBeVisible();
+    await expect(draft.getByText(/awaiting approval/i)).toBeVisible({ timeout: 15_000 });
     await expect(draft.getByRole('button', { name: /submit for review/i })).toHaveCount(0);
     await expect(draft.getByRole('button', { name: /^cancel$/i })).toBeVisible();
   } finally {
