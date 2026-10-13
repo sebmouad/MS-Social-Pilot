@@ -255,7 +255,7 @@ export default async function PostsPage({
               // narrowing down to one Page's failures means both at once.
               href={pageHref('/posts', { ...params, status: value || undefined }, 1)}
               aria-current={active ? 'page' : undefined}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-semibold transition-colors ${
+              className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors ${
                 active ? 'bg-brand-50 text-brand-600' : 'bg-white text-slate-700 shadow-surface hover:bg-slate-50'
               }`}
             >

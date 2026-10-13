@@ -341,8 +341,8 @@ export function PagesSidebar({ pages, groups, group, visible, canManageGroups, i
   if (docked) {
     return (
       <aside aria-label={t('label')} className="space-y-3">
+        {tools && <div className="space-y-3 border-b border-slate-200 pb-3">{tools}</div>}
         {body}
-        {tools && <div className="space-y-3 border-t border-slate-200 pt-3">{tools}</div>}
       </aside>
     );
   }
