@@ -3,6 +3,8 @@ import { getTranslations } from 'next-intl/server';
 import { DesignEditor } from '@/components/DesignEditor';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { AiVideoPanel } from '@/components/AiVideoPanel';
+import { AiVoicePanel } from '@/components/AiVoicePanel';
+import { voiceAvailable } from '@/lib/ai-voice';
 import { imageAvailable } from '@/lib/ai-image';
 import { listVideos, videoAvailable } from '@/lib/ai-video';
 import { canCompose } from '@/lib/constants';
@@ -26,6 +28,7 @@ export default async function DesignPage() {
     <div className="space-y-6">
       <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
       <DesignEditor canGenerate={workspace.aiEnabled && imageAvailable()} />
+      {workspace.aiEnabled && voiceAvailable() && canCompose(auth.role) && <AiVoicePanel />}
       {videos && (
         <AiVideoPanel
           initial={videos.map((video) => ({ id: video.id, prompt: video.prompt, aspectRatio: video.aspectRatio, status: video.status as 'working' | 'ready' | 'failed', mediaId: video.mediaId, error: video.error }))}

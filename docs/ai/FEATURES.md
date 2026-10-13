@@ -205,3 +205,6 @@ A row of swatches under the text: black, purple, red, red-to-blue. For a text-on
 
 ## AI video (`/design`)
 When a Gemini key is set in Root and the workspace's AI is on, Design shows "Video from a description": a prompt and a shape (tall or wide). The request is stored (`ai_videos`) and the worker (`aiVideos`, every minute) polls Google's Veo operation; the finished MP4 is kept in the media library and listed with an Open link. The model is the newest full-size Veo model the key lists. Counts against the hourly allowance, monthly AI credits and budget; a video not finished within 30 minutes is marked failed. OpenAI's video API no longer exists (shut down 24 Sep 2026).
+
+## AI voice (`/design`)
+With an OpenAI key in Root and the workspace's AI on, Design shows "Voice from a text": up to 2,000 characters and one of OpenAI's documented voice names; the newest speech model the key lists reads it, and the MP3 is played or downloaded (not stored, since a Facebook post cannot carry audio alone). Counts against the hourly allowance, monthly credits and budget. Not yet tried against the live provider.

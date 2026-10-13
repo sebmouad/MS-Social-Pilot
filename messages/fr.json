@@ -4201,6 +4201,17 @@
       "working": "En cours de création…",
       "failed": "Création impossible.",
       "open": "Ouvrir"
+    },
+    "voice": {
+      "title": "Voix à partir d’un texte",
+      "text": "Texte à lire à voix haute",
+      "placeholder": "Par exemple, le script d’un Reel",
+      "voice": "Voix",
+      "start": "Créer l’audio",
+      "working": "Création de l’audio…",
+      "player": "Le texte lu",
+      "download": "Télécharger le MP3",
+      "hint": "2 000 caractères au maximum. Une publication Facebook ne peut pas contenir de l’audio seul : il est à écouter ou à ajouter à une vidéo dans votre propre éditeur. Décompté de vos crédits IA."
     }
   },
   "campaigns": {

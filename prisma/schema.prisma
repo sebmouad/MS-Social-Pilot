@@ -125,6 +125,8 @@ enum AiGenerationKind {
   image
   /// A short video made from a description.
   video
+  /// A spoken version of a text.
+  voice
 }
 
 // ---------------------------------------------------------------------------

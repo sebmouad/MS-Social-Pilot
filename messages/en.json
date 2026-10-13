@@ -4201,6 +4201,17 @@
       "working": "Being made…",
       "failed": "Could not be made.",
       "open": "Open"
+    },
+    "voice": {
+      "title": "Voice from a text",
+      "text": "Text to read aloud",
+      "placeholder": "For example, the script for a Reel",
+      "voice": "Voice",
+      "start": "Make the audio",
+      "working": "Making the audio…",
+      "player": "The spoken text",
+      "download": "Download MP3",
+      "hint": "Up to 2,000 characters. Facebook posts cannot carry audio alone, so this is for you to play or add to a video in your own editor. Counts against your AI credits."
     }
   },
   "campaigns": {
