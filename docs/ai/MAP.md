@@ -33,5 +33,5 @@ FEATURES.md (what exists) and NEXT_PHASES.md (specs).
 | AI agent with schedules | M | ✅ `/settings/agents`, drafts only |
 | Tasks and workflows | L | ✅ board (to do, doing, done, assignee, due date); ⬜ workflows |
 | Location tags and @mentions | M | ✅ place (a Facebook place Page's id) in the composer, sent as `place` on feed and multi-photo posts; `@[page-id]` typed in the text is mentioned by Facebook as Graph documents (checked 2026-10-13). ⬜ searching places and Pages by name: that needs Meta's Page Public Content Access review |
-| Coloured text backgrounds | S | ⏸ the Page feed publish reference (checked 2026-10-13) lists no text-background parameter, so nothing can be sent; the Design editor makes a coloured picture instead |
+| Coloured text backgrounds | S | ⏸ not in Meta's Page feed reference. Only an undocumented `text_format_preset_id` is used by third-party tools (ids copied from the browser, no official list: gist.github.com/moraxh/1eeb76b651f504450ab2fa03a8040f72, publer.com/docs/…/facebook-text-posts-with-background). Shipping it would mean hard-coded ids that can change and a live-Page test; decide with the owner. The Design editor makes a coloured picture instead (checked 2026-10-13) |
 | Mobile app | L | PWA exists |
