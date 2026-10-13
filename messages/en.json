@@ -234,7 +234,7 @@
     },
     "mapLabel": "Map of followers by country",
     "technicalDetails": "Technical details: which metrics Facebook serves this channel",
-    "allSelected": "{count, plural, one {The selected profile} other {All # selected profiles}}",
+    "allSelected": "{count, plural, one {The selected channel} other {All # selected channels}}",
     "pin": "Pin {metric} to the analysis",
     "unpin": "Unpin {metric}",
     "pinHint": "Show this as a tile on Analysis and All channels",
@@ -279,7 +279,7 @@
     "colRejected": "Sent back",
     "colRejectedHint": "The reviewer asked for changes.",
     "colEmpty": "Nothing here",
-    "countLine": "{count, plural, =0 {Nothing waiting for review} one {# post waiting for review} other {# posts waiting for review}} · {profiles, plural, one {# profile} other {# profiles}}",
+    "countLine": "{count, plural, =0 {Nothing waiting for review} one {# post waiting for review} other {# posts waiting for review}} · {profiles, plural, one {# channel} other {# channels}}",
     "approvedBy": "Approved by {name} on {at}"
   },
   "auth": {
@@ -1795,7 +1795,7 @@
       "done": "{count, plural, one {Done for # post.} other {Done for # posts.}}",
       "someFailed": "{count, plural, one {# post was left as it was:} other {# posts were left as they were:}}"
     },
-    "countLine": "{count, plural, =0 {No posts} one {# post} other {# posts}} · {profiles, plural, one {# profile} other {# profiles}}"
+    "countLine": "{count, plural, =0 {No posts} one {# post} other {# posts}} · {profiles, plural, one {# channel} other {# channels}}"
   },
   "queue": {
     "addSlot": "Add slot",
@@ -2710,7 +2710,7 @@
       "root": "Root",
       "disabled": "Disabled",
       "allPages": "All",
-      "somePages": "{count, plural, =0 {No profile} one {# profile} other {# profiles}}",
+      "somePages": "{count, plural, =0 {No channel} one {# channel} other {# channels}}",
       "never": "Never",
       "capabilities": {
         "manageAccounts": "Connect and remove channels",
@@ -2824,7 +2824,7 @@
     },
     "workspace": {
       "title": "Workspace",
-      "summary": "{pages, plural, =0 {No profile} one {# profile} other {# profiles}} · {posts, plural, =0 {no post} one {# post} other {# posts}} · created {created}",
+      "summary": "{pages, plural, =0 {No channel} one {# channel} other {# channels}} · {posts, plural, =0 {no post} one {# post} other {# posts}} · created {created}",
       "access": "Access",
       "open": "Open as root",
       "openHelp": "You see and act as its owner. A banner stays on every screen and the visit is logged.",
@@ -3135,7 +3135,7 @@
   "profileScope": {
     "title": "Choose channels",
     "all": "{count, plural, one {All channels (#)} other {All channels (#)}}",
-    "some": "{count, plural, one {# profile} other {# profiles}}",
+    "some": "{count, plural, one {# channel} other {# channels}}",
     "search": "Search channels",
     "groups": "Groups",
     "allGroups": "All",
@@ -3148,7 +3148,7 @@
     "only": "Only",
     "noMatch": "No channel matches.",
     "pickOne": "Pick at least one channel.",
-    "show": "{count, plural, =0 {Show profiles} one {Show # profile} other {Show # profiles}}",
+    "show": "{count, plural, =0 {Show channels} one {Show # channel} other {Show # channels}}",
     "cancel": "Cancel",
     "network": {
       "facebook": "Facebook",
@@ -3171,7 +3171,7 @@
   "totalView": {
     "none": "No channel to add up yet. Connect a channel or pick channels above.",
     "noRanking": "Nothing to rank for this period.",
-    "intro": "{count, plural, one {Totals for # profile} other {Totals for # profiles}} over {days, plural, one {the last day} other {the last # days}}.",
+    "intro": "{count, plural, one {Totals for # channel} other {Totals for # channels}} over {days, plural, one {the last day} other {the last # days}}.",
     "followers": "Followers",
     "followersHelp": "Sum of the followers of every selected channel at the end of the period.",
     "netFollows": "Net follows",
@@ -3218,7 +3218,7 @@
   },
   "inbox": {
     "title": "Inbox",
-    "subtitle": "{comments, plural, =0 {No open comments} one {# open comment} other {# open comments}} · {messages, plural, =0 {no open conversations} one {# open conversation} other {# open conversations}} · {profiles, plural, one {# profile} other {# profiles}}",
+    "subtitle": "{comments, plural, =0 {No open comments} one {# open comment} other {# open comments}} · {messages, plural, =0 {no open conversations} one {# open conversation} other {# open conversations}} · {profiles, plural, one {# channel} other {# channels}}",
     "typeLabel": "Type",
     "typeAll": "Everything",
     "typeComments": "Comments",

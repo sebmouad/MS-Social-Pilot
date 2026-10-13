@@ -279,7 +279,7 @@
     "colRejected": "Renvoyées",
     "colRejectedHint": "Le validateur a demandé des modifications.",
     "colEmpty": "Rien ici",
-    "countLine": "{count, plural, =0 {Rien en attente de validation} one {# publication en attente de validation} other {# publications en attente de validation}} · {profiles, plural, one {# profil} other {# profils}}",
+    "countLine": "{count, plural, =0 {Rien en attente de validation} one {# publication en attente de validation} other {# publications en attente de validation}} · {profiles, plural, one {# canal} other {# canaux}}",
     "approvedBy": "Approuvée par {name} le {at}"
   },
   "auth": {
@@ -1795,7 +1795,7 @@
       "done": "{count, plural, one {Fait pour # publication.} other {Fait pour # publications.}}",
       "someFailed": "{count, plural, one {# publication est restée telle quelle :} other {# publications sont restées telles quelles :}}"
     },
-    "countLine": "{count, plural, =0 {Aucune publication} one {# publication} other {# publications}} · {profiles, plural, one {# profil} other {# profils}}"
+    "countLine": "{count, plural, =0 {Aucune publication} one {# publication} other {# publications}} · {profiles, plural, one {# canal} other {# canaux}}"
   },
   "queue": {
     "addSlot": "Ajouter un créneau",
@@ -2710,7 +2710,7 @@
       "root": "Root",
       "disabled": "Désactivé",
       "allPages": "Tous",
-      "somePages": "{count, plural, =0 {Aucun profil} one {# profil} other {# profils}}",
+      "somePages": "{count, plural, =0 {Aucun canal} one {# canal} other {# canaux}}",
       "never": "Jamais",
       "capabilities": {
         "manageAccounts": "Connecter et retirer des canaux",
@@ -2824,7 +2824,7 @@
     },
     "workspace": {
       "title": "Espace de travail",
-      "summary": "{pages, plural, =0 {Aucun profil} one {# profil} other {# profils}} · {posts, plural, =0 {aucune publication} one {# publication} other {# publications}} · créé le {created}",
+      "summary": "{pages, plural, =0 {Aucun canal} one {# canal} other {# canaux}} · {posts, plural, =0 {aucune publication} one {# publication} other {# publications}} · créé le {created}",
       "access": "Accès",
       "open": "Ouvrir en tant que root",
       "openHelp": "Vous voyez et agissez comme son propriétaire. Un bandeau reste affiché sur chaque écran et la visite est journalisée.",
@@ -3135,7 +3135,7 @@
   "profileScope": {
     "title": "Choisir les canaux",
     "all": "{count, plural, one {Tous les canaux (#)} other {Tous les canaux (#)}}",
-    "some": "{count, plural, one {# profil} other {# profils}}",
+    "some": "{count, plural, one {# canal} other {# canaux}}",
     "search": "Rechercher un canal",
     "groups": "Groupes",
     "allGroups": "Tous",
@@ -3148,7 +3148,7 @@
     "only": "Seulement",
     "noMatch": "Aucun canal ne correspond.",
     "pickOne": "Choisissez au moins un canal.",
-    "show": "{count, plural, =0 {Afficher les profils} one {Afficher # profil} other {Afficher # profils}}",
+    "show": "{count, plural, =0 {Afficher les canaux} one {Afficher # canal} other {Afficher # canaux}}",
     "cancel": "Annuler",
     "network": {
       "facebook": "Facebook",
@@ -3171,7 +3171,7 @@
   "totalView": {
     "none": "Aucun canal à additionner pour l’instant. Connectez un canal ou choisissez des canaux ci-dessus.",
     "noRanking": "Rien à classer sur cette période.",
-    "intro": "{count, plural, one {Totaux pour # profil} other {Totaux pour # profils}} sur {days, plural, one {le dernier jour} other {les # derniers jours}}.",
+    "intro": "{count, plural, one {Totaux pour # canal} other {Totaux pour # canaux}} sur {days, plural, one {le dernier jour} other {les # derniers jours}}.",
     "followers": "Abonnés",
     "followersHelp": "Somme des abonnés de chaque canal choisi à la fin de la période.",
     "netFollows": "Abonnements nets",
@@ -3218,7 +3218,7 @@
   },
   "inbox": {
     "title": "Boîte de réception",
-    "subtitle": "{comments, plural, =0 {Aucun commentaire à traiter} one {# commentaire à traiter} other {# commentaires à traiter}} · {messages, plural, =0 {aucune conversation à traiter} one {# conversation à traiter} other {# conversations à traiter}} · {profiles, plural, one {# profil} other {# profils}}",
+    "subtitle": "{comments, plural, =0 {Aucun commentaire à traiter} one {# commentaire à traiter} other {# commentaires à traiter}} · {messages, plural, =0 {aucune conversation à traiter} one {# conversation à traiter} other {# conversations à traiter}} · {profiles, plural, one {# canal} other {# canaux}}",
     "typeLabel": "Type",
     "typeAll": "Tout",
     "typeComments": "Commentaires",
