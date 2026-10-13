@@ -34,6 +34,8 @@ const PUBLIC: Record<string, string> = {
   'auth/password-reset': 'Someone who forgot their password cannot sign in to ask for a new one.',
   'auth/password-reset/confirm': 'The emailed link is the proof, not a session.',
   health: 'A load balancer has no cookies.',
+  'oauth/register': 'An MCP client registers itself before anybody has signed in (RFC 7591); it gets only a client id.',
+  'oauth/token': 'The proof is the one-time code and its PKCE verifier, not a session.',
   'cron/tick': 'Called by a scheduler, and guarded by its own secret rather than a session.',
   'share/[token]': 'A client answering a review link has no account; the unguessable token is the authority, and it reaches only its own Pages.',
   'calendar-feed/[token]': 'A calendar app (Google Calendar, Outlook) fetching a member’s private feed has no session; the unguessable token is the authority, and the feed is clamped to what that member may still see.',

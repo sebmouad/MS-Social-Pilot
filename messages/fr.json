@@ -4301,5 +4301,17 @@
       "friday": "vendredi",
       "saturday": "samedi"
     }
+  },
+  "oauth": {
+    "title": "Connecter un assistant",
+    "subtitle": "Espace de travail : {workspace}",
+    "ask": "<b>{client}</b> demande à utiliser MS Social Pilot en votre nom. Il vous renverra vers <b>{host}</b>.",
+    "scopeLabel": "Ce qu’il pourra faire",
+    "scopeRead": "Lecture seule : canaux, publications, file d’attente, boîte de réception et statistiques.",
+    "scopeWrite": "Lecture et écriture : aussi rédiger, programmer, modifier et approuver des publications, avec les mêmes règles d’approbation que l’éditeur.",
+    "revokeHint": "Cela crée une clé API au nom de l’assistant. Révoquez-la à tout moment dans Paramètres › Clés API.",
+    "allow": "Autoriser",
+    "deny": "Refuser",
+    "invalid": "Ce lien de connexion est incomplet ou expiré. Relancez la connexion depuis l’assistant."
   }
 }

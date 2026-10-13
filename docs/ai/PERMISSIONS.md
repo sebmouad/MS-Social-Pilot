@@ -27,6 +27,12 @@ connection can do in plain words (`src/lib/scope-abilities.ts`), never Meta's
 permission names.
 
 ## Developer features are switched on by root (owner approved, 2026-10-12)
+The Claude web connector (2026-10-13) follows the same rule: `/oauth/authorize`
+and `/api/oauth/authorize` are developer paths, so only root can connect an
+assistant, and the key it gets is an ordinary API key. `/api/oauth/register`
+and `/api/oauth/token` need no session (a client id, and a one-time code with
+its PKCE verifier); neither grants anything on its own. No privilege widened.
+
 API keys (and Claude through MCP), outgoing webhooks and their delivery log
 are off for every workspace by default (`Workspace.developerFeatures`). Root
 switches them on per workspace in Root › Workspaces (logged as

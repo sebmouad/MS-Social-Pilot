@@ -2395,3 +2395,33 @@ model AiVideo {
   @@index([status])
   @@map("ai_videos")
 }
+
+/// A program that registered itself to connect over OAuth (the Claude web
+/// connector, or any MCP client): its name and where it may send people back.
+model OAuthClient {
+  id           String   @id @default(cuid())
+  name         String
+  redirectUris String[]
+  createdAt    DateTime @default(now())
+
+  codes OAuthCode[]
+}
+
+/// A one-time code from the consent screen, swapped once for an API key.
+model OAuthCode {
+  id            String   @id @default(cuid())
+  /// sha256 of the code.
+  codeHash      String   @unique
+  clientId      String
+  userId        String
+  workspaceId   String
+  redirectUri   String
+  /// PKCE S256 challenge.
+  codeChallenge String
+  /// `read` or `write`.
+  scope         String
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}

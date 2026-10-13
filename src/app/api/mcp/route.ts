@@ -4,6 +4,7 @@ import { ZodError } from 'zod';
 import { AuthError, ForbiddenError } from '@/lib/auth';
 import { requireApiToken, type ApiContext } from '@/lib/api-tokens';
 import { AppError } from '@/lib/errors';
+import { env } from '@/lib/env';
 import {
   apiApprovePost,
   apiAssignInbox,
@@ -238,7 +239,10 @@ function reply(id: RpcId, result: unknown) {
 }
 
 function failure(id: RpcId, code: number, message: string, status = 200) {
-  return NextResponse.json({ jsonrpc: '2.0', id, error: { code, message } }, { status });
+  // A 401 points OAuth clients (the Claude web connector) at how to sign in.
+  const headers: Record<string, string> =
+    status === 401 ? { 'www-authenticate': `Bearer resource_metadata="${env.appUrl}/.well-known/oauth-protected-resource"` } : {};
+  return NextResponse.json({ jsonrpc: '2.0', id, error: { code, message } }, { status, headers });
 }
 
 function explain(error: unknown): string {

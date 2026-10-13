@@ -4301,5 +4301,17 @@
       "friday": "Friday",
       "saturday": "Saturday"
     }
+  },
+  "oauth": {
+    "title": "Connect an assistant",
+    "subtitle": "Workspace: {workspace}",
+    "ask": "<b>{client}</b> asks to use MS Social Pilot as you. It will send you back to <b>{host}</b>.",
+    "scopeLabel": "What it may do",
+    "scopeRead": "Read only: channels, posts, queue, inbox and analytics.",
+    "scopeWrite": "Read and write: also draft, schedule, edit and approve posts, with the same approval rules as the composer.",
+    "revokeHint": "This makes an API key named after the assistant. Revoke it any time under Settings › API keys.",
+    "allow": "Allow",
+    "deny": "Deny",
+    "invalid": "This connection link is incomplete or out of date. Start connecting again from the assistant."
   }
 }

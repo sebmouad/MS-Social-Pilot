@@ -208,3 +208,17 @@ When a Gemini key is set in Root and the workspace's AI is on, Design shows "Vid
 
 ## AI voice (`/design`)
 With an OpenAI key in Root and the workspace's AI on, Design shows "Voice from a text": up to 2,000 characters and one of OpenAI's documented voice names; the newest speech model the key lists reads it, and the MP3 is played or downloaded (not stored, since a Facebook post cannot carry audio alone). Counts against the hourly allowance, monthly credits and budget. Not yet tried against the live provider.
+
+## Claude web connector (OAuth for the MCP server)
+
+Add `https://<your domain>/api/mcp` as a custom connector in Claude (or any
+remote MCP client). The client reads `/.well-known/oauth-protected-resource`
+and `/.well-known/oauth-authorization-server`, registers itself at
+`/api/oauth/register`, and sends the person to `/oauth/authorize`: a consent
+screen naming the assistant and where it returns, with a read-only or
+read-and-write choice. Allowing issues a one-time code (5 minutes, PKCE S256
+only) that `/api/oauth/token` swaps for an API key named "<assistant>
+(connector)". No refresh tokens: the key lasts until revoked under Settings ›
+API keys. Same rules as other keys: only root, and only in a workspace where root
+switched developer features on (the consent screen 404s otherwise).
+Not signed in yet: sign in, then start connecting again from the assistant.

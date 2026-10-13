@@ -135,7 +135,7 @@ export function moduleOfPath(pathname: string): ModuleKey | null {
  * them on for the workspace, and then for its owner only. Screens 404 and API
  * routes answer 403 otherwise, like a switched-off module.
  */
-const DEVELOPER_PATHS = ['/settings/api', '/settings/webhooks', '/api/api-tokens', '/api/webhooks', '/api/webhook-deliveries'];
+const DEVELOPER_PATHS = ['/settings/api', '/settings/webhooks', '/api/api-tokens', '/api/webhooks', '/api/webhook-deliveries', '/oauth/authorize', '/api/oauth/authorize'];
 
 export function isDeveloperPath(pathname: string): boolean {
   return DEVELOPER_PATHS.some((prefix) => matches(pathname, prefix));
