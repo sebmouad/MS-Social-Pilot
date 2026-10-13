@@ -760,7 +760,10 @@
       "instagram": "Read Instagram",
       "instagramPublish": "Publish to Instagram",
       "ads": "Read ad results"
-    }
+    },
+    "summaryLabel": "Networks",
+    "summaryConnected": "{count, plural, one {# connected} other {# connected}}",
+    "summaryNone": "Not connected"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -4162,7 +4165,14 @@
     "moveTo_todo": "Back to do",
     "moveTo_doing": "Start",
     "moveTo_done": "Done",
-    "delete": "Delete the task"
+    "delete": "Delete the task",
+    "workflowTitle": "Start a workflow",
+    "workflowHint": "One step per line. Each step becomes a task, in order, for the person picked above, due a set number of days after the step before.",
+    "workflowSteps": "Steps",
+    "workflowPlaceholder": "Write the brief\nGet the client’s OK\nSchedule the posts",
+    "workflowStart": "First step due",
+    "workflowGap": "Days between steps",
+    "workflowStartButton": "Create the tasks"
   },
   "design": {
     "title": "Design",

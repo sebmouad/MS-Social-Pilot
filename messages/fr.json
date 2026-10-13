@@ -760,7 +760,10 @@
       "instagram": "Lire Instagram",
       "instagramPublish": "Publier sur Instagram",
       "ads": "Lire les résultats publicitaires"
-    }
+    },
+    "summaryLabel": "Réseaux",
+    "summaryConnected": "{count, plural, one {# connecté} other {# connectés}}",
+    "summaryNone": "Non connecté"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -4162,7 +4165,14 @@
     "moveTo_todo": "Remettre à faire",
     "moveTo_doing": "Commencer",
     "moveTo_done": "Terminé",
-    "delete": "Supprimer la tâche"
+    "delete": "Supprimer la tâche",
+    "workflowTitle": "Lancer un processus",
+    "workflowHint": "Une étape par ligne. Chaque étape devient une tâche, dans l’ordre, pour la personne choisie plus haut, à rendre un nombre de jours fixe après la précédente.",
+    "workflowSteps": "Étapes",
+    "workflowPlaceholder": "Rédiger le brief\nObtenir l’accord du client\nProgrammer les publications",
+    "workflowStart": "Première étape pour le",
+    "workflowGap": "Jours entre les étapes",
+    "workflowStartButton": "Créer les tâches"
   },
   "design": {
     "title": "Création",

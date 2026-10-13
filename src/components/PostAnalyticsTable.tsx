@@ -349,7 +349,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
         <label className="flex items-center gap-2 text-xs text-slate-600">
           {t('rowsPerPage')}
           <select
-            className="input w-auto py-1 text-sm"
+            className="input-sm"
             value={size}
             onChange={(event) => {
               setSize(Number(event.target.value) as (typeof PAGE_SIZES)[number]);

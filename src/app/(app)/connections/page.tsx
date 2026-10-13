@@ -13,6 +13,8 @@ import { screenMetadata } from '@/lib/metadata';
 import { canManageAccounts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
+import { TargetType } from '@prisma/client';
+import { targetScope } from '@/lib/page-access';
 import { formatInZone } from '@/lib/time';
 import { abilitiesOf } from '@/lib/scope-abilities';
 
@@ -90,6 +92,12 @@ export default async function ConnectionsPage({
   });
 
   const canManage = canManageAccounts(auth.role);
+  const tType = await getTranslations('pagesSidebar.type');
+  const typeCounts = await prisma.target.groupBy({
+    by: ['type'],
+    where: { workspaceId: auth.workspace.id, ...targetScope(auth.pageScope) },
+    _count: { _all: true },
+  });
   const accounts = allAccounts.filter((account) => account.provider === 'facebook');
   const networkAccounts = allAccounts.filter((account) => isNetworkKey(account.provider));
   const networkNotice = first(params.network);
@@ -151,6 +159,24 @@ export default async function ConnectionsPage({
         ))}
       </nav>
 
+
+      {/* Every network at a glance: how many are connected, or that none is yet. */}
+      <section aria-label={t('summaryLabel')} className="card divide-y divide-slate-100">
+        {(Object.values(TargetType) as TargetType[])
+          .filter((type) => (type !== 'group' || env.groupsEnabled) && (type !== 'instagram' || env.instagramEnabled))
+          .map((type) => {
+            const count = typeCounts.find((row) => row.type === type)?._count._all ?? 0;
+            const anchor = type === 'page' || type === 'group' ? '#facebook' : type === 'instagram' ? '#instagram' : '#networks';
+            return (
+              <a key={type} href={anchor} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-slate-50">
+                <span className="font-semibold text-slate-900">{tType(type)}</span>
+                <span className={count > 0 ? 'font-semibold text-emerald-700' : 'text-slate-500'}>
+                  {count > 0 ? t('summaryConnected', { count }) : t('summaryNone')}
+                </span>
+              </a>
+            );
+          })}
+      </section>
 
       {accounts.length === 0 && orphans.length === 0 ? (
         <div className="card flex flex-col items-center gap-3 p-8 text-center">

@@ -29,6 +29,10 @@ export function TasksClient({ tasks, members, myId, canEdit }: { tasks: TaskRow[
   const [due, setDue] = useState('');
   const [mine, setMine] = useState(false);
   const [error, setError] = useState(false);
+  const [steps, setSteps] = useState('');
+  const [start, setStart] = useState('');
+  const [gap, setGap] = useState(1);
+  const [running, setRunning] = useState(false);
   const names = new Map(members.map((member) => [member.id, member.name]));
 
   async function call(path: string, method: string, body?: unknown) {
@@ -48,6 +52,31 @@ export function TasksClient({ tasks, members, myId, canEdit }: { tasks: TaskRow[
       setTitle('');
       setDue('');
     }
+  }
+
+  /**
+   * A workflow: one task per line, in order, each due `gap` days after the one
+   * before (from the start day, when there is one), all for the same person.
+   */
+  async function startWorkflow() {
+    const lines = steps.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 30);
+    setRunning(true);
+    setError(false);
+    for (const [index, line] of lines.entries()) {
+      const dueOn = start ? new Date(Date.parse(`${start}T00:00:00Z`) + index * gap * 86_400_000).toISOString().slice(0, 10) : null;
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: line.slice(0, 200), assigneeId: assignee || null, dueOn }),
+      }).catch(() => null);
+      if (!response?.ok) {
+        setError(true);
+        break;
+      }
+    }
+    setRunning(false);
+    setSteps('');
+    router.refresh();
   }
 
   const shown = tasks.filter((task) => !mine || task.assigneeId === myId);
@@ -83,6 +112,28 @@ export function TasksClient({ tasks, members, myId, canEdit }: { tasks: TaskRow[
             <Icon name="plus" size={16} /> {t('add')}
           </button>
         </form>
+      )}
+      {canEdit && (
+        <details className="card p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-700">{t('workflowTitle')}</summary>
+          <div className="mt-3 space-y-2">
+            <p className="hint">{t('workflowHint')}</p>
+            <textarea aria-label={t('workflowSteps')} className="input" rows={4} value={steps} placeholder={t('workflowPlaceholder')} onChange={(event) => setSteps(event.target.value)} />
+            <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap">
+              <div>
+                <label className="label" htmlFor="workflow-start">{t('workflowStart')}</label>
+                <input id="workflow-start" type="date" className="input" value={start} onChange={(event) => setStart(event.target.value)} />
+              </div>
+              <div>
+                <label className="label" htmlFor="workflow-gap">{t('workflowGap')}</label>
+                <input id="workflow-gap" type="number" min={0} max={30} className="input" value={gap} onChange={(event) => setGap(Math.max(0, Math.min(30, Number(event.target.value) || 0)))} />
+              </div>
+              <button type="button" className="btn-secondary col-span-2 sm:col-auto" disabled={running || !steps.trim()} onClick={() => void startWorkflow()}>
+                {running ? tCommon('working') : t('workflowStartButton')}
+              </button>
+            </div>
+          </div>
+        </details>
       )}
       <div className="flex items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-slate-700">

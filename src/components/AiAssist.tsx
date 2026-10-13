@@ -114,7 +114,7 @@ export function AiAssist({ draft, onResult, targetIds = [], onHashtags }: Props)
         )}
 
         <select
-          className="ms-auto rounded-lg border border-slate-300 px-2 py-1 text-xs"
+          className="ms-auto input-sm"
           value={tone}
           onChange={(event) => setTone(event.target.value)}
           aria-label={t('aiTone')}

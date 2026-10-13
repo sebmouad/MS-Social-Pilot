@@ -28,7 +28,7 @@ always the left sidebar (`src/components/AppShell.tsx`).
 
 ## Component classes and components
 - `.card`, `.card-viz`, `.btn-primary`, `.btn-secondary`, `.btn-ghost`,
-  `.btn-danger`, `.input`, `.label`, `.hint`, `.badge`, `.segmented` +
+  `.btn-danger`, `.input` (`.input-sm` for a compact select in a row), `.label`, `.hint`, `.badge`, `.segmented` +
   `.segmented-item(-active)`, `.scroll-x`, `.filter-row`, `.nums` (tabular figures).
 - `Dialog` (centred, Escape/backdrop close, focus trap-lite), `ConfirmProvider` /
   `useConfirm()` (title = question, body = consequence, action-named buttons,

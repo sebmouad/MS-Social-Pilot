@@ -45,7 +45,7 @@ export function CommentDelay({
       </label>
       <select
         id="comment-delay"
-        className="input w-auto py-1 text-sm"
+        className="input-sm"
         disabled={disabled}
         value={custom ? 'custom' : String(value)}
         onChange={(event) => {

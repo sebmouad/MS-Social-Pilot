@@ -258,7 +258,7 @@ export function PostList({
           <label className="flex items-center gap-1.5 text-sm text-slate-600">
             <span>{tBulk('moveBy')}</span>
             <select
-              className="input h-9 w-auto py-0"
+              className="input-sm"
               value=""
               disabled={bulkBusy}
               onChange={(event) => {
@@ -284,7 +284,7 @@ export function PostList({
               <label className="flex items-center gap-1.5 text-sm">
                 <span className="sr-only">{tBulk('addLabel')}</span>
                 <select
-                  className="input h-9 w-auto py-0"
+                  className="input-sm"
                   value=""
                   disabled={bulkBusy}
                   onChange={(event) => event.target.value && void bulk({ kind: 'label', labelId: event.target.value, add: true })}
@@ -300,7 +300,7 @@ export function PostList({
               <label className="flex items-center gap-1.5 text-sm">
                 <span className="sr-only">{tBulk('removeLabel')}</span>
                 <select
-                  className="input h-9 w-auto py-0"
+                  className="input-sm"
                   value=""
                   disabled={bulkBusy}
                   onChange={(event) => event.target.value && void bulk({ kind: 'label', labelId: event.target.value, add: false })}

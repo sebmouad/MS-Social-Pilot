@@ -389,7 +389,7 @@ export function TeamClient({ members, invitations, canManage, viewerRole, emailC
               {canManageMember(member) ? (
                 <>
                   <select
-                    className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                    className="input-sm"
                     aria-label={t('memberRole', { name: member.name })}
                     value={requested?.userId === member.userId ? requested.role : member.role}
                     disabled={busy.has(member.userId)}

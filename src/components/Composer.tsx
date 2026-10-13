@@ -172,6 +172,7 @@ export function Composer({
   const backgroundAllowed = format === 'post' && !link.trim() && media.length === 0 && message.length <= BACKGROUND_MAX_CHARS;
   const [naturalSizes, setNaturalSizes] = useState<Record<string, { width: number; height: number }>>({});
   const [selected, setSelected] = useState<string[]>(editing?.targetIds ?? initialTargetIds ?? []);
+  const [moreOpen, setMoreOpen] = useState(Boolean(editing?.firstComment || editing?.place || editing?.textBackground));
   const [savedGroups, setSavedGroups] = useState<PageGroupView[]>([]);
   const [groupName, setGroupName] = useState<string | null>(null);
   const [groupStatus, setGroupStatus] = useState<{ ok: boolean; text: string } | null>(null);
@@ -734,6 +735,13 @@ export function Composer({
           {/* What a person means by a character: one emoji is one, not two. */}
           <ComposerTools text={message} insert={insertAtCursor} canDelete={canEditLabels} />
 
+          {/* Less used settings, folded so the composer starts short; open when a post already uses one. */}
+          <details
+            className="mt-5 rounded-xl border border-slate-200 px-4 py-3"
+            open={moreOpen}
+            onToggle={(event) => setMoreOpen((event.currentTarget as HTMLDetailsElement).open)}
+          >
+            <summary className="cursor-pointer text-sm font-semibold text-slate-700">{tCommon('moreOptions')}</summary>
           <div className={`mt-5 ${format === 'story' ? 'hidden' : ''}`}>
             <label className="label" htmlFor="first-comment">
               {t('firstComment')} <span className="font-normal text-slate-400">{tAuth('optional')}</span>
@@ -804,6 +812,7 @@ export function Composer({
               {t('placeHint')}
             </p>
           </div>
+          </details>
 
           {/* Instagram's limit is a fifth of Facebook's and genuinely
               reachable. Said here rather than discovered at the scheduled

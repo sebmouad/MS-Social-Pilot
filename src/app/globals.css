@@ -359,6 +359,12 @@
     @apply btn px-2 text-slate-600 hover:bg-slate-100;
   }
 
+  /* A small select inside a row (filters, per-item menus): same border and focus as .input. */
+  .input-sm {
+    @apply h-9 w-auto rounded-md border border-slate-300 bg-white px-2 py-0 text-sm text-slate-900
+      focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+  }
+
   .input {
     @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900
       placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;

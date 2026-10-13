@@ -27,7 +27,7 @@ export function QuerySelect({
     <label>
       <span className="sr-only">{label}</span>
       <select
-        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+        className="input-sm"
         value={value}
         onChange={(event) => {
           const next = new URLSearchParams(params.toString());
