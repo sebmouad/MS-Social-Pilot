@@ -184,3 +184,9 @@ MCP `POST /api/mcp` (tools: list_pages, list_posts, create_post, update_post, ca
 get_page_analytics); API keys read or read/write, acting as their owner. PWA
 (manifest, icons, offline page, share target, shortcuts). Slack incoming
 webhooks, Telegram bots.
+
+## Saved views (2026-10-13)
+Calendar and Posts: in the channel column, "My views" lists the person's saved
+combinations of channels, labels and filters, one click to reopen; "Save this
+view" names the current one. Per person and screen (`saved_views`); the date
+or page being looked at is not part of a view. `/api/saved-views`.

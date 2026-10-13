@@ -4039,5 +4039,15 @@
     "granted": "{name} est maintenant {role} dans {client}.",
     "removed": "{name} n’a plus accès à {client}.",
     "failed": "Cela n’a pas fonctionné. Réessayez."
+  },
+  "savedViews": {
+    "title": "Mes vues",
+    "empty": "Enregistrez les canaux et filtres que vous utilisez ensemble, puis rouvrez-les en un clic.",
+    "saveCurrent": "Enregistrer cette vue",
+    "save": "Enregistrer",
+    "nameLabel": "Nom de la vue",
+    "namePlaceholder": "Nom, par exemple « Client A, cette semaine »",
+    "remove": "Supprimer la vue {name}",
+    "saveFailed": "Impossible d’enregistrer la vue. Réessayez."
   }
 }

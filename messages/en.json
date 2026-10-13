@@ -4039,5 +4039,15 @@
     "granted": "{name} is now {role} in {client}.",
     "removed": "{name} no longer has access to {client}.",
     "failed": "That did not work. Try again."
+  },
+  "savedViews": {
+    "title": "My views",
+    "empty": "Save the channels and filters you use together, then reopen them in one click.",
+    "saveCurrent": "Save this view",
+    "save": "Save",
+    "nameLabel": "Name of the view",
+    "namePlaceholder": "Name, for example “Client A, this week”",
+    "remove": "Remove the view {name}",
+    "saveFailed": "The view could not be saved. Try again."
   }
 }

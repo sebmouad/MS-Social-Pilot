@@ -184,6 +184,7 @@ model User {
   aiGenerations        AiGeneration[]
   settingChanges       AppSetting[]
   apiTokens            ApiToken[]
+  savedViews           SavedView[]
   rootActions          RootActivity[]
   recoveryCodes        RecoveryCode[]
   trustedDevices       TrustedDevice[]
@@ -328,6 +329,7 @@ model Workspace {
   chartNotes           ChartNote[]
   postTemplates        PostTemplate[]
   savedReplies         SavedReply[]
+  savedViews           SavedView[]
   captionTests         CaptionTest[]
   shareLinks           ShareLink[]
   reportTemplates      ReportTemplate[]
@@ -1571,6 +1573,26 @@ model PostTemplate {
 
 /// A reusable answer for comments and Messenger (NEXT_PHASES G8), with
 /// `{first_name}` and `{page}` filled when it is picked. Shared per workspace.
+/// A named combination of channels, filters and status on the calendar or the
+/// post list, reopened in one click. Per person: `query` is the address's own
+/// query string, so it is exactly what the screen already understands.
+model SavedView {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  name        String
+  /// "calendar" or "posts".
+  screen      String
+  query       String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, userId, screen])
+  @@map("saved_views")
+}
+
 model SavedReply {
   id          String   @id @default(cuid())
   workspaceId String

@@ -1,3 +1,4 @@
+import { SavedViews } from '@/components/SavedViews';
 import Link from 'next/link';
 import type { Prisma } from '@prisma/client';
 import { getTranslations } from 'next-intl/server';
@@ -69,7 +70,15 @@ export default async function PostsPage({
 
   // Every destination this member may see, enabled or not: a Page switched
   // off last month still has posts worth finding.
-  const [filter, labels] = await Promise.all([loadPageFilter(auth, params), listLabels(auth.workspace.id)]);
+  const [filter, labels, savedViews] = await Promise.all([
+    loadPageFilter(auth, params),
+    listLabels(auth.workspace.id),
+    prisma.savedView.findMany({
+      where: { workspaceId: auth.workspace.id, userId: auth.user.id, screen: 'posts' },
+      select: { id: true, name: true, query: true },
+      orderBy: { name: 'asc' },
+    }),
+  ]);
   const labelParam = first(params.label);
   const activeLabel = labels.find((label) => label.id === labelParam) ?? null;
   const labelById = new Map(labels.map((label) => [label.id, label]));
@@ -206,6 +215,10 @@ export default async function PostsPage({
           );
         })}
       </nav>
+
+      <div className="card p-3">
+        <SavedViews screen="posts" views={savedViews} />
+      </div>
 
       <PagesSidebar
         workspaceId={auth.workspace.id}

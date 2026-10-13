@@ -1,3 +1,4 @@
+import { SavedViews } from '@/components/SavedViews';
 import { EmptyState } from '@/components/EmptyState';
 import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
@@ -103,10 +104,15 @@ export default async function CalendarPage({
   const safeYear = Number.isFinite(year) ? year : today.getUTCFullYear();
   const safeMonth = Number.isFinite(monthIndex) && monthIndex >= 0 && monthIndex <= 11 ? monthIndex : today.getUTCMonth();
 
-  const [filter, labels, aiSetting] = await Promise.all([
+  const [filter, labels, aiSetting, savedViews] = await Promise.all([
     loadPageFilter(auth, params),
     listLabels(auth.workspace.id),
     prisma.workspace.findUnique({ where: { id: auth.workspace.id }, select: { aiEnabled: true, weekStartsOn: true } }),
+    prisma.savedView.findMany({
+      where: { workspaceId: auth.workspace.id, userId: auth.user.id, screen: 'calendar' },
+      select: { id: true, name: true, query: true },
+      orderBy: { name: 'asc' },
+    }),
   ]);
   const aiOn = aiAvailable() && Boolean(aiSetting?.aiEnabled);
   const labelParam = Array.isArray(params.label) ? params.label[0] : params.label;
@@ -451,6 +457,7 @@ export default async function CalendarPage({
           <Link href="/compose" className="btn-primary">
             {tDash('newPost')}
           </Link>
+      <SavedViews screen="calendar" views={savedViews} />
     </div>
   );
 
