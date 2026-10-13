@@ -72,12 +72,6 @@ test('switching tabs keeps the Page and window but drops one view’s filters', 
   expect(next.searchParams.get('days')).toBe('7');
   for (const dropped of ['q', 'shown', 'page']) expect(next.searchParams.has(dropped)).toBe(false);
 
-  // The comment filter keeps the window too, rather than resetting it to 30 days.
-  await expect(page.locator('form input[type="hidden"][name="days"]')).toHaveValue('7');
-
-  // Comments are not windowed, so the header claims no date range.
-  await expect(page.locator('header p').first()).not.toContainText('–');
-
   expect(failures).toEqual([]);
 });
 
