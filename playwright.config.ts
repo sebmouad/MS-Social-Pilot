@@ -85,6 +85,8 @@ export default defineConfig({
       // Unlocks the one route that throws on purpose, so the error boundary is
       // exercised rather than assumed. Set nowhere else.
       E2E_ALLOW_THROW: 'true',
+      // A production build over plain http: its Secure cookies would never come back.
+      E2E_INSECURE_COOKIES: 'true',
     },
   },
 });

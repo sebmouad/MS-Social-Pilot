@@ -29,6 +29,16 @@ import { emailEnabled } from './email/send';
 import { hit } from './rate-limit';
 
 /**
+ * Cookies are Secure in production. The browser walk serves a production build
+ * over plain http on localhost, where a Secure cookie is not sent by its API
+ * client, so that one harness switches it off; it is set nowhere else.
+ */
+function cookiesSecure(): boolean {
+  return env.isProduction && process.env.E2E_INSECURE_COOKIES !== 'true';
+}
+
+
+/**
  * Sessions, and resolving which workspace the request is acting on.
  *
  * Sessions are database-backed rather than stateless JWTs so logging out, or
@@ -376,7 +386,7 @@ export async function setSessionCookie(token: string): Promise<void> {
     httpOnly: true,
     // "lax" so the OAuth redirect back from Facebook keeps the session.
     sameSite: 'lax',
-    secure: env.isProduction,
+    secure: cookiesSecure(),
     path: '/',
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
   });
@@ -444,7 +454,7 @@ export async function setTrustedDeviceCookie(token: string, days: number): Promi
   (await cookies()).set(TRUSTED_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: env.isProduction,
+    secure: cookiesSecure(),
     path: '/',
     maxAge: days * 24 * 60 * 60,
   });
@@ -475,7 +485,7 @@ export async function setActiveWorkspaceCookie(workspaceId: string): Promise<voi
   store.set(WORKSPACE_COOKIE, workspaceId, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: env.isProduction,
+    secure: cookiesSecure(),
     path: '/',
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
   });
@@ -682,7 +692,7 @@ export async function startRootVisit(workspaceId: string): Promise<void> {
   store.set(ROOT_VISIT_COOKIE, workspaceId, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: env.isProduction,
+    secure: cookiesSecure(),
     path: '/',
     maxAge: 60 * 60 * 8,
   });
