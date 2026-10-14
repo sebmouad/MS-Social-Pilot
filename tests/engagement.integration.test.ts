@@ -415,6 +415,33 @@ describe('syncTargetEdges', () => {
 });
 
 describe('external post insights', () => {
+  it('reads every selected Page post beyond the preview limit', async () => {
+    const { workspace, target } = await seedWorkspace();
+    const other = await prisma.target.create({ data: {
+      workspaceId: workspace.id, type: 'page', providerId: 'other-external-page', name: 'Other Page',
+    } });
+    const createdTime = new Date('2026-09-01T12:00:00Z');
+    await prisma.externalPost.createMany({ data: [
+      ...Array.from({ length: 501 }, (_, index) => ({
+        targetId: target.id, remoteId: `external-${index}`, message: `Post ${index}`, createdTime,
+        insights: { reactions: 1 },
+      })),
+      { targetId: other.id, remoteId: 'outside-selection', message: 'Other', createdTime, insights: { reactions: 99 } },
+    ] });
+
+    const window = { workspaceId: workspace.id, targetIds: [target.id],
+      from: new Date('2026-09-01T00:00:00Z'), to: new Date('2026-09-02T00:00:00Z') };
+    expect(await engagement.readExternalPosts({ ...window, limit: 100 })).toHaveLength(100);
+    const posts = await engagement.readExternalPosts({ ...window, all: true });
+    expect(posts).toHaveLength(501);
+    expect(posts.reduce((sum, post) => sum + (post.reactions ?? 0), 0)).toBe(501);
+    expect(new Set(posts.map((post) => post.id)).size).toBe(501);
+    expect(posts.every((post) => post.targetName === target.name)).toBe(true);
+    const { externalPostsCsv } = await import('../src/lib/analytics-export');
+    const csv = await externalPostsCsv(window);
+    expect(csv.trimEnd().split('\n')).toHaveLength(502);
+  });
+
   /** The post catalogue, as Graph returns it for a single post. */
   function stubPostCatalogue(): void {
     routes['/insights'] = () => ({

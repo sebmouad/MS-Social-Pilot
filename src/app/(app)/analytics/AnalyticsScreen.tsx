@@ -329,7 +329,7 @@ export async function AnalyticsScreen({
             source: 'app' as const,
           })),
             // Posts made on Facebook itself, so the table covers the whole Page.
-            (await readExternalPosts({ workspaceId: auth.workspace.id, ...postsScope, from, to, limit: 500 })).map(
+            (await readExternalPosts({ workspaceId: auth.workspace.id, ...postsScope, from, to, all: true })).map(
               (post) => {
                 const interactions = post.reactions !== null && post.comments !== null && post.shares !== null
                   ? post.reactions + post.comments + post.shares

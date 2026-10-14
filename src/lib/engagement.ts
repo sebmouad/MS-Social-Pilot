@@ -1345,42 +1345,51 @@ export async function readExternalPosts(options: {
   from?: Date;
   to?: Date;
   limit?: number;
+  /** Read the entire window for Analytics and CSV, rather than a recent preview. */
+  all?: boolean;
 }): Promise<ExternalPostRow[]> {
-  const rows = await prisma.externalPost.findMany({
-    where: {
-      target: { workspaceId: options.workspaceId },
-      ...(options.targetId ? { targetId: options.targetId } : options.targetIds ? { targetId: { in: options.targetIds } } : {}),
-      ...(options.from || options.to
-        ? { createdTime: { ...(options.from ? { gte: options.from } : {}), ...(options.to ? { lte: options.to } : {}) } }
-        : {}),
-    },
-    include: { target: { select: { name: true, pictureUrl: true } } },
-    orderBy: { createdTime: 'desc' },
-    take: options.limit ?? 100,
-  });
-
-  return rows.map((row) => {
-    const insights = parseInsights(row.insights);
-
-    return {
-      id: row.id,
-      message: row.message ?? '(no text)',
-      permalink: row.permalink,
-      statusType: row.statusType,
-      createdTime: row.createdTime,
-      targetName: row.target.name,
-      targetPictureUrl: row.target.pictureUrl,
-      pictureUrl: row.pictureUrl,
-      impressions: insights?.impressions ?? null,
-      reach: insights?.reach ?? null,
-      engagedUsers: insights?.engagedUsers ?? null,
-      reactions: insights?.reactions ?? null,
-      comments: insights?.comments ?? null,
-      shares: insights?.shares ?? null,
-      metricCount: Object.keys(insights?.metrics ?? {}).length,
-      syncedAt: row.insightsSyncedAt,
-    };
-  });
+  const rows: ExternalPostRow[] = [];
+  const size = options.all ? 500 : options.limit ?? 100;
+  let cursor: string | undefined;
+  for (;;) {
+    const batch = await prisma.externalPost.findMany({
+      where: {
+        target: { workspaceId: options.workspaceId },
+        ...(options.targetId ? { targetId: options.targetId } : options.targetIds ? { targetId: { in: options.targetIds } } : {}),
+        ...(options.from || options.to
+          ? { createdTime: { ...(options.from ? { gte: options.from } : {}), ...(options.to ? { lte: options.to } : {}) } }
+          : {}),
+      },
+      include: { target: { select: { name: true, pictureUrl: true } } },
+      orderBy: [{ createdTime: 'desc' }, { id: 'desc' }],
+      take: size,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+    rows.push(...batch.map((row) => {
+      const insights = parseInsights(row.insights);
+      return {
+        id: row.id,
+        message: row.message ?? '(no text)',
+        permalink: row.permalink,
+        statusType: row.statusType,
+        createdTime: row.createdTime,
+        targetName: row.target.name,
+        targetPictureUrl: row.target.pictureUrl,
+        pictureUrl: row.pictureUrl,
+        impressions: insights?.impressions ?? null,
+        reach: insights?.reach ?? null,
+        engagedUsers: insights?.engagedUsers ?? null,
+        reactions: insights?.reactions ?? null,
+        comments: insights?.comments ?? null,
+        shares: insights?.shares ?? null,
+        metricCount: Object.keys(insights?.metrics ?? {}).length,
+        syncedAt: row.insightsSyncedAt,
+      };
+    }));
+    if (!options.all || batch.length < size) break;
+    cursor = batch[batch.length - 1]!.id;
+  }
+  return rows;
 }
 
 /**

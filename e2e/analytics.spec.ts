@@ -135,3 +135,25 @@ test('a Page post with unread insights shows missing figures instead of zero', a
     await prisma.externalPost.delete({ where: { id: external.id } });
   }
 });
+
+test('Posts counts every Page post beyond the former 500-row limit', async ({ page }) => {
+  const failures = collectFailures(page);
+  const createdTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  await prisma.externalPost.createMany({ data: Array.from({ length: 501 }, (_, index) => ({
+    targetId, remoteId: `e2e-page-count-${index}`, message: `Walk: external ${index}`, createdTime,
+  })) });
+  try {
+    await open(page, `/analytics?view=posts&target=${targetId}`);
+    const sources = page.getByRole('radiogroup', { name: 'Which posts' });
+    const pagePosts = sources.getByRole('radio', { name: /Made on Facebook 501/ });
+    await expect(pagePosts).toBeVisible();
+    await expect(async () => {
+      await pagePosts.click();
+      await expect(pagePosts).toHaveAttribute('aria-checked', 'true', { timeout: 1_500 });
+    }).toPass({ timeout: 30_000 });
+    await expect(page.getByText('1–25 of 501')).toBeVisible();
+    expect(failures).toEqual([]);
+  } finally {
+    await prisma.externalPost.deleteMany({ where: { targetId, remoteId: { startsWith: 'e2e-page-count-' } } });
+  }
+});

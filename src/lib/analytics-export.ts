@@ -148,7 +148,7 @@ export async function pageInsightsCsv(options: Window): Promise<string> {
 /** Posts that reached a Page without going through this app. */
 export async function externalPostsCsv(options: Window): Promise<string> {
   const posts = (
-    await perTarget(options, (targetId) => readExternalPosts({ ...options, targetId, limit: 2000 }))
+    await perTarget(options, (targetId) => readExternalPosts({ ...options, targetId, all: true }))
   ).sort((a, b) => b.createdTime.getTime() - a.createdTime.getTime());
 
   return toCsv(
