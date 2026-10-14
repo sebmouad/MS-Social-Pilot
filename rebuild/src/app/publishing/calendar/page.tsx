@@ -6,7 +6,7 @@ import styles from "../publishing.module.css";
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default async function CalendarPage() {
-  const viewer = await requireViewer();
+  const viewer = await requireViewer({ feature: 'publishing/calendar' });
   const timeZone = viewer.membership.workspace.timezone;
   const nowParts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "numeric" }).formatToParts(new Date());
   const year = Number(nowParts.find(part => part.type === "year")?.value);

@@ -5,7 +5,7 @@ import { PageHeading, PostMessage, PostTargets, formatDate } from "../publishing
 import styles from "../publishing.module.css";
 
 export default async function ApprovalsPage() {
-  const viewer = await requireViewer();
+  const viewer = await requireViewer({ feature: 'publishing/approvals' });
   const posts = (await listPosts(viewer.workspaceId)).filter(post => post.status === "pending_approval").sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   const columns: TableColumn<PostSummary>[] = [
     { key: "post", label: "Post", render: post => <PostMessage message={post.message}/> },

@@ -5,7 +5,7 @@ import { PageHeading, PostMessage, PostTargets, formatDate } from "../publishing
 import styles from "../publishing.module.css";
 
 export default async function QueuePage() {
-  const viewer = await requireViewer();
+  const viewer = await requireViewer({ feature: 'publishing/queue' });
   const posts = (await listPosts(viewer.workspaceId)).filter(post => post.status === "scheduled").sort((a, b) => (a.scheduledAt?.getTime() ?? 0) - (b.scheduledAt?.getTime() ?? 0));
   const columns: TableColumn<PostSummary>[] = [
     { key: "time", label: "Scheduled for", render: post => <span className={styles.date}>{formatDate(post.scheduledAt, viewer.membership.workspace.timezone)}</span> },

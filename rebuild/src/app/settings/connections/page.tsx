@@ -11,7 +11,7 @@ const providerName = (provider: string) => provider.replace(/[_-]/g, ' ').replac
 const accountStatus = (invalidatedAt: Date | null) => invalidatedAt ? { label: 'Needs attention', tone: 'warning' as const } : { label: 'Connected', tone: 'good' as const };
 
 export default async function ConnectionsPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
-  const [viewer, params] = await Promise.all([requireViewer(), searchParams]);
+  const [viewer, params] = await Promise.all([requireViewer({ feature: 'settings/connections' }), searchParams]);
   const [accounts, adAccounts] = await Promise.all([listConnections(viewer.workspaceId), getAdAccounts(viewer.workspaceId)]);
   const socialById = new Map(accounts.map(account => [account.id, account]));
   const adRows = adAccounts.map(ad => {

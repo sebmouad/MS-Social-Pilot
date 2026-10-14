@@ -3,7 +3,7 @@ import { requireViewer } from '@/server/context';
 import { getAdPerformance } from '@/server/data';
 
 export default async function CampaignsPage() {
-  const { workspaceId } = await requireViewer();
+  const { workspaceId } = await requireViewer({ feature: 'ads/campaigns' });
   const { campaignRows } = await getAdPerformance(workspaceId, 30);
   const campaigns = new Map<string, { id: string; name: string; account: string; currency: string | null; spend: number; impressions: number; clicks: number; reach: number; reachDate: Date | null }>();
   for (const row of campaignRows) {

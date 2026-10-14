@@ -20,10 +20,12 @@ export default function SignIn() {
         body: JSON.stringify({ email: form.get('email'), password: form.get('password') }),
       });
       const result = await response.json();
-      if (result.code === 'SECOND_FACTOR_REQUIRED') {
-        setMessage('This account requires a second factor. The rebuild cannot verify TOTP, passkeys, or recovery codes yet. Use the existing app to sign in.');
-      } else if (!response.ok) {
+      if (!response.ok) {
         setMessage('Sign-in failed. Check your email and password.');
+      } else if (result.next === 'verify') {
+        window.location.assign('/two-step');
+      } else if (result.next === 'enroll') {
+        window.location.assign('/two-step/enroll');
       } else {
         window.location.assign('/home');
       }

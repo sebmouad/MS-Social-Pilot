@@ -63,8 +63,12 @@ model User {
   passwordHash String
   disabledAt   DateTime?
   isInstanceOwner Boolean @default(false)
+  totpSecret String?
+  totpPendingSecret String?
   totpEnabledAt DateTime?
+  totpLastStep Int?
   passkeys     Passkey[]
+  recoveryCodes RecoveryCode[]
   memberships  Membership[]
   posts        Post[]
   sessions     Session[]
@@ -100,6 +104,18 @@ model Passkey {
 
   @@index([userId])
   @@map("passkeys")
+}
+
+model RecoveryCode {
+  id        String    @id
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("recovery_codes")
 }
 
 model AppSetting {

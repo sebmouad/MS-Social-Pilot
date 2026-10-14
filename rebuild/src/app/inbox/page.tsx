@@ -3,7 +3,7 @@ import { requireViewer } from '@/server/context';
 import { prisma } from '@/server/data';
 
 export default async function InboxPage() {
-  const viewer = await requireViewer();
+  const viewer = await requireViewer({ feature: 'inbox/conversations' });
   const [conversations, comments] = await Promise.all([
     prisma.conversation.findMany({
       where: { target: { workspaceId: viewer.workspaceId } },

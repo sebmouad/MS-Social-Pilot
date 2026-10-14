@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { signIn } from '@/server/auth-flow';
+import { authRateLimit, signIn } from '@/server/auth-flow';
 import { hit, clear, forgive } from '@/server/rate-limit';
 import { clientIp } from '@/server/client-ip';
 
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   }
   const address = email.trim().toLowerCase();
   const client = clientIp(request);
-  const limit = { limit: Number(process.env.LOGIN_ATTEMPTS) || 10, windowMs: (Number(process.env.LOGIN_WINDOW_MINUTES) || 15) * 60_000 };
+  const limit = await authRateLimit();
   const addressKey = `rebuild-login:address:${address}`;
   const clientKey = client ? `rebuild-login:client:${client}` : null;
   const pairKey = client ? `rebuild-login:pair:${client}:${address}` : null;
@@ -31,8 +31,7 @@ export async function POST(request: Request) {
       forgive(clientKey, Number.MAX_SAFE_INTEGER - pair.remaining);
       clear(pairKey);
     }
-    if (outcome === 'second-factor-required') return NextResponse.json({ code: 'SECOND_FACTOR_REQUIRED' }, { status: 403 });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, next: outcome });
   } catch {
     return NextResponse.json({ code: 'INVALID_CREDENTIALS' }, { status: 401 });
   }

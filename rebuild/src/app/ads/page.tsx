@@ -3,7 +3,7 @@ import { requireViewer } from '@/server/context';
 import { getAdAccounts, getAdPerformance } from '@/server/data';
 
 export default async function AdsPage() {
-  const { workspaceId } = await requireViewer();
+  const { workspaceId } = await requireViewer({ feature: 'ads/overview' });
   const accounts = await getAdAccounts(workspaceId);
   const { accountRows } = await getAdPerformance(workspaceId, 30);
   const enabled = accounts.filter((account) => account.enabled).length;

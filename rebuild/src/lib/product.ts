@@ -5,7 +5,7 @@ export type FeatureId =
   | 'publishing/posts' | 'publishing/calendar' | 'publishing/queue' | 'publishing/approvals'
   | 'inbox/conversations' | 'analytics/overview' | 'analytics/reports'
   | 'ads/overview' | 'ads/campaigns'
-  | 'settings/connections' | 'settings/team' | 'settings/account';
+  | 'settings/connections' | 'settings/team' | 'settings/account' | 'settings/appearance';
 
 export interface ProductPage {
   id: FeatureId;
@@ -29,6 +29,7 @@ export const PAGES: readonly ProductPage[] = [
   { id: 'settings/connections', title: 'Connections', href: '/settings/connections', module: 'settings', description: 'Choose connected accounts and channels.' },
   { id: 'settings/team', title: 'Team', href: '/settings/team', module: 'settings', description: 'Manage people and access.' },
   { id: 'settings/account', title: 'Account', href: '/settings/account', module: 'settings', description: 'Your profile and preferences.' },
+  { id: 'settings/appearance', title: 'Appearance', href: '/settings/appearance', module: 'settings', description: 'Choose a comfortable theme.' },
 ] as const;
 
 export const MODULES: readonly { id: ModuleId; title: string; href: string }[] = [

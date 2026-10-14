@@ -6,7 +6,7 @@ import { SettingsPage, SettingsPanel, styles } from '../_components';
 export const metadata: Metadata = { title: 'Account' };
 
 export default async function AccountPage() {
-  const viewer = await requireViewer();
+  const viewer = await requireViewer({ feature: 'settings/account' });
   const values = [
     { label: 'Name', value: viewer.user.name },
     { label: 'Email', value: viewer.user.email },

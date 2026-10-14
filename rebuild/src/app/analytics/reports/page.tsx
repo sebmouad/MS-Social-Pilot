@@ -3,7 +3,7 @@ import { requireViewer } from '@/server/context';
 import { listPosts } from '@/server/data';
 
 export default async function ReportsPage() {
-  const { workspaceId } = await requireViewer();
+  const { workspaceId } = await requireViewer({ feature: 'analytics/reports' });
   const posts = await listPosts(workspaceId, 500);
   const total = posts.length;
   const published = posts.filter((post) => post.status === 'published').length;

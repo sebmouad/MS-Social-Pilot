@@ -14,7 +14,7 @@ const NOTICE_TEXT: Record<string, string> = {
 };
 
 export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
-  const viewer = await requireViewer();
+  const viewer = await requireViewer({ feature: 'publishing/posts' });
   const posts = await listPosts(viewer.workspaceId);
   const { notice } = await searchParams;
   const noticeText = notice ? NOTICE_TEXT[notice] : undefined;

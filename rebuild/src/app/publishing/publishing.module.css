@@ -13,10 +13,10 @@
 .targets { color: var(--ink-soft); font-size: 12px; }
 .date { white-space: nowrap; }
 .calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.weekday { padding: 12px 10px; color: var(--ink-faint); background: #fafbfa; border-bottom: 1px solid var(--line); font-size: 10px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
-.day { min-height: 116px; padding: 10px; border-right: 1px solid #edf1ed; border-bottom: 1px solid #edf1ed; }
+.weekday { padding: 12px 10px; color: var(--ink-faint); background: var(--surface-raised); border-bottom: 1px solid var(--line); font-size: 10px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.day { min-height: 116px; padding: 10px; border-right: 1px solid var(--line-subtle); border-bottom: 1px solid var(--line-subtle); }
 .day:nth-child(7n) { border-right: 0; }
-.outside { background: #fafbfa; color: #a4ada7; }
+.outside { background: var(--surface-raised); color: var(--ink-faint); }
 .dayNumber { margin-bottom: 8px; font-size: 12px; font-weight: 700; }
 .event { display: block; margin: 5px 0; padding: 6px 7px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; }
 .event[data-status="pending_approval"] { background: var(--warning-soft); color: var(--warning); }

@@ -20,13 +20,15 @@ function Mark() {
   return <svg className="shell-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23.5 12.2 8l4 9 3.2-5.3L27 23.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="23.5" cy="8.5" r="2.5" fill="currentColor"/></svg>;
 }
 
-export function AppShell({ children, activeModule, userName, workspaceName, sidebar }: { children: ReactNode; activeModule: ModuleId; userName: string; workspaceName: string; sidebar?: ReactNode }) {
+export function AppShell({ children, activeModule, enabledModules, enabledFeatures, userName, workspaceName, sidebar }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; userName: string; workspaceName: string; sidebar?: ReactNode }) {
   const pathname = usePathname();
-  const modulePages = PAGES.filter(page => page.module === activeModule);
+  const modulePages = PAGES.filter(page => page.module === activeModule && enabledFeatures.includes(page.id));
+  const enabledModuleSet = new Set(enabledModules);
+  const enabledModulePages = new Set(enabledFeatures.map(id => PAGES.find(page => page.id === id)?.module).filter(Boolean));
   return <div className="shell">
     <aside className="shell-sidebar" aria-label="Main navigation">
       <a className="shell-brand" href="/home" aria-label="Social Pilot, home"><Mark/><span>Social Pilot</span></a>
-      <nav className="shell-nav">{MODULES.map((module) => <a key={module.id} href={module.href} className={`shell-nav__link${activeModule === module.id ? " is-active" : ""}`} aria-current={activeModule === module.id ? "page" : undefined}>
+      <nav className="shell-nav">{MODULES.filter(module => enabledModuleSet.has(module.id) && enabledModulePages.has(module.id)).map((module) => <a key={module.id} href={PAGES.find(page => page.module === module.id && enabledFeatures.includes(page.id))?.href ?? module.href} className={`shell-nav__link${activeModule === module.id ? " is-active" : ""}`} aria-current={activeModule === module.id ? "page" : undefined}>
         <span className="shell-nav__glyph"><ModuleIcon name={module.title}/></span><span>{module.title}</span>
       </a>)}</nav>
       {modulePages.length > 1 && <nav className="shell-subnav" aria-label={`${MODULES.find(module => module.id === activeModule)?.title} pages`}>

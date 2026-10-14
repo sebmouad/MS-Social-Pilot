@@ -7,7 +7,7 @@ import { SettingsPage, SettingsPanel, styles } from '../_components';
 export const metadata: Metadata = { title: 'Team' };
 
 export default async function TeamPage() {
-  const viewer = await requireViewer();
+  const viewer = await requireViewer({ feature: 'settings/team' });
   const canViewTeam = viewer.membership.role === 'owner' || viewer.membership.role === 'admin';
   if (!canViewTeam) return <PageFrame module="settings"><SettingsPage active="settings/team" title="Team" description="Workspace members and roles."><SettingsPanel title="Team access"><p className={styles['settings-note']}>Only workspace owners and admins can view the member directory.</p></SettingsPanel></SettingsPage></PageFrame>;
   const members = await prisma.membership.findMany({

@@ -6,7 +6,7 @@ const day = 24 * 60 * 60 * 1000;
 const dateLabel = (date: Date) => date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ filter?: string; channel?: string | string[] }> }) {
-  const { workspaceId } = await requireViewer();
+  const { workspaceId } = await requireViewer({ feature: 'analytics/overview' });
   const params = await searchParams;
   const [allPosts, allInsights, targets] = await Promise.all([listPosts(workspaceId, 500), getPageInsightRows(workspaceId, 30), getTargets(workspaceId)]);
   const requested = new Set(Array.isArray(params.channel) ? params.channel : params.channel ? [params.channel] : []);
