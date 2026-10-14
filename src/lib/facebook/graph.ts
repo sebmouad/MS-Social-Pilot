@@ -337,6 +337,14 @@ interface PagedResponse<T> {
   paging?: { cursors?: { after?: string }; next?: string };
 }
 
+/** A bounded read still has more pages; callers needing complete data must retry in smaller windows. */
+export class GraphPageLimitError extends GraphError {
+  constructor(maxPages: number) {
+    super({ message: `The read exceeded ${maxPages} pages and is incomplete. Narrow the date window.`, kind: 'invalid_request' });
+    this.name = 'GraphPageLimitError';
+  }
+}
+
 /**
  * Read every page of a Graph edge.
  *
@@ -346,7 +354,7 @@ interface PagedResponse<T> {
  */
 export async function graphPaged<T>(
   path: string,
-  options: GraphRequestOptions & { maxPages: number; limit?: number },
+  options: GraphRequestOptions & { maxPages: number; limit?: number; requireComplete?: boolean },
 ): Promise<T[]> {
   const items: T[] = [];
   let after: string | undefined;
@@ -361,7 +369,15 @@ export async function graphPaged<T>(
 
     after = data.paging?.cursors?.after;
     // No `next` means this was the last page, whatever the cursor says.
-    if (!after || !data.paging?.next) break;
+    if (!data.paging?.next) break;
+    if (!after) {
+      if (options.requireComplete) throw new GraphError({
+        message: 'Graph offered another page without a cursor; the read is incomplete.',
+        kind: 'invalid_request',
+      });
+      break;
+    }
+    if (page === options.maxPages - 1 && options.requireComplete) throw new GraphPageLimitError(options.maxPages);
   }
 
   return items;

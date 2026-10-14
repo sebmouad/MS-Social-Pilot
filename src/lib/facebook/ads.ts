@@ -1,4 +1,4 @@
-import { graphPaged, graphRequest } from './graph';
+import { GraphPageLimitError, graphPaged, graphRequest } from './graph';
 import { AD_DEFAULT_FIELDS } from './metrics';
 
 /**
@@ -13,7 +13,7 @@ import { AD_DEFAULT_FIELDS } from './metrics';
  * not requested.
  */
 
-const MAX_ACCOUNT_PAGES = 3;
+const MAX_ACCOUNT_PAGES = 20;
 const MAX_INSIGHT_PAGES = 10;
 
 export interface AdAccountRef {
@@ -39,6 +39,7 @@ export async function fetchAdAccounts(
   const raw = await graphPaged<RawAdAccount>('me/adaccounts', {
     accessToken,
     maxPages: MAX_ACCOUNT_PAGES,
+    requireComplete: true,
     limit: 100,
     signal: options.signal,
     params: { fields: 'id,account_id,name,currency,account_status' },
@@ -169,18 +170,34 @@ export async function fetchAdInsights(options: {
   const requested = new Set(options.fields ?? AD_DEFAULT_FIELDS);
   requested.add(ID_FIELD[options.level]);
 
-  const raw = await graphPaged<Record<string, unknown>>(`${options.actId}/insights`, {
-    accessToken: options.accessToken,
-    maxPages: MAX_INSIGHT_PAGES,
-    limit: 200,
-    signal: options.signal,
-    params: {
-      level: options.level,
-      time_increment: 1,
-      time_range: JSON.stringify({ since: day(options.since), until: day(options.until) }),
-      fields: [...requested].join(','),
-    },
-  });
+  const fetchWindow = async (sinceDay: string, untilDay: string): Promise<Record<string, unknown>[]> => {
+    try {
+      return await graphPaged<Record<string, unknown>>(`${options.actId}/insights`, {
+        accessToken: options.accessToken,
+        maxPages: MAX_INSIGHT_PAGES,
+        requireComplete: true,
+        limit: 200,
+        signal: options.signal,
+        params: {
+          level: options.level,
+          time_increment: 1,
+          time_range: JSON.stringify({ since: sinceDay, until: untilDay }),
+          fields: [...requested].join(','),
+        },
+      });
+    } catch (error) {
+      if (!(error instanceof GraphPageLimitError) || sinceDay === untilDay) throw error;
+      const start = Date.parse(`${sinceDay}T00:00:00Z`);
+      const end = Date.parse(`${untilDay}T00:00:00Z`);
+      const middle = start + Math.floor((end - start) / (2 * 24 * 60 * 60 * 1000)) * 24 * 60 * 60 * 1000;
+      const midpoint = new Date(middle).toISOString().slice(0, 10);
+      const next = new Date(middle + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const left = await fetchWindow(sinceDay, midpoint);
+      const right = await fetchWindow(next, untilDay);
+      return [...left, ...right];
+    }
+  };
+  const raw = await fetchWindow(day(options.since), day(options.until));
 
   return raw
     .map((entry) => {

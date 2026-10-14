@@ -54,7 +54,7 @@ beforeEach(() => {
   routes = {};
 });
 
-const { graphPaged } = await import('../src/lib/facebook/graph');
+const { graphPaged, GraphPageLimitError } = await import('../src/lib/facebook/graph');
 const {
   fetchComments,
   fetchConversations,
@@ -98,6 +98,18 @@ describe('graphPaged', () => {
     });
 
     expect(items).toHaveLength(3);
+    expect(seen).toHaveLength(3);
+  });
+
+  it('rejects an incomplete read when the caller requires every page', async () => {
+    routes['/thing/items'] = () => ({
+      data: [{ id: 'x' }],
+      paging: { cursors: { after: 'always' }, next: 'http://next' },
+    });
+
+    await expect(graphPaged('thing/items', {
+      accessToken: 'token', maxPages: 3, requireComplete: true,
+    })).rejects.toBeInstanceOf(GraphPageLimitError);
     expect(seen).toHaveLength(3);
   });
 
@@ -347,6 +359,40 @@ describe('Instagram discovery', () => {
 });
 
 describe('Ads insights', () => {
+  it('splits a crowded date window and includes every day', async () => {
+    routes['/act_1/insights'] = (params) => {
+      const range = JSON.parse(params.get('time_range')!);
+      if (range.since !== range.until) {
+        return {
+          data: [{ date_start: range.since, campaign_id: 'c1', spend: '1' }],
+          paging: { cursors: { after: 'more' }, next: 'http://next' },
+        };
+      }
+      return { data: [{ date_start: range.since, campaign_id: 'c1', spend: '2' }] };
+    };
+
+    const rows = await fetchAdInsights({
+      actId: 'act_1', accessToken: 'token', level: 'campaign',
+      since: new Date('2026-08-01T00:00:00Z'), until: new Date('2026-08-02T00:00:00Z'),
+    });
+
+    expect(rows.map((row) => row.date.toISOString().slice(0, 10))).toEqual(['2026-08-01', '2026-08-02']);
+    expect(seen).toHaveLength(12);
+  });
+
+  it('rejects a single day that still exceeds the page limit', async () => {
+    routes['/act_1/insights'] = () => ({
+      data: [{ date_start: '2026-08-01', campaign_id: 'c1', spend: '1' }],
+      paging: { cursors: { after: 'more' }, next: 'http://next' },
+    });
+
+    await expect(fetchAdInsights({
+      actId: 'act_1', accessToken: 'token', level: 'campaign',
+      since: new Date('2026-08-01T00:00:00Z'), until: new Date('2026-08-01T00:00:00Z'),
+    })).rejects.toBeInstanceOf(GraphPageLimitError);
+    expect(seen).toHaveLength(10);
+  });
+
   it('prefixes a bare account id with act_', async () => {
     routes['/me/adaccounts'] = () => ({
       data: [{ account_id: '12345', name: 'Acme', currency: 'EUR' }],

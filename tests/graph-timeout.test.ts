@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { randomBytes } from 'node:crypto';
 
 /**
@@ -68,8 +68,11 @@ describe('graph timeouts', () => {
     const aborted = AbortSignal.abort();
 
     // "The operation was aborted", five times over, tells nobody anything.
-    await expect(
-      graphUpload('slow-photo', {
+    // Node 24 Undici reports a second, unhandled stream error if handed a
+    // pre-aborted multipart body. Stub only the transport's abort response.
+    vi.stubGlobal('fetch', (_url: URL, init: RequestInit) => Promise.reject(init.signal?.reason));
+    try {
+      await expect(graphUpload('slow-photo', {
         accessToken: 'token',
         signal: aborted,
         file: {
@@ -77,21 +80,28 @@ describe('graph timeouts', () => {
           filename: 'holiday.mp4',
           contentType: 'video/mp4',
         },
-      }),
-    ).rejects.toThrow(/holiday\.mp4 \(2\.0 MB\) did not finish within 300 seconds/);
+      })).rejects.toThrow(/holiday\.mp4 \(2\.0 MB\) did not finish within 300 seconds/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('abandons a call that outlasts the request timeout', async () => {
     // Five seconds is the registry's minimum for this setting, so the stall
     // has to be longer than that rather than as short as the test would like.
     process.env.GRAPH_TIMEOUT_SECONDS = '5';
-    delays.set('/slow-json', 8_000);
-
     const { graphRequest, GraphError } = await import('../src/lib/facebook/graph');
-
-    await expect(
-      graphRequest('slow-json', { accessToken: 'token' }),
-    ).rejects.toThrow(GraphError);
+    // A delayed real HTTP response after abort triggers an unhandled Undici
+    // stream rejection on Node 24, outside graphRequest's control. This
+    // transport stub still exercises the actual timeout and abort signal.
+    vi.stubGlobal('fetch', (_url: URL, init: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+    }));
+    try {
+      await expect(graphRequest('slow-json', { accessToken: 'token' })).rejects.toThrow(GraphError);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   }, 20_000);
 
   it('lets an upload run past the shorter request timeout', async () => {
