@@ -63,6 +63,14 @@ export const x: NetworkConnector = {
   key: 'x',
   label: 'X',
   rules: NETWORK_RULES.x,
+  async remove(remotePostId, context) {
+    const token = await freshToken(context);
+    const { data } = await netJson<{ data?: { deleted?: boolean } }>('X', `${API}/tweets/${encodeURIComponent(remotePostId)}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (data.data?.deleted !== true) throw new GraphError({ message: 'X did not confirm deletion. The post record was kept.', kind: 'rejected' });
+  },
   async publish(target, post, context) {
     const token = await freshToken(context);
     const mediaIds: string[] = [];

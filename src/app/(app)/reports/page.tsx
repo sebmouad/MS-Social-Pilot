@@ -167,7 +167,16 @@ export default async function ReportsPage({
     }).toString()}`;
 
   return (
-    <ChannelsLayout auth={auth} selection={selection} tools={<><AnalyticsTabs current="report" /><PhoneFold><div className="flex flex-col gap-2">{selected && canEdit && (
+    <ChannelsLayout auth={auth} selection={selection} tools={<><AnalyticsTabs current="report" /><div className="print:hidden"><DateRangePicker range={range} path="/reports" keep={keep} /></div>{pages.length > 1 && (
+      <nav className="flex flex-col gap-1 print:hidden" aria-label={t('choosePage')}>
+        {pages.map((page) => (
+          <Link key={page.id} href={pageHref(page.id)} aria-current={page.id === selected?.id ? 'page' : undefined}
+            className={`rounded-lg px-2.5 py-2 text-sm font-semibold ${page.id === selected?.id ? 'bg-brand-50 text-brand-700' : 'text-slate-700 hover:bg-slate-100'}`}>
+            {page.name}
+          </Link>
+        ))}
+      </nav>
+    )}<PhoneFold><div className="flex flex-col gap-2">{selected && canEdit && (
             <ReportSchedules
               key={`${auth.workspace.id}:${selected.id}`}
               targetId={selected.id}
@@ -208,28 +217,6 @@ export default async function ReportsPage({
       <ScreenHeader title={t('title')} subtitle={t('subtitle')} />
 
       <ReportTemplates templates={templateRows} sections={sections} rangeKey={range.key} canSave={canEdit} />
-
-      <div className="filter-row print:hidden">
-        <DateRangePicker range={range} path="/reports" keep={keep} />
-        {pages.length > 1 && (
-          <nav className="flex flex-wrap gap-2" aria-label={t('choosePage')}>
-            {pages.map((page) => (
-              <Link
-                key={page.id}
-                href={pageHref(page.id)}
-                aria-current={page.id === selected?.id ? 'page' : undefined}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${
-                  page.id === selected?.id
-                    ? 'bg-brand-50 text-brand-600'
-                    : 'bg-white text-slate-700 shadow-surface hover:bg-slate-50'
-                }`}
-              >
-                {page.name}
-              </Link>
-            ))}
-          </nav>
-        )}
-      </div>
 
       {rangeError ? (
         <div className="card p-8 text-center text-sm text-amber-700">{rangeError}</div>

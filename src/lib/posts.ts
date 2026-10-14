@@ -1,6 +1,6 @@
 import { setPostFields } from './custom-fields';
 import { assertMonthlyRoom } from './plans';
-import { NETWORK_LABELS, networkProblems } from './networks';
+import { NETWORK_LABELS, networkProblems, isNetworkKey, removeNetworkPost } from './networks';
 import { ownLabels } from './page-groups';
 import { prisma } from './prisma';
 import { env } from './env';
@@ -34,6 +34,7 @@ import {
   postEditBlocker,
   PUBLISHABLE_APPROVAL_STATUSES,
   QUEUE_OCCUPYING_STATUSES,
+  UNCONFIRMED_REMOTE_POST,
 } from './constants';
 import { notifyApprovalRequest } from './email/notify';
 import { ApprovalStatus, PostStatus, Prisma, WorkspaceRole } from '@prisma/client';
@@ -940,6 +941,7 @@ export async function updatePost(
   if (blocker === 'publishing') throw errors.alreadyPublishing();
   if (blocker === 'published') throw errors.alreadyPublished();
   if (blocker === 'scheduled_remote') throw errors.scheduledInFacebook();
+  if (blocker === 'unconfirmed_remote') throw errors.unconfirmedRemotePost();
 
   // The schema can only check the fields it was sent; emptiness depends on the
   // ones it was not, so it is checked here against what the post will hold.
@@ -1227,6 +1229,10 @@ export async function cancelPost(
   if (!post) throw errors.postNotFound();
   assertMayAct(post, context);
 
+  if (post.targets.some((target) => target.status === 'failed' && target.errorCode === UNCONFIRMED_REMOTE_POST)) {
+    throw errors.unconfirmedRemotePost();
+  }
+
   const failures: string[] = [];
   // Destinations whose copy is still sitting in Facebook's queue. These must
   // not be marked cancelled: a post reading "Cancelled" here while Facebook
@@ -1291,7 +1297,11 @@ export async function retryPost(
   assertMayAct(post, context);
 
   const { count } = await prisma.postTarget.updateMany({
-    where: { postId, status: 'failed' },
+    where: {
+      postId,
+      status: 'failed',
+      OR: [{ errorCode: null }, { errorCode: { not: UNCONFIRMED_REMOTE_POST } }],
+    },
     data: { status: 'pending', attempts: 0, nextAttemptAt: null, errorCode: null, errorMessage: null },
   });
 
@@ -1372,9 +1382,8 @@ export function mediaFromInput(media: CreatePostInput['media']): PostMedia[] {
 /**
  * Take a published post down from Facebook, on every Page it went to.
  *
- * Only Facebook Pages: Instagram's API cannot delete, and the other networks
- * are removed on their own sites. Each destination taken down is kept, marked
- * with when, so the record of what went out stays honest.
+ * Each successful destination is marked immediately. A failed deletion stays
+ * visible and can be retried without deleting the successful copies twice.
  */
 export async function removePublishedPost(
   context: { workspaceId: string; userId: string; role: WorkspaceRole },
@@ -1392,24 +1401,91 @@ export async function removePublishedPost(
   let removed = 0;
   const { deleteRemotePost } = await import('./facebook/publish');
   for (const postTarget of post.targets) {
-    if (postTarget.status !== 'published' || !postTarget.remotePostId || postTarget.removedAt) continue;
-    if (postTarget.target.type !== 'page') {
-      failures.push(`${postTarget.target.name}: remove it on the network itself.`);
-      continue;
-    }
-    const encrypted = postTarget.target.accessToken ?? postTarget.target.socialAccount?.accessToken ?? null;
-    if (!encrypted) {
-      failures.push(`${postTarget.target.name}: no stored token. Reconnect the account and try again.`);
+    if (postTarget.status !== 'published' || postTarget.removedAt) continue;
+    if (!postTarget.remotePostId) {
+      failures.push(`${postTarget.target.name}: the remote post ID is missing, so deletion cannot be confirmed.`);
       continue;
     }
     try {
-      await deleteRemotePost(postTarget.remotePostId, decryptSecret(encrypted));
+      if (postTarget.target.type === 'page') {
+        const encrypted = postTarget.target.accessToken ?? postTarget.target.socialAccount?.accessToken ?? null;
+        if (!encrypted) throw new Error('No stored token. Reconnect the account and try again.');
+        await deleteRemotePost(postTarget.remotePostId, decryptSecret(encrypted));
+      } else if (isNetworkKey(postTarget.target.type)) {
+        const account = postTarget.target.socialAccount;
+        if (!account) throw new Error('No connected account. Reconnect and try again.');
+        if (postTarget.target.type === 'youtube' && !account.scopes.split(/\s+/).some((scope) => scope === 'https://www.googleapis.com/auth/youtube.force-ssl' || scope === 'https://www.googleapis.com/auth/youtube')) {
+          throw new Error('Reconnect YouTube to grant video deletion permission, then try again.');
+        }
+        await removeNetworkPost(postTarget.target.type, account, postTarget.remotePostId);
+      } else {
+        throw new Error('This network does not allow removal from this app. Delete it on the platform, or remove only the app record.');
+      }
       await prisma.postTarget.update({ where: { id: postTarget.id }, data: { removedAt: now } });
       removed += 1;
     } catch (error) {
-      failures.push(`${postTarget.target.name}: ${asGraphError(error).displayMessage}`);
+      failures.push(`${postTarget.target.name}: ${error instanceof Error ? error.message : asGraphError(error).displayMessage}`);
     }
   }
-  await logActivity(context.workspaceId, 'post.cancelled', { postId, removedFromFacebook: removed, action: 'removed' }, context.userId);
+  if (removed > 0) await logActivity(context.workspaceId, 'post.remoteRemoved', { postId, removed, failures: failures.length }, context.userId);
   return { removed, failures };
+}
+
+/** Permanently remove the app record, with an explicit opt-in for remote copies. */
+export async function deletePostRecord(
+  context: { workspaceId: string; userId: string; role: WorkspaceRole },
+  postId: string,
+  deleteRemote: boolean,
+): Promise<{ deleted: true; removedRemote: number }> {
+  const post = await prisma.post.findFirst({
+    where: { id: postId, workspaceId: context.workspaceId },
+    include: { targets: true },
+  });
+  if (!post) throw errors.postNotFound();
+  assertMayAct(post, context);
+  if (post.targets.some((target) => target.status === 'processing')) {
+    throw new AppError({ key: 'errors.postPublishing', fallback: 'This post is being published. Try deleting it after its destination statuses settle.', status: 409 });
+  }
+
+  // Native schedules must be stopped at Facebook even for local-only removal:
+  // otherwise a post the user removed would still go live in the future.
+  if (post.targets.some((target) => target.status === 'scheduled_remote')) {
+    const cancelled = await cancelPost(context, postId);
+    if (cancelled.failures.length) {
+      throw new AppError({ key: 'errors.remoteDeleteFailed', fallback: cancelled.failures.join(' '), params: { detail: cancelled.failures.join(' ') }, status: 409 });
+    }
+  }
+
+  let removedRemote = 0;
+  if (deleteRemote) {
+    if (post.targets.some((target) => target.status === 'failed' && target.errorCode === UNCONFIRMED_REMOTE_POST)) {
+      throw errors.unconfirmedRemotePost();
+    }
+    const result = await removePublishedPost(context, postId);
+    removedRemote = result.removed;
+    if (result.failures.length) {
+      throw new AppError({ key: 'errors.remoteDeleteFailed', fallback: result.failures.join(' '), params: { detail: result.failures.join(' ') }, status: 409 });
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Lock destination rows: a worker's pending -> processing claim must finish
+    // before we decide whether deletion is safe, or wait until our delete is
+    // committed and find no row. This prevents a deleted queue item going live.
+    await tx.$queryRaw`SELECT id FROM post_targets WHERE "postId" = ${postId} FOR UPDATE`;
+    const current = await tx.post.findFirst({
+      where: { id: postId, workspaceId: context.workspaceId },
+      include: { targets: { select: { status: true, removedAt: true } } },
+    });
+    if (!current) throw errors.postNotFound();
+    if (current.targets.some((target) => target.status === 'processing')) {
+      throw new AppError({ key: 'errors.postPublishing', fallback: 'This post is being published. Try deleting it after its destination statuses settle.', status: 409 });
+    }
+    if (deleteRemote && current.targets.some((target) => target.status === 'published' && !target.removedAt)) {
+      throw new AppError({ key: 'errors.remoteDeleteFailed', fallback: 'A destination published while deletion was in progress. The record was kept; retry remote deletion.', params: { detail: 'A destination published while deletion was in progress. Retry remote deletion.' }, status: 409 });
+    }
+    await tx.post.delete({ where: { id: postId } });
+  });
+  await logActivity(context.workspaceId, 'post.deleted', { postId, deleteRemote, removedRemote }, context.userId);
+  return { deleted: true, removedRemote };
 }

@@ -19,11 +19,12 @@ interface Account {
   name: string;
   pictureUrl: string | null;
   invalidReason: string | null;
+  lastSyncedLabel: string | null;
   targets: Array<{ id: string; name: string; category: string | null; enabled: boolean }>;
 }
 
 /**
- * Every network besides Facebook, one card each: what is connected, and the
+ * Every network besides Facebook, one table row each: what is connected, and the
  * way to connect more. Networks that need a developer app this installation
  * has not been given say so, and send the owner to Configuration.
  */
@@ -58,6 +59,8 @@ export function OtherNetworks({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Account | null>(null);
+  const [deleteData, setDeleteData] = useState(false);
+  const [justConnected, setJustConnected] = useState(false);
 
   async function connectBluesky() {
     setPending(true);
@@ -75,6 +78,7 @@ export function OtherNetworks({
     }
     setAppPassword('');
     setDialog(null);
+    setJustConnected(true);
     router.refresh();
   }
 
@@ -95,20 +99,28 @@ export function OtherNetworks({
     setBotToken('');
     setChannel('');
     setDialog(null);
+    setJustConnected(true);
     router.refresh();
   }
 
   async function toggle(targetId: string, enabled: boolean) {
-    await fetch(`/api/targets/${targetId}`, {
+    const response = await fetch(`/api/targets/${targetId}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ enabled }),
     }).catch(() => null);
+    if (!response?.ok) {
+      setError((await response?.json().catch(() => ({})))?.error ?? tCommon('genericError'));
+      return;
+    }
     router.refresh();
   }
 
   async function remove(account: Account) {
-    await fetch(`/api/accounts/${account.id}`, { method: 'DELETE' }).catch(() => null);
+    const response = await fetch(`/api/accounts/${account.id}`, {
+      method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ deleteData }),
+    }).catch(() => null);
+    if (!response?.ok) { setError((await response?.json().catch(() => ({})))?.error ?? tCommon('genericError')); return; }
     setRemoving(null);
     router.refresh();
   }
@@ -138,20 +150,26 @@ export function OtherNetworks({
               })}
         </p>
       )}
+      {justConnected && <p role="status" className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-800">{tConnections('selectChannelsHint')}</p>}
+      {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="card scroll-x">
+      <table className="data-table w-full min-w-[720px] text-sm">
+        <thead><tr><th scope="col" className="px-4 py-2">{tConnections('columnSource')}</th><th scope="col" className="px-4 py-2">{tConnections('columnStatus')}</th><th scope="col" className="px-4 py-2 text-end">{tConnections('columnActions')}</th></tr></thead>
+        <tbody className="divide-y divide-slate-100">
         {networks.map((network) => {
           const mine = accounts.filter((account) => account.network === network.key);
           return (
-            <article key={network.key} className="card flex flex-col p-4">
-              <header className="flex items-center gap-3">
+            <tr key={network.key}>
+              <td className="px-4 py-3"><div className="flex items-center gap-3">
                 <NetworkMark network={network.key} size={36} />
                 <div className="min-w-0 flex-1">
                   <h3 className="text-[15px] font-semibold text-slate-900">{network.label}</h3>
                   <p className="text-xs text-slate-500">{t(`hint_${network.key}`)}</p>
                 </div>
-              </header>
+              </div></td>
 
+              <td className="px-4 py-3">
               {mine.length > 0 && (
                 <ul className="mt-3 space-y-2">
                   {mine.map((account) => (
@@ -160,12 +178,13 @@ export function OtherNetworks({
                         <FeedAvatar name={account.name} pictureUrl={account.pictureUrl} size="sm" />
                         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{account.name}</span>
                         {canManage && (
-                          <button type="button" className="btn-ghost px-2 py-1 text-xs hover:text-red-600" onClick={() => setRemoving(account)}>
+                          <button type="button" className="btn-ghost px-2 py-1 text-xs hover:text-red-600" onClick={() => { setDeleteData(false); setRemoving(account); }}>
                             {t('disconnect')}
                           </button>
                         )}
                       </div>
                       {account.invalidReason && <p className="mt-1 text-xs text-red-600">{tConnections('needsReconnectHint')}</p>}
+                      {account.lastSyncedLabel && <p className="mt-1 text-xs text-slate-500">{tConnections('synced', { when: account.lastSyncedLabel })}</p>}
                       <ul className="mt-2 space-y-1">
                         {account.targets.map((target) => (
                           <li key={target.id} className="flex items-center gap-2 text-xs text-slate-700">
@@ -186,8 +205,9 @@ export function OtherNetworks({
                   ))}
                 </ul>
               )}
+              </td>
 
-              <div className="mt-auto pt-3">
+              <td className="px-4 py-3 text-end"><div className="flex justify-end">
                 {!canManage ? null : (network.key === 'bluesky' || network.key === 'mastodon' || network.key === 'telegram') && !network.available ? null : network.key === 'bluesky' || network.key === 'mastodon' || network.key === 'telegram' ? (
                   <button type="button" className="btn-secondary w-full" onClick={() => setDialog(network.key as 'bluesky' | 'mastodon' | 'telegram')}>
                     <Icon name="plus" size={16} />
@@ -220,10 +240,12 @@ export function OtherNetworks({
                     )}
                   </p>
                 )}
-              </div>
-            </article>
+              </div></td>
+            </tr>
           );
         })}
+        </tbody>
+      </table>
       </div>
 
       <Dialog
@@ -352,7 +374,11 @@ export function OtherNetworks({
           </>
         }
       >
-        <p className="text-sm text-slate-700">{t('disconnectHint')}</p>
+        <fieldset className="space-y-2 text-sm">
+          <legend className="mb-2 font-semibold text-slate-900">{tConnections('disconnectDataChoice')}</legend>
+          <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3"><input type="radio" name="network-disconnect-data" checked={!deleteData} onChange={() => setDeleteData(false)} />{tConnections('retainRelatedData')}</label>
+          <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3"><input type="radio" name="network-disconnect-data" checked={deleteData} onChange={() => setDeleteData(true)} />{tConnections('deleteRelatedData')}</label>
+        </fieldset>
       </Dialog>
     </section>
   );

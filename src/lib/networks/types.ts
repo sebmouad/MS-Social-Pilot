@@ -89,6 +89,8 @@ export interface NetworkConnector {
   rules: NetworkRules;
   /** Publish to one destination: an account, a company Page, a board. */
   publish: (target: { providerId: string; name: string }, post: NetworkPost, context: NetworkContext) => Promise<NetworkPublishResult>;
+  /** Remove a post owned by this connection, where the provider permits it. */
+  remove?: (remotePostId: string, context: NetworkContext) => Promise<void>;
   /** Read a published post's counters; absent where this app cannot read them yet. */
   stats?: (remotePostId: string, context: NetworkContext) => Promise<NetworkPostStats>;
   /** Read the replies to a published post; absent where this app cannot read them yet. */

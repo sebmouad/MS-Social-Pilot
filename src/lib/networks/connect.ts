@@ -1,4 +1,3 @@
-import { assertRoom } from '../plans';
 import { createHash } from 'node:crypto';
 import { Prisma, TargetType } from '@prisma/client';
 
@@ -239,6 +238,7 @@ export async function finishNetworkAuth(key: Exclude<NetworkKey, 'bluesky' | 'te
         accessToken: token.access_token,
         refreshToken: token.refresh_token ?? null,
         expiresAt: new Date(Date.now() + token.expires_in * 1000),
+        scopes: token.scope ?? '',
         targets: channels.map((channel) => ({
           providerId: channel.id,
           name: channel.snippet.title,
@@ -339,9 +339,8 @@ export async function saveNetworkAccount(options: { workspaceId: string; key: Ne
         data: { name: target.name, pictureUrl: target.pictureUrl, category: target.category ?? null, socialAccountId: account.id, canPublish: true, publishBlocker: null },
       });
     } else {
-      await assertRoom(workspaceId, 'channels');
       await prisma.target.create({
-        data: { workspaceId, type, providerId: target.providerId, name: target.name, pictureUrl: target.pictureUrl, category: target.category ?? null, socialAccountId: account.id, accessToken: null },
+        data: { workspaceId, type, providerId: target.providerId, name: target.name, pictureUrl: target.pictureUrl, category: target.category ?? null, socialAccountId: account.id, accessToken: null, enabled: false },
       });
     }
   }

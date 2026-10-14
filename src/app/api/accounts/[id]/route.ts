@@ -2,6 +2,8 @@ import { requireAuth } from '@/lib/auth';
 import { checkAccountHealth } from '@/lib/accounts';
 import { disconnect } from '@/lib/connections';
 import { ok, route } from '@/lib/api';
+import { readJson } from '@/lib/api';
+import { z } from 'zod';
 import { errors } from '@/lib/errors';
 
 type Context = { params: Promise<{ id: string }> };
@@ -21,14 +23,16 @@ export const GET = route(async (_request: Request, context: Context) => {
   return ok({ health });
 });
 
-export const DELETE = route(async (_request: Request, context: Context) => {
+export const DELETE = route(async (request: Request, context: Context) => {
   const auth = await requireAuth();
   const { id } = await context.params;
+  const input = z.object({ deleteData: z.boolean().default(false) }).parse((await readJson(request).catch(() => ({}))) ?? {});
 
   const result = await disconnect({
     workspaceId: auth.workspace.id,
     role: auth.role,
     socialAccountId: id,
+    deleteData: input.deleteData,
   });
 
   if (result.outcome === 'forbidden') {

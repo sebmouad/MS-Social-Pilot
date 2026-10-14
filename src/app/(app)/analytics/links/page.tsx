@@ -67,12 +67,11 @@ export default async function LinkClicksPage({
   const keep = Object.fromEntries(new URLSearchParams(selection.query));
 
   return (
-    <ChannelsLayout auth={auth} selection={selection}>
+    <ChannelsLayout auth={auth} selection={selection} tools={<DateRangePicker range={range} path="/analytics/links" keep={keep} />}>
     <div className="min-w-0 flex-1 space-y-6">
       <ScreenHeader
         title={t('title')}
         subtitle={t('intro')}
-        actions={<DateRangePicker range={range} path="/analytics/links" keep={keep} />}
       />
 
       {report.total === 0 ? (

@@ -63,6 +63,13 @@ export const pinterest: NetworkConnector = {
   key: 'pinterest',
   label: 'Pinterest',
   rules: NETWORK_RULES.pinterest,
+  async remove(remotePostId, context) {
+    const token = await freshToken(context);
+    await netJson('Pinterest', `${API}/pins/${encodeURIComponent(remotePostId)}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${token}` },
+    });
+  },
   async publish(target, post, context) {
     const images = post.media.filter((item) => item.kind === 'image').slice(0, 5);
     if (images.length === 0) throw new GraphError({ message: 'Pinterest: a Pin needs a picture.', kind: 'rejected' });

@@ -232,6 +232,20 @@ export default async function AdsPage({
           the table on a phone. */}
       <SidebarDock>
         <aside className="space-y-4">
+          {accounts.length > 1 && (
+            <div>
+              <p className="mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('account')}</p>
+              <QuerySelect
+                param="account"
+                value={account.id}
+                label={t('account')}
+                options={accounts.map((entry) => ({
+                  value: entry.id,
+                  label: entry.currency ? `${entry.name} (${entry.currency})` : entry.name,
+                }))}
+              />
+            </div>
+          )}
           <DateRangePicker
             range={range}
             path="/ads"
@@ -257,30 +271,11 @@ export default async function AdsPage({
               ))}
             </ul>
           </nav>
-        </aside>
-      </SidebarDock>
-
-      <div className="filter-row">
-
-        {accounts.length > 1 && (
-          <QuerySelect
-            param="account"
-            value={account.id}
-            label={t('account')}
-            options={accounts.map((entry) => ({
-              value: entry.id,
-              label: entry.currency ? `${entry.name} (${entry.currency})` : entry.name,
-            }))}
-          />
-        )}
-
-        <div className="ms-auto flex flex-wrap gap-2">
-          {/* One account's rows in its own currency, over the range on screen. */}
-          <a className="btn-secondary" href={exportHref}>
+          <a className="btn-secondary w-full" href={exportHref}>
             {t('exportCsv')}
           </a>
-        </div>
-      </div>
+        </aside>
+      </SidebarDock>
 
       <p className="text-xs text-slate-500">
         {account.name}

@@ -62,6 +62,7 @@ export const POST = route(async (request: Request) => {
         },
         {
           message: row.message,
+          firstComment: row.first_comment ?? null,
           link: row.link ? row.link : null,
           media: row.media_url
             ? [

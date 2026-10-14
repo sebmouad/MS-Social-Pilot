@@ -168,10 +168,10 @@ export function bulkCsvTemplate(now: Date = new Date()): string {
   };
 
   return [
-    'message,link,scheduled_at,media_url',
-    `"Spring sale starts today — 20% off everything.",https://example.com/sale,${day(7, 9, 0)},`,
-    `"New blog post: how we cut build times in half.",https://example.com/blog/builds,${day(8, 14, 30)},`,
-    `"Behind the scenes at the workshop.",,${day(9, 11, 0)},https://example.com/photo.jpg`,
+    'message,link,scheduled_at,media_url,first_comment',
+    `"Spring sale starts today — 20% off everything.",https://example.com/sale,${day(7, 9, 0)},,"See the offer in the link above."`,
+    `"New blog post: how we cut build times in half.",https://example.com/blog/builds,${day(8, 14, 30)},,`,
+    `"Behind the scenes at the workshop.",,${day(9, 11, 0)},https://example.com/photo.jpg,"What would you make here?"`,
     '',
   ].join('\n');
 }

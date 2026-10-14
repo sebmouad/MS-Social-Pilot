@@ -34,7 +34,7 @@ export const GET = route(async (request: Request, context: { params: Promise<{ n
     const connected = await finishNetworkAuth(network, pending, code);
     const saved = await saveNetworkAccount({ workspaceId: auth.workspace.id, key: network, connected });
     await logActivity(auth.workspace.id, 'account.connected', { provider: network, destinations: saved.targets }, auth.user.id);
-    return back({ connected: String(saved.targets) });
+    return back({ connected: String(saved.targets), select: '1' });
   } catch (error) {
     return back({ error: (error instanceof Error ? error.message : 'The connection failed.').slice(0, 200) });
   }

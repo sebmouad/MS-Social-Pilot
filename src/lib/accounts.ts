@@ -1,10 +1,10 @@
-import { channelRoom } from './plans';
 import { prisma } from './prisma';
 import { env } from './env';
 import { encryptSecret, decryptSecret } from './crypto';
 import { asGraphError } from './facebook/graph';
 import { fetchGroups, fetchPages, fetchProfile, debugToken, type AccessToken } from './facebook/oauth';
 import { logActivity } from './scheduler/runner';
+import { AppError } from './errors';
 
 /**
  * Connecting Facebook accounts and keeping the list of destinations current.
@@ -90,21 +90,7 @@ export async function syncAccountTargets(socialAccountId: string): Promise<SyncS
   }
 
   const seen: string[] = [];
-  // Pages past the plan's channels are left out, and said so.
-  let room = await channelRoom(account.workspaceId);
-  const known = new Set(
-    (await prisma.target.findMany({ where: { workspaceId: account.workspaceId }, select: { providerId: true } })).map((row) => row.providerId),
-  );
-  let skipped = 0;
-
   for (const page of pages) {
-    if (!known.has(page.id)) {
-      if (room < 1) {
-        skipped++;
-        continue;
-      }
-      room--;
-    }
     // CREATE_CONTENT is the task that actually permits publishing; without it
     // the token will read fine and fail at post time.
     const canPublish = page.tasks.length === 0 || page.tasks.includes('CREATE_CONTENT');
@@ -117,6 +103,7 @@ export async function syncAccountTargets(socialAccountId: string): Promise<SyncS
         workspaceId: account.workspaceId,
         socialAccountId: account.id,
         type: 'page',
+        enabled: false,
         providerId: page.id,
         name: page.name,
         pictureUrl: page.pictureUrl,
@@ -142,8 +129,6 @@ export async function syncAccountTargets(socialAccountId: string): Promise<SyncS
     seen.push(page.id);
   }
 
-  if (skipped > 0) warnings.push(`${skipped} Page(s) were not added: the plan's channel limit is reached.`);
-
   for (const group of groups) {
     await prisma.target.upsert({
       where: {
@@ -153,6 +138,7 @@ export async function syncAccountTargets(socialAccountId: string): Promise<SyncS
         workspaceId: account.workspaceId,
         socialAccountId: account.id,
         type: 'group',
+        enabled: false,
         providerId: group.id,
         name: group.name,
         pictureUrl: group.pictureUrl,
@@ -284,12 +270,16 @@ export async function invalidateAccountsForFacebookUser(providerUserId: string, 
 export async function disconnectAccount(
   workspaceId: string,
   socialAccountId: string,
+  deleteData = false,
 ): Promise<{ stillScheduledOnFacebook: number }> {
   const targets = await prisma.target.findMany({
     where: { socialAccountId, workspaceId },
     select: { id: true, name: true, accessToken: true },
   });
   const targetIds = targets.map((target) => target.id);
+  const affectedPosts = deleteData
+    ? (await prisma.postTarget.findMany({ where: { targetId: { in: targetIds } }, select: { postId: true }, distinct: ['postId'] })).map((row) => row.postId)
+    : [];
 
   // Posts Facebook is already holding are the one thing disconnecting cannot
   // stop by forgetting about them: they publish on their own. And this is the
@@ -301,6 +291,10 @@ export async function disconnectAccount(
   });
 
   const { stopped, stillScheduledOnFacebook } = await stopHandedOffPosts(targets, account?.accessToken ?? null);
+
+  if (deleteData && stillScheduledOnFacebook > 0) {
+    throw new AppError({ key: 'errors.scheduledInFacebook', fallback: 'Facebook still holds scheduled posts. Cancel them before deleting related data.', status: 409 });
+  }
 
   await prisma.$transaction([
     prisma.target.updateMany({
@@ -333,14 +327,26 @@ export async function disconnectAccount(
         errorMessage: 'Cancelled because the Facebook account was disconnected.',
       },
     }),
+    ...(deleteData ? [
+      prisma.instagramAccount.deleteMany({ where: { workspaceId, socialAccountId } }),
+      prisma.adAccount.deleteMany({ where: { workspaceId, socialAccountId } }),
+      prisma.target.deleteMany({ where: { workspaceId, id: { in: targetIds } } }),
+    ] : [
+      prisma.instagramAccount.updateMany({ where: { workspaceId, socialAccountId }, data: { enabled: false, socialAccountId: null } }),
+      prisma.adAccount.updateMany({ where: { workspaceId, socialAccountId }, data: { enabled: false, socialAccountId: null } }),
+    ]),
     prisma.socialAccount.deleteMany({ where: { id: socialAccountId, workspaceId } }),
   ]);
+  if (deleteData && affectedPosts.length > 0) {
+    await prisma.post.deleteMany({ where: { workspaceId, id: { in: affectedPosts }, targets: { none: {} } } });
+  }
 
   await logActivity(workspaceId, 'account.disconnected', {
     socialAccountId,
     targets: targetIds.length,
     removedFromFacebook: stopped.length,
     stillScheduledOnFacebook,
+    deleteData,
   });
 
   return { stillScheduledOnFacebook };
@@ -407,24 +413,50 @@ export async function removeTarget(
   workspaceId: string,
   targetId: string,
   actorId?: string,
+  deleteData = true,
 ): Promise<{ removed: boolean; stillScheduledOnFacebook: number }> {
   const target = await prisma.target.findFirst({
     where: { id: targetId, workspaceId },
     select: { id: true, name: true, type: true, accessToken: true, socialAccount: { select: { accessToken: true } } },
   });
   if (!target) return { removed: false, stillScheduledOnFacebook: 0 };
+  const affectedPosts = deleteData
+    ? (await prisma.postTarget.findMany({ where: { targetId: target.id }, select: { postId: true }, distinct: ['postId'] })).map((row) => row.postId)
+    : [];
 
-  const { stillScheduledOnFacebook } = await stopHandedOffPosts(
+  const { stopped, stillScheduledOnFacebook } = await stopHandedOffPosts(
     [target],
     target.socialAccount?.accessToken ?? null,
   );
 
-  await prisma.target.deleteMany({ where: { id: target.id, workspaceId } });
+  if (deleteData) {
+    await prisma.target.deleteMany({ where: { id: target.id, workspaceId } });
+    if (affectedPosts.length > 0) {
+      await prisma.post.deleteMany({ where: { workspaceId, id: { in: affectedPosts }, targets: { none: {} } } });
+    }
+  } else {
+    if (stillScheduledOnFacebook > 0) {
+      throw new AppError({ key: 'errors.scheduledInFacebook', fallback: 'Facebook still holds scheduled posts. Cancel them before disconnecting this channel.', status: 409 });
+    }
+    await prisma.$transaction([
+      prisma.target.update({ where: { id: target.id }, data: {
+        socialAccountId: null, accessToken: null, enabled: false, canPublish: false,
+        publishBlocker: 'This channel was disconnected from the workspace.',
+        publishBlockerCode: 'disconnected',
+      } }),
+      prisma.postTarget.updateMany({ where: { targetId: target.id, status: { in: ['pending', 'processing'] } }, data: {
+        status: 'cancelled', nextAttemptAt: null, errorCode: 'account_disconnected', errorMessage: 'Cancelled because the channel was disconnected.',
+      } }),
+      prisma.postTarget.updateMany({ where: { id: { in: stopped } }, data: {
+        status: 'cancelled', nextAttemptAt: null, errorCode: 'account_disconnected', errorMessage: 'Cancelled because the channel was disconnected.',
+      } }),
+    ]);
+  }
 
   await logActivity(
     workspaceId,
     'target.removed',
-    { name: target.name, type: target.type, stillScheduledOnFacebook },
+    { name: target.name, type: target.type, stillScheduledOnFacebook, deleteData },
     actorId,
   );
 

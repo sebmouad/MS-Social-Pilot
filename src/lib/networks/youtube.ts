@@ -10,7 +10,7 @@ import { failureFor, netJson, textWithLink, type NetworkConnector, type NetworkC
  * on the way to publishing.
  */
 
-export const YOUTUBE_SCOPES = ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly'];
+export const YOUTUBE_SCOPES = ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly', 'https://www.googleapis.com/auth/youtube.force-ssl'];
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const API = 'https://www.googleapis.com/youtube/v3';
 
@@ -18,6 +18,7 @@ interface Token {
   access_token: string;
   refresh_token?: string;
   expires_in: number;
+  scope?: string;
 }
 
 export async function youtubeToken(options: { code: string; redirectUri: string }): Promise<Token> {
@@ -78,6 +79,13 @@ export const youtube: NetworkConnector = {
   key: 'youtube',
   label: 'YouTube',
   rules: NETWORK_RULES.youtube,
+  async remove(remotePostId, context) {
+    const token = await freshToken(context);
+    await netJson('YouTube', `${API}/videos?id=${encodeURIComponent(remotePostId)}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${token}` },
+    });
+  },
   async publish(target, post, context) {
     const video = post.media.find((item) => item.kind === 'video');
     if (!video) throw new GraphError({ message: 'YouTube: a post needs a video.', kind: 'rejected' });

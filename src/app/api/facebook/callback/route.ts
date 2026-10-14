@@ -74,6 +74,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const parts = [`Connected ${sync.pages} page${sync.pages === 1 ? '' : 's'}`];
     if (env.groupsEnabled) parts.push(`${sync.groups} group${sync.groups === 1 ? '' : 's'}`);
     accounts.searchParams.set('connected', parts.join(' and '));
+    accounts.searchParams.set('select', '1');
     if (sync.warnings.length > 0) accounts.searchParams.set('warning', sync.warnings[0]!);
 
     return NextResponse.redirect(accounts);

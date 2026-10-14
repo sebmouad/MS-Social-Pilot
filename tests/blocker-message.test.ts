@@ -83,7 +83,7 @@ describe('the block reasons', () => {
  *
  * `PostTarget.errorCode` carries Facebook's codes alongside ours. Facebook's
  * stay in Facebook's wording — it wrote the useful part, and a translated
- * paraphrase of "Unsupported get request" helps nobody. The four this app
+ * paraphrase of "Unsupported get request" helps nobody. The codes this app
  * composed itself can be said in French to a French reader.
  */
 describe('the failures this app writes itself', () => {
@@ -121,7 +121,7 @@ describe('the failures this app writes itself', () => {
     // still passes because the code exists somewhere.
     const accounts = readFileSync('src/lib/accounts.ts', 'utf8');
     const sentences = (
-      accounts.match(/errorMessage: 'Cancelled because the Facebook account was disconnected\.'/g) ??
+      accounts.match(/errorMessage: 'Cancelled because (?:the Facebook account|the channel) was disconnected\.'/g) ??
       []
     ).length;
     const codes = (accounts.match(/errorCode: 'account_disconnected'/g) ?? []).length;

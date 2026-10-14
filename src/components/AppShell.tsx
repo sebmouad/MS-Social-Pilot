@@ -30,6 +30,7 @@ interface Props {
   pendingApprovals: number;
   /** Root only: the way into the root section. */
   isRoot?: boolean;
+  developerFeatures?: boolean;
   /** False for a viewer: no composer buttons. */
   canWrite?: boolean;
   /** Root is looking after this workspace without being a member of it. */
@@ -97,6 +98,7 @@ export function AppShell({
   showApprovals,
   pendingApprovals,
   isRoot = false,
+  developerFeatures = false,
   canWrite = true,
   rootVisit = false,
   modules = MODULE_KEYS,
@@ -106,6 +108,7 @@ export function AppShell({
   children,
 }: Props) {
   const t = useTranslations('nav');
+  const tSettings = useTranslations();
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -291,8 +294,19 @@ export function AppShell({
         { href: '/settings/team', label: t('teamRoles'), icon: 'team', group: t('section_workspace') },
         { href: '/tasks', label: t('tasks'), icon: 'approvals', group: t('section_workspace') },
         { href: '/settings/sharing', label: t('clientLinks'), icon: 'link', group: t('section_workspace') },
+        { href: '/settings', label: tSettings('settings.general'), icon: 'settings', also: ['/setup'], group: tSettings('settings.title') },
+        { href: '/settings/pages', label: tSettings('groups.title'), icon: 'folders', group: tSettings('settings.title') },
+        { href: '/settings/bio', label: tSettings('bio.title'), icon: 'link', group: tSettings('settings.title') },
+        { href: '/settings/fields', label: tSettings('customFields.title'), icon: 'tag', group: tSettings('settings.title') },
+        { href: '/settings/agents', label: tSettings('agents.title'), icon: 'sparkles', group: tSettings('settings.title') },
+        { href: '/settings/notifications', label: tSettings('notifications.title'), icon: 'bell', group: tSettings('settings.title') },
+        { href: '/settings/account', label: tSettings('account.title'), icon: 'key', group: tSettings('settings.title') },
+        { href: '/settings/media', label: tSettings('media.title'), icon: 'image', group: tSettings('settings.title') },
+        ...(role === 'owner' || role === 'admin' ? [{ href: '/settings/history', label: tSettings('history.title'), icon: 'clock' as IconName, group: tSettings('settings.title') }] : []),
+        ...(role === 'owner' ? [{ href: '/settings/export', label: tSettings('workspaceExport.title'), icon: 'download' as IconName, group: tSettings('settings.title') }] : []),
+        ...(developerFeatures ? [{ href: '/settings/api', label: tSettings('apiKeys.title'), icon: 'code' as IconName, group: tSettings('settings.title') }] : []),
+        ...(developerFeatures && (role === 'owner' || role === 'admin') ? [{ href: '/settings/webhooks', label: tSettings('webhooks.title'), icon: 'share' as IconName, group: tSettings('settings.title') }] : []),
         ...(role === 'owner' ? [{ href: '/agency', label: t('agency'), icon: 'folders' as IconName, group: t('group_agency') }] : []),
-        { href: '/settings', label: t('settings'), icon: 'settings', also: ['/setup'], hidden: true },
       ],
     },
   ];

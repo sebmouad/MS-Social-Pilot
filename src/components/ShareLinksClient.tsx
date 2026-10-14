@@ -79,7 +79,19 @@ export function ShareLinksClient({
 
   async function revoke(link: LinkRow) {
     if (!(await confirm({ title: t('revokeConfirm', { title: link.title }), danger: true, confirmLabel: t('revoke') }))) return;
-    await fetch(`/api/share-links/${link.id}`, { method: 'DELETE' }).catch(() => null);
+    const response = await fetch(`/api/share-links/${link.id}`, { method: 'DELETE' }).catch(() => null);
+    if (!response?.ok) { setError(tCommon('genericError')); return; }
+    router.refresh();
+  }
+
+  async function purge(link: LinkRow) {
+    if (!(await confirm({ title: t('deleteConfirm', { title: link.title }), danger: true, confirmLabel: t('delete') }))) return;
+    const response = await fetch(`/api/share-links/${link.id}/purge`, { method: 'POST' }).catch(() => null);
+    if (!response?.ok) {
+      const body = (await response?.json().catch(() => ({}))) as { error?: string } | undefined;
+      setError(body?.error ?? tCommon('genericError'));
+      return;
+    }
     router.refresh();
   }
 
@@ -95,6 +107,7 @@ export function ShareLinksClient({
 
   return (
     <div className="space-y-4">
+      {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="flex justify-end">
         <button type="button" className="btn-primary" onClick={() => setDraft({ ...EMPTY })}>
           <Icon name="plus" size={16} />
@@ -126,13 +139,11 @@ export function ShareLinksClient({
                   {link.kind !== 'calendar' && ` · ${t('answers', { count: link.answers })}`}
                 </span>
               </span>
-              {link.revoked ? (
-                <span className="badge bg-slate-100 text-slate-600">{t('revoked')}</span>
-              ) : (
-                <button type="button" className="btn-secondary px-3 py-1 text-xs hover:text-red-600" onClick={() => void revoke(link)}>
-                  {t('revoke')}
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {link.revoked ? <span className="badge bg-slate-100 text-slate-600">{t('revoked')}</span> :
+                  <button type="button" className="btn-secondary px-3 py-1 text-xs hover:text-red-600" onClick={() => void revoke(link)}>{t('revoke')}</button>}
+                <button type="button" className="btn-ghost text-xs text-red-700" onClick={() => void purge(link)}>{t('delete')}</button>
+              </div>
             </li>
           ))}
         </ul>

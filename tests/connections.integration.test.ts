@@ -303,6 +303,18 @@ describe('setLinkedAccountEnabled', () => {
 });
 
 describe('removeLinkedAccount', () => {
+  it('disconnects Instagram and ads while retaining their captured data when chosen', async () => {
+    const { workspace, instagram, adAccount } = await seed();
+    await prisma.instagramMedia.create({ data: { accountId: instagram.id, remoteId: 'keep-media', timestamp: new Date() } });
+    await prisma.adInsight.create({ data: { adAccountId: adAccount.id, level: 'account', objectId: 'keep-spend', date: new Date() } });
+    for (const [kind, id] of [['instagram', instagram.id], ['ads', adAccount.id]] as const) {
+      expect((await connections.removeLinkedAccount({ workspaceId: workspace.id, role: WorkspaceRole.owner, kind, id, deleteData: false })).outcome).toBe('ok');
+    }
+    expect(await prisma.instagramAccount.findUniqueOrThrow({ where: { id: instagram.id } })).toMatchObject({ enabled: false, socialAccountId: null });
+    expect(await prisma.adAccount.findUniqueOrThrow({ where: { id: adAccount.id } })).toMatchObject({ enabled: false, socialAccountId: null });
+    expect(await prisma.instagramMedia.count({ where: { accountId: instagram.id } })).toBe(1);
+    expect(await prisma.adInsight.count({ where: { adAccountId: adAccount.id } })).toBe(1);
+  });
   it('deletes the account and its captured rows', async () => {
     const { workspace, instagram } = await seed();
     await prisma.instagramMedia.create({
@@ -350,8 +362,16 @@ describe('removeLinkedAccount', () => {
 });
 
 describe('disconnect', () => {
+  it('deletes related channel history only when explicitly requested', async () => {
+    const { workspace, account, page, user } = await seed();
+    await prisma.post.create({ data: { workspaceId: workspace.id, authorId: user.id, message: 'Old post', status: 'published', targets: { create: { targetId: page.id, status: 'published' } } } });
+    await connections.disconnect({ workspaceId: workspace.id, role: WorkspaceRole.owner, socialAccountId: account.id, deleteData: true });
+    expect(await prisma.target.count({ where: { id: page.id } })).toBe(0);
+    expect(await prisma.postTarget.count()).toBe(0);
+    expect(await prisma.post.count({ where: { workspaceId: workspace.id } })).toBe(0);
+  });
   it('removes the account and disables everything it reached', async () => {
-    const { workspace, account, page } = await seed();
+    const { workspace, account, page, instagram, adAccount } = await seed();
 
     expect(
       (
@@ -372,6 +392,8 @@ describe('disconnect', () => {
     expect(after.canPublish).toBe(false);
     expect(after.accessToken).toBeNull();
     expect(after.publishBlocker).toMatch(/disconnected/i);
+    expect(await prisma.instagramAccount.findUniqueOrThrow({ where: { id: instagram.id } })).toMatchObject({ enabled: false, socialAccountId: null });
+    expect(await prisma.adAccount.findUniqueOrThrow({ where: { id: adAccount.id } })).toMatchObject({ enabled: false, socialAccountId: null });
   });
 
   it('cancels work that was queued against it', async () => {
@@ -427,6 +449,13 @@ describe('disconnect', () => {
 });
 
 describe('removeTarget', () => {
+  it('can disconnect a channel while retaining its history', async () => {
+    const { workspace, page, user } = await seed();
+    const post = await prisma.post.create({ data: { workspaceId: workspace.id, authorId: user.id, message: 'Old post', status: 'published', targets: { create: { targetId: page.id, status: 'published' } } } });
+    await connections.removeTarget({ workspaceId: workspace.id, role: WorkspaceRole.owner, targetId: page.id, deleteData: false });
+    expect(await prisma.target.findUniqueOrThrow({ where: { id: page.id } })).toMatchObject({ enabled: false, socialAccountId: null, accessToken: null });
+    expect(await prisma.postTarget.count({ where: { postId: post.id, targetId: page.id } })).toBe(1);
+  });
   // The bug: a Page added by mistake could only be switched off, and a Page
   // left behind by a disconnected account was shown nowhere at all.
   it('deletes the destination and what was captured for it', async () => {
@@ -451,6 +480,7 @@ describe('removeTarget', () => {
     expect(result.outcome).toBe('ok');
     expect(await prisma.target.count({ where: { id: page.id } })).toBe(0);
     expect(await prisma.postTarget.count()).toBe(0);
+    expect(await prisma.post.count({ where: { workspaceId: workspace.id } })).toBe(0);
     expect(await prisma.activityLog.count({ where: { action: 'target.removed' } })).toBe(1);
   });
 

@@ -127,6 +127,18 @@ export const bluesky: NetworkConnector = {
   key: 'bluesky',
   label: 'Bluesky',
   rules: NETWORK_RULES.bluesky,
+  async remove(remotePostId, { credentials }) {
+    const meta = credentials.meta as { identifier?: string; pds?: string };
+    if (!meta.identifier) throw new GraphError({ message: 'Bluesky: reconnect the account.', kind: 'auth' });
+    const session = await blueskySession(meta.identifier, credentials.accessToken, meta.pds ?? ENTRYWAY);
+    const match = /^at:\/\/([^/]+)\/app\.bsky\.feed\.post\/([^/]+)$/.exec(remotePostId);
+    if (!match || match[1] !== session.did) throw new GraphError({ message: 'Bluesky: this post does not belong to the connected account.', kind: 'permission' });
+    await netJson('Bluesky', `${session.pds}/xrpc/com.atproto.repo.deleteRecord`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${session.accessJwt}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ repo: session.did, collection: 'app.bsky.feed.post', rkey: match[2] }),
+    });
+  },
   async publish(_target, post, { credentials }) {
     const meta = credentials.meta as { identifier?: string; pds?: string };
     if (!meta.identifier) throw new GraphError({ message: 'Bluesky: reconnect the account.', kind: 'auth' });

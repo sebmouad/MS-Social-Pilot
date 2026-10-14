@@ -10,6 +10,10 @@ cards, reports builder). Navigation: always on the left.
   and a slim top bar for utilities only. A new screen gets a link in its area's
   sidebar group; never add a top tab bar for a module. Views inside one screen
   (such as the analytics views) use `SubTabs` or `.segmented`.
+- Settings links belong in the Workspace area sidebar. The settings layout
+  must not add a third navigation column. Permissions live on Team and roles.
+- Segmented controls use compact rectangular tabs. Narrow sidebars stack long
+  choices; format choices use an even grid so labels never wrap into a pill.
 - Root has its own shell (`RootShell`) with an amber accent and a persistent
   banner; its entry is in the account menu, for root only.
 - Phone: one drawer with every link; "New post" one tap away; no horizontal

@@ -1328,7 +1328,7 @@ describe('reconciling posts scheduled inside Facebook', () => {
 
     // It most likely went out, so "Post now" must not send a second copy.
     received = [];
-    expect((await runner.publishNow(post.id)).claimed).toBe(0);
+    await expect(runner.publishNow(post.id)).rejects.toMatchObject({ key: 'errors.unconfirmedRemotePost' });
     expect(received).toEqual([]);
   });
 

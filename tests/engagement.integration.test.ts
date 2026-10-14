@@ -1150,7 +1150,8 @@ describe('Ads', () => {
 
     expect(await ads.discoverAdAccounts(workspace.id)).toEqual({ found: 1, errors: [] });
 
-    const [account] = await ads.listAdAccounts(workspace.id);
+    const [account] = await ads.listAdAccounts(workspace.id, { includeDisabled: true });
+    expect(account!.enabled).toBe(false);
     expect(account!.actId).toBe('act_500');
     expect(account!.currency).toBe('EUR');
   });
@@ -1160,7 +1161,7 @@ describe('Ads', () => {
     stubAds();
     await ads.discoverAdAccounts(workspace.id);
 
-    const [account] = await ads.listAdAccounts(workspace.id);
+    const [account] = await ads.listAdAccounts(workspace.id, { includeDisabled: true });
     const result = await ads.syncAdAccount({ adAccountId: account!.id });
 
     expect(result.error).toBeUndefined();
@@ -1186,7 +1187,7 @@ describe('Ads', () => {
     const { workspace } = await seedWorkspace();
     stubAds();
     await ads.discoverAdAccounts(workspace.id);
-    const [account] = await ads.listAdAccounts(workspace.id);
+    const [account] = await ads.listAdAccounts(workspace.id, { includeDisabled: true });
 
     routes['/act_500/insights'] = () => ({
       data: [
@@ -1231,7 +1232,7 @@ describe('Ads', () => {
     const { workspace } = await seedWorkspace();
     stubAds();
     await ads.discoverAdAccounts(workspace.id);
-    const [account] = await ads.listAdAccounts(workspace.id);
+    const [account] = await ads.listAdAccounts(workspace.id, { includeDisabled: true });
 
     await ads.syncAdAccount({ adAccountId: account!.id });
     await ads.syncAdAccount({ adAccountId: account!.id });
@@ -1243,7 +1244,7 @@ describe('Ads', () => {
     const { workspace } = await seedWorkspace();
     stubAds();
     await ads.discoverAdAccounts(workspace.id);
-    const [account] = await ads.listAdAccounts(workspace.id);
+    const [account] = await ads.listAdAccounts(workspace.id, { includeDisabled: true });
 
     routes['/act_500/insights'] = () => ({
       data: [
@@ -1294,7 +1295,7 @@ describe('Ads', () => {
     const theirs = await seedWorkspace('theirs');
     stubAds();
     await ads.discoverAdAccounts(theirs.workspace.id);
-    const [account] = await ads.listAdAccounts(theirs.workspace.id);
+    const [account] = await ads.listAdAccounts(theirs.workspace.id, { includeDisabled: true });
     await ads.syncAdAccount({ adAccountId: account!.id });
 
     const summary = await ads.readAdSummary({

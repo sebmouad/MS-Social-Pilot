@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 
 import { Icon, type IconName } from './Icon';
-import { useConfirm } from './ConfirmProvider';
 import { blockerMessage } from './blockerMessage';
+import { Dialog } from './Dialog';
 
 export interface TargetView {
   id: string;
@@ -36,6 +36,7 @@ export interface LinkedAccountView {
   label: string;
   detail: string | null;
   enabled: boolean;
+  connected: boolean;
   lastSyncedLabel: string | null;
 }
 
@@ -68,12 +69,18 @@ export function ConnectionsClient({
   const t = useTranslations('connections');
   const locale = useLocale();
   const tCommon = useTranslations('common');
-  const confirm = useConfirm();
   const router = useRouter();
 
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState<ConnectionView | null>(null);
+  const [deleteData, setDeleteData] = useState(false);
+  const [disconnectingTarget, setDisconnectingTarget] = useState<TargetView | null>(null);
+  const [deleteTargetData, setDeleteTargetData] = useState(false);
+  const [disconnectingLinked, setDisconnectingLinked] = useState<{ kind: 'instagram' | 'ads'; id: string; label: string } | null>(null);
+  const [deleteLinkedData, setDeleteLinkedData] = useState(false);
+  const [targetSelection, setTargetSelection] = useState<Record<string, boolean>>({});
 
   async function call(
     id: string,
@@ -117,9 +124,10 @@ export function ConnectionsClient({
    * morning, and nothing they saw suggested that could happen.
    */
   async function disconnectAccount(accountId: string) {
-    const body = (await call(accountId, `/api/accounts/${accountId}`, 'DELETE')) as {
+    const body = (await call(accountId, `/api/accounts/${accountId}`, 'DELETE', { deleteData })) as {
       stillScheduledOnFacebook?: number;
     } | null;
+    if (body) setDisconnecting(null);
     const stranded = body?.stillScheduledOnFacebook ?? 0;
     if (stranded > 0) setError(t('stillScheduledGone', { count: stranded }));
   }
@@ -128,25 +136,20 @@ export function ConnectionsClient({
     const body = (await call(id, `/api/targets/${id}`, 'PATCH', { enabled })) as {
       stillScheduledOnFacebook?: number;
     } | null;
+    if (body) setTargetSelection((current) => ({ ...current, [id]: enabled }));
     const waiting = body?.stillScheduledOnFacebook ?? 0;
     if (waiting > 0) setNotice(t('stillScheduledOff', { count: waiting }));
   }
 
   async function removeTarget(target: TargetView) {
-    const ok = await confirm({
-      title: t('removeTargetConfirm', { name: target.name }),
-      body: t('removeTargetBody'),
-      danger: true,
-      confirmLabel: t('removeTarget'),
-    });
-    if (!ok) return;
-    const body = (await call(target.id, `/api/targets/${target.id}`, 'DELETE')) as {
+    const body = (await call(target.id, `/api/targets/${target.id}`, 'DELETE', { deleteData: deleteTargetData })) as {
       stillScheduledOnFacebook?: number;
     } | null;
     if (!body) return;
+    setDisconnectingTarget(null);
     const stranded = body.stillScheduledOnFacebook ?? 0;
     if (stranded > 0) setError(t('stillScheduledRemoved', { count: stranded }));
-    else setNotice(t('targetRemoved', { name: target.name }));
+    else setNotice(deleteTargetData ? t('targetRemoved', { name: target.name }) : t('targetDisconnected', { name: target.name }));
   }
 
   function statusBadge(connection: ConnectionView) {
@@ -223,11 +226,7 @@ export function ConnectionsClient({
                   type="button"
                   className="btn-danger"
                   disabled={busy === connection.id}
-                  onClick={async () => {
-                    if (await confirm({ title: t('disconnectConfirm', { name: connection.name }), danger: true, confirmLabel: t('disconnect') })) {
-                      void disconnectAccount(connection.id);
-                    }
-                  }}
+                  onClick={() => { setDeleteData(false); setDisconnecting(connection); }}
                 >
                   <Icon name="trash" size={15} /> {t('disconnect')}
                 </button>
@@ -242,7 +241,8 @@ export function ConnectionsClient({
               canManage={canManage}
               busy={busy}
               onToggle={(id, enabled) => toggleTarget(id, enabled)}
-              onRemove={removeTarget}
+              selection={targetSelection}
+              onRemove={(target) => { setDeleteTargetData(false); setDisconnectingTarget(target); }}
             />
 
             {groups.length > 0 && <TargetList
@@ -253,7 +253,8 @@ export function ConnectionsClient({
               canManage={canManage}
               busy={busy}
               onToggle={(id, enabled) => toggleTarget(id, enabled)}
-              onRemove={removeTarget}
+              selection={targetSelection}
+              onRemove={(target) => { setDeleteTargetData(false); setDisconnectingTarget(target); }}
             />}
 
             {/* Only once there is one: a workspace with no linked Instagram
@@ -268,7 +269,8 @@ export function ConnectionsClient({
                 canManage={canManage}
                 busy={busy}
                 onToggle={(id, enabled) => toggleTarget(id, enabled)}
-              onRemove={removeTarget}
+                selection={targetSelection}
+              onRemove={(target) => { setDeleteTargetData(false); setDisconnectingTarget(target); }}
               />
             )}
           </section>
@@ -287,7 +289,8 @@ export function ConnectionsClient({
             canManage={canManage}
             busy={busy}
             onToggle={(id, enabled) => toggleTarget(id, enabled)}
-            onRemove={removeTarget}
+            selection={targetSelection}
+            onRemove={(target) => { setDeleteTargetData(false); setDisconnectingTarget(target); }}
           />
         </section>
       )}
@@ -296,6 +299,7 @@ export function ConnectionsClient({
       {connections.length > 0 && (
         <>
       <LinkedAccounts
+        kind="instagram"
         anchor="instagram"
         title={t('instagramTitle')}
         description={t('instagramHint')}
@@ -308,9 +312,11 @@ export function ConnectionsClient({
         canManage={canManage}
         busy={busy}
         call={call}
+        onRemove={(account) => { setDeleteLinkedData(false); setDisconnectingLinked({ kind: 'instagram', ...account }); }}
       />
 
       <LinkedAccounts
+        kind="ads"
         anchor="ads"
         title={t('adsTitle')}
         description={t('adsHint')}
@@ -323,9 +329,50 @@ export function ConnectionsClient({
         canManage={canManage}
         busy={busy}
         call={call}
+        onRemove={(account) => { setDeleteLinkedData(false); setDisconnectingLinked({ kind: 'ads', ...account }); }}
       />
         </>
       )}
+      <Dialog open={disconnecting !== null} title={disconnecting ? t('disconnectConfirm', { name: disconnecting.name }) : t('disconnect')}
+        closeLabel={tCommon('close')} onClose={() => setDisconnecting(null)}
+        footer={<>
+          <button type="button" className="btn-secondary" onClick={() => setDisconnecting(null)}>{tCommon('cancel')}</button>
+          <button type="button" className="btn-danger" disabled={busy !== null} onClick={() => disconnecting && void disconnectAccount(disconnecting.id)}>{t('disconnect')}</button>
+        </>}>
+        <fieldset className="space-y-2 text-sm">
+          <legend className="mb-2 font-semibold text-slate-900">{t('disconnectDataChoice')}</legend>
+          <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3"><input type="radio" name="disconnect-data" checked={!deleteData} onChange={() => setDeleteData(false)} />{t('retainRelatedData')}</label>
+          <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3"><input type="radio" name="disconnect-data" checked={deleteData} onChange={() => setDeleteData(true)} />{t('deleteRelatedData')}</label>
+        </fieldset>
+      </Dialog>
+      <Dialog open={disconnectingTarget !== null} title={disconnectingTarget ? t('disconnectTargetConfirm', { name: disconnectingTarget.name }) : t('disconnect')}
+        closeLabel={tCommon('close')} onClose={() => setDisconnectingTarget(null)}
+        footer={<>
+          <button type="button" className="btn-secondary" onClick={() => setDisconnectingTarget(null)}>{tCommon('cancel')}</button>
+          <button type="button" className="btn-danger" disabled={busy !== null} onClick={() => disconnectingTarget && void removeTarget(disconnectingTarget)}>{t('disconnect')}</button>
+        </>}>
+        <fieldset className="space-y-2 text-sm">
+          <legend className="mb-2 font-semibold text-slate-900">{t('disconnectDataChoice')}</legend>
+          <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3"><input type="radio" name="target-disconnect-data" checked={!deleteTargetData} onChange={() => setDeleteTargetData(false)} />{t('retainRelatedData')}</label>
+          <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3"><input type="radio" name="target-disconnect-data" checked={deleteTargetData} onChange={() => setDeleteTargetData(true)} />{t('deleteRelatedData')}</label>
+        </fieldset>
+      </Dialog>
+      <Dialog open={disconnectingLinked !== null} title={disconnectingLinked ? t('disconnectTargetConfirm', { name: disconnectingLinked.label }) : t('disconnect')}
+        closeLabel={tCommon('close')} onClose={() => setDisconnectingLinked(null)}
+        footer={<>
+          <button type="button" className="btn-secondary" onClick={() => setDisconnectingLinked(null)}>{tCommon('cancel')}</button>
+          <button type="button" className="btn-danger" disabled={busy !== null} onClick={async () => {
+            if (!disconnectingLinked) return;
+            const result = await call(disconnectingLinked.id, `/api/connections/${disconnectingLinked.kind}/${disconnectingLinked.id}`, 'DELETE', { deleteData: deleteLinkedData });
+            if (result) setDisconnectingLinked(null);
+          }}>{t('disconnect')}</button>
+        </>}>
+        <fieldset className="space-y-2 text-sm">
+          <legend className="mb-2 font-semibold text-slate-900">{t('disconnectDataChoice')}</legend>
+          <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3"><input type="radio" name="linked-disconnect-data" checked={!deleteLinkedData} onChange={() => setDeleteLinkedData(false)} />{t('retainRelatedData')}</label>
+          <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3"><input type="radio" name="linked-disconnect-data" checked={deleteLinkedData} onChange={() => setDeleteLinkedData(true)} />{t('deleteRelatedData')}</label>
+        </fieldset>
+      </Dialog>
     </div>
   );
 }
@@ -339,6 +386,7 @@ function TargetList({
   busy,
   onToggle,
   onRemove,
+  selection,
 }: {
   title: string;
   icon: IconName;
@@ -348,6 +396,7 @@ function TargetList({
   busy: string | null;
   onToggle: (id: string, enabled: boolean) => void;
   onRemove: (target: TargetView) => void;
+  selection: Record<string, boolean>;
 }) {
   const t = useTranslations('connections');
 
@@ -360,7 +409,16 @@ function TargetList({
       {targets.length === 0 ? (
         <p className="mt-2 text-sm text-slate-500">{empty}</p>
       ) : (
-        <ul className="mt-2 divide-y divide-slate-100">
+        <div className="scroll-x mt-2">
+        <table className="data-table w-full min-w-[640px] text-sm">
+          <thead><tr>
+            <th scope="col" className="px-3 py-2">{t('columnSource')}</th>
+            <th scope="col" className="px-3 py-2">{t('columnAudience')}</th>
+            <th scope="col" className="px-3 py-2">{t('columnSync')}</th>
+            <th scope="col" className="px-3 py-2">{t('columnStatus')}</th>
+            <th scope="col" className="px-3 py-2 text-end">{t('columnActions')}</th>
+          </tr></thead>
+          <tbody className="divide-y divide-slate-100">
           {targets.map((target) => {
             const blocked = blockerMessage(
               target.publishBlockerCode,
@@ -371,8 +429,8 @@ function TargetList({
             ) ?? t('blockedGeneric');
 
             return (
-            <li key={target.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-2.5">
+            <tr key={target.id}>
+              <td className="px-3 py-2.5"><div className="flex min-w-0 items-center gap-2.5">
                 {/* The Page's own photo, round as Facebook draws it; its
                     initial when Facebook gave none. */}
                 {target.type === 'page' || target.pictureUrl ? (
@@ -385,51 +443,54 @@ function TargetList({
 
                 <div className="min-w-0">
                   <p className="truncate text-[15px] font-semibold text-slate-900">{target.name}</p>
-                  <p className="text-xs text-slate-500">
-                    {target.followers !== null && t('followers', { count: target.followers })}
-                  </p>
                   {!target.canPublish && blocked && (
                     <p className="mt-0.5 flex items-center gap-1 text-xs text-amber-700">
                       <Icon name="warning" size={12} /> {blocked}
                     </p>
                   )}
                 </div>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-2">
+              </div></td>
+              <td className="nums px-3 py-2.5 text-slate-600">{target.followers !== null ? t('followers', { count: target.followers }) : '—'}</td>
+              <td className="px-3 py-2.5 text-slate-600">{target.lastSyncedLabel ?? '—'}</td>
+              <td className="px-3 py-2.5">
               <label className="flex shrink-0 items-center gap-2 text-xs text-slate-600">
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-slate-300"
-                  checked={target.enabled}
+                  checked={selection[target.id] ?? target.enabled}
                   aria-label={t('toggleDestination', { name: target.name })}
                   disabled={!canManage || busy === target.id}
                   onChange={(event) => onToggle(target.id, event.target.checked)}
                 />
-                {target.enabled ? t('active') : t('paused')}
+                {(selection[target.id] ?? target.enabled) ? t('active') : t('paused')}
               </label>
+              </td>
+              <td className="px-3 py-2.5 text-end">
               {canManage && (
                 <button
                   type="button"
                   className="btn-ghost shrink-0 text-xs text-red-700"
                   disabled={busy === target.id}
-                  aria-label={t('removeTargetNamed', { name: target.name })}
+                  aria-label={t('disconnectTargetNamed', { name: target.name })}
                   onClick={() => onRemove(target)}
                 >
-                  <Icon name="trash" size={14} /> {t('removeTarget')}
+                  <Icon name="trash" size={14} /> {t('disconnect')}
                 </button>
               )}
-              </div>
-            </li>
+              </td>
+            </tr>
             );
           })}
-        </ul>
+          </tbody>
+        </table>
+        </div>
       )}
     </div>
   );
 }
 
 function LinkedAccounts({
+  kind,
   anchor,
   title,
   description,
@@ -442,7 +503,9 @@ function LinkedAccounts({
   canManage,
   busy,
   call,
+  onRemove,
 }: {
+  kind: 'instagram' | 'ads';
   /** The id the page's "jump to" chips link to. */
   anchor: string;
   title: string;
@@ -456,6 +519,7 @@ function LinkedAccounts({
   canManage: boolean;
   busy: string | null;
   call: (id: string, path: string, method: string, body?: unknown) => Promise<unknown>;
+  onRemove: (account: Pick<LinkedAccountView, 'id' | 'label'>) => void;
 }) {
   const t = useTranslations('connections');
 
@@ -488,36 +552,42 @@ function LinkedAccounts({
       ) : accounts.length === 0 ? (
         <p className="mt-3 text-sm text-slate-500">{t('noneFound')}</p>
       ) : (
-        <ul className="mt-3 divide-y divide-slate-100">
+        <div className="scroll-x mt-3"><table className="data-table w-full min-w-[520px] text-sm">
+          <thead><tr><th scope="col" className="px-3 py-2">{t('columnSource')}</th><th scope="col" className="px-3 py-2">{t('columnSync')}</th><th scope="col" className="px-3 py-2">{t('columnStatus')}</th><th scope="col" className="px-3 py-2 text-end">{t('columnActions')}</th></tr></thead>
+          <tbody className="divide-y divide-slate-100">
           {accounts.map((account) => (
-            <li key={account.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
-              <div className="min-w-0">
+            <tr key={account.id}>
+              <td className="px-3 py-2.5"><div className="min-w-0">
                 <p className="truncate text-sm font-medium text-slate-900">{account.label}</p>
                 <p className="text-xs text-slate-500">
                   {account.detail}
                   {` · ${t('accountReference', { id: account.id.slice(-8) })}`}
-                  {account.lastSyncedLabel && ` · ${t('synced', { when: account.lastSyncedLabel })}`}
                 </p>
-              </div>
+              </div></td>
 
+              <td className="px-3 py-2.5 text-slate-600">{account.lastSyncedLabel ?? '—'}</td>
+              <td className="px-3 py-2.5">
               <label className="flex shrink-0 items-center gap-2 text-xs text-slate-600">
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-slate-300"
                   checked={account.enabled}
                   aria-label={t('toggleAccount', { name: account.label })}
-                  disabled={!canManage || busy === account.id}
+                  disabled={!canManage || busy === account.id || !account.connected}
                   onChange={(event) =>
                     call(account.id, `${togglePath}/${account.id}`, 'PATCH', {
                       enabled: event.target.checked,
                     })
                   }
                 />
-                {account.enabled ? t('active') : t('paused')}
+                {account.connected ? (account.enabled ? t('active') : t('paused')) : t('reconnectRequired')}
               </label>
-            </li>
+              </td>
+              <td className="px-3 py-2.5 text-end">{canManage && <button type="button" className="btn-ghost text-xs text-red-700" disabled={busy === account.id} onClick={() => onRemove(account)}>{t('disconnect')}</button>}</td>
+            </tr>
           ))}
-        </ul>
+          </tbody>
+        </table></div>
       )}
     </section>
   );

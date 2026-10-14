@@ -141,9 +141,11 @@ Rates and unique reach remain daily readings instead of misleading sums.
 
 ## Workspace
 
-- **Channels** `/connections`: one row per network ("Not connected" / "N
-  connected") opening a connect sheet; Facebook profiles and their Pages
-  (enable, pause, remove), Instagram and ad accounts, other networks. Members
+- **Channels** `/connections`: grouped tables for Facebook profiles and Pages,
+  Instagram profiles, ad accounts and other platforms. Newly discovered sources
+  start unselected; an owner or admin chooses which channels to include with
+  checkboxes. Disconnecting offers to retain related history or delete it.
+  Members
   see only Connected or Needs reconnecting with Reconnect; permissions, tokens
   and raw errors are root's (Root › Platforms).
 - **Team** `/settings/team`: invite by email (several at once), roles, Page

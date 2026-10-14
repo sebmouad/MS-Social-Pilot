@@ -1,4 +1,3 @@
-import { channelRoom } from './plans';
 import { TargetType } from '@prisma/client';
 
 import { prisma } from './prisma';
@@ -77,6 +76,7 @@ export async function discoverInstagramAccounts(workspaceId: string): Promise<{
         where: { workspaceId_igUserId: { workspaceId, igUserId: ref.igUserId } },
         create: {
           workspaceId,
+          enabled: false,
           socialAccountId: target.socialAccountId,
           targetId: target.id,
           igUserId: ref.igUserId,
@@ -153,9 +153,6 @@ async function upsertInstagramTarget(options: {
     followersCount: options.followersCount,
   };
 
-  // A new account past the plan's channels is left out until there is room.
-  const known = await prisma.target.findUnique({ where: { workspaceId_providerId: { workspaceId: options.workspaceId, providerId: options.igUserId } }, select: { id: true } });
-  if (!known && (await channelRoom(options.workspaceId)) < 1) return;
   await prisma.target.upsert({
     where: {
       workspaceId_providerId: { workspaceId: options.workspaceId, providerId: options.igUserId },
@@ -163,6 +160,7 @@ async function upsertInstagramTarget(options: {
     create: {
       workspaceId: options.workspaceId,
       type: TargetType.instagram,
+      enabled: false,
       providerId: options.igUserId,
       canPublish: false,
       publishBlocker: INSTAGRAM_PUBLISH_BLOCKER,

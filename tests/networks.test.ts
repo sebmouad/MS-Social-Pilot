@@ -77,6 +77,72 @@ describe('failures', () => {
   });
 });
 
+describe('remote deletion', () => {
+  it('deletes a Pinterest Pin with the connected account', async () => {
+    const seen: Array<{ url: string; method?: string; authorization?: string }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      seen.push({ url, method: init.method, authorization: (init.headers as Record<string, string>).authorization });
+      return new Response(null, { status: 204 });
+    }));
+    const { pinterest } = await import('../src/lib/networks/pinterest');
+    const ctx = context();
+    ctx.credentials.expiresAt = new Date(Date.now() + 60 * 60 * 1000) as never;
+    await pinterest.remove!('pin/1', ctx);
+    expect(seen).toEqual([{ url: 'https://api.pinterest.com/v5/pins/pin%2F1', method: 'DELETE', authorization: 'Bearer secret' }]);
+  });
+
+  it('deletes a YouTube video and treats a provider refusal as a failure', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      seen.push(url);
+      return new Response(JSON.stringify({ error: { message: 'Insufficient permissions' } }), { status: 403 });
+    }));
+    const { youtube } = await import('../src/lib/networks/youtube');
+    const ctx = context();
+    ctx.credentials.expiresAt = new Date(Date.now() + 60 * 60 * 1000) as never;
+    await expect(youtube.remove!('video/1', ctx)).rejects.toThrow(/Insufficient permissions/);
+    expect(seen).toEqual(['https://www.googleapis.com/youtube/v3/videos?id=video%2F1']);
+  });
+
+  it('deletes only a Bluesky record owned by the connected account', async () => {
+    const seen: Array<{ url: string; body: unknown }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      seen.push({ url, body: init.body ? JSON.parse(String(init.body)) : null });
+      return new Response(JSON.stringify(url.endsWith('createSession')
+        ? { accessJwt: 'jwt', did: 'did:plc:abc', handle: 'me.bsky.social' }
+        : {}));
+    }));
+    const ctx = context({ meta: { identifier: 'did:plc:abc' } });
+    await expect(bluesky.remove!('at://did:plc:other/app.bsky.feed.post/one', ctx)).rejects.toThrow(/does not belong/);
+    await bluesky.remove!('at://did:plc:abc/app.bsky.feed.post/one', ctx);
+    expect(seen.filter((call) => call.url.endsWith('deleteRecord'))).toEqual([{
+      url: 'https://bsky.social/xrpc/com.atproto.repo.deleteRecord',
+      body: { repo: 'did:plc:abc', collection: 'app.bsky.feed.post', rkey: 'one' },
+    }]);
+  });
+
+  it('deletes a Mastodon status from the account instance', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      seen.push(url);
+      return new Response(null, { status: 200 });
+    }));
+    vi.doMock('../src/lib/safe-fetch', async (original) => ({ ...(await original<object>()), assertResolvesPublicly: async () => undefined }));
+    const { mastodon: fresh } = await import('../src/lib/networks/mastodon');
+    await fresh.remove!('42', context({ meta: { instance: 'https://piaille.fr' } }));
+    expect(seen).toEqual(['https://piaille.fr/api/v1/statuses/42']);
+    vi.doUnmock('../src/lib/safe-fetch');
+  });
+
+  it('requires X to confirm remote deletion', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ data: { deleted: false } }))));
+    const { x } = await import('../src/lib/networks/x');
+    const ctx = context();
+    ctx.credentials.expiresAt = new Date(Date.now() + 60 * 60 * 1000) as never;
+    await expect(x.remove!('123', ctx)).rejects.toThrow(/did not confirm deletion/);
+  });
+});
+
 describe('publishing', () => {
   it('Bluesky: signs in with the app password and creates the post record', async () => {
     const calls: Array<{ url: string; body: unknown }> = [];

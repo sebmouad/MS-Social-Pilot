@@ -69,6 +69,7 @@ function routeFiles(directory: string, prefix = ''): string[] {
 /** Bodies that pass validation, so the refusal tested is about ownership, not shape. */
 const BODY: Record<string, unknown> = {
   'posts/[id]': { message: 'Changed by another client' },
+  'posts/[id]/purge': { deleteRemote: false },
   'posts/[id]/notes': { body: 'Hijacked' },
   'targets/[id]': { enabled: false },
   'targets/[id]/profile': { brandVoice: 'Hijacked' },
@@ -209,6 +210,7 @@ beforeAll(async () => {
     'report-schedules/[id]': schedule.id,
     'report-templates/[id]': template.id,
     'share-links/[id]': share.id,
+    'share-links/[id]/purge': share.id,
     'snippets/[id]': snippet.id,
     'targets/[id]': target.id,
     'targets/[id]/profile': target.id,
@@ -221,7 +223,7 @@ beforeAll(async () => {
     target: target.id,
     post: post.id,
   });
-  for (const action of ['', '/approve', '/duplicate', '/first-comment', '/publish', '/recycle', '/remove', '/retry', '/undo-send', '/versions', '/notes']) {
+  for (const action of ['', '/approve', '/duplicate', '/first-comment', '/publish', '/purge', '/recycle', '/remove', '/retry', '/undo-send', '/versions', '/notes']) {
     A[`posts/[id]${action}`] = post.id;
   }
 

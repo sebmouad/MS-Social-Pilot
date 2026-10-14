@@ -32,6 +32,10 @@ describe('plan limits', () => {
     for (const id of ['1', '2', '3']) await prisma.target.create({ data: { workspaceId: workspace.id, type: 'page', providerId: id, name: `Page ${id}` } });
 
     await expect(plans.assertRoom(workspace.id, 'channels')).rejects.toMatchObject({ key: 'errors.planLimit_channels', status: 402 });
+    await prisma.target.update({ where: { workspaceId_providerId: { workspaceId: workspace.id, providerId: '3' } }, data: { enabled: false } });
+    expect((await plans.planUsage(workspace.id, 'channels')).used).toBe(2);
+    await expect(plans.assertRoom(workspace.id, 'channels')).resolves.toBeUndefined();
+    await prisma.target.update({ where: { workspaceId_providerId: { workspaceId: workspace.id, providerId: '3' } }, data: { enabled: true } });
     await prisma.user.update({ where: { id: user.id }, data: { extraChannels: 1 } });
     await expect(plans.assertRoom(workspace.id, 'channels')).resolves.toBeUndefined();
 

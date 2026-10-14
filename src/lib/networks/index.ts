@@ -120,6 +120,12 @@ export async function readNetworkReplies(key: NetworkKey, account: StoredAccount
   return connector.replies ? connector.replies(remotePostId, contextFor(account)) : null;
 }
 
+export async function removeNetworkPost(key: NetworkKey, account: StoredAccount, remotePostId: string): Promise<void> {
+  const remove = CONNECTORS[key].remove;
+  if (!remove) throw new Error(`${CONNECTORS[key].label} does not support removal from this app.`);
+  await remove(remotePostId, contextFor(account));
+}
+
 /** Publish one destination on a network other than Facebook. */
 export async function publishToNetwork(options: {
   key: NetworkKey;

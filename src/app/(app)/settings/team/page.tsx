@@ -6,6 +6,8 @@ import { getTranslations } from 'next-intl/server';
 
 import { ClientAccess } from '@/components/ClientAccess';
 import { TeamClient } from '@/components/TeamClient';
+import { PrivilegesView } from '@/components/PrivilegesView';
+import { privilegesByMember } from '@/lib/root';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { canManageSettings, canManageTeam } from '@/lib/constants';
@@ -50,6 +52,7 @@ export default async function TeamPage() {
       : Promise.resolve([]),
     canManageTeam(auth.role) ? listPageGroups(auth.workspace.id, ALL_PAGES) : Promise.resolve([]),
   ]);
+  const privileges = auth.isInstanceOwner ? await privilegesByMember({ workspaceId: auth.workspace.id }) : null;
 
   return (
     <div className="space-y-6">
@@ -96,6 +99,10 @@ export default async function TeamPage() {
           ))}
         </dl>
       </section>
+      {privileges && <section id="permissions" className="space-y-3 scroll-mt-24">
+        <h2 className="text-lg font-semibold text-slate-900">{(await getTranslations('root.privileges'))('workspaceTitle')}</h2>
+        <PrivilegesView members={privileges} showWorkspace={false} />
+      </section>}
     </div>
   );
 }

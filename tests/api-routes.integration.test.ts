@@ -272,6 +272,7 @@ const CONTRIBUTOR_MUST_NOT: Array<[Method, string]> = [
   ['DELETE', 'report-schedules/[id]'],
   ['POST', 'share-links'],
   ['DELETE', 'share-links/[id]'],
+  ['POST', 'share-links/[id]/purge'],
 ];
 
 describe('a signed-in contributor', () => {

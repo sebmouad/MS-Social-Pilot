@@ -79,6 +79,7 @@ export async function discoverAdAccounts(workspaceId: string): Promise<{
           where: { workspaceId_actId: { workspaceId, actId: adAccount.actId } },
           create: {
             workspaceId,
+            enabled: false,
             socialAccountId: account.id,
             actId: adAccount.actId,
             name: adAccount.name,

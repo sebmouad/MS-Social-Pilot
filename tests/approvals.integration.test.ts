@@ -600,6 +600,45 @@ describe('editing after approval', () => {
 });
 
 describe('retrying a post that is back in the queue', () => {
+  it('does not resend or rewrite a Facebook post whose publication is unconfirmed', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
+    const post = await prisma.post.create({ data: {
+      workspaceId: workspace.id,
+      authorId: owner.id,
+      message: 'May already be on Facebook',
+      status: PostStatus.failed,
+      approvalStatus: ApprovalStatus.not_required,
+      targets: { create: { targetId: target.id, status: 'failed', errorCode: 'unconfirmed_on_facebook' } },
+    } });
+    const actor = { workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner };
+    expect(await posts.retryPost(actor, post.id)).toBe(0);
+    await expect(posts.cancelPost(actor, post.id)).rejects.toMatchObject({ key: 'errors.unconfirmedRemotePost' });
+    await expect(posts.updatePost({ ...actor, requiresApproval: false }, post.id, { message: 'Changed copy' }))
+      .rejects.toMatchObject({ key: 'errors.unconfirmedRemotePost' });
+    await expect(runner.publishNow(post.id)).rejects.toMatchObject({ key: 'errors.unconfirmedRemotePost' });
+    expect(await prisma.postTarget.findFirstOrThrow({ where: { postId: post.id } }))
+      .toMatchObject({ status: 'failed', errorCode: 'unconfirmed_on_facebook' });
+  });
+
+  it('retries only the confirmed failures when another destination is unconfirmed', async () => {
+    const owner = await makeUser('Owner');
+    const { workspace, target } = await makeWorkspace({ name: 'Client', ownerId: owner.id });
+    const other = await prisma.target.create({ data: { workspaceId: workspace.id, type: 'page', providerId: 'another-page', name: 'Another Page' } });
+    const post = await prisma.post.create({ data: {
+      workspaceId: workspace.id, authorId: owner.id, message: 'Two destinations', status: PostStatus.failed,
+      approvalStatus: ApprovalStatus.not_required,
+      targets: { create: [
+        { targetId: target.id, status: 'failed', errorCode: 'unconfirmed_on_facebook' },
+        { targetId: other.id, status: 'failed', errorCode: 'timeout' },
+      ] },
+    } });
+    expect(await posts.retryPost({ workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner }, post.id)).toBe(1);
+    const destinations = await prisma.postTarget.findMany({ where: { postId: post.id }, orderBy: { targetId: 'asc' } });
+    expect(destinations.find((row) => row.targetId === target.id)).toMatchObject({ status: 'failed', errorCode: 'unconfirmed_on_facebook' });
+    expect(destinations.find((row) => row.targetId === other.id)).toMatchObject({ status: 'pending', errorCode: null });
+  });
+
   it('does not label a held post as scheduled', async () => {
     const owner = await makeUser('Owner');
     const contributor = await makeUser('Contributor');

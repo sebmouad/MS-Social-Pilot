@@ -3,6 +3,7 @@ import { removeTarget, setTargetEnabled } from '@/lib/connections';
 import { targetUpdateSchema } from '@/lib/validation';
 import { fail, ok, readJson, route } from '@/lib/api';
 import { errors } from '@/lib/errors';
+import { z } from 'zod';
 
 /**
  * Enable or disable a destination in the composer.
@@ -50,19 +51,21 @@ export const PATCH = route(async (request: Request, context: { params: Promise<{
  * disconnecting the account it came from). Posts Facebook was holding for it
  * are deleted there first; the ones it would not drop are counted back.
  */
-export const DELETE = route(async (_request: Request, context: { params: Promise<{ id: string }> }) => {
+export const DELETE = route(async (request: Request, context: { params: Promise<{ id: string }> }) => {
   const auth = await requireAuth();
   const { id } = await context.params;
+  const input = z.object({ deleteData: z.boolean().default(true) }).parse((await readJson(request).catch(() => ({}))) ?? {});
 
   const result = await removeTarget({
     workspaceId: auth.workspace.id,
     role: auth.role,
     targetId: id,
     actorId: auth.user.id,
+    deleteData: input.deleteData,
   });
 
   if (result.outcome === 'forbidden') throw errors.adminsOnlyDestinations();
   if (result.outcome === 'not_found') throw errors.destinationNotFound();
 
-  return ok({ id, removed: true, stillScheduledOnFacebook: result.stillScheduledOnFacebook });
+  return ok({ id, removed: input.deleteData, disconnected: !input.deleteData, stillScheduledOnFacebook: result.stillScheduledOnFacebook });
 });

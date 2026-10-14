@@ -20,6 +20,7 @@ import type { PostFormat } from '../facebook/publish';
 import {
   PUBLISHABLE_APPROVAL_STATUSES,
   TERMINAL_TARGET_STATUSES,
+  UNCONFIRMED_REMOTE_POST,
   PostStatus,
   PostTargetStatus,
 } from '../constants';
@@ -728,11 +729,14 @@ export async function publishNow(postId: string, logger?: TickOptions['logger'])
   // review queue exists to prevent.
   const post = await prisma.post.findUniqueOrThrow({
     where: { id: postId },
-    select: { approvalStatus: true },
+    select: { approvalStatus: true, targets: { select: { status: true, errorCode: true } } },
   });
   if (!PUBLISHABLE_APPROVAL_STATUSES.includes(post.approvalStatus)) {
     throw errors.awaitingApproval();
   }
+  const unconfirmed = post.targets.some((target) => target.status === 'failed' && target.errorCode === UNCONFIRMED_REMOTE_POST);
+  const sendable = post.targets.some((target) => target.status === 'pending' || (target.status === 'failed' && target.errorCode !== UNCONFIRMED_REMOTE_POST));
+  if (unconfirmed && !sendable) throw errors.unconfirmedRemotePost();
 
   await prisma.post.update({
     where: { id: postId },
@@ -750,7 +754,7 @@ export async function publishNow(postId: string, logger?: TickOptions['logger'])
     where: {
       postId,
       status: { in: ['pending', 'failed'] },
-      OR: [{ errorCode: null }, { errorCode: { not: 'unconfirmed_on_facebook' } }],
+      OR: [{ errorCode: null }, { errorCode: { not: UNCONFIRMED_REMOTE_POST } }],
     },
     data: { status: 'pending', nextAttemptAt: null, attempts: 0 },
   });

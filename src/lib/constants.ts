@@ -34,6 +34,8 @@ export {
 export const WORKSPACE_ROLES = Object.values(WorkspaceRole);
 export const POST_STATUSES = Object.values(PostStatus);
 export const POST_TARGET_STATUSES = Object.values(PostTargetStatus);
+/** Facebook may have published this native post; never automatically resend it. */
+export const UNCONFIRMED_REMOTE_POST = 'unconfirmed_on_facebook';
 export const PUBLISH_MODES = Object.values(PublishMode);
 export const TARGET_TYPES = Object.values(TargetType);
 export const LOCALES = Object.values(Locale);
@@ -295,14 +297,14 @@ export function postStatusFilter(value: string | undefined): PostStatus[] | unde
  * whether to offer an Edit button. Written once so the two cannot drift — a
  * button that leads to a 409 is worse than no button.
  */
-export type EditBlocker = 'publishing' | 'published' | 'scheduled_remote' | null;
+export type EditBlocker = 'publishing' | 'published' | 'scheduled_remote' | 'unconfirmed_remote' | null;
 
 /** A destination a worker is holding open right now. */
 const IN_FLIGHT = 'processing';
 
 export function postEditBlocker(post: {
   status: string;
-  targets: Array<{ status: string }>;
+  targets: Array<{ status: string; errorCode?: string | null }>;
 }): EditBlocker {
   if (post.status === PostStatus.publishing) return 'publishing';
   if (post.status === PostStatus.published || post.status === PostStatus.partially_failed) {
@@ -321,6 +323,9 @@ export function postEditBlocker(post: {
   if (post.targets.some((target) => target.status === 'scheduled_remote')) {
     return 'scheduled_remote';
   }
+  if (post.targets.some((target) => target.status === 'failed' && target.errorCode === UNCONFIRMED_REMOTE_POST)) {
+    return 'unconfirmed_remote';
+  }
   return null;
 }
 
@@ -332,7 +337,7 @@ export function postEditBlocker(post: {
  */
 export function postIsEditable(post: {
   status: string;
-  targets: Array<{ status: string }>;
+  targets: Array<{ status: string; errorCode?: string | null }>;
 }): boolean {
   return postEditBlocker(post) === null;
 }
@@ -385,13 +390,14 @@ export type TargetBlockReason = (typeof TARGET_BLOCK_REASONS)[number];
  *
  * `PostTarget.errorCode` also carries Facebook's own codes and error kinds.
  * Those keep their stored wording, because Facebook wrote it and it is the
- * informative part. These five are sentences this app composed, so they can be
+ * informative part. These are sentences this app composed, so they can be
  * said in the reader's language instead.
  */
 export const OWN_TARGET_ERRORS = [
   'account_disconnected',
   'deleted_on_facebook',
   'destination_off',
+  'unconfirmed_on_facebook',
   'worker_lost',
 ] as const;
 

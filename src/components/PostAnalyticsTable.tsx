@@ -2,6 +2,7 @@
 
 import { EmptyState } from '@/components/EmptyState';
 import { useMemo, useState } from 'react';
+import { SidebarDock } from './SidebarDock';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 
@@ -134,6 +135,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
         {/* Which posts: the ones this app published, the ones made on Facebook
             itself, or both. Only offered when there are both kinds. */}
         {counts.page > 0 && counts.app > 0 && (
+          <SidebarDock>
           <div className="segmented" role="radiogroup" aria-label={t('sourceFilter')}>
             {(['all', 'app', 'page'] as const).map((value) => (
               <button
@@ -151,6 +153,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
               </button>
             ))}
           </div>
+          </SidebarDock>
         )}
 
         {/* A ten-column table has no sortable headers on a phone, so the sort

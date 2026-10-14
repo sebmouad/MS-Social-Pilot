@@ -6,15 +6,13 @@ import { getTranslations } from 'next-intl/server';
 import { ConnectionsClient } from '@/components/ConnectionsClient';
 import { Icon } from '@/components/Icon';
 import { OtherNetworks } from '@/components/OtherNetworks';
-import { ConnectSummary } from '@/components/ConnectSummary';
+import { SidebarDock } from '@/components/SidebarDock';
 import { NETWORK_KEYS, NETWORK_LABELS, isNetworkKey, networkAvailable, type NetworkKey } from '@/lib/networks';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { canManageAccounts } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
-import { TargetType } from '@prisma/client';
-import { targetScope } from '@/lib/page-access';
 import { formatInZone } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
@@ -86,13 +84,6 @@ export default async function ConnectionsPage({
   });
 
   const canManage = canManageAccounts(auth.role);
-  const tType = await getTranslations('pagesSidebar.type');
-  const tNetworks = await getTranslations('networks');
-  const typeCounts = await prisma.target.groupBy({
-    by: ['type'],
-    where: { workspaceId: auth.workspace.id, ...targetScope(auth.pageScope) },
-    _count: { _all: true },
-  });
   const accounts = allAccounts.filter((account) => account.provider === 'facebook');
   const networkAccounts = allAccounts.filter((account) => isNetworkKey(account.provider));
   const networkNotice = first(params.network);
@@ -112,6 +103,11 @@ export default async function ConnectionsPage({
         }
       />
       {meter.limit !== null && <PlanMeter label={tPlan('channels', { used: meter.used, limit: meter.limit })} used={meter.used} limit={meter.limit} />}
+      {canManage && first(params.select) === '1' && (
+        <p role="status" className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-800">
+          {t('selectChannelsHint')}
+        </p>
+      )}
 
       {(['connected', 'warning', 'error'] as const).map((kind) => {
         const value = first(params[kind]);
@@ -132,7 +128,7 @@ export default async function ConnectionsPage({
       })}
 
       {/* A long screen: chips jump to each part, as Simplified does. */}
-      <nav aria-label={t('jumpTo')} className="flex flex-wrap gap-2">
+      <SidebarDock><nav aria-label={t('jumpTo')} className="flex flex-col gap-1">
         {[
           ...(accounts.length > 0
             ? [
@@ -146,40 +142,13 @@ export default async function ConnectionsPage({
           <a
             key={chip.href}
             href={chip.href}
-            className="rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-surface hover:bg-slate-50"
+            className="rounded-lg px-2.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
           >
             {chip.label}
           </a>
         ))}
-      </nav>
+      </nav></SidebarDock>
 
-
-      {/* Every network at a glance; each row opens a sheet that starts connecting. */}
-      <ConnectSummary
-        isRoot={auth.isInstanceOwner}
-        rows={(Object.values(TargetType) as TargetType[])
-          .filter((type) => (type !== 'group' || env.groupsEnabled) && (type !== 'instagram' || env.instagramEnabled))
-          .map((type) => {
-            const facebook = type === 'page' || type === 'group' || type === 'instagram';
-            const formNetwork = type === 'bluesky' || type === 'mastodon' || type === 'telegram';
-            const available = facebook || (isNetworkKey(type) && networkAvailable(type));
-            return {
-              type,
-              label: tType(type),
-              count: typeCounts.find((row) => row.type === type)?._count._all ?? 0,
-              anchor: type === 'instagram' ? '#instagram' : facebook ? '#facebook' : '#networks',
-              hint: facebook ? t(`sheetHint_${type}`) : tNetworks(`hint_${type}`),
-              action: !canManage
-                ? null
-                : !available
-                  ? { kind: 'needsApp' as const }
-                  : {
-                      kind: 'link' as const,
-                      href: facebook ? '/api/facebook/connect' : formNetwork ? `/connections?connect=${type}#networks` : `/api/networks/${type}/connect`,
-                    },
-            };
-          })}
-      />
 
       {accounts.length === 0 && orphans.length === 0 ? (
         <div className="card flex flex-col items-center gap-3 p-8 text-center">
@@ -218,6 +187,7 @@ export default async function ConnectionsPage({
               ? t('viaPage', { page: account.target.name })
               : t('noLinkedPage'),
             enabled: account.enabled,
+            connected: account.socialAccountId !== null,
             lastSyncedLabel: account.lastSyncedAt
               ? formatInZone(account.lastSyncedAt, timezone)
               : null,
@@ -227,6 +197,7 @@ export default async function ConnectionsPage({
             label: account.name,
             detail: account.currency ?? null,
             enabled: account.enabled,
+            connected: account.socialAccountId !== null,
             lastSyncedLabel: account.lastSyncedAt
               ? formatInZone(account.lastSyncedAt, timezone)
               : null,
@@ -252,6 +223,7 @@ export default async function ConnectionsPage({
           name: account.name,
           pictureUrl: account.pictureUrl,
           invalidReason: account.invalidatedAt ? t('reconnectRequired') : null,
+          lastSyncedLabel: account.lastSyncedAt ? formatInZone(account.lastSyncedAt, timezone) : null,
           targets: account.targets.map((target) => ({ id: target.id, name: target.name, category: target.category, enabled: target.enabled })),
         }))}
       />

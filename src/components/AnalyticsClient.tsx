@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
+import { SidebarDock } from './SidebarDock';
 
 import { BarList } from './charts/BarList';
 import { ChartFrame } from './charts/ChartFrame';
@@ -289,7 +290,7 @@ export function AnalyticsClient({
       )}
 
       {/* The browsable catalogue. Filter row above the content it scopes. */}
-      <div className="filter-row justify-between">
+      <SidebarDock><div className="filter-row justify-between">
         <input
           type="search"
           className="input w-full sm:w-64"
@@ -302,6 +303,7 @@ export function AnalyticsClient({
           <span className="text-xs text-slate-500">{t('metricsShown', { count: shown })}</span>
         </div>
       </div>
+      </SidebarDock>
 
       {series.length === 0 ? (
         <div className="card p-8 text-center">

@@ -9,6 +9,7 @@ import { canApprove, canCompose } from '@/lib/constants';
 import { pendingApprovalCount } from '@/lib/approvals';
 import { brand } from '@/lib/operator';
 import { ensureSettings } from '@/lib/settings';
+import { mayUseDeveloperFeatures } from '@/lib/modules';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const auth = await getAuthContext();
@@ -36,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         showApprovals={showApprovals}
         pendingApprovals={pendingApprovals}
         isRoot={auth.isInstanceOwner}
+        developerFeatures={mayUseDeveloperFeatures(auth)}
         canWrite={canCompose(auth.role)}
         rootVisit={auth.rootVisit}
         modules={refusal === 'suspended' ? [] : auth.modules}

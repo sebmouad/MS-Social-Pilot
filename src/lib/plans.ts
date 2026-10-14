@@ -35,7 +35,7 @@ type Subscriber = NonNullable<Awaited<ReturnType<typeof subscriberOf>>>;
 export async function usageOf(userId: string): Promise<Record<PlanLimit, number>> {
   const workspaceIds = await ownedWorkspaceIds(userId);
   const [channels, members] = await Promise.all([
-    prisma.target.count({ where: { workspaceId: { in: workspaceIds }, type: { not: TargetType.group } } }),
+    prisma.target.count({ where: { workspaceId: { in: workspaceIds }, type: { not: TargetType.group }, enabled: true } }),
     prisma.membership.findMany({
       where: { workspaceId: { in: workspaceIds }, role: { not: WorkspaceRole.client } },
       distinct: ['userId'],

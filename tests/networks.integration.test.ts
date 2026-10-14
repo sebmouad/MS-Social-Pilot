@@ -59,6 +59,7 @@ async function seed() {
     },
   });
   const target = await prisma.target.findFirstOrThrow({ where: { socialAccountId: saved.accountId } });
+  await prisma.target.update({ where: { id: target.id }, data: { enabled: true } });
   return { owner, workspace, target };
 }
 

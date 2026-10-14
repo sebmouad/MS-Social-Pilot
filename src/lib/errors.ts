@@ -286,6 +286,13 @@ export const errors = {
       status: 409,
     }),
 
+  unconfirmedRemotePost: () =>
+    new AppError({
+      key: 'errors.unconfirmedRemotePost',
+      fallback: 'Facebook never confirmed this scheduled post. Check the Page before creating another copy; this one cannot be retried or edited safely.',
+      status: 409,
+    }),
+
   awaitingApproval: () =>
     new AppError({
       key: 'errors.awaitingApproval',

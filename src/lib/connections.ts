@@ -3,6 +3,7 @@ import { WorkspaceRole } from '@prisma/client';
 import { prisma } from './prisma';
 import { canManageAccounts } from './constants';
 import { disconnectAccount, removeTarget as forgetTarget } from './accounts';
+import { assertRoom } from './plans';
 
 /**
  * Managing what this workspace is connected to.
@@ -66,7 +67,7 @@ export async function setTargetEnabled(options: {
       reason: target.publishBlocker ?? 'This destination cannot be published to right now.',
     };
   }
-
+  if (options.enabled && !target.enabled && target.type !== 'group') await assertRoom(options.workspaceId, 'channels');
   await prisma.target.update({
     where: { id: target.id },
     data: { enabled: options.enabled },
@@ -97,6 +98,7 @@ export async function removeTarget(options: {
   role: WorkspaceRole;
   targetId: string;
   actorId?: string;
+  deleteData?: boolean;
 }): Promise<ConnectionResult> {
   if (!canManageAccounts(options.role)) return { outcome: 'forbidden' };
 
@@ -104,6 +106,7 @@ export async function removeTarget(options: {
     options.workspaceId,
     options.targetId,
     options.actorId,
+    options.deleteData ?? true,
   );
   if (!removed) return { outcome: 'not_found' };
   return stillScheduledOnFacebook > 0 ? { outcome: 'ok', stillScheduledOnFacebook } : OK;
@@ -123,6 +126,12 @@ export async function setLinkedAccountEnabled(options: {
   if (!canManageAccounts(options.role)) return { outcome: 'forbidden' };
 
   const where = { id: options.id, workspaceId: options.workspaceId };
+  if (options.enabled) {
+    const source = options.kind === 'instagram'
+      ? await prisma.instagramAccount.findFirst({ where, select: { socialAccountId: true } })
+      : await prisma.adAccount.findFirst({ where, select: { socialAccountId: true } });
+    if (source && !source.socialAccountId) return { outcome: 'blocked', reason: 'Reconnect the source before enabling it.' };
+  }
   const data = { enabled: options.enabled };
 
   const updated =
@@ -145,15 +154,27 @@ export async function removeLinkedAccount(options: {
   role: WorkspaceRole;
   kind: LinkedKind;
   id: string;
+  deleteData?: boolean;
 }): Promise<ConnectionResult> {
   if (!canManageAccounts(options.role)) return { outcome: 'forbidden' };
 
   const where = { id: options.id, workspaceId: options.workspaceId };
+  const instagramTarget = options.kind === 'instagram'
+    ? await prisma.instagramAccount.findFirst({ where, select: { igUserId: true } })
+    : null;
+  const target = instagramTarget
+    ? await prisma.target.findFirst({ where: { workspaceId: options.workspaceId, type: 'instagram', providerId: instagramTarget.igUserId }, select: { id: true } })
+    : null;
 
-  const removed =
-    options.kind === 'instagram'
+  const removed = options.deleteData === false
+    ? options.kind === 'instagram'
+      ? await prisma.instagramAccount.updateMany({ where, data: { enabled: false, socialAccountId: null, targetId: null } })
+      : await prisma.adAccount.updateMany({ where, data: { enabled: false, socialAccountId: null } })
+    : options.kind === 'instagram'
       ? await prisma.instagramAccount.deleteMany({ where })
       : await prisma.adAccount.deleteMany({ where });
+
+  if (removed.count > 0 && target) await forgetTarget(options.workspaceId, target.id, undefined, options.deleteData !== false);
 
   return removed.count > 0 ? OK : { outcome: 'not_found' };
 }
@@ -168,6 +189,7 @@ export async function disconnect(options: {
   workspaceId: string;
   role: WorkspaceRole;
   socialAccountId: string;
+  deleteData?: boolean;
 }): Promise<ConnectionResult> {
   if (!canManageAccounts(options.role)) return { outcome: 'forbidden' };
 
@@ -177,7 +199,7 @@ export async function disconnect(options: {
   });
   if (!account) return { outcome: 'not_found' };
 
-  const { stillScheduledOnFacebook } = await disconnectAccount(options.workspaceId, account.id);
+  const { stillScheduledOnFacebook } = await disconnectAccount(options.workspaceId, account.id, options.deleteData ?? false);
   return stillScheduledOnFacebook > 0 ? { outcome: 'ok', stillScheduledOnFacebook } : OK;
 }
 

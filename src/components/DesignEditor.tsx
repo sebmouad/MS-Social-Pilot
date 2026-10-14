@@ -207,7 +207,7 @@ export function DesignEditor({
       </div>
       <div className="space-y-4">
         <section className="card space-y-3 p-4">
-          <div className="segmented w-full flex-wrap" role="radiogroup" onKeyDown={onRadioGroupKeyDown} aria-label={t('size')}>
+          <div className="segmented grid w-full grid-cols-2 gap-1" role="radiogroup" onKeyDown={onRadioGroupKeyDown} aria-label={t('size')}>
             {(Object.keys(SIZES) as SizeKey[]).map((key) => (
               <button key={key} type="button" role="radio" aria-checked={size === key} tabIndex={size === key ? 0 : -1} className={`segmented-item ${size === key ? 'segmented-item-active' : ''}`} onClick={() => setSize(key)}>
                 {t(`size_${key}`)}

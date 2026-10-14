@@ -137,6 +137,14 @@ describe('parseCsvWithHeader', () => {
  * a whole column can be wrong at once.
  */
 describe('bulkRowSchema', () => {
+  it('keeps a first comment with commas and newlines from the CSV', () => {
+    const { rows } = parseCsvWithHeader('message,first_comment\nHello,"Details, links\nand hashtags"');
+    expect(bulkRowSchema.parse(rows[0]).first_comment).toBe('Details, links\nand hashtags');
+  });
+
+  it('rejects an overlong first comment', () => {
+    expect(bulkRowSchema.safeParse({ message: 'Hello', first_comment: 'x'.repeat(8001) }).success).toBe(false);
+  });
   it('treats an empty cell as no link at all', () => {
     const parsed = bulkRowSchema.parse({ message: 'Hello', link: '', media_url: '   ' });
     expect(parsed.link).toBeUndefined();

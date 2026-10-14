@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { useConfirm } from './ConfirmProvider';
+import { Dialog } from './Dialog';
 
 import { StatusBadge } from './StatusBadge';
 import { LabelChips } from './LabelChips';
@@ -21,7 +22,7 @@ import {
   type FeedLinkPreview,
   type FeedMedia,
 } from './FeedPost';
-import { postIsEditable } from '@/lib/constants';
+import { postIsEditable, UNCONFIRMED_REMOTE_POST } from '@/lib/constants';
 
 export interface PostView {
   id: string;
@@ -120,6 +121,8 @@ export function PostList({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [deletePost, setDeletePost] = useState<PostView | null>(null);
+  const [deleteRemote, setDeleteRemote] = useState(false);
   const tBulk = useTranslations('posts.bulk');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -225,6 +228,34 @@ export function PostList({
       else router.refresh();
     } catch {
       setError(t('actionFailed'));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function purge() {
+    if (!deletePost) return;
+    const id = deletePost.id;
+    setBusy(id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/posts/${id}/purge`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ deleteRemote }),
+      });
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        setError(body.error ?? t('actionFailed'));
+        setDeletePost(null);
+        return;
+      }
+      setDeletePost(null);
+      setSelected((current) => { const next = new Set(current); next.delete(id); return next; });
+      router.refresh();
+    } catch {
+      setError(t('actionFailed'));
+      setDeletePost(null);
     } finally {
       setBusy(null);
     }
@@ -349,16 +380,16 @@ export function PostList({
         // Facebook is holding it: our worker has nothing to send, and the
         // publish route refuses it, so offering the button is a dead end.
         const heldByFacebook = post.targets.some((target) => target.status === 'scheduled_remote');
+        const hasSendableTarget = post.targets.some((target) =>
+          target.status === 'pending' || (target.status === 'failed' && target.errorCode !== UNCONFIRMED_REMOTE_POST));
         const canPublishNow =
-          post.mayAct && post.cleared && !heldByFacebook && PUBLISHABLE_NOW.includes(post.status);
+          post.mayAct && post.cleared && !heldByFacebook && hasSendableTarget && PUBLISHABLE_NOW.includes(post.status);
         const canCancel = post.mayAct && CANCELLABLE.includes(post.status);
         const canSubmit = post.mayAct && needsReview && SUBMITTABLE.includes(post.status);
         const canWithdraw = post.mayAct && post.status === 'pending_approval';
         // The same rule the API enforces, so the button is never a dead end.
         const canEdit = post.mayAct && postIsEditable(post);
-        const canRetry = post.mayAct && post.targets.some((target) => target.status === 'failed');
-        const canRemove =
-          post.mayAct && post.targets.some((target) => target.status === 'published' && target.type === 'page' && target.url && !target.removed);
+        const canRetry = post.mayAct && post.targets.some((target) => target.status === 'failed' && target.errorCode !== UNCONFIRMED_REMOTE_POST);
         const refusedComments = post.targets.filter((target) => target.firstCommentError);
         const canRetryComment = post.mayAct && Boolean(post.firstComment) && refusedComments.length > 0;
         const commentState = !post.firstComment
@@ -404,7 +435,7 @@ export function PostList({
               </div>
               {post.targets.some((target) => target.removed) &&
               post.targets.every((target) => target.removed || target.status !== 'published') ? (
-                <span className="badge bg-slate-100 text-slate-600">{t('removedFromFacebook')}</span>
+                <span className="badge bg-slate-100 text-slate-600">{t('removedFromPlatform')}</span>
               ) : (
                 <StatusBadge status={post.status} />
               )}
@@ -464,14 +495,14 @@ export function PostList({
                   <li key={target.id} className="flex flex-wrap items-center gap-2 text-[13px]">
                     <span className="font-semibold text-slate-700">{target.name}</span>
                     {target.removed ? (
-                      <span className="badge bg-slate-100 text-slate-600">{t('removedFromFacebook')}</span>
+                      <span className="badge bg-slate-100 text-slate-600">{t('removedFromPlatform')}</span>
                     ) : (
                       <StatusBadge status={target.status} kind="target" />
                     )}
                     {/* A cancelled or removed post was taken off Facebook: its old address leads nowhere. */}
                     {target.url && target.status !== 'cancelled' && !target.removed && (
                       <ExternalLink href={target.url} className="font-semibold text-brand-600 hover:underline">
-                        {t('viewOnFacebook')}
+                        {t('viewOnPlatform')}
                       </ExternalLink>
                     )}
                     {failureText(target) && (
@@ -636,24 +667,15 @@ export function PostList({
                 <ActionIcon name="posts" />
                   {tCommon('duplicate')}
               </button>
-              {canRemove && (
+              {post.mayAct && (
                 <button
                   type="button"
                   className={`${ACTION} text-red-700 hover:bg-red-50`}
                   disabled={working}
-                  onClick={() =>
-                    act(post.id, {
-                      path: `/api/posts/${post.id}/remove`,
-                      method: 'POST',
-                      confirmText: t('removeConfirm', { count: post.targets.filter((target) => target.status === 'published' && !target.removed).length }),
-                      confirmLabel: t('removeAction'),
-                      cancelLabel: t('keepPost'),
-                      danger: true,
-                    })
-                  }
+                  onClick={() => { setDeleteRemote(false); setDeletePost(post); }}
                 >
                   <ActionIcon name="trash" />
-                  {t('removeAction')}
+                  {t('deleteRecord')}
                 </button>
               )}
               {canCancel && (
@@ -687,6 +709,27 @@ export function PostList({
           })}
         </section>
       ))}
+      <Dialog
+        open={deletePost !== null}
+        title={t('deleteRecord')}
+        closeLabel={tCommon('close')}
+        onClose={() => setDeletePost(null)}
+        footer={<>
+          <button type="button" className="btn-secondary" onClick={() => setDeletePost(null)}>{t('keepPost')}</button>
+          <button type="button" className="btn-danger" disabled={busy !== null} onClick={() => void purge()}>{t('deleteRecord')}</button>
+        </>}
+      >
+        <div className="space-y-4 text-sm text-slate-700">
+          <p>{t('deleteRecordHint')}</p>
+          {deletePost?.targets.some((target) => target.status === 'published' && !target.removed) && <>
+            <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
+              <input type="checkbox" className="mt-0.5 h-4 w-4" checked={deleteRemote} onChange={(event) => setDeleteRemote(event.target.checked)} />
+              <span>{t('deleteRemoteCheckbox')}</span>
+            </label>
+            <p className="text-xs text-slate-600">{t('deleteRemoteHint')}</p>
+          </>}
+        </div>
+      </Dialog>
     </div>
   );
 }

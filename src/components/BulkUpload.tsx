@@ -87,7 +87,7 @@ export function BulkUpload({
           className="input min-h-[120px] font-mono text-xs"
           value={csv}
           onChange={(event) => setCsv(event.target.value)}
-          placeholder="message,link,scheduled_at,media_url"
+          placeholder="message,link,scheduled_at,media_url,first_comment"
         />
       </div>
 

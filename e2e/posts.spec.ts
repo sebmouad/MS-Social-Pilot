@@ -170,6 +170,33 @@ test('a search narrows the list and survives switching tabs', async ({ page }) =
   expect(failures).toEqual([]);
 });
 
+test('deletes old app records and offers remote deletion only for published copies', async ({ page }) => {
+  const targetId = await connectPretendPage(OWNER.workspace);
+  const published = await prisma.post.create({ data: {
+    workspaceId, authorId, message: `${MARK}: old published record`, status: 'published',
+    publishedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    targets: { create: [{ targetId, status: 'published', remotePostId: 'pretend-remote', remoteUrl: 'https://facebook.com/pretend-remote' }] },
+  } });
+  await open(page, `/posts?q=${encodeURIComponent('old published record')}`);
+  const card = page.locator('article', { hasText: 'old published record' });
+  await expect(card).toBeVisible();
+  await card.getByRole('button', { name: 'Delete post' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Delete post' });
+  await expect(dialog.getByRole('checkbox', { name: /also delete published copies/i })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Delete post' }).click();
+  await expect.poll(() => prisma.post.findUnique({ where: { id: published.id } })).toBeNull();
+
+  const draft = await prisma.post.create({ data: {
+    workspaceId, authorId, message: `${MARK}: old draft record`,
+    targets: { create: [{ targetId }] },
+  } });
+  await open(page, `/posts?q=${encodeURIComponent('old draft record')}`);
+  await page.locator('article', { hasText: 'old draft record' }).getByRole('button', { name: 'Delete post' }).click();
+  await expect(page.getByRole('dialog').getByRole('checkbox')).toHaveCount(0);
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete post' }).click();
+  await expect.poll(() => prisma.post.findUnique({ where: { id: draft.id } })).toBeNull();
+});
+
 test('"Publish now" is not offered on a post Facebook is holding, and asks first elsewhere', async ({ page }) => {
   const failures = collectFailures(page);
 

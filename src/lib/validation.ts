@@ -361,7 +361,7 @@ export const queueSlotsSchema = z.object({
 
 /**
  * One row of a bulk upload. The CSV columns are:
- * `message,link,scheduled_at,media_url`
+ * `message,link,scheduled_at,media_url,first_comment`
  */
 /**
  * A CSV cell that is either blank or a URL.
@@ -389,6 +389,7 @@ export const bulkRowSchema = z.object({
   link: optionalCsvUrl,
   scheduled_at: z.string().trim().optional(),
   media_url: optionalCsvUrl,
+  first_comment: firstComment.optional(),
 });
 
 export const bulkUploadSchema = z.object({

@@ -31,6 +31,11 @@ describe('a post that has not gone out', () => {
     ).toBe(true);
   });
 
+  it('blocks editing when Facebook may have published the failed destination', () => {
+    expect(postEditBlocker({ status: 'failed', targets: [{ status: 'failed', errorCode: 'unconfirmed_on_facebook' }] }))
+      .toBe('unconfirmed_remote');
+  });
+
   it('can be edited after being cancelled, which is how a cancellation is undone', () => {
     expect(postIsEditable({ status: 'cancelled', targets: [{ status: 'cancelled' }] })).toBe(true);
   });

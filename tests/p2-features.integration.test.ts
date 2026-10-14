@@ -148,6 +148,30 @@ describe('a Page’s drafts', () => {
 });
 
 describe('taking a published post down', () => {
+  it('deletes a draft record and its destinations without a remote request', async () => {
+    const { owner, workspace, bakery } = await seed();
+    const post = await prisma.post.create({ data: {
+      workspaceId: workspace.id, authorId: owner.id, message: 'Old draft',
+      targets: { create: [{ targetId: bakery.id }] },
+    } });
+    const posts = await import('../src/lib/posts');
+    expect(await posts.deletePostRecord({ workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner }, post.id, false)).toEqual({ deleted: true, removedRemote: 0 });
+    expect(await prisma.post.findUnique({ where: { id: post.id } })).toBeNull();
+    expect(await prisma.postTarget.count({ where: { postId: post.id } })).toBe(0);
+  });
+
+  it('keeps a published record when remote removal cannot be confirmed', async () => {
+    const { owner, workspace, bakery } = await seed();
+    const post = await prisma.post.create({ data: {
+      workspaceId: workspace.id, authorId: owner.id, message: 'Still live', status: 'published',
+      targets: { create: [{ targetId: bakery.id, status: 'published', remotePostId: '1_9' }] },
+    } });
+    const posts = await import('../src/lib/posts');
+    await expect(posts.deletePostRecord({ workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner }, post.id, true)).rejects.toMatchObject({ key: 'errors.remoteDeleteFailed' });
+    expect(await prisma.post.findUnique({ where: { id: post.id } })).not.toBeNull();
+    expect(await posts.deletePostRecord({ workspaceId: workspace.id, userId: owner.id, role: WorkspaceRole.owner }, post.id, false)).toEqual({ deleted: true, removedRemote: 0 });
+  });
+
   it('deletes it on Facebook and marks each Page with when', async () => {
     const { owner, workspace, bakery } = await seed();
     const { encryptSecret } = await import('../src/lib/crypto');

@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { TargetType, WorkspaceRole } from '@prisma/client';
 import { loadSelection } from '@/lib/page-filter';
 import { ChannelsLayout } from '@/components/ChannelsLayout';
+import { SidebarDock } from '@/components/SidebarDock';
 
 import { AnalyticsClient } from '@/components/AnalyticsClient';
 import { AnalyticsTabs } from '@/components/AnalyticsTabs';
@@ -702,7 +703,7 @@ async function CommentsView({
 
   return (
     <div className="space-y-4">
-      <form method="get" className="flex flex-wrap items-end gap-2">
+      <SidebarDock><form method="get" className="flex flex-wrap items-end gap-2">
         <input type="hidden" name="view" value="comments" />
         {typeof params.target === 'string' && (
           <input type="hidden" name="target" value={params.target} />
@@ -736,7 +737,7 @@ async function CommentsView({
         <button type="submit" className="btn-secondary">
           {t('applyFilter')}
         </button>
-      </form>
+      </form></SidebarDock>
 
     <CommentsPanel
       note={<AutoSyncNote job="edges" timezone={timezone} firstReadPending={firstReadPending} />}

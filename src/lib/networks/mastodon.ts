@@ -90,6 +90,15 @@ export const mastodon: NetworkConnector = {
   key: 'mastodon',
   label: 'Mastodon',
   rules: NETWORK_RULES.mastodon,
+  async remove(remotePostId, { credentials }) {
+    const instance = (credentials.meta as { instance?: string }).instance;
+    if (!instance) throw new GraphError({ message: 'Mastodon: reconnect the account.', kind: 'auth' });
+    await netJson('Mastodon', `${instance}/api/v1/statuses/${encodeURIComponent(remotePostId)}`, {
+      method: 'DELETE',
+      untrustedHost: true,
+      headers: { authorization: `Bearer ${credentials.accessToken}` },
+    });
+  },
   async publish(_target, post, { credentials }) {
     const instance = (credentials.meta as { instance?: string }).instance;
     if (!instance) throw new GraphError({ message: 'Mastodon: reconnect the account.', kind: 'auth' });
