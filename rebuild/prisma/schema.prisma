@@ -1,0 +1,247 @@
+// Read-only compatibility view for the fresh app. This schema maps only the
+// legacy tables and columns the new app needs; it is not a migration schema.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  owner
+  admin
+  editor
+  contributor
+  viewer
+  client
+}
+
+enum TargetType {
+  page
+  group
+  instagram
+  bluesky
+  mastodon
+  linkedin
+  threads
+  x
+  pinterest
+  telegram
+  youtube
+  tiktok
+}
+
+enum PostStatus {
+  draft
+  pending_approval
+  rejected
+  scheduled
+  publishing
+  published
+  partially_failed
+  failed
+  cancelled
+}
+
+enum PostTargetStatus {
+  pending
+  processing
+  published
+  scheduled_remote
+  failed
+  cancelled
+  skipped
+}
+
+model User {
+  id           String       @id
+  email        String       @unique
+  name         String
+  passwordHash String
+  disabledAt   DateTime?
+  memberships  Membership[]
+  posts        Post[]
+  sessions     Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  pending   String?
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Workspace {
+  id             String          @id
+  name           String
+  slug           String          @unique
+  timezone       String
+  memberships    Membership[]
+  targets        Target[]
+  posts          Post[]
+  socialAccounts SocialAccount[]
+  adAccounts     AdAccount[]
+
+  @@map("workspaces")
+}
+
+model Membership {
+  id          String        @id
+  userId      String
+  workspaceId String
+  role        WorkspaceRole
+  user        User          @relation(fields: [userId], references: [id])
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id])
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+  @@map("memberships")
+}
+
+model SocialAccount {
+  id             String      @id
+  workspaceId    String
+  provider       String
+  providerUserId String
+  name           String
+  pictureUrl     String?
+  invalidatedAt  DateTime?
+  createdAt      DateTime
+  workspace      Workspace   @relation(fields: [workspaceId], references: [id])
+  targets        Target[]
+  adAccounts     AdAccount[]
+
+  @@unique([workspaceId, provider, providerUserId])
+  @@index([workspaceId])
+  @@map("social_accounts")
+}
+
+model Target {
+  id              String         @id
+  workspaceId     String
+  socialAccountId String?
+  type            TargetType
+  providerId      String
+  name            String
+  pictureUrl      String?
+  enabled         Boolean
+  canPublish      Boolean
+  createdAt       DateTime
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id])
+  socialAccount   SocialAccount? @relation(fields: [socialAccountId], references: [id])
+  postTargets     PostTarget[]
+  insights        PageInsight[]
+
+  @@unique([workspaceId, providerId])
+  @@index([socialAccountId])
+  @@map("targets")
+}
+
+/// Stored Page metrics captured by the legacy analytics sync.
+model PageInsight {
+  id        String   @id
+  targetId  String
+  metric    String
+  period    String
+  endTime   DateTime
+  value     Json
+  numeric   Float?
+  fetchedAt DateTime
+  target    Target   @relation(fields: [targetId], references: [id])
+
+  @@unique([targetId, metric, period, endTime])
+  @@index([targetId, metric, endTime])
+  @@map("page_insights")
+}
+
+model Post {
+  id          String       @id
+  workspaceId String
+  authorId    String
+  message     String
+  status      PostStatus
+  scheduledAt DateTime?
+  publishedAt DateTime?
+  createdAt   DateTime
+  updatedAt   DateTime
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id])
+  author      User         @relation(fields: [authorId], references: [id])
+  targets     PostTarget[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, scheduledAt])
+  @@map("posts")
+}
+
+model PostTarget {
+  id           String           @id
+  postId       String
+  targetId     String
+  status       PostTargetStatus
+  remotePostId String?
+  remoteUrl    String?
+  publishedAt  DateTime?
+  post         Post             @relation(fields: [postId], references: [id])
+  target       Target           @relation(fields: [targetId], references: [id])
+
+  @@unique([postId, targetId])
+  @@index([targetId])
+  @@map("post_targets")
+}
+
+model AdAccount {
+  id              String         @id
+  workspaceId     String
+  socialAccountId String?
+  actId           String
+  name            String
+  currency        String?
+  accountStatus   Int?
+  enabled         Boolean
+  lastSyncedAt    DateTime?
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id])
+  socialAccount   SocialAccount? @relation(fields: [socialAccountId], references: [id])
+  insights        AdInsight[]
+
+  @@unique([workspaceId, actId])
+  @@index([workspaceId])
+  @@map("ad_accounts")
+}
+
+/// Stored daily delivery metrics for an ad account, campaign, ad set or ad.
+model AdInsight {
+  id          String   @id
+  adAccountId String
+  level       String
+  objectId    String
+  objectName  String?
+  date        DateTime
+  spend       Float
+  impressions Int
+  clicks      Int
+  reach       Int
+  cpc         Float?
+  cpm         Float?
+  cpp         Float?
+  ctr         Float?
+  frequency   Float?
+  actions     Json?
+  fields      Json?
+  fetchedAt   DateTime
+  adAccount   AdAccount @relation(fields: [adAccountId], references: [id])
+
+  @@unique([adAccountId, level, objectId, date])
+  @@index([adAccountId, date])
+  @@map("ad_insights")
+}

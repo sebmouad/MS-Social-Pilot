@@ -1,0 +1,20 @@
+.route-tabs { display: flex; gap: 6px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.route-tabs a { padding: 8px 12px; border-radius: 7px; color: var(--ink-soft); font-size: 13px; font-weight: 650; }
+.route-tabs a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.analytics-panel-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.analytics-panel-title h2 { margin-bottom: 4px; }
+.account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.account-card { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md, 12px); }
+.account-card__top { display: flex; align-items: center; justify-content: space-between; }
+.account-mark { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; background: #edf2ff; color: #3156a5; font-size: 20px; font-weight: 800; }
+.account-card .badge.is-enabled { background: var(--accent-soft); color: var(--accent); }
+.account-card h3 { margin: 16px 0 5px; font-size: 16px; }
+.account-card p { margin: 0; overflow-wrap: anywhere; }
+.account-card__details { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
+.account-card__details dt { color: var(--ink-faint); font-size: 11px; }
+.account-card__details dd { margin: 5px 0 0; font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
+.empty-state { text-align: center; padding: 42px 24px; }
+.empty-state h2, .empty-state h3 { margin: 10px 0 8px; }
+.empty-state p { max-width: 580px; margin: 0 auto 16px; color: var(--ink-soft); font-size: 14px; line-height: 1.6; }
+.empty-state__icon { display: inline-grid; width: 42px; height: 42px; place-items: center; border-radius: 14px; background: var(--accent-soft); color: var(--accent); font-size: 21px; }
+@media (max-width: 620px) { .account-grid { grid-template-columns: 1fr; } .analytics-panel-title { align-items: flex-start; flex-direction: column; } }

@@ -1,0 +1,38 @@
+.settings-page { display: grid; gap: 22px; }
+.settings-heading { display: flex; justify-content: space-between; align-items: flex-start; }
+.settings-heading h1 { margin: 5px 0 7px; font-size: clamp(28px, 3vw, 36px); line-height: 1.12; letter-spacing: -.04em; }
+.settings-heading > div > p:last-child { margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.5; }
+.settings-eyebrow { margin: 0; color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.settings-tabs { display: flex; gap: 5px; padding: 5px; width: fit-content; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.settings-tabs a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 8px; color: var(--ink-soft); font-size: 13px; font-weight: 650; white-space: nowrap; }
+.settings-tabs a:hover { background: var(--surface-muted); color: var(--ink); }
+.settings-tabs a.is-active { background: var(--accent-soft); color: var(--accent); }
+.settings-panel { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 4px 20px rgb(24 35 30 / 4%); }
+.settings-panel__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.settings-panel__heading h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
+.settings-panel__heading p { margin: 5px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+.settings-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; }
+.settings-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.settings-table th { height: 42px; padding: 0 14px; border-bottom: 1px solid var(--line); background: #fafbfa; color: var(--ink-faint); font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; }
+.settings-table td { height: 56px; padding: 10px 14px; border-bottom: 1px solid #edf1ed; vertical-align: middle; }
+.settings-table tr:last-child td { border-bottom: 0; }
+.settings-table__primary { display: block; color: var(--ink); font-weight: 650; }
+.settings-table__secondary { display: block; margin-top: 4px; color: var(--ink-faint); font-size: 11px; }
+.settings-status { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-soft); font-size: 11px; font-weight: 650; white-space: nowrap; }
+.settings-status__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); }
+.settings-status--good { color: var(--accent); }
+.settings-status--good .settings-status__dot { background: #3f9a66; }
+.settings-status--warning { color: var(--warning); }
+.settings-status--warning .settings-status__dot { background: #d58a31; }
+.settings-empty { padding: 28px 16px; color: var(--ink-faint); text-align: center; font-size: 13px; line-height: 1.5; }
+.settings-inline-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.settings-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; color: var(--ink-soft); font-size: 11px; white-space: nowrap; }
+.settings-chip[data-disabled="true"] { color: var(--ink-faint); background: #fafbfa; }
+.settings-chip__dot { width: 6px; height: 6px; border-radius: 50%; background: #3f9a66; }
+.settings-chip[data-disabled="true"] .settings-chip__dot { background: var(--line-strong); }
+.settings-account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--line); }
+.settings-account-item { min-width: 0; padding: 16px; background: var(--surface); }
+.settings-account-item dt { color: var(--ink-faint); font-size: 11px; font-weight: 650; }
+.settings-account-item dd { margin: 7px 0 0; overflow-wrap: anywhere; color: var(--ink); font-size: 14px; font-weight: 650; }
+.settings-note { margin: 14px 0 0; color: var(--ink-faint); font-size: 12px; line-height: 1.5; }
+@media (max-width: 620px) { .settings-panel { padding: 17px; } .settings-account-grid { grid-template-columns: 1fr; } }
