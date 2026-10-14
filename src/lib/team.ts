@@ -1,8 +1,8 @@
 import { assertFeature, assertRoom } from './plans';
-import { WorkspaceRole } from '@prisma/client';
+import { Prisma, WorkspaceRole } from '@prisma/client';
 
 import { prisma } from './prisma';
-import { atLeast } from './constants';
+import { atLeast, canManageTeam } from './constants';
 import { hashToken, randomToken } from './crypto';
 import { AppError, errors } from './errors';
 import { sendEmail } from './email/send';
@@ -37,6 +37,32 @@ function assertRankPermits(actorRole: WorkspaceRole, affectedRole: WorkspaceRole
   if (!atLeast(actorRole, affectedRole)) throw errors.noPermission();
 }
 
+type TeamActor = WorkspaceRole | { userId: string; requireOwner?: boolean; rootVisit?: boolean; agencyOnly?: boolean };
+
+function assertAgencyTarget(actor: TeamActor, role: WorkspaceRole): void {
+  if (typeof actor !== 'string' && actor.agencyOnly && (role === WorkspaceRole.owner || role === WorkspaceRole.client)) {
+    throw errors.notFound();
+  }
+}
+
+/** Re-read an authenticated caller after the workspace lock, before changing access. */
+async function currentActorRole(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  actor: TeamActor,
+): Promise<WorkspaceRole> {
+  if (typeof actor === 'string') return actor;
+  if (actor.rootVisit) {
+    const user = await tx.user.findUnique({ where: { id: actor.userId }, select: { isInstanceOwner: true } });
+    if (!user?.isInstanceOwner) throw errors.noPermission();
+    return WorkspaceRole.owner;
+  }
+  const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId } } });
+  if (!membership || !canManageTeam(membership.role)) throw errors.noPermission();
+  if (actor.requireOwner && membership.role !== WorkspaceRole.owner) throw errors.noPermission();
+  return membership.role;
+}
+
 export class InvitationError extends AppError {}
 
 export interface InvitationResult {
@@ -52,6 +78,8 @@ export async function inviteMember(options: {
   invitedById: string;
   /** The inviter's own role, so nobody invites somebody above themselves. */
   actorRole: WorkspaceRole;
+  rootVisit?: boolean;
+  verifyActor?: boolean;
   email: string;
   role: WorkspaceRole;
 }): Promise<InvitationResult> {
@@ -67,44 +95,29 @@ export async function inviteMember(options: {
     prisma.user.findUniqueOrThrow({ where: { id: options.invitedById } }),
   ]);
 
-  // Already a member: inviting again would create a confusing dead-end link.
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    const membership = await prisma.membership.findUnique({
-      where: { userId_workspaceId: { userId: existingUser.id, workspaceId: options.workspaceId } },
-    });
-    if (membership) {
-      throw new AppError({
-        key: 'errors.alreadyMember',
-        fallback: 'That person is already a member of this workspace.',
-        status: 409,
-      });
-    }
-  }
-
   const token = randomToken(32);
   const expiresAt = new Date(Date.now() + INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000);
 
   // Re-inviting the same address updates the pending row rather than creating
   // a second one, so the unique constraint holds and the newest link wins.
-  const invitation = await prisma.invitation.upsert({
-    where: { workspaceId_email: { workspaceId: options.workspaceId, email } },
-    create: {
-      workspaceId: options.workspaceId,
-      email,
-      role: options.role,
-      tokenHash: hashToken(token),
-      invitedById: options.invitedById,
-      expiresAt,
-    },
-    update: {
-      role: options.role,
-      tokenHash: hashToken(token),
-      invitedById: options.invitedById,
-      expiresAt,
-      acceptedAt: null,
-      acceptedByUserId: null,
-    },
+  const invitation = await prisma.$transaction(async (tx) => {
+    await lockWorkspaceOwners(tx, options.workspaceId);
+    if (options.verifyActor) {
+      const role = await currentActorRole(tx, options.workspaceId, { userId: options.invitedById, rootVisit: options.rootVisit });
+      assertRankPermits(role, options.role);
+    }
+    const existingUser = await tx.user.findUnique({ where: { email } });
+    if (existingUser) {
+      const membership = await tx.membership.findUnique({
+        where: { userId_workspaceId: { userId: existingUser.id, workspaceId: options.workspaceId } },
+      });
+      if (membership) throw new AppError({ key: 'errors.alreadyMember', fallback: 'That person is already a member of this workspace.', status: 409 });
+    }
+    return tx.invitation.upsert({
+      where: { workspaceId_email: { workspaceId: options.workspaceId, email } },
+      create: { workspaceId: options.workspaceId, email, role: options.role, tokenHash: hashToken(token), invitedById: options.invitedById, expiresAt },
+      update: { role: options.role, tokenHash: hashToken(token), invitedById: options.invitedById, expiresAt, acceptedAt: null, acceptedByUserId: null },
+    });
   });
 
   const rendered = invitationEmail({
@@ -227,8 +240,12 @@ export async function acceptInvitation(token: string, userId: string): Promise<s
   return invitation.workspaceId;
 }
 
-export async function revokeInvitation(workspaceId: string, invitationId: string): Promise<void> {
-  const { count } = await prisma.invitation.deleteMany({ where: { id: invitationId, workspaceId } });
+export async function revokeInvitation(workspaceId: string, invitationId: string, actor: TeamActor): Promise<void> {
+  const count = await prisma.$transaction(async (tx) => {
+    await lockWorkspaceOwners(tx, workspaceId);
+    await currentActorRole(tx, workspaceId, actor);
+    return (await tx.invitation.deleteMany({ where: { id: invitationId, workspaceId } })).count;
+  });
   if (count === 0) throw errors.notFound();
   await logActivity(workspaceId, 'team.invitationRevoked', { invitationId });
 }
@@ -242,12 +259,14 @@ export async function revokeInvitation(workspaceId: string, invitationId: string
 export async function removeMember(
   workspaceId: string,
   userId: string,
-  actorRole: WorkspaceRole,
+  actor: TeamActor,
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await lockWorkspaceOwners(tx, workspaceId);
+    const actorRole = await currentActorRole(tx, workspaceId, actor);
     const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId, workspaceId } } });
     if (!membership) throw errors.notFound();
+    assertAgencyTarget(actor, membership.role);
     assertRankPermits(actorRole, membership.role);
     if (membership.role === WorkspaceRole.owner) {
       const owners = await tx.membership.count({ where: { workspaceId, role: WorkspaceRole.owner } });
@@ -262,12 +281,14 @@ export async function changeRole(
   workspaceId: string,
   userId: string,
   role: WorkspaceRole,
-  actorRole: WorkspaceRole,
+  actor: TeamActor,
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await lockWorkspaceOwners(tx, workspaceId);
+    const actorRole = await currentActorRole(tx, workspaceId, actor);
     const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId, workspaceId } } });
     if (!membership) throw errors.notFound();
+    assertAgencyTarget(actor, membership.role);
     assertRankPermits(actorRole, role);
     assertRankPermits(actorRole, membership.role);
     if ((membership.role === WorkspaceRole.client) !== (role === WorkspaceRole.client)) {
@@ -293,38 +314,29 @@ export async function setPageAccess(
   workspaceId: string,
   userId: string,
   access: { all: boolean; targetIds: string[] },
-  actorRole: WorkspaceRole,
+  actor: TeamActor,
 ): Promise<void> {
-  const membership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId, workspaceId } },
-  });
-  if (!membership) throw new AppError({ key: 'errors.notFound', fallback: 'Not found.', status: 404 });
-  assertRankPermits(actorRole, membership.role);
-  if (atLeast(membership.role, WorkspaceRole.admin) && !access.all) {
-    throw new AppError({
-      key: 'errors.adminsSeeAllPages',
-      fallback: 'Owners and admins always have every Page. Change their role first.',
-      status: 409,
-    });
-  }
-
-  const targets = access.all
-    ? []
-    : await prisma.target.findMany({
+  const pages = await prisma.$transaction(async (tx) => {
+    await lockWorkspaceOwners(tx, workspaceId);
+    const actorRole = await currentActorRole(tx, workspaceId, actor);
+    const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId, workspaceId } } });
+    if (!membership) throw errors.notFound();
+    assertRankPermits(actorRole, membership.role);
+    if (atLeast(membership.role, WorkspaceRole.admin) && !access.all) {
+      throw new AppError({ key: 'errors.adminsSeeAllPages', fallback: 'Owners and admins always have every Page. Change their role first.', status: 409 });
+    }
+    const targets = access.all ? [] : await tx.target.findMany({
         where: { workspaceId, id: { in: access.targetIds } },
         select: { id: true },
       });
-
-  await prisma.$transaction([
-    prisma.membership.update({ where: { id: membership.id }, data: { allPages: access.all } }),
-    prisma.memberPageAccess.deleteMany({ where: { membershipId: membership.id } }),
-    prisma.memberPageAccess.createMany({
-      data: targets.map((target) => ({ membershipId: membership.id, targetId: target.id })),
-    }),
-  ]);
+    await tx.membership.update({ where: { id: membership.id }, data: { allPages: access.all } });
+    await tx.memberPageAccess.deleteMany({ where: { membershipId: membership.id } });
+    await tx.memberPageAccess.createMany({ data: targets.map((target) => ({ membershipId: membership.id, targetId: target.id })) });
+    return targets.length;
+  });
   await logActivity(workspaceId, 'team.pageAccessChanged', {
     userId,
     all: access.all,
-    pages: targets.length,
+    pages,
   });
 }

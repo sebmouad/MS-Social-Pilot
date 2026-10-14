@@ -52,6 +52,8 @@ export const POST = route(async (request: Request) => {
     workspaceId: auth.workspace.id,
     invitedById: auth.user.id,
     actorRole: auth.role,
+    rootVisit: auth.rootVisit,
+    verifyActor: true,
     email: input.email,
     role: input.role,
   });

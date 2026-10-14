@@ -28,9 +28,9 @@ export const PATCH = route(async (request: Request, context: Context) => {
   const input = patchSchema.parse(await readJson(request));
 
   if ('pages' in input) {
-    await setPageAccess(auth.workspace.id, id, input.pages, auth.role);
+    await setPageAccess(auth.workspace.id, id, input.pages, { userId: auth.user.id, rootVisit: auth.rootVisit });
   } else {
-    await changeRole(auth.workspace.id, id, input.role, auth.role);
+    await changeRole(auth.workspace.id, id, input.role, { userId: auth.user.id, rootVisit: auth.rootVisit });
   }
   return ok({ ok: true });
 });
@@ -47,9 +47,9 @@ export const DELETE = route(async (request: Request, context: Context) => {
   const type = new URL(request.url).searchParams.get('type');
 
   if (type === 'invitation') {
-    await revokeInvitation(auth.workspace.id, id);
+    await revokeInvitation(auth.workspace.id, id, { userId: auth.user.id, rootVisit: auth.rootVisit });
   } else {
-    await removeMember(auth.workspace.id, id, auth.role);
+    await removeMember(auth.workspace.id, id, { userId: auth.user.id, rootVisit: auth.rootVisit });
   }
 
   return ok({ ok: true });

@@ -70,4 +70,18 @@ describe('agency access', () => {
     await expect(agency.setClientAccess({ ownerId: owner.id, workspaceId: b.id, userId: client.id, role: 'viewer' })).rejects.toThrow();
     expect(await roleOf(admin.id, b.id)).toBeNull();
   });
+
+  it('keeps owners and clients outside agency edits even when a target role changes mid-request', async () => {
+    const [owner, peer, client] = [await user(), await user(), await user()];
+    const a = await workspace('Client A');
+    await join(owner.id, a.id, 'owner');
+    await join(peer.id, a.id, 'owner');
+    await join(client.id, a.id, 'client');
+    const team = await import('../src/lib/team');
+    const actor = { userId: owner.id, requireOwner: true, agencyOnly: true };
+    await expect(team.removeMember(a.id, peer.id, actor)).rejects.toMatchObject({ key: 'errors.notFound' });
+    await expect(team.changeRole(a.id, client.id, WorkspaceRole.viewer, actor)).rejects.toMatchObject({ key: 'errors.notFound' });
+    expect(await roleOf(peer.id, a.id)).toBe('owner');
+    expect(await roleOf(client.id, a.id)).toBe('client');
+  });
 });

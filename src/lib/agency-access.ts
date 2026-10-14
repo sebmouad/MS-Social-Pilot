@@ -5,6 +5,7 @@ import { errors } from './errors';
 import { prisma } from './prisma';
 import { assertRoom } from './plans';
 import { logActivity } from './scheduler/runner';
+import { lockWorkspaceOwners } from './owner-guard';
 
 /**
  * The agency level: everything one person owns, side by side,
@@ -74,14 +75,29 @@ export async function setClientAccess(options: { ownerId: string; workspaceId: s
   if (current && (current.role === WorkspaceRole.owner || current.role === WorkspaceRole.client)) throw errors.notFound();
 
   if (role === null) {
-    if (current) await removeMember(workspaceId, userId, WorkspaceRole.owner);
+    if (current) await removeMember(workspaceId, userId, { userId: ownerId, requireOwner: true, agencyOnly: true });
     return;
   }
   if (current) {
-    if (current.role !== role) await changeRole(workspaceId, userId, role, WorkspaceRole.owner);
+    if (current.role !== role) await changeRole(workspaceId, userId, role, { userId: ownerId, requireOwner: true, agencyOnly: true });
     return;
   }
   await assertRoom(workspaceId, 'members');
-  await prisma.membership.create({ data: { userId, workspaceId, role } });
+  await prisma.$transaction(async (tx) => {
+    await lockWorkspaceOwners(tx, workspaceId);
+    const owner = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: ownerId, workspaceId } } });
+    if (owner?.role !== WorkspaceRole.owner) throw errors.notFound();
+    const stillOnTeam = await tx.membership.findFirst({
+      where: {
+        userId,
+        role: { notIn: [WorkspaceRole.owner, WorkspaceRole.client] },
+        workspace: { memberships: { some: { userId: ownerId, role: WorkspaceRole.owner } } },
+      },
+    });
+    if (!stillOnTeam) throw errors.notFound();
+    const existing = await tx.membership.findUnique({ where: { userId_workspaceId: { userId, workspaceId } } });
+    if (existing) throw errors.rootAlreadyMember();
+    await tx.membership.create({ data: { userId, workspaceId, role } });
+  });
   await logActivity(workspaceId, 'team.joined', { userId, role, via: 'agency' }, ownerId);
 }

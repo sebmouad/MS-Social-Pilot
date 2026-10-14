@@ -253,6 +253,62 @@ describe('inviting a client to create their own workspace', () => {
 });
 
 describe('root creates and deletes', () => {
+  it('rejects a Team write after its authenticated caller loses owner access', async () => {
+    const actor = await person({ root: true });
+    const owner = await person();
+    const successor = await person();
+    const editor = await person();
+    await prisma.workspace.delete({ where: { id: successor.workspace.id } });
+    await prisma.workspace.delete({ where: { id: editor.workspace.id } });
+    await prisma.membership.createMany({ data: [
+      { userId: successor.user.id, workspaceId: owner.workspace.id, role: WorkspaceRole.owner },
+      { userId: editor.user.id, workspaceId: owner.workspace.id, role: WorkspaceRole.editor },
+    ] });
+    const membership = await prisma.membership.findUniqueOrThrow({
+      where: { userId_workspaceId: { userId: owner.user.id, workspaceId: owner.workspace.id } },
+    });
+    await root.changeMemberRole(actor.user.id, membership.id, WorkspaceRole.admin);
+    const team = await import('../src/lib/team');
+    await expect(team.changeRole(owner.workspace.id, editor.user.id, WorkspaceRole.owner, { userId: owner.user.id }))
+      .rejects.toMatchObject({ key: 'errors.noPermission' });
+    await expect(team.inviteMember({
+      workspaceId: owner.workspace.id,
+      invitedById: owner.user.id,
+      actorRole: WorkspaceRole.owner,
+      verifyActor: true,
+      email: 'future-owner@example.test',
+      role: WorkspaceRole.owner,
+    })).rejects.toMatchObject({ key: 'errors.noPermission' });
+    await expect(team.setPageAccess(owner.workspace.id, successor.user.id, { all: false, targetIds: [] }, { userId: owner.user.id }))
+      .rejects.toMatchObject({ key: 'errors.noPermission' });
+    expect(await prisma.membership.findUniqueOrThrow({
+      where: { userId_workspaceId: { userId: editor.user.id, workspaceId: owner.workspace.id } },
+    })).toMatchObject({ role: WorkspaceRole.editor });
+  });
+
+  it('lets a current root visitor manage Team without joining the workspace', async () => {
+    const actor = await person({ root: true });
+    const owner = await person();
+    const editor = await person();
+    await prisma.workspace.delete({ where: { id: editor.workspace.id } });
+    await prisma.membership.create({ data: { userId: editor.user.id, workspaceId: owner.workspace.id, role: WorkspaceRole.editor } });
+    cookieJar.set('msp_session', actor.token);
+    cookieJar.set('msp_root_visit', owner.workspace.id);
+    const route = await import('../src/app/api/team/[id]/route');
+    const response = await route.PATCH(new Request('http://localhost/api/team/' + editor.user.id, {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ role: WorkspaceRole.admin }),
+    }), { params: Promise.resolve({ id: editor.user.id }) });
+    expect(response.status).toBe(200);
+    expect(await prisma.membership.findUniqueOrThrow({
+      where: { userId_workspaceId: { userId: editor.user.id, workspaceId: owner.workspace.id } },
+    })).toMatchObject({ role: WorkspaceRole.admin });
+    expect(await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.user.id, workspaceId: owner.workspace.id } } })).toBeNull();
+    await prisma.user.update({ where: { id: actor.user.id }, data: { isInstanceOwner: false } });
+    const team = await import('../src/lib/team');
+    await expect(team.removeMember(owner.workspace.id, editor.user.id, { userId: actor.user.id, rootVisit: true }))
+      .rejects.toMatchObject({ key: 'errors.noPermission' });
+  });
+
   it('keeps an owner when root and team remove different owners at the same time', async () => {
     const actor = await person({ root: true });
     const first = await person();
