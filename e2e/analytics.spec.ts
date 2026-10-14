@@ -136,6 +136,41 @@ test('a Page post with unread insights shows missing figures instead of zero', a
   }
 });
 
+test('post metric breakdown reveals every stored entry and filters from the sidebar', async ({ page }) => {
+  const failures = collectFailures(page);
+  const external = await prisma.externalPost.create({ data: {
+    targetId,
+    remoteId: 'e2e-full-metric-breakdown',
+    message: 'Walk: complete metric breakdown',
+    createdTime: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    insights: {
+      metrics: {
+        post_reactions_by_type_total: Object.fromEntries(Array.from({ length: 15 }, (_, index) => [`kind_${index + 1}`, 15 - index])),
+        post_media_view: 42,
+      },
+    },
+  } });
+  try {
+    await open(page, `/analytics/post/${external.id}?external=true`);
+    const filter = page.locator('#shell-filters').getByRole('searchbox', { name: 'Filter metrics' });
+    await expect(filter).toBeVisible();
+    const breakdown = page.getByText('post_reactions_by_type_total');
+    await expect(breakdown).toBeVisible();
+    await expect(page.getByText('kind_15', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Show all 15 breakdown entries' }).click();
+    await expect(page.getByText('kind_15', { exact: true })).toBeVisible();
+    await filter.fill('media_view');
+    await expect(breakdown).toHaveCount(0);
+    await expect(page.getByText('post_media_view')).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole('searchbox', { name: 'Filter metrics' })).toBeVisible();
+    await expect(page.locator('#shell-filters').getByRole('searchbox')).toHaveCount(0);
+    expect(failures).toEqual([]);
+  } finally {
+    await prisma.externalPost.delete({ where: { id: external.id } });
+  }
+});
+
 test('Posts counts every Page post beyond the former 500-row limit', async ({ page }) => {
   const failures = collectFailures(page);
   const createdTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
