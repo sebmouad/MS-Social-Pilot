@@ -15,6 +15,7 @@ the matching file in the same commit when a change makes one wrong.
 | [FEATURES.md](FEATURES.md) | Every screen and what it does |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How the app is built: routes, data, worker, connectors, selection, auth |
 | [PERMISSIONS.md](PERMISSIONS.md) | Root, workspace roles and privileges (audited by the owner) |
+| [QUALITY_AUDIT.md](QUALITY_AUDIT.md) | Release-quality evidence, remaining checks and AI-agent handoff |
 | [INTERNAL_STANDARDISATION.md](INTERNAL_STANDARDISATION.md) | Shared logic, interaction contracts and cross-screen review matrix |
 | [DESIGN.md](DESIGN.md) | UI rules, tokens, components, copy |
 | [OPERATIONS.md](OPERATIONS.md) | Tests, settings, deploy, rollback, backups, recovery |
