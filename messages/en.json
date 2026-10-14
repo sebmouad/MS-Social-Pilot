@@ -164,6 +164,20 @@
     "lostLikes": "Lost likes",
     "netChange": "Net change",
     "audienceHint": "Audience breakdowns are the latest available snapshots. Gains and losses cover the selected range; historical Page likes are labelled separately from follows.",
+    "selectedAudience": "Selected audience by channel",
+    "storedVideoMetrics": "{count, plural, one {# stored video metric} other {# stored video metrics}}",
+    "facebookOnlyMetrics": "Channel likes, people talking about this, and demographic maps use Facebook Page data only.",
+    "reportForChannel": "Report for {name}",
+    "instagramMetrics": "Instagram account metrics",
+    "instagramMetricsHint": "All stored metrics returned by Instagram for the selected accounts. Daily readings follow the date range; lifetime figures show the latest available snapshot, even when captured earlier.",
+    "instagramMetricsEmpty": "No stored Instagram account metrics in this date range.",
+    "instagramFollowing": "Following",
+    "instagramMediaCount": "Published media",
+    "storedReadings": "{count, plural, one {# stored reading} other {# stored readings}}",
+    "metric": "Metric",
+    "period": "Period",
+    "audienceCoverage": "{covered, plural, one {# of {total} selected channels has a follower count} other {# of {total} selected channels have follower counts}}. Missing figures are excluded from the total.",
+    "growthCoverage": "{covered, plural, one {# of {total} selected Facebook Pages has follower growth} other {# of {total} selected Facebook Pages have follower growth}}. Other networks and historical Page likes are excluded.",
     "probeAll": "Test coverage",
     "probed": "Checked {checked} metric names; Facebook serves {available}.",
     "coverageTitle": "Catalogue coverage",
@@ -4638,6 +4652,7 @@
     }
   },
   "analyticsSummary": {
+    "allNetworkFollowers": "{covered, plural, one {# of {total} selected channels supplies a follower count} other {# of {total} selected channels supply follower counts}}. No period comparison where growth is unavailable.",
     "none": "No channels to summarise yet.",
     "changed": "What changed",
     "figures": "Key figures",
@@ -4702,6 +4717,8 @@
     "report": "Report"
   },
   "channelFigures": {
+    "allMetrics": "Explore all metrics",
+    "allPostMetrics": "{count, plural, one {# stored metric} other {# stored metrics}}",
     "title": "Instagram and other networks",
     "postsTitle": "Posts on Instagram and other networks",
     "audienceTitle": "Followers on Instagram and other networks",

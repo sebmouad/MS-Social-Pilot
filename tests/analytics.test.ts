@@ -62,8 +62,15 @@ beforeAll(async () => {
         data: names.map((name) => ({
           name,
           period,
+          ...(url.searchParams.get('metric_type') === 'total_value'
+            ? { total_value: url.searchParams.get('breakdown')
+                ? { breakdowns: [{ dimension_keys: ['country'], results: [{ dimension_values: ['FR'], value: 12 }, { dimension_values: ['US'], value: 7 }] }] }
+                : { value: name === 'likes' ? 31 : null } }
+            : {}),
           values:
-            name === 'page_fans_country'
+            url.searchParams.get('metric_type') === 'total_value'
+              ? undefined
+              : name === 'page_fans_country'
               ? [{ value: { FR: 120, GB: 80, US: 40 }, end_time: '2026-09-02T07:00:00+0000' }]
               : [
                   { value: 10, end_time: '2026-09-01T07:00:00+0000' },
@@ -423,6 +430,28 @@ describe('fetchInsights across levels', () => {
     });
 
     expect(extras.some((entry) => entry.get('metric_type') === 'total_value')).toBe(true);
+  });
+
+  it('reads Instagram total_value numbers and leaves empty totals empty', async () => {
+    const result = await fetchInsights({
+      objectId: 'ig1', level: 'ig_account', accessToken: 'token', period: 'day',
+      only: ['likes', 'comments'], extraParams: { metric_type: 'total_value' },
+    });
+
+    expect(result.series.find((item) => item.name === 'likes')?.latest).toBe(31);
+    expect(result.series.find((item) => item.name === 'likes')?.total).toBe(31);
+    expect(result.series.find((item) => item.name === 'comments')?.latest).toBeNull();
+  });
+
+  it('reads Instagram demographic total_value breakdown dimensions', async () => {
+    const result = await fetchInsights({
+      objectId: 'ig1', level: 'ig_account', accessToken: 'token', period: 'lifetime',
+      only: ['follower_demographics'],
+      extraParams: { metric_type: 'total_value', breakdown: 'country' },
+    });
+
+    expect(result.series[0]?.latest).toEqual({ FR: 12, US: 7 });
+    expect(result.series[0]?.total).toBeNull();
   });
 
   it('defaults page and Instagram accounts to day, everything else to lifetime', async () => {

@@ -55,6 +55,9 @@ import { FeedPost } from '@/components/FeedPost';
 import { EmptyState } from '@/components/EmptyState';
 import { NetworksView } from './NetworksView';
 import { ChannelFiguresSection } from '@/components/analysis/ChannelFiguresSection';
+import { readAudienceChannels } from '@/lib/channel-figures-data';
+import { InstagramMetricsSection } from '@/components/analysis/InstagramMetricsSection';
+import { StoredMetricDetails } from '@/components/analysis/StoredMetricDetails';
 import type { IconName } from '@/components/Icon';
 import { formatOfStatusType } from '@/lib/page-analysis';
 import { feedMediaOfPicture } from '@/lib/feed';
@@ -106,7 +109,7 @@ export async function AnalyticsScreen({
   if (otherChannels && !only) {
     const range = parseRange({ range: first(params.range), from: first(params.from), to: first(params.to), days: first(params.days) }, timezone);
     const asked = parseAnalyticsView(first(params.view));
-    const channelView = asked === 'networks' ? 'networks' : PRIMARY_ANALYTICS_VIEWS.includes(asked) ? asked : 'summary';
+    const channelView = asked === 'networks' || asked === 'overview' ? asked : PRIMARY_ANALYTICS_VIEWS.includes(asked) ? asked : 'summary';
     return (
       <ChannelsLayout
         auth={auth}
@@ -114,7 +117,7 @@ export async function AnalyticsScreen({
         tools={
           <>
             <AnalyticsTabs current={channelView} />
-            <DateRangePicker range={range} path="/analytics" keep={{ view: channelView }} />
+            <DateRangePicker range={range} path="/analytics" keep={{ ...Object.fromEntries(new URLSearchParams(selection.query)), view: channelView }} />
           </>
         }
       >
@@ -123,7 +126,9 @@ export async function AnalyticsScreen({
             <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">{channelView === 'networks' ? t('view.networks') : t('title')}</h1>
             <p className="mt-1 text-sm text-slate-600">{t('noPagesOtherChannels')}</p>
           </header>
-          {channelView === 'networks' ? (
+          {channelView === 'overview' ? (
+            <InstagramMetricsSection workspaceId={auth.workspace.id} selection={igSelection} from={range.from} to={range.to} />
+          ) : channelView === 'networks' ? (
             <NetworksView workspaceId={auth.workspace.id} scope={pageScope} from={range.from} to={range.to} timezone={timezone} />
           ) : (
             <ChannelFiguresSection
@@ -135,6 +140,7 @@ export async function AnalyticsScreen({
               to={range.to}
               timezone={timezone}
               emptyWhenNone
+              overviewHref={`/analytics?view=overview&${selection.query ? `${selection.query}&` : ''}${rangeQuery(range)}`}
             />
           )}
         </div>
@@ -212,7 +218,7 @@ export async function AnalyticsScreen({
             <DateRangePicker
               range={range}
               path={only ? INBOX_VIEW_PATHS[only]! : '/analytics'}
-              keep={{ view, target: selected.id }}
+              keep={{ ...Object.fromEntries(new URLSearchParams(selection.query)), view, ...(requested ? { target: selected.id } : {}) }}
               compare={view === 'summary' || view === 'compare' ? compare : undefined}
             />
           )}
@@ -228,7 +234,7 @@ export async function AnalyticsScreen({
         </div>
       </header>
 
-      {pages.length > 1 && !requested && !['summary', 'total', 'compare', 'posts', 'responseTime', 'networks'].includes(view) && (
+      {pages.length > 1 && !requested && !['summary', 'total', 'compare', 'posts', 'audience', 'responseTime', 'networks'].includes(view) && (
         <p className="rounded-xl bg-brand-50 px-4 py-2 text-sm text-brand-800">{t('oneChannelHint', { name: selected.name })}</p>
       )}
 
@@ -248,8 +254,10 @@ export async function AnalyticsScreen({
           days={window}
           timeZone={timezone}
           compare={compare}
-          rangeQuery={summaryIds.length === 1 ? `target=${selected.id}&${periodQuery}` : periodQuery}
+          rangeQuery={`${selection.query ? `${selection.query}&` : ''}${requested ? `target=${selected.id}&` : ''}${periodQuery}`}
           reportHref={`/reports?target=${selected.id}&${periodQuery}`}
+          reportLabel={t('reportForChannel', { name: selected.name })}
+          otherAudiences={requested ? [] : await readAudienceChannels({ workspaceId: auth.workspace.id, scope: pageScope, instagram: igSelection })}
         />
       )}
 
@@ -279,8 +287,8 @@ export async function AnalyticsScreen({
           timeZone={timezone}
           sort={first(params.sort)}
           order={first(params.order)}
-          targetId={selected.id}
-          rangeQuery={periodQuery}
+          targetId={requested ? selected.id : undefined}
+          rangeQuery={`${selection.query ? `${selection.query}&` : ''}${periodQuery}`}
           compare={compare}
           targetIds={pageScope.all ? undefined : pageScope.ids}
           groups={await listPageGroups(auth.workspace.id, auth.pageScope)}
@@ -360,7 +368,7 @@ export async function AnalyticsScreen({
         to={to}
       />}
 
-      {view === 'audience' && <AudienceView targetId={selected.id} from={from} to={to} timeZone={timezone} />}
+      {view === 'audience' && <AudienceView targets={(requested ? [selected] : pages).map((page) => ({ id: page.id, name: page.name }))} workspaceId={auth.workspace.id} scope={pageScope} instagram={igSelection} includeOther={!requested} from={from} to={to} timeZone={timezone} />}
 
       {view === 'videos' && (
         <VideosView
@@ -431,8 +439,8 @@ export async function AnalyticsScreen({
       )}
 
       {/* Instagram and the other networks in the selection, in each primary view. */}
-      {(view === 'summary' || view === 'posts' || view === 'audience' || view === 'compare') && (
-        <ChannelFiguresSection view={view} workspaceId={auth.workspace.id} scope={pageScope} instagram={igSelection} from={from} to={to} timezone={timezone} />
+      {(view === 'summary' || view === 'posts' || view === 'compare') && (
+        <ChannelFiguresSection view={view} workspaceId={auth.workspace.id} scope={pageScope} instagram={igSelection} from={from} to={to} timezone={timezone} overviewHref={`/analytics?view=overview&${selection.query ? `${selection.query}&` : ''}${periodQuery}`} />
       )}
 
 
@@ -467,6 +475,7 @@ export async function AnalyticsScreen({
           }}
         />
       )}
+      {view === 'overview' && <InstagramMetricsSection workspaceId={auth.workspace.id} selection={igSelection} from={from} to={to} />}
     </div>
     </ChannelsLayout>
   );
@@ -632,6 +641,7 @@ async function VideosView({
                   {t('uniqueViews')}: {video.uniqueViews?.toLocaleString(appLocale()) ?? '—'} · {t('totalWatch')}:{' '}
                   {watched(video.totalWatchTimeMs)}
                 </p>
+                <StoredMetricDetails metrics={video.metrics} summary={t('storedVideoMetrics', { count: Object.keys(video.metrics).length })} locale={appLocale()} />
               </div>
             </li>
           );

@@ -164,6 +164,20 @@
     "lostLikes": "J'aime perdus",
     "netChange": "Variation nette",
     "audienceHint": "Les répartitions d’audience sont les derniers instantanés disponibles. Les gains et pertes couvrent la période sélectionnée ; les J’aime historiques de la Page sont distingués des abonnements.",
+    "selectedAudience": "Audience sélectionnée par canal",
+    "storedVideoMetrics": "{count, plural, one {# indicateur vidéo enregistré} other {# indicateurs vidéo enregistrés}}",
+    "facebookOnlyMetrics": "Les J’aime, les personnes qui parlent de la Page et les cartes démographiques utilisent uniquement les données des Pages Facebook.",
+    "reportForChannel": "Rapport pour {name}",
+    "instagramMetrics": "Indicateurs des comptes Instagram",
+    "instagramMetricsHint": "Tous les indicateurs enregistrés pour les comptes Instagram sélectionnés. Les mesures quotidiennes suivent la période choisie ; les chiffres permanents montrent le dernier instantané disponible, même plus ancien.",
+    "instagramMetricsEmpty": "Aucun indicateur Instagram enregistré pour cette période.",
+    "instagramFollowing": "Abonnements",
+    "instagramMediaCount": "Médias publiés",
+    "storedReadings": "{count, plural, one {# mesure enregistrée} other {# mesures enregistrées}}",
+    "metric": "Indicateur",
+    "period": "Période",
+    "audienceCoverage": "{covered, plural, one {# canal sur {total} fournit son nombre d’abonnés} other {# canaux sur {total} fournissent leur nombre d’abonnés}}. Les chiffres indisponibles sont exclus du total.",
+    "growthCoverage": "{covered, plural, one {# Page Facebook sur {total} fournit l’évolution des abonnés} other {# Pages Facebook sur {total} fournissent l’évolution des abonnés}}. Les autres réseaux et les anciens J’aime sont exclus.",
     "probeAll": "Tester la couverture",
     "probed": "{checked} indicateurs testés ; Facebook en fournit {available}.",
     "coverageTitle": "Couverture du catalogue",
@@ -4638,6 +4652,7 @@
     }
   },
   "analyticsSummary": {
+    "allNetworkFollowers": "{covered, plural, one {# canal sur {total} fournit son nombre d’abonnés} other {# canaux sur {total} fournissent leur nombre d’abonnés}}. Pas de comparaison temporelle si l’évolution manque.",
     "none": "Aucun canal à résumer pour l’instant.",
     "changed": "Ce qui a changé",
     "figures": "Chiffres clés",
@@ -4702,6 +4717,8 @@
     "report": "Rapport"
   },
   "channelFigures": {
+    "allMetrics": "Explorer tous les indicateurs",
+    "allPostMetrics": "{count, plural, one {# indicateur enregistré} other {# indicateurs enregistrés}}",
     "title": "Instagram et autres réseaux",
     "postsTitle": "Publications sur Instagram et les autres réseaux",
     "audienceTitle": "Abonnés sur Instagram et les autres réseaux",

@@ -15,6 +15,7 @@ export interface NetworkPostRow {
   reposts: number | null;
   replies: number | null;
   views: number | null;
+  metrics?: Record<string, number | Record<string, number>>;
 }
 
 export interface NetworkTotal {
@@ -76,6 +77,7 @@ export async function readNetworkPosts(options: { workspaceId: string; scope: Pa
       reposts: insights?.shares ?? null,
       replies: insights?.comments ?? null,
       views: insights?.impressions ?? null,
+      metrics: insights?.metrics ?? {},
     };
   });
 }

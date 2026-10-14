@@ -1,4 +1,5 @@
 import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 
 import { EmptyState } from '@/components/EmptyState';
 import { ExternalLink } from '@/components/ExternalLink';
@@ -7,6 +8,7 @@ import { totalChannels } from '@/lib/channel-figures';
 import { readChannelFigures } from '@/lib/channel-figures-data';
 import type { PageScope } from '@/lib/page-access';
 import { appLocale, formatInZone } from '@/lib/time';
+import { StoredMetricDetails } from './StoredMetricDetails';
 
 /**
  * Instagram and other-network channels in the selection, under the Page
@@ -22,6 +24,7 @@ export async function ChannelFiguresSection({
   to,
   timezone,
   emptyWhenNone = false,
+  overviewHref,
 }: {
   view: 'summary' | 'posts' | 'audience' | 'compare';
   workspaceId: string;
@@ -32,6 +35,7 @@ export async function ChannelFiguresSection({
   timezone: string;
   /** Show an empty state rather than nothing (no Facebook Pages above it). */
   emptyWhenNone?: boolean;
+  overviewHref?: string;
 }) {
   const { channels, posts } = await readChannelFigures({ workspaceId, scope, instagram, from, to });
   const t = await getTranslations('channelFigures');
@@ -76,6 +80,7 @@ export async function ChannelFiguresSection({
                         </>
                       )}
                     </p>
+                    <StoredMetricDetails metrics={post.metrics} summary={t('allPostMetrics', { count: Object.keys(post.metrics).length })} locale={appLocale()} />
                   </td>
                   <td className="px-4 py-2.5 text-slate-600">{label(post.network, post.channel)}</td>
                   <td className="px-4 py-2.5 text-end">{number(post.reach)}</td>
@@ -92,6 +97,7 @@ export async function ChannelFiguresSection({
   }
 
   if (view === 'audience') {
+    const total = totalChannels(channels);
     return (
       <section aria-label={t('audienceTitle')} className="space-y-2">
         <h2 className="text-[17px] font-bold text-slate-900">{t('audienceTitle')}</h2>
@@ -110,6 +116,12 @@ export async function ChannelFiguresSection({
                   <td className="px-4 py-2.5 text-end">{number(channel.followers)}</td>
                 </tr>
               ))}
+              {channels.length > 1 && (
+                <tr className="font-semibold">
+                  <td className="px-4 py-2.5">{t('total')}</td>
+                  <td className="px-4 py-2.5 text-end">{number(total.followers)}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -121,7 +133,10 @@ export async function ChannelFiguresSection({
   const total = view === 'summary' && channels.length > 1 ? totalChannels(channels) : null;
   return (
     <section aria-label={t('title')} className="space-y-2">
-      <h2 className="text-[17px] font-bold text-slate-900">{t('title')}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-[17px] font-bold text-slate-900">{t('title')}</h2>
+        {view === 'summary' && overviewHref && <Link href={overviewHref} className="text-sm font-semibold text-brand-700 hover:underline">{t('allMetrics')}</Link>}
+      </div>
       <div className="card scroll-x">
         <table className="data-table w-full min-w-[720px] text-sm">
           <thead>

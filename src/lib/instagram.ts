@@ -470,7 +470,9 @@ export async function readInstagramInsights(options: {
   to: Date;
 }): Promise<IgStoredSeries[]> {
   const rows = await prisma.instagramInsight.findMany({
-    where: { accountId: options.accountId, endTime: { gte: options.from, lte: options.to } },
+    // Lifetime demographics are standing snapshots: keep the latest even
+    // when the selected posting window starts after their last capture.
+    where: { accountId: options.accountId, OR: [{ period: 'lifetime' }, { endTime: { gte: options.from, lte: options.to } }] },
     orderBy: [{ metric: 'asc' }, { endTime: 'asc' }],
   });
 

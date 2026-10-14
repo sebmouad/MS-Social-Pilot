@@ -6,6 +6,7 @@ import { ExternalLink } from '@/components/ExternalLink';
 import { Icon, type IconName } from '@/components/Icon';
 import { StatTile } from '@/components/charts/StatTile';
 import { comparePages } from '@/lib/page-analysis-data';
+import { sumKnown } from '@/lib/aggregate';
 import { channelChanges, combinedFindings, summaryFigures, sumSeries, type SummaryKpiKey } from '@/lib/analytics-summary';
 import type { CompareMode } from '@/lib/date-range';
 import { BLOCK_HOURS, MIN_POSTS_PER_SLOT, bestTimes, type Finding } from '@/lib/page-analysis';
@@ -37,6 +38,8 @@ export async function SummaryView({
   compare,
   rangeQuery,
   reportHref,
+  reportLabel,
+  otherAudiences = [],
 }: {
   workspaceId: string;
   targetIds: string[];
@@ -47,6 +50,8 @@ export async function SummaryView({
   compare: CompareMode;
   rangeQuery: string;
   reportHref: string;
+  reportLabel?: string;
+  otherAudiences?: Array<{ followers: number | null }>;
 }) {
   const t = await getTranslations('analyticsSummary');
   const tAnalysis = await getTranslations('pageAnalysis');
@@ -56,6 +61,10 @@ export async function SummaryView({
   if (rows.length === 0) return <EmptyState title={t('none')} />;
 
   const figures = summaryFigures(rows);
+  const selectedFollowers = otherAudiences.length > 0
+    ? sumKnown([figures.kpis.find((kpi) => kpi.key === 'followers')?.current ?? null, ...otherAudiences.map((row) => row.followers)])
+    : null;
+  const followerCoverage = rows.filter((row) => row.followers !== null).length + otherAudiences.filter((row) => row.followers !== null).length;
   const said = combinedFindings(rows);
   const longDays = weekdayNames(locale, 'long');
   const shortDays = weekdayNames(locale, 'short');
@@ -72,6 +81,7 @@ export async function SummaryView({
 
   const noteOf = (key: SummaryKpiKey): string => {
     if (key === 'followers') {
+      if (otherAudiences.length > 0) return t('allNetworkFollowers', { covered: followerCoverage, total: rows.length + otherAudiences.length });
       if (figures.netFollows === null) return t('meaning.followers');
       const parts =
         figures.follows !== null || figures.unfollows !== null
@@ -130,8 +140,8 @@ export async function SummaryView({
             <StatTile
               key={kpi.key}
               label={t(`kpi.${kpi.key}`)}
-              value={valueOf(kpi.key, kpi.current)}
-              delta={kpi.change}
+              value={valueOf(kpi.key, kpi.key === 'followers' && otherAudiences.length > 0 ? selectedFollowers : kpi.current)}
+              delta={kpi.key === 'followers' && otherAudiences.length > 0 ? null : kpi.change}
               deltaLabel={vs}
               note={noteOf(kpi.key)}
             />
@@ -232,7 +242,7 @@ export async function SummaryView({
           {t('rawFigures')}
         </Link>
         <Link href={reportHref} className="font-semibold text-brand-700 hover:underline">
-          {t('report')}
+          {reportLabel ?? t('report')}
         </Link>
       </p>
     </div>

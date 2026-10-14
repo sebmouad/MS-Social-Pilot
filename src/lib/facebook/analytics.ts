@@ -65,6 +65,10 @@ interface RawInsight {
   title?: string;
   description?: string;
   values?: Array<{ value: unknown; end_time?: string }>;
+  total_value?: {
+    value?: unknown;
+    breakdowns?: Array<{ dimension_values?: unknown[]; results?: Array<{ dimension_values?: unknown[]; value?: unknown }> }>;
+  };
 }
 
 function normaliseValue(value: unknown): number | Record<string, number> | null {
@@ -81,7 +85,19 @@ function normaliseValue(value: unknown): number | Record<string, number> | null 
 }
 
 function toSeries(raw: RawInsight): MetricSeries {
-  const points: MetricPoint[] = (raw.values ?? [])
+  const totalValue = raw.total_value;
+  const breakdown = totalValue?.breakdowns?.reduce<Record<string, number>>((result, row) => {
+    for (const item of row.results ?? []) {
+      const key = (item.dimension_values ?? row.dimension_values)?.join(' / ');
+      if (key && typeof item.value === 'number') result[key] = (result[key] ?? 0) + item.value;
+    }
+    return result;
+  }, {});
+  const totalPoint = totalValue
+    ? normaliseValue(totalValue.value) ?? (breakdown && Object.keys(breakdown).length > 0 ? breakdown : null)
+    : null;
+  const source = raw.values ?? (totalPoint === null ? [] : [{ value: totalPoint }]);
+  const points: MetricPoint[] = source
     .map((entry) => ({ endTime: entry.end_time ?? null, value: normaliseValue(entry.value) }))
     .filter((point): point is MetricPoint => point.value !== null);
 

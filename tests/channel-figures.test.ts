@@ -32,6 +32,13 @@ describe('channel figures', () => {
     expect(instagramPosts(account, items, from, to)).toHaveLength(2);
   });
 
+  it('carries every stored media metric into the post explorer', () => {
+    const posts = instagramPosts({ id: 'a1', username: 'client_a' }, [
+      { ...media('2026-09-10', {}), metrics: { saved: 6, views: 40, reactions_by_type: { like: 3, love: 1 } } },
+    ], from, to);
+    expect(posts[0]?.metrics).toEqual({ saved: 6, views: 40, reactions_by_type: { like: 3, love: 1 } });
+  });
+
   it('groups other-network posts per channel without inventing reach or followers', () => {
     const posts = networkPosts([
       { id: 'p1', network: 'bluesky', channel: 'Client A', message: 'x', publishedAt: from, url: null, likes: 3, reposts: 1, replies: null, views: null },
@@ -42,6 +49,16 @@ describe('channel figures', () => {
     expect(channels).toHaveLength(2);
     expect(channels[0]).toMatchObject({ network: 'bluesky', posts: 2, interactions: 4, reach: null, followers: null, impressions: null });
     expect(channels[1]).toMatchObject({ network: 'mastodon', posts: 1, interactions: null });
+  });
+
+  it('includes selected channels with no posts and carries readable audience counts', () => {
+    const channels = networkChannels([], [
+      { id: 'x1', network: 'x', name: 'Account X', followers: 48 },
+      { id: 'b1', network: 'bluesky', name: 'Account B', followers: null },
+    ]);
+    expect(channels).toHaveLength(2);
+    expect(channels[0]).toMatchObject({ name: 'Account X', posts: 0, followers: 48, impressions: null, interactions: null });
+    expect(totalChannels(channels).followers).toBe(48);
   });
 
   it('totals add counts, never reach, and recompute the rate', () => {

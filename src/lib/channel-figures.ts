@@ -34,6 +34,8 @@ export interface ChannelPost {
   reach: number | null;
   impressions: number | null;
   interactions: number | null;
+  /** Every stored provider metric for this post, including breakdown maps. */
+  metrics: Record<string, number | Record<string, number>>;
 }
 
 /** Sum that stays null while every part is null. */
@@ -80,7 +82,7 @@ export function instagramChannel(input: {
 /** Instagram media in the window, as post rows. */
 export function instagramPosts(
   account: { id: string; username: string },
-  media: Array<{ id: string; caption: string; permalink: string | null; timestamp: Date; reach: number | null; impressions: number | null; likeCount: number | null; commentsCount: number | null; saved: number | null }>,
+  media: Array<{ id: string; caption: string; permalink: string | null; timestamp: Date; reach: number | null; impressions: number | null; likeCount: number | null; commentsCount: number | null; saved: number | null; metrics?: Record<string, number | Record<string, number>> }>,
   from: Date,
   to: Date,
 ): ChannelPost[] {
@@ -96,12 +98,13 @@ export function instagramPosts(
       reach: item.reach,
       impressions: item.impressions,
       interactions: sumKnown([item.likeCount, item.commentsCount, item.saved]),
+      metrics: item.metrics ?? {},
     }));
 }
 
 /** Posts on the other networks (readNetworkPosts rows) as post rows. */
 export function networkPosts(
-  rows: Array<{ id: string; network: string; channel: string; message: string; publishedAt: Date; url: string | null; likes: number | null; reposts: number | null; replies: number | null; views: number | null }>,
+  rows: Array<{ id: string; network: string; channel: string; message: string; publishedAt: Date; url: string | null; likes: number | null; reposts: number | null; replies: number | null; views: number | null; metrics?: Record<string, number | Record<string, number>> }>,
 ): ChannelPost[] {
   return rows.map((row) => ({
     key: `net:${row.id}`,
@@ -114,23 +117,36 @@ export function networkPosts(
     reach: null,
     impressions: row.views,
     interactions: sumKnown([row.likes, row.reposts, row.replies]),
+    metrics: {
+      ...row.metrics,
+      ...(row.likes === null ? {} : { likes: row.likes }),
+      ...(row.reposts === null ? {} : { reposts: row.reposts }),
+      ...(row.replies === null ? {} : { replies: row.replies }),
+      ...(row.views === null ? {} : { views: row.views }),
+    },
   }));
 }
 
-/** One row per channel of the other networks; they report no followers or reach here. */
-export function networkChannels(posts: ChannelPost[]): ChannelFigures[] {
+/** Include selected connections even when they have no posts in the window. */
+export function networkChannels(posts: ChannelPost[], targets: Array<{ id: string; network: string; name: string; followers: number | null }> = []): ChannelFigures[] {
   const byChannel = new Map<string, ChannelPost[]>();
   for (const post of posts) {
     const key = `${post.network}:${post.channel}`;
     byChannel.set(key, [...(byChannel.get(key) ?? []), post]);
   }
+  for (const target of targets) {
+    const key = `${target.network}:${target.name}`;
+    if (!byChannel.has(key)) byChannel.set(key, []);
+  }
   return [...byChannel.entries()].map(([key, rows]) => {
     const interactions = sumKnown(rows.map((row) => row.interactions));
+    const target = targets.find((entry) => `${entry.network}:${entry.name}` === key);
+    const [network, ...name] = key.split(':');
     return {
-      key: `net:${key}`,
-      network: rows[0]!.network,
-      name: rows[0]!.channel,
-      followers: null,
+      key: target ? `net:${target.id}` : `net:${key}`,
+      network: network!,
+      name: name.join(':'),
+      followers: target?.followers ?? null,
       posts: rows.length,
       reach: null,
       impressions: sumKnown(rows.map((row) => row.impressions)),

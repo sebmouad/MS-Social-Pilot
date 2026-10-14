@@ -121,6 +121,19 @@ test('two profiles add up on the Summary, and the selection follows to Posts and
   expect(failures).toEqual([]);
 });
 
+test('Audience sums selected followers and changing the date keeps both Pages', async ({ page }) => {
+  const failures = collectFailures(page);
+  const pages = `${firstId},${secondId}`;
+  const first = await prisma.target.findUniqueOrThrow({ where: { id: firstId }, select: { followersCount: true } });
+  await open(page, `/analytics?view=audience&pages=${pages}`);
+  await expect(page.getByRole('heading', { name: 'Selected audience by channel' })).toBeVisible();
+  const expected = (first.followersCount ?? 0) + 240;
+  await expect(page.locator(`[title="${expected.toLocaleString('en-US')}"]`)).toBeVisible();
+  const href = await page.locator('details a[href*="range=7d"]').first().getAttribute('href');
+  expect(new URL(href!, 'http://localhost').searchParams.get('pages')).toBe(pages);
+  expect(failures).toEqual([]);
+});
+
 test('the comparison draws a line per profile that the legend hides and shows', async ({ page }) => {
   const failures = collectFailures(page);
 

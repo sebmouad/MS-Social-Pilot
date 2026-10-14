@@ -104,6 +104,18 @@ connecting Pages.
   Facebook serves (pin a metric as a tile), interactions, videos, comments,
   reviews, inbox, response time, posts made outside the app, other networks.
   Chart notes (editor+), export menu, "last read" note instead of pull buttons.
+- Audience totals add follower counts from every selected Facebook Page,
+  Instagram account and other connected channel with a stored count. The
+  screen lists each channel and reports how many supplied a value; missing
+  values remain unknown. Follower growth adds only compatible Facebook follow
+  metrics, excluding historical Page likes and networks without growth data.
+  The period control preserves the shared channel selection. Overview exposes
+  every stored Instagram account insight alongside the Facebook metric
+  explorer, including numeric `total_value`, demographic breakdowns, profile
+  counts and saved readings. Lifetime snapshots stay visible outside the
+  selected posting range. Posts on Instagram and the other networks expose
+  every stored per-post metric in a disclosure; the Videos view does the same
+  for Facebook video metrics.
 - **Single post** `/analytics/post/[postTargetId]`.
 - **Caption tests** `/analytics/tests`: A/B results, winner only past a minimum
   number of views; the result can feed the Page's AI voice.
