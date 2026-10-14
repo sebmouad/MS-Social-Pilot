@@ -22,6 +22,13 @@ describe('timezone conversion', () => {
     expect(utcToLocalInput(utc, 'America/New_York')).toBe('2026-07-15T09:00');
   });
 
+  it('does not borrow the host DST change for zones that do not change that day', () => {
+    // The US changes clocks on this date; London and Dubai do not.
+    expect(wallClockExists('2027-03-14T02:00', 'Europe/London')).toBe(true);
+    expect(wallClockExists('2027-03-14T02:00', 'Asia/Dubai')).toBe(true);
+    expect(utcToLocalInput(new Date('2027-03-13T22:00:00Z'), 'Asia/Dubai')).toBe('2027-03-14T02:00');
+  });
+
   it('accepts an input that already carries seconds', () => {
     expect(localInputToUtc('2026-01-15T09:00:00', 'UTC').toISOString()).toBe('2026-01-15T09:00:00.000Z');
   });

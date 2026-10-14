@@ -127,7 +127,10 @@ connecting Pages.
 
 ## Ads: `/ads`
 
-Ad accounts' results by level and period (needs `ads_read`).
+Ad accounts' results by level and period (needs `ads_read`). Each campaign,
+ad set and ad exposes every stored numeric daily reading from its latest day,
+including action dimensions, alongside additive action totals for the period.
+Rates and unique reach remain daily readings instead of misleading sums.
 
 ## Workspace
 

@@ -388,8 +388,33 @@ export default async function AdsPage({
                   const share = summary.spend > 0 ? Math.round((row.spend / summary.spend) * 100) : 0;
                   return (
                     <tr key={row.objectId}>
-                      <td className="max-w-xs truncate px-4 py-2.5 font-medium text-slate-900" title={row.name}>
+                      <td className="max-w-xs px-4 py-2.5 font-medium text-slate-900" title={row.name}>
                         {row.name}
+                        {(Object.keys(row.actions).length > 0 || row.latestReading) && (
+                          <details className="mt-1 max-w-md text-xs font-normal text-slate-600">
+                            <summary className="cursor-pointer text-brand-700">{t('metricDetails')}</summary>
+                            {Object.keys(row.actions).length > 0 && (
+                              <div className="mt-2">
+                                <p className="font-semibold">{t('periodActions')}</p>
+                                <dl className="mt-1 space-y-1">
+                                  {Object.entries(row.actions).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => (
+                                    <div key={key} className="flex justify-between gap-4"><dt className="break-all">{key.replace(/_/g, ' ')}</dt><dd className="nums">{count(value)}</dd></div>
+                                  ))}
+                                </dl>
+                              </div>
+                            )}
+                            {row.latestReading && (
+                              <div className="mt-2">
+                                <p className="font-semibold">{t('latestReading', { date: row.latestReading.date })}</p>
+                                <dl className="mt-1 space-y-1">
+                                  {Object.entries(row.latestReading.metrics).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => (
+                                    <div key={key} className="flex justify-between gap-4"><dt className="break-all">{key.replace(/_/g, ' ')}</dt><dd className="nums">{value.toLocaleString(locale)}</dd></div>
+                                  ))}
+                                </dl>
+                              </div>
+                            )}
+                          </details>
+                        )}
                       </td>
                       {level !== 'campaign' && (
                         <td

@@ -103,7 +103,15 @@ export function firstRealInstant(localInput: string, timeZone: string): Date {
 
 /** Render a UTC instant as a `datetime-local` input value in the given zone. */
 export function utcToLocalInput(date: Date, timeZone: string): string {
-  return formatInTimeZone(date, timeZone, "yyyy-MM-dd'T'HH:mm");
+  // formatInTimeZone can apply the host's DST transition to this round-trip:
+  // on the US spring-forward date it rendered 02:00 as 03:00 even for Dubai.
+  // formatToParts reads the requested zone directly, independent of host TZ.
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')}T${value('hour')}:${value('minute')}`;
 }
 
 /**

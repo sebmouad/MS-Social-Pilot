@@ -143,3 +143,27 @@ describe('listAdAccounts', () => {
     ).toEqual(['Boston', 'Paris']);
   });
 });
+
+describe('ad metric details', () => {
+  it('keeps latest daily rates separate from period action totals', async () => {
+    const { workspace, euros } = await seed();
+    await prisma.adInsight.update({
+      where: { adAccountId_level_objectId_date: {
+        adAccountId: euros.id, level: 'campaign', objectId: 'act_1-c', date: new Date('2026-08-10T00:00:00Z'),
+      } },
+      data: {
+        actions: { actions: [{ action_type: 'link_click', value: '5' }], cost_per_action_type: [{ action_type: 'link_click', value: '2.5' }] },
+        fields: { video_p25_watched_actions: '12', campaign_name: 'Paris campaign', campaign_id: '123456789012345678' },
+        frequency: 1.5,
+      },
+    });
+    const [row] = await ads.readCampaigns({ workspaceId: workspace.id, adAccountId: euros.id, from, to });
+    expect(row?.actions).toEqual({ link_click: 5 });
+    expect(row?.latestReading).toMatchObject({ date: '2026-08-10', metrics: {
+      frequency: 1.5, video_p25_watched_actions: 12,
+      'actions: link_click': 5, 'cost_per_action_type: link_click': 2.5,
+    } });
+    expect(row?.latestReading?.metrics).not.toHaveProperty('campaign_name');
+    expect(row?.latestReading?.metrics).not.toHaveProperty('campaign_id');
+  });
+});

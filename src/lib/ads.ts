@@ -341,6 +341,36 @@ export interface CampaignRow {
   cpm: number | null;
   ctr: number | null;
   actions: Record<string, number>;
+  /** Raw metrics from the latest stored day; rates and unique reach are not summed. */
+  latestReading: { date: string; metrics: Record<string, number> } | null;
+}
+
+/** Preserve every numeric insight from one day without inventing period totals. */
+export function adDailyMetrics(row: {
+  spend: number; impressions: number; clicks: number; reach: number;
+  cpc: number | null; cpm: number | null; cpp: number | null;
+  ctr: number | null; frequency: number | null;
+  actions: unknown; fields: unknown;
+}): Record<string, number> {
+  const metrics: Record<string, number> = {
+    spend: row.spend, impressions: row.impressions, clicks: row.clicks, reach: row.reach,
+  };
+  for (const key of ['cpc', 'cpm', 'cpp', 'ctr', 'frequency'] as const) {
+    if (row[key] !== null) metrics[key] = row[key]!;
+  }
+  const fields = row.fields && typeof row.fields === 'object' && !Array.isArray(row.fields)
+    ? row.fields as Record<string, unknown> : {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (key in metrics || key.endsWith('_id')) continue;
+    const number = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+    if (Number.isFinite(number)) metrics[key] = number;
+  }
+  const actions = row.actions && typeof row.actions === 'object' && !Array.isArray(row.actions)
+    ? row.actions as Record<string, unknown> : {};
+  for (const [field, entries] of Object.entries(actions)) {
+    for (const [action, value] of Object.entries(actionMap(entries))) metrics[`${field}: ${action}`] = value;
+  }
+  return metrics;
 }
 
 /** Per-object totals over the window, biggest spender first. */
@@ -378,6 +408,7 @@ export async function readCampaigns(options: {
       cpm: null,
       ctr: null,
       actions: {},
+      latestReading: null,
     };
 
     existing.spend += row.spend;
@@ -395,6 +426,11 @@ export async function readCampaigns(options: {
     const parsed = row.actions as Record<string, unknown> | null;
     for (const [key, value] of Object.entries(actionMap(parsed?.actions))) {
       existing.actions[key] = (existing.actions[key] ?? 0) + value;
+    }
+
+    const date = row.date.toISOString().slice(0, 10);
+    if (!existing.latestReading || date > existing.latestReading.date) {
+      existing.latestReading = { date, metrics: adDailyMetrics(row) };
     }
 
     grouped.set(row.objectId, existing);
