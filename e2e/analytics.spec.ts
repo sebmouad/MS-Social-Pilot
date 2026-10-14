@@ -116,3 +116,22 @@ test('the posts table says which way it is sorted', async ({ page }) => {
 
   expect(failures).toEqual([]);
 });
+
+test('a Page post with unread insights shows missing figures instead of zero', async ({ page }) => {
+  const failures = collectFailures(page);
+  const external = await prisma.externalPost.create({ data: {
+    targetId,
+    remoteId: 'e2e-unread-external',
+    message: 'Walk: unseen external',
+    createdTime: new Date(Date.now() - 24 * 60 * 60 * 1000),
+  } });
+  try {
+    await open(page, `/analytics?view=posts&target=${targetId}`);
+    const row = page.getByRole('row', { name: /Walk: unseen external/ });
+    await expect(row).toBeVisible();
+    await expect(row.getByRole('cell', { name: '—' })).toHaveCount(7);
+    expect(failures).toEqual([]);
+  } finally {
+    await prisma.externalPost.delete({ where: { id: external.id } });
+  }
+});

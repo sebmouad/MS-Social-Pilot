@@ -17,15 +17,15 @@ export interface PostRow {
   imageUrl?: string | null;
   publishedLabel: string | null;
   url: string | null;
-  impressions: number;
-  reach: number;
-  engagedUsers: number;
-  reactions: number;
-  comments: number;
-  shares: number;
-  clicks: number;
-  negativeFeedback: number;
-  videoViews: number;
+  impressions: number | null;
+  reach: number | null;
+  engagedUsers: number | null;
+  reactions: number | null;
+  comments: number | null;
+  shares: number | null;
+  clicks: number | null;
+  negativeFeedback: number | null;
+  videoViews: number | null;
   organic: number;
   paid: number;
   engagementRate: number | null;
@@ -124,7 +124,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
     return <EmptyState title={t('noPosts')} />;
   }
 
-  const biggestReach = Math.max(...posts.map((post) => post.reach), 1);
+  const biggestReach = posts.reduce((max, post) => Math.max(max, post.reach ?? 0), 1);
 
   return (
     <section className="card-viz">
@@ -217,7 +217,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
 
             {/* Reach against the best-performing post in the range: the one
                 comparison a single row cannot make on its own. */}
-            <span
+            {post.reach !== null && <span
               className="mt-2 block h-1.5 w-full overflow-hidden rounded-sm"
               style={{ background: VIZ.grid }}
               aria-hidden
@@ -231,7 +231,7 @@ export function PostAnalyticsTable({ posts }: { posts: PostRow[] }) {
                   borderBottomRightRadius: 4,
                 }}
               />
-            </span>
+            </span>}
 
             <dl className="mt-2 grid grid-cols-3 gap-2">
               {columns.slice(0, 6).map((column) => {

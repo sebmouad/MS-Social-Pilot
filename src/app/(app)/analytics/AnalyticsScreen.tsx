@@ -331,7 +331,9 @@ export async function AnalyticsScreen({
             // Posts made on Facebook itself, so the table covers the whole Page.
             (await readExternalPosts({ workspaceId: auth.workspace.id, ...postsScope, from, to, limit: 500 })).map(
               (post) => {
-                const interactions = (post.reactions ?? 0) + (post.comments ?? 0) + (post.shares ?? 0);
+                const interactions = post.reactions !== null && post.comments !== null && post.shares !== null
+                  ? post.reactions + post.comments + post.shares
+                  : null;
                 return {
                   postTargetId: post.id,
                   href: `/analytics/post/${post.id}?external=true`,
@@ -341,18 +343,18 @@ export async function AnalyticsScreen({
                   imageUrl: post.pictureUrl,
                   publishedLabel: formatInZone(post.createdTime, timezone),
                   url: post.permalink,
-                  impressions: post.impressions ?? 0,
-                  reach: post.reach ?? 0,
-                  engagedUsers: post.engagedUsers ?? 0,
-                  reactions: post.reactions ?? 0,
-                  comments: post.comments ?? 0,
-                  shares: post.shares ?? 0,
-                  clicks: 0,
-                  negativeFeedback: 0,
-                  videoViews: 0,
+                  impressions: post.impressions,
+                  reach: post.reach,
+                  engagedUsers: post.engagedUsers,
+                  reactions: post.reactions,
+                  comments: post.comments,
+                  shares: post.shares,
+                  clicks: null,
+                  negativeFeedback: null,
+                  videoViews: null,
                   organic: 0,
                   paid: 0,
-                  engagementRate: post.reach ? Math.round((interactions / post.reach) * 1000) / 10 : null,
+                  engagementRate: post.reach && interactions !== null ? Math.round((interactions / post.reach) * 1000) / 10 : null,
                   source: 'page' as const,
                 };
               },
