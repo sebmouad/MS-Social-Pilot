@@ -253,6 +253,41 @@ describe('inviting a client to create their own workspace', () => {
 });
 
 describe('root creates and deletes', () => {
+  it('keeps an owner when root and team remove different owners at the same time', async () => {
+    const actor = await person({ root: true });
+    const first = await person();
+    const second = await person();
+    await prisma.workspace.delete({ where: { id: second.workspace.id } });
+    await prisma.membership.create({
+      data: { userId: second.user.id, workspaceId: first.workspace.id, role: WorkspaceRole.owner },
+    });
+    const firstMembership = await prisma.membership.findUniqueOrThrow({
+      where: { userId_workspaceId: { userId: first.user.id, workspaceId: first.workspace.id } },
+    });
+    const team = await import('../src/lib/team');
+    const outcomes = await Promise.allSettled([
+      root.changeMemberRole(actor.user.id, firstMembership.id, WorkspaceRole.admin),
+      team.removeMember(first.workspace.id, second.user.id, WorkspaceRole.owner),
+    ]);
+    expect(outcomes.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(await prisma.membership.count({ where: { workspaceId: first.workspace.id, role: WorkspaceRole.owner } })).toBe(1);
+  });
+
+  it('keeps an owner when root deletes one account while team removes the other', async () => {
+    const actor = await person({ root: true });
+    const first = await person();
+    const second = await person();
+    await prisma.workspace.delete({ where: { id: second.workspace.id } });
+    await prisma.membership.create({ data: { userId: second.user.id, workspaceId: first.workspace.id, role: WorkspaceRole.owner } });
+    const team = await import('../src/lib/team');
+    const outcomes = await Promise.allSettled([
+      root.deleteUserAsRoot(actor.user.id, first.user.id),
+      team.removeMember(first.workspace.id, second.user.id, WorkspaceRole.owner),
+    ]);
+    expect(outcomes.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(await prisma.membership.count({ where: { workspaceId: first.workspace.id, role: WorkspaceRole.owner } })).toBe(1);
+  });
+
   it('creates a workspace for an existing account and deletes it', async () => {
     const theRoot = await person({ root: true });
     const owner = await person();

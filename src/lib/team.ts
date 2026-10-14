@@ -8,6 +8,7 @@ import { AppError, errors } from './errors';
 import { sendEmail } from './email/send';
 import { invitationEmail } from './email/templates';
 import { logActivity } from './scheduler/runner';
+import { lockWorkspaceOwners } from './owner-guard';
 
 /**
  * Team membership and invitations.
@@ -243,28 +244,17 @@ export async function removeMember(
   userId: string,
   actorRole: WorkspaceRole,
 ): Promise<void> {
-  const membership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId, workspaceId } },
-  });
-  // Not a member here — including a member of another workspace.
-  if (!membership) throw errors.notFound();
-
-  assertRankPermits(actorRole, membership.role);
-
-  if (membership.role === WorkspaceRole.owner) {
-    const owners = await prisma.membership.count({
-      where: { workspaceId, role: WorkspaceRole.owner },
-    });
-    if (owners <= 1) {
-      throw new AppError({
-        key: 'errors.lastOwner',
-        fallback: 'A workspace must keep at least one owner.',
-        status: 409,
-      });
+  await prisma.$transaction(async (tx) => {
+    await lockWorkspaceOwners(tx, workspaceId);
+    const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId, workspaceId } } });
+    if (!membership) throw errors.notFound();
+    assertRankPermits(actorRole, membership.role);
+    if (membership.role === WorkspaceRole.owner) {
+      const owners = await tx.membership.count({ where: { workspaceId, role: WorkspaceRole.owner } });
+      if (owners <= 1) throw new AppError({ key: 'errors.lastOwner', fallback: 'A workspace must keep at least one owner.', status: 409 });
     }
-  }
-
-  await prisma.membership.delete({ where: { userId_workspaceId: { userId, workspaceId } } });
+    await tx.membership.delete({ where: { userId_workspaceId: { userId, workspaceId } } });
+  });
   await logActivity(workspaceId, 'team.removed', { userId });
 }
 
@@ -274,41 +264,20 @@ export async function changeRole(
   role: WorkspaceRole,
   actorRole: WorkspaceRole,
 ): Promise<void> {
-  const membership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId, workspaceId } },
-  });
-  if (!membership) throw new AppError({ key: 'errors.notFound', fallback: 'Not found.', status: 404 });
-
-  // Both ends of the change: the role being granted, and the role being taken
-  // away. Promoting somebody to owner and demoting the sitting owner arrive at
-  // the same place.
-  assertRankPermits(actorRole, role);
-  assertRankPermits(actorRole, membership.role);
-
-  // A client stays a client, and nobody on the team becomes one: invite them
-  // separately (owner approved, 2026-10-12).
-  if ((membership.role === WorkspaceRole.client) !== (role === WorkspaceRole.client)) {
-    throw new AppError({ key: 'errors.clientRoleFixed', fallback: 'A client stays a client. Invite the person again with the other role.', status: 409 });
-  }
-
-  // Same guard as removal, by another route: demoting the last owner would
-  // leave the workspace unadministrable.
-  if (membership.role === WorkspaceRole.owner && role !== WorkspaceRole.owner) {
-    const owners = await prisma.membership.count({
-      where: { workspaceId, role: WorkspaceRole.owner },
-    });
-    if (owners <= 1) {
-      throw new AppError({
-        key: 'errors.lastOwner',
-        fallback: 'A workspace must keep at least one owner.',
-        status: 409,
-      });
+  await prisma.$transaction(async (tx) => {
+    await lockWorkspaceOwners(tx, workspaceId);
+    const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId, workspaceId } } });
+    if (!membership) throw errors.notFound();
+    assertRankPermits(actorRole, role);
+    assertRankPermits(actorRole, membership.role);
+    if ((membership.role === WorkspaceRole.client) !== (role === WorkspaceRole.client)) {
+      throw new AppError({ key: 'errors.clientRoleFixed', fallback: 'A client stays a client. Invite the person again with the other role.', status: 409 });
     }
-  }
-
-  await prisma.membership.update({
-    where: { userId_workspaceId: { userId, workspaceId } },
-    data: { role },
+    if (membership.role === WorkspaceRole.owner && role !== WorkspaceRole.owner) {
+      const owners = await tx.membership.count({ where: { workspaceId, role: WorkspaceRole.owner } });
+      if (owners <= 1) throw new AppError({ key: 'errors.lastOwner', fallback: 'A workspace must keep at least one owner.', status: 409 });
+    }
+    await tx.membership.update({ where: { userId_workspaceId: { userId, workspaceId } }, data: { role } });
   });
   await logActivity(workspaceId, 'team.roleChanged', { userId, role });
 }

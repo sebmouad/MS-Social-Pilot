@@ -9,6 +9,7 @@ import { env } from './env';
 import { hashToken, randomToken } from './crypto';
 import { clearSecondFactors } from './two-step';
 import { MODULE_KEYS, type ModuleKey } from './modules';
+import { lockWorkspaceOwners } from './owner-guard';
 
 /**
  * What root can do to the whole installation, from the root section
@@ -203,20 +204,24 @@ export async function deleteWorkspaceAsRoot(actorId: string, workspaceId: string
  * or deleted first, so no workspace is left without an owner.
  */
 export async function deleteUserAsRoot(actorId: string, userId: string): Promise<void> {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw errors.notFound();
-  if (user.isInstanceOwner) throw errors.rootCannotBeDisabled();
-  for (const membership of await prisma.membership.findMany({ where: { userId, role: WorkspaceRole.owner } })) {
-    const owners = await prisma.membership.count({ where: { workspaceId: membership.workspaceId, role: WorkspaceRole.owner } });
-    if (owners === 1) throw errors.soleOwner();
-  }
-  await prisma.$transaction([
-    prisma.post.updateMany({ where: { authorId: userId }, data: { authorId: actorId } }),
-    prisma.post.updateMany({ where: { submittedById: userId }, data: { submittedById: null } }),
-    prisma.post.updateMany({ where: { reviewedById: userId }, data: { reviewedById: null } }),
-    prisma.invitation.updateMany({ where: { invitedById: userId }, data: { invitedById: actorId } }),
-    prisma.user.delete({ where: { id: userId } }),
-  ]);
+  const user = await prisma.$transaction(async (tx) => {
+    const account = await tx.user.findUnique({ where: { id: userId } });
+    if (!account) throw errors.notFound();
+    if (account.isInstanceOwner) throw errors.rootCannotBeDisabled();
+    const memberships = await tx.membership.findMany({ where: { userId }, select: { workspaceId: true } });
+    for (const workspaceId of memberships.map((m) => m.workspaceId).sort()) await lockWorkspaceOwners(tx, workspaceId);
+    const owned = await tx.membership.findMany({ where: { userId, role: WorkspaceRole.owner }, select: { workspaceId: true } });
+    for (const { workspaceId } of owned) {
+      const owners = await tx.membership.count({ where: { workspaceId, role: WorkspaceRole.owner } });
+      if (owners <= 1) throw errors.soleOwner();
+    }
+    await tx.post.updateMany({ where: { authorId: userId }, data: { authorId: actorId } });
+    await tx.post.updateMany({ where: { submittedById: userId }, data: { submittedById: null } });
+    await tx.post.updateMany({ where: { reviewedById: userId }, data: { reviewedById: null } });
+    await tx.invitation.updateMany({ where: { invitedById: userId }, data: { invitedById: actorId } });
+    await tx.user.delete({ where: { id: userId } });
+    return account;
+  }, { timeout: 30_000 });
   await logRootActivity(actorId, 'user.deleted', { email: user.email });
 }
 
@@ -495,9 +500,9 @@ async function findMembership(membershipId: string) {
 }
 
 /** A workspace always keeps an owner: the last one cannot be re-roled or removed. */
-async function assertNotLastOwner(membership: { workspaceId: string; role: WorkspaceRole }) {
+async function assertNotLastOwner(tx: Prisma.TransactionClient, membership: { workspaceId: string; role: WorkspaceRole }) {
   if (membership.role !== WorkspaceRole.owner) return;
-  const owners = await prisma.membership.count({
+  const owners = await tx.membership.count({
     where: { workspaceId: membership.workspaceId, role: WorkspaceRole.owner },
   });
   if (owners <= 1) throw errors.rootLastOwner();
@@ -506,8 +511,13 @@ async function assertNotLastOwner(membership: { workspaceId: string; role: Works
 export async function changeMemberRole(actorId: string, membershipId: string, role: WorkspaceRole): Promise<void> {
   const membership = await findMembership(membershipId);
   if (membership.role === role) return;
-  await assertNotLastOwner(membership);
-  await prisma.membership.update({ where: { id: membershipId }, data: { role } });
+  await prisma.$transaction(async (tx) => {
+    await lockWorkspaceOwners(tx, membership.workspaceId);
+    const current = await tx.membership.findUnique({ where: { id: membershipId } });
+    if (!current) throw errors.notFound();
+    await assertNotLastOwner(tx, current);
+    await tx.membership.update({ where: { id: membershipId }, data: { role } });
+  });
   await logRootActivity(actorId, 'member.roleChanged', {
     email: membership.user.email,
     workspace: membership.workspace.name,
@@ -529,8 +539,13 @@ export async function setMemberModules(actorId: string, membershipId: string, di
 
 export async function removeMemberAsRoot(actorId: string, membershipId: string): Promise<void> {
   const membership = await findMembership(membershipId);
-  await assertNotLastOwner(membership);
-  await prisma.membership.delete({ where: { id: membershipId } });
+  await prisma.$transaction(async (tx) => {
+    await lockWorkspaceOwners(tx, membership.workspaceId);
+    const current = await tx.membership.findUnique({ where: { id: membershipId } });
+    if (!current) throw errors.notFound();
+    await assertNotLastOwner(tx, current);
+    await tx.membership.delete({ where: { id: membershipId } });
+  });
   await logRootActivity(actorId, 'member.removed', { email: membership.user.email, workspace: membership.workspace.name });
 }
 
