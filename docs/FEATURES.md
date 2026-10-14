@@ -24,6 +24,7 @@ Getting-started checklist (connect, first post, queue, team, client link,
 assistant; dismissible), setup card for root, token and failure warnings, Pages
 hub (per Page: followers, next and last post, quick links), monthly goals per
 Page (new followers, views, engagement, posts published) with progress and pace.
+Token warnings follow the selected channels and the member's Page access.
 `/welcome` walks a new workspace through name, time zone and audience, then
 connecting Pages.
 

@@ -224,3 +224,30 @@ export async function summariseConnections(
 
   return { accounts, broken, expiring, pages, groups, instagram, adAccounts };
 }
+
+/** Token warnings for channels the member actually has selected. */
+export async function selectedConnectionWarnings(options: {
+  workspaceId: string;
+  targetIds: string[];
+  now?: Date;
+  warnWithinDays?: number;
+}): Promise<{ broken: Array<{ id: string; name: string; reason: string | null }>; expiring: number }> {
+  const now = options.now ?? new Date();
+  const horizon = new Date(now.getTime() + (options.warnWithinDays ?? 7) * 24 * 60 * 60 * 1000);
+  const accounts = await prisma.socialAccount.findMany({
+    where: {
+      workspaceId: options.workspaceId,
+      OR: [
+        { targets: { some: { id: { in: options.targetIds } } } },
+        { instagramAccounts: { some: { targetId: { in: options.targetIds } } } },
+      ],
+    },
+    select: { id: true, name: true, invalidatedAt: true, invalidReason: true, tokenExpiresAt: true },
+  });
+  return {
+    broken: accounts.filter((account) => account.invalidatedAt !== null)
+      .map((account) => ({ id: account.id, name: account.name, reason: account.invalidReason })),
+    expiring: accounts.filter((account) => account.invalidatedAt === null && account.tokenExpiresAt !== null
+      && account.tokenExpiresAt > now && account.tokenExpiresAt <= horizon).length,
+  };
+}

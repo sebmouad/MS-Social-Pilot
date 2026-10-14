@@ -14,7 +14,7 @@ import { postScope, postTargetScope, targetScope } from '@/lib/page-access';
 import { loadSelection } from '@/lib/page-filter';
 import { ChannelsLayout } from '@/components/ChannelsLayout';
 import { screenMetadata } from '@/lib/metadata';
-import { summariseConnections } from '@/lib/connections';
+import { selectedConnectionWarnings } from '@/lib/connections';
 import { countOpenInbox } from '@/lib/inbox';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
@@ -55,7 +55,7 @@ export default async function DashboardPage({
   const scopeIds = scope.all ? undefined : scope.ids;
   const postsIn = postScope(scope);
 
-  const [upcoming, recent, counts, targetCount, staleAccounts, failures, totals, health, inbox, aiSetting] =
+  const [upcoming, recent, counts, targetCount, failures, totals, connectionWarnings, inbox, aiSetting] =
     await Promise.all([
     prisma.post.findMany({
       where: { workspaceId, status: { in: ['scheduled', 'publishing'] }, scheduledAt: { gte: now }, ...postsIn },
@@ -66,17 +66,14 @@ export default async function DashboardPage({
     recentOutcomes(workspaceId, 5, scopeIds),
     prisma.post.groupBy({ by: ['status'], where: { workspaceId, ...postsIn }, _count: true }),
     prisma.target.count({ where: { workspaceId, enabled: true, canPublish: true, ...targetScope(scope) } }),
-    prisma.socialAccount.findMany({
-      where: { workspaceId, invalidatedAt: { not: null } },
-      select: { id: true, name: true, invalidReason: true },
-    }),
     prisma.postTarget.count({ where: { status: 'failed', post: { workspaceId }, ...postTargetScope(scope) } }),
       publishedTotals(workspaceId, scopeIds),
-      summariseConnections(workspaceId, { now, warnWithinDays: env.tokenWarningDays }),
+      selectedConnectionWarnings({ workspaceId, targetIds: selection.ids, now, warnWithinDays: env.tokenWarningDays }),
       countOpenInbox({ workspaceId, targetIds: selection.ids }),
       prisma.workspace.findUnique({ where: { id: workspaceId }, select: { aiEnabled: true } }),
     ]);
   const aiOn = aiAvailable() && Boolean(aiSetting?.aiEnabled) && auth.modules.includes('schedule');
+  const staleAccounts = connectionWarnings.broken;
 
   // An unfinished installation otherwise greets its owner with four zeros and
   // no hint why. Setup belongs to the installation owner, so only they are pointed at it.
@@ -164,7 +161,7 @@ export default async function DashboardPage({
           <ul className="mt-1 list-inside list-disc">
             {staleAccounts.map((account) => (
               <li key={account.id}>
-                {account.name}: {account.invalidReason ?? t('reconnectRequired')}
+                {account.name}: {account.reason ?? t('reconnectRequired')}
               </li>
             ))}
           </ul>
@@ -177,10 +174,10 @@ export default async function DashboardPage({
       {/* A dead token has a banner above. This one is the warning *before* it
           happens, which is the difference between a five-minute reconnection
           and a week of silently failing posts. */}
-      {staleAccounts.length === 0 && health.expiring > 0 && (
+      {staleAccounts.length === 0 && connectionWarnings.expiring > 0 && (
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <Icon name="clock" size={16} />
-          {t('tokensExpiring', { count: health.expiring, days: env.tokenWarningDays })}{' '}
+          {t('tokensExpiring', { count: connectionWarnings.expiring, days: env.tokenWarningDays })}{' '}
           <Link href="/connections" className="font-medium underline">
             {t('reviewConnections')}
           </Link>

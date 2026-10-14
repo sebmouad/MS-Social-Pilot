@@ -669,6 +669,29 @@ describe('summariseConnections', () => {
   });
 });
 
+describe('selectedConnectionWarnings', () => {
+  it('shows only warnings linked to selected channels in this workspace', async () => {
+    const { workspace, account, page } = await seed();
+    const now = new Date('2026-09-01T10:00:00Z');
+    const otherAccount = await prisma.socialAccount.create({ data: {
+      workspaceId: workspace.id, providerUserId: 'other-user', name: 'Other connection',
+      accessToken: account.accessToken, tokenExpiresAt: new Date('2026-09-03T10:00:00Z'),
+    } });
+    const otherPage = await prisma.target.create({ data: {
+      workspaceId: workspace.id, socialAccountId: otherAccount.id,
+      type: 'page', providerId: 'other-page', name: 'Other Page', accessToken: account.accessToken,
+    } });
+    await prisma.socialAccount.update({ where: { id: account.id }, data: { invalidatedAt: now, invalidReason: 'Expired' } });
+
+    expect(await connections.selectedConnectionWarnings({ workspaceId: workspace.id, targetIds: [page.id], now }))
+      .toEqual({ broken: [{ id: account.id, name: account.name, reason: 'Expired' }], expiring: 0 });
+    expect(await connections.selectedConnectionWarnings({ workspaceId: workspace.id, targetIds: [otherPage.id], now }))
+      .toEqual({ broken: [], expiring: 1 });
+    expect(await connections.selectedConnectionWarnings({ workspaceId: workspace.id, targetIds: [], now }))
+      .toEqual({ broken: [], expiring: 0 });
+  });
+});
+
 /**
  * Disconnecting an account that Facebook is still holding posts for.
  *

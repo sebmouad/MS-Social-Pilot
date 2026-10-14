@@ -20,6 +20,7 @@ This document owns cross-screen UI contracts. `DESIGN.md` owns visual tokens and
 | Report context | reports page, `ReportControls`, reports API | CSV uses applied sidebar scope intersected with authorization; email uses selected Page context. |
 | Delivery readiness | `emailEnabled`, report schedules | Unavailable delivery is unavailable; skipped/failed email cannot be reported as sent. |
 | Audience metrics | `audience-growth-metrics.ts`, analytics view model, `analytics-summary.ts` | Labels follow source provenance; mixed follower/like sources cannot produce a meaningful net value. Historical comparisons require a nearby stored follower snapshot for every selected Page. Missing data stays unavailable. |
+| Connection warnings | `selectedConnectionWarnings` | Dashboard token warnings describe only accounts attached to channels in the shared selection and the member's access. |
 | Disclosure and filters | `PhoneFold`, `SidebarDock`, `QuerySelect` | Desktop tools stay reachable across resizing; dock follows recreated shell target; changed searches reset pagination. |
 | Copy and visuals | EN/FR catalogs, StatusBadge, theme tokens | Both languages, ICU counts, factual source scope, consistent scheduled/review colors. |
 
