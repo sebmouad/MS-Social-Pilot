@@ -62,6 +62,9 @@ model User {
   name         String
   passwordHash String
   disabledAt   DateTime?
+  isInstanceOwner Boolean @default(false)
+  totpEnabledAt DateTime?
+  passkeys     Passkey[]
   memberships  Membership[]
   posts        Post[]
   sessions     Session[]
@@ -75,11 +78,37 @@ model Session {
   tokenHash String   @unique
   expiresAt DateTime
   pending   String?
+  challenge String?
   user      User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+model Passkey {
+  id           String   @id
+  userId       String
+  credentialId String   @unique
+  publicKey    Bytes
+  counter      Int      @default(0)
+  transports   String[]
+  name         String
+  lastUsedAt   DateTime?
+  createdAt    DateTime
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("passkeys")
+}
+
+model AppSetting {
+  key       String   @id
+  value     Json
+  encrypted Boolean  @default(false)
+  updatedAt DateTime
+
+  @@map("app_settings")
 }
 
 model Workspace {
@@ -142,6 +171,7 @@ model Target {
   socialAccount   SocialAccount? @relation(fields: [socialAccountId], references: [id])
   postTargets     PostTarget[]
   insights        PageInsight[]
+  conversations   Conversation[]
 
   @@unique([workspaceId, providerId])
   @@index([socialAccountId])
@@ -194,10 +224,74 @@ model PostTarget {
   publishedAt  DateTime?
   post         Post             @relation(fields: [postId], references: [id])
   target       Target           @relation(fields: [targetId], references: [id])
+  comments     PostComment[]
 
   @@unique([postId, targetId])
   @@index([targetId])
   @@map("post_targets")
+}
+
+/// Read-only inbox compatibility models mapped to the existing legacy tables.
+model PostComment {
+  id             String   @id
+  postTargetId   String
+  remoteId       String
+  parentRemoteId String?
+  message        String
+  fromName       String?
+  fromId         String?
+  likeCount      Int      @default(0)
+  replyCount     Int      @default(0)
+  isHidden       Boolean  @default(false)
+  createdTime    DateTime
+  fetchedAt      DateTime @default(now())
+  firstSeenAt    DateTime @default(now())
+  resolvedAt     DateTime?
+  assigneeId     String?
+  sentById       String?
+  sentiment      String?
+  postTarget     PostTarget @relation(fields: [postTargetId], references: [id])
+
+  @@unique([postTargetId, remoteId])
+  @@index([postTargetId, createdTime])
+  @@map("post_comments")
+}
+
+model Conversation {
+  id           String   @id
+  targetId     String
+  remoteId     String
+  snippet      String?
+  unreadCount  Int      @default(0)
+  messageCount Int      @default(0)
+  participants Json?
+  updatedTime  DateTime
+  fetchedAt    DateTime @default(now())
+  resolvedAt   DateTime?
+  assigneeId   String?
+  target       Target   @relation(fields: [targetId], references: [id])
+  messages     ConversationMessage[]
+
+  @@unique([targetId, remoteId])
+  @@index([targetId, updatedTime])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             String   @id
+  conversationId String
+  remoteId       String
+  fromName       String?
+  fromId         String?
+  message        String?
+  createdTime    DateTime
+  firstSeenAt    DateTime @default(now())
+  sentById       String?
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+
+  @@unique([conversationId, remoteId])
+  @@index([conversationId, createdTime])
+  @@map("conversation_messages")
 }
 
 model AdAccount {

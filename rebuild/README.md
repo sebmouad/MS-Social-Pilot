@@ -15,10 +15,10 @@ Set `DATABASE_URL` to a non-production copy of the existing schema for interacti
 
 ## Data and authorization
 
-The new app reads existing users, sessions, memberships, workspaces, posts, channels, social connections, and ad accounts by their original IDs. Existing fully verified browser sessions are accepted on the same hostname. Pending second-factor sessions are rejected. Every workspace read starts from a validated membership. Provider credentials are not selected into frontend views.
+The new app reads existing users, sessions, memberships, workspaces, posts, channels, social connections, and ad accounts by their original IDs. Existing fully verified browser sessions are accepted on the same hostname. Password sign-in works only when the account does not require a second factor; TOTP, passkeys, and recovery verification remain cutover gates. Every workspace read starts from a validated membership. Until Page-level access and client screen scopes are implemented, only owners and admins may enter the preview. Provider credentials are not selected into frontend views.
 
 ## Current limits before cutover
 
-This is a reviewable foundation, not a production replacement. Sign-in, two-factor challenge, account recovery, write operations, provider connections, background jobs, complete analytics/ads data coverage, inbox interactions, role-aware feature entitlement, and integration tests remain to be implemented. No customer traffic should be routed here until these flows work with existing production data and a tested rollback path.
+This is a reviewable foundation, not a production replacement. Local draft CRUD and local channel/ad-account selection work, but published-post remote deletion, disconnect with retain/delete, OAuth discovery, two-factor challenge, account recovery, background jobs, complete analytics/ads data coverage, inbox interactions, scoped role access, feature entitlement, and integration tests remain to be implemented. No customer traffic should be routed here until these flows work with existing production data and a tested rollback path.
 
 See `docs/DATA_COMPATIBILITY.md` and `docs/AUTH_COMPATIBILITY.md` for migration boundaries.

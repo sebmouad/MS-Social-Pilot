@@ -54,12 +54,15 @@ button, input, select { font: inherit; }
 .shell-subnav__link { display: flex; align-items: center; min-height: 34px; padding: 0 12px; border-radius: 8px; color: var(--ink-soft); font-size: 12px; text-decoration: none; }
 .shell-subnav__link:hover { background: var(--surface-muted); color: var(--ink); }
 .shell-subnav__link.is-active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.shell-sidebar-filter { margin-top: 24px; padding: 18px 12px 0; border-top: 1px solid var(--line); }
 .shell-main { min-width: 0; }
 .shell-topbar { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 36px; border-bottom: 1px solid var(--line); background: rgb(255 255 255 / 82%); }
 .shell-topbar__crumb, .shell-topbar__actions { display: flex; align-items: center; gap: 12px; }
 .shell-topbar__crumb { color: var(--ink-faint); font-size: 12px; }
 .shell-topbar__crumb strong { color: var(--ink); font-weight: 650; }
 .shell-topbar__actions { gap: 14px; color: var(--ink-soft); font-size: 12px; }
+.shell-signout { padding: 6px 8px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-soft); font-size: 12px; cursor: pointer; }
+.shell-signout:hover { background: var(--surface-muted); color: var(--ink); }
 .shell-content { max-width: 1440px; margin: 0 auto; padding: 36px; }
 .ui-button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; border: 1px solid transparent; border-radius: 9px; font-weight: 650; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
 .ui-button:disabled { opacity: .5; cursor: not-allowed; }
@@ -106,6 +109,7 @@ button, input, select { font: inherit; }
   .shell-subnav { position: fixed; z-index: 4; inset: auto 0 64px; display: flex; gap: 4px; width: 100%; margin: 0; padding: 8px; overflow-x: auto; border-top: 1px solid var(--line); background: var(--surface); }
   .shell-subnav__label { display: none; }
   .shell-subnav__link { flex: 0 0 auto; white-space: nowrap; }
+  .shell-sidebar-filter { position: fixed; z-index: 4; inset: auto 0 112px; max-height: 42vh; margin: 0; padding: 12px 18px; overflow-y: auto; border-top: 1px solid var(--line); background: var(--surface); }
   .shell-topbar { min-height: 58px; padding: 0 18px; }
   .shell-topbar__crumb span:first-child, .shell-topbar__crumb span:nth-child(2) { display: none; }
   .shell-content { padding: 24px 18px; }

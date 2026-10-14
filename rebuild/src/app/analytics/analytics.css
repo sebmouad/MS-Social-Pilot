@@ -15,4 +15,8 @@
 .report-row:last-child { border-bottom: 0; }
 .report-row strong { color: var(--ink-soft); font-size: 13px; }
 .text-link { color: var(--accent); font-size: 13px; font-weight: 700; }
+.analytics-sidebar-filter { display: grid; gap: 10px; }
+.analytics-sidebar-filter label { display: flex; align-items: center; gap: 9px; color: var(--ink-soft); font-size: 12px; }
+.analytics-sidebar-filter input { accent-color: var(--accent); }
+.analytics-sidebar-filter button { min-height: 34px; margin-top: 8px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--accent); font-size: 12px; font-weight: 700; cursor: pointer; }
 @media (max-width: 620px) { .activity-chart { gap: 5px; } .activity-chart__item small { font-size: 9px; white-space: normal; } .analytics-panel-title { align-items: flex-start; flex-direction: column; } }

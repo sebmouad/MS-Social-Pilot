@@ -40,6 +40,7 @@ export function getUserByEmail(email: string) {
   });
 }
 
+
 /** Validate a legacy session by its hash and expiry; pending sessions are exposed to the caller. */
 export function getSessionByTokenHash(tokenHash: string) {
   return prisma.session.findUnique({
@@ -158,6 +159,20 @@ export async function getPageInsightRows(workspaceId: string, days = 30) {
     orderBy: { endTime: "desc" },
     select: { id: true, metric: true, period: true, endTime: true, numeric: true, target: { select: { id: true, name: true } } },
   });
+}
+
+/** Latest stored follower stock for each selected Page, with the current name preferred. */
+export async function getLatestPageAudience(workspaceId: string, targetIds: string[]) {
+  return Promise.all(targetIds.map(async targetId => {
+    const rows = await prisma.pageInsight.findMany({
+      where: { targetId, target: { workspaceId, type: 'page' }, metric: { in: ['page_follows', 'page_fans'] }, numeric: { not: null } },
+      orderBy: { endTime: 'desc' },
+      take: 20,
+      select: { metric: true, numeric: true, endTime: true, target: { select: { id: true, name: true } } },
+    });
+    const latest = rows[0];
+    return latest ? { targetId, name: latest.target.name, audience: latest.numeric ?? 0, asOf: latest.endTime, metric: latest.metric } : null;
+  })).then(rows => rows.filter((row): row is NonNullable<typeof row> => row !== null));
 }
 
 /** Read account-level delivery rows and campaign-level rows for a workspace. */

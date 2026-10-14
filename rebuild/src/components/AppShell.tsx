@@ -20,7 +20,7 @@ function Mark() {
   return <svg className="shell-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23.5 12.2 8l4 9 3.2-5.3L27 23.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="23.5" cy="8.5" r="2.5" fill="currentColor"/></svg>;
 }
 
-export function AppShell({ children, activeModule, userName, workspaceName }: { children: ReactNode; activeModule: ModuleId; userName: string; workspaceName: string }) {
+export function AppShell({ children, activeModule, userName, workspaceName, sidebar }: { children: ReactNode; activeModule: ModuleId; userName: string; workspaceName: string; sidebar?: ReactNode }) {
   const pathname = usePathname();
   const modulePages = PAGES.filter(page => page.module === activeModule);
   return <div className="shell">
@@ -33,7 +33,8 @@ export function AppShell({ children, activeModule, userName, workspaceName }: { 
         <p className="shell-subnav__label">{MODULES.find(module => module.id === activeModule)?.title}</p>
         {modulePages.map(page => <a key={page.id} href={page.href} className={`shell-subnav__link${pathname === page.href ? " is-active" : ""}`} aria-current={pathname === page.href ? "page" : undefined}>{page.title}</a>)}
       </nav>}
+      {sidebar && <div className="shell-sidebar-filter">{sidebar}</div>}
     </aside>
-    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions"><span className="shell-topbar__user">{userName}</span></div></header><main className="shell-content">{children}</main></div>
+    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions"><span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main className="shell-content">{children}</main></div>
   </div>;
 }

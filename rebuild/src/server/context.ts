@@ -15,6 +15,9 @@ export async function requireViewer() {
   const workspaces = await listWorkspaces(user.id);
   if (!workspaces.length) redirect('/no-workspace');
   const selected = (await cookies()).get('sp_workspace')?.value;
-  const membership = workspaces.find((item) => item.workspace.id === selected) ?? workspaces[0]!;
+  const membership = workspaces.find((item) => item.workspace.id === selected) ?? workspaces.find(item => item.role === 'owner' || item.role === 'admin') ?? workspaces[0]!;
+  // Page-level and client screen scopes are not mapped by the rebuild yet.
+  // Keep those accounts on the existing app until the new authorization layer exists.
+  if (membership.role !== 'owner' && membership.role !== 'admin') redirect('/access-limited');
   return { user, membership, workspaces, workspaceId: membership.workspace.id };
 }

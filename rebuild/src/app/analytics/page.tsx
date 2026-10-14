@@ -1,14 +1,21 @@
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
-import { getPageInsightRows, listPosts } from '@/server/data';
+import { getLatestPageAudience, getPageInsightRows, getTargets, listPosts } from '@/server/data';
 
 const day = 24 * 60 * 60 * 1000;
 const dateLabel = (date: Date) => date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ filter?: string; channel?: string | string[] }> }) {
   const { workspaceId } = await requireViewer();
-  const posts = await listPosts(workspaceId, 500);
-  const pageInsights = await getPageInsightRows(workspaceId, 30);
+  const params = await searchParams;
+  const [allPosts, allInsights, targets] = await Promise.all([listPosts(workspaceId, 500), getPageInsightRows(workspaceId, 30), getTargets(workspaceId)]);
+  const requested = new Set(Array.isArray(params.channel) ? params.channel : params.channel ? [params.channel] : []);
+  const selectedIds = targets.filter(target => params.filter !== '1' || requested.has(target.id)).map(target => target.id);
+  const selectedSet = new Set(selectedIds);
+  const posts = allPosts.filter(post => post.targets.some(target => selectedSet.has(target.target.id)));
+  const pageInsights = allInsights.filter(row => selectedSet.has(row.target.id));
+  const audienceRows = await getLatestPageAudience(workspaceId, targets.filter(target => target.type === 'page' && selectedSet.has(target.id)).map(target => target.id));
+  const audienceTotal = audienceRows.reduce((sum, row) => sum + row.audience, 0);
   const now = Date.now();
   const since = now - 30 * day;
   const recent = posts.filter((post) => post.publishedAt && post.publishedAt.getTime() >= since);
@@ -40,7 +47,11 @@ export default async function AnalyticsPage() {
   }
   const number = new Intl.NumberFormat();
 
-  return <PageFrame module="analytics"><div className="page-stack">
+  const sidebar = <form action="/analytics" method="get" className="analytics-sidebar-filter"><p className="shell-subnav__label">Channels</p><input type="hidden" name="filter" value="1" />
+    {targets.length ? targets.map(target => <label key={target.id}><input type="checkbox" name="channel" value={target.id} defaultChecked={selectedSet.has(target.id)} /><span>{target.name}</span></label>) : <p className="small-note">No channels connected.</p>}
+    <button type="submit">Apply channels</button></form>;
+
+  return <PageFrame module="analytics" sidebar={sidebar}><div className="page-stack">
     <header className="page-heading"><div><p className="eyebrow">Analytics</p><h1>Publishing activity</h1><p>Publishing history and stored Page performance for the last 30 days.</p></div></header>
     <section className="metric-grid" aria-label="Publishing metrics">
       <article className="metric-card"><dl><dt>Published in last 30 days</dt><dd>{recent.length}</dd></dl></article>
@@ -54,6 +65,10 @@ export default async function AnalyticsPage() {
     <section className="panel"><div className="analytics-panel-title"><div><h2>Stored Page performance</h2><p className="small-note">Captured daily insight rows ending in the last 30 days.</p></div></div>
       {totals.size ? <div className="metric-grid">{[...totals].map(([metric, value]) => <article className="metric-card" key={metric}><dl><dt>{additiveLabels[metric]}</dt><dd>{number.format(Math.round(value))}</dd></dl></article>)}</div> : <p className="empty-note">No daily Page performance rows are stored for this period.</p>}
       {reachRows.size > 0 && <><h3>Latest reach by Page</h3><p className="small-note">Reach is unique per Page, so these figures are shown separately and are not added across channels.</p><div className="report-list">{[...reachRows.values()].map((row) => <div className="report-row" key={row.name}><span>{row.name}</span><strong>{number.format(Math.round(row.value))} · {dateLabel(row.date)}</strong></div>)}</div></>}
+    </section>
+    <section className="panel"><h2>Selected audience</h2><p className="small-note">Latest stored follower or Page-like count for each selected Page. Counts are added across Pages; a person who follows more than one Page can appear more than once.</p>
+      <div className="metric-grid"><article className="metric-card"><dl><dt>Total across {audienceRows.length} Pages with data</dt><dd>{number.format(Math.round(audienceTotal))}</dd></dl></article></div>
+      {audienceRows.length ? <div className="report-list">{audienceRows.map(row => <div className="report-row" key={row.targetId}><span>{row.name}</span><strong>{number.format(Math.round(row.audience))} · {dateLabel(row.asOf)}</strong></div>)}</div> : <p className="empty-note">No stored audience counts for the selected Pages.</p>}
     </section>
   </div></PageFrame>;
 }
