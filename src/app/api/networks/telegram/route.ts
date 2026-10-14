@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireCapability } from '@/lib/auth';
 import { canManageAccounts } from '@/lib/constants';
 import { AppError, errors } from '@/lib/errors';
-import { networkAvailable } from '@/lib/networks';
+import { networkOffered } from '@/lib/networks';
 import { ok, readJson, route } from '@/lib/api';
 import { logActivity } from '@/lib/scheduler/runner';
 import { connectTelegram, saveNetworkAccount } from '@/lib/networks/connect';
@@ -19,7 +19,7 @@ const schema = z.object({
 /** Connect a Telegram channel through a bot that is one of its administrators. */
 export const POST = route(async (request: Request) => {
   const auth = await requireCapability(canManageAccounts);
-  if (!networkAvailable('telegram')) throw errors.notFound();
+  if (!(await networkOffered(auth.workspace.id, 'telegram'))) throw errors.notFound();
   const input = schema.parse(await readJson(request));
   try {
     const connected = await connectTelegram(input.botToken, input.channel);

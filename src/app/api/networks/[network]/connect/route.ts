@@ -6,7 +6,7 @@ import { canManageAccounts } from '@/lib/constants';
 import { env } from '@/lib/env';
 import { errors } from '@/lib/errors';
 import { route } from '@/lib/api';
-import { isNetworkKey, networkAvailable } from '@/lib/networks';
+import { isNetworkKey, networkOffered } from '@/lib/networks';
 import { oauthCookie, startNetworkAuth } from '@/lib/networks/connect';
 
 /**
@@ -17,7 +17,7 @@ export const GET = route(async (request: Request, context: { params: Promise<{ n
   const auth = await requireAuth();
   if (!canManageAccounts(auth.role)) throw errors.adminsOnlyConnect();
   const { network } = await context.params;
-  if (!isNetworkKey(network) || network === 'bluesky' || network === 'telegram' || !networkAvailable(network)) throw errors.notFound();
+  if (!isNetworkKey(network) || network === 'bluesky' || network === 'telegram' || !(await networkOffered(auth.workspace.id, network))) throw errors.notFound();
   const url = new URL(request.url);
 
   let started: { url: string; cookie: string };

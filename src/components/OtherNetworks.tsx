@@ -1,13 +1,11 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { Dialog } from './Dialog';
 import { FeedAvatar } from './FeedPost';
-import { platformSettingsHref } from '@/lib/root-platforms';
 import { Icon } from './Icon';
 import { NetworkMark } from './NetworkMark';
 
@@ -32,14 +30,12 @@ export function OtherNetworks({
   networks,
   accounts,
   canManage,
-  isOwner,
   notice,
   initialDialog,
 }: {
   networks: Array<{ key: NetworkKey; label: string; available: boolean }>;
   accounts: Account[];
   canManage: boolean;
-  isOwner: boolean;
   notice: { network: NetworkKey; error: string | null; connected: string | null } | null;
   /** `?connect=` from the connect sheet: open that network's form straight away. */
   initialDialog?: string | null;
@@ -49,7 +45,7 @@ export function OtherNetworks({
   const tCommon = useTranslations('common');
   const router = useRouter();
   const [dialog, setDialog] = useState<'bluesky' | 'mastodon' | 'telegram' | null>(
-    canManage && (initialDialog === 'bluesky' || initialDialog === 'mastodon' || initialDialog === 'telegram') ? initialDialog : null,
+    canManage && (initialDialog === 'bluesky' || initialDialog === 'mastodon' || initialDialog === 'telegram') && networks.some((network) => network.key === initialDialog && network.available) ? initialDialog : null,
   );
   const [botToken, setBotToken] = useState('');
   const [channel, setChannel] = useState('');
@@ -192,7 +188,7 @@ export function OtherNetworks({
                               type="checkbox"
                               className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                               checked={target.enabled}
-                              disabled={!canManage}
+                              disabled={!canManage || (!network.available && !target.enabled)}
                               aria-label={t('useTarget', { name: target.name })}
                               onChange={() => void toggle(target.id, !target.enabled)}
                             />
@@ -226,20 +222,7 @@ export function OtherNetworks({
                       </a>
                     )}
                   </div>
-                ) : (
-                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    {isOwner ? (
-                      <>
-                        {t('needsApp', { network: network.label })}{' '}
-                        <Link href={platformSettingsHref(network.key)} className="font-semibold text-brand-600 hover:underline">
-                          {t('openConfig')}
-                        </Link>
-                      </>
-                    ) : (
-                      t('needsAppAskOwner', { network: network.label })
-                    )}
-                  </p>
-                )}
+                ) : null}
               </div></td>
             </tr>
           );

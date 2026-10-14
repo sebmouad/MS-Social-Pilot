@@ -3,6 +3,7 @@ import { TargetType, WorkspaceRole } from '@prisma/client';
 
 import { AppError } from './errors';
 import { prisma } from './prisma';
+import { PLAN_FEATURES, PLATFORM_ADDONS, platformFeature, type PlanFeature, type PlatformAddon } from './product-catalog';
 
 /**
  * Subscription plans (Root › Plans). A plan belongs to the subscriber, the
@@ -10,8 +11,7 @@ import { prisma } from './prisma';
  * person owns. No plan, or root, means no limits.
  */
 
-export const PLAN_FEATURES = ['clients', 'whiteLabel', 'api'] as const;
-export type PlanFeature = (typeof PLAN_FEATURES)[number];
+export { PLAN_FEATURES };
 export type PlanLimit = 'channels' | 'members' | 'workspaces';
 
 async function ownedWorkspaceIds(userId: string): Promise<string[]> {
@@ -117,6 +117,18 @@ export async function hasFeature(workspaceId: string, feature: PlanFeature): Pro
   const subscriber = await subscriberOf(workspaceId);
   if (!subscriber?.plan || subscriber.isInstanceOwner) return true;
   return subscriber.plan.features.includes(feature);
+}
+
+/** Platforms are add-ons: an unassigned customer plan includes Facebook only. */
+export async function includedPlatforms(workspaceId: string): Promise<Set<PlatformAddon>> {
+  const subscriber = await subscriberOf(workspaceId);
+  if (subscriber?.isInstanceOwner) return new Set<PlatformAddon>(PLATFORM_ADDONS);
+  const features = subscriber?.plan?.features ?? [];
+  return new Set(PLATFORM_ADDONS.filter((platform) => features.includes(platformFeature(platform))));
+}
+
+export async function hasPlatform(workspaceId: string, platform: PlatformAddon): Promise<boolean> {
+  return (await includedPlatforms(workspaceId)).has(platform);
 }
 
 /** Refuses an action the workspace's plan does not include. */

@@ -4,6 +4,12 @@ import { prisma } from './prisma';
 import { canManageAccounts } from './constants';
 import { disconnectAccount, removeTarget as forgetTarget } from './accounts';
 import { assertRoom } from './plans';
+import { networkOffered, isNetworkKey } from './networks';
+import { hasPlatform } from './plans';
+import { env } from './env';
+import { enabledProductFeatures } from './product-catalog';
+import { subscriberOf } from './plans';
+import { ensureSettings } from './settings';
 
 /**
  * Managing what this workspace is connected to.
@@ -58,6 +64,17 @@ export async function setTargetEnabled(options: {
     where: { id: options.targetId, workspaceId: options.workspaceId },
   });
   if (!target) return { outcome: 'not_found' };
+
+  if (options.enabled) {
+    await ensureSettings();
+    const provider = target.type === 'instagram' ? 'instagram' : target.socialAccountId
+      ? (await prisma.socialAccount.findUnique({ where: { id: target.socialAccountId }, select: { provider: true } }))?.provider
+      : 'facebook';
+    const offered = provider === 'facebook' ||
+      (provider === 'instagram' ? env.instagramEnabled && await hasPlatform(options.workspaceId, 'instagram') :
+        isNetworkKey(provider ?? '') && await networkOffered(options.workspaceId, provider as Parameters<typeof networkOffered>[1]));
+    if (!offered) return { outcome: 'blocked', reason: 'This destination is not available for this workspace.' };
+  }
 
   // Turning a destination back on when Facebook has already refused it would
   // put failing posts back into the queue. Off is always allowed.
@@ -127,6 +144,11 @@ export async function setLinkedAccountEnabled(options: {
 
   const where = { id: options.id, workspaceId: options.workspaceId };
   if (options.enabled) {
+    await ensureSettings();
+    const offered = options.kind === 'instagram'
+      ? env.instagramEnabled && await hasPlatform(options.workspaceId, 'instagram')
+      : env.adsEnabled && enabledProductFeatures([], (await subscriberOf(options.workspaceId))?.plan?.features).includes('ads/performance');
+    if (!offered) return { outcome: 'blocked', reason: 'This source is not available for this workspace.' };
     const source = options.kind === 'instagram'
       ? await prisma.instagramAccount.findFirst({ where, select: { socialAccountId: true } })
       : await prisma.adAccount.findFirst({ where, select: { socialAccountId: true } });

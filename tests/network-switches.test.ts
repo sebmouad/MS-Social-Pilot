@@ -4,15 +4,15 @@ import { networkAvailable } from '@/lib/networks';
 import { SETTING_DEFINITIONS } from '@/lib/settings/definitions';
 
 describe('network switches', () => {
-  it('has one switch per network, on by default', () => {
+  it('has one switch per network, off until Root adds it', () => {
     for (const key of ['bluesky', 'mastodon', 'linkedin', 'threads', 'x', 'pinterest', 'telegram', 'youtube', 'tiktok']) {
       const definition = SETTING_DEFINITIONS.find((item) => item.key === `networks.${key}`);
-      expect(definition?.default).toBe(true);
+      expect(definition?.default).toBe(false);
     }
   });
 
-  it('keeps networks that need no app keys available while switched on', () => {
-    expect(networkAvailable('bluesky')).toBe(true);
-    expect(networkAvailable('mastodon')).toBe(true);
+  it('does not offer networks before Root enables them', () => {
+    expect(networkAvailable('bluesky')).toBe(false);
+    expect(networkAvailable('mastodon')).toBe(false);
   });
 });

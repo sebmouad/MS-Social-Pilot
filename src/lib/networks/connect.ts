@@ -14,7 +14,7 @@ import { MASTODON_SCOPES, mastodonAccount, mastodonToken, normaliseInstance, reg
 import { PINTEREST_SCOPES, pinterestAccount, pinterestBoards, pinterestToken } from './pinterest';
 import { THREADS_SCOPES, threadsProfile, threadsToken } from './threads';
 import { X_SCOPES, xMe, xToken } from './x';
-import { callbackUrl } from './index';
+import { callbackUrl, networkOffered } from './index';
 import type { NetworkKey } from './types';
 
 /**
@@ -312,6 +312,7 @@ export async function connectTelegram(botToken: string, channel: string): Promis
  * rather than deleted, so their history stays.
  */
 export async function saveNetworkAccount(options: { workspaceId: string; key: NetworkKey; connected: Connected }) {
+  if (!(await networkOffered(options.workspaceId, options.key))) throw new Error('This platform is unavailable.');
   const { connected, workspaceId, key } = options;
   const data = {
     name: connected.name,

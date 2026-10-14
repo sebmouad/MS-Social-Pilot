@@ -632,7 +632,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'boolean',
     label: 'TikTok switched on',
     description: 'Off hides TikTok from Connections and stops new TikTok accounts from being connected. Accounts already connected keep their posts.',
-    default: true,
+    default: false,
   },
   {
     key: 'tiktok.clientKey',
@@ -658,7 +658,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'boolean',
     label: 'YouTube switched on',
     description: 'Off hides YouTube from Connections and stops new YouTube channels from being connected. Channels already connected keep their posts.',
-    default: true,
+    default: false,
   },
   {
     key: 'youtube.clientId',
@@ -684,7 +684,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'boolean',
     label: 'Telegram switched on',
     description: 'Off hides Telegram from Connections and stops new Telegram channels from being connected. Channels already connected keep their posts.',
-    default: true,
+    default: false,
   },
   {
     key: 'networks.bluesky',
@@ -692,7 +692,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'boolean',
     label: 'Bluesky switched on',
     description: 'Off hides Bluesky from Connections and stops new Bluesky accounts from being connected. Accounts already connected keep their posts.',
-    default: true,
+    default: false,
   },
   {
     key: 'networks.mastodon',
@@ -700,7 +700,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'boolean',
     label: 'Mastodon switched on',
     description: 'Off hides Mastodon from Connections and stops new Mastodon accounts from being connected. Accounts already connected keep their posts.',
-    default: true,
+    default: false,
   },
   {
     key: 'networks.linkedin',
@@ -708,7 +708,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'boolean',
     label: 'LinkedIn switched on',
     description: 'Off hides LinkedIn from Connections and stops new LinkedIn accounts from being connected. Accounts already connected keep their posts.',
-    default: true,
+    default: false,
   },
   {
     key: 'networks.threads',
@@ -716,7 +716,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'boolean',
     label: 'Threads switched on',
     description: 'Off hides Threads from Connections and stops new Threads accounts from being connected. Accounts already connected keep their posts.',
-    default: true,
+    default: false,
   },
   {
     key: 'networks.x',
@@ -724,7 +724,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'boolean',
     label: 'X switched on',
     description: 'Off hides X from Connections and stops new X accounts from being connected. Accounts already connected keep their posts.',
-    default: true,
+    default: false,
   },
   {
     key: 'networks.pinterest',
@@ -732,7 +732,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'boolean',
     label: 'Pinterest switched on',
     description: 'Off hides Pinterest from Connections and stops new Pinterest accounts from being connected. Accounts already connected keep their posts.',
-    default: true,
+    default: false,
   },
   // Bluesky and Mastodon need nothing here: Bluesky signs in with an app
   // password, and each Mastodon server registers the app on the fly.

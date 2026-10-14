@@ -8,7 +8,7 @@ import { clientInvitationEmail, rootTransferEmail } from './email/templates';
 import { env } from './env';
 import { hashToken, randomToken } from './crypto';
 import { clearSecondFactors } from './two-step';
-import { MODULE_KEYS, type ModuleKey } from './modules';
+import { ACCESS_SWITCH_KEYS, isAccessSwitchKey, type AccessSwitchKey } from './modules';
 import { lockWorkspaceOwners } from './owner-guard';
 
 /**
@@ -428,7 +428,7 @@ export async function workspaceDetail(workspaceId: string) {
     createdAt: row.createdAt.toISOString(),
     suspended: row.suspendedAt !== null,
     developerFeatures: row.developerFeatures,
-    disabledModules: row.disabledModules.filter(isKnownModule),
+    disabledModules: row.disabledModules.filter(isAccessSwitchKey),
     pages: row._count.targets,
     posts: row._count.posts,
     members: row.memberships.map((membership) => ({
@@ -439,14 +439,10 @@ export async function workspaceDetail(workspaceId: string) {
       disabled: membership.user.disabledAt !== null,
       role: membership.role,
       allPages: membership.allPages,
-      disabledModules: membership.disabledModules.filter(isKnownModule),
+      disabledModules: membership.disabledModules.filter(isAccessSwitchKey),
       createdAt: membership.createdAt.toISOString(),
     })),
   };
-}
-
-function isKnownModule(value: string): value is ModuleKey {
-  return (MODULE_KEYS as string[]).includes(value);
 }
 
 async function findWorkspace(workspaceId: string) {
@@ -462,9 +458,9 @@ export async function setWorkspaceSuspended(actorId: string, workspaceId: string
   await logRootActivity(actorId, suspended ? 'workspace.suspended' : 'workspace.resumed', { workspace: workspace.name });
 }
 
-export async function setWorkspaceModules(actorId: string, workspaceId: string, disabled: ModuleKey[]): Promise<void> {
+export async function setWorkspaceModules(actorId: string, workspaceId: string, disabled: AccessSwitchKey[]): Promise<void> {
   const workspace = await findWorkspace(workspaceId);
-  const off = MODULE_KEYS.filter((key) => disabled.includes(key));
+  const off = ACCESS_SWITCH_KEYS.filter((key) => disabled.includes(key));
   await prisma.workspace.update({ where: { id: workspaceId }, data: { disabledModules: off } });
   await logRootActivity(actorId, 'workspace.modulesChanged', { workspace: workspace.name, off: off.join(', ') || '—' });
 }
@@ -526,9 +522,9 @@ export async function changeMemberRole(actorId: string, membershipId: string, ro
   });
 }
 
-export async function setMemberModules(actorId: string, membershipId: string, disabled: ModuleKey[]): Promise<void> {
+export async function setMemberModules(actorId: string, membershipId: string, disabled: AccessSwitchKey[]): Promise<void> {
   const membership = await findMembership(membershipId);
-  const off = MODULE_KEYS.filter((key) => disabled.includes(key));
+  const off = ACCESS_SWITCH_KEYS.filter((key) => disabled.includes(key));
   await prisma.membership.update({ where: { id: membershipId }, data: { disabledModules: off } });
   await logRootActivity(actorId, 'member.modulesChanged', {
     email: membership.user.email,

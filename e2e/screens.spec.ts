@@ -175,14 +175,16 @@ test('the icon rail lists the areas, the sidebar the pages of the one in use', a
   await expect(sidebar).toBeVisible();
 });
 
-test('Connections offers chips that jump to each part of the page', async ({ page }) => {
+test('Connections offers chips only for visible sections', async ({ page }) => {
   test.setTimeout(120_000);
   await open(page, '/connections');
   const chips = page.getByRole('navigation', { name: /jump to/i });
-  await expect(chips.getByRole('link', { name: /other networks/i })).toBeVisible();
-  await expect(async () => {
-    await chips.getByRole('link', { name: /other networks/i }).click();
-    await expect(page).toHaveURL(/#networks$/, { timeout: 1_500 });
-  }).toPass();
-  await expect(page.locator('#networks')).toBeInViewport();
+  const platforms = chips.getByRole('link', { name: /platforms/i });
+  if (await platforms.count()) {
+    await platforms.click();
+    await expect(page).toHaveURL(/#networks$/);
+    await expect(page.locator('#networks')).toBeInViewport();
+  } else {
+    await expect(page.locator('#networks')).toHaveCount(0);
+  }
 });

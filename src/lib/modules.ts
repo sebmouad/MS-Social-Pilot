@@ -1,4 +1,5 @@
 import type { IconName } from '@/components/Icon';
+import { PRODUCT_FEATURE_KEYS } from './product-catalog';
 
 /**
  * The three things this app is for, and which screens belong to each.
@@ -95,6 +96,12 @@ export const METHOD_HEADER = 'x-msp-method';
 
 
 export const MODULE_KEYS: ModuleKey[] = MODULES.map((module) => module.key);
+export const ACCESS_SWITCH_KEYS = [...MODULE_KEYS, ...PRODUCT_FEATURE_KEYS] as const;
+export type AccessSwitchKey = (typeof ACCESS_SWITCH_KEYS)[number];
+
+export function isAccessSwitchKey(value: string): value is AccessSwitchKey {
+  return (ACCESS_SWITCH_KEYS as readonly string[]).includes(value);
+}
 
 export function isModuleKey(value: string): value is ModuleKey {
   return (MODULE_KEYS as string[]).includes(value);

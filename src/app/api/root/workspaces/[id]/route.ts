@@ -2,14 +2,14 @@ import { z } from 'zod';
 
 import { requireRootApi } from '@/lib/auth';
 import { ok, readJson, route } from '@/lib/api';
-import { MODULE_KEYS, type ModuleKey } from '@/lib/modules';
+import { ACCESS_SWITCH_KEYS, type AccessSwitchKey } from '@/lib/modules';
 import { deleteWorkspaceAsRoot, renameWorkspace, setWorkspaceDeveloperFeatures, setWorkspaceModules, setWorkspaceSuspended } from '@/lib/root';
 
 const schema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
   suspended: z.boolean().optional(),
   developerFeatures: z.boolean().optional(),
-  disabledModules: z.array(z.enum(MODULE_KEYS as [ModuleKey, ...ModuleKey[]])).optional(),
+  disabledModules: z.array(z.enum(ACCESS_SWITCH_KEYS as unknown as [AccessSwitchKey, ...AccessSwitchKey[]])).optional(),
 });
 
 /** Rename, suspend or resume a workspace, or switch its modules. Root only (404 for everyone else). */

@@ -3,12 +3,12 @@ import { z } from 'zod';
 
 import { requireRootApi } from '@/lib/auth';
 import { ok, readJson, route } from '@/lib/api';
-import { MODULE_KEYS, type ModuleKey } from '@/lib/modules';
+import { ACCESS_SWITCH_KEYS, type AccessSwitchKey } from '@/lib/modules';
 import { changeMemberRole, removeMemberAsRoot, setMemberModules } from '@/lib/root';
 
 const schema = z.object({
   role: z.nativeEnum(WorkspaceRole).optional(),
-  disabledModules: z.array(z.enum(MODULE_KEYS as [ModuleKey, ...ModuleKey[]])).optional(),
+  disabledModules: z.array(z.enum(ACCESS_SWITCH_KEYS as unknown as [AccessSwitchKey, ...AccessSwitchKey[]])).optional(),
 });
 
 /** Change a member's role or switch modules off for them. Root only (404 for everyone else). */

@@ -22,6 +22,7 @@ beforeAll(async () => {
   connect = await import('../src/lib/networks/connect');
   posts = await import('../src/lib/posts');
   runner = await import('../src/lib/scheduler/runner');
+  await (await import('../src/lib/settings')).writeSetting('networks.bluesky', true, null);
 }, 120_000);
 
 afterAll(async () => {
@@ -42,7 +43,7 @@ beforeEach(async () => {
 });
 
 async function seed() {
-  const owner = await prisma.user.create({ data: { email: 'o@example.test', name: 'Owner', passwordHash: 'x' } });
+  const owner = await prisma.user.create({ data: { email: 'o@example.test', name: 'Owner', passwordHash: 'x', isInstanceOwner: true } });
   const workspace = await prisma.workspace.create({
     data: { name: 'Agency', slug: 'agency', timezone: 'UTC', memberships: { create: [{ userId: owner.id, role: WorkspaceRole.owner }] } },
   });

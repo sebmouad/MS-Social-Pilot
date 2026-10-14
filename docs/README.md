@@ -47,9 +47,12 @@ bar for utilities only.
   privileges, sessions), health (status, worker, errors, alerts, backups) and
   history (activity, changelog), plus a danger zone.
 
-Root can switch the analytics, ads and schedule modules off per workspace or
-per member, and turns developer features (API keys, MCP, webhooks) on per
-workspace.
+Root can switch analytics, ads and publishing areas, plus individual
+`publishing/*`, `analytics/*`, `ads/*` and `settings/*` features, off per
+workspace or member. Plans select the same features and additional platforms;
+Facebook remains the initial platform. Root separately turns developer
+features (API keys, MCP, webhooks) on per workspace. See
+[MODULAR_PRODUCT.md](MODULAR_PRODUCT.md) for the migration contract.
 
 ## Stack
 

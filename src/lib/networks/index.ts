@@ -3,7 +3,8 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../prisma';
 import { decryptSecret, encryptSecret } from '../crypto';
 import { env } from '../env';
-import { settingBoolean } from '../settings';
+import { ensureSettings, settingBoolean } from '../settings';
+import { hasPlatform } from '../plans';
 import { readStoredFile } from '../media';
 import type { PostMedia } from '../json';
 import { bluesky } from './bluesky';
@@ -52,6 +53,12 @@ export function networkAvailable(key: NetworkKey): boolean {
     case 'tiktok':
       return Boolean(env.tiktokClientKey && env.tiktokClientSecret);
   }
+}
+
+/** A connection can be offered only when Root configured it and the plan includes it. */
+export async function networkOffered(workspaceId: string, key: NetworkKey): Promise<boolean> {
+  await ensureSettings();
+  return networkAvailable(key) && (await hasPlatform(workspaceId, key));
 }
 
 export function callbackUrl(key: NetworkKey): string {

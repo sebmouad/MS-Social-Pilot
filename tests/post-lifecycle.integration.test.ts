@@ -65,6 +65,7 @@ beforeAll(async () => {
   posts = await import('../src/lib/posts');
   approvals = await import('../src/lib/approvals');
   runner = await import('../src/lib/scheduler/runner');
+  await (await import('../src/lib/settings')).writeSetting('features.instagram', true, null);
 }, 120_000);
 
 afterAll(async () => {
@@ -596,6 +597,7 @@ describe('withdrawing a post from review', () => {
 
 describe('Instagram without media', () => {
   async function instagram(s: Seed) {
+    await prisma.user.update({ where: { id: s.owner.id }, data: { isInstanceOwner: true } });
     const { encryptSecret } = await import('../src/lib/crypto');
     return prisma.target.create({
       data: {

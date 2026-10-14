@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireCapability } from '@/lib/auth';
 import { canManageAccounts } from '@/lib/constants';
 import { AppError, errors } from '@/lib/errors';
-import { networkAvailable } from '@/lib/networks';
+import { networkOffered } from '@/lib/networks';
 import { ok, readJson, route } from '@/lib/api';
 import { logActivity } from '@/lib/scheduler/runner';
 import { connectBluesky, saveNetworkAccount } from '@/lib/networks/connect';
@@ -21,7 +21,7 @@ const schema = z.object({
 /** Connect a Bluesky account with an app password made in Bluesky's settings. */
 export const POST = route(async (request: Request) => {
   const auth = await requireCapability(canManageAccounts);
-  if (!networkAvailable('bluesky')) throw errors.notFound();
+  if (!(await networkOffered(auth.workspace.id, 'bluesky'))) throw errors.notFound();
   const input = schema.parse(await readJson(request));
   try {
     const connected = await connectBluesky(input.identifier, input.appPassword);

@@ -8,6 +8,7 @@ import { Icon } from '@/components/Icon';
 import { OtherNetworks } from '@/components/OtherNetworks';
 import { SidebarDock } from '@/components/SidebarDock';
 import { NETWORK_KEYS, NETWORK_LABELS, isNetworkKey, networkAvailable, type NetworkKey } from '@/lib/networks';
+import { includedPlatforms } from '@/lib/plans';
 import { requirePage } from '@/lib/auth';
 import { screenMetadata } from '@/lib/metadata';
 import { canManageAccounts } from '@/lib/constants';
@@ -86,6 +87,13 @@ export default async function ConnectionsPage({
   const canManage = canManageAccounts(auth.role);
   const accounts = allAccounts.filter((account) => account.provider === 'facebook');
   const networkAccounts = allAccounts.filter((account) => isNetworkKey(account.provider));
+  const included = await includedPlatforms(auth.workspace.id);
+  const offeredNetworks = NETWORK_KEYS.map((key) => ({
+    key,
+    label: NETWORK_LABELS[key],
+    available: included.has(key) && networkAvailable(key),
+  }));
+  const visibleNetworks = offeredNetworks.filter((entry) => entry.available || networkAccounts.some((account) => account.provider === entry.key));
   const networkNotice = first(params.network);
 
   return (
@@ -133,11 +141,11 @@ export default async function ConnectionsPage({
           ...(accounts.length > 0
             ? [
                 { href: '#facebook', label: t('jump_facebook') },
-                { href: '#instagram', label: t('jump_instagram') },
-                { href: '#ads', label: t('jump_ads') },
+                ...(env.instagramEnabled && included.has('instagram') || instagram.length > 0 ? [{ href: '#instagram', label: t('jump_instagram') }] : []),
+                ...(env.adsEnabled && auth.features.includes('ads/performance') || ads.length > 0 ? [{ href: '#ads', label: t('jump_ads') }] : []),
               ]
             : []),
-          { href: '#networks', label: t('jump_networks') },
+          ...(visibleNetworks.length > 0 ? [{ href: '#networks', label: t('jump_networks') }] : []),
         ].map((chip) => (
           <a
             key={chip.href}
@@ -167,8 +175,8 @@ export default async function ConnectionsPage({
         <>
         <ConnectionsClient
           canManage={canManage}
-          instagramEnabled={env.instagramEnabled}
-          adsEnabled={env.adsEnabled}
+          instagramEnabled={env.instagramEnabled && included.has('instagram')}
+          adsEnabled={env.adsEnabled && auth.features.includes('ads/performance')}
           orphans={orphans.map(targetView)}
           connections={accounts.map((account) => ({
             id: account.id,
@@ -206,17 +214,16 @@ export default async function ConnectionsPage({
         </>
       )}
 
-      <div id="networks" className="scroll-mt-20">
+      {visibleNetworks.length > 0 && <div id="networks" className="scroll-mt-20">
       <OtherNetworks
         canManage={canManage}
-        isOwner={auth.role === 'owner'}
         initialDialog={first(params.connect)}
         notice={
           networkNotice && isNetworkKey(networkNotice)
             ? { network: networkNotice, error: first(params.error) ?? null, connected: first(params.connected) ?? null }
             : null
         }
-        networks={NETWORK_KEYS.map((key) => ({ key, label: NETWORK_LABELS[key], available: networkAvailable(key) }))}
+        networks={visibleNetworks}
         accounts={networkAccounts.map((account) => ({
           id: account.id,
           network: account.provider as NetworkKey,
@@ -227,7 +234,7 @@ export default async function ConnectionsPage({
           targets: account.targets.map((target) => ({ id: target.id, name: target.name, category: target.category, enabled: target.enabled })),
         }))}
       />
-      </div>
+      </div>}
 
 
     </div>

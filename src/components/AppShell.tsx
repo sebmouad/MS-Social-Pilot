@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl';
 import { Icon, type IconName } from './Icon';
 import { SIDEBAR_DOCK_ID } from './SidebarDock';
 import { isPageActive, moduleOfPath, MODULE_KEYS, type ModuleKey } from '@/lib/modules';
+import { productFeatureOfPath, type ProductFeature } from '@/lib/product-catalog';
 import { mayOpenScreen } from '@/lib/role-access';
 
 export interface WorkspaceOption {
@@ -37,6 +38,7 @@ interface Props {
   rootVisit?: boolean;
   /** The modules this member may use; links to the others are not shown. */
   modules?: ModuleKey[];
+  features?: ProductFeature[];
   /** The member's role, and what this workspace opens to its clients: a viewer or client sees a shorter list. */
   role?: string;
   clientAccess?: string[];
@@ -102,6 +104,7 @@ export function AppShell({
   canWrite = true,
   rootVisit = false,
   modules = MODULE_KEYS,
+  features,
   role = 'owner',
   clientAccess = [],
   brand = { name: 'MS Social Pilot', logoUrl: null },
@@ -229,9 +232,10 @@ export function AppShell({
 
   const usable = (href: string) => {
     const module = moduleOfPath(href);
-    return (module === null || modules.includes(module)) && mayOpenScreen(role, clientAccess, href);
+    const feature = productFeatureOfPath(href);
+    return (module === null || modules.includes(module)) && (!features || feature === null || features.includes(feature)) && mayOpenScreen(role, clientAccess, href);
   };
-  const canCompose = canWrite && modules.includes('schedule');
+  const canCompose = canWrite && modules.includes('schedule') && (!features || features.includes('publishing/posts'));
 
   // The main areas, each on the icon rail, each with its own pages in the
   // sidebar beside it — as Simplified lays it out.

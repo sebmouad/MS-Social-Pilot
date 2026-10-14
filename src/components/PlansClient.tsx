@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { PLAN_FEATURES } from '@/lib/product-catalog';
 
-const FEATURES = ['clients', 'whiteLabel', 'api'] as const;
+const FEATURES = PLAN_FEATURES.filter((feature) => feature !== 'product_v2');
 const LIMITS = ['channels', 'members', 'workspaces', 'postsPerMonth', 'aiCredits'] as const;
 const PRICES = ['priceMonthly', 'priceYearly', 'extraChannelPrice'] as const;
 
@@ -66,7 +67,7 @@ export function PlansClient({ plans, subscribers }: { plans: PlanRow[]; subscrib
       currency: String(form.get('currency') ?? plan.currency),
       ...Object.fromEntries(PRICES.map((key) => [key, Math.round(Number(form.get(key) ?? 0) * 100)])),
       ...Object.fromEntries(LIMITS.map((key) => [key, number(key)])),
-      features: FEATURES.filter((feature) => form.get(`feature_${feature}`) === 'on'),
+      features: ['product_v2', ...FEATURES.filter((feature) => form.get(`feature_${feature}`) === 'on')],
       isDefault: form.get('isDefault') === 'on',
     });
   }
@@ -114,8 +115,8 @@ export function PlansClient({ plans, subscribers }: { plans: PlanRow[]; subscrib
               <legend className="text-xs font-semibold text-slate-700">{t('features')}</legend>
               {FEATURES.map((feature) => (
                 <label key={feature} className="flex items-center gap-2 text-sm text-slate-700">
-                  <input type="checkbox" name={`feature_${feature}`} defaultChecked={plan.features.includes(feature)} className="h-4 w-4 rounded border-slate-300" />
-                  {t(`feature_${feature}`)}
+                  <input type="checkbox" name={`feature_${feature}`} defaultChecked={feature.includes('/') ? !plan.features.includes('product_v2') || plan.features.includes(feature) : plan.features.includes(feature)} className="h-4 w-4 rounded border-slate-300" />
+                  {t(`feature_${feature.replace('/', '_')}`)}
                 </label>
               ))}
               <label className="flex items-center gap-2 text-sm text-slate-700">

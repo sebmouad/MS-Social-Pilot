@@ -14,7 +14,9 @@ import { publishToInstagram } from '../facebook/instagram-publish';
 import { decideRetry } from './backoff';
 import { notifyConnectionExpired, notifyPublishFailure } from '../email/notify';
 import { prepareLinks } from '../links';
-import { isNetworkKey, publishToNetwork } from '../networks';
+import { isNetworkKey, networkOffered, publishToNetwork } from '../networks';
+import { hasPlatform } from '../plans';
+import { ensureSettings } from '../settings';
 import { postFirstComment } from '../first-comment';
 import type { PostFormat } from '../facebook/publish';
 import {
@@ -332,6 +334,22 @@ async function publishClaimed(
 
   const attempts = row.attempts + 1;
   const { post, target } = row;
+  await ensureSettings();
+
+  // A plan or Root switch may change after a post was scheduled. Hold that
+  // destination until it becomes available again, without spending an attempt.
+  const offered = target.type === 'instagram'
+    ? env.instagramEnabled && await hasPlatform(post.workspaceId, 'instagram')
+    : isNetworkKey(target.type) ? await networkOffered(post.workspaceId, target.type) : true;
+  if (!offered) {
+    await writeIfStillOurs(postTargetId, options.workerId, {
+      status: 'pending', lockedAt: null, lockedBy: null,
+      nextAttemptAt: new Date(options.now.getTime() + 5 * 60_000),
+      errorCode: 'platform_unavailable',
+      errorMessage: 'The destination is currently unavailable for this workspace. Publishing will resume when it is available.',
+    });
+    return 'retrying';
+  }
 
   try {
     // Pages publish with their own page token; Groups fall back to the

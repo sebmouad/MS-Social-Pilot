@@ -53,6 +53,14 @@ without the owner's review.
   their screens 404 and their API routes answer 403 (the path comes from
   `src/middleware.ts`, matched by `moduleOfPath()`). Shared screens (dashboard,
   channels, settings) belong to no module.
+- **Product features** (`src/lib/product-catalog.ts`): Root may also disable
+  individual `publishing/*`, `analytics/*`, `ads/*` and `settings/*` features
+  for a workspace or member. The same feature registry filters navigation and
+  guards direct page/API access; disabling a parent hides dependent features.
+  Plans saved with `product_v2` select features explicitly. Older plans keep
+  existing feature access until Root edits the plan. Additional platforms
+  require both a plan entitlement and Root availability; Facebook remains
+  available by default. These switches do not delete existing data.
 - **Developer features** (API keys, MCP, the Claude web connector, outgoing
   webhooks and their log): off for every workspace by default
   (`Workspace.developerFeatures`); root switches them on per workspace. When on,

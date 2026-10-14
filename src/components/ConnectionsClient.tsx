@@ -298,6 +298,7 @@ export function ConnectionsClient({
       {/* Only orphans left: nothing reaches Instagram or ads any more. */}
       {connections.length > 0 && (
         <>
+      {(instagramEnabled || instagram.length > 0) && (
       <LinkedAccounts
         kind="instagram"
         anchor="instagram"
@@ -306,7 +307,6 @@ export function ConnectionsClient({
         icon="instagram"
         accounts={instagram}
         enabled={instagramEnabled}
-        disabledNote={t('featureOff')}
         discoverPath="/api/instagram"
         togglePath="/api/connections/instagram"
         canManage={canManage}
@@ -314,7 +314,9 @@ export function ConnectionsClient({
         call={call}
         onRemove={(account) => { setDeleteLinkedData(false); setDisconnectingLinked({ kind: 'instagram', ...account }); }}
       />
+      )}
 
+      {(adsEnabled || ads.length > 0) && (
       <LinkedAccounts
         kind="ads"
         anchor="ads"
@@ -323,7 +325,6 @@ export function ConnectionsClient({
         icon="megaphone"
         accounts={ads}
         enabled={adsEnabled}
-        disabledNote={t('featureOff')}
         discoverPath="/api/ads"
         togglePath="/api/connections/ads"
         canManage={canManage}
@@ -331,6 +332,7 @@ export function ConnectionsClient({
         call={call}
         onRemove={(account) => { setDeleteLinkedData(false); setDisconnectingLinked({ kind: 'ads', ...account }); }}
       />
+      )}
         </>
       )}
       <Dialog open={disconnecting !== null} title={disconnecting ? t('disconnectConfirm', { name: disconnecting.name }) : t('disconnect')}
@@ -497,7 +499,6 @@ function LinkedAccounts({
   icon,
   accounts,
   enabled,
-  disabledNote,
   discoverPath,
   togglePath,
   canManage,
@@ -513,7 +514,6 @@ function LinkedAccounts({
   icon: IconName;
   accounts: LinkedAccountView[];
   enabled: boolean;
-  disabledNote: string;
   discoverPath: string;
   togglePath: string;
   canManage: boolean;
@@ -545,11 +545,7 @@ function LinkedAccounts({
         )}
       </div>
 
-      {!enabled ? (
-        <p className="mt-3 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-          <Icon name="warning" size={15} /> {disabledNote}
-        </p>
-      ) : accounts.length === 0 ? (
+      {accounts.length === 0 ? (
         <p className="mt-3 text-sm text-slate-500">{t('noneFound')}</p>
       ) : (
         <div className="scroll-x mt-3"><table className="data-table w-full min-w-[520px] text-sm">

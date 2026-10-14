@@ -8,6 +8,7 @@ import { useFormatter, useTranslations } from 'next-intl';
 import { requestJson } from '@/lib/client-request';
 import { useConfirm } from './ConfirmProvider';
 import { Icon } from './Icon';
+import { PRODUCT_FEATURES } from '@/lib/product-catalog';
 
 /** One call to a root API route; the error text comes from the server, already translated. */
 async function call(url: string, method: string, body?: unknown): Promise<string | null> {
@@ -630,7 +631,9 @@ function ModuleSwitches({
   onChange: (off: string[]) => void;
 }) {
   const tNav = useTranslations('nav.module');
+  const tPlan = useTranslations('root.plans');
   return (
+    <div className="space-y-2">
     <div className="flex flex-wrap gap-x-4 gap-y-1">
       {moduleKeys.map((key) => {
         const isLocked = locked.includes(key);
@@ -650,6 +653,27 @@ function ModuleSwitches({
           </label>
         );
       })}
+    </div>
+    <details className="rounded-lg border border-slate-200 p-3">
+      <summary className="cursor-pointer text-sm font-medium text-slate-700">{tPlan('features')}</summary>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {PRODUCT_FEATURES.map((feature) => {
+          const parentOff = feature.module !== null && (off.includes(feature.module) || locked.includes(feature.module));
+          const isLocked = locked.includes(feature.key) || parentOff;
+          return <label key={feature.key} className={`flex items-start gap-2 text-sm ${isLocked ? 'text-slate-400' : 'text-slate-700'}`}>
+            <input
+              id={`${id}-${feature.key.replace('/', '-')}`}
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600"
+              checked={!isLocked && !off.includes(feature.key)}
+              disabled={disabled || isLocked}
+              onChange={(event) => onChange(event.target.checked ? off.filter((entry) => entry !== feature.key) : [...off, feature.key])}
+            />
+            <span>{tPlan(`feature_${feature.key.replace('/', '_')}`)}</span>
+          </label>;
+        })}
+      </div>
+    </details>
     </div>
   );
 }

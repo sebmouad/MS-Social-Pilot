@@ -6,7 +6,7 @@ import { canManageAccounts } from '@/lib/constants';
 import { env } from '@/lib/env';
 import { route } from '@/lib/api';
 import { logActivity } from '@/lib/scheduler/runner';
-import { isNetworkKey } from '@/lib/networks';
+import { isNetworkKey, networkOffered } from '@/lib/networks';
 import { finishNetworkAuth, oauthCookie, openPendingAuth, saveNetworkAccount } from '@/lib/networks/connect';
 
 /** Back from the network's sign-in: keep the account, then return to Connections saying how it went. */
@@ -26,7 +26,7 @@ export const GET = route(async (request: Request, context: { params: Promise<{ n
   if (denied) return back({ error: denied.slice(0, 200) });
   const code = url.searchParams.get('code');
   // The state has to match the one this browser was sent with, and for this person and workspace.
-  if (!pending || !code || pending.userId !== auth.user.id || pending.workspaceId !== auth.workspace.id || !canManageAccounts(auth.role)) {
+  if (!pending || !code || pending.userId !== auth.user.id || pending.workspaceId !== auth.workspace.id || !canManageAccounts(auth.role) || !(await networkOffered(auth.workspace.id, network))) {
     return back({ error: 'The sign-in could not be verified. Please try again.' });
   }
 

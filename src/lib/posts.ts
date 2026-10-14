@@ -243,13 +243,23 @@ export async function allocateQueueSlot(
 }
 
 /** Load the workspace's targets, rejecting ids that do not belong to it. */
-async function loadTargets(workspaceId: string, targetIds: string[]) {
+async function loadTargets(workspaceId: string, targetIds: string[], checkAvailability = true) {
   const targets = await prisma.target.findMany({
     where: { id: { in: targetIds }, workspaceId },
     include: { socialAccount: true },
   });
 
   if (targets.length !== targetIds.length) throw errors.targetsUnavailable();
+
+  const { networkOffered, isNetworkKey } = await import('./networks');
+  const { hasPlatform } = await import('./plans');
+  const { ensureSettings } = await import('./settings');
+  await ensureSettings();
+  for (const target of checkAvailability ? targets : []) {
+    const provider = target.type === 'instagram' ? 'instagram' : (target.socialAccount?.provider ?? 'facebook');
+    if (provider === 'instagram' && !(env.instagramEnabled && await hasPlatform(workspaceId, 'instagram'))) throw errors.targetsUnavailable();
+    if (isNetworkKey(provider) && !(await networkOffered(workspaceId, provider))) throw errors.targetsUnavailable();
+  }
 
   const disabled = targets.filter((target) => !target.enabled);
   if (disabled.length > 0) {
@@ -296,7 +306,7 @@ export async function createPost(
   now: Date = new Date(),
 ): Promise<CreatePostResult> {
   await assertMonthlyRoom(context.workspaceId, 'postsPerMonth', now);
-  const targets = await loadTargets(context.workspaceId, input.targetIds);
+  const targets = await loadTargets(context.workspaceId, input.targetIds, !input.saveAsDraft);
   const labelIds = await ownLabels(context.workspaceId, input.labelIds ?? []);
   if (
     input.textBackground &&

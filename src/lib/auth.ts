@@ -21,7 +21,8 @@ import {
   PATHNAME_HEADER,
   type ModuleKey,
 } from './modules';
-import { assertWorkspaceRoom, defaultPlanId } from './plans';
+import { assertWorkspaceRoom, defaultPlanId, subscriberOf } from './plans';
+import { enabledProductFeatures, productFeatureOfPath, type ProductFeature } from './product-catalog';
 import { homeFor, mayOpenScreen, mayWrite } from './role-access';
 import { DEFAULT_THEME, isTheme, type Theme } from './themes';
 import { noteSignIn, requestDevice, touchSession } from './sessions';
@@ -88,6 +89,8 @@ export interface AuthContext {
   role: WorkspaceRole;
   /** The modules this member may use here (root's switches, `src/lib/modules.ts`). */
   modules: ModuleKey[];
+  /** Included subfeatures after Root, member and plan switches. */
+  features: ProductFeature[];
   /**
    * Root is looking after this workspace without being a member: they act as
    * its owner, every visit is logged, and a banner says so.
@@ -563,6 +566,8 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
         .map((id) => user.memberships.find((entry) => entry.workspaceId === id))
         .find((entry) => entry !== undefined) ?? user.memberships[0]!);
 
+  const subscriber = await subscriberOf(membership.workspace.id);
+
   return {
     user: {
       id: user.id,
@@ -587,6 +592,10 @@ export const getAuthContext = cache(async (requestedWorkspaceId?: string): Promi
     },
     role: membership.role,
     modules: enabledModules(membership.workspace.disabledModules, membership.disabledModules),
+    features: enabledProductFeatures(
+      [...membership.workspace.disabledModules, ...membership.disabledModules],
+      subscriber?.plan?.features,
+    ),
     rootVisit: visited !== null,
     isInstanceOwner: user.isInstanceOwner,
     pageScope: scopeOf(membership),
@@ -651,6 +660,8 @@ export async function accessRefusal(context: AuthContext): Promise<'suspended' |
   const pathname = (await headers()).get(PATHNAME_HEADER);
   const module = pathname ? moduleOfPath(pathname) : null;
   if (module && !context.modules.includes(module)) return 'module';
+  const feature = pathname ? productFeatureOfPath(pathname) : null;
+  if (feature && !context.features.includes(feature)) return 'module';
   if (pathname && isDeveloperPath(pathname) && !mayUseDeveloperFeatures(context)) return 'module';
   if (pathname && !pathname.startsWith('/api/') && !mayOpenScreen(context.role, context.workspace.clientAccess, pathname)) return 'module';
   return null;

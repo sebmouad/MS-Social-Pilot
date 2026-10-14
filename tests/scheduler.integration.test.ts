@@ -801,6 +801,9 @@ describe('fairness between workspaces', () => {
  * the container two-step, and a URL instead of an upload — happens.
  */
 describe('publishing to Instagram', () => {
+  beforeAll(async () => {
+    await (await import('../src/lib/settings')).writeSetting('features.instagram', true, null);
+  });
   async function seedInstagramPost(options: { media?: unknown[] } = {}) {
     const { encryptSecret } = await import('../src/lib/crypto');
     const suffix = randomBytes(4).toString('hex');
@@ -813,6 +816,7 @@ describe('publishing to Instagram', () => {
         email: `ig-${suffix}@example.com`,
         name: 'Owner',
         passwordHash: 'x',
+        isInstanceOwner: true,
         memberships: { create: { workspaceId: workspace.id, role: 'owner' } },
       },
     });

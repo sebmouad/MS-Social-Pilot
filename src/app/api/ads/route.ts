@@ -60,6 +60,7 @@ export const POST = route(async (request: Request) => {
   }
 
   if (input.action === 'discover') {
+    if (!auth.features.includes('ads/performance')) throw errors.moduleOff();
     return ok(await discoverAdAccounts(auth.workspace.id));
   }
 

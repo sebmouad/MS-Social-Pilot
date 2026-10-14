@@ -41,6 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         canWrite={canCompose(auth.role)}
         rootVisit={auth.rootVisit}
         modules={refusal === 'suspended' ? [] : auth.modules}
+        features={refusal === 'suspended' ? [] : auth.features}
         role={auth.role}
         clientAccess={auth.workspace.clientAccess}
         brand={brand()}

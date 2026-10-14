@@ -12,6 +12,8 @@ import {
   syncInstagramAccount,
 } from '@/lib/instagram';
 import { errors } from '@/lib/errors';
+import { env } from '@/lib/env';
+import { hasPlatform } from '@/lib/plans';
 
 /** Accounts, and optionally one account's stored insights and media. */
 export const GET = route(async (request: Request) => {
@@ -65,6 +67,7 @@ export const POST = route(async (request: Request) => {
   }
 
   if (input.action === 'discover') {
+    if (!env.instagramEnabled || !(await hasPlatform(auth.workspace.id, 'instagram'))) throw errors.notFound();
     return ok(await discoverInstagramAccounts(auth.workspace.id));
   }
 
