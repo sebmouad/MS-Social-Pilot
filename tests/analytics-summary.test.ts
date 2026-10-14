@@ -4,8 +4,10 @@ import {
   channelChanges,
   combinedFindings,
   summaryFigures,
+  sumCompleteSeries,
   sumSeries,
   weekly,
+  weeklyComplete,
   type SummaryChannel,
 } from '../src/lib/analytics-summary';
 
@@ -69,6 +71,17 @@ describe('summaryFigures', () => {
   it('withholds a combined follower comparison when any selected snapshot is missing', () => {
     const rows = [channel({ name: 'Client A' }), channel({ name: 'Client B', previous: { followers: null, posts: 2, interactions: 100, reach: 800, netFollows: 5 } })];
     expect(figure(rows, 'followers')).toMatchObject({ current: 2000, previous: null, change: null });
+  });
+});
+
+describe('daily aggregation coverage', () => {
+  it('requires every selected channel before adding reach for a day', () => {
+    expect(sumCompleteSeries([[10, null, 0], [5, 7, 0]])).toEqual([15, null, 0]);
+    expect(sumCompleteSeries([])).toEqual([]);
+  });
+
+  it('does not turn a missing daily reach reading into a weekly zero', () => {
+    expect(weeklyComplete([1, 2, null, 4, 5, 6, 7, 8, 9])).toEqual([null, 17]);
   });
 });
 

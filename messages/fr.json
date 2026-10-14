@@ -4702,7 +4702,7 @@
         "day": "Par jour",
         "week": "Par semaine"
       },
-      "reachNote": "Jour par jour, les personnes touchées sont la somme sur les publications du jour."
+      "reachNote": "La couverture quotidienne vient des statistiques des Pages. Une interruption signifie qu’au moins une Page sélectionnée n’a pas de mesure ; le cumul entre Pages est une borne supérieure."
     },
     "bestPosts": "Meilleures publications",
     "allPosts": "Toutes les publications",

@@ -5,12 +5,12 @@ import { useLocale, useTranslations } from 'next-intl';
 
 import { ChartFrame } from '@/components/charts/ChartFrame';
 import { TimeSeries } from '@/components/charts/TimeSeries';
-import { weekly } from '@/lib/analytics-summary';
+import { weeklyComplete } from '@/lib/analytics-summary';
 
 const FIGURES = ['reach', 'interactions', 'posts'] as const;
 type Figure = (typeof FIGURES)[number];
 
-export type TrendSeries = Record<Figure, number[]>;
+export type TrendSeries = Record<Figure, Array<number | null>>;
 
 /**
  * One figure for the selection, day by day or week by week, with the
@@ -42,18 +42,18 @@ export function SummaryTrend({
   );
 
   const xs = step === 'day' ? days : days.filter((_, index) => index % 7 === 0);
-  const now = step === 'day' ? current[figure] : weekly(current[figure]);
-  const before = (step === 'day' ? previous[figure] : weekly(previous[figure])).slice(0, xs.length);
+  const now = step === 'day' ? current[figure] : weeklyComplete(current[figure]);
+  const before = (step === 'day' ? previous[figure] : weeklyComplete(previous[figure])).slice(0, xs.length);
 
   if (days.length < 2) return null;
 
   const lines = [
-    { label: t('trend.thisPeriod'), colorIndex: 0, points: xs.map((day, index) => ({ x: `${day}T12:00:00Z`, y: now[index] ?? 0 })) },
+    { label: t('trend.thisPeriod'), colorIndex: 0, points: xs.map((day, index) => ({ x: `${day}T12:00:00Z`, y: now[index] ?? null })) },
     {
       label: previousLabel,
       colorIndex: 1,
       dashed: true,
-      points: before.map((value, index) => ({ x: `${xs[index]}T12:00:00Z`, y: value })),
+      points: xs.map((day, index) => ({ x: `${day}T12:00:00Z`, y: before[index] ?? null })),
     },
   ];
 
@@ -90,7 +90,7 @@ export function SummaryTrend({
       ]}
       table={{
         head: [t(step === 'day' ? 'trend.day' : 'trend.week'), t('trend.thisPeriod'), previousLabel],
-        rows: xs.map((day, index) => [dayFormat.format(new Date(`${day}T12:00:00Z`)), now[index] ?? 0, before[index] ?? '—']),
+        rows: xs.map((day, index) => [dayFormat.format(new Date(`${day}T12:00:00Z`)), now[index] ?? '—', before[index] ?? '—']),
       }}
     >
       <div className="mb-3 flex flex-wrap items-center gap-2">

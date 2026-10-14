@@ -31,9 +31,6 @@ build, unit and browser tests, deploy, check live with real data.
 
 ## Known gaps
 
-- **Summary trend chart** is built from the selection's posts (`dailySeries` in `src/lib/page-analysis.ts`: results by publish
-  day), not from Page-level daily insights, so days without
-  posts show nothing even when the Page had views.
 - **E2E test data** has no channels with stored insights on the analytics
   screens, so the browser walk checks the Summary, Posts, Audience and Compare
   views mostly in their empty states.

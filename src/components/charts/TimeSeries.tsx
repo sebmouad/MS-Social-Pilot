@@ -8,7 +8,8 @@ import { VIZ, compact, niceTicks, seriesColor } from '@/lib/viz';
 export interface TimeSeriesPoint {
   /** ISO timestamp. */
   x: string;
-  y: number;
+  /** Null is a missing reading, drawn as a gap rather than as zero. */
+  y: number | null;
 }
 
 export interface TimeSeriesLine {
@@ -89,11 +90,12 @@ export function TimeSeries({
   const length = Math.max(...lines.map((line) => line.points.length), 0);
 
   const [max, whole] = useMemo(() => {
-    const values = lines.flatMap((line) => line.points.map((point) => point.y));
+    const values = lines.flatMap((line) => line.points.map((point) => point.y))
+      .filter((value): value is number => value !== null);
     return [values.length > 0 ? Math.max(...values) : 0, values.every((value) => Number.isInteger(value))] as const;
   }, [lines]);
 
-  if (length < 2) {
+  if (length < 2 || lines.every((line) => line.points.every((point) => point.y === null))) {
     return <div className="py-8 text-center text-xs text-slate-500">—</div>;
   }
 
@@ -219,16 +221,22 @@ export function TimeSeries({
           const dimmed = emphasis !== undefined && emphasis !== index;
           const stroke = dimmed ? VIZ.muted : seriesColor(line.colorIndex);
 
-          const path = line.points
-            .map((point, position) => `${position === 0 ? 'M' : 'L'}${xAt(position)},${yAt(point.y)}`)
-            .join(' ');
-
-          const last = line.points[line.points.length - 1];
+          let connected = false;
+          const path = line.points.map((point, position) => {
+            if (point.y === null) { connected = false; return ''; }
+            const segment = `${connected ? 'L' : 'M'}${xAt(position)},${yAt(point.y)}`;
+            connected = true;
+            return segment;
+          }).join(' ');
+          let lastIndex = line.points.length - 1;
+          while (lastIndex >= 0 && line.points[lastIndex]?.y === null) lastIndex -= 1;
+          const last = lastIndex >= 0 ? line.points[lastIndex] : null;
+          const activeValue = active !== null ? line.points[active]?.y : null;
 
           return (
             <g key={line.label}>
               {/* A single series gets a wash under it; several would muddy. */}
-              {lines.length === 1 && (
+              {lines.length === 1 && line.points.every((point) => point.y !== null) && (
                 <path
                   d={`${path} L${xAt(line.points.length - 1)},${yAt(0)} L${xAt(0)},${yAt(0)} Z`}
                   fill={stroke}
@@ -238,12 +246,12 @@ export function TimeSeries({
 
               <path d={path} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" strokeDasharray={line.dashed ? '5 4' : undefined} />
 
-              {last && !dimmed && (
+              {last && last.y !== null && !dimmed && (
                 <>
                   {/* The end dot carries a surface ring so it stays legible
                       where two series cross. */}
                   <circle
-                    cx={xAt(line.points.length - 1)}
+                    cx={xAt(lastIndex)}
                     cy={yAt(last.y)}
                     r={4}
                     fill={stroke}
@@ -252,7 +260,7 @@ export function TimeSeries({
                   />
                   {/* Label the end only. A number on every point goes unread. */}
                   <text
-                    x={xAt(line.points.length - 1) + 8}
+                    x={xAt(lastIndex) + 8}
                     y={yAt(last.y) + 4}
                     fontSize={11}
                     fontWeight={600}
@@ -264,10 +272,10 @@ export function TimeSeries({
                 </>
               )}
 
-              {active !== null && line.points[active] && (
+              {active !== null && activeValue !== null && activeValue !== undefined && (
                 <circle
                   cx={xAt(active)}
-                  cy={yAt(line.points[active]!.y)}
+                  cy={yAt(activeValue)}
                   r={4}
                   fill={stroke}
                   stroke={VIZ.surface}
@@ -298,7 +306,8 @@ export function TimeSeries({
                   style={{ background: seriesColor(line.colorIndex) }}
                 />
                 <span className="nums font-semibold text-slate-900">
-                  {(line.points[active]?.y ?? 0).toLocaleString(locale)}
+                  {line.points[active]?.y === null || line.points[active]?.y === undefined
+                    ? '—' : line.points[active]!.y!.toLocaleString(locale)}
                 </span>
                 <span className="text-slate-500">{line.label}</span>
               </li>

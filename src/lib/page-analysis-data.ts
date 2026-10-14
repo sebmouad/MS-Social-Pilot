@@ -4,6 +4,7 @@ import { comparisonWindow, type CompareMode } from './date-range';
 import { feedLinkOf, feedMediaOf, feedMediaOfPicture } from './feed';
 import { prisma } from './prisma';
 import { errors } from './errors';
+import { utcToLocalInput } from './time';
 import { parseInsights, parseMedia } from './json';
 import {
   analyse,
@@ -222,6 +223,25 @@ export function totalsOf(
   return totals;
 }
 
+/** Daily Page reach, using the newest available metric name for each day. */
+export function pageReachByDay(
+  rows: Array<{ metric: string; endTime: Date; numeric: number | null }>,
+  days: string[],
+  timeZone: string,
+): Array<number | null> {
+  const byDay = new Map<string, { rank: number; value: number }>();
+  for (const row of rows) {
+    if (row.numeric === null) continue;
+    const rank = PAGE_METRICS.reach.indexOf(row.metric);
+    if (rank < 0) continue;
+    // Graph's end_time is the boundary after the day the value describes.
+    const day = utcToLocalInput(new Date(row.endTime.getTime() - 1), timeZone).slice(0, 10);
+    const held = byDay.get(day);
+    if (!held || rank < held.rank) byDay.set(day, { rank, value: row.numeric });
+  }
+  return days.map((day) => byDay.get(day)?.value ?? null);
+}
+
 /** Every metric name the totals read, for a query that loads many Pages at once. */
 export const PAGE_TOTAL_METRICS = Object.values(PAGE_METRICS).flat();
 
@@ -322,6 +342,8 @@ export interface PageComparisonRow {
   health: Health;
   /** Day by day over the window, for the chart with one line per Page. */
   daily: Pick<DailySeries, 'days' | 'posts' | 'interactions' | 'reach'>;
+  /** Page-level daily reach; null means no stored reading for that day. */
+  dailyPageReach: Array<number | null>;
   /** Follows gained and lost over the window; null where Meta serves none. */
   follows: number | null;
   unfollows: number | null;
@@ -333,6 +355,7 @@ export interface PageComparisonRow {
     reach: number | null;
     netFollows: number | null;
     daily: Pick<DailySeries, 'days' | 'posts' | 'interactions' | 'reach'>;
+    dailyPageReach: Array<number | null>;
   };
   /** The Page's three strongest posts of the window, by interactions. */
   top: AnalysedPost[];
@@ -370,7 +393,7 @@ export async function comparePages(options: {
   // One Page at a time: a workspace has a handful, and each is a few queries.
   const rows: PageComparisonRow[] = [];
   for (const page of pages) {
-    const [current, previous, totals, syncedAt, followerSnapshot] = await Promise.all([
+    const [current, previous, totals, syncedAt, followerSnapshot, reachRows] = await Promise.all([
       loadPagePosts(page.id, options.from, options.to),
       loadPagePosts(page.id, previousFrom, new Date(baseline.to.getTime() - 1)),
       loadPageTotals(page.id, [
@@ -385,6 +408,16 @@ export async function comparePages(options: {
         },
         orderBy: { endTime: 'desc' },
         select: { numeric: true },
+      }),
+      prisma.pageInsight.findMany({
+        where: {
+          targetId: page.id, period: 'day', metric: { in: PAGE_METRICS.reach },
+          OR: [
+            { endTime: { gt: options.from, lte: options.to } },
+            { endTime: { gt: previousFrom, lte: baseline.to } },
+          ],
+        },
+        select: { metric: true, endTime: true, numeric: true },
       }),
     ]);
 
@@ -402,6 +435,8 @@ export async function comparePages(options: {
       (a, b) => b.interactions - a.interactions || b.publishedAt.getTime() - a.publishedAt.getTime(),
     );
 
+    const daily = dailySeries(current, options.from, options.to, options.timeZone);
+    const previousDaily = dailySeries(previous, previousFrom, new Date(baseline.to.getTime() - 1), options.timeZone);
     rows.push({
       targetId: page.id,
       name: page.name,
@@ -416,7 +451,8 @@ export async function comparePages(options: {
       reach: kpis.find((kpi) => kpi.key === 'reach')?.current ?? null,
       netFollows: netFollows(totals[0]!),
       health: healthScore({ cadence: rhythm, kpis, followers }),
-      daily: dailySeries(current, options.from, options.to, options.timeZone),
+      daily,
+      dailyPageReach: pageReachByDay(reachRows, daily.days, options.timeZone),
       follows: totals[0]!.follows,
       unfollows: totals[0]!.unfollows,
       previous: {
@@ -425,7 +461,8 @@ export async function comparePages(options: {
         interactions: before.interactions,
         reach: kpis.find((kpi) => kpi.key === 'reach')?.previous ?? null,
         netFollows: netFollows(totals[1]!),
-        daily: dailySeries(previous, previousFrom, new Date(baseline.to.getTime() - 1), options.timeZone),
+        daily: previousDaily,
+        dailyPageReach: pageReachByDay(reachRows, previousDaily.days, options.timeZone),
       },
       top: ranked.slice(0, 3),
       postList: current,

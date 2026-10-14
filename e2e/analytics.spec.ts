@@ -59,6 +59,27 @@ test('an unknown view opens the Summary rather than an empty screen', async ({ p
   expect(failures).toEqual([]);
 });
 
+test('Summary shows stored Page reach on a day without posts and gaps for missing days', async ({ page }) => {
+  const failures = collectFailures(page);
+  const endTime = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000);
+  endTime.setUTCHours(12, 0, 0, 0);
+  const reading = await prisma.pageInsight.create({ data: {
+    targetId, metric: 'page_total_media_view_unique', period: 'day', endTime,
+    value: 777, numeric: 777,
+  } });
+  try {
+    await open(page, `/analytics?view=summary&pages=${targetId}&range=7d`);
+    const trend = page.locator('section.card-viz').filter({ has: page.getByRole('heading', { name: 'Trend' }) });
+    await trend.getByRole('radio', { name: 'People reached' }).click();
+    await trend.getByRole('button', { name: 'Table' }).click();
+    await expect(trend.getByRole('cell', { name: '777' })).toBeVisible();
+    await expect(trend.getByRole('cell', { name: '—' }).first()).toBeVisible();
+    expect(failures).toEqual([]);
+  } finally {
+    await prisma.pageInsight.delete({ where: { id: reading.id } });
+  }
+});
+
 test('switching tabs keeps the Page and window but drops one view’s filters', async ({ page }) => {
   const failures = collectFailures(page);
 

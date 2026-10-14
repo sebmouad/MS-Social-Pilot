@@ -4702,7 +4702,7 @@
         "day": "Daily",
         "week": "Weekly"
       },
-      "reachNote": "Day by day, people reached is the sum over that day's posts."
+      "reachNote": "Daily reach comes from Page insights. A gap means at least one selected Page has no reading; across Pages the sum is an upper bound."
     },
     "bestPosts": "Best posts",
     "allPosts": "All posts",

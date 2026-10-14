@@ -7,7 +7,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { StatTile } from '@/components/charts/StatTile';
 import { comparePages } from '@/lib/page-analysis-data';
 import { sumKnown } from '@/lib/aggregate';
-import { channelChanges, combinedFindings, summaryFigures, sumSeries, type SummaryKpiKey } from '@/lib/analytics-summary';
+import { channelChanges, combinedFindings, summaryFigures, sumCompleteSeries, sumSeries, type SummaryKpiKey } from '@/lib/analytics-summary';
 import type { CompareMode } from '@/lib/date-range';
 import { BLOCK_HOURS, MIN_POSTS_PER_SLOT, bestTimes, type Finding } from '@/lib/page-analysis';
 import { formatInZone } from '@/lib/time';
@@ -104,10 +104,10 @@ export async function SummaryView({
   );
 
   const trendDays = rows[0]!.daily.days;
-  const series = (pick: (row: (typeof rows)[number]) => { posts: number[]; interactions: number[]; reach: number[] }) => ({
-    reach: sumSeries(rows.map((row) => pick(row).reach)),
-    interactions: sumSeries(rows.map((row) => pick(row).interactions)),
-    posts: sumSeries(rows.map((row) => pick(row).posts)),
+  const series = (pick: (row: (typeof rows)[number]) => { daily: { posts: number[]; interactions: number[] }; dailyPageReach: Array<number | null> }) => ({
+    reach: sumCompleteSeries(rows.map((row) => pick(row).dailyPageReach)),
+    interactions: sumSeries(rows.map((row) => pick(row).daily.interactions)),
+    posts: sumSeries(rows.map((row) => pick(row).daily.posts)),
   });
 
   return (
@@ -151,8 +151,8 @@ export async function SummaryView({
 
       <SummaryTrend
         days={trendDays}
-        current={series((row) => row.daily)}
-        previous={series((row) => row.previous.daily)}
+        current={series((row) => row)}
+        previous={series((row) => row.previous)}
         previousLabel={compare === 'year' ? t('trend.lastYear') : t('trend.previous', { days })}
       />
 

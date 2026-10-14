@@ -167,11 +167,33 @@ export function sumSeries(series: ReadonlyArray<ReadonlyArray<number>>): number[
   return Array.from({ length }, (_, day) => series.reduce((sum, values) => sum + (values[day] ?? 0), 0));
 }
 
+/** An aggregate day is unknown if any selected channel lacks a reading. */
+export function sumCompleteSeries(series: ReadonlyArray<ReadonlyArray<number | null>>): Array<number | null> {
+  const length = Math.max(0, ...series.map((values) => values.length));
+  return Array.from({ length }, (_, day) =>
+    series.length > 0 && series.every((values) => typeof values[day] === 'number')
+      ? series.reduce((sum, values) => sum + (values[day] as number), 0)
+      : null,
+  );
+}
+
 /** Daily values grouped into consecutive weeks of seven days, from the first day. */
 export function weekly(values: ReadonlyArray<number>): number[] {
   const out: number[] = [];
   for (let start = 0; start < values.length; start += 7) {
     out.push(values.slice(start, start + 7).reduce((sum, value) => sum + value, 0));
+  }
+  return out;
+}
+
+/** A weekly figure is unavailable if any day in that week is missing. */
+export function weeklyComplete(values: ReadonlyArray<number | null>): Array<number | null> {
+  const out: Array<number | null> = [];
+  for (let start = 0; start < values.length; start += 7) {
+    const days = values.slice(start, start + 7);
+    out.push(days.every((value): value is number => value !== null)
+      ? days.reduce((sum, value) => sum + value, 0)
+      : null);
   }
   return out;
 }

@@ -120,6 +120,9 @@ connecting Pages.
 - Follower comparisons use a nearby stored Facebook follower snapshot at the
   comparison date. Missing or stale snapshots leave the change unavailable;
   historical Page likes are not treated as follower counts.
+- The Summary's daily reach trend uses stored Page insights, including days
+  without posts. Missing readings break the line instead of appearing as zero;
+  multi-Page days require a reading from every selected Page.
 - **Single post** `/analytics/post/[postTargetId]`.
 - **Caption tests** `/analytics/tests`: A/B results, winner only past a minimum
   number of views; the result can feed the Page's AI voice.

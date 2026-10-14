@@ -246,6 +246,21 @@ describe('comparePages', () => {
     [row] = await data.comparePages({ workspaceId: workspace.id, from: FROM, to: NOW, timeZone: 'UTC' });
     expect(row?.previous.followers).toBeNull();
   });
+
+  it('keeps Page reach on a day with no post and leaves unmeasured days empty', async () => {
+    const { workspace, page } = await seed();
+    const measuredDay = new Date(FROM.getTime() + 2 * DAY);
+    await prisma.pageInsight.createMany({ data: [
+      { targetId: page.id, metric: 'page_impressions_unique', period: 'day', endTime: measuredDay, value: 12, numeric: 12 },
+      { targetId: page.id, metric: 'page_total_media_view_unique', period: 'day', endTime: measuredDay, value: 20, numeric: 20 },
+    ] });
+    const [row] = await data.comparePages({ workspaceId: workspace.id, from: FROM, to: NOW, timeZone: 'UTC' });
+    const index = row!.daily.days.indexOf(measuredDay.toISOString().slice(0, 10));
+    expect(index).toBeGreaterThanOrEqual(0);
+    expect(row!.daily.posts[index]).toBe(0);
+    expect(row!.dailyPageReach[index]).toBe(20);
+    expect(row!.dailyPageReach[index - 1]).toBeNull();
+  });
 });
 
 describe('the older views, corrected', () => {
