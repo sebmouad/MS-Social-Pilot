@@ -782,7 +782,7 @@
       }
     },
     "instagramDestinations": "Comptes Instagram où publier",
-    "instagramHint": "Comptes professionnels accessibles via une page connectée. Utilisables comme destinations une fois instagram_content_publish approuvé ; jusque-là, ils apparaissent désactivés.",
+    "instagramHint": "Comptes professionnels Instagram liés à une Page Facebook connectée. Sélectionnez les comptes à utiliser ici.",
     "instagramTitle": "Comptes Instagram",
     "noGroups": "Aucun groupe. Facebook ne permet plus aux applications de publier dans les groupes.",
     "noLinkedPage": "Aucune page reliée",
@@ -1144,7 +1144,7 @@
     "author": "Auteur",
     "emptyHint": "Récupérez-les depuis Facebook dès maintenant. Les nouveaux arrivent aussi d'eux-mêmes toutes les quelques heures.",
     "inboxWaiting": "La messagerie s’ouvrira quand Meta aura validé l’accès Messenger",
-    "inboxWaitingHint": "Lire et répondre aux messages du canal nécessite l’autorisation pages_messaging de Meta, comprise dans la revue de l’app. Une fois accordée, un propriétaire active la messagerie dans Paramètres → Configuration."
+    "inboxWaitingHint": "Les messages apparaîtront ici lorsque ce canal prendra en charge la messagerie."
   },
   "errors": {
     "postPublishing": "Cette publication est en cours d’envoi. Réessayez après la mise à jour de ses destinations.",

@@ -782,7 +782,7 @@
       }
     },
     "instagramDestinations": "Instagram accounts you can post to",
-    "instagramHint": "Business accounts reachable through a connected page. Usable as destinations once instagram_content_publish is approved; until then they appear turned off.",
+    "instagramHint": "Instagram business accounts linked to a connected Facebook Page. Select the accounts you want to use here.",
     "instagramTitle": "Instagram accounts",
     "noGroups": "No groups. Facebook no longer lets apps post to Groups.",
     "noLinkedPage": "No linked page",
@@ -1144,7 +1144,7 @@
     "author": "Author",
     "emptyHint": "Pull from Facebook to bring them in now. New ones also arrive on their own every few hours.",
     "inboxWaiting": "Inbox opens once Meta approves Messenger access",
-    "inboxWaitingHint": "Reading and answering channel messages needs Meta’s approval of the pages_messaging permission, which is part of the app review. Once it is granted, an owner switches Inbox on under Settings → Configuration."
+    "inboxWaitingHint": "Messages will appear here when this channel supports inbox access."
   },
   "errors": {
     "postPublishing": "This post is being published. Try deleting it after its destination statuses settle.",
