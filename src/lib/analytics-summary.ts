@@ -15,7 +15,7 @@ export interface SummaryChannel extends ProfileFigures {
   follows: number | null;
   unfollows: number | null;
   findings: Finding[];
-  previous: { posts: number; interactions: number; reach: number | null; netFollows: number | null };
+  previous: { followers: number | null; posts: number; interactions: number; reach: number | null; netFollows: number | null };
 }
 
 export type SummaryKpiKey = 'reach' | 'interactions' | 'followers' | 'rate' | 'posts' | 'perPost';
@@ -43,14 +43,14 @@ export interface SummaryFigures {
  *
  * Counts add up; reach is summed per channel and flagged as an upper bound
  * when there is more than one; the interaction rate is recomputed from summed
- * interactions over summed reach, never averaged. Followers before the window
- * are today's count less the window's net change, so their change is the net.
+ * interactions over summed reach, never averaged. Historical followers come
+ * from stored Page snapshots; missing snapshots never become estimated totals.
  */
 export function summaryFigures(rows: ReadonlyArray<SummaryChannel>): SummaryFigures {
   const now = totalProfiles(rows);
   const before = totalProfiles(
     rows.map((row) => ({
-      followers: null,
+      followers: row.previous.followers,
       netFollows: row.previous.netFollows,
       posts: row.previous.posts,
       interactions: row.previous.interactions,
@@ -58,8 +58,8 @@ export function summaryFigures(rows: ReadonlyArray<SummaryChannel>): SummaryFigu
     })),
   );
 
-  const followersBefore =
-    now.followers !== null && now.netFollows !== null ? now.followers - now.netFollows : null;
+  const followersBefore = rows.length > 0 && rows.every((row) => row.followers !== null && row.previous.followers !== null)
+    ? before.followers : null;
   // No posts, no rate: 0 % would read as posts that nobody touched.
   const rateNow = now.posts ? ratio(now.interactions, now.reachUpTo, 100) : null;
   const rateBefore = before.posts ? ratio(before.interactions, before.reachUpTo, 100) : null;

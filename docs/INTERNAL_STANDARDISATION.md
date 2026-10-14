@@ -8,7 +8,7 @@ This document owns cross-screen UI contracts. `DESIGN.md` owns visual tokens and
 | --- | --- | --- |
 | Browser JSON mutations | `src/lib/client-request.ts` | Preserve HTTP status, fields, trace ID and transport uncertainty; never automatically retry a write. |
 | Modal and drawer focus | `src/components/useModalFocus.ts`, `Dialog.tsx` | Focus containment, Escape, inert background, body locking, opener restoration. Close mobile drawer at desktop breakpoint. |
-| Confirmation | `ConfirmProvider.tsx` | Shared translated confirmation; no browser confirm prompts for app actions. |
+| Confirmation | `ConfirmProvider.tsx` | Shared translated confirmation; consumers require the provider, with no browser confirm fallback. |
 | Unsaved forms | `useUnsavedChanges.ts`, `config-draft.ts` | Composer and root settings share link/reload/history protection. Reverted root values become clean; credentials remain only in component memory. |
 | Editor navigation | `src/lib/navigation-guard.ts`, `Composer.tsx` | Confirm links, workspace changes, sign-out, Chrome history traversal; session recovery scoped by user/workspace/post. |
 | Media reuse | `MediaPicker.tsx` | Authenticated workspace listing, explicit selection, no implicit upload or publish. Composer enforces attachment limits. |
@@ -19,7 +19,7 @@ This document owns cross-screen UI contracts. `DESIGN.md` owns visual tokens and
 | Task workflow | `src/lib/task-workflow.ts` | Preserve created/failed/unattempted/uncertain outcomes; retry only known unresolved rows. Unknown creates require checking board. |
 | Report context | reports page, `ReportControls`, reports API | CSV uses applied sidebar scope intersected with authorization; email uses selected Page context. |
 | Delivery readiness | `emailEnabled`, report schedules | Unavailable delivery is unavailable; skipped/failed email cannot be reported as sent. |
-| Audience metrics | `audience-growth-metrics.ts`, analytics view model | Labels follow source provenance; mixed follower/like sources cannot produce a meaningful net value. Missing data stays unavailable. |
+| Audience metrics | `audience-growth-metrics.ts`, analytics view model, `analytics-summary.ts` | Labels follow source provenance; mixed follower/like sources cannot produce a meaningful net value. Historical comparisons require a nearby stored follower snapshot for every selected Page. Missing data stays unavailable. |
 | Disclosure and filters | `PhoneFold`, `SidebarDock`, `QuerySelect` | Desktop tools stay reachable across resizing; dock follows recreated shell target; changed searches reset pagination. |
 | Copy and visuals | EN/FR catalogs, StatusBadge, theme tokens | Both languages, ICU counts, factual source scope, consistent scheduled/review colors. |
 

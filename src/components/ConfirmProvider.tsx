@@ -95,6 +95,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 /** `const confirm = useConfirm(); if (!(await confirm({ title }))) return;` */
 export function useConfirm(): Ask {
   const ask = useContext(ConfirmContext);
-  // Outside the provider (a test, a public page): the browser's own, so nothing breaks.
-  return ask ?? (async (options) => window.confirm(typeof options === 'string' ? options : options.title));
+  // Isolated renders may omit the provider; fail when an action asks rather
+  // than while the component renders, and never fall back to window.confirm.
+  return ask ?? (async () => { throw new Error('useConfirm requires ConfirmProvider'); });
 }

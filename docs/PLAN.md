@@ -31,10 +31,6 @@ build, unit and browser tests, deploy, check live with real data.
 
 ## Known gaps
 
-- **Followers, previous period**: the Summary estimates the count before the
-  window as today's count minus the window's net follows (`summaryFigures` in
-  `src/lib/analytics-summary.ts`) rather than reading a stored total for that
-  date, so it drifts when follows data is missing.
 - **Summary trend chart** is built from the selection's posts (`dailySeries` in `src/lib/page-analysis.ts`: results by publish
   day), not from Page-level daily insights, so days without
   posts show nothing even when the Page had views.

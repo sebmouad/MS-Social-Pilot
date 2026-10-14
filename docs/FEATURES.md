@@ -116,6 +116,9 @@ connecting Pages.
   selected posting range. Posts on Instagram and the other networks expose
   every stored per-post metric in a disclosure; the Videos view does the same
   for Facebook video metrics.
+- Follower comparisons use a nearby stored Facebook follower snapshot at the
+  comparison date. Missing or stale snapshots leave the change unavailable;
+  historical Page likes are not treated as follower counts.
 - **Single post** `/analytics/post/[postTargetId]`.
 - **Caption tests** `/analytics/tests`: A/B results, winner only past a minimum
   number of views; the result can feed the Page's AI voice.

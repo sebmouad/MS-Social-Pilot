@@ -327,6 +327,7 @@ export interface PageComparisonRow {
   unfollows: number | null;
   /** The same figures over the comparison window (previous period or last year). */
   previous: {
+    followers: number | null;
     posts: number;
     interactions: number;
     reach: number | null;
@@ -369,7 +370,7 @@ export async function comparePages(options: {
   // One Page at a time: a workspace has a handful, and each is a few queries.
   const rows: PageComparisonRow[] = [];
   for (const page of pages) {
-    const [current, previous, totals, syncedAt] = await Promise.all([
+    const [current, previous, totals, syncedAt, followerSnapshot] = await Promise.all([
       loadPagePosts(page.id, options.from, options.to),
       loadPagePosts(page.id, previousFrom, new Date(baseline.to.getTime() - 1)),
       loadPageTotals(page.id, [
@@ -377,6 +378,14 @@ export async function comparePages(options: {
         { from: previousFrom, to: baseline.to },
       ]),
       lastSynced(page.id, page.profileSyncedAt),
+      prisma.pageInsight.findFirst({
+        where: {
+          targetId: page.id, metric: 'page_follows', period: 'day', numeric: { not: null },
+          endTime: { lte: baseline.to, gte: new Date(baseline.to.getTime() - 7 * DAY_MS) },
+        },
+        orderBy: { endTime: 'desc' },
+        select: { numeric: true },
+      }),
     ]);
 
     const now = summarise(current);
@@ -411,6 +420,7 @@ export async function comparePages(options: {
       follows: totals[0]!.follows,
       unfollows: totals[0]!.unfollows,
       previous: {
+        followers: page.followersCount === null ? null : followerSnapshot?.numeric ?? null,
         posts: before.posts,
         interactions: before.interactions,
         reach: kpis.find((kpi) => kpi.key === 'reach')?.previous ?? null,

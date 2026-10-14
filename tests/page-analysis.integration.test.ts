@@ -217,6 +217,35 @@ describe('comparePages', () => {
     const rows = await data.comparePages({ workspaceId: workspace.id, from: FROM, to: NOW, timeZone: 'UTC' });
     expect(rows.map((row) => row.name)).toEqual(['Another', 'Bakery']);
   });
+
+  it('uses a nearby stored follower snapshot for the comparison, not inferred growth', async () => {
+    const { workspace, page } = await seed();
+    await prisma.pageInsight.createMany({ data: [
+      { targetId: page.id, metric: 'page_follows', period: 'day', endTime: new Date(FROM.getTime() - 2 * DAY), value: 970, numeric: 970 },
+      { targetId: page.id, metric: 'page_follows', period: 'day', endTime: new Date(FROM.getTime() - DAY), value: 980, numeric: 980 },
+      { targetId: page.id, metric: 'page_follows', period: 'day', endTime: new Date(FROM.getTime() + DAY), value: 990, numeric: 990 },
+    ] });
+    const [row] = await data.comparePages({ workspaceId: workspace.id, from: FROM, to: NOW, timeZone: 'UTC' });
+    expect(row?.followers).toBe(1000);
+    expect(row?.previous.followers).toBe(980);
+  });
+
+  it('withholds old or like-count snapshots from follower comparison', async () => {
+    const { workspace, page } = await seed();
+    await prisma.pageInsight.create({ data: {
+      targetId: page.id, metric: 'page_follows', period: 'day',
+      endTime: new Date(FROM.getTime() - 20 * DAY), value: 900, numeric: 900,
+    } });
+    let [row] = await data.comparePages({ workspaceId: workspace.id, from: FROM, to: NOW, timeZone: 'UTC' });
+    expect(row?.previous.followers).toBeNull();
+    await prisma.target.update({ where: { id: page.id }, data: { followersCount: null, fanCount: 1000 } });
+    await prisma.pageInsight.create({ data: {
+      targetId: page.id, metric: 'page_follows', period: 'day',
+      endTime: new Date(FROM.getTime() - DAY), value: 980, numeric: 980,
+    } });
+    [row] = await data.comparePages({ workspaceId: workspace.id, from: FROM, to: NOW, timeZone: 'UTC' });
+    expect(row?.previous.followers).toBeNull();
+  });
 });
 
 describe('the older views, corrected', () => {

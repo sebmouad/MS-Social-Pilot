@@ -20,7 +20,7 @@ function channel(overrides: Partial<SummaryChannel> & { name: string }): Summary
     follows: 15,
     unfollows: 5,
     findings: [],
-    previous: { posts: 2, interactions: 100, reach: 800, netFollows: 5 },
+    previous: { followers: 990, posts: 2, interactions: 100, reach: 800, netFollows: 5 },
     ...overrides,
   };
 }
@@ -51,8 +51,8 @@ describe('summaryFigures', () => {
     expect(summaryFigures([channel({ name: 'Client A' })]).reachIsUpperBound).toBe(false);
   });
 
-  it('puts followers before the window at today less the net change, with gained and lost', () => {
-    const result = summaryFigures([channel({ name: 'Client A' }), channel({ name: 'Client B', netFollows: -30, follows: null, unfollows: 30 })]);
+  it('uses stored follower snapshots, with gained and lost kept separate', () => {
+    const result = summaryFigures([channel({ name: 'Client A' }), channel({ name: 'Client B', netFollows: -30, follows: null, unfollows: 30, previous: { followers: 1030, posts: 2, interactions: 100, reach: 800, netFollows: 5 } })]);
     expect(result.kpis.find((kpi) => kpi.key === 'followers')).toMatchObject({ current: 2000, previous: 2020 });
     expect(result.netFollows).toBe(-20);
     expect(result.follows).toBe(15);
@@ -60,10 +60,15 @@ describe('summaryFigures', () => {
   });
 
   it('has no previous figure where none is known', () => {
-    const rows = [channel({ name: 'Client A', netFollows: null, reach: null, previous: { posts: 0, interactions: 0, reach: null, netFollows: null } })];
+    const rows = [channel({ name: 'Client A', netFollows: null, reach: null, previous: { followers: null, posts: 0, interactions: 0, reach: null, netFollows: null } })];
     expect(figure(rows, 'followers').previous).toBeNull();
     expect(figure(rows, 'reach')).toMatchObject({ current: null, change: null });
     expect(figure(rows, 'interactions').change).toBeNull();
+  });
+
+  it('withholds a combined follower comparison when any selected snapshot is missing', () => {
+    const rows = [channel({ name: 'Client A' }), channel({ name: 'Client B', previous: { followers: null, posts: 2, interactions: 100, reach: 800, netFollows: 5 } })];
+    expect(figure(rows, 'followers')).toMatchObject({ current: 2000, previous: null, change: null });
   });
 });
 
@@ -108,7 +113,7 @@ describe('channelChanges', () => {
     const rows = [
       channel({ name: 'Client A', interactions: 110 }),
       channel({ name: 'Client B', interactions: 20 }),
-      channel({ name: 'Client C', interactions: 0, previous: { posts: 0, interactions: 0, reach: 500, netFollows: null } }),
+      channel({ name: 'Client C', interactions: 0, previous: { followers: null, posts: 0, interactions: 0, reach: 500, netFollows: null } }),
     ];
     expect(channelChanges(rows).map((row) => [row.name, row.figure, row.change])).toEqual([
       ['Client C', 'reach', 100],
