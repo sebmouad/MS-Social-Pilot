@@ -67,12 +67,14 @@ export interface RemoteStatusRequest { credential: PlatformCredential; remoteId:
 export interface RemoteStatus { state: 'published' | 'scheduled' | 'unknown'; publishedAt?: Date | null }
 export interface RemoteDeleteRequest { credential: PlatformCredential; remoteId: string }
 export interface InboxRequest { credential: PlatformCredential; targetId: string }
+export interface InboxCommentsRequest extends InboxRequest { remotePostId: string }
 export interface InboxItem {
   id: string;
   text: string;
   createdAt: Date;
   targetId?: string;
   parentId?: string | null;
+  conversationId?: string | null;
   authorId?: string | null;
   authorName?: string | null;
   kind?: 'comment' | 'message';
@@ -116,6 +118,7 @@ export interface PlatformAdapter {
   getRemoteStatus?(request: RemoteStatusRequest): Promise<RemoteStatus>;
   deleteRemote?(request: RemoteDeleteRequest): Promise<void>;
   listInbox?(request: InboxRequest): Promise<InboxItem[]>;
+  listComments?(request: InboxCommentsRequest): Promise<InboxItem[]>;
   replyToInbox?(request: InboxActionRequest): Promise<{ remoteId: string }>;
   hideInboxItem?(request: InboxActionRequest & { hidden: boolean }): Promise<void>;
   deleteInboxItem?(request: InboxActionRequest): Promise<void>;

@@ -343,7 +343,19 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
     async deleteRemote(request) { await engine.deletePost(request.credential.accessToken, request.remoteId); },
     async listInbox(request) {
       const conversations = await engine.listInbox(request.credential.accessToken, request.targetId);
-      return conversations.map(c => ({ id: c.id, text: c.snippet ?? '', createdAt: c.updatedAt, targetId: request.targetId, kind: 'message' as const }));
+      return conversations.flatMap(conversation => conversation.messages.map(message => ({
+        id: message.id, text: message.text ?? '', createdAt: message.createdAt,
+        targetId: request.targetId, conversationId: conversation.id,
+        authorId: message.fromId, authorName: message.fromName, kind: 'message' as const,
+      })));
+    },
+    async listComments(request) {
+      const comments = await engine.listComments(request.credential.accessToken, request.remotePostId);
+      return comments.map(comment => ({
+        id: comment.id, text: comment.message, createdAt: comment.createdAt,
+        targetId: request.targetId, parentId: comment.parentId,
+        authorId: comment.fromId, authorName: comment.fromName, kind: 'comment' as const,
+      }));
     },
     async replyToInbox(request) {
       if (!request.text?.trim()) throw new FacebookApiError('A reply needs text.', 0);

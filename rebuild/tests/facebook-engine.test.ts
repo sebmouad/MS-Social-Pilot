@@ -140,6 +140,19 @@ describe('Facebook Graph adapter', () => {
     expect(await engine.getAdInsights('token', 'act_1', new Date('2026-01-01Z'), new Date('2026-01-02Z'))).toEqual([{ spend: '4.2' }]);
   });
 
+  it('exposes message and comment details through the neutral inbox contract', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/conversations')) return response({ data: [{ id: 'conversation-1', updated_time: '2026-01-02T00:00:00Z', messages: { data: [{ id: 'message-1', message: 'Hello', created_time: '2026-01-02T00:00:00Z', from: { id: 'visitor-1', name: 'Visitor' } }] } }] });
+      if (url.includes('/comments')) return response({ data: [{ id: 'comment-1', message: 'Question', created_time: '2026-01-02T01:00:00Z', from: { id: 'visitor-2', name: 'Second visitor' }, parent: { id: 'parent-1' } }] });
+      return response({ data: [] });
+    }) as unknown as typeof fetch;
+    const adapter = createFacebookAdapter(config, fetcher);
+    const request = { credential: { accessToken: 'token' }, targetId: 'page-1' };
+    expect(await adapter.listInbox!(request)).toEqual([{ id: 'message-1', text: 'Hello', createdAt: new Date('2026-01-02T00:00:00Z'), targetId: 'page-1', conversationId: 'conversation-1', authorId: 'visitor-1', authorName: 'Visitor', kind: 'message' }]);
+    expect(await adapter.listComments!({ ...request, remotePostId: 'post-1' })).toEqual([{ id: 'comment-1', text: 'Question', createdAt: new Date('2026-01-02T01:00:00Z'), targetId: 'page-1', parentId: 'parent-1', authorId: 'visitor-2', authorName: 'Second visitor', kind: 'comment' }]);
+  });
+
   it('retains every dated Page insight value and its provider period or breakdown', async () => {
     const fetcher = mockFetch(response({ data: [
       { name: 'page_media_view', period: 'day', values: [
