@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { removeWorkspaceStorage } from '../src/server/data-control/storage';
+import { readWorkspaceStorage, removeWorkspaceStorage } from '../src/server/data-control/storage';
 
 const tempDirs: string[] = [];
 
@@ -17,6 +17,21 @@ afterEach(async () => {
 });
 
 describe('removeWorkspaceStorage', () => {
+  it('reads tenant media recursively and rejects symlinks', async () => {
+    const root = await tempDir();
+    const tenant = path.join(root, 'workspace-a');
+    const outside = await tempDir();
+    await mkdir(path.join(tenant, 'nested'), { recursive: true });
+    await writeFile(path.join(tenant, 'nested', 'photo.bin'), Buffer.from([1, 2, 3]));
+    await writeFile(path.join(outside, 'secret.bin'), 'secret');
+    await expect(readWorkspaceStorage(root, 'workspace-a')).resolves.toEqual([
+      { path: 'media/nested/photo.bin', content: Buffer.from([1, 2, 3]) },
+    ]);
+    await expect(readWorkspaceStorage(root, 'workspace-a', 2)).rejects.toThrow(/archive size limit/);
+    await symlink(outside, path.join(tenant, 'external'));
+    await expect(readWorkspaceStorage(root, 'workspace-a')).rejects.toThrow(/symbolic link/);
+  });
+
   it('removes only the selected workspace media and exports and reports file totals', async () => {
     const root = await tempDir();
     await mkdir(path.join(root, 'workspace-a', 'nested'), { recursive: true });

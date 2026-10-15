@@ -33,7 +33,7 @@ export function DataControls({ workspaceName, destructive = false }: { workspace
     finally { setBusy(false); }
   }
 
-  if (!destructive) return <div className={styles['data-controls']}><a className={styles['data-button']} href="/api/settings/data">Download JSON export</a><span className={styles['settings-note']}>The file is generated when you request it and is not stored by this app.</span></div>;
+  if (!destructive) return <div className={styles['data-controls']}><a className={styles['data-button']} href="/api/settings/data">Download workspace ZIP</a><span className={styles['settings-note']}>Includes the rebuild database snapshot and stored workspace media. The archive manifest describes database coverage.</span></div>;
 
   return <div className={styles['data-controls']}>
     {!counts ? <button type="button" onClick={previewDeletion} disabled={busy || previewBusy}>{previewBusy ? 'Counting rows…' : 'Preview rows to delete'}</button> : <>
@@ -44,6 +44,6 @@ export function DataControls({ workspaceName, destructive = false }: { workspace
       <div className={styles['data-delete-row']}><input id="delete-workspace-data" value={confirmation} onChange={event => setConfirmation(event.currentTarget.value)} autoComplete="off" disabled={busy} /><button type="button" className={styles['data-danger-button']} disabled={busy || confirmation !== 'DELETE'} onClick={removeData}>{busy ? 'Deleting…' : 'Delete workspace data'}</button></div>
     </>}
     {notice && <p role={notice.startsWith('Workspace records and stored files were') ? 'status' : 'alert'} className={styles['settings-note']}>{notice}</p>}
-    <span className={styles['settings-note']}>Deletion is permanent once complete. If file cleanup fails, retry with the same confirmation; the app resumes without repeating database deletion. The JSON export covers core records only and is not a full backup. {workspaceName} remains as an empty workspace.</span>
+    <span className={styles['settings-note']}>Deletion is permanent once complete. If file cleanup fails, retry with the same confirmation; the app resumes without repeating database deletion. {workspaceName} remains as an empty workspace.</span>
   </div>;
 }

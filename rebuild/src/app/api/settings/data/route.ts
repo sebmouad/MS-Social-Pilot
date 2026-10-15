@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '@/server/data-control';
+import { exportWorkspaceArchive } from '@/server/data-control/archive';
 
 export const runtime = 'nodejs';
 const deleteSchema = z.object({ confirmation: z.string().max(20) });
@@ -21,10 +22,10 @@ export async function GET() {
   try { viewer = await requireViewer({ feature: 'settings/data' }); }
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   try {
-    const payload = await exportWorkspaceData({ userId: viewer.user.id, workspaceId: viewer.workspaceId });
+    const archive = await exportWorkspaceArchive({ userId: viewer.user.id, workspaceId: viewer.workspaceId });
     const safeSlug = viewer.membership.workspace.slug.replace(/[^A-Za-z0-9_-]/g, '-');
-    const filename = `workspace-${safeSlug}-export-${new Date().toISOString().slice(0, 10)}.json`;
-    return new Response(JSON.stringify(payload, null, 2), { headers: { 'content-type': 'application/json; charset=utf-8', 'content-disposition': `attachment; filename="${filename}"`, 'cache-control': 'no-store' } });
+    const filename = `workspace-${safeSlug}-export-${new Date().toISOString().slice(0, 10)}.zip`;
+    return new Response(new Uint8Array(archive), { headers: { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="${filename}"`, 'cache-control': 'no-store' } });
   } catch (error) { return dataError(error, 'Could not export workspace data.'); }
 }
 

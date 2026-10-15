@@ -1,7 +1,9 @@
-import { lstat, readdir, realpath, unlink, rmdir } from 'node:fs/promises';
+import { lstat, readdir, realpath, unlink, rmdir, open } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import path from 'node:path';
 
 export type WorkspaceStorageCleanup = { files: number; bytes: number };
+export type WorkspaceStorageFile = { path: string; content: Buffer };
 
 type TreeStats = WorkspaceStorageCleanup;
 
@@ -60,6 +62,40 @@ async function removeTree(directory: string): Promise<void> {
     else throw new Error(`Refusing to remove a non-file entry: ${entryPath}`);
   }
   await rmdir(directory);
+}
+
+/** Read a tenant's media tree without following links. Missing or special entries fail the export. */
+async function readTree(directory: string, prefix: string, files: WorkspaceStorageFile[], budget: { remaining: number }): Promise<void> {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const fullPath = path.join(directory, entry.name);
+    const info = await lstat(fullPath);
+    if (info.isSymbolicLink()) throw new Error(`Refusing to export a tree containing a symbolic link: ${fullPath}`);
+    if (info.isDirectory()) await readTree(fullPath, `${prefix}/${entry.name}`, files, budget);
+    else if (info.isFile()) {
+      const handle = await open(fullPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+      try {
+        const opened = await handle.stat();
+        if (!opened.isFile()) throw new Error(`Refusing to export a non-file entry: ${fullPath}`);
+        if (opened.size > budget.remaining) throw new Error('Workspace media exceeds the configured archive size limit.');
+        const content = await handle.readFile();
+        if (content.length > budget.remaining) throw new Error('Workspace media exceeds the configured archive size limit.');
+        budget.remaining -= content.length;
+        files.push({ path: `${prefix}/${entry.name}`, content });
+      } finally { await handle.close(); }
+    }
+    else throw new Error(`Refusing to export a non-file entry: ${fullPath}`);
+  }
+}
+
+/** Read every file for one workspace, including unindexed files, with path and link checks. */
+export async function readWorkspaceStorage(mediaRoot: string, workspaceId: string, maxBytes = Number.MAX_SAFE_INTEGER): Promise<WorkspaceStorageFile[]> {
+  validateWorkspaceId(workspaceId);
+  const root = await canonicalMediaRoot(mediaRoot);
+  const directory = path.join(root, workspaceId);
+  if (!(await assertDirectory(directory))) return [];
+  const files: WorkspaceStorageFile[] = [];
+  await readTree(directory, 'media', files, { remaining: maxBytes });
+  return files;
 }
 
 /** Resolve Root's configured storage path before a purge is queued. */
