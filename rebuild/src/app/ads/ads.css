@@ -18,9 +18,10 @@
 .empty-state p { max-width: 580px; margin: 0 auto 16px; color: var(--ink-soft); font-size: 14px; line-height: 1.6; }
 .empty-state__icon { display: inline-grid; width: 42px; height: 42px; place-items: center; border-radius: 14px; background: var(--accent-soft); color: var(--accent); font-size: 21px; }
 .ads-sidebar-filter { display: grid; gap: 11px; }
+.ads-filter-heading { margin: 0 0 2px; color: var(--ink-faint); font-size: 10px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
 .ads-sidebar-filter label { display: grid; gap: 6px; color: var(--ink-soft); font-size: 11px; font-weight: 650; }
 .ads-sidebar-filter select, .ads-sidebar-filter input { width: 100%; min-width: 0; height: 36px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 11px; }
-.ads-sidebar-filter button { min-height: 34px; margin-top: 4px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent); color: var(--on-accent, #fff); font-size: 12px; font-weight: 700; cursor: pointer; }
+.ads-sidebar-filter button { min-height: 40px; margin-top: 8px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--accent); font-size: 12px; font-weight: 700; cursor: pointer; }
 .ads-filter-reset { justify-self: center; color: var(--ink-faint); font-size: 11px; }
 .ads-account-list { display: grid; gap: 12px; margin-top: 18px; }
 .ads-account-card { min-width: 0; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
@@ -42,6 +43,7 @@
 .ads-result-level { margin-top: 22px; }
 .ads-result-level h3 { margin-bottom: 9px; font-size: 14px; }
 .ads-performance-table { min-width: 1200px; }
+.ads-performance-mobile { display: none; }
 .ads-performance-table td { vertical-align: middle; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ads-performance-table td:first-child { min-width: 190px; max-width: 290px; white-space: normal; overflow-wrap: anywhere; }
 .ads-performance-table td:first-child strong { display: block; }
@@ -70,6 +72,27 @@
 .ads-day-details p { margin: 7px 0; line-height: 1.5; }
 @media (max-width: 620px) { .ads-account-card__heading { flex-direction: column; } .ads-account-card__sync { white-space: normal; } }
 @media (max-width: 620px) { .account-grid { grid-template-columns: 1fr; } .analytics-panel-title { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 720px) {
+  .ads-performance-mobile { display: grid; gap: 12px; }
+  .ads-result-level > .ui-table-wrap { display: none; }
+  .ads-performance-card { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-raised, var(--surface)); }
+  .ads-performance-card__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .ads-performance-card__heading > div { min-width: 0; }
+  .ads-performance-card__heading strong { display: block; overflow-wrap: anywhere; }
+  .ads-performance-card__heading > span { flex: 0 0 auto; color: var(--ink-faint); font-size: 10px; }
+  .ads-performance-card__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px 14px; margin: 14px 0; padding-top: 12px; border-top: 1px solid var(--line); }
+  .ads-performance-card__metrics > div { min-width: 0; }
+  .ads-performance-card__metrics dt { color: var(--ink-faint); font-size: 10px; }
+  .ads-performance-card__metrics dd { margin: 3px 0 0; color: var(--ink); font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .ads-performance-card__metrics dd small { display: block; margin-top: 3px; color: var(--ink-faint); font-size: 9px; font-weight: 400; }
+  .ads-performance-card .ads-object-actions { margin: 12px 0; }
+  .ads-performance-card .ads-object-actions__status, .ads-performance-card .ads-object-actions__budget { gap: 6px; }
+  .ads-performance-card .ads-object-actions button, .ads-performance-card .ads-object-actions select { min-height: 34px; font-size: 11px; }
+  .ads-performance-card .ads-object-actions input { min-height: 34px; }
+  .ads-performance-card .ads-stored-details { padding-top: 10px; border-top: 1px solid var(--line); }
+  .ads-performance-card .ads-stored-details summary { min-height: 24px; display: flex; align-items: center; }
+  .ads-performance-card .ads-detail-content { width: 100%; max-height: 420px; box-sizing: border-box; }
+}
 .ads-campaign-create { margin: 1rem 0; padding: 1rem; border: 1px solid var(--border, #d7ded9); border-radius: .75rem; background: var(--surface-soft, #f7f9f7); }
 .ads-campaign-create h3 { margin: 0 0 .35rem; }
 .ads-campaign-create__fields { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; margin-top: .75rem; }
