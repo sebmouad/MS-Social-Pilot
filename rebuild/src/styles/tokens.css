@@ -82,6 +82,7 @@ button, input, select { font: inherit; }
 .shell-subnav__link.is-active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 .shell-root-mobile { display: none; }
 .shell-sidebar-filter { margin-top: 24px; padding: 18px 12px 0; border-top: 1px solid var(--line); }
+.shell-filter-scrim { display: none; }
 .shell-main { min-width: 0; }
 .shell-topbar { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 36px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 88%, transparent); }
 .shell-topbar__crumb, .shell-topbar__actions { display: flex; align-items: center; gap: 12px; }
@@ -145,11 +146,15 @@ button, input, select { font: inherit; }
   .shell-subnav__link { flex: 0 0 auto; white-space: nowrap; }
   .shell-root-mobile { display: flex; }
   .shell-root-link { display: none; }
-  .shell-sidebar-filter { display: none; position: fixed; z-index: 6; inset: 58px 0 64px; margin: 0; padding: 20px 18px; overflow-y: auto; border-top: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow-panel); }
+  .shell-sidebar-filter { display: none; position: fixed; z-index: 6; inset: 58px auto 64px 0; width: min(360px, calc(100% - 48px)); margin: 0; padding: 20px 18px; overflow-y: auto; border-top: 1px solid var(--line); border-right: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow-panel); }
   .shell-sidebar-filter.is-open { display: block; }
+  .shell-filter-scrim { display: block; position: fixed; z-index: 5; inset: 58px 0 64px min(360px, calc(100% - 48px)); padding: 0; border: 0; background: var(--scrim); cursor: pointer; }
   .shell-filter-toggle { display: inline-flex; }
   .shell-topbar { min-height: 58px; padding: 0 18px; }
   .shell-topbar__crumb span:first-child, .shell-topbar__crumb span:nth-child(2) { display: none; }
   .shell-content { padding: 24px 18px; }
   .ui-table { min-width: 620px; }
+}
+@media (max-width: 380px) {
+  .shell-topbar__user { display: none; }
 }

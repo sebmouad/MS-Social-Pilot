@@ -24,6 +24,12 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const pathname = usePathname();
   const [filterOpen, setFilterOpen] = useState(false);
   useEffect(() => setFilterOpen(false), [pathname]);
+  useEffect(() => {
+    if (!filterOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setFilterOpen(false); };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [filterOpen]);
   const modulePages = PAGES.filter(page => page.module === activeModule && enabledFeatures.includes(page.id));
   const enabledModuleSet = new Set(enabledModules);
   const enabledModulePages = new Set(enabledFeatures.map(id => PAGES.find(page => page.id === id)?.module).filter(Boolean));
@@ -38,6 +44,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
         {modulePages.map(page => <a key={page.id} href={page.href} className={`shell-subnav__link${pathname === page.href ? " is-active" : ""}`} aria-current={pathname === page.href ? "page" : undefined}>{page.title}</a>)}
         {rootAccess && activeModule === 'settings' && <a className="shell-subnav__link shell-root-mobile" href="/root/config">Root controls</a>}
       </nav>}
+      {sidebar && filterOpen && <button className="shell-filter-scrim" type="button" aria-label="Close filters" onClick={() => setFilterOpen(false)} />}
       {sidebar && <div id="shell-filters" className={`shell-sidebar-filter${filterOpen ? " is-open" : ""}`} onSubmitCapture={() => setFilterOpen(false)} onClickCapture={event => { if ((event.target as Element).closest('a[href]')) setFilterOpen(false); }}>{sidebar}</div>}
       {rootAccess && <a className="shell-subnav__link shell-root-link" href="/root/config">Root controls</a>}
     </aside>
