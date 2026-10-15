@@ -19,3 +19,7 @@
 .root-directory td button,.root-directory__search button { min-height: 36px; padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--ink); cursor: pointer; }
 .root-directory__self { color: var(--ink-faint); }
 .root-directory__actions { display: flex; gap: 6px; flex-wrap: wrap; min-width: 280px; }
+.root-directory__create { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; padding: 16px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.root-directory__create label { display: grid; gap: 4px; color: var(--ink-soft); font-size: 12px; }
+.root-directory__create input { min-height: 40px; padding: 8px 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); }
+.root-directory__create button { min-height: 40px; padding: 8px 13px; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: white; cursor: pointer; }
