@@ -40,9 +40,10 @@ const tools = [
   { name: 'set_inbox_resolved', description: 'Resolve or reopen a synced Facebook conversation or comment. Confirmation must exactly match RESOLVE <message|comment> <id> or REOPEN <message|comment> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'resolved', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment'] }, id: { type: 'string' }, resolved: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'moderate_inbox_comment', description: 'Hide or unhide a synced Facebook comment. This contacts Facebook. Confirmation must exactly match HIDE COMMENT <id> or UNHIDE COMMENT <id>.', inputSchema: { type: 'object', required: ['id', 'hidden', 'confirmation'], properties: { id: { type: 'string' }, hidden: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_page_analytics', description: 'Read stored daily insights for one workspace Page.', inputSchema: { type: 'object', required: ['pageId'], properties: { pageId: { type: 'string' }, days: { type: 'integer', minimum: 1, maximum: 365 } }, additionalProperties: false } },
-  { name: 'get_analytics_overview', description: 'Read all available analytics metrics and combined audience for selected channels. Metrics are paginated.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel.' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
-  { name: 'list_ad_accounts', description: 'List advertising accounts in this workspace.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'get_ads_performance', description: 'Read stored campaign, ad set, and ad performance for accessible ad accounts. Results are paginated.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, accountId: { type: 'string', description: 'Accessible ad account ID.' }, level: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
+  { name: 'get_analytics_overview', description: 'Read available metrics and combined audience for selected channels. Metrics, audience entries, and selected channels have independent offsets; each response is bounded.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel.' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, audienceOffset: { type: 'integer', minimum: 0 }, targetOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
+  { name: 'get_analytics_metric_details', description: 'Read a bounded page of stored date points or channel/breakdown rows for one Analytics metric. Continue with nextOffset until null.', inputSchema: { type: 'object', required: ['metricKey', 'kind'], properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel.' }, metricKey: { type: 'string', minLength: 1 }, kind: { type: 'string', enum: ['points', 'rows'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
+  { name: 'list_ad_accounts', description: 'List advertising accounts in this workspace using bounded offset pagination.', inputSchema: { type: 'object', properties: { offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
+  { name: 'get_ads_performance', description: 'Read stored campaign, ad set, and ad performance for accessible ad accounts. Performance rows and account summaries have independent offsets.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, accountId: { type: 'string', description: 'Accessible ad account ID.' }, level: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, accountOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
   { name: 'create_ad_campaign', description: 'Create a paused Facebook campaign in a selected account. The confirmation must match CREATE PAUSED FACEBOOK CAMPAIGN <JSON-quoted name> IN ACCOUNT <adAccountId> WITH OBJECTIVE <objective>.', inputSchema: { type: 'object', required: ['adAccountId', 'name', 'objective', 'confirmation'], properties: { adAccountId: { type: 'string' }, name: { type: 'string' }, objective: { type: 'string', enum: ['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'update_ad', description: 'Change the status or one budget of a verified Facebook campaign, ad set, or ad. Confirmation must exactly match SET AD STATUS <objectId> TO <ACTIVE|PAUSED> or SET AD BUDGET <objectId> TO <amount> MINOR UNITS.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType', 'confirmation'], properties: { adAccountId: { type: 'string' }, objectId: { type: 'string' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, status: { type: 'string', enum: ['active', 'paused'] }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, lifetimeBudgetMinor: { type: 'integer', minimum: 1 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'preview_workspace_data_deletion', description: 'Count workspace records that a data deletion would remove. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -84,6 +85,7 @@ const toolFeatures: Record<string, string> = {
   moderate_inbox_comment: 'inbox/conversations',
   get_page_analytics: 'analytics/overview',
   get_analytics_overview: 'analytics/overview',
+  get_analytics_metric_details: 'analytics/overview',
   get_ads_performance: 'ads/campaigns',
   list_ad_accounts: 'ads/campaigns',
   create_ad_campaign: 'ads/campaigns',
@@ -120,6 +122,30 @@ function requiredString(args: Record<string, unknown>, key: string) {
   const value = args[key];
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${key} is required.`);
   return value.trim();
+}
+
+async function loadScopedAnalytics(viewer: McpViewer, args: Record<string, unknown>) {
+  const date = (key: 'start' | 'end') => {
+    const value = args[key];
+    if (value === undefined) return undefined;
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(new Date(`${value}T00:00:00`).getTime())) throw new Error(`${key} must be a valid YYYY-MM-DD date.`);
+    return value;
+  };
+  const start = date('start');
+  const end = date('end');
+  if (start && end && start > end) throw new Error('start must not be after end.');
+  const range = analyticsRange(start, end);
+  const maxRangeDays = Number(await runtimeConfig('analytics.maxRangeDays'));
+  if ((range.to.getTime() - range.from.getTime()) / 86_400_000 > maxRangeDays) throw new Error(`Date range exceeds the configured ${maxRangeDays}-day maximum.`);
+  const allowedTargetIds = pageIdsFor(viewer);
+  const available = await loadAnalytics(viewer.workspaceId, [], range, allowedTargetIds);
+  const availableIds = new Set(available.targets.map(target => target.id));
+  const cap = viewer.maxResultItems ?? 100;
+  if (args.targetIds !== undefined && (!Array.isArray(args.targetIds) || args.targetIds.length > cap || args.targetIds.some(id => typeof id !== 'string' || !availableIds.has(id)))) throw new Error('One or more selected channels are unavailable or exceed the configured result limit.');
+  const selectedIds = args.targetIds === undefined ? available.targets.map(target => target.id) : [...new Set(args.targetIds as string[])];
+  const data = await loadAnalytics(viewer.workspaceId, selectedIds, range, allowedTargetIds);
+  const overview = buildAnalytics(data.pageRows, data.adRows, data.audienceRows, data.selectedTargets, data.adAccountCount, data.instagramRows, data.selectedInstagramAudience);
+  return { range, data, overview };
 }
 
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
@@ -240,35 +266,53 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       return { page, days, insights: rows };
     }
     case 'get_analytics_overview': {
-      const date = (key: 'start' | 'end') => {
-        const value = args[key];
-        if (value === undefined) return undefined;
-        if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(new Date(`${value}T00:00:00`).getTime())) throw new Error(`${key} must be a valid YYYY-MM-DD date.`);
-        return value;
-      };
-      const start = date('start');
-      const end = date('end');
-      if (start && end && start > end) throw new Error('start must not be after end.');
-      const range = analyticsRange(start, end);
-      const maxRangeDays = Number(await runtimeConfig('analytics.maxRangeDays'));
-      if ((range.to.getTime() - range.from.getTime()) / 86_400_000 > maxRangeDays) throw new Error(`Date range exceeds the configured ${maxRangeDays}-day maximum.`);
-      const allowedTargetIds = pageIdsFor(viewer);
-      const available = await loadAnalytics(viewer.workspaceId, [], range, allowedTargetIds);
-      const availableIds = new Set(available.targets.map(target => target.id));
-      if (args.targetIds !== undefined && (!Array.isArray(args.targetIds) || args.targetIds.some(id => typeof id !== 'string' || !availableIds.has(id)))) throw new Error('One or more selected channels are unavailable.');
-      const selectedIds = args.targetIds === undefined ? available.targets.map(target => target.id) : [...new Set(args.targetIds as string[])];
-      const data = await loadAnalytics(viewer.workspaceId, selectedIds, range, allowedTargetIds);
-      const overview = buildAnalytics(data.pageRows, data.adRows, data.audienceRows, data.selectedTargets, data.adAccountCount, data.instagramRows, data.selectedInstagramAudience);
+      const { range, data, overview } = await loadScopedAnalytics(viewer, args);
+      const offset = args.offset === undefined ? 0 : Number(args.offset);
+      const audienceOffset = args.audienceOffset === undefined ? 0 : Number(args.audienceOffset);
+      const targetOffset = args.targetOffset === undefined ? 0 : Number(args.targetOffset);
+      const limit = args.limit === undefined ? Math.min(cap, 50) : Number(args.limit);
+      if (![offset, audienceOffset, targetOffset].every(value => Number.isInteger(value) && value >= 0) || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('offsets and limit must be valid integers.');
+      const pageLimit = Math.min(limit, cap);
+      const metrics = overview.metrics.slice(offset, offset + pageLimit);
+      const boundedMetrics = metrics.map(metric => ({
+        ...metric,
+        points: metric.points.slice(0, cap),
+        rows: metric.rows.slice(0, cap),
+        pointsTruncated: metric.points.length > cap,
+        rowsTruncated: metric.rows.length > cap,
+      }));
+      const audienceEntries = overview.audience.entries.slice(audienceOffset, audienceOffset + pageLimit);
+      const selectedTargets = data.selectedTargets.slice(targetOffset, targetOffset + pageLimit).map(target => ({ id: target.id, type: target.type, name: target.name }));
+      return { range, selectedTargets, selectedTargetCount: data.selectedTargets.length, nextTargetOffset: targetOffset + selectedTargets.length < data.selectedTargets.length ? targetOffset + selectedTargets.length : null, audience: { ...overview.audience, entries: audienceEntries, entryCount: overview.audience.entries.length, entriesTruncated: audienceOffset + audienceEntries.length < overview.audience.entries.length, nextOffset: audienceOffset + audienceEntries.length < overview.audience.entries.length ? audienceOffset + audienceEntries.length : null }, adAccountCount: data.adAccountCount, metricCount: overview.metrics.length, metrics: boundedMetrics, nextOffset: offset + metrics.length < overview.metrics.length ? offset + metrics.length : null };
+    }
+    case 'get_analytics_metric_details': {
+      const metricKey = requiredString(args, 'metricKey');
+      const kind = args.kind;
+      if (kind !== 'points' && kind !== 'rows') throw new Error('kind must be points or rows.');
+      const { range, overview } = await loadScopedAnalytics(viewer, args);
+      const metric = overview.metrics.find(candidate => candidate.key === metricKey);
+      if (!metric) throw new Error('Metric is unavailable for this selection and date range.');
       const offset = args.offset === undefined ? 0 : Number(args.offset);
       const limit = args.limit === undefined ? Math.min(cap, 50) : Number(args.limit);
       if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('offset and limit must be valid integers.');
       const pageLimit = Math.min(limit, cap);
-      const metrics = overview.metrics.slice(offset, offset + pageLimit);
-      return { range, selectedTargets: data.selectedTargets.map(target => ({ id: target.id, type: target.type, name: target.name })), audience: overview.audience, adAccountCount: data.adAccountCount, metricCount: overview.metrics.length, metrics, nextOffset: offset + metrics.length < overview.metrics.length ? offset + metrics.length : null };
+      const details = metric[kind];
+      const items = details.slice(offset, offset + pageLimit);
+      return { range, metric: { key: metric.key, label: metric.label, source: metric.source, unit: metric.unit, kind: metric.kind }, detailKind: kind, totalCount: details.length, offset, items, nextOffset: offset + items.length < details.length ? offset + items.length : null };
     }
-    case 'list_ad_accounts':
+    case 'list_ad_accounts': {
       if (viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can list advertising accounts.');
-      return prisma.adAccount.findMany({ where: { workspaceId: viewer.workspaceId }, orderBy: { name: 'asc' }, take: cap, select: { id: true, actId: true, name: true, enabled: true, currency: true } });
+      const offset = args.offset === undefined ? 0 : Number(args.offset);
+      const limit = args.limit === undefined ? cap : Number(args.limit);
+      if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('offset and limit must be valid integers.');
+      const pageLimit = Math.min(limit, cap);
+      const where = { workspaceId: viewer.workspaceId };
+      const [accounts, accountCount] = await Promise.all([
+        prisma.adAccount.findMany({ where, orderBy: { name: 'asc' }, skip: offset, take: pageLimit, select: { id: true, actId: true, name: true, enabled: true, currency: true } }),
+        prisma.adAccount.count({ where }),
+      ]);
+      return { accounts, accountCount, nextOffset: offset + accounts.length < accountCount ? offset + accounts.length : null };
+    }
     case 'get_ads_performance': {
       const date = (key: 'start' | 'end') => {
         const value = args[key];
@@ -297,12 +341,16 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const limit = args.limit === undefined ? Math.min(cap, 50) : Number(args.limit);
       if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('offset and limit must be valid integers.');
       const pageLimit = Math.min(limit, cap);
+      const accountOffset = args.accountOffset === undefined ? 0 : Number(args.accountOffset);
+      if (!Number.isInteger(accountOffset) || accountOffset < 0) throw new Error('accountOffset must be a non-negative integer.');
       const performance = rows.slice(offset, offset + pageLimit).map(row => ({
         id: row.id, name: row.name, level: row.level, accountId: row.accountId, accountName: row.accountName, currency: row.currency,
         spend: row.spend, impressions: row.impressions, clicks: row.clicks, reach: row.reach, reachDate: row.reachDate,
         cpc: row.cpc, cpm: row.cpm, cpp: row.cpp, ctr: row.ctr, frequency: row.frequency, actions: row.actions, dailyRowCount: row.rows,
       }));
-      return { range, accounts: accounts.filter(account => !accountId || account.id === accountId).map(({ id, name, currency }) => ({ id, name, currency })), level: level ?? null, resultCount: rows.length, performance, nextOffset: offset + performance.length < rows.length ? offset + performance.length : null };
+      const visibleAccounts = accounts.filter(account => !accountId || account.id === accountId);
+      const accountPage = visibleAccounts.slice(accountOffset, accountOffset + cap).map(({ id, name, currency }) => ({ id, name, currency }));
+      return { range, accounts: accountPage, accountCount: visibleAccounts.length, nextAccountOffset: accountOffset + accountPage.length < visibleAccounts.length ? accountOffset + accountPage.length : null, level: level ?? null, resultCount: rows.length, performance, nextOffset: offset + performance.length < rows.length ? offset + performance.length : null };
     }
     case 'create_ad_campaign': {
       const adAccountId = requiredString(args, 'adAccountId');
@@ -495,10 +543,12 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     { uri: 'msp://posts', name: 'Posts', description: 'Recent workspace posts.', mimeType: 'application/json' },
     { uri: 'msp://media/images', name: 'Workspace images', description: 'Bounded workspace image metadata; image bytes are excluded.', mimeType: 'application/json' },
     { uri: 'msp://inbox', name: 'Inbox', description: 'Recent synced inbox activity.', mimeType: 'application/json' },
+    { uri: 'msp://analytics/overview', name: 'Analytics overview', description: 'Selected-channel audience totals and available stored metrics for the default date range.', mimeType: 'application/json' },
+    { uri: 'msp://ads/performance', name: 'Ads performance', description: 'Stored campaign, ad set, and ad performance for the default date range.', mimeType: 'application/json' },
     { uri: 'msp://data/deletion-preview', name: 'Data deletion preview', description: 'Current workspace record counts before deletion.', mimeType: 'application/json' },
     ...(canUseRootTool(viewer) ? [{ uri: 'msp://root/config', name: 'Root configuration', description: 'Installation setting definitions and safe values.', mimeType: 'application/json' }] : []),
   ].filter(resource => {
-    const feature = resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
+    const feature = resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : resource.uri === 'msp://ads/performance' ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
     return (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
   }) });
   if (method === 'resources/read') {
@@ -510,6 +560,8 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     else if (uri === 'msp://posts') contents = await runTool(viewer, 'list_posts', { limit: 100 });
     else if (uri === 'msp://media/images') contents = await runTool(viewer, 'list_workspace_images', { limit: 100 });
     else if (uri === 'msp://inbox') contents = await runTool(viewer, 'list_inbox', { limit: 50 });
+    else if (uri === 'msp://analytics/overview') contents = await runTool(viewer, 'get_analytics_overview', {});
+    else if (uri === 'msp://ads/performance') contents = await runTool(viewer, 'get_ads_performance', {});
     else if (uri === 'msp://data/deletion-preview') contents = await runTool(viewer, 'preview_workspace_data_deletion', {});
     else if (uri === 'msp://root/config') contents = await runTool(viewer, 'get_root_config', {});
     else return error(-32602, `Unknown resource: ${uri}`);

@@ -4,7 +4,7 @@ vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: 
 
 const db = vi.hoisted(() => ({
   target: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
-  adAccount: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
+  adAccount: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
   socialAccount: { findFirst: vi.fn() },
   post: { findMany: vi.fn() },
   pageInsight: { findMany: vi.fn() },
@@ -90,7 +90,7 @@ beforeEach(() => {
   dataControls.remove.mockResolvedValue({ posts: 2 });
   const targets = [{ id: 'page-allowed', type: 'page', name: 'Allowed' }];
   analytics.load.mockResolvedValue({ targets, selectedTargets: targets, pageRows: [], adRows: [], audienceRows: [], adAccountCount: 0, instagramRows: [], selectedInstagramAudience: [] });
-  analytics.build.mockReturnValue({ audience: { total: 12, covered: 1, selected: 1, entries: [] }, metrics: [{ key: 'reach' }, { key: 'clicks' }] });
+  analytics.build.mockReturnValue({ audience: { total: 12, covered: 1, selected: 1, entries: [] }, metrics: [{ key: 'reach', points: [], rows: [] }, { key: 'clicks', points: [], rows: [] }] });
   adsQueries.accounts.mockResolvedValue([{ id: 'account-a', name: 'Account A', currency: 'USD' }]);
   adsQueries.dataset.mockResolvedValue({ insights: [
     { id: 'row-1', adAccountId: 'account-a', level: 'campaign', objectId: 'campaign-a', objectName: 'Campaign A', date: new Date('2026-10-14T00:00:00.000Z'), spend: 20, impressions: 1000, clicks: 20, reach: 900, cpc: 1, cpm: 20, cpp: null, ctr: 2, frequency: 1.1, actions: [], fields: {}, adAccount: { id: 'account-a', name: 'Account A', currency: 'USD' } },
@@ -172,9 +172,89 @@ describe('MCP workspace boundaries', () => {
     const response = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 51, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { targetIds: ['page-allowed'], limit: 1 } } });
     const result = (await response.json()).result.structuredContent;
     expect(result.audience.total).toBe(12);
-    expect(result.metrics).toEqual([{ key: 'reach' }]);
+    expect(result.metrics.map((metric: { key: string }) => metric.key)).toEqual(['reach']);
     expect(result.nextOffset).toBe(1);
     expect(analytics.load).toHaveBeenLastCalledWith('workspace-a', ['page-allowed'], expect.any(Object), ['page-allowed']);
+  });
+  it('publishes scoped Analytics and Ads resources using the same read tools', async () => {
+    analytics.load.mockResolvedValue({ targets: [{ id: 'page-allowed', type: 'page', name: 'Allowed' }], selectedTargets: [{ id: 'page-allowed', type: 'page', name: 'Allowed' }], pageRows: [], adRows: [], audienceRows: [], adAccountCount: 0, instagramRows: [], selectedInstagramAudience: [] });
+    const resources = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 52, method: 'resources/list' });
+    const uris = (await resources.json()).result.resources.map((resource: { uri: string }) => resource.uri);
+    expect(uris).toContain('msp://analytics/overview');
+    expect(uris).toContain('msp://ads/performance');
+
+    const analyticsResource = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 53, method: 'resources/read', params: { uri: 'msp://analytics/overview' } });
+    expect((await analyticsResource.json()).result.contents[0].text).toContain('"audience"');
+    expect(analytics.load).toHaveBeenCalledWith('workspace-a', ['page-allowed'], expect.any(Object), undefined);
+
+    const adsResource = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 54, method: 'resources/read', params: { uri: 'msp://ads/performance' } });
+    expect((await adsResource.json()).result.contents[0].text).toContain('"performance"');
+    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', undefined);
+  });
+  it('caps nested Analytics result rows and reports truncation', async () => {
+    const limited = { ...viewer, maxResultItems: 1 };
+    analytics.build.mockReturnValue({ audience: { total: 30, covered: 2, selected: 2, entries: [{ id: 'page-a' }, { id: 'page-b' }] }, metrics: [{ key: 'reach', points: [{ date: '2026-10-14' }, { date: '2026-10-15' }], rows: [{ label: 'A' }, { label: 'B' }] }] });
+    const response = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 55, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { limit: 1 } } });
+    const result = (await response.json()).result.structuredContent;
+    expect(result.audience).toMatchObject({ total: 30, entries: [{ id: 'page-a' }], entriesTruncated: true });
+    expect(result.metrics[0]).toMatchObject({ points: [{ date: '2026-10-14' }], rows: [{ label: 'A' }], pointsTruncated: true, rowsTruncated: true });
+  });
+  it('paginates audience entries and selected targets beyond the Root result cap', async () => {
+    const limited = { ...viewer, maxResultItems: 1 };
+    const targets = [{ id: 'page-a', type: 'page', name: 'Page A' }, { id: 'page-b', type: 'page', name: 'Page B' }];
+    analytics.load.mockResolvedValue({ targets, selectedTargets: targets, pageRows: [], adRows: [], audienceRows: [], adAccountCount: 0, instagramRows: [], selectedInstagramAudience: [] });
+    analytics.build.mockReturnValue({ audience: { total: 30, covered: 2, selected: 2, entries: [{ id: 'page-a', value: 10 }, { id: 'page-b', value: 20 }] }, metrics: [] });
+    const first = (await (await handleMcpMessage(limited, { jsonrpc: '2.0', id: 57, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { limit: 1 } } })).json()).result.structuredContent;
+    expect(first.audience.entries).toEqual([{ id: 'page-a', value: 10 }]);
+    expect(first.audience.nextOffset).toBe(1);
+    expect(first.selectedTargets.map((target: { id: string }) => target.id)).toEqual(['page-a']);
+    expect(first.nextTargetOffset).toBe(1);
+
+    const second = (await (await handleMcpMessage(limited, { jsonrpc: '2.0', id: 58, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { limit: 1, audienceOffset: 1, targetOffset: 1 } } })).json()).result.structuredContent;
+    expect(second.audience.entries).toEqual([{ id: 'page-b', value: 20 }]);
+    expect(second.audience.nextOffset).toBeNull();
+    expect(second.selectedTargets.map((target: { id: string }) => target.id)).toEqual(['page-b']);
+    expect(second.nextTargetOffset).toBeNull();
+  });
+  it('paginates accessible Ads accounts independently of performance rows', async () => {
+    const limited = { ...viewer, maxResultItems: 1 };
+    adsQueries.accounts.mockResolvedValue([{ id: 'account-a', name: 'Account A', currency: 'USD' }, { id: 'account-b', name: 'Account B', currency: 'EUR' }]);
+    const response = (offset: number) => handleMcpMessage(limited, { jsonrpc: '2.0', id: 59 + offset, method: 'tools/call', params: { name: 'get_ads_performance', arguments: { accountOffset: offset, limit: 1 } } });
+    const first = (await (await response(0)).json()).result.structuredContent;
+    expect(first.accounts).toEqual([{ id: 'account-a', name: 'Account A', currency: 'USD' }]);
+    expect(first.accountCount).toBe(2);
+    expect(first.nextAccountOffset).toBe(1);
+    const second = (await (await response(1)).json()).result.structuredContent;
+    expect(second.accounts).toEqual([{ id: 'account-b', name: 'Account B', currency: 'EUR' }]);
+    expect(second.nextAccountOffset).toBeNull();
+  });
+  it('paginates the manager-only ad account directory beyond the Root result cap', async () => {
+    const limited = { ...viewer, maxResultItems: 1 };
+    db.adAccount.findMany.mockResolvedValueOnce([{ id: 'account-a' }]).mockResolvedValueOnce([{ id: 'account-b' }]);
+    db.adAccount.count.mockResolvedValue(2);
+    const readPage = (offset: number) => handleMcpMessage(limited, { jsonrpc: '2.0', id: 61 + offset, method: 'tools/call', params: { name: 'list_ad_accounts', arguments: { offset, limit: 1 } } });
+    const first = (await (await readPage(0)).json()).result.structuredContent;
+    expect(first.accounts).toEqual([{ id: 'account-a' }]);
+    expect(first.nextOffset).toBe(1);
+    const second = (await (await readPage(1)).json()).result.structuredContent;
+    expect(second.accounts).toEqual([{ id: 'account-b' }]);
+    expect(second.nextOffset).toBeNull();
+  });
+  it('paginates every point and row for an authorized Analytics metric', async () => {
+    const limited = { ...viewer, maxResultItems: 1, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
+    analytics.build.mockReturnValue({ audience: { total: 12, covered: 1, selected: 1, entries: [] }, metrics: [{ key: 'reach::day', label: 'Reach', source: 'page', unit: 'count', kind: 'flow', points: [{ date: '2026-10-14', value: 4 }, { date: '2026-10-15', value: 5 }], rows: [{ label: 'Page A', value: 4 }, { label: 'Page B', value: 5 }] }] });
+    const callMetric = (kind: 'points' | 'rows', offset: number) => handleMcpMessage(limited, { jsonrpc: '2.0', id: 56 + offset, method: 'tools/call', params: { name: 'get_analytics_metric_details', arguments: { metricKey: 'reach::day', kind, offset, limit: 1, targetIds: ['page-allowed'], start: '2026-10-14', end: '2026-10-15' } } });
+
+    for (const kind of ['points', 'rows'] as const) {
+      const first = (await (await callMetric(kind, 0)).json()).result.structuredContent;
+      expect(first.items).toHaveLength(1);
+      expect(first.nextOffset).toBe(1);
+      const second = (await (await callMetric(kind, 1)).json()).result.structuredContent;
+      expect(second.items).toHaveLength(1);
+      expect(second.nextOffset).toBeNull();
+      expect(second.totalCount).toBe(2);
+    }
+    expect(analytics.load).toHaveBeenCalledWith('workspace-a', ['page-allowed'], expect.any(Object), ['page-allowed']);
   });
   it('applies ads write scope, manager role, and exact confirmations before shared ads services', async () => {
     const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 60, method: 'tools/list' });
