@@ -21,7 +21,7 @@ const names: Record<string, string> = {
 };
 
 export function metricLabel(key: string): string {
-  return names[key] ?? key.replace(/^page_/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return names[key] ?? key.replace(/^page_/, '').replace(/[:_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 export function pageMetricKind(key: string): AnalyticsMetric['kind'] {

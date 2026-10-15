@@ -145,7 +145,7 @@ export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRow
   const adFields = ['spend', 'impressions', 'clicks', 'reach'] as const;
   for (const key of adFields) {
     const channelValues = new Map<string, ChannelSeries>();
-    const observations = adRows.map(row => { const label = key === 'spend' && row.adAccount.currency ? `${row.adAccount.name} · ${row.adAccount.currency}` : row.adAccount.name; const item = channelValues.get(label) ?? { values: [], latest: row.date }; item.values.push(row[key]); if (row.date > item.latest) item.latest = row.date; channelValues.set(label, item); return { date: row.date, label, value: row[key] }; });
+    const observations = adRows.map(row => { const label = key === 'spend' && row.adAccount.currency ? `${row.adAccount.name} · ${row.adAccount.currency}` : row.adAccount.name; const item = channelValues.get(row.adAccount.id) ?? { label, values: [], latest: row.date }; item.values.push(row[key]); if (row.date > item.latest) item.latest = row.date; channelValues.set(row.adAccount.id, item); return { date: row.date, label, value: row[key] }; });
     if (observations.length) {
       const metric = metricSeries(key, 'ads', key === 'reach' ? 'stock' : 'flow', key === 'spend' ? 'currency' : 'count', observations, channelValues, adAvailableCount);
       metric.updatedAt = new Date(Math.max(...adRows.map(row => row.fetchedAt.getTime())));
@@ -203,7 +203,8 @@ export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRow
         const record = asMap(item); if (typeof record.action_type === 'string') addExtra(`${key}:${record.action_type}`, row, record.value);
       } else addExtra(key, row, value);
     }
-    for (const [key, value] of Object.entries(asMap(row.actions))) {
+    const actionGroups = Array.isArray(row.actions) ? [['actions', row.actions] as const] : Object.entries(asMap(row.actions));
+    for (const [key, value] of actionGroups) {
       if (!Array.isArray(value)) continue;
       for (const item of value) { const record = asMap(item); if (typeof record.action_type === 'string') addExtra(`${key}:${record.action_type}`, row, record.value); }
     }

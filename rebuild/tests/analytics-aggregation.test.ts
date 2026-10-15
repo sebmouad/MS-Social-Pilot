@@ -43,4 +43,16 @@ describe('analytics aggregation', () => {
     expect(result.metrics.find(metric => metric.key === 'quality_ranking')?.available).toBe(2);
     expect(result.metrics.find(metric => metric.key === 'actions:link_click')?.total).toBe(30);
   });
+
+  it('keeps same-named ad accounts separate and reads direct action arrays', () => {
+    const base = { date: date('2026-10-01'), spend: 10, impressions: 100, clicks: 4, reach: 50, cpc: 2.5, cpm: 100, cpp: 0.2, ctr: 4, frequency: 2, fetchedAt: date('2026-10-02'), fields: {} };
+    const rows = [
+      { ...base, adAccount: { id: 'a1', name: 'Main', currency: 'USD' }, actions: [{ action_type: 'link_click', value: '4' }] },
+      { ...base, adAccount: { id: 'a2', name: 'Main', currency: 'USD' }, actions: [{ action_type: 'link_click', value: '3' }] },
+    ];
+    const metrics = buildAnalytics([], rows, [], [], 2).metrics;
+    expect(metrics.find(metric => metric.key === 'reach')).toMatchObject({ total: 100, coverage: 2 });
+    expect(metrics.find(metric => metric.key === 'spend')).toMatchObject({ total: 20, coverage: 2 });
+    expect(metrics.find(metric => metric.key === 'actions:link_click')).toMatchObject({ total: 7, label: 'Actions Link Click' });
+  });
 });
