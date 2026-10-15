@@ -18,8 +18,8 @@ vi.mock('../src/server/post-mutations', () => ({ createLocalDraft: mutations.cre
 vi.mock('../src/server/connection-mutations', () => ({ setConnectionSelections: mutations.select }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
 vi.mock('../src/server/inbox/actions', () => ({ replyToFacebookInbox: inboxMutations.reply, setFacebookInboxResolved: inboxMutations.resolve, moderateFacebookComment: inboxMutations.moderate }));
-const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn() }));
-vi.mock('../src/server/publishing/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove }));
+const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
+vi.mock('../src/server/publishing/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
 
 import { handleMcpMessage, type McpViewer } from '../src/server/mcp/server';
 import { resolvePermissions } from '../src/server/permissions';
@@ -52,6 +52,12 @@ beforeEach(() => {
   publishingMutations.publish.mockResolvedValue({ published: 1, failed: 0, needsReconciliation: 0 });
   publishingMutations.sync.mockResolvedValue({ synced: 1 });
   publishingMutations.remove.mockResolvedValue(undefined);
+  publishingMutations.create.mockResolvedValue({ id: 'new-post' });
+  publishingMutations.update.mockResolvedValue(undefined);
+  publishingMutations.submit.mockResolvedValue(undefined);
+  publishingMutations.review.mockResolvedValue(undefined);
+  publishingMutations.schedule.mockResolvedValue(undefined);
+  publishingMutations.cancel.mockResolvedValue(undefined);
 });
 
 describe('MCP workspace boundaries', () => {
@@ -90,7 +96,7 @@ describe('MCP workspace boundaries', () => {
 
     db.post.findMany.mockResolvedValue([]);
     await handleMcpMessage(limited, { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'list_posts', arguments: {} } });
-    expect(db.post.findMany.mock.calls.at(-1)?.[0].where).toMatchObject({ workspaceId: 'workspace-a', OR: [{ targets: { some: { targetId: { in: ['page-a'] } } } }, { authorId: 'user-a', targets: { none: {} } }] });
+    expect(db.post.findMany.mock.calls.at(-1)?.[0].where).toMatchObject({ workspaceId: 'workspace-a', OR: [{ targets: { some: {}, none: { targetId: { notIn: ['page-a'] } } } }, { authorId: 'user-a', targets: { none: {} } }] });
     expect(db.post.findMany.mock.calls.at(-1)?.[0].select.targets.where).toEqual({ targetId: { in: ['page-a'] } });
   });
 
@@ -187,6 +193,25 @@ describe('MCP workspace boundaries', () => {
     const remoteDelete = await call('delete_post', { postId: 'post-a', deleteRemote: true, confirmation: 'DELETE POST post-a REMOTE' });
     expect((await remoteDelete.json()).result.structuredContent).toMatchObject({ postId: 'post-a', deleted: true, remoteDeletionRequested: true });
     expect(publishingMutations.remove).toHaveBeenCalledWith(viewer, 'post-a', true);
+    expect(db.$executeRaw).toHaveBeenCalled();
+  });
+
+  it('confirms configured post creation and scheduling, with workspace actor passed to lifecycle', async () => {
+    const denied = await call('create_post', { message: 'hello', targetIds: ['page-a'] });
+    expect((await denied.json()).result.isError).toBe(true);
+    expect(publishingMutations.create).not.toHaveBeenCalled();
+
+    const created = await call('create_post', { message: 'hello', firstComment: 'follow-up', targetIds: ['page-a'], imageUrl: 'https://example.com/photo.jpg', confirmation: 'CREATE POST' });
+    expect((await created.json()).result.structuredContent).toEqual({ id: 'new-post', status: 'draft' });
+    expect(publishingMutations.create).toHaveBeenCalledWith(viewer, expect.objectContaining({ targetIds: ['page-a'], firstComment: 'follow-up', media: [{ kind: 'image', url: 'https://example.com/photo.jpg' }] }));
+
+    const time = '2030-01-02T12:00:00.000Z';
+    const scheduled = await call('schedule_post', { postId: 'new-post', scheduledAt: time, confirmation: `SCHEDULE POST new-post ${time}` });
+    expect((await scheduled.json()).result.structuredContent).toMatchObject({ postId: 'new-post', status: 'scheduled' });
+    expect(publishingMutations.schedule).toHaveBeenCalledWith(viewer, 'new-post', new Date(time));
+    const updated = await call('update_post', { postId: 'new-post', message: 'edited', targetIds: ['page-a'], confirmation: 'UPDATE POST new-post' });
+    expect((await updated.json()).result.structuredContent).toEqual({ postId: 'new-post', updated: true });
+    expect(publishingMutations.update).toHaveBeenCalledWith(viewer, expect.objectContaining({ postId: 'new-post', targetIds: ['page-a'] }));
     expect(db.$executeRaw).toHaveBeenCalled();
   });
 });

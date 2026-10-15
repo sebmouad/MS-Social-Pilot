@@ -5,7 +5,7 @@ import { setConnectionSelections } from '../connection-mutations';
 import { randomBytes } from 'node:crypto';
 import { canAccessFeature, canAccessPage, type ScopedPermissions } from '../permissions';
 import { moderateFacebookComment, replyToFacebookInbox, setFacebookInboxResolved } from '../inbox/actions';
-import { deletePost, publishPost, syncPostStatus } from '../publishing/lifecycle';
+import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '../publishing/lifecycle';
 
 export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number; apiKeyId?: string };
 type JsonRpcId = string | number | null;
@@ -32,6 +32,12 @@ const tools = [
   { name: 'publish_post', description: 'Publish a workspace post now to its configured destinations. This contacts social platforms. Confirmation must exactly match PUBLISH POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'sync_post_status', description: 'Refresh a post status from supported social platforms. Confirmation must exactly match SYNC POST STATUS <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'delete_post', description: 'Permanently delete a workspace post and its local publishing history. Set deleteRemote to true to also request deletion of remote posts. Confirmation must exactly match DELETE POST <postId> LOCAL or DELETE POST <postId> REMOTE.', inputSchema: { type: 'object', required: ['postId', 'deleteRemote', 'confirmation'], properties: { postId: { type: 'string' }, deleteRemote: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'create_post', description: 'Create a local post draft with selected destinations and optional first comment, link, or media URL. Confirmation must exactly match CREATE POST.', inputSchema: { type: 'object', required: ['message', 'targetIds', 'confirmation'], properties: { message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'update_post', description: 'Edit an unpublished post and its selected destinations. Confirmation must exactly match UPDATE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'message', 'targetIds', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'submit_post_for_approval', description: 'Submit a draft for review. Confirmation must exactly match SUBMIT POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'review_post', description: 'Approve or reject a pending post. Confirmation must exactly match APPROVE POST <postId> or REJECT POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'decision', 'confirmation'], properties: { postId: { type: 'string' }, decision: { type: 'string', enum: ['approve', 'reject'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'schedule_post', description: 'Schedule a draft for a future ISO timestamp. Confirmation must exactly match SCHEDULE POST <postId> <timestamp>.', inputSchema: { type: 'object', required: ['postId', 'scheduledAt', 'confirmation'], properties: { postId: { type: 'string' }, scheduledAt: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'cancel_scheduled_post', description: 'Return a queued post to drafts before delivery. Confirmation must exactly match CANCEL SCHEDULE <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'set_connection_selection', description: 'Enable or disable one workspace channel or advertising account. Confirmation must exactly identify the selection and action.', inputSchema: { type: 'object', required: ['kind', 'id', 'enabled', 'confirmation'], properties: { kind: { type: 'string', enum: ['target', 'adAccount'] }, id: { type: 'string' }, enabled: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
 ];
 
@@ -50,10 +56,16 @@ const toolFeatures: Record<string, string> = {
   publish_post: 'publishing/posts',
   sync_post_status: 'publishing/posts',
   delete_post: 'publishing/posts',
+  create_post: 'publishing/posts',
+  update_post: 'publishing/posts',
+  submit_post_for_approval: 'publishing/posts',
+  review_post: 'publishing/approvals',
+  schedule_post: 'publishing/posts',
+  cancel_scheduled_post: 'publishing/posts',
   set_connection_selection: 'settings/connections',
 };
 
-const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment']);
+const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -61,6 +73,12 @@ async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string
 
 function requireConfirmation(args: Record<string, unknown>, expected: string) {
   if (args.confirmation !== expected) throw new Error(`Confirmation required. Repeat the call with confirmation exactly: ${expected}`);
+}
+
+function requiredString(args: Record<string, unknown>, key: string) {
+  const value = args[key];
+  if (typeof value !== 'string' || !value.trim()) throw new Error(`${key} is required.`);
+  return value.trim();
 }
 
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
@@ -81,7 +99,7 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime()))) throw new Error('from and to must be valid ISO dates.');
       const limit = Math.max(1, Math.min(cap, Math.trunc(Number(args.limit) || cap)));
       const pageIds = pageIdsFor(viewer);
-      return prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, ...(pageIds ? { OR: [{ targets: { some: { targetId: { in: pageIds } } } }, { authorId: viewer.userId, targets: { none: {} } }] } : {}), ...(status.length ? { status: { in: status as never[] } } : {}), ...(from || to ? { scheduledAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}) }, orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }], take: limit, select: { id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, targets: { where: pageIds ? { targetId: { in: pageIds } } : {}, select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, type: true, name: true } } } } } });
+      return prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, ...(pageIds ? { OR: [{ targets: { some: {}, none: { targetId: { notIn: pageIds } } } }, { authorId: viewer.userId, targets: { none: {} } }] } : {}), ...(status.length ? { status: { in: status as never[] } } : {}), ...(from || to ? { scheduledAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}) }, orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }], take: limit, select: { id: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, targets: { where: pageIds ? { targetId: { in: pageIds } } : {}, select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, type: true, name: true } } } } } });
     }
     case 'list_inbox': {
       const kind = args.kind === 'comment' || args.kind === 'message' ? args.kind : undefined;
@@ -187,6 +205,61 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       await deletePost(viewer, postId, args.deleteRemote);
       await auditWrite(viewer, name, { postId, remoteDeletionRequested: args.deleteRemote });
       return { postId, deleted: true, remoteDeletionRequested: args.deleteRemote };
+    }
+    case 'create_post': {
+      requireConfirmation(args, 'CREATE POST');
+      if (!Array.isArray(args.targetIds) || args.targetIds.some(id => typeof id !== 'string')) throw new Error('targetIds must be an array of destination IDs.');
+      const media = [
+        ...(typeof args.imageUrl === 'string' && args.imageUrl.trim() ? [{ kind: 'image' as const, url: args.imageUrl.trim() }] : []),
+        ...(typeof args.videoUrl === 'string' && args.videoUrl.trim() ? [{ kind: 'video' as const, url: args.videoUrl.trim() }] : []),
+      ];
+      const result = await createPost(viewer, { message: requiredString(args, 'message'), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media });
+      await auditWrite(viewer, name, { postId: result.id, targetCount: args.targetIds.length });
+      return { id: result.id, status: 'draft' };
+    }
+    case 'update_post': {
+      const postId = requiredString(args, 'postId');
+      requireConfirmation(args, `UPDATE POST ${postId}`);
+      if (!Array.isArray(args.targetIds) || args.targetIds.some(id => typeof id !== 'string')) throw new Error('targetIds must be an array of destination IDs.');
+      const media = [
+        ...(typeof args.imageUrl === 'string' && args.imageUrl.trim() ? [{ kind: 'image' as const, url: args.imageUrl.trim() }] : []),
+        ...(typeof args.videoUrl === 'string' && args.videoUrl.trim() ? [{ kind: 'video' as const, url: args.videoUrl.trim() }] : []),
+      ];
+      await updatePost(viewer, { postId, message: requiredString(args, 'message'), firstComment: typeof args.firstComment === 'string' ? args.firstComment : '', targetIds: args.targetIds, link: typeof args.link === 'string' ? args.link : undefined, media });
+      await auditWrite(viewer, name, { postId, targetCount: args.targetIds.length });
+      return { postId, updated: true };
+    }
+    case 'submit_post_for_approval': {
+      const postId = requiredString(args, 'postId');
+      requireConfirmation(args, `SUBMIT POST ${postId}`);
+      await submitPostForApproval(viewer, postId);
+      await auditWrite(viewer, name, { postId });
+      return { postId, status: 'pending_approval' };
+    }
+    case 'review_post': {
+      const postId = requiredString(args, 'postId');
+      if (args.decision !== 'approve' && args.decision !== 'reject') throw new Error('decision must be approve or reject.');
+      requireConfirmation(args, `${args.decision.toUpperCase()} POST ${postId}`);
+      await reviewPost(viewer, postId, args.decision);
+      await auditWrite(viewer, name, { postId, decision: args.decision });
+      return { postId, decision: args.decision };
+    }
+    case 'schedule_post': {
+      const postId = requiredString(args, 'postId');
+      const scheduledAt = requiredString(args, 'scheduledAt');
+      const date = new Date(scheduledAt);
+      if (!Number.isFinite(date.getTime()) || !/^\d{4}-\d\d-\d\dT/.test(scheduledAt)) throw new Error('scheduledAt must be an ISO date-time.');
+      requireConfirmation(args, `SCHEDULE POST ${postId} ${scheduledAt}`);
+      await schedulePost(viewer, postId, date);
+      await auditWrite(viewer, name, { postId, scheduledAt: date.toISOString() });
+      return { postId, status: 'scheduled', scheduledAt: date.toISOString() };
+    }
+    case 'cancel_scheduled_post': {
+      const postId = requiredString(args, 'postId');
+      requireConfirmation(args, `CANCEL SCHEDULE ${postId}`);
+      await cancelScheduledPost(viewer, postId);
+      await auditWrite(viewer, name, { postId });
+      return { postId, status: 'draft' };
     }
     case 'set_connection_selection': {
       requireFeature(viewer.entitlements, 'settings/connections');
