@@ -36,4 +36,14 @@ describe('scoped post pagination', () => {
     expect(count).toHaveBeenCalledWith({ where });
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where, skip: 50, take: 50 }));
   });
+
+  it('queries scheduled and approval queues before paging in workflow order', async () => {
+    const count = vi.spyOn(prisma.post, 'count').mockResolvedValue(75);
+    const findMany = vi.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
+    await listPostPage('workspace-1', 2, 50, ['page-1'], 'author-1', { status: 'scheduled', order: 'scheduled_asc' });
+    expect(count).toHaveBeenCalledWith({ where: expect.objectContaining({ workspaceId: 'workspace-1', status: 'scheduled', OR: expect.any(Array) }) });
+    expect(findMany).toHaveBeenLastCalledWith(expect.objectContaining({ skip: 50, orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }] }));
+    await listPostPage('workspace-1', 1, 50, ['page-1'], 'author-1', { status: 'pending_approval', order: 'created_asc' });
+    expect(findMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: expect.objectContaining({ status: 'pending_approval' }), orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }));
+  });
 });

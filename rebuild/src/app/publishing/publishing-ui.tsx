@@ -5,6 +5,15 @@ export function PageHeading({ title, description, eyebrow = "Publishing", summar
   return <header className={styles.heading}><div><p className={styles.eyebrow}>{eyebrow}</p><h1>{title}</h1><p>{description}</p></div>{summary ? <span className={styles.summary}>{summary}</span> : null}</header>;
 }
 
+export function PublishingPagination({ path, page, pages }: { path: string; page: number; pages: number }) {
+  if (pages <= 1) return null;
+  return <nav className={styles.postPagination} aria-label="Post pages">
+    {page > 1 ? <a className="ui-button ui-button--secondary" href={`${path}?page=${page - 1}`}>Previous page</a> : <span />}
+    <span>Page {page} of {pages}</span>
+    {page < pages ? <a className="ui-button ui-button--secondary" href={`${path}?page=${page + 1}`}>Next page</a> : <span />}
+  </nav>;
+}
+
 export function PostMessage({ message }: { message: string }) {
   const text = message.trim();
   return <span className={styles.message}>{text || "No text included"}</span>;

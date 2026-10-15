@@ -117,7 +117,7 @@ export async function listPosts(workspaceId: string, limit = 100): Promise<PostS
 }
 
 /** Paginate posts after workspace and channel scope have been enforced in the query. */
-export async function listPostPage(workspaceId: string, page: number, pageSize: number, allowedTargetIds: readonly string[] | null, authorId: string, filters: { status?: PostStatus; channelId?: string } = {}) {
+export async function listPostPage(workspaceId: string, page: number, pageSize: number, allowedTargetIds: readonly string[] | null, authorId: string, filters: { status?: PostStatus; channelId?: string; order?: 'scheduled_asc' | 'created_asc' } = {}) {
   const size = Math.max(1, Math.min(Math.trunc(pageSize), 100));
   const requestedPage = Number.isSafeInteger(page) && page > 0 ? page : 1;
   const where: Prisma.PostWhereInput = {
@@ -134,7 +134,9 @@ export async function listPostPage(workspaceId: string, page: number, pageSize: 
   const currentPage = Math.min(requestedPage, pages);
   const posts = await prisma.post.findMany({
     where,
-    orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+    orderBy: filters.order === 'scheduled_asc' ? [{ scheduledAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }]
+      : filters.order === 'created_asc' ? [{ createdAt: 'asc' }, { id: 'asc' }]
+      : [{ scheduledAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
     skip: (currentPage - 1) * size,
     take: size,
     select: {
