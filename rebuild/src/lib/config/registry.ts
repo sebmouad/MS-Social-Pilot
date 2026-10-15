@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 23;
+export const CONFIG_SCHEMA_VERSION = 24;
 
 const cron = z.string().min(9).max(100).refine((value) => {
   const fields = value.trim().split(/\s+/);
@@ -40,6 +40,7 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'auth.passkeyChallengeMinutes', group: 'Security · passkeys', label: 'Passkey challenge lifetime (minutes)', kind: 'number', description: 'Maximum age of one WebAuthn challenge within a password-verified sign-in session.', defaultValue: 5, schema: z.number().int().min(1).max(30), consumption: 'active' }),
   entry({ key: 'security.twoStep', group: 'Security', label: 'Two-step requirement', kind: 'select', description: 'Admins, everyone, or off. Enrolled factors still require verification.', defaultValue: 'admins', schema: z.enum(['admins', 'everyone', 'off']), consumption: 'active', options: [{ value: 'admins', label: 'Admins' }, { value: 'everyone', label: 'Everyone' }, { value: 'off', label: 'Off' }] }),
   entry({ key: 'security.apiRequestsPerMinute', group: 'Security · rate limits', label: 'API requests per minute', kind: 'number', description: 'Default per-actor request budget for application APIs.', defaultValue: 120, schema: z.number().int().min(1).max(100000), consumption: 'planned' }),
+  entry({ key: 'root.directoryPageSize', group: 'Root', label: 'Root directory page size', kind: 'number', description: 'Users and workspaces shown per page in the private Root directory.', defaultValue: 25, schema: z.number().int().min(1).max(200), consumption: 'active' }),
 
   entry({ key: 'meta.graphBaseUrl', group: 'API endpoints', label: 'Meta Graph API base URL', kind: 'text', description: 'HTTPS origin and optional path used by Meta Graph requests.', defaultValue: 'https://graph.facebook.com', schema: url, consumption: 'active' }),
   entry({ key: 'meta.oauthBaseUrl', group: 'API endpoints', label: 'Meta OAuth dialog base URL', kind: 'text', description: 'HTTPS origin used to display the Meta authorization dialog.', defaultValue: 'https://www.facebook.com', schema: url, consumption: 'active' }),

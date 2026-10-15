@@ -1,0 +1,18 @@
+import { RootFrame } from '@/server/root/RootFrame';
+import { listRootUsers } from '@/server/root/directory';
+import { runtimeConfig } from '@/server/config/store';
+import { requireRootPage } from '@/server/config/access';
+
+export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Users · Root' };
+
+export default async function RootUsersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
+  await requireRootPage();
+  const params = await searchParams;
+  const data = await listRootUsers(params, await runtimeConfig('root.directoryPageSize'));
+  const url = (page: number) => `/root/users?${new URLSearchParams({ ...(data.query ? { q: data.query } : {}), page: String(page) })}`;
+  return <RootFrame active="/root/users"><div className="root-directory__head"><div><p className="root-config__eyebrow">Root · Directory</p><h1>Users</h1><p>{data.total} accounts. Credentials and recovery factors are never displayed here.</p></div><form className="root-directory__search" action="/root/users"><label>Search users<input name="q" defaultValue={data.query} placeholder="Name or email" /></label><button type="submit">Search</button></form></div>
+    <div className="root-directory__table-wrap"><table><thead><tr><th scope="col">User</th><th scope="col">Access</th><th scope="col">Workspaces</th><th scope="col">Sessions</th><th scope="col">Created</th></tr></thead><tbody>{data.users.map(user => <tr key={user.id}><td><strong>{user.name}</strong><br />{user.email}</td><td>{user.disabledAt ? 'Disabled' : user.isInstanceOwner ? 'Instance owner' : 'Active'}</td><td>{user._count.memberships}</td><td>{user._count.sessions}</td><td>{user.createdAt.toLocaleDateString()}</td></tr>)}</tbody></table>{!data.users.length && <p className="root-config__empty">No users match this search.</p>}</div>
+    <div className="root-directory__pager"><span>Page {data.page} of {Math.max(1, Math.ceil(data.total / data.take))}</span><span>{data.page > 1 && <a href={url(data.page - 1)}>Previous</a>}{data.page * data.take < data.total && <> · <a href={url(data.page + 1)}>Next</a></>}</span></div>
+  </RootFrame>;
+}
