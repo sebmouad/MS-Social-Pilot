@@ -45,7 +45,7 @@ export function MediaLibrary({ canDelete }: { canDelete: boolean }) {
       <div className={styles.mediaGrid}>
         {items.map(image => <article className={styles.mediaCard} key={image.id}>
           <a className={styles.mediaPreview} href={`/api/media/${encodeURIComponent(image.id)}`} target="_blank" rel="noreferrer" aria-label="Open image preview">
-            <img src={`/api/media/${encodeURIComponent(image.id)}`} alt="Stored workspace image" loading="lazy" />
+            <img src={`/api/media/${encodeURIComponent(image.id)}`} alt="Stored workspace image" width={160} height={160} loading="lazy" />
           </a>
           <div className={styles.mediaDetails}>
             <span className={styles.mediaType}>{image.mimeType.replace('image/', '').toUpperCase()} · {formatBytes(image.size)}</span>

@@ -5,7 +5,7 @@ type AdRow = { date: Date; spend: number; impressions: number; clicks: number; r
 type AudienceRow = { metric: string; numeric: number | null; endTime: Date; fetchedAt: Date; target: { id: string; name: string } };
 type InstagramRow = { metric: string; period: string; endTime: Date; fetchedAt: Date; numeric: number | null; value: unknown; account: { id: string; igUserId: string; username: string } };
 type InstagramAudienceRow = { igUserId: string; followersCount: number | null; lastSyncedAt: Date | null; updatedAt?: Date };
-type ChannelSeries = { label?: string; values: number[]; latest: Date };
+type ChannelSeries = { label?: string; values: number[]; latest: Date; latestValue?: number };
 
 export type MetricView = {
   key: string; label: string; source: 'page' | 'instagram' | 'ads'; unit: AnalyticsMetric['unit']; kind: AnalyticsMetric['kind'];
@@ -37,9 +37,9 @@ function metricSeries(key: string, source: 'page' | 'instagram' | 'ads', kind: A
   for (const row of observations) { const day = isoDay(row.date); const values = grouped.get(day) ?? []; values.push(row.value); grouped.set(day, values); }
   const points = [...grouped].sort(([a], [b]) => a.localeCompare(b)).map(([date, values]) => ({ date, label: formatDay(date), value: values.reduce((sum, n) => sum + n, 0) }));
   const values = [...channelValues.values()];
-  const total = kind === 'stock' ? values.reduce((sum, item) => sum + (item.values.at(-1) ?? 0), 0) : aggregateValues(observations.map(row => row.value), kind);
+  const total = kind === 'stock' ? values.reduce((sum, item) => sum + (item.latestValue ?? item.values.at(-1) ?? 0), 0) : aggregateValues(observations.map(row => row.value), kind);
   const latestAt = values.length ? new Date(Math.max(...values.map(item => item.latest.getTime()))) : null;
-  const rows = [...channelValues].map(([key, item]) => ({ label: item.label ?? key, value: kind === 'stock' ? item.values.at(-1)! : item.values.reduce((sum, value) => sum + value, 0), asOf: item.latest })).sort((a, b) => b.value - a.value);
+  const rows = [...channelValues].map(([key, item]) => ({ label: item.label ?? key, value: kind === 'stock' ? (item.latestValue ?? item.values.at(-1)!) : item.values.reduce((sum, value) => sum + value, 0), asOf: item.latest })).sort((a, b) => b.value - a.value);
   return { key, label: metricLabel(key), source, unit, kind, total, latestAt, coverage: rows.length, available: selectedCount, points, rows };
 }
 
@@ -72,7 +72,7 @@ export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRow
       if (numeric !== null) {
         observations.push({ date: row.endTime, label: row.target.name, value: numeric });
         const item = channelValues.get(row.target.id) ?? { label: row.target.name, values: [], latest: row.endTime };
-        item.values.push(numeric); if (row.endTime > item.latest) item.latest = row.endTime; channelValues.set(row.target.id, item);
+        item.values.push(numeric); if (item.latestValue === undefined || row.endTime >= item.latest) { item.latest = row.endTime; item.latestValue = numeric; } channelValues.set(row.target.id, item);
       } else if (asMap(row.value) && Object.keys(asMap(row.value)).length) {
         const previous = breakdownLatest.get(row.target.id);
         if (!previous || row.endTime > previous.endTime) breakdownLatest.set(row.target.id, row);
@@ -117,7 +117,7 @@ export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRow
         observations.push({ date: row.endTime, label: name, value: numeric });
         const item = channelValues.get(target.id) ?? { label: name, values: [], latest: row.endTime };
         item.values.push(numeric);
-        if (row.endTime > item.latest) item.latest = row.endTime;
+        if (row.endTime >= item.latest) { item.latest = row.endTime; item.latestValue = numeric; }
         channelValues.set(target.id, item);
       } else if (kind === 'breakdown' && Object.keys(asMap(row.value)).length) {
         const previous = breakdownLatest.get(target.id);
@@ -145,7 +145,7 @@ export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRow
   const adFields = ['spend', 'impressions', 'clicks', 'reach'] as const;
   for (const key of adFields) {
     const channelValues = new Map<string, ChannelSeries>();
-    const observations = adRows.map(row => { const label = key === 'spend' && row.adAccount.currency ? `${row.adAccount.name} · ${row.adAccount.currency}` : row.adAccount.name; const item = channelValues.get(row.adAccount.id) ?? { label, values: [], latest: row.date }; item.values.push(row[key]); if (row.date > item.latest) item.latest = row.date; channelValues.set(row.adAccount.id, item); return { date: row.date, label, value: row[key] }; });
+    const observations = adRows.map(row => { const label = key === 'spend' && row.adAccount.currency ? `${row.adAccount.name} · ${row.adAccount.currency}` : row.adAccount.name; const item = channelValues.get(row.adAccount.id) ?? { label, values: [], latest: row.date }; item.values.push(row[key]); if (row.date >= item.latest) { item.latest = row.date; item.latestValue = row[key]; } channelValues.set(row.adAccount.id, item); return { date: row.date, label, value: row[key] }; });
     if (observations.length) {
       const metric = metricSeries(key, 'ads', key === 'reach' ? 'stock' : 'flow', key === 'spend' ? 'currency' : 'count', observations, channelValues, adAvailableCount);
       metric.updatedAt = new Date(Math.max(...adRows.map(row => row.fetchedAt.getTime())));

@@ -55,4 +55,19 @@ describe('analytics aggregation', () => {
     expect(metrics.find(metric => metric.key === 'spend')).toMatchObject({ total: 20, coverage: 2 });
     expect(metrics.find(metric => metric.key === 'actions:link_click')).toMatchObject({ total: 7, label: 'Actions Link Click' });
   });
+
+  it('uses each account’s newest stock value when snapshots arrive out of order', () => {
+    const base = { spend: 0, impressions: 0, clicks: 0, cpc: null, cpm: null, cpp: null, ctr: null, frequency: null, actions: {}, fields: {}, fetchedAt: date('2026-10-04') };
+    const adRows = [
+      { ...base, date: date('2026-10-03'), reach: 80, adAccount: { id: 'a1', name: 'Main', currency: 'USD' } },
+      { ...base, date: date('2026-10-01'), reach: 20, adAccount: { id: 'a1', name: 'Main', currency: 'USD' } },
+    ];
+    const pageRows = [
+      { metric: 'page_follows', endTime: date('2026-10-03'), numeric: 90, value: 90, target: { id: 'p1', name: 'Page' } },
+      { metric: 'page_follows', endTime: date('2026-10-01'), numeric: 50, value: 50, target: { id: 'p1', name: 'Page' } },
+    ];
+    const metrics = buildAnalytics(pageRows, adRows, [], [{ id: 'p1', type: 'page', name: 'Page' }]).metrics;
+    expect(metrics.find(metric => metric.key === 'reach')).toMatchObject({ total: 80, rows: [expect.objectContaining({ value: 80 })] });
+    expect(metrics.find(metric => metric.key === 'page_follows::day')).toMatchObject({ total: 90, rows: [expect.objectContaining({ value: 90 })] });
+  });
 });

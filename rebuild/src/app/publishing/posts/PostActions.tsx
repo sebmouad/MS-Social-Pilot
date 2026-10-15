@@ -98,7 +98,7 @@ function ImageAttachment({ post, imageRules }: { post?: PostRow; imageRules: Ima
     {existingReference ? <label className={styles.removeImage}><input type="checkbox" name="removeExistingImage" checked={removeExisting} onChange={event => setRemoveExisting(event.currentTarget.checked)} /> Remove current image</label> : null}
     <label htmlFor={post ? `image-alt-${post.id}` : 'new-post-image-alt'}>Image description <span>(optional)</span></label>
     <input id={post ? `image-alt-${post.id}` : 'new-post-image-alt'} name="altText" type="text" maxLength={imageRules.maxAltCharacters} placeholder="Describe the image for people using a screen reader" defaultValue={image?.altText ?? ''} />
-    {preview && (!removeExisting || file) ? <div className={styles.imagePreview}><img src={preview} alt="Selected post image preview" /><span>{file ? file.name : 'Current image'}</span></div> : null}
+    {preview && (!removeExisting || file) ? <div className={styles.imagePreview}><img src={preview} alt="Selected post image preview" width={72} height={72} /><span>{file ? file.name : 'Current image'}</span></div> : null}
     <small aria-live="polite" data-image-upload-status="true" />
     <small>Upload one image up to {Math.ceil(imageRules.maxUploadBytes / 1048576)} MB. Destinations may have lower limits.</small>
   </div>;
