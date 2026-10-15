@@ -1,0 +1,7 @@
+# Workspace data controls
+
+The Data and privacy settings page exports a JSON snapshot of workspace details, memberships, posts and destination links, connection metadata, inbox history, and stored Page and ad metrics. It omits provider access and refresh tokens and the instance-wide `root_activities` audit history. The export is generated on request, sent with `no-store`, and is not persisted by the app.
+
+Deleting workspace data requires an owner or admin and the exact confirmation `DELETE`. It removes posts, comments, destinations, conversations and messages, social and advertising account records, and stored insights. Workspace identity and memberships remain. Deletion is performed in one database transaction: an error rolls back the full deletion, and the audit event with aggregate record counts is written in that transaction after data removal. Download an export before deletion when a recovery copy is needed.
+
+Disconnecting a social source offers two local choices. Retaining history disables its channels and ad accounts while keeping records. Deleting related local data removes channel and ad records, channel insights, inbox messages and comments, and post links to those channels; a post with links to other channels remains. A post with no remaining destination is removed. Both choices may leave remote scheduled publishing in progress, do not delete remote posts, and do not revoke authorization at the provider. The choice and affected counts are audited.

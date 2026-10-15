@@ -261,7 +261,7 @@ model PostTarget {
   @@map("post_targets")
 }
 
-/// Read-only inbox compatibility models mapped to the existing legacy tables.
+/// Inbox records mapped to the existing legacy tables; provider writes are performed by the server action layer.
 model PostComment {
   id             String   @id
   postTargetId   String

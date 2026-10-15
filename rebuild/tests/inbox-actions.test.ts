@@ -1,0 +1,65 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  prisma: {
+    membership: { findUnique: vi.fn() }, target: { findFirst: vi.fn(), findMany: vi.fn() }, conversation: { findFirst: vi.fn(), update: vi.fn() },
+    conversationMessage: { create: vi.fn() }, postComment: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() }, $executeRaw: vi.fn(),
+  },
+  config: vi.fn(), decrypt: vi.fn(), engine: { replyToConversation: vi.fn(), replyToComment: vi.fn(), moderateComment: vi.fn() },
+  configuredEngine: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), canUseFeature: vi.fn(), canAccessFeature: vi.fn(), canAccessPage: vi.fn(),
+}));
+
+vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
+vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: mocks.decrypt }));
+vi.mock('../src/server/platforms/facebook', () => ({ configuredFacebookEngine: mocks.configuredEngine }));
+vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: mocks.canUseFeature }));
+vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
+vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature, canAccessPage: mocks.canAccessPage }));
+
+import { moderateFacebookComment, replyToFacebookInbox } from '../src/server/inbox/actions';
+
+const actor = { userId: 'user-1', workspaceId: 'workspace-1' };
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.prisma.membership.findUnique.mockResolvedValue({ id: 'membership-1', role: 'owner' });
+  mocks.entitlements.mockResolvedValue({}); mocks.permissions.mockResolvedValue({});
+  mocks.canUseFeature.mockReturnValue(true); mocks.canAccessFeature.mockReturnValue(true); mocks.canAccessPage.mockReturnValue(true);
+  mocks.prisma.target.findFirst.mockResolvedValue({ id: 'target-1', providerId: 'page-1', accessToken: 'encrypted', socialAccount: { scopes: 'pages_messaging,pages_manage_engagement', tokenExpiresAt: null, invalidatedAt: null } });
+  mocks.config.mockImplementation(async key => key === 'meta.inboxWriteScopes' ? ['pages_messaging', 'pages_manage_engagement'] : ['pages_messaging']);
+  mocks.decrypt.mockReturnValue('page-secret'); mocks.configuredEngine.mockResolvedValue(mocks.engine);
+  mocks.prisma.conversation.findFirst.mockResolvedValue({ id: 'conversation-1', remoteId: 'remote-conversation-1', targetId: 'target-1' });
+  mocks.engine.replyToConversation.mockResolvedValue('remote-message-1');
+  mocks.engine.moderateComment.mockResolvedValue(undefined);
+  mocks.prisma.conversationMessage.create.mockResolvedValue({}); mocks.prisma.conversation.update.mockResolvedValue({});
+  mocks.prisma.postComment.findFirst.mockResolvedValue({ id: 'comment-1', remoteId: 'remote-comment-1', postTarget: { targetId: 'target-1' } });
+  mocks.prisma.postComment.update.mockResolvedValue({}); mocks.prisma.$executeRaw.mockResolvedValue(1);
+});
+
+describe('workspace Facebook inbox actions', () => {
+  it('sends and stores a reply only after scoped page, feature, entitlement, and provider-scope checks', async () => {
+    await replyToFacebookInbox(actor, { kind: 'message', id: 'conversation-1', text: '  Hello there  ' });
+    expect(mocks.engine.replyToConversation).toHaveBeenCalledWith('page-secret', 'remote-conversation-1', 'Hello there');
+    expect(mocks.prisma.conversationMessage.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ remoteId: 'remote-message-1', sentById: 'user-1', message: 'Hello there' }) }));
+    expect(mocks.prisma.target.findFirst.mock.calls[0][0].where).toMatchObject({ workspaceId: actor.workspaceId, type: 'page' });
+    expect(JSON.stringify(mocks.prisma.$executeRaw.mock.calls)).not.toContain('page-secret');
+  });
+
+  it('blocks channel scope and missing provider permissions before any Facebook write', async () => {
+    mocks.canAccessPage.mockReturnValue(false);
+    await expect(replyToFacebookInbox(actor, { kind: 'message', id: 'conversation-1', text: 'Hello' })).rejects.toThrow(/do not have access/);
+    expect(mocks.engine.replyToConversation).not.toHaveBeenCalled();
+    mocks.canAccessPage.mockReturnValue(true);
+    mocks.prisma.target.findFirst.mockResolvedValue({ id: 'target-1', providerId: 'page-1', accessToken: 'encrypted', socialAccount: { scopes: 'pages_messaging', tokenExpiresAt: null, invalidatedAt: null } });
+    await expect(moderateFacebookComment(actor, { id: 'comment-1', hidden: true })).rejects.toThrow(/Inbox is unavailable for this connection/);
+    expect(mocks.engine.moderateComment).not.toHaveBeenCalled();
+  });
+
+  it('moderates only a comment stored under the current workspace and audits the result', async () => {
+    await moderateFacebookComment(actor, { id: 'comment-1', hidden: true });
+    expect(mocks.engine.moderateComment).toHaveBeenCalledWith('page-secret', 'remote-comment-1', true);
+    expect(mocks.prisma.postComment.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'comment-1' }, data: expect.objectContaining({ isHidden: true }) }));
+    expect(JSON.stringify(mocks.prisma.$executeRaw.mock.calls)).toContain('inbox.comment_hidden');
+  });
+});

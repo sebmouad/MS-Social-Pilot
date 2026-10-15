@@ -18,6 +18,7 @@ vi.mock('../src/server/post-mutations', () => ({ createLocalDraft: mutations.cre
 vi.mock('../src/server/connection-mutations', () => ({ setConnectionSelections: mutations.select }));
 
 import { handleMcpMessage, type McpViewer } from '../src/server/mcp/server';
+import { resolvePermissions } from '../src/server/permissions';
 
 const viewer: McpViewer = {
   userId: 'user-a', workspaceId: 'workspace-a', role: 'owner',
@@ -25,9 +26,10 @@ const viewer: McpViewer = {
   entitlements: {
     workspaceId: 'workspace-a',
     modules: { home: true, publishing: true, inbox: true, analytics: true, ads: true, settings: true },
-    features: { 'home/overview': true, 'publishing/posts': true, 'publishing/calendar': true, 'publishing/queue': true, 'publishing/approvals': true, 'inbox/conversations': true, 'analytics/overview': true, 'analytics/reports': true, 'ads/overview': true, 'ads/campaigns': true, 'settings/connections': true, 'settings/team': true, 'settings/account': true, 'settings/appearance': true },
+    features: { 'home/overview': true, 'publishing/posts': true, 'publishing/calendar': true, 'publishing/queue': true, 'publishing/approvals': true, 'inbox/conversations': true, 'analytics/overview': true, 'analytics/reports': true, 'ads/overview': true, 'ads/campaigns': true, 'settings/connections': true, 'settings/team': true, 'settings/account': true, 'settings/appearance': true, 'settings/data': true },
     platformCapabilities: {},
   },
+  permissions: resolvePermissions({ role: 'owner', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: true, pageAccess: [] }),
 };
 const call = (name: string, args: Record<string, unknown> = {}) => handleMcpMessage(viewer, {
   jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args },
@@ -66,6 +68,20 @@ describe('MCP workspace boundaries', () => {
     db.pageInsight.findMany.mockResolvedValue([]);
     await call('get_page_analytics', { pageId: 'page-a', days: 5 });
     expect(db.pageInsight.findMany.mock.calls[0][0].where.targetId).toBe('page-a');
+  });
+
+  it('applies feature grants and page scope to MCP discovery and reads', async () => {
+    const limited = { ...viewer, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-a' }] }) };
+    const listed = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 3, method: 'tools/list' });
+    const names = (await listed.json()).result.tools.map((tool: { name: string }) => tool.name);
+    expect(names).toContain('list_posts');
+    expect(names).not.toContain('create_draft');
+    expect(names).not.toContain('list_ad_accounts');
+
+    db.post.findMany.mockResolvedValue([]);
+    await handleMcpMessage(limited, { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'list_posts', arguments: {} } });
+    expect(db.post.findMany.mock.calls.at(-1)?.[0].where).toMatchObject({ workspaceId: 'workspace-a', OR: [{ targets: { some: { targetId: { in: ['page-a'] } } } }, { authorId: 'user-a', targets: { none: {} } }] });
+    expect(db.post.findMany.mock.calls.at(-1)?.[0].select.targets.where).toEqual({ targetId: { in: ['page-a'] } });
   });
 
   it('rejects unknown statuses and invalid dates before querying posts', async () => {

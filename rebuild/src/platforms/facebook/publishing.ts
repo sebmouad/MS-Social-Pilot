@@ -23,7 +23,9 @@ export interface FacebookPublishInput {
   media?: readonly FacebookMedia[]; firstComment?: string | null;
 }
 export interface FacebookPublished { remoteId: string; url: string | null }
-export interface FacebookConversation { id: string; snippet: string | null; updatedAt: Date; messages: Array<{ id: string; text: string | null; createdAt: Date }> }
+export interface FacebookInboxMessage { id: string; text: string | null; createdAt: Date; fromName: string | null; fromId: string | null }
+export interface FacebookConversation { id: string; snippet: string | null; updatedAt: Date; unreadCount: number; messageCount: number; messages: FacebookInboxMessage[] }
+export interface FacebookComment { id: string; message: string; fromName: string | null; fromId: string | null; createdAt: Date; parentId: string | null; likeCount: number; replyCount: number; isHidden: boolean }
 export interface FacebookEngine {
   getAuthorizationUrl(input: OAuthStartRequest): string;
   exchangeCode(input: OAuthExchangeRequest): Promise<{ accessToken: string; expiresAt: Date | null }>;
@@ -35,10 +37,12 @@ export interface FacebookEngine {
   getStatus(accessToken: string, remoteId: string): Promise<{ state: 'published' | 'scheduled' | 'unknown'; publishedAt: Date | null }>;
   deletePost(accessToken: string, remoteId: string): Promise<void>;
   listInbox(accessToken: string, pageId: string): Promise<FacebookConversation[]>;
+  listComments(accessToken: string, postId: string): Promise<FacebookComment[]>;
   getPageAnalytics(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<Record<string, number | null>>;
   getAdInsights(accessToken: string, accountId: string, since: Date, until: Date): Promise<Array<Record<string, unknown>>>;
   updateAd(input: AdMutationRequest): Promise<void>;
   replyToConversation(accessToken: string, conversationId: string, text: string): Promise<string>;
+  replyToComment(accessToken: string, commentId: string, text: string): Promise<string>;
   moderateComment(accessToken: string, commentId: string, hidden: boolean): Promise<void>;
   deleteComment(accessToken: string, commentId: string): Promise<void>;
 }
@@ -206,17 +210,33 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       if (typeof result.id !== 'string') throw new FacebookApiError('Facebook did not return a reply id.', 200);
       return result.id;
     },
+    async replyToComment(token, commentId, text) {
+      const result = object(await request(`${encodeURIComponent(commentId)}/comments`, { method: 'POST', token, body: { message: text } }));
+      if (typeof result.id !== 'string') throw new FacebookApiError('Facebook did not return a reply id.', 200);
+      return result.id;
+    },
     async moderateComment(token, commentId, hidden) {
       await request(encodeURIComponent(commentId), { method: 'POST', token, body: { is_hidden: String(hidden) } });
     },
     async deleteComment(token, commentId) { await request(encodeURIComponent(commentId), { method: 'DELETE', token }); },
     async listInbox(token, pageId) {
-      const raw = await pages<JsonObject>(collectionUrl(`${encodeURIComponent(pageId)}/conversations`, token, 'id,snippet,updated_time,messages.limit(20){id,message,created_time}'), token);
+      const raw = await pages<JsonObject>(collectionUrl(`${encodeURIComponent(pageId)}/conversations`, token, 'id,snippet,updated_time,unread_count,message_count,messages.limit(20){id,message,created_time,from{id,name}}'), token);
       return raw.flatMap(c => {
         if (typeof c.id !== 'string') return [];
         const data = object(c.messages).data;
-        const messages = Array.isArray(data) ? data.flatMap(m => { const x = object(m); const createdAt = date(x.created_time); return typeof x.id === 'string' && createdAt ? [{ id: x.id, text: typeof x.message === 'string' ? x.message : null, createdAt }] : []; }) : [];
-        return [{ id: c.id, snippet: typeof c.snippet === 'string' ? c.snippet : null, updatedAt: date(c.updated_time) ?? new Date(0), messages }];
+        const messages = Array.isArray(data) ? data.flatMap(m => { const x = object(m); const createdAt = date(x.created_time); const from = object(x.from); return typeof x.id === 'string' && createdAt ? [{ id: x.id, text: typeof x.message === 'string' ? x.message : null, createdAt, fromName: typeof from.name === 'string' ? from.name : null, fromId: typeof from.id === 'string' ? from.id : null }] : []; }) : [];
+        return [{ id: c.id, snippet: typeof c.snippet === 'string' ? c.snippet : null, updatedAt: date(c.updated_time) ?? new Date(0),
+          unreadCount: typeof c.unread_count === 'number' ? c.unread_count : 0, messageCount: typeof c.message_count === 'number' ? c.message_count : messages.length, messages }];
+      });
+    },
+    async listComments(token, postId) {
+      const raw = await pages<JsonObject>(collectionUrl(`${encodeURIComponent(postId)}/comments`, token, 'id,message,from{id,name},created_time,parent{id},like_count,comment_count,is_hidden'), token);
+      return raw.flatMap(item => {
+        const from = object(item.from); const parent = object(item.parent); const createdAt = date(item.created_time);
+        if (typeof item.id !== 'string' || typeof item.message !== 'string' || !createdAt) return [];
+        return [{ id: item.id, message: item.message, fromName: typeof from.name === 'string' ? from.name : null, fromId: typeof from.id === 'string' ? from.id : null,
+          createdAt, parentId: typeof parent.id === 'string' ? parent.id : null, likeCount: typeof item.like_count === 'number' ? item.like_count : 0,
+          replyCount: typeof item.comment_count === 'number' ? item.comment_count : 0, isHidden: item.is_hidden === true }];
       });
     },
     async getPageAnalytics(token, pageId, since, until) {

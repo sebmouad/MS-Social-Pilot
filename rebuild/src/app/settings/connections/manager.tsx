@@ -13,6 +13,8 @@ export function ConnectionManager({ sources, canManage, initiallyOpen = false }:
   const [connecting, setConnecting] = useState(false);
   const [notice, setNotice] = useState('');
   const [disconnect, setDisconnect] = useState<Source | null>(null);
+  const [disconnectMode, setDisconnectMode] = useState<'retain' | 'delete'>('retain');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const toggle = (kind: 'target' | 'adAccount', id: string, checked: boolean) => setSelected(current => ({ ...current, [`${kind}:${id}`]: checked }));
 
@@ -49,10 +51,10 @@ export function ConnectionManager({ sources, canManage, initiallyOpen = false }:
     if (!disconnect) return;
     setBusy(true); setNotice('');
     try {
-      const response = await fetch('/api/connections', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ socialAccountId: disconnect.id }) });
+      const response = await fetch('/api/connections', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ socialAccountId: disconnect.id, mode: disconnectMode, ...(disconnectMode === 'delete' ? { confirmation: deleteConfirmation } : {}) }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? 'Could not disconnect this source.');
-      setDisconnect(null); window.location.reload();
+      setDisconnect(null); setDeleteConfirmation(''); setDisconnectMode('retain'); window.location.reload();
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Could not disconnect this source.'); }
     finally { setBusy(false); }
   }
@@ -68,15 +70,19 @@ export function ConnectionManager({ sources, canManage, initiallyOpen = false }:
         {source.targets.map(item => <label key={item.id}><input type="checkbox" checked={selected[`target:${item.id}`] ?? item.enabled} disabled={Boolean(source.invalidatedAt) || busy} onChange={event => toggle('target', item.id, event.currentTarget.checked)} /><span>{item.name || item.type}<small>Channel · {item.type}</small></span></label>)}
         {source.adAccounts.map(item => <label key={item.id}><input type="checkbox" checked={selected[`adAccount:${item.id}`] ?? item.enabled} disabled={Boolean(source.invalidatedAt) || busy} onChange={event => toggle('adAccount', item.id, event.currentTarget.checked)} /><span>{item.name}<small>Ad account · {item.actId}</small></span></label>)}
         {!source.targets.length && !source.adAccounts.length && <p className={styles['settings-note']}>No channels or ad accounts have been discovered for this source.</p>}
-        <button type="button" className={styles['connection-danger-link']} onClick={() => { setDisconnect(source); }}>Disconnect locally…</button>
+        <button type="button" className={styles['connection-danger-link']} onClick={() => { setDisconnect(source); setDisconnectMode('retain'); setDeleteConfirmation(''); }}>Disconnect locally…</button>
       </fieldset>) : <p>No discovered sources are available.</p>}
       {notice && <p role="alert" className={styles['connection-error']}>{notice}</p>}
       <footer><button type="button" onClick={() => setOpen(false)} disabled={busy}>Cancel</button><button type="button" className={styles['connection-primary-button']} onClick={saveSelection} disabled={busy}>{busy ? 'Saving…' : 'Save selections'}</button></footer>
     </section></div>}
-    {disconnect && <div className={styles['connection-backdrop']}><section className={styles['connection-dialog']} role="alertdialog" aria-modal="true" aria-labelledby="disconnect-title"><header><div><p className={styles['settings-eyebrow']}>Local disconnect</p><h2 id="disconnect-title">Disconnect {disconnect.name} locally?</h2><p>This disables its channels and ad accounts for this workspace. Provider access is not revoked, related local records are retained, and posts already handed to the provider may still publish.</p></div><button type="button" aria-label="Close" onClick={() => setDisconnect(null)}>×</button></header>
-      <p className={styles['settings-note']}>{disconnect.targets.length} channel{disconnect.targets.length === 1 ? '' : 's'} and {disconnect.adAccounts.length} ad account{disconnect.adAccounts.length === 1 ? '' : 's'} will be retained with their local history.</p>
+    {disconnect && <div className={styles['connection-backdrop']}><section className={styles['connection-dialog']} role="alertdialog" aria-modal="true" aria-labelledby="disconnect-title"><header><div><p className={styles['settings-eyebrow']}>Local disconnect</p><h2 id="disconnect-title">Disconnect {disconnect.name} locally?</h2><p>Neither choice revokes provider access or deletes content already published. Posts already handed to the provider may still publish.</p></div><button type="button" aria-label="Close" onClick={() => setDisconnect(null)}>×</button></header>
+      <fieldset className={styles['connection-retention']}><legend>Related local data</legend>
+        <label><input type="radio" name="disconnect-data" checked={disconnectMode === 'retain'} onChange={() => { setDisconnectMode('retain'); setDeleteConfirmation(''); }} disabled={busy} /><span>Retain history <small>Disable this source and keep its channels, account records, inbox, metrics, comments, and post links.</small></span></label>
+        <label><input type="radio" name="disconnect-data" checked={disconnectMode === 'delete'} onChange={() => setDisconnectMode('delete')} disabled={busy} /><span>Delete related local data <small>Remove {disconnect.targets.length} channel{disconnect.targets.length === 1 ? '' : 's'}, {disconnect.adAccounts.length} ad account{disconnect.adAccounts.length === 1 ? '' : 's'}, and their local history. A post remains if it still targets another channel.</small></span></label>
+      </fieldset>
+      {disconnectMode === 'delete' && <label className={styles['disconnect-confirm']}>Type DELETE to confirm<input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.currentTarget.value)} autoComplete="off" disabled={busy} /></label>}
       {notice && <p role="alert" className={styles['connection-error']}>{notice}</p>}
-      <footer><button type="button" onClick={() => setDisconnect(null)} disabled={busy}>Cancel</button><button type="button" className={styles['connection-danger-button']} onClick={disconnectSource} disabled={busy}>{busy ? 'Disconnecting…' : 'Disconnect source'}</button></footer>
+      <footer><button type="button" onClick={() => setDisconnect(null)} disabled={busy}>Cancel</button><button type="button" className={styles['connection-danger-button']} onClick={disconnectSource} disabled={busy || (disconnectMode === 'delete' && deleteConfirmation !== 'DELETE')}>{busy ? 'Disconnecting…' : disconnectMode === 'delete' ? 'Disconnect and delete data' : 'Disconnect and retain data'}</button></footer>
     </section></div>}
   </>;
 }

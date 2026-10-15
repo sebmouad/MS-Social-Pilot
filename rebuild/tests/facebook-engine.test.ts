@@ -106,12 +106,16 @@ describe('Facebook Graph adapter', () => {
       const url = String(input);
       if (url.includes('/act_1/insights')) return response({ data: [{ spend: '4.2' }] });
       if (url.includes('/insights')) return response({ data: [{ name: 'page_views_total', values: [{ value: 7 }] }] });
-      if (url.includes('/conversations')) return response({ data: [{ id: 'c1', snippet: 'Hi', updated_time: '2026-01-02T00:00:00Z', messages: { data: [{ id: 'm1', message: 'Hello', created_time: '2026-01-02T00:00:00Z' }] } }] });
+      if (url.includes('/conversations')) return response({ data: [{ id: 'c1', snippet: 'Hi', updated_time: '2026-01-02T00:00:00Z', unread_count: 2, message_count: 4, messages: { data: [{ id: 'm1', message: 'Hello', created_time: '2026-01-02T00:00:00Z', from: { id: 'person-1', name: 'Visitor' } }] } }] });
+      if (url.includes('/comments')) return response({ data: [{ id: 'comment-1', message: 'Question', from: { id: 'person-1', name: 'Visitor' }, created_time: '2026-01-02T00:00:00Z', parent: { id: 'parent-1' }, like_count: 2, comment_count: 1, is_hidden: false }] });
       return response({ data: [] });
     }) as unknown as typeof fetch;
     const engine = createFacebookEngine(config, fetcher);
     expect(await engine.getPageAnalytics('token', 'p1')).toEqual({ page_views_total: 7 });
-    expect((await engine.listInbox('token', 'p1'))[0].messages[0].text).toBe('Hello');
+    expect((await engine.listInbox('token', 'p1'))[0]).toMatchObject({ unreadCount: 2, messageCount: 4, messages: [{ text: 'Hello', fromName: 'Visitor', fromId: 'person-1' }] });
+    expect(await engine.listComments('token', 'post-1')).toEqual([{ id: 'comment-1', message: 'Question', fromName: 'Visitor', fromId: 'person-1', createdAt: new Date('2026-01-02T00:00:00Z'), parentId: 'parent-1', likeCount: 2, replyCount: 1, isHidden: false }]);
+    const calls = (fetcher as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    expect(String(calls.find(call => String(call[0]).includes('/comments'))?.[0])).toContain('parent%7Bid%7D');
     expect(await engine.getAdInsights('token', 'act_1', new Date('2026-01-01Z'), new Date('2026-01-02Z'))).toEqual([{ spend: '4.2' }]);
   });
 

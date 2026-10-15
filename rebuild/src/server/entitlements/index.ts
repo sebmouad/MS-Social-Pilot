@@ -8,6 +8,7 @@ export interface EntitlementSource {
   membership: { userId: string; disabledModules: readonly string[] };
   planFeatures?: readonly string[] | null;
   isInstanceOwner?: boolean;
+  installationAvailability?: Readonly<Record<string, boolean>>;
 }
 
 export interface Entitlements {
@@ -43,6 +44,7 @@ const FEATURE_ROOT_SWITCH: Record<FeatureId, string | null> = {
   'settings/connections': null,
   'settings/team': 'settings/team',
   'settings/account': null,
+  'settings/data': null,
   'settings/appearance': null,
 };
 
@@ -68,13 +70,13 @@ export function resolveEntitlements(source: EntitlementSource): Entitlements {
   const suspended = Boolean(source.workspace.suspendedAt) && !source.isInstanceOwner;
   const modules = Object.fromEntries(MODULE_IDS.map((id) => {
     const rootSwitch = MODULE_ROOT_SWITCH[id];
-    return [id, !suspended && !isOff(rootSwitch, disabled)];
+    return [id, !suspended && !isOff(rootSwitch, disabled) && source.installationAvailability?.[`entitlements.modules.${id}`] !== false];
   })) as Record<ModuleId, boolean>;
 
   const features = Object.fromEntries(FEATURE_IDS.map((id) => {
     const page = PAGES.find((candidate) => candidate.id === id)!;
     const rootSwitch = FEATURE_ROOT_SWITCH[id];
-    return [id, modules[page.module] && !isOff(rootSwitch, disabled) && planAllowsFeature(id, source.planFeatures)];
+    return [id, modules[page.module] && !isOff(rootSwitch, disabled) && planAllowsFeature(id, source.planFeatures) && source.installationAvailability?.[`entitlements.features.${id}`] !== false];
   })) as Record<FeatureId, boolean>;
 
   const platformCapabilities = Object.fromEntries((source.planFeatures ?? [])
@@ -139,10 +141,17 @@ export async function loadEntitlements(userId: string, workspaceId: string): Pro
   `;
   const row = rows[0];
   if (!row) return null;
+  const availabilityRows = await prisma.appSetting.findMany({
+    where: { OR: [{ key: { startsWith: 'entitlements.modules.' } }, { key: { startsWith: 'entitlements.features.' } }] },
+    select: { key: true, value: true, encrypted: true },
+  });
+  // Invalid values fail closed. Root's registry validates all new writes.
+  const installationAvailability = Object.fromEntries(availabilityRows.map((item) => [item.key, item.encrypted === false && item.value === true]));
   return resolveEntitlements({
     workspace: { id: row.workspaceId, disabledModules: row.workspaceDisabled, suspendedAt: row.suspendedAt },
     membership: { userId, disabledModules: row.memberDisabled },
     planFeatures: row.planFeatures,
     isInstanceOwner: row.isInstanceOwner,
+    installationAvailability,
   });
 }

@@ -1,5 +1,5 @@
 .root-config {
-  max-width: 960px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 48px var(--space-6);
   color: var(--ink);
@@ -15,8 +15,19 @@
 .root-config > h1 { margin: 0 0 8px; font-size: clamp(27px, 3vw, 38px); letter-spacing: -.04em; }
 .root-config__intro { max-width: 700px; color: var(--ink-soft); line-height: 1.6; }
 .root-config__status { color: var(--ink-soft); }
+.root-config__layout { display: grid; grid-template-columns: minmax(210px, 260px) minmax(0, 1fr); gap: var(--space-5); align-items: start; margin-top: var(--space-6); }
+.root-config__sidebar { position: sticky; top: var(--space-4); max-height: calc(100vh - 2 * var(--space-4)); overflow: auto; padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.root-config__sidebar label { display: block; margin-bottom: var(--space-2); font-size: 13px; font-weight: 700; }
+.root-config__sidebar input { box-sizing: border-box; width: 100%; min-height: 40px; padding: 8px 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); }
+.root-config__sidebar nav { display: grid; gap: 3px; margin-top: var(--space-4); }
+.root-config__sidebar nav button { width: 100%; padding: 10px 12px; text-align: left; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); cursor: pointer; }
+.root-config__sidebar nav button:hover, .root-config__sidebar nav button.is-active { background: var(--surface-muted); color: var(--accent); }
+.root-config__content-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
+.root-config__content-head h2 { margin: 0; font-size: 23px; }
+.root-config__content-head span { color: var(--ink-faint); font-size: 13px; white-space: nowrap; }
+.root-config__empty { padding: var(--space-5); color: var(--ink-soft); }
 .root-config__card, .root-config__catalog {
-  margin: var(--space-5) 0;
+  margin: var(--space-3) 0;
   padding: var(--space-5);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -57,4 +68,4 @@
 }
 .root-config__card small { display: block; margin-top: var(--space-2); color: var(--ink-faint); }
 .root-config__catalog li { margin: 6px 0; }
-@media (max-width: 600px) { .root-config { padding: var(--space-6) var(--space-4); } }
+@media (max-width: 760px) { .root-config { padding: var(--space-6) var(--space-4); } .root-config__layout { grid-template-columns: 1fr; } .root-config__sidebar { position: static; max-height: 320px; } }

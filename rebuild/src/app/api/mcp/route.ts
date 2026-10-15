@@ -6,6 +6,7 @@ import { loadEntitlements } from '@/server/entitlements';
 import { handleMcpMessage, type McpViewer } from '@/server/mcp/server';
 import { runtimeConfig } from '@/server/config/store';
 import { hit } from '@/server/rate-limit';
+import { loadPermissions } from '@/server/permissions/loader';
 
 async function getViewer(): Promise<McpViewer | null> {
   if (await runtimeConfig('mcp.enabled') !== true) return null;
@@ -22,13 +23,12 @@ async function getViewer(): Promise<McpViewer | null> {
   const membership = workspaces.find(item => item.workspace.id === selected) ?? workspaces.find(item => item.role === 'owner' || item.role === 'admin') ?? workspaces[0];
   const configuredRoles = await runtimeConfig('mcp.authenticatedRoles') as unknown;
   const roles = Array.isArray(configuredRoles) ? configuredRoles : ['owner', 'admin'];
-  // Non-manager channel scope is not yet applied to every MCP query. Keep the
-  // preview gate closed even if Root stores a broader future role policy.
-  if (!membership || !['owner', 'admin'].includes(membership.role) || !roles.includes(membership.role)) return null;
+  if (!membership || !roles.includes(membership.role)) return null;
   const entitlements = await loadEntitlements(user.id, membership.workspace.id);
-  if (!entitlements) return null;
+  const permissions = await loadPermissions(user.id, membership.workspace.id);
+  if (!entitlements || !permissions) return null;
   const maxResultItems = await runtimeConfig('mcp.maxResultItems') as number;
-  return { userId: user.id, workspaceId: membership.workspace.id, role: membership.role, workspace: membership.workspace, entitlements, maxResultItems };
+  return { userId: user.id, workspaceId: membership.workspace.id, role: membership.role, workspace: membership.workspace, entitlements, permissions, maxResultItems };
 }
 
 function unauthenticated() {

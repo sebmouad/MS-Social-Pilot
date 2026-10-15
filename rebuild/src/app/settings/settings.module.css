@@ -35,6 +35,13 @@
 .settings-account-item dt { color: var(--ink-faint); font-size: 11px; font-weight: 650; }
 .settings-account-item dd { margin: 7px 0 0; overflow-wrap: anywhere; color: var(--ink); font-size: 14px; font-weight: 650; }
 .settings-note { margin: 14px 0 0; color: var(--ink-faint); font-size: 12px; line-height: 1.5; }
+.data-controls { display: grid; justify-items: start; gap: 10px; margin-top: 18px; }
+.data-button,.data-danger-button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; padding: 0 15px; border: 1px solid var(--accent); border-radius: 9px; background: var(--accent); color: white; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.data-confirm-label { color: var(--ink); font-size: 12px; font-weight: 700; }
+.data-delete-row { display: flex; flex-wrap: wrap; gap: 9px; }
+.data-delete-row input { width: 160px; min-height: 40px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; }
+.data-danger-button { border-color: var(--warning); background: var(--warning); }
+.data-danger-button:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 620px) { .settings-panel { padding: 17px; } .settings-account-grid { grid-template-columns: 1fr; } }
 .connection-primary-button,.connection-danger-button,.connection-dialog footer button { min-height: 38px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
 .connection-primary-button { border-color: var(--accent); background: var(--accent); color: white; }
@@ -55,6 +62,8 @@
 .connection-source small { display: block; margin-top: 3px; color: var(--ink-faint); font-size: 11px; }
 .connection-dialog footer { display: flex; justify-content: flex-end; gap: 9px; padding-top: 16px; }
 .connection-warning,.connection-error { padding: 12px; border-radius: 9px; background: var(--surface-raised); color: var(--warning); font-size: 12px; line-height: 1.5; }
+.disconnect-confirm { display: grid; justify-items: start; gap: 8px; color: var(--ink); font-size: 12px; font-weight: 700; }
+.disconnect-confirm input { width: 160px; min-height: 38px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
 .connection-error { color: var(--warning); }
 .connection-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .connection-toolbar p { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }

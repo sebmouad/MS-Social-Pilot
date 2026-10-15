@@ -46,24 +46,46 @@ async function currentMembership(actor: ConnectionMutationActor) {
 
 
 /** Locally disconnect a source while retaining its discovered records and history. */
-export async function disconnectSocialAccount(actor: ConnectionMutationActor, socialAccountId: string) {
-  const membership = await currentMembership(actor);
-  if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can change connections.');
-  const account = await prisma.socialAccount.findFirst({
-    where: { id: socialAccountId, workspaceId: actor.workspaceId },
-    select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } },
-  });
-  if (!account) throw new Error('This source is unavailable in the current workspace.');
-  const targetIds = account.targets.map(item => item.id);
-  const adAccountIds = account.adAccounts.map(item => item.id);
-
+export async function disconnectSocialAccount(actor: ConnectionMutationActor, socialAccountId: string, mode: 'retain' | 'delete' = 'retain', confirmation?: string) {
   return prisma.$transaction(async tx => {
+    const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
+    if (!membership) throw new Error('You are no longer a member of this workspace.');
+    if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can change connections.');
+    if (mode === 'delete' && confirmation !== 'DELETE') throw new Error('Type DELETE to confirm related data removal.');
+    const account = await tx.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
+    if (!account) throw new Error('This source is unavailable in the current workspace.');
+    const targetIds = account.targets.map(item => item.id);
+    const adAccountIds = account.adAccounts.map(item => item.id);
     const stillScheduled = targetIds.length ? await tx.postTarget.count({ where: { targetId: { in: targetIds }, status: 'scheduled_remote' } }) : 0;
-    await tx.target.updateMany({ where: { workspaceId: actor.workspaceId, id: { in: targetIds } }, data: { enabled: false } });
-    await tx.adAccount.updateMany({ where: { workspaceId: actor.workspaceId, id: { in: adAccountIds } }, data: { enabled: false } });
-    await tx.socialAccount.updateMany({ where: { id: account.id, workspaceId: actor.workspaceId }, data: { invalidatedAt: new Date() } });
-    await auditConnectionEvent(tx, actor, 'connection.local_disconnected', { socialAccountId: account.id, channels: targetIds.length, adAccounts: adAccountIds.length, retained: true, stillScheduled });
-    return { stillScheduled, retained: { channels: targetIds.length, adAccounts: adAccountIds.length } };
+
+    if (mode === 'retain') {
+      await tx.target.updateMany({ where: { workspaceId: actor.workspaceId, id: { in: targetIds } }, data: { enabled: false } });
+      await tx.adAccount.updateMany({ where: { workspaceId: actor.workspaceId, id: { in: adAccountIds } }, data: { enabled: false } });
+      await tx.socialAccount.updateMany({ where: { id: account.id, workspaceId: actor.workspaceId }, data: { invalidatedAt: new Date() } });
+      await auditConnectionEvent(tx, actor, 'connection.local_disconnected', { socialAccountId: account.id, channels: targetIds.length, adAccounts: adAccountIds.length, retained: true, stillScheduled });
+      return { mode, stillScheduled, retained: { channels: targetIds.length, adAccounts: adAccountIds.length } };
+    }
+
+    if (stillScheduled > 0) throw new Error('This source has posts still scheduled at the provider. Cancel or reconcile those posts before deleting its local records.');
+
+    const targetLinks = targetIds.length ? await tx.postTarget.findMany({ where: { targetId: { in: targetIds } }, select: { id: true, postId: true } }) : [];
+    const targetLinkIds = targetLinks.map(row => row.id);
+    const affectedPostIds = [...new Set(targetLinks.map(row => row.postId))];
+    const conversations = targetIds.length ? await tx.conversation.findMany({ where: { targetId: { in: targetIds } }, select: { id: true } }) : [];
+    const conversationIds = conversations.map(row => row.id);
+    const comments = targetLinkIds.length ? await tx.postComment.deleteMany({ where: { postTargetId: { in: targetLinkIds } } }) : { count: 0 };
+    if (targetLinkIds.length) await tx.postTarget.deleteMany({ where: { id: { in: targetLinkIds } } });
+    const orphanPosts = affectedPostIds.length ? await tx.post.deleteMany({ where: { id: { in: affectedPostIds }, workspaceId: actor.workspaceId, targets: { none: {} } } }) : { count: 0 };
+    if (conversationIds.length) await tx.conversationMessage.deleteMany({ where: { conversationId: { in: conversationIds } } });
+    const deletedConversations = conversationIds.length ? await tx.conversation.deleteMany({ where: { id: { in: conversationIds } } }) : { count: 0 };
+    const insights = targetIds.length ? await tx.pageInsight.deleteMany({ where: { targetId: { in: targetIds } } }) : { count: 0 };
+    const adInsights = adAccountIds.length ? await tx.adInsight.deleteMany({ where: { adAccountId: { in: adAccountIds } } }) : { count: 0 };
+    await tx.target.deleteMany({ where: { workspaceId: actor.workspaceId, id: { in: targetIds } } });
+    await tx.adAccount.deleteMany({ where: { workspaceId: actor.workspaceId, id: { in: adAccountIds } } });
+    await tx.socialAccount.deleteMany({ where: { id: account.id, workspaceId: actor.workspaceId } });
+    const counts = { channels: targetIds.length, adAccounts: adAccountIds.length, postTargets: targetLinks.length, orphanPosts: orphanPosts.count, comments: comments.count, conversations: deletedConversations.count, pageInsights: insights.count, adInsights: adInsights.count, scheduledRemote: stillScheduled };
+    await auditConnectionEvent(tx, actor, 'connection.local_disconnected', { socialAccountId: account.id, retained: false, counts });
+    return { mode, deleted: counts, stillScheduled };
   });
 }
 

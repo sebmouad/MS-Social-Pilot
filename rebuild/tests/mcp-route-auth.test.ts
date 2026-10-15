@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   listWorkspaces: vi.fn(),
   userFindUnique: vi.fn(),
   queryRaw: vi.fn(),
+  appSettingFindMany: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({
@@ -17,7 +18,7 @@ vi.mock('next/headers', () => ({
 vi.mock('../src/server/data', () => ({
   getSessionByTokenHash: state.getSessionByTokenHash,
   listWorkspaces: state.listWorkspaces,
-  prisma: { user: { findUnique: state.userFindUnique }, $queryRaw: state.queryRaw },
+  prisma: { user: { findUnique: state.userFindUnique }, appSetting: { findMany: state.appSettingFindMany }, $queryRaw: state.queryRaw },
 }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => key === 'mcp.enabled' ? true : key === 'mcp.authenticatedRoles' ? ['owner', 'admin'] : 1_048_576) }));
 
@@ -44,7 +45,10 @@ beforeEach(() => {
   state.getSessionByTokenHash.mockImplementation(async () => state.session);
   state.userFindUnique.mockImplementation(async () => state.user);
   state.listWorkspaces.mockImplementation(async () => state.workspaces);
-  state.queryRaw.mockImplementation(async (_query: TemplateStringsArray, _userId: string, workspaceId: string) => [{ workspaceId, workspaceDisabled: [], suspendedAt: null, memberDisabled: [], planFeatures: null, isInstanceOwner: false }]);
+  state.appSettingFindMany.mockResolvedValue([]);
+  state.queryRaw.mockImplementation(async (query: TemplateStringsArray, _userId: string, workspaceId: string) => query.join('').includes('AS role')
+    ? [{ role: 'admin', allPages: true, workspaceDisabled: [], memberDisabled: [], clientAccess: [], pageIds: [] }]
+    : [{ workspaceId, workspaceDisabled: [], suspendedAt: null, memberDisabled: [], planFeatures: null, isInstanceOwner: false }]);
 });
 
 describe('MCP route authentication', () => {

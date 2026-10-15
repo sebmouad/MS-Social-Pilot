@@ -41,6 +41,7 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'settings/connections': null,
   'settings/team': 'settings/team',
   'settings/account': null,
+  'settings/data': null,
   'settings/appearance': null,
 };
 

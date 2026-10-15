@@ -5,7 +5,7 @@ import { disconnectSocialAccount, setConnectionSelections } from '@/server/conne
 
 export const runtime = 'nodejs';
 const selectionSchema = z.object({ items: z.array(z.object({ kind: z.enum(['target', 'adAccount']), id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), enabled: z.boolean() })).max(250) });
-const disconnectSchema = z.object({ socialAccountId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/) });
+const disconnectSchema = z.object({ socialAccountId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), mode: z.enum(['retain', 'delete']).default('retain'), confirmation: z.string().max(20).optional() });
 
 export async function PATCH(request: Request) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 });
@@ -29,7 +29,7 @@ export async function DELETE(request: Request) {
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   try {
     const input = disconnectSchema.parse(await request.json());
-    const result = await disconnectSocialAccount({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input.socialAccountId);
+    const result = await disconnectSocialAccount({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input.socialAccountId, input.mode, input.confirmation);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     return connectionError(error, 'The source could not be disconnected.');
@@ -51,6 +51,8 @@ function connectionError(error: unknown, fallback: string) {
     ['Reconnect this source', 409],
     ['You are no longer a member', 401],
     ['Invalid selection list', 400],
+    ['Type DELETE', 400],
+    ['still scheduled at the provider', 409],
   ];
   const match = known.find(([phrase]) => error.message.includes(phrase));
   return match

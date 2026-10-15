@@ -3,11 +3,13 @@ import { canUseFeature, requireFeature, type Entitlements } from '../entitlement
 import { createLocalDraft, deleteLocalDraft, updateLocalDraft } from '../post-mutations';
 import { setConnectionSelections } from '../connection-mutations';
 import { randomBytes } from 'node:crypto';
+import { canAccessFeature, canAccessPage, type ScopedPermissions } from '../permissions';
 
-export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; maxResultItems?: number };
+export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number };
 type JsonRpcId = string | number | null;
 
 const versions = ['2025-06-18', '2025-03-26', '2024-11-05'];
+const pageIdsFor = (viewer: McpViewer): string[] | undefined => viewer.permissions?.pageScope.all === false ? [...viewer.permissions.pageScope.ids] : undefined;
 const textResult = (value: unknown) => ({
   content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
   structuredContent: Array.isArray(value) ? { items: value } : value,
@@ -48,10 +50,12 @@ function requireConfirmation(args: Record<string, unknown>, expected: string) {
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
   const feature = toolFeatures[name];
   if (feature) requireFeature(viewer.entitlements, feature);
+  if (feature && (!viewer.permissions || !canAccessFeature(viewer.permissions, feature, name.startsWith('create_') || name.startsWith('update_') || name.startsWith('delete_') || name === 'set_connection_selection' ? 'write' : 'read'))) throw new Error('You do not have permission to use this feature.');
   const cap = viewer.maxResultItems ?? 100;
   switch (name) {
     case 'list_pages':
-      return prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true }, orderBy: [{ type: 'asc' }, { name: 'asc' }], take: cap, select: { id: true, type: true, providerId: true, name: true, pictureUrl: true, canPublish: true } });
+      const pageIds = pageIdsFor(viewer);
+      return prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, ...(pageIds ? { id: { in: pageIds } } : {}) }, orderBy: [{ type: 'asc' }, { name: 'asc' }], take: cap, select: { id: true, type: true, providerId: true, name: true, pictureUrl: true, canPublish: true } });
     case 'list_posts': {
       const status = typeof args.status === 'string' ? args.status.split(',').map(s => s.trim()).filter(Boolean) : [];
       const allowedStatuses = new Set(['draft', 'pending_approval', 'rejected', 'scheduled', 'publishing', 'published', 'partially_failed', 'failed', 'cancelled']);
@@ -60,14 +64,16 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const to = typeof args.to === 'string' ? new Date(args.to) : undefined;
       if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime()))) throw new Error('from and to must be valid ISO dates.');
       const limit = Math.max(1, Math.min(cap, Math.trunc(Number(args.limit) || cap)));
-      return prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, ...(status.length ? { status: { in: status as never[] } } : {}), ...(from || to ? { scheduledAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}) }, orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }], take: limit, select: { id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, targets: { select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, type: true, name: true } } } } } });
+      const pageIds = pageIdsFor(viewer);
+      return prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, ...(pageIds ? { OR: [{ targets: { some: { targetId: { in: pageIds } } } }, { authorId: viewer.userId, targets: { none: {} } }] } : {}), ...(status.length ? { status: { in: status as never[] } } : {}), ...(from || to ? { scheduledAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}) }, orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }], take: limit, select: { id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, targets: { where: pageIds ? { targetId: { in: pageIds } } : {}, select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, type: true, name: true } } } } } });
     }
     case 'list_inbox': {
       const kind = args.kind === 'comment' || args.kind === 'message' ? args.kind : undefined;
       const state = args.state === 'resolved' || args.state === 'all' ? args.state : 'open';
       const limit = Math.max(1, Math.min(cap, Math.trunc(Number(args.limit) || Math.min(50, cap))));
-      const conversationWhere = { target: { workspaceId: viewer.workspaceId }, ...(state === 'all' ? {} : { resolvedAt: state === 'resolved' ? { not: null } : null }) };
-      const commentWhere = { isHidden: false, postTarget: { post: { workspaceId: viewer.workspaceId }, target: { workspaceId: viewer.workspaceId } }, ...(state === 'all' ? {} : { resolvedAt: state === 'resolved' ? { not: null } : null }) };
+      const pageIds = pageIdsFor(viewer);
+      const conversationWhere = { target: { workspaceId: viewer.workspaceId, ...(pageIds ? { id: { in: pageIds } } : {}) }, ...(state === 'all' ? {} : { resolvedAt: state === 'resolved' ? { not: null } : null }) };
+      const commentWhere = { isHidden: false, postTarget: { post: { workspaceId: viewer.workspaceId }, target: { workspaceId: viewer.workspaceId, ...(pageIds ? { id: { in: pageIds } } : {}) } }, ...(state === 'all' ? {} : { resolvedAt: state === 'resolved' ? { not: null } : null }) };
       const [conversations, comments] = await Promise.all([
         kind === 'comment' ? Promise.resolve([]) : prisma.conversation.findMany({ where: conversationWhere, orderBy: { updatedTime: 'desc' }, take: limit, select: { id: true, snippet: true, unreadCount: true, updatedTime: true, resolvedAt: true, target: { select: { id: true, type: true, name: true } }, messages: { orderBy: { createdTime: 'desc' }, take: 5, select: { id: true, fromName: true, message: true, createdTime: true } } } }),
         kind === 'message' ? Promise.resolve([]) : prisma.postComment.findMany({ where: commentWhere, orderBy: { createdTime: 'desc' }, take: limit, select: { id: true, message: true, fromName: true, createdTime: true, resolvedAt: true, replyCount: true, postTarget: { select: { target: { select: { id: true, type: true, name: true } }, post: { select: { id: true, message: true } } } } } }),
@@ -76,13 +82,15 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
     }
     case 'get_page_analytics': {
       const pageId = String(args.pageId ?? '');
-      const page = await prisma.target.findFirst({ where: { id: pageId, workspaceId: viewer.workspaceId, type: 'page' }, select: { id: true, name: true } });
+      const pageIds = pageIdsFor(viewer);
+      const page = await prisma.target.findFirst({ where: { id: pageId, workspaceId: viewer.workspaceId, type: 'page', ...(pageIds ? { id: { in: pageIds } } : {}) }, select: { id: true, name: true } });
       if (!page) throw new Error('Page not found in this workspace.');
       const days = Math.max(1, Math.min(365, Math.trunc(Number(args.days) || 30)));
       const rows = await prisma.pageInsight.findMany({ where: { targetId: pageId, period: 'day', endTime: { gte: new Date(Date.now() - days * 86_400_000) } }, orderBy: { endTime: 'desc' }, take: cap, select: { metric: true, period: true, endTime: true, numeric: true, value: true } });
       return { page, days, insights: rows };
     }
     case 'list_ad_accounts':
+      if (viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can list advertising accounts.');
       return prisma.adAccount.findMany({ where: { workspaceId: viewer.workspaceId }, orderBy: { name: 'asc' }, take: cap, select: { id: true, actId: true, name: true, enabled: true, currency: true } });
     case 'create_draft': {
       requireFeature(viewer.entitlements, 'publishing/posts');
@@ -141,7 +149,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     const requested = String(params.protocolVersion ?? '');
     return reply({ protocolVersion: versions.includes(requested) ? requested : versions[0], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } }, serverInfo: { name: 'ms-social-pilot', version: '0.1.0' }, instructions: `Workspace-scoped access for ${viewer.workspace.name}. Writes are limited to local drafts and channel/ad account selections. Every write requires an explicit confirmation string. Times use ${viewer.workspace.timezone}.` });
   }
-  if (method === 'tools/list') return reply({ tools: tools.filter(tool => canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin')) });
+  if (method === 'tools/list') return reply({ tools: tools.filter(tool => canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, ['create_draft', 'update_draft', 'delete_draft', 'set_connection_selection'].includes(tool.name) ? 'write' : 'read')) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (tool.name !== 'list_ad_accounts' || viewer.role === 'owner' || viewer.role === 'admin')) });
   if (method === 'tools/call') {
     const name = String(params.name ?? '');
     if (!tools.some(tool => tool.name === name)) return error(-32602, `Unknown tool: ${name}`);
@@ -158,7 +166,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     { uri: 'msp://inbox', name: 'Inbox', description: 'Recent synced inbox activity.', mimeType: 'application/json' },
   ].filter(resource => {
     const feature = resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : null;
-    return feature === null || canUseFeature(viewer.entitlements, feature);
+    return feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read')));
   }) });
   if (method === 'resources/read') {
     const uri = String(params.uri ?? '');
