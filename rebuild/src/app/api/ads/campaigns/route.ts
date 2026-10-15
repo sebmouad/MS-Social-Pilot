@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 const schema = z.object({
   adAccountId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/),
   name: z.string().trim().min(1).max(100),
-  objective: z.enum(['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION']),
+  objective: z.string().min(1).max(100),
   confirmation: z.string().max(300),
 }).strict();
 

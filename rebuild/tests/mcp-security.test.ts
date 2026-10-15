@@ -35,7 +35,7 @@ vi.mock('../src/server/ads/actions', () => ({
   createWorkspaceAdCampaign: adsMutations.create,
   updateWorkspaceAd: adsMutations.update,
   readWorkspaceAdObject: adsMutations.read,
-  campaignCreationConfirmation: (adAccountId: string, name: string, objective: string) => `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(name.trim())} IN ACCOUNT ${adAccountId} WITH OBJECTIVE ${objective}`,
+  campaignCreationConfirmation: (_workspaceId: string, adAccountId: string, name: string, objective: string) => `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(name.trim())} IN ACCOUNT ${adAccountId} WITH OBJECTIVE ${objective}`,
 }));
 const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
 vi.mock('../src/server/publishing/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));

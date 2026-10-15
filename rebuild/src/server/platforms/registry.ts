@@ -37,6 +37,14 @@ export async function platformInbox(provider: string): Promise<PlatformHost['inb
   return inbox;
 }
 
+/** Enabled Ads implementation for a module that declares the Ads capability. */
+export async function platformAds(provider: string): Promise<NonNullable<PlatformHost['ads']> | null> {
+  const module = platformModule(provider);
+  const ads = hostFor(provider)?.ads;
+  if (!module || module.capabilities.ads !== 'supported' || !ads || !await isPlatformEnabled(provider)) return null;
+  return ads;
+}
+
 /** Installed, enabled modules with a real server inbox host and inbox capability. */
 export async function inboxPlatformIds(): Promise<string[]> {
   return Promise.all((PLATFORM_MODULES as readonly PlatformModule[]).map(async module =>

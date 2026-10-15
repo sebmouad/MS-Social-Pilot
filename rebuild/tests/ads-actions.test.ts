@@ -22,12 +22,39 @@ vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: mocks.decrypt }));
 vi.mock('../src/server/platforms/facebook', () => ({ configuredFacebookEngine: mocks.configuredEngine, configuredFacebookAdapter: vi.fn(), configuredFacebookOAuth: vi.fn() }));
-vi.mock('../src/server/ads/facebook-ads', () => ({ configuredCreateFacebookAdSet: mocks.createFacebookAdSet }));
+vi.mock('../src/platforms/facebook/ads', () => ({
+  FACEBOOK_AD_OBJECTIVES: new Set(['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION']),
+  FACEBOOK_ADS_MANAGEMENT_SCOPE: 'ads_management',
+  validateFacebookCampaign: (name: string, objective: string) => { if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name)) throw new Error('Campaign names must contain 1 to 100 printable characters.'); if (!['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION'].includes(objective)) throw new Error('Choose a supported campaign objective.'); },
+  validateFacebookAdSet: (input: { name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }) => { if (!input.name || input.name.length > 100 || /[\u0000-\u001f\u007f]/.test(input.name)) throw new Error('Ad set names must contain 1 to 100 printable characters.'); if (!Number.isSafeInteger(input.dailyBudgetMinor) || input.dailyBudgetMinor < 1) throw new Error('Daily budgets must be positive whole minor currency units.'); if (!/^[A-Z]{2}$/.test(input.countryCode)) throw new Error('Country code must be a two-letter uppercase code.'); },
+  facebookCampaignConfirmation: (_id: string, name: string, objective: string) => `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(name.trim())} IN ACCOUNT local-account-1 WITH OBJECTIVE ${objective}`,
+  facebookAdSetConfirmation: (input: { name: string; campaignId: string; adAccountId: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }) => `CREATE PAUSED FACEBOOK AD SET ${JSON.stringify(input.name.trim())} UNDER CAMPAIGN ${input.campaignId} IN ACCOUNT ${input.adAccountId} WITH DAILY BUDGET ${input.dailyBudgetMinor} MINOR UNITS TARGETING ${input.countryCode} OPTIMIZED FOR ${input.optimizationGoal}`,
+  type: {},
+}));
+vi.mock('../src/server/platforms/registry', () => ({
+  platformAds: vi.fn(async (provider: string) => {
+    if (await mocks.config(`platforms.${provider}.enabled`) !== true) return null;
+    return {
+      readScopes: async () => await mocks.config('meta.adsReadScopes'), manageScopes: async () => await mocks.config('meta.adsManageScopes'),
+      hasReadScopes: (required: string[], granted: string[]) => required.length > 0 && required.every(scope => granted.includes(scope)),
+      validateManageScopes: (required: string[], granted: string[]) => {
+        if (!required.length || !required.includes('ads_management')) throw new Error('Root has not configured the ads_management scope.');
+        if (required.some(scope => !granted.includes(scope))) throw new Error('Reconnect this Facebook source and grant the configured ads management scopes.');
+      },
+      validateCampaign: (name: string, objective: string) => { if (!name || name.length > 100) throw new Error('Campaign names must contain 1 to 100 printable characters.'); if (!['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION'].includes(objective)) throw new Error('Choose a supported campaign objective.'); },
+      campaignConfirmation: (_id: string, name: string, objective: string) => `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(name.trim())} IN ACCOUNT local-account-1 WITH OBJECTIVE ${objective}`,
+      validateAdSet: (input: { name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }) => { if (!input.name || input.name.length > 100) throw new Error('Ad set names must contain 1 to 100 printable characters.'); if (!Number.isSafeInteger(input.dailyBudgetMinor) || input.dailyBudgetMinor < 1) throw new Error('Daily budgets must be positive whole minor currency units.'); if (!/^[A-Z]{2}$/.test(input.countryCode)) throw new Error('Country code must be a two-letter uppercase code.'); },
+      adSetConfirmation: (input: { name: string; campaignId: string; adAccountId: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }) => `CREATE PAUSED FACEBOOK AD SET ${JSON.stringify(input.name.trim())} UNDER CAMPAIGN ${input.campaignId} IN ACCOUNT ${input.adAccountId} WITH DAILY BUDGET ${input.dailyBudgetMinor} MINOR UNITS TARGETING ${input.countryCode} OPTIMIZED FOR ${input.optimizationGoal}`,
+      read: mocks.engine.readAdObject, update: mocks.engine.updateAd, createCampaign: mocks.engine.createCampaign, createAdSet: mocks.createFacebookAdSet,
+    };
+  }),
+}));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: mocks.canUseFeature }));
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature }));
 
 import { canManageWorkspaceAds, canReadWorkspaceAds, createWorkspaceAdCampaign, createWorkspaceAdSet, readWorkspaceAdObject, updateWorkspaceAd } from '../src/server/ads/actions';
+import { platformAds } from '../src/server/platforms/registry';
 
 const actor = { userId: 'user-1', workspaceId: 'workspace-1' };
 const statusChange = {
@@ -44,7 +71,7 @@ beforeEach(() => {
   mocks.canAccessFeature.mockReturnValue(true);
   mocks.prisma.adAccount.findFirst.mockResolvedValue({
     id: 'local-account-1', actId: 'act_99',
-    socialAccount: { id: 'social-1', accessToken: 'encrypted-token', scopes: 'ads_read,ads_management', invalidatedAt: null, tokenExpiresAt: null },
+    socialAccount: { id: 'social-1', provider: 'facebook', accessToken: 'encrypted-token', scopes: 'ads_read,ads_management', invalidatedAt: null, tokenExpiresAt: null },
   });
   mocks.prisma.adInsight.findFirst.mockResolvedValue({ id: 'insight-1' });
   mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : ['ads_management']);
@@ -58,12 +85,22 @@ beforeEach(() => {
 });
 
 describe('workspace Ads actions', () => {
+  it('dispatches live reads through the provider recorded on the selected ad account', async () => {
+    mocks.config.mockImplementation(async (key: string) => key === 'platforms.instagram.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : false);
+    mocks.prisma.adAccount.findFirst.mockResolvedValue({
+      id: 'local-account-1', actId: 'remote-account',
+      socialAccount: { id: 'social-1', provider: 'instagram', accessToken: 'encrypted-token', scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null },
+    });
+    await expect(readWorkspaceAdObject(actor, { adAccountId: 'local-account-1', objectId: 'campaign-44', objectType: 'campaign' })).resolves.toMatchObject({ id: 'campaign-44' });
+    expect(platformAds).toHaveBeenCalledWith('instagram');
+  });
+
   it('allows read-authorized members to inspect live status without ads_management or the spend-change switch', async () => {
     mocks.prisma.membership.findUnique.mockResolvedValue({ role: 'viewer' });
     mocks.config.mockImplementation(async (key: string) => key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : false);
     mocks.prisma.adAccount.findFirst.mockResolvedValue({
       id: 'local-account-1', actId: 'act_99',
-      socialAccount: { id: 'social-1', accessToken: 'encrypted-token', scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null },
+      socialAccount: { id: 'social-1', provider: 'facebook', accessToken: 'encrypted-token', scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null },
     });
     expect(await canReadWorkspaceAds(actor, 'local-account-1', ['target-a'])).toBe(true);
     expect(mocks.prisma.adAccount.findFirst.mock.calls[0][0].where.socialAccount.is.targets.some).toEqual({ workspaceId: actor.workspaceId, id: { in: ['target-a'] } });
@@ -82,7 +119,7 @@ describe('workspace Ads actions', () => {
     mocks.config.mockImplementation(async (key: string) => key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : false);
     mocks.prisma.adAccount.findFirst.mockResolvedValue({
       id: 'local-account-1', actId: 'act_99',
-      socialAccount: { id: 'social-1', accessToken: 'encrypted-token', scopes: 'ads_management', invalidatedAt: null, tokenExpiresAt: null },
+      socialAccount: { id: 'social-1', provider: 'facebook', accessToken: 'encrypted-token', scopes: 'ads_management', invalidatedAt: null, tokenExpiresAt: null },
     });
     await expect(readWorkspaceAdObject(actor, { adAccountId: 'local-account-1', objectId: 'campaign-44', objectType: 'campaign' })).rejects.toThrow(/performance access is unavailable/);
     expect(mocks.engine.readAdObject).not.toHaveBeenCalled();
@@ -92,8 +129,8 @@ describe('workspace Ads actions', () => {
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(true);
     mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? false : key === 'platforms.facebook.enabled' ? true : ['ads_management']);
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(false);
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : ['ads_management']);
-    mocks.prisma.adAccount.findFirst.mockResolvedValue({ socialAccount: { scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null } });
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : ['ads_management']);
+    mocks.prisma.adAccount.findFirst.mockResolvedValue({ socialAccount: { provider: 'facebook', scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null } });
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(false);
   });
 
@@ -116,7 +153,7 @@ describe('workspace Ads actions', () => {
     const input = { adAccountId: 'local-account-1', name: 'Spring launch', objective: 'OUTCOME_TRAFFIC' as const,
       confirmation: 'CREATE PAUSED FACEBOOK CAMPAIGN "Spring launch" IN ACCOUNT local-account-1 WITH OBJECTIVE OUTCOME_TRAFFIC' };
     mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? true : key === 'platforms.facebook.enabled' ? false : ['ads_management']);
-    await expect(createWorkspaceAdCampaign(actor, input)).rejects.toThrow(/Facebook platform is disabled/);
+    await expect(createWorkspaceAdCampaign(actor, input)).rejects.toThrow(/platform is disabled or Ads capability is unavailable/);
     mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : ['ads_read']);
     await expect(createWorkspaceAdCampaign(actor, input)).rejects.toThrow(/Root has not configured/);
     expect(mocks.engine.createCampaign).not.toHaveBeenCalled();
@@ -179,10 +216,10 @@ describe('workspace Ads actions', () => {
     await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/disabled in Root/);
     expect(mocks.engine.updateAd).not.toHaveBeenCalled();
 
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : ['ads_management']);
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : ['ads_management']);
     mocks.prisma.adAccount.findFirst.mockResolvedValue({
       id: 'local-account-1', actId: 'act_99',
-      socialAccount: { id: 'social-1', accessToken: 'encrypted-token', scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null },
+      socialAccount: { id: 'social-1', provider: 'facebook', accessToken: 'encrypted-token', scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null },
     });
     await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/grant the configured/);
     expect(mocks.engine.updateAd).not.toHaveBeenCalled();

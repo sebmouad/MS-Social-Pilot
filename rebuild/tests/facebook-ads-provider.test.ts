@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createFacebookAdSet } from '../src/server/ads/facebook-ads';
+import { createFacebookAdSet } from '../src/platforms/facebook/adset';
 
 const config = {
   graphBaseUrl: 'https://graph.facebook.com', oauthBaseUrl: 'https://www.facebook.com', graphVersion: 'v99.0',

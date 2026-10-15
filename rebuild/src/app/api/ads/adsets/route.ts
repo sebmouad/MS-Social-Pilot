@@ -13,7 +13,7 @@ const schema = z.object({
   name: z.string().trim().min(1).max(100),
   dailyBudgetMinor: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   countryCode: z.string().regex(/^[A-Z]{2}$/),
-  optimizationGoal: z.enum(['LINK_CLICKS', 'IMPRESSIONS']),
+  optimizationGoal: z.string().min(1).max(100),
   confirmation: z.string().max(500),
 }).strict();
 
