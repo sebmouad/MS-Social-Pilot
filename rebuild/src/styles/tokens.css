@@ -17,6 +17,7 @@
   --warning: #a15d18;
   --warning-soft: #fff2df;
   --danger: #ad3b36;
+  --on-danger: white;
   --danger-soft: #fbe9e7;
   --focus: #477ee8;
   --selection: #c9e6d2;
@@ -50,7 +51,7 @@
   color-scheme: dark;
   --canvas: #111a20; --surface: #18242c; --surface-muted: #22323c; --surface-raised: #1d2a33; --surface-hover: #22313a;
   --ink: #edf4f6; --ink-soft: #bdcbd1; --ink-faint: #91a3ac; --line: #344750; --line-strong: #506570; --line-subtle: #2a3b44;
-  --accent: #79c8a2; --accent-hover: #9cdbba; --accent-soft: #24483b; --warning: #f0bd73; --warning-soft: #49371f; --danger: #f28a82; --danger-soft: #492d30;
+  --accent: #79c8a2; --accent-hover: #9cdbba; --accent-soft: #24483b; --warning: #f0bd73; --warning-soft: #49371f; --danger: #f28a82; --on-danger: #351311; --danger-soft: #492d30;
   --focus: #9ac5ff; --selection: #315d4c; --shadow-panel: 0 14px 38px rgb(0 0 0 / 28%); --scrim: rgb(0 0 0 / 58%);
 }
 
@@ -105,7 +106,7 @@ button, input, select { font: inherit; }
 .ui-button--secondary:hover:not(:disabled) { background: var(--surface-muted); }
 .ui-button--quiet { background: transparent; color: var(--ink-soft); }
 .ui-button--quiet:hover:not(:disabled) { background: var(--surface-muted); color: var(--ink); }
-.ui-button--danger { background: var(--danger); color: white; }
+.ui-button--danger { background: var(--danger); color: var(--on-danger, white); }
 .ui-button__icon { display: inline-flex; }
 .ui-visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .ui-table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
