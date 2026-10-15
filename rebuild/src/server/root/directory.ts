@@ -17,8 +17,8 @@ export async function listRootUsers(input: { q?: string; page?: string }, pageSi
   const [total, users] = await Promise.all([
     prisma.user.count({ where }),
     prisma.user.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: selection.skip, take: selection.take,
-      select: { id: true, name: true, email: true, isInstanceOwner: true, disabledAt: true, createdAt: true,
-        _count: { select: { memberships: true, sessions: true } } } }),
+      select: { id: true, name: true, email: true, isInstanceOwner: true, disabledAt: true, totpEnabledAt: true, createdAt: true,
+        _count: { select: { memberships: true, sessions: true, passkeys: true } } } }),
   ]);
   return { ...selection, total, users };
 }

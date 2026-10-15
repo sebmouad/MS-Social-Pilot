@@ -3,27 +3,36 @@
 import { useState } from 'react';
 import { ModalDialog } from '@/components/ModalDialog';
 
-export function RootUserControls({ id, email, disabled, self }: { id: string; email: string; disabled: boolean; self: boolean }) {
-  const [open, setOpen] = useState(false);
+type Action = 'disable' | 'enable' | 'sign-out' | 'reset-two-step';
+
+export function RootUserControls({ id, email, disabled, root, self }: { id: string; email: string; disabled: boolean; root: boolean; self: boolean }) {
+  const [action, setAction] = useState<Action | null>(null);
   const [confirmation, setConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const phrase = `${disabled ? 'ENABLE' : 'DISABLE'} ${email}`;
+  const phrase = action ? `${action === 'disable' ? 'DISABLE' : action === 'enable' ? 'ENABLE' : action === 'sign-out' ? 'SIGN OUT' : 'RESET TWO-STEP'} ${email}` : '';
+  const title = action === 'disable' ? 'Disable account' : action === 'enable' ? 'Enable account' : action === 'sign-out' ? 'Sign out sessions' : 'Reset two-step verification';
+  function begin(next: Action) { setConfirmation(''); setError(''); setAction(next); }
   async function save() {
+    if (!action) return;
     setBusy(true); setError('');
     try {
-      const response = await fetch(`/api/root/users/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ disabled: !disabled, confirmation }) });
+      const accessChange = action === 'disable' || action === 'enable';
+      const response = await fetch(`/api/root/users/${encodeURIComponent(id)}`, {
+        method: accessChange ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(accessChange ? { disabled: action === 'disable', confirmation } : { action, confirmation }),
+      });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error ?? 'Account change failed.');
       window.location.reload();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Account change failed.'); setBusy(false); }
   }
   if (self) return <span className="root-directory__self">Your account</span>;
-  return <><button type="button" onClick={() => { setConfirmation(''); setError(''); setOpen(true); }}>{disabled ? 'Enable' : 'Disable'}</button>
-    {open && <ModalDialog className="ui-dialog" labelledBy={`root-user-${id}`} onDismiss={() => { if (!busy) setOpen(false); }} busy={busy}>
-      <div className="ui-dialog__header"><h2 id={`root-user-${id}`}>{disabled ? 'Enable' : 'Disable'} account?</h2></div>
-      <div className="ui-dialog__body"><p>{email}</p><p>{disabled ? 'The user can sign in again.' : 'All current sessions will end immediately.'}</p><label>Type <strong>{phrase}</strong> to confirm<input value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" /></label>{error && <p role="alert" className="ui-error">{error}</p>}</div>
-      <div className="ui-dialog__actions"><button type="button" data-dialog-cancel onClick={() => setOpen(false)} disabled={busy}>Cancel</button><button type="button" onClick={() => void save()} disabled={busy || confirmation !== phrase}>{busy ? 'Saving…' : disabled ? 'Enable account' : 'Disable account'}</button></div>
+  return <><div className="root-directory__actions"><button type="button" onClick={() => begin(disabled ? 'enable' : 'disable')}>{disabled ? 'Enable' : 'Disable'}</button><button type="button" onClick={() => begin('sign-out')}>Sign out</button>{!root && <button type="button" onClick={() => begin('reset-two-step')}>Reset two-step</button>}</div>
+    {action && <ModalDialog className="ui-dialog" labelledBy={`root-user-${id}`} onDismiss={() => { if (!busy) setAction(null); }} busy={busy}>
+      <div className="ui-dialog__header"><h2 id={`root-user-${id}`}>{title}?</h2></div>
+      <div className="ui-dialog__body"><p>{email}</p><p>{action === 'disable' ? 'The account will be disabled and all sessions will end.' : action === 'enable' ? 'The user can sign in again.' : action === 'sign-out' ? 'All current sessions will end. The account stays active.' : 'Authenticator, passkeys, recovery codes and sessions will be cleared. The user must set up verification again when required by policy.'}</p><label>Type <strong>{phrase}</strong> to confirm<input value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" /></label>{error && <p role="alert" className="ui-error">{error}</p>}</div>
+      <div className="ui-dialog__actions"><button type="button" data-dialog-cancel onClick={() => setAction(null)} disabled={busy}>Cancel</button><button type="button" onClick={() => void save()} disabled={busy || confirmation !== phrase}>{busy ? 'Saving…' : title}</button></div>
     </ModalDialog>}
   </>;
 }

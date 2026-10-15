@@ -25,3 +25,33 @@ export async function setRootUserDisabled(actorId: string, userId: string, disab
     return { changed: true, sessionsRevoked };
   }, { isolationLevel: 'Serializable' });
 }
+
+export async function revokeRootUserSessions(actorId: string, userId: string, confirmation: string) {
+  return prisma.$transaction(async tx => {
+    const target = await tx.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+    if (!target) throw new Error('User not found.');
+    if (actorId === target.id) throw new Error('You cannot change access to your own account.');
+    if (confirmation !== `SIGN OUT ${target.email}`) throw new Error('Enter the exact confirmation shown.');
+    const sessionsRevoked = (await tx.session.deleteMany({ where: { userId: target.id } })).count;
+    const detail = JSON.stringify({ userId: target.id, sessionsRevoked });
+    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, ${'root.user_signed_out'}, ${detail}::jsonb, NOW())`;
+    return { sessionsRevoked };
+  });
+}
+
+export async function resetRootUserTwoStep(actorId: string, userId: string, confirmation: string) {
+  return prisma.$transaction(async tx => {
+    const target = await tx.user.findUnique({ where: { id: userId }, select: { id: true, email: true, isInstanceOwner: true } });
+    if (!target) throw new Error('User not found.');
+    if (target.isInstanceOwner) throw new Error('An instance owner’s second step cannot be reset here.');
+    if (actorId === target.id) throw new Error('You cannot change access to your own account.');
+    if (confirmation !== `RESET TWO-STEP ${target.email}`) throw new Error('Enter the exact confirmation shown.');
+    await tx.user.update({ where: { id: target.id }, data: { totpSecret: null, totpPendingSecret: null, totpEnabledAt: null, totpLastStep: null } });
+    await tx.passkey.deleteMany({ where: { userId: target.id } });
+    await tx.recoveryCode.deleteMany({ where: { userId: target.id } });
+    const sessionsRevoked = (await tx.session.deleteMany({ where: { userId: target.id } })).count;
+    const detail = JSON.stringify({ userId: target.id, sessionsRevoked });
+    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actorId}, ${'root.user_two_step_reset'}, ${detail}::jsonb, NOW())`;
+    return { sessionsRevoked };
+  });
+}
