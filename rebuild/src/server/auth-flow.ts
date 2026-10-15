@@ -2,9 +2,8 @@ import { cookies } from 'next/headers';
 import { createHash, randomBytes, scryptSync } from 'node:crypto';
 import { verifyLegacyPassword, hashLegacySessionToken, LEGACY_SESSION_COOKIE } from './auth';
 import { prisma } from './data';
+import { runtimeConfig } from './config/store';
 
-const SESSION_DAYS = 30;
-const PENDING_MINUTES = 15;
 const cookieOptions = { httpOnly: true, sameSite: 'lax' as const, secure: process.env.NODE_ENV === 'production', path: '/' };
 let dummyPasswordHash: string | null = null;
 
@@ -61,11 +60,15 @@ export async function signIn(email: string, password: string): Promise<'signed-i
   // passkey-only accounts a TOTP enrollment path after password verification.
   const next = hasTotp ? 'verify' : hasPasskey || policy === 'everyone' || (policy === 'admins' && privileged) ? 'enroll' : null;
 
+  const [sessionDays, pendingMinutes] = await Promise.all([
+    runtimeConfig('auth.sessionDays') as Promise<number>,
+    runtimeConfig('auth.pendingMinutes') as Promise<number>,
+  ]);
   const token = randomBytes(32).toString('base64url');
-  const expiresAt = new Date(Date.now() + (next ? PENDING_MINUTES * 60 * 1000 : SESSION_DAYS * 24 * 60 * 60 * 1000));
+  const expiresAt = new Date(Date.now() + (next ? pendingMinutes * 60 * 1000 : sessionDays * 24 * 60 * 60 * 1000));
   await prisma.session.create({ data: { id: randomBytes(18).toString('base64url'), userId: user.id, tokenHash: hashToken(token), expiresAt, pending: next, challenge: null } });
   const store = await cookies();
-  store.set(LEGACY_SESSION_COOKIE, token, { ...cookieOptions, maxAge: next ? PENDING_MINUTES * 60 : SESSION_DAYS * 24 * 60 * 60 });
+  store.set(LEGACY_SESSION_COOKIE, token, { ...cookieOptions, maxAge: next ? pendingMinutes * 60 : sessionDays * 24 * 60 * 60 });
   return next ?? 'signed-in';
 }
 

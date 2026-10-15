@@ -33,6 +33,13 @@
 .hiddenForm { display: none; }
 .editDetails summary { cursor: pointer; color: var(--accent); font-size: 12px; font-weight: 700; }
 .editForm { min-width: min(360px, 72vw); margin-top: 10px; }
+.help { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
+.targetReference { display: grid; gap: 4px; max-height: 120px; overflow: auto; margin: 0; padding-left: 20px; color: var(--ink-soft); font-size: 11px; }
+.targetPicker { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 6px 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; }
+.targetPicker legend { padding: 0 5px; color: var(--ink-soft); font-size: 12px; font-weight: 700; }
+.targetPicker label, .confirmCheck { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: 12px; }
+.targetPicker small, .targetPicker p { flex-basis: 100%; margin: 0; color: var(--ink-faint); font-size: 11px; }
+.confirmCheck { align-items: flex-start; margin-top: 12px; line-height: 1.45; }
 .noActions { color: var(--ink-faint); font-size: 11px; }
 .successNotice, .errorNotice { margin: -7px 0 0; padding: 11px 14px; border-radius: 9px; font-size: 13px; }
 .successNotice { color: var(--accent); background: var(--accent-soft); }

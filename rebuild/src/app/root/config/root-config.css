@@ -35,6 +35,17 @@
   background: var(--surface);
   color: var(--ink);
 }
+.root-config__controls select,
+.root-config__controls textarea {
+  min-width: min(320px, 100%);
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+.root-config__controls textarea { min-width: min(520px, 100%); font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .root-config__controls button {
   min-height: 38px;
   padding: 0 13px;

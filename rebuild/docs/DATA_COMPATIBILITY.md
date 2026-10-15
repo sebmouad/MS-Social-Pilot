@@ -8,15 +8,15 @@ reuse existing sign-in state.
 
 This schema is a client view, not a database migration. Do not run `prisma db
 push`, `prisma migrate`, or any schema migration from the rebuild app against
-the production database. The new app's data module exposes read queries only;
-application code should continue to authorize each request through the user's
-membership before reading workspace-scoped records.
+the production database. The rebuild now writes compatible sessions, two-step
+credentials, draft posts, selected destinations, and Root configuration.
+Every read and write must validate workspace membership and feature access.
 
 The mapped column and enum names follow `app/prisma/schema.prisma`. The schema
-omits legacy fields and tables the new app does not need, including workspace
-settings and external provider credentials. Session token hashes are read only
-for authentication; session creation and revocation remain outside this layer.
-Social access tokens are not selected by the read API. No legacy settings are
-copied into the rebuild app. If it later needs additional data, add only the
-required columns and relations after checking the production schema; preserve
-the read-only boundary until a separately reviewed write design exists.
+omits legacy fields and tables the new app does not need, including some
+workspace settings and external provider credentials. Session token hashes
+are read for authentication; the rebuild also creates and revokes sessions.
+Social access tokens are not selected by customer read views. A small set of
+legacy app settings backs the typed Root configuration registry. Additional
+models must be checked against the production schema and migration plan before
+use.

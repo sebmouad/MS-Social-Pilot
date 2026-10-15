@@ -1,5 +1,6 @@
-// Read-only compatibility view for the fresh app. This schema maps only the
-// legacy tables and columns the new app needs; it is not a migration schema.
+// Compatibility view for the fresh app. This schema maps selected legacy
+// tables and columns; some services write through these mappings. It is not
+// a migration schema and must not be pushed to the existing database.
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/client"
@@ -67,6 +68,8 @@ model User {
   totpPendingSecret String?
   totpEnabledAt DateTime?
   totpLastStep Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   passkeys     Passkey[]
   recoveryCodes RecoveryCode[]
   memberships  Membership[]
@@ -132,6 +135,8 @@ model Workspace {
   name           String
   slug           String          @unique
   timezone       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   memberships    Membership[]
   targets        Target[]
   posts          Post[]
@@ -161,8 +166,14 @@ model SocialAccount {
   providerUserId String
   name           String
   pictureUrl     String?
+  accessToken    String
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  scopes         String @default("")
   invalidatedAt  DateTime?
-  createdAt      DateTime
+  invalidReason  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   workspace      Workspace   @relation(fields: [workspaceId], references: [id])
   targets        Target[]
   adAccounts     AdAccount[]
@@ -180,9 +191,11 @@ model Target {
   providerId      String
   name            String
   pictureUrl      String?
+  accessToken     String?
   enabled         Boolean
   canPublish      Boolean
   createdAt       DateTime
+  updatedAt       DateTime @updatedAt
   workspace       Workspace      @relation(fields: [workspaceId], references: [id])
   socialAccount   SocialAccount? @relation(fields: [socialAccountId], references: [id])
   postTargets     PostTarget[]
@@ -216,6 +229,7 @@ model Post {
   workspaceId String
   authorId    String
   message     String
+  firstComment String?
   status      PostStatus
   scheduledAt DateTime?
   publishedAt DateTime?
@@ -320,6 +334,8 @@ model AdAccount {
   accountStatus   Int?
   enabled         Boolean
   lastSyncedAt    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   workspace       Workspace      @relation(fields: [workspaceId], references: [id])
   socialAccount   SocialAccount? @relation(fields: [socialAccountId], references: [id])
   insights        AdInsight[]

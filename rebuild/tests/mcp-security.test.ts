@@ -1,18 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
-  target: { findMany: vi.fn(), findFirst: vi.fn() },
+  target: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
+  adAccount: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
+  socialAccount: { findFirst: vi.fn() },
   post: { findMany: vi.fn() },
   pageInsight: { findMany: vi.fn() },
   conversation: { findMany: vi.fn() },
   postComment: { findMany: vi.fn() },
+  $executeRaw: vi.fn(),
+  $transaction: vi.fn(),
+  membership: { findUnique: vi.fn() },
 }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
+const mutations = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), remove: vi.fn(), select: vi.fn() }));
+vi.mock('../src/server/post-mutations', () => ({ createLocalDraft: mutations.create, updateLocalDraft: mutations.update, deleteLocalDraft: mutations.remove }));
+vi.mock('../src/server/connection-mutations', () => ({ setConnectionSelections: mutations.select }));
 
 import { handleMcpMessage, type McpViewer } from '../src/server/mcp/server';
 
 const viewer: McpViewer = {
-  userId: 'user-a', workspaceId: 'workspace-a',
+  userId: 'user-a', workspaceId: 'workspace-a', role: 'owner',
   workspace: { id: 'workspace-a', name: 'Alpha', timezone: 'UTC' },
   entitlements: {
     workspaceId: 'workspace-a',
@@ -25,7 +33,14 @@ const call = (name: string, args: Record<string, unknown> = {}) => handleMcpMess
   jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args },
 });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  db.$executeRaw.mockResolvedValue(1);
+  mutations.create.mockResolvedValue({ id: 'new-post' });
+  mutations.update.mockResolvedValue(undefined);
+  mutations.remove.mockResolvedValue(undefined);
+  mutations.select.mockResolvedValue(undefined);
+});
 
 describe('MCP workspace boundaries', () => {
   it('scopes destination and post queries to the authenticated workspace and clamps limits', async () => {
@@ -34,7 +49,7 @@ describe('MCP workspace boundaries', () => {
     await call('list_pages');
     await call('list_posts', { limit: 900 });
     expect(db.target.findMany.mock.calls[0][0].where).toEqual({ workspaceId: 'workspace-a', enabled: true });
-    expect(db.post.findMany.mock.calls[0][0]).toMatchObject({ where: { workspaceId: 'workspace-a' }, take: 200 });
+    expect(db.post.findMany.mock.calls[0][0]).toMatchObject({ where: { workspaceId: 'workspace-a' }, take: 100 });
   });
 
   it('checks page ownership before reading analytics and constrains insight lookup to the requested page', async () => {
@@ -70,5 +85,31 @@ describe('MCP workspace boundaries', () => {
       isHidden: false,
       postTarget: { post: { workspaceId: 'workspace-a' }, target: { workspaceId: 'workspace-a' } },
     });
+  });
+
+  it('requires explicit draft confirmations and audits successful writes', async () => {
+    const missing = await call('create_draft', { message: 'hello' });
+    expect((await missing.json()).result.isError).toBe(true);
+    expect(mutations.create).not.toHaveBeenCalled();
+
+    const created = await call('create_draft', { message: ' hello ', confirmation: 'CREATE DRAFT' });
+    expect((await created.json()).result.structuredContent).toEqual({ id: 'new-post', status: 'draft' });
+    expect(mutations.create).toHaveBeenCalledWith(viewer, 'hello');
+    expect(db.$executeRaw).toHaveBeenCalled();
+
+    const deleted = await call('delete_draft', { postId: 'post-a', confirmation: 'DELETE DRAFT post-a' });
+    expect((await deleted.json()).result.structuredContent).toEqual({ id: 'post-a', deleted: true });
+    expect(mutations.remove).toHaveBeenCalledWith(viewer, 'post-a');
+  });
+
+  it('uses the existing selection mutation and prevents non-admin selection changes', async () => {
+    const response = await call('set_connection_selection', { kind: 'target', id: 'page-a', enabled: false, confirmation: 'SET CONNECTION target page-a DISABLED' });
+    expect((await response.json()).result.structuredContent).toEqual({ kind: 'target', id: 'page-a', enabled: false });
+    expect(mutations.select).toHaveBeenCalledWith(viewer, [{ kind: 'target', id: 'page-a', enabled: false }]);
+
+    const editor = { ...viewer, role: 'editor' };
+    const denied = await handleMcpMessage(editor, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'set_connection_selection', arguments: { kind: 'target', id: 'page-a', enabled: false, confirmation: 'SET CONNECTION target page-a DISABLED' } } });
+    expect((await denied.json()).result.isError).toBe(true);
+    expect(mutations.select).toHaveBeenCalledTimes(1);
   });
 });

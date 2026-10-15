@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import { CONFIG_BY_KEY, CONFIG_REGISTRY, type ConfigKey } from '@/lib/config/registry';
+import { CONFIG_BY_KEY, CONFIG_REGISTRY, CONFIG_SCHEMA_VERSION, type ConfigKey } from '@/lib/config/registry';
 import { prisma } from '@/server/data';
 import { Prisma } from '../../../generated/client';
 
@@ -28,6 +28,27 @@ function decrypt(value: string): string {
   return Buffer.concat([decipher.update(Buffer.from(body, 'base64url')), decipher.final()]).toString('utf8');
 }
 
+/** Runtime readers always validate stored values against the current registry. */
+export async function runtimeConfig(key: string): Promise<unknown> {
+  const definition = CONFIG_BY_KEY.get(key);
+  if (!definition || definition.kind === 'secret') throw new Error('Unknown non-secret configuration key.');
+  const row = await prisma.appSetting.findUnique({ where: { key }, select: { value: true, encrypted: true } });
+  if (!row) return definition.defaultValue;
+  if (row.encrypted) throw new Error('A non-secret setting was stored as encrypted.');
+  const checked = definition.schema.safeParse(row.value);
+  if (!checked.success) throw new Error(`Stored configuration is invalid: ${key}.`);
+  return checked.data;
+}
+
+export async function runtimeSecret(key: string): Promise<string | null> {
+  const definition = CONFIG_BY_KEY.get(key);
+  if (!definition || definition.kind !== 'secret') throw new Error('Unknown secret configuration key.');
+  const row = await prisma.appSetting.findUnique({ where: { key }, select: { value: true, encrypted: true } });
+  if (!row) return null;
+  if (!row.encrypted || typeof row.value !== 'string') throw new Error(`Stored secret is invalid: ${key}.`);
+  return decrypt(row.value);
+}
+
 export async function readConfig() {
   const rows = await prisma.appSetting.findMany({ where: { key: { in: CONFIG_REGISTRY.map((item) => item.key) } }, select: { key: true, value: true, encrypted: true } });
   const stored = new Map(rows.map((row) => [row.key, row]));
@@ -48,6 +69,7 @@ export async function saveConfig(input: unknown, actorId: string) {
   const request = requestResult.data;
   const definition = CONFIG_BY_KEY.get(request.key as ConfigKey);
   if (!definition) throw new Error('Unknown configuration key.');
+  if (request.clear && definition.kind !== 'secret') throw new Error('Only secret values can be cleared.');
   if (definition.kind === 'secret' && request.clear) {
     await prisma.$transaction(async (tx) => {
       await tx.appSetting.deleteMany({ where: { key: definition.key } });
@@ -73,5 +95,5 @@ export async function saveConfig(input: unknown, actorId: string) {
 async function audit(tx: Prisma.TransactionClient, actorId: string, key: string, change: string) {
   // Existing installation-wide audit table from the legacy schema. Parameterized
   // values keep the query safe; the secret itself is never included in detail.
-  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`cfg_${randomBytes(12).toString('hex')}`}, ${actorId}, 'config.changed', ${JSON.stringify({ key, change })}::jsonb, NOW())`;
+  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`cfg_${randomBytes(12).toString('hex')}`}, ${actorId}, 'config.changed', ${JSON.stringify({ key, change, schemaVersion: CONFIG_SCHEMA_VERSION })}::jsonb, NOW())`;
 }

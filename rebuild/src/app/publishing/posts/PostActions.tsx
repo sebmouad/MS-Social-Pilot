@@ -1,51 +1,86 @@
 "use client";
 
-import { createDraftAction, deleteDraftAction, updateDraftAction } from "./actions";
+import { createPostAction, deletePostAction, importPostsAction, publishPostAction, syncPostAction, updatePostAction } from "./actions";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components";
 import styles from "../publishing.module.css";
 
-export function CreateDraftForm() {
-  return <form action={createDraftAction} className={styles.draftForm}>
+type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean };
+type PostRow = { id: string; message: string; firstComment: string | null; status: string; publishedAt: Date | null; targets: Array<{ status: string; remotePostId: string | null; target: { id: string } }> };
+
+export function PostEditorForm({ targets }: { targets: TargetChoice[] }) {
+  return <form action={createPostAction} className={styles.draftForm}>
     <label htmlFor="new-post-message">Post text</label>
-    <textarea id="new-post-message" name="message" maxLength={10_000} required rows={4} placeholder="Write a draft for your team…" />
-    <div className={styles.formFooter}><span>Saved as a local draft. No channels are selected.</span><button className="ui-button ui-button--primary" type="submit">Create draft</button></div>
+    <textarea id="new-post-message" name="message" required rows={4} placeholder="Write a post for your team…" />
+    <label htmlFor="new-post-first-comment">First comment <span>(optional)</span></label>
+    <textarea id="new-post-first-comment" name="firstComment" rows={2} placeholder="Add a link or follow-up as the first comment…" />
+    <TargetPicker targets={targets} />
+    <div className={styles.formFooter}><span>Saved locally until you publish it.</span><button className="ui-button ui-button--primary" type="submit">Create post</button></div>
   </form>;
 }
 
-export function DraftRowActions({ postId, message }: { postId: string; message: string }) {
+export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
+  return <form action={importPostsAction} className={styles.draftForm}>
+    <label htmlFor="posts-csv">Import posts from CSV</label>
+    <p className={styles.help}>Required header: <code>message,firstComment,targetIds</code>. Separate multiple target IDs with semicolons. Imported posts remain drafts.</p>
+    <ul className={styles.targetReference}>{targets.filter(target => target.type === 'page' && target.provider === 'facebook' && target.canPublish).map(target => <li key={target.id}>{target.name}: <code>{target.id}</code></li>)}</ul>
+    <input id="posts-csv" type="file" name="csv" accept=".csv,text/csv" required />
+    <button className="ui-button ui-button--secondary" type="submit">Import CSV</button>
+  </form>;
+}
+
+export function PostRowActions({ post, targets, canEdit, canPublish }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const deleteForm = useRef<HTMLFormElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
+  const selected = new Set(post.targets.map(item => item.target.id));
+  const hasRemote = post.targets.some(item => Boolean(item.remotePostId));
+  const isDraft = post.status === 'draft' && !post.publishedAt;
   useEffect(() => {
     if (deleteOpen && !dialog.current?.open) dialog.current?.showModal();
     if (!deleteOpen && dialog.current?.open) dialog.current.close();
   }, [deleteOpen]);
   return <div className={styles.rowActions}>
-    <details className={styles.editDetails}>
-      <summary>Edit draft</summary>
-      <form action={updateDraftAction} className={styles.editForm}>
-        <input type="hidden" name="postId" value={postId} />
-        <label htmlFor={`message-${postId}`}>Post text</label>
-        <textarea id={`message-${postId}`} name="message" defaultValue={message} maxLength={10_000} required rows={4} />
-        <button className="ui-button ui-button--secondary ui-button--sm" type="submit">Save draft</button>
+    {canEdit && isDraft ? <details className={styles.editDetails}>
+      <summary>Edit post</summary>
+      <form action={updatePostAction} className={styles.editForm}>
+        <input type="hidden" name="postId" value={post.id} />
+        <label htmlFor={`message-${post.id}`}>Post text</label>
+        <textarea id={`message-${post.id}`} name="message" defaultValue={post.message} required rows={4} />
+        <label htmlFor={`comment-${post.id}`}>First comment <span>(optional)</span></label>
+        <textarea id={`comment-${post.id}`} name="firstComment" defaultValue={post.firstComment ?? ''} rows={2} />
+        <TargetPicker targets={targets} selected={selected} />
+        <button className="ui-button ui-button--secondary ui-button--sm" type="submit">Save post</button>
       </form>
-    </details>
-    <form ref={deleteForm} action={deleteDraftAction} className={styles.hiddenForm}>
-      <input type="hidden" name="postId" value={postId} />
-    </form>
-    <Button variant="danger" size="sm" type="button" onClick={() => setDeleteOpen(true)}>Delete draft</Button>
-    <dialog
-      className="ui-dialog"
-      aria-labelledby={`delete-title-${postId}`}
-      aria-describedby={`delete-description-${postId}`}
-      ref={dialog}
-      onClose={() => setDeleteOpen(false)}
-      onCancel={event => { event.preventDefault(); setDeleteOpen(false); }}
-    >
-      <div className="ui-dialog__header"><div><h2 id={`delete-title-${postId}`}>Delete this draft?</h2><p id={`delete-description-${postId}`}>This permanently removes the unpublished draft and its associated local notes and history. No social channel will be contacted.</p></div></div>
-      <div className="ui-dialog__body"><p>This action cannot be undone.</p></div>
-      <div className="ui-dialog__actions"><Button type="button" onClick={() => setDeleteOpen(false)}>Keep draft</Button><Button variant="danger" type="button" onClick={() => deleteForm.current?.requestSubmit()}>Delete draft</Button></div>
+    </details> : null}
+    {canPublish && isDraft && post.targets.length ? <form action={publishPostAction}>
+      <input type="hidden" name="postId" value={post.id} />
+      <button className="ui-button ui-button--primary ui-button--sm" type="submit">Publish now</button>
+    </form> : null}
+    {hasRemote ? <form action={syncPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Sync status</button></form> : null}
+    {post.targets.some(item => item.status === 'processing' && !item.remotePostId) ? <span className={styles.noActions}>A publish result needs manual Facebook review before retrying.</span> : null}
+    <Button variant="danger" size="sm" type="button" onClick={() => setDeleteOpen(true)}>Delete locally</Button>
+    <dialog className="ui-dialog" aria-labelledby={`delete-title-${post.id}`} ref={dialog} onClose={() => setDeleteOpen(false)} onCancel={event => { event.preventDefault(); setDeleteOpen(false); }}>
+      <form action={deletePostAction}>
+        <input type="hidden" name="postId" value={post.id} />
+        <div className="ui-dialog__header"><div><h2 id={`delete-title-${post.id}`}>Delete this post locally?</h2><p>This permanently removes the post and its local publishing history.</p></div></div>
+        <div className="ui-dialog__body">
+          <p>{hasRemote ? 'Remote posts will remain on Facebook unless you also select remote deletion.' : 'No remote post is recorded for this item.'}</p>
+          {hasRemote ? <label className={styles.confirmCheck}><input type="checkbox" name="deleteRemote" /> Also delete recorded Facebook posts. This cannot be undone.</label> : null}
+        </div>
+        <div className="ui-dialog__actions"><Button type="button" onClick={() => setDeleteOpen(false)}>Cancel</Button><Button variant="danger" type="submit">Delete locally</Button></div>
+      </form>
     </dialog>
   </div>;
+}
+
+function TargetPicker({ targets, selected = new Set<string>() }: { targets: TargetChoice[]; selected?: Set<string> }) {
+  const supported = targets.filter(target => target.type === 'page' && target.provider === 'facebook' && target.canPublish);
+  return <fieldset className={styles.targetPicker}>
+    <legend>Destinations <span>(optional)</span></legend>
+    {supported.length ? supported.map(target => <label key={target.id}>
+      <input type="checkbox" name="targetIds" value={target.id} defaultChecked={selected.has(target.id)} />
+      <span>{target.name}</span>
+    </label>) : <p>No enabled Facebook Pages can publish right now.</p>}
+    <small>Only enabled Facebook Pages are available in this publishing flow.</small>
+  </fieldset>;
 }

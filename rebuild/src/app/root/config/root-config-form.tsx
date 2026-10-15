@@ -40,16 +40,26 @@ export function RootConfigForm({ definitions, initialValues, availability }: { d
         <h2>{definition.label}</h2>
         <p>{definition.description}</p>
         {definition.kind === 'boolean' ? <label><input type="checkbox" checked={Boolean(current?.value)} onChange={(event) => void save(definition.key, event.target.checked)} /> Enabled</label> : <div className="root-config__controls">
-          <input aria-label={definition.label} type={definition.kind === 'secret' ? 'password' : definition.kind === 'number' ? 'number' : 'text'} autoComplete="off" placeholder={definition.kind === 'secret' ? (current?.isSet ? 'Saved value hidden' : 'Enter secret') : String(current?.value ?? '')} value={inputs[definition.key] ?? ''} onChange={(event) => setInputs((old) => ({ ...old, [definition.key]: event.target.value }))} />
-          <button type="button" onClick={() => void save(definition.key, definition.kind === 'number' ? Number(inputs[definition.key]) : inputs[definition.key] ?? '')}>Save</button>
+          {definition.kind === 'select' ? <select aria-label={definition.label} value={String(current?.value ?? definition.defaultValue)} onChange={(event) => void save(definition.key, event.target.value)}>
+            {(definition.options ?? []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select> : definition.kind === 'json' ? <textarea aria-label={definition.label} rows={4} value={inputs[definition.key] ?? JSON.stringify(current?.value ?? definition.defaultValue, null, 2)} onChange={(event) => setInputs((old) => ({ ...old, [definition.key]: event.target.value }))} /> : <input aria-label={definition.label} type={definition.kind === 'secret' ? 'password' : definition.kind === 'number' ? 'number' : 'text'} autoComplete="off" placeholder={definition.kind === 'secret' ? (current?.isSet ? 'Saved value hidden' : 'Enter secret') : String(current?.value ?? '')} value={inputs[definition.key] ?? ''} onChange={(event) => setInputs((old) => ({ ...old, [definition.key]: event.target.value }))} />}
+          {definition.kind !== 'select' && <button type="button" onClick={() => {
+            let value: unknown = inputs[definition.key] ?? '';
+            if (definition.kind === 'number') value = Number(value);
+            if (definition.kind === 'json') {
+              try { value = JSON.parse(String(value)); }
+              catch { setMessage(`${definition.label}: enter valid JSON.`); return; }
+            }
+            void save(definition.key, value);
+          }}>Save</button>}
           {definition.kind === 'secret' && <button type="button" onClick={() => void clearSecret(definition.key)}>Clear saved secret</button>}
         </div>}
-        <small>Source: {current?.source ?? 'default'}{definition.kind === 'secret' && current?.isSet ? ' · saved value is concealed' : ''}</small>
+        <small>Source: {current?.source ?? 'default'} · {definition.consumption === 'active' ? 'Active in rebuild' : definition.consumption === 'configured' ? 'Stored; runtime wiring pending' : 'Stored; consumer not implemented'}{definition.kind === 'secret' && current?.isSet ? ' · saved value is concealed' : ''}</small>
       </section>;
     })}
     <section className="root-config__catalog">
       <h2>Generated module and feature availability</h2>
-      <p>Entries come from the rebuild product catalog. Availability controls are not persisted or enforced in this slice.</p>
+      <p>Entries come from the rebuild product catalog. Root availability defaults are persisted above, but enforcement in the entitlement resolver remains pending.</p>
       <h3>Modules</h3><ul>{availability.modules.map((module) => <li key={module.id}>{module.title} <code>{module.id}</code></li>)}</ul>
       <h3>Features</h3><ul>{availability.features.map((feature) => <li key={feature.id}>{feature.title} <code>{feature.id}</code> · {feature.module}</li>)}</ul>
     </section>

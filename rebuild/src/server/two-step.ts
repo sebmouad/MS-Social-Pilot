@@ -4,8 +4,9 @@ import { hashLegacySessionToken, LEGACY_SESSION_COOKIE } from './auth';
 import { prisma } from './data';
 import { decryptSecret, encryptSecret } from './secret-crypto';
 import { matchTotp, newTotpSecret, otpauthUri } from './totp';
+import type { Prisma } from '../../generated/client';
+import { runtimeConfig } from './config/store';
 
-const SESSION_DAYS = 30;
 const RECOVERY_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 
 async function pendingSession(kind: 'verify' | 'enroll') {
@@ -26,16 +27,19 @@ export async function pendingUserId(kind: 'verify' | 'enroll') {
   return (await pendingSession(kind)).userId;
 }
 
-async function completePending(sessionId: string, kind: 'verify' | 'enroll') {
-  const changed = await prisma.session.updateMany({
+async function completePending(tx: Prisma.TransactionClient, sessionId: string, kind: 'verify' | 'enroll', sessionDays: number) {
+  const changed = await tx.session.updateMany({
     where: { id: sessionId, pending: kind, expiresAt: { gt: new Date() } },
-    data: { pending: null, challenge: null, expiresAt: new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000) },
+    data: { pending: null, challenge: null, expiresAt: new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000) },
   });
   if (changed.count !== 1) throw new Error('Your sign-in has expired.');
+}
+
+async function extendSessionCookie(sessionDays: number) {
   // The cookie already contains the same token; extend its browser expiry.
   const store = await cookies();
   const token = store.get(LEGACY_SESSION_COOKIE)?.value;
-  if (token) store.set(LEGACY_SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: SESSION_DAYS * 24 * 60 * 60 });
+  if (token) store.set(LEGACY_SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: sessionDays * 24 * 60 * 60 });
 }
 
 function normalizeRecoveryCode(value: string) {
@@ -64,7 +68,11 @@ export async function confirmEnrollment(code: string) {
   if (!user.totpPendingSecret || user.totpEnabledAt) throw new Error('Authenticator setup has expired.');
   const step = matchTotp(decryptSecret(user.totpPendingSecret), code);
   if (step === null) throw new Error('The authenticator code is incorrect.');
-  const codes = Array.from({ length: 10 }, generateRecoveryCode);
+  const [sessionDays, recoveryCodeCount] = await Promise.all([
+    runtimeConfig('auth.sessionDays') as Promise<number>,
+    runtimeConfig('auth.recoveryCodeCount') as Promise<number>,
+  ]);
+  const codes = Array.from({ length: recoveryCodeCount }, generateRecoveryCode);
   await prisma.$transaction(async tx => {
     const changed = await tx.user.updateMany({
       where: { id: pending.userId, totpEnabledAt: null, totpPendingSecret: user.totpPendingSecret },
@@ -73,27 +81,39 @@ export async function confirmEnrollment(code: string) {
     if (changed.count !== 1) throw new Error('Authenticator setup has already completed.');
     await tx.recoveryCode.deleteMany({ where: { userId: pending.userId } });
     await tx.recoveryCode.createMany({ data: codes.map(value => ({ id: randomBytes(18).toString('base64url'), userId: pending.userId, codeHash: createHash('sha256').update(normalizeRecoveryCode(value)).digest('hex'), createdAt: new Date() })) });
+    await completePending(tx, pending.id, 'enroll', sessionDays);
   });
-  await completePending(pending.id, 'enroll');
+  await extendSessionCookie(sessionDays);
   return codes;
 }
 
 export async function verifySecondStep(code: string) {
   const pending = await pendingSession('verify');
+  const sessionDays = await runtimeConfig('auth.sessionDays') as number;
   const user = await prisma.user.findUniqueOrThrow({ where: { id: pending.userId }, select: { totpSecret: true, totpLastStep: true, totpEnabledAt: true } });
   const digits = code.replace(/\s/g, '');
   if (/^\d{6}$/.test(digits) && user.totpSecret && user.totpEnabledAt) {
     const step = matchTotp(decryptSecret(user.totpSecret), digits);
     if (step !== null) {
-      const changed = await prisma.user.updateMany({ where: { id: pending.userId, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] }, data: { totpLastStep: step } });
-      if (changed.count === 1) { await completePending(pending.id, 'verify'); return 'totp' as const; }
+      const accepted = await prisma.$transaction(async tx => {
+        const changed = await tx.user.updateMany({ where: { id: pending.userId, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] }, data: { totpLastStep: step } });
+        if (changed.count !== 1) return false;
+        await completePending(tx, pending.id, 'verify', sessionDays);
+        return true;
+      });
+      if (accepted) { await extendSessionCookie(sessionDays); return 'totp' as const; }
     }
   }
   const normalized = normalizeRecoveryCode(code);
   if (normalized.length === 10) {
     const hash = createHash('sha256').update(normalized).digest('hex');
-    const changed = await prisma.recoveryCode.updateMany({ where: { userId: pending.userId, codeHash: hash, usedAt: null }, data: { usedAt: new Date() } });
-    if (changed.count === 1) { await completePending(pending.id, 'verify'); return 'recovery' as const; }
+    const accepted = await prisma.$transaction(async tx => {
+      const changed = await tx.recoveryCode.updateMany({ where: { userId: pending.userId, codeHash: hash, usedAt: null }, data: { usedAt: new Date() } });
+      if (changed.count !== 1) return false;
+      await completePending(tx, pending.id, 'verify', sessionDays);
+      return true;
+    });
+    if (accepted) { await extendSessionCookie(sessionDays); return 'recovery' as const; }
   }
   throw new Error('The verification code is incorrect.');
 }

@@ -1,0 +1,19 @@
+import { adsManifest } from './ads/manifest';
+import { analyticsManifest } from './analytics/manifest';
+import { homeManifest } from './home/manifest';
+import { inboxManifest } from './inbox/manifest';
+import { publishingManifest } from './publishing/manifest';
+import { settingsManifest } from './settings/manifest';
+
+/** Customer module catalog. Internal Root tools intentionally live outside it. */
+export const moduleManifests = [
+  homeManifest,
+  publishingManifest,
+  inboxManifest,
+  analyticsManifest,
+  adsManifest,
+  settingsManifest,
+] as const;
+
+export type ManifestModuleId = (typeof moduleManifests)[number]['id'];
+export type ManifestFeatureId = (typeof moduleManifests)[number]['pages'][number]['id'];

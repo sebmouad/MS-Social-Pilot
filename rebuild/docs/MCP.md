@@ -1,24 +1,27 @@
 # MCP
 
-The rebuild exposes a read-only, stateless MCP endpoint at `/api/mcp` using JSON-RPC over HTTP POST. It implements MCP initialization, ping, tool listing and calls, plus resource listing and reads. Notifications receive HTTP 202 without a JSON-RPC body. GET is authenticated and returns 405 because server-sent event streams are not implemented.
+The rebuild exposes a stateless MCP endpoint at `/api/mcp` using JSON-RPC over HTTP POST. It implements initialization, ping, tool listing and calls, and resource listing and reads. Notifications receive HTTP 202 without a JSON-RPC body. GET is authenticated and returns 405 because server-sent event streams are not implemented.
 
 ## Authentication and scope
 
-Requests use the rebuild app's existing `msp_session` browser session cookie. The session must be valid, non-pending, unexpired, and attached to an enabled user. The `sp_workspace` cookie selects the workspace, with the same owner/admin fallback used by the rebuild UI. As in the current UI, only owner/admin memberships are admitted while finer-grained role and page scopes remain unmapped. All queries are constrained to that selected workspace. MCP does not accept API keys, create sessions, or expose credentials/tokens.
+Requests use the rebuild app's `msp_session` browser session cookie. The session must be valid, non-pending, unexpired, and attached to an enabled user. The `sp_workspace` cookie selects the workspace, with the existing owner/admin fallback when no selection matches. Root settings `mcp.enabled`, `mcp.authenticatedRoles`, and `mcp.maxRequestBytes` are enforced by the route. Each selected membership is checked again by the reused mutation helpers where applicable, and all reads and writes are constrained to the selected workspace. Entitlements are checked for each tool. Writes to connection selections are restricted to owners and admins.
+
+The rebuild has no API-key table or safely mappable API-key hash/scope workflow in its available Prisma schema. MCP therefore does not accept bearer API keys or create sessions. It never exposes social credentials or access tokens. Root controls the request body size, a per-process request limit, and the maximum items in list responses. The rate counter resets on process restart and is not shared across replicas.
 
 ## Tools
 
-- `list_pages`: enabled workspace destinations (all supported channel types).
-- `list_posts`: workspace posts, optionally filtered by status and scheduled date.
-- `list_inbox`: synced conversation and comment records, optionally filtered by type and resolution state.
-- `get_page_analytics`: stored daily insight rows for a Page in the selected workspace.
+- `list_pages`: enabled destinations in the current workspace.
+- `list_posts`: workspace posts with optional status and scheduled-date filters.
+- `list_inbox`: synced conversations and comments with optional type and resolution filters.
+- `get_page_analytics`: stored daily insights for a Page in the current workspace.
+- `list_ad_accounts`: advertising accounts in the current workspace.
+- `create_draft`, `update_draft`, `delete_draft`: operate only on local, unpublished, unconnected drafts through the same server mutations as the UI. They do not schedule, publish, or contact providers. Each call requires an exact confirmation value: `CREATE DRAFT`, `UPDATE DRAFT <postId>`, or `DELETE DRAFT <postId>`. Delete is permanent.
+- `set_connection_selection`: enable or disable one workspace channel or ad account through the UI's existing selection mutation. Confirmation must exactly match `SET CONNECTION <target|adAccount> <id> <ENABLED|DISABLED>`. The underlying mutation checks current membership, source validity, and workspace ownership, and records an audit event.
 
-The resource URIs `msp://workspace`, `msp://targets`, `msp://posts`, and `msp://inbox` expose corresponding read-only JSON. Posts and inbox resources return recent records with bounded limits.
+All MCP writes create a `root_activities` audit entry with actor, workspace, tool, and affected record identifiers. The operation-specific mutation also applies its existing authorization checks. Tools are filtered by current workspace entitlements; unknown or denied actions fail closed.
 
-## Deliberately withheld
+The resources `msp://workspace`, `msp://targets`, `msp://posts`, and `msp://inbox` expose workspace-scoped JSON. Posts and inbox resources return bounded recent records.
 
-No write tools are exposed. The rebuild has no MCP/API-key write scope, and does not yet implement an MCP confirmation flow. Its current post and inbox data helpers are read-only; the rebuild's UI mutations do not provide enough support to safely reproduce legacy scheduling, approval, cancellation, resolution, or assignment operations through MCP. Queue slots, templates, attention summaries, and detailed analytics are also absent from the rebuild's mapped data model, so they are not advertised as tools.
+## Parity boundaries
 
-## Legacy parity gaps
-
-The legacy endpoint used bearer API keys with read/write scopes and offered create/update/cancel/approve/request-changes post tools, inbox resolve/assign tools, queue and template listing, attention summaries, and richer Page analytics. The rebuild intentionally provides only the read capabilities backed by its current schema and UI access gate. Its session-cookie authentication also means MCP clients must operate in an authenticated browser session; a dedicated token workflow is not yet available.
+The legacy MCP used bearer API keys with read/write scopes and included post scheduling, approval, cancellation and request-changes operations; inbox resolve/assign operations; queue and template reads; attention summaries; and richer analytics. The rebuild schema or reusable server mutations do not currently support those operations, so they are not advertised. MCP write confirmations are explicit tool arguments, not an interactive human approval UI; clients should obtain user approval before repeating a write call with the required confirmation string.

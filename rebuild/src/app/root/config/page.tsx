@@ -13,7 +13,7 @@ export default async function RootConfigPage() {
     <a className="root-config__back" href="/home">← Back to Social Pilot</a>
     <p className="root-config__eyebrow">Root · Installation</p>
     <h1>Runtime configuration</h1>
-    <p className="root-config__intro">Technical settings are validated against a typed registry. This first slice is intentionally limited; each option below states whether rebuilt screens consume it.</p>
+    <p className="root-config__intro">Operational settings are validated against a versioned registry. Each option states whether rebuilt runtime paths consume it yet.</p>
     <RootConfigForm definitions={definitions} initialValues={values} availability={AVAILABILITY_CATALOG} />
   </main>;
 }

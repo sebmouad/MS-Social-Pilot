@@ -47,9 +47,10 @@ state, and disabled state exactly. Never export raw session cookie tokens.
   value and can query the matching session row. A different hostname, cookie
   name, or isolated session store requires users to sign in again.
 - Pending sessions represent an unfinished second-factor flow and are rejected
-  by the normal-session validator. The fresh app must implement compatible
-  TOTP/passkey/recovery flows before it can resume those sessions; simplest is
-  to require a fresh sign-in and first-factor/second-factor verification.
+  by the normal-session validator. The rebuild creates new pending sessions
+  after password verification and can complete TOTP, recovery-code, or TOTP
+  enrollment flows. Existing legacy pending challenges should be restarted
+  with a fresh password sign-in. Passkey verification remains unimplemented.
 - Password verification is compatible, but new password hashing and any
   rehash-on-login migration policy are outside this bridge. Do not overwrite
   legacy hashes until the fresh app's password policy and storage are settled.
@@ -57,10 +58,10 @@ state, and disabled state exactly. Never export raw session cookie tokens.
   current memberships and enforce its own authorization rules for every
   workspace operation. This bridge does not import settings, themes, roles,
   memberships, or application data.
-- Email verification, account recovery, trusted devices, passkeys, and
-  authenticator enrollment are not implemented here. Their exact schemas and
-  user flows need separate compatibility decisions.
+- Email verification, account recovery, trusted devices, and passkeys are not
+  implemented in this bridge. TOTP enrollment is implemented by the rebuild's
+  separate two-step service, using the existing user and recovery-code tables.
 
-The helpers perform no database reads or writes themselves. Callers should
-keep legacy access read-only and fail closed when required fields or the
-legacy source are unavailable.
+The helpers in this document perform no database reads or writes themselves.
+Their rebuild callers now write sessions and two-step credentials. Keep a
+tested rollback path and fail closed when required fields are unavailable.

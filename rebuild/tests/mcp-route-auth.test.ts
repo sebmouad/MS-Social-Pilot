@@ -19,6 +19,7 @@ vi.mock('../src/server/data', () => ({
   listWorkspaces: state.listWorkspaces,
   prisma: { user: { findUnique: state.userFindUnique }, $queryRaw: state.queryRaw },
 }));
+vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => key === 'mcp.enabled' ? true : key === 'mcp.authenticatedRoles' ? ['owner', 'admin'] : 1_048_576) }));
 
 import { hashLegacySessionToken } from '../src/server/auth';
 import { POST } from '../src/app/api/mcp/route';
@@ -47,6 +48,16 @@ beforeEach(() => {
 });
 
 describe('MCP route authentication', () => {
+  it('rejects cross-origin browser writes before session lookup', async () => {
+    const crossOrigin = new Request('http://localhost/api/mcp', {
+      method: 'POST',
+      headers: { origin: 'https://other.example', 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
+    });
+    expect((await POST(crossOrigin)).status).toBe(403);
+    expect(state.getSessionByTokenHash).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed tokens and pending sessions without looking up a user', async () => {
     state.token = 'invalid';
     expect((await POST(request())).status).toBe(401);

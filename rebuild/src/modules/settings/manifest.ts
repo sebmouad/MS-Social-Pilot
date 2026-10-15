@@ -1,0 +1,13 @@
+import type { ModuleManifest } from '../types';
+
+export const settingsManifest = {
+  id: 'settings',
+  title: 'Settings',
+  href: '/settings/connections',
+  pages: [
+    { id: 'settings/connections', title: 'Connections', href: '/settings/connections', description: 'Choose connected accounts and channels.' },
+    { id: 'settings/team', title: 'Team', href: '/settings/team', description: 'Manage people and access.' },
+    { id: 'settings/account', title: 'Account', href: '/settings/account', description: 'Your profile and preferences.' },
+    { id: 'settings/appearance', title: 'Appearance', href: '/settings/appearance', description: 'Choose a comfortable theme.' },
+  ],
+} as const satisfies ModuleManifest;

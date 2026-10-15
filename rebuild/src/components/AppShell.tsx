@@ -20,7 +20,7 @@ function Mark() {
   return <svg className="shell-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23.5 12.2 8l4 9 3.2-5.3L27 23.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="23.5" cy="8.5" r="2.5" fill="currentColor"/></svg>;
 }
 
-export function AppShell({ children, activeModule, enabledModules, enabledFeatures, userName, workspaceName, sidebar }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; userName: string; workspaceName: string; sidebar?: ReactNode }) {
+export function AppShell({ children, activeModule, enabledModules, enabledFeatures, rootAccess, userName, workspaceName, sidebar }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; rootAccess: boolean; userName: string; workspaceName: string; sidebar?: ReactNode }) {
   const pathname = usePathname();
   const modulePages = PAGES.filter(page => page.module === activeModule && enabledFeatures.includes(page.id));
   const enabledModuleSet = new Set(enabledModules);
@@ -36,6 +36,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
         {modulePages.map(page => <a key={page.id} href={page.href} className={`shell-subnav__link${pathname === page.href ? " is-active" : ""}`} aria-current={pathname === page.href ? "page" : undefined}>{page.title}</a>)}
       </nav>}
       {sidebar && <div className="shell-sidebar-filter">{sidebar}</div>}
+      {rootAccess && <a className="shell-subnav__link" href="/root/config">Root controls</a>}
     </aside>
     <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions"><span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main className="shell-content">{children}</main></div>
   </div>;
