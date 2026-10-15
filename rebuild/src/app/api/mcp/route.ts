@@ -34,7 +34,7 @@ async function getViewer(): Promise<McpViewer | null> {
   if (!hash) return null;
   const session = await getSessionByTokenHash(hash);
   if (!isUsableLegacySession(session, undefined)) return null;
-  const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true } });
+  const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { id: true, isInstanceOwner: true } });
   if (!user) return null;
   const workspaces = await listWorkspaces(user.id);
   const selected = jar.get('sp_workspace')?.value;
@@ -46,7 +46,7 @@ async function getViewer(): Promise<McpViewer | null> {
   const permissions = await loadPermissions(user.id, membership.workspace.id);
   if (!entitlements || !permissions) return null;
   const maxResultItems = await runtimeConfig('mcp.maxResultItems') as number;
-  return { userId: user.id, workspaceId: membership.workspace.id, role: membership.role, workspace: membership.workspace, entitlements, permissions, maxResultItems };
+  return { userId: user.id, workspaceId: membership.workspace.id, role: membership.role, workspace: membership.workspace, entitlements, permissions, maxResultItems, isInstanceOwner: user.isInstanceOwner };
 }
 
 async function getBearerViewer(request: Request): Promise<McpViewer | null> {

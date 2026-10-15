@@ -6,8 +6,10 @@ import { randomBytes } from 'node:crypto';
 import { canAccessFeature, canAccessPage, type ScopedPermissions } from '../permissions';
 import { moderateFacebookComment, replyToFacebookInbox, setFacebookInboxResolved } from '../inbox/actions';
 import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '../publishing/lifecycle';
+import { readConfig, saveConfig } from '../config/store';
+import { CONFIG_SCHEMA_VERSION, safeConfigShape } from '@/lib/config/registry';
 
-export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number; apiKeyId?: string };
+export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number; apiKeyId?: string; isInstanceOwner?: boolean };
 type JsonRpcId = string | number | null;
 
 const versions = ['2025-06-18', '2025-03-26', '2024-11-05'];
@@ -39,7 +41,11 @@ const tools = [
   { name: 'schedule_post', description: 'Schedule a draft for a future ISO timestamp. Confirmation must exactly match SCHEDULE POST <postId> <timestamp>.', inputSchema: { type: 'object', required: ['postId', 'scheduledAt', 'confirmation'], properties: { postId: { type: 'string' }, scheduledAt: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'cancel_scheduled_post', description: 'Return a queued post to drafts before delivery. Confirmation must exactly match CANCEL SCHEDULE <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'set_connection_selection', description: 'Enable or disable one workspace channel or advertising account. Confirmation must exactly identify the selection and action.', inputSchema: { type: 'object', required: ['kind', 'id', 'enabled', 'confirmation'], properties: { kind: { type: 'string', enum: ['target', 'adAccount'] }, id: { type: 'string' }, enabled: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'get_root_config', description: 'Read installation configuration definitions and safe values. Only available to the signed-in instance owner; secrets are masked.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'set_root_config', description: 'Validate and save an installation setting. Only available to the signed-in instance owner. Confirmation must exactly match SET ROOT CONFIG <key> or CLEAR ROOT SECRET <key>.', inputSchema: { type: 'object', required: ['key', 'confirmation'], properties: { key: { type: 'string' }, value: {}, clear: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
 ];
+const rootTools = new Set(['get_root_config', 'set_root_config']);
+const canUseRootTool = (viewer: McpViewer) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
 
 const toolFeatures: Record<string, string> = {
   list_pages: 'settings/connections',
@@ -65,7 +71,7 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment']);
+const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'set_root_config']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -82,11 +88,22 @@ function requiredString(args: Record<string, unknown>, key: string) {
 }
 
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
+  if (rootTools.has(name) && !canUseRootTool(viewer)) throw new Error('Root configuration is unavailable.');
   const feature = toolFeatures[name];
   if (feature) requireFeature(viewer.entitlements, feature);
   if (feature && (!viewer.permissions || !canAccessFeature(viewer.permissions, feature, writeTools.has(name) ? 'write' : 'read'))) throw new Error('You do not have permission to use this feature.');
   const cap = viewer.maxResultItems ?? 100;
   switch (name) {
+    case 'get_root_config':
+      return { schemaVersion: CONFIG_SCHEMA_VERSION, definitions: safeConfigShape(), values: await readConfig() };
+    case 'set_root_config': {
+      const key = requiredString(args, 'key');
+      const clear = args.clear === true;
+      requireConfirmation(args, `${clear ? 'CLEAR ROOT SECRET' : 'SET ROOT CONFIG'} ${key}`);
+      await saveConfig({ key, value: args.value, clear }, viewer.userId);
+      await auditWrite(viewer, name, { key, clear });
+      return { key, saved: true, schemaVersion: CONFIG_SCHEMA_VERSION };
+    }
     case 'list_pages':
       const pageIds = pageIdsFor(viewer);
       return prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, ...(pageIds ? { id: { in: pageIds } } : {}) }, orderBy: [{ type: 'asc' }, { name: 'asc' }], take: cap, select: { id: true, type: true, providerId: true, name: true, pictureUrl: true, canPublish: true } });
@@ -290,11 +307,12 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     const requested = String(params.protocolVersion ?? '');
     return reply({ protocolVersion: versions.includes(requested) ? requested : versions[0], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } }, serverInfo: { name: 'ms-social-pilot', version: '0.1.0' }, instructions: `Workspace-scoped access for ${viewer.workspace.name}. Writes can manage local posts, publish posts, sync provider status, change channel/ad account selections, or manage Facebook Inbox items. Publishing, remote post deletion, Inbox replies, and comment moderation contact social platforms. Every write requires an explicit confirmation string. Times use ${viewer.workspace.timezone}.` });
   }
-  if (method === 'tools/list') return reply({ tools: tools.filter(tool => canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (tool.name !== 'list_ad_accounts' || viewer.role === 'owner' || viewer.role === 'admin')) });
+  if (method === 'tools/list') return reply({ tools: tools.filter(tool => rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (tool.name !== 'list_ad_accounts' || viewer.role === 'owner' || viewer.role === 'admin')) });
   if (method === 'tools/call') {
     const name = String(params.name ?? '');
     if (!tools.some(tool => tool.name === name)) return error(-32602, `Unknown tool: ${name}`);
     try {
+      if (rootTools.has(name) && !canUseRootTool(viewer)) throw new Error('Root configuration is unavailable.');
       if (name === 'set_connection_selection' && viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can change connections.');
       return reply(textResult(await runTool(viewer, name, (params.arguments ?? {}) as Record<string, unknown>)));
     }
@@ -305,6 +323,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     { uri: 'msp://targets', name: 'Destinations', description: 'Enabled workspace destinations.', mimeType: 'application/json' },
     { uri: 'msp://posts', name: 'Posts', description: 'Recent workspace posts.', mimeType: 'application/json' },
     { uri: 'msp://inbox', name: 'Inbox', description: 'Recent synced inbox activity.', mimeType: 'application/json' },
+    ...(canUseRootTool(viewer) ? [{ uri: 'msp://root/config', name: 'Root configuration', description: 'Installation setting definitions and safe values.', mimeType: 'application/json' }] : []),
   ].filter(resource => {
     const feature = resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : null;
     return feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read')));
@@ -316,6 +335,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     else if (uri === 'msp://targets') contents = await runTool(viewer, 'list_pages', {});
     else if (uri === 'msp://posts') contents = await runTool(viewer, 'list_posts', { limit: 100 });
     else if (uri === 'msp://inbox') contents = await runTool(viewer, 'list_inbox', { limit: 50 });
+    else if (uri === 'msp://root/config') contents = await runTool(viewer, 'get_root_config', {});
     else return error(-32602, `Unknown resource: ${uri}`);
     return reply({ contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(contents, null, 2) }] });
   }

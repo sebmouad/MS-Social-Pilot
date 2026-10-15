@@ -16,6 +16,8 @@ vi.mock('../src/server/data', () => ({ prisma: db }));
 const mutations = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), remove: vi.fn(), select: vi.fn() }));
 vi.mock('../src/server/post-mutations', () => ({ createLocalDraft: mutations.create, updateLocalDraft: mutations.update, deleteLocalDraft: mutations.remove }));
 vi.mock('../src/server/connection-mutations', () => ({ setConnectionSelections: mutations.select }));
+const rootConfig = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn() }));
+vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
 vi.mock('../src/server/inbox/actions', () => ({ replyToFacebookInbox: inboxMutations.reply, setFacebookInboxResolved: inboxMutations.resolve, moderateFacebookComment: inboxMutations.moderate }));
 const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
@@ -58,6 +60,8 @@ beforeEach(() => {
   publishingMutations.review.mockResolvedValue(undefined);
   publishingMutations.schedule.mockResolvedValue(undefined);
   publishingMutations.cancel.mockResolvedValue(undefined);
+  rootConfig.read.mockResolvedValue([{ key: 'meta.appSecret', value: '', isSet: true, source: 'database' }]);
+  rootConfig.save.mockResolvedValue(undefined);
 });
 
 describe('MCP workspace boundaries', () => {
@@ -212,6 +216,30 @@ describe('MCP workspace boundaries', () => {
     const updated = await call('update_post', { postId: 'new-post', message: 'edited', targetIds: ['page-a'], confirmation: 'UPDATE POST new-post' });
     expect((await updated.json()).result.structuredContent).toEqual({ postId: 'new-post', updated: true });
     expect(publishingMutations.update).toHaveBeenCalledWith(viewer, expect.objectContaining({ postId: 'new-post', targetIds: ['page-a'] }));
+    expect(db.$executeRaw).toHaveBeenCalled();
+  });
+
+  it('offers Root configuration only to the signed-in instance owner and never returns secret values', async () => {
+    const root = { ...viewer, isInstanceOwner: true };
+    const listed = await handleMcpMessage(root, { jsonrpc: '2.0', id: 10, method: 'tools/list' });
+    expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('set_root_config');
+    const read = await handleMcpMessage(root, { jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name: 'get_root_config', arguments: {} } });
+    expect((await read.json()).result.structuredContent.values).toEqual([{ key: 'meta.appSecret', value: '', isSet: true, source: 'database' }]);
+
+    const denied = await handleMcpMessage({ ...viewer, role: 'admin' }, { jsonrpc: '2.0', id: 12, method: 'tools/call', params: { name: 'get_root_config', arguments: {} } });
+    expect((await denied.json()).result.isError).toBe(true);
+    const bearer = await handleMcpMessage({ ...root, apiKeyId: 'key-1' }, { jsonrpc: '2.0', id: 13, method: 'tools/call', params: { name: 'get_root_config', arguments: {} } });
+    expect((await bearer.json()).result.isError).toBe(true);
+  });
+
+  it('requires an exact Root confirmation and reuses registry validation and audit', async () => {
+    const root = { ...viewer, isInstanceOwner: true };
+    const missing = await handleMcpMessage(root, { jsonrpc: '2.0', id: 14, method: 'tools/call', params: { name: 'set_root_config', arguments: { key: 'mcp.enabled', value: false } } });
+    expect((await missing.json()).result.isError).toBe(true);
+    expect(rootConfig.save).not.toHaveBeenCalled();
+    const saved = await handleMcpMessage(root, { jsonrpc: '2.0', id: 15, method: 'tools/call', params: { name: 'set_root_config', arguments: { key: 'mcp.enabled', value: false, confirmation: 'SET ROOT CONFIG mcp.enabled' } } });
+    expect((await saved.json()).result.structuredContent).toMatchObject({ key: 'mcp.enabled', saved: true });
+    expect(rootConfig.save).toHaveBeenCalledWith({ key: 'mcp.enabled', value: false, clear: false }, 'user-a');
     expect(db.$executeRaw).toHaveBeenCalled();
   });
 });

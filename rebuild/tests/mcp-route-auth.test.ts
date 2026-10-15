@@ -102,4 +102,14 @@ describe('MCP route authentication', () => {
     const denied = await POST(writeAttempt);
     expect((await denied.json()).result.isError).toBe(true);
   });
+
+  it('exposes Root MCP tools only when the authenticated browser user is the instance owner', async () => {
+    const listed = () => new Request('http://localhost/api/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 12, method: 'tools/list' }) });
+    state.user = { id: 'u1', isInstanceOwner: true };
+    const response = await POST(listed());
+    expect((await response.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('get_root_config');
+    state.user = { id: 'u1', isInstanceOwner: false };
+    const denied = await POST(listed());
+    expect((await denied.json()).result.tools.map((tool: { name: string }) => tool.name)).not.toContain('get_root_config');
+  });
 });
