@@ -366,6 +366,7 @@ model PostTarget {
   remotePostId String?
   remoteUrl    String?
   publishedAt  DateTime?
+  updatedAt    DateTime         @updatedAt
   post         Post             @relation(fields: [postId], references: [id])
   target       Target           @relation(fields: [targetId], references: [id])
   comments     PostComment[]

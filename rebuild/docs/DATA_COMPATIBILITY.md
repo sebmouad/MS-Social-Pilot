@@ -21,6 +21,12 @@ legacy app settings backs the typed Root configuration registry. Additional
 models must be checked against the production schema and migration plan before
 use.
 
+## Verified local delivery write
+
+The synthetic preview run found that legacy `post_targets.updatedAt` is required without a database default, while the replacement client had omitted it. The client view now maps it with Prisma's `@updatedAt`; this is a client-generation fix and requires no production DDL. The cutover verifier also checks that the column exists.
+
+`tests/post-target-schema.integration.test.ts` writes a post with a nested destination against the full legacy schema in an explicitly supplied loopback `_preview` database, verifies its delivery timestamps, then rolls back all probe records. It failed on the missing timestamp before the mapping fix and passed after client regeneration. Set `REBUILD_PREVIEW_DATABASE_URL` to the dedicated synthetic database to run it; it is skipped without that explicit URL. See [PREVIEW.md](PREVIEW.md) for setup. This proves the mapped write against local schema/sample data, not production migration or provider delivery.
+
 ## Workspace export and erasure coverage
 
 The rebuild's workspace data export and purge cover its mapped schema, tables
