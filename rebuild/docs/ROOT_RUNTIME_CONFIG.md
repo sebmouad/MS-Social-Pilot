@@ -4,6 +4,15 @@ Registry entries retain literal key types and infer value types from their
 validation schemas. Server readers accept these typed keys; dynamic keys still
 pass through the same runtime validation.
 
+The legacy Facebook configuration can be mapped into this registry on a
+staging copy with `node --env-file-if-exists=../.env --import tsx
+scripts/import-legacy-config.ts` from `app/rebuild`. The default is a dry run
+that prints only source and destination key names. `--apply` validates every
+candidate, skips Root keys already present, encrypts the app secret again, and
+records value-free changes under the installation owner. It must be rehearsed
+on a production-shaped copy before any production use. The importer never
+enables ads management automatically.
+
 The private `/root/config` screen is guarded by the installation owner flag (`User.isInstanceOwner`) and the validated session cookie. Its API returns 404 to signed-in non-owners. Secret values are write-only: the API reports only whether a value is set, never its plaintext or ciphertext. The screen groups settings in a sidebar and supports key/description search.
 
 `src/lib/config/registry.ts` is the single definition point. Each entry declares its typed schema, default, group, UI control, and consumption status. `CONFIG_SCHEMA_VERSION` identifies the registry representation in API responses and config-change audit details; bump it when keys or stored representations change. Zod validation runs at the save boundary. Ordinary values are stored in the existing `app_settings` table. Secret values use the installation `ENCRYPTION_KEY` with AES-256-GCM in the `v1:<iv>:<tag>:<ciphertext>` envelope. Root changes append a `config.changed` record to `root_activities`; audit detail contains only the key, change type, and schema version.

@@ -5,10 +5,10 @@ import { FACEBOOK_OAUTH_STATE_COOKIE, openFacebookOAuthState } from '@/server/co
 import { persistFacebookDiscovery, recordFacebookConnectionFailure } from '@/server/connection-mutations';
 import { FacebookApiError } from '@/platforms/facebook/publishing';
 import { platformFor } from '@/server/platforms/registry';
+import { FACEBOOK_CONNECTION_CALLBACK_PATH } from '@/platforms/facebook/protocol';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const CALLBACK_PATH = '/api/connections/facebook/callback';
 
 export async function GET(request: NextRequest) {
   const viewer = await requireViewer({ feature: 'settings/connections' });
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   let stage = 'configuration';
   try {
     const [oauth, engine] = await Promise.all([configuredFacebookOAuth(), configuredFacebookEngine()]);
-    const expectedRedirect = new URL(CALLBACK_PATH, request.url).toString();
+    const expectedRedirect = new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, request.url).toString();
     if (new URL(oauth.redirectUri).toString() !== expectedRedirect) return finish(request, 'connect_failed');
 
     stage = 'exchange';
@@ -57,7 +57,7 @@ function finish(request: NextRequest, notice: string, openSelection = false) {
   const response = NextResponse.redirect(location, { status: 303, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
   response.cookies.set(FACEBOOK_OAUTH_STATE_COOKIE, '', {
     httpOnly: true, secure: new URL(request.url).protocol === 'https:', sameSite: 'lax',
-    path: CALLBACK_PATH, maxAge: 0,
+    path: FACEBOOK_CONNECTION_CALLBACK_PATH, maxAge: 0,
   });
   return response;
 }

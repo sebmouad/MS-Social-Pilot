@@ -1,4 +1,5 @@
 /** Graph API wire protocol paths and field names are isolated here. */
+export const FACEBOOK_CONNECTION_CALLBACK_PATH = '/api/connections/facebook/callback';
 export const FACEBOOK_PROTOCOL = Object.freeze({
   pageFeedEdge: 'feed',
   accessTokenField: 'access_token',

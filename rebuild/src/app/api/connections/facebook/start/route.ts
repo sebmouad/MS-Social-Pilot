@@ -5,10 +5,10 @@ import { configuredFacebookEngine, configuredFacebookOAuth } from '@/server/plat
 import { createFacebookOAuthState, FACEBOOK_OAUTH_STATE_COOKIE } from '@/server/connection-oauth-state';
 import { recordFacebookConnectionFailure } from '@/server/connection-mutations';
 import { platformFor } from '@/server/platforms/registry';
+import { FACEBOOK_CONNECTION_CALLBACK_PATH } from '@/platforms/facebook/protocol';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const CALLBACK_PATH = '/api/connections/facebook/callback';
 
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 });
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       runtimeConfig('ads.managementEnabled') as Promise<boolean>,
       runtimeConfig('meta.oauthStateMinutes') as Promise<number>,
     ]);
-    const expectedRedirect = new URL(CALLBACK_PATH, request.url).toString();
+    const expectedRedirect = new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, request.url).toString();
     if (new URL(oauth.redirectUri).toString() !== expectedRedirect) {
       await recordFacebookConnectionFailure({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, 'configuration', 'internal_error');
       return NextResponse.json({ error: 'Connection unavailable. Try again or contact support.' }, { status: 503 });
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const response = NextResponse.json({ authorizationUrl }, { headers: { 'cache-control': 'no-store' } });
     response.cookies.set(FACEBOOK_OAUTH_STATE_COOKIE, pending.cookieValue, {
       httpOnly: true, secure: new URL(request.url).protocol === 'https:', sameSite: 'lax',
-      path: CALLBACK_PATH, maxAge: stateTtlSeconds,
+      path: FACEBOOK_CONNECTION_CALLBACK_PATH, maxAge: stateTtlSeconds,
     });
     return response;
   } catch {
