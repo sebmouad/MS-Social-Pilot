@@ -1,4 +1,7 @@
 .page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 25px; }
+.postWorkbench { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, .85fr); align-items: start; gap: 18px; }
+.postWorkbench > :only-child { grid-column: 1 / -1; }
+.importCard { position: sticky; top: 20px; }
 .page > *, .draftForm > *, .editForm > * { min-width: 0; }
 .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); overflow-x: auto; }
 .tab { color: var(--ink-soft); font-size: 13px; font-weight: 650; padding: 0 14px 13px; white-space: nowrap; }
@@ -35,9 +38,13 @@
 .createCard > p { margin: 0 0 18px; color: var(--ink-soft); font-size: 13px; }
 .draftForm, .editForm { display: grid; gap: 9px; }
 .draftForm input:not([type="checkbox"]), .editForm input:not([type="checkbox"]) { width: 100%; max-width: 100%; }
+.draftForm input:not([type="checkbox"]):not([type="file"]):not([type="hidden"]), .editForm input:not([type="checkbox"]):not([type="file"]):not([type="hidden"]) { min-height: 40px; padding: 9px 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-size: 13px; }
 .draftForm label, .editForm label { color: var(--ink-soft); font-size: 12px; font-weight: 700; }
 .imageAttachment { display: grid; gap: 7px; }
 .imageAttachment > input[type="file"] { width: 100%; max-width: 100%; padding: 8px; border: 1px dashed var(--line); border-radius: 9px; color: var(--ink-soft); background: var(--surface-raised); font: inherit; font-size: 12px; }
+.draftForm input[type="file"]::file-selector-button { min-height: 34px; margin-right: 12px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-weight: 650; cursor: pointer; }
+.draftForm input[type="file"]::file-selector-button:hover { background: var(--surface-muted); }
+.importCard .draftForm input[type="file"] { width: 100%; padding: 8px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--ink-soft); background: var(--surface-raised); font-size: 12px; }
 .imageAttachment > input[type="text"] { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); font: inherit; font-size: 13px; }
 .imageAttachment .removeImage { display: inline-flex; align-items: center; gap: 7px; color: var(--ink-soft); font-size: 12px; font-weight: 600; }
 .imageAttachment small { color: var(--ink-faint); font-size: 11px; line-height: 1.4; }
@@ -78,4 +85,5 @@
 .mediaType { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); font-weight: 650; }
 .mediaFooter { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px 12px; }
 .mediaMore { display: flex; justify-content: center; }
+@media (max-width: 1100px) { .postWorkbench { grid-template-columns: minmax(0, 1fr); } .importCard { position: static; } }
 @media (max-width: 720px) { .heading { align-items: start; flex-direction: column; } .calendar { display: none; } .agenda { display: block; } .formFooter { align-items: start; flex-direction: column; } }

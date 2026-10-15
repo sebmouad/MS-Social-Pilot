@@ -58,6 +58,8 @@ Inter and the system sans stack carry navigation, forms, and prose. Use a restra
 
 The desktop shell has a 256px sidebar and a main content area capped at 1440px, with a 36px content inset. The sidebar names the current workspace above the module navigation and owns its vertical scroll. A keyboard skip link leads directly to the main content. On narrow screens, primary modules form a bottom rail with device safe-area spacing; route tabs scroll horizontally above it; filters open from an explicit top-bar control. Tables own horizontal overflow. The publishing calendar becomes an agenda below 720px. Forms and data panels keep natural document scrolling unless a component has its own bounded surface.
 
+Publishing uses a workbench arrangement on wide screens: the post composer is the primary column and batch import is a narrower, independent task panel. They stack before the posts table on smaller screens. This gives long-form writing a readable measure without reducing the data table's width. URL and file controls inherit the active theme rather than browser-default light styling.
+
 ## Elevation & Depth
 
 Use borders and surface tone for most separation. The panel shadow in `tokens.css` is reserved for raised panels; dialogs receive stronger elevation over a scrim. Avoid stacked shadows on every table row or chip. Error, loading, and confirmation surfaces must preserve enough geometry that controls do not jump while work completes.

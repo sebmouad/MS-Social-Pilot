@@ -65,8 +65,10 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   return <>
     <PageHeading title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary={`${posts.length} ${posts.length === 1 ? "post" : "posts"} · up to 100 recent`}/>
     {noticeText ? <p className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} role={notice?.startsWith('failed') ? 'alert' : 'status'}>{noticeText}</p> : null}
-    {canAuthorDrafts ? <section className={`${styles.card} ${styles.createCard}`}><h2>Create a post</h2><p>Choose an enabled destination now or save this as a local draft.</p><PostEditorForm targets={targetChoices} imageRules={imageRules}/></section> : null}
-    {canManageDrafts ? <section className={`${styles.card} ${styles.createCard}`}><h2>Import a batch</h2><p>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section> : null}
+    {(canAuthorDrafts || canManageDrafts) ? <div className={styles.postWorkbench}>
+      {canAuthorDrafts ? <section className={`${styles.card} ${styles.createCard}`}><h2>Create a post</h2><p>Choose an enabled destination now or save this as a local draft.</p><PostEditorForm targets={targetChoices} imageRules={imageRules}/></section> : null}
+      {canManageDrafts ? <section className={`${styles.card} ${styles.createCard} ${styles.importCard}`}><h2>Import a batch</h2><p>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section> : null}
+    </div> : null}
     <section className={styles.card}><DataTable columns={columns} rows={rows} rowKey={post => post.id} caption="Recent posts" emptyMessage="No posts have been created in this workspace yet."/></section>
   </>;
 }

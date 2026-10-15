@@ -22,18 +22,18 @@ There is no released billing or legal-copy contract for the rebuild. Do not inve
 
 ## Canonical UI map
 
-| Capability | Current owner and decision | Verification or gap |
-|---|---|---|
-| Navigation | `src/components/AppShell.tsx`, module manifests | Desktop/sidebar and phone/bottom-rail browser checks |
-| Theme and scrollbar | `src/styles/tokens.css`; theme metadata in `src/lib/themes.ts` | Theme screenshots; global scrollbar baseline still to be verified |
-| Read-only table | `src/components/DataTable.tsx` | Native table, caption, header sort; server pagination is not universal yet |
-| Table selection | No shared owner yet | Define before adding bulk table actions |
-| Select/listbox | Native `<select>` for current English UI | Browser owns open popup; revisit for localized/authored popup requirements |
-| Date | Native date/time input where used | Workspace timezone and date-only parsing need route tests |
-| Forms | Screen-local forms plus server validation | Shared field error/first-invalid-focus owner remains to be built |
-| Dialog | `src/components/ModalDialog.tsx` owns the native modal lifecycle; `Dialog.tsx` supplies the standard frame | Connections and post deletion use it; focus, Escape, restoration, and destructive flow browser tests remain required |
-| Toast/status | Inline `role=status`/`role=alert` today | One shared notification owner remains to be built |
-| CRUD | Server services are authoritative; screens keep context until confirmed | Full create/edit/delete and failure E2E coverage remains incomplete |
+| Capability | Canonical owner | Source of truth | Allowed variants | Verification |
+|---|---|---|---|---|
+| Navigation | `src/components/AppShell.tsx` | Module manifests | Desktop sidebar, phone bottom rail | Browser keyboard and viewport checks |
+| Theme and Scrollbar | `src/styles/tokens.css` | `DESIGN.md` | Grove, Coast, Clay, Nightfall | Theme screenshots and computed styles pending |
+| Read-only table | `src/components/DataTable.tsx` | Server list query | Sortable or static columns | Caption/header checks; pagination parity pending |
+| Table Selection | No shared owner yet | `UX-CONTRACT.md` | None until a shared owner exists | Define before bulk table actions |
+| Select/Listbox | Native `<select>` | `DESIGN.md` and this contract | Browser-owned popup in English UI | Keyboard and popup checks pending |
+| Date | Native date/time inputs | Workspace timezone policy | Date or datetime-local | Date-only parsing and browser checks pending |
+| Form | Screen-local forms plus server validation | Server validation | Create or edit | Shared field error and first-invalid-focus owner pending |
+| Dialog | `src/components/ModalDialog.tsx` | This contract | Confirmation or selection | Focus, Escape, restoration browser checks pending |
+| Toast | Inline `role=status`/`role=alert` | This contract | Success or error | Shared notification owner pending |
+| CRUD | Server services | Domain services | Create, edit, delete | Full failure-path E2E coverage pending |
 
 ## Workflow ledger
 
