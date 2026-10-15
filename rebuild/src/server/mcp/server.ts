@@ -9,6 +9,7 @@ import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, s
 import { readConfig, saveConfig } from '../config/store';
 import { CONFIG_SCHEMA_VERSION, safeConfigShape } from '@/lib/config/registry';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
+import { assertWorkspaceNotPurging } from '../data-control/guard';
 
 export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number; apiKeyId?: string; isInstanceOwner?: boolean };
 type JsonRpcId = string | number | null;
@@ -103,6 +104,9 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
   const feature = toolFeatures[name];
   if (feature) requireFeature(viewer.entitlements, feature);
   if (feature && (!viewer.permissions || !canAccessFeature(viewer.permissions, feature, writeTools.has(name) ? 'write' : 'read'))) throw new Error('You do not have permission to use this feature.');
+  if (writeTools.has(name) && name !== 'delete_workspace_data' && name !== 'set_root_config') {
+    await assertWorkspaceNotPurging(viewer.workspaceId);
+  }
   const cap = viewer.maxResultItems ?? 100;
   switch (name) {
     case 'get_root_config':

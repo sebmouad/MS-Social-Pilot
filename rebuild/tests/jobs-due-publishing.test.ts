@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@/server/data-control/guard', () => ({ assertWorkspaceNotPurging: vi.fn() }));
 
 const state = vi.hoisted(() => ({
   findMany: vi.fn(), config: vi.fn(), permissions: vi.fn(), entitlements: vi.fn(), publish: vi.fn(),

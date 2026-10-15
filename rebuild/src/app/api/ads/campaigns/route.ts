@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
 import { createWorkspaceAdCampaign } from '@/server/ads/actions';
+import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
   try { viewer = await requireViewer({ feature: 'ads/campaigns' }); }
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   try {
+    await assertWorkspaceNotPurging(viewer.workspaceId);
     const input = schema.parse(await request.json());
     const result = await createWorkspaceAdCampaign({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input);
     return NextResponse.json({ ok: true, ...result }, { headers: { 'cache-control': 'no-store' } });
@@ -38,7 +40,7 @@ function actionError(error: unknown) {
     ['Confirmation required.', 400], ['Campaign names', 400], ['supported campaign objective', 400],
     ['Only workspace owners and admins', 403], ['Ads management is not enabled', 403], ['Ads management is disabled', 403],
     ['Facebook platform is disabled', 403], ['Root has not configured', 403], ['Reconnect this Facebook source', 403],
-    ['no longer a member', 401], ['unavailable', 409],
+    ['no longer a member', 401], ['unavailable', 409], ['Workspace data deletion is in progress.', 409],
   ];
   const match = known.find(([phrase]) => error.message.includes(phrase));
   return match ? NextResponse.json({ error: error.message }, { status: match[1], headers: { 'cache-control': 'no-store' } })

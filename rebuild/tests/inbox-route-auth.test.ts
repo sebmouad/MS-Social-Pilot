@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: vi.fn() }));
 
 const mocks = vi.hoisted(() => ({
   requireViewer: vi.fn(), sync: vi.fn(), reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn(),

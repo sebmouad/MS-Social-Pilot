@@ -6,6 +6,7 @@ import { createFacebookOAuthState, FACEBOOK_OAUTH_STATE_COOKIE } from '@/server/
 import { recordFacebookConnectionFailure } from '@/server/connection-mutations';
 import { platformFor } from '@/server/platforms/registry';
 import { FACEBOOK_CONNECTION_CALLBACK_PATH } from '@/platforms/facebook/protocol';
+import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
   if (!await platformFor('facebook', 'connection')) return NextResponse.json({ error: 'This connection is unavailable.' }, { status: 404 });
 
   try {
+    await assertWorkspaceNotPurging(viewer.workspaceId);
     const [oauth, engine, adsReadScopes, adsManageScopes, adsManagementEnabled, stateMinutes] = await Promise.all([
       configuredFacebookOAuth(), configuredFacebookEngine(),
       runtimeConfig('meta.adsReadScopes') as Promise<string[]>,

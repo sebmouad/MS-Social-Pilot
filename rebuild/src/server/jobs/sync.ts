@@ -9,6 +9,7 @@ import { publishPost } from '@/server/publishing/lifecycle';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { loadEntitlements, canUseFeature } from '@/server/entitlements';
+import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 
 export type JobSummary = { examined: number; updated: number; skipped: number; failed: number };
 const DAY_MS = 86_400_000;
@@ -35,6 +36,7 @@ export async function publishDuePosts(now = new Date()): Promise<JobSummary> {
   const result: JobSummary = { examined: rows.length, updated: 0, skipped: 0, failed: 0 };
   for (const row of rows) {
     try {
+      await assertWorkspaceNotPurging(row.workspaceId);
       const [permissions, entitlements] = await Promise.all([
         loadPermissions(row.authorId, row.workspaceId), loadEntitlements(row.authorId, row.workspaceId),
       ]);
@@ -70,6 +72,7 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0):
     const encrypted = row.target.accessToken ?? account?.accessToken;
     if (!account || account.workspaceId !== row.target.workspaceId || account.invalidatedAt || (account.tokenExpiresAt && account.tokenExpiresAt <= now) || !encrypted || !row.remotePostId) { result.skipped++; continue; }
     try {
+      await assertWorkspaceNotPurging(row.target.workspaceId);
       const status = await withRetries(() => engine.getStatus(decryptSecret(encrypted), row.remotePostId!), retryLimit);
       if (status.state !== 'published') { result.skipped++; continue; }
       const changed = await prisma.postTarget.updateMany({
@@ -111,6 +114,7 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0): Promi
     const encrypted = target.accessToken ?? account?.accessToken;
     if (!account || account.workspaceId !== target.workspaceId || account.invalidatedAt || (account.tokenExpiresAt && account.tokenExpiresAt <= now) || !encrypted) { result.skipped++; continue; }
     try {
+      await assertWorkspaceNotPurging(target.workspaceId);
       const observations = await withRetries(() => engine.getPageInsightObservations(decryptSecret(encrypted), target.providerId, since, now), retryLimit);
       for (const { metric, period, endTime, value, numeric } of observations) {
         await prisma.pageInsight.upsert({
@@ -144,6 +148,7 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0): Promis
     const granted = new Set((connection?.scopes ?? '').split(',').map(scope => scope.trim()).filter(Boolean));
     if (!connection || connection.workspaceId !== account.workspaceId || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= now) || !connection.accessToken || !requiredScopes.size || [...requiredScopes].some(scope => !granted.has(scope))) { result.skipped++; continue; }
     try {
+      await assertWorkspaceNotPurging(account.workspaceId);
       const rows = await withRetries(() => engine.getAdInsights(decryptSecret(connection.accessToken!), account.actId, since, until), retryLimit);
       for (const row of rows) {
         const date = validDate(row.date_start);
@@ -188,6 +193,7 @@ export async function syncInbox(now = new Date(), retryLimit = 0): Promise<JobSu
     const granted = new Set((account?.scopes ?? '').split(',').map(scope => scope.trim()).filter(Boolean));
     if (!account || account.workspaceId !== target.workspaceId || account.invalidatedAt || (account.tokenExpiresAt && account.tokenExpiresAt <= now) || !encrypted || !required.size || [...required].some(scope => !granted.has(scope))) { result.skipped++; continue; }
     try {
+      await assertWorkspaceNotPurging(target.workspaceId);
       const token = decryptSecret(encrypted);
       const conversations = await withRetries(() => engine.listInbox(token, target.providerId), retryLimit);
       const posts = await prisma.postTarget.findMany({ where: { targetId: target.id, status: 'published', remotePostId: { not: null } }, orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }], take: limit, select: { id: true, remotePostId: true } });

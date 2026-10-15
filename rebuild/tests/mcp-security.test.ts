@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+const purgeGuard = vi.hoisted(() => vi.fn());
+vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: purgeGuard }));
 
 const db = vi.hoisted(() => ({
   target: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
@@ -172,6 +174,13 @@ describe('MCP workspace boundaries', () => {
     const deleted = await call('delete_draft', { postId: 'post-a', confirmation: 'DELETE DRAFT post-a' });
     expect((await deleted.json()).result.structuredContent).toEqual({ id: 'post-a', deleted: true });
     expect(mutations.remove).toHaveBeenCalledWith(viewer, 'post-a');
+  });
+
+  it('blocks MCP writes before a mutation while workspace deletion is pending', async () => {
+    purgeGuard.mockRejectedValueOnce(new Error('Workspace data deletion is in progress.'));
+    const response = await call('publish_post', { postId: 'post-a', confirmation: 'PUBLISH POST post-a' });
+    expect((await response.json()).result).toMatchObject({ isError: true, structuredContent: { error: 'Workspace data deletion is in progress.' } });
+    expect(publishingMutations.publish).not.toHaveBeenCalled();
   });
 
   it('uses the existing selection mutation and prevents non-admin selection changes', async () => {

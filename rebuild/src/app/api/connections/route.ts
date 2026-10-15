@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
 import { disconnectSocialAccount, previewSocialAccountDeletion, setConnectionSelections } from '@/server/connection-mutations';
+import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
 const selectionSchema = z.object({ items: z.array(z.object({ kind: z.enum(['target', 'adAccount']), id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), enabled: z.boolean() })).max(250) });
@@ -29,6 +30,7 @@ export async function PATCH(request: Request) {
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   try {
     const input = selectionSchema.parse(await request.json());
+    await assertWorkspaceNotPurging(viewer.workspaceId);
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
     await setConnectionSelections(actor, input.items);
     return NextResponse.json({ ok: true });
@@ -44,6 +46,7 @@ export async function DELETE(request: Request) {
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   try {
     const input = disconnectSchema.parse(await request.json());
+    await assertWorkspaceNotPurging(viewer.workspaceId);
     const result = await disconnectSocialAccount({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input.socialAccountId, input.mode, input.confirmation);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
@@ -68,6 +71,7 @@ function connectionError(error: unknown, fallback: string) {
     ['Invalid selection list', 400],
     ['Type DELETE', 400],
     ['still scheduled at the provider', 409],
+    ['Workspace data deletion is in progress.', 409],
   ];
   const match = known.find(([phrase]) => error.message.includes(phrase));
   return match

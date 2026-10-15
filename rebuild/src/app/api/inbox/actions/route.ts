@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
 import { moderateFacebookComment, replyToFacebookInbox, setFacebookInboxResolved, syncFacebookInbox } from '@/server/inbox/actions';
+import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
   try { viewer = await requireViewer({ feature: 'inbox/conversations', channelScoped: true }); }
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   try {
+    await assertWorkspaceNotPurging(viewer.workspaceId);
     const input = schema.parse(await request.json());
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
     const result = input.action === 'sync' ? await syncFacebookInbox(actor, input.targetId)
@@ -32,6 +34,7 @@ export async function POST(request: Request) {
     const known: Array<[string, number]> = [
       ['Invalid inbox item', 400], ['Write a reply', 400], ['no longer a member', 401], ['not have access', 403], ['not enabled', 403],
       ['unavailable', 409], ['Reconnect this Facebook source', 403], ['Inbox is unavailable for this connection', 403],
+      ['Workspace data deletion is in progress.', 409],
     ];
     const match = known.find(([phrase]) => message.includes(phrase));
     return match ? NextResponse.json({ error: message }, { status: match[1], headers: { 'cache-control': 'no-store' } })

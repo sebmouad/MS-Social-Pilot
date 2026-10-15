@@ -6,6 +6,7 @@ import { persistFacebookDiscovery, recordFacebookConnectionFailure } from '@/ser
 import { FacebookApiError } from '@/platforms/facebook/publishing';
 import { platformFor } from '@/server/platforms/registry';
 import { FACEBOOK_CONNECTION_CALLBACK_PATH } from '@/platforms/facebook/protocol';
+import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
 
   let stage = 'configuration';
   try {
+    await assertWorkspaceNotPurging(viewer.workspaceId);
     const [oauth, engine] = await Promise.all([configuredFacebookOAuth(), configuredFacebookEngine()]);
     const expectedRedirect = new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, request.url).toString();
     if (new URL(oauth.redirectUri).toString() !== expectedRedirect) return finish(request, 'connect_failed');

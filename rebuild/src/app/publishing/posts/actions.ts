@@ -85,7 +85,7 @@ export async function reviewPostAction(data: FormData) {
 async function run(operation: (viewer: Awaited<ReturnType<typeof requireViewer>>) => Promise<string>, feature: 'publishing/posts' | 'publishing/approvals' = 'publishing/posts', path = PATH) {
   let notice: string = 'failed';
   try {
-    const viewer = await requireViewer({ feature, channelScoped: true });
+    const viewer = await requireViewer({ feature, channelScoped: true, write: true });
     if (!canAccessFeature(viewer.permissions, feature, 'write')) throw new Error(feature.endsWith('approvals') ? 'You cannot review posts.' : 'You cannot manage posts.');
     notice = await operation(viewer);
     revalidatePath(PATH);
