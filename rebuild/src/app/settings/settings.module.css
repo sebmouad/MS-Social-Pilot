@@ -84,7 +84,7 @@
 .connection-source label + label,.connection-retention label + label { border-top: 1px solid var(--line-subtle); }
 .connection-source input,.connection-retention input { margin-top: 3px; accent-color: var(--accent); }
 .connection-source small { display: block; margin-top: 3px; color: var(--ink-faint); font-size: 11px; }
-.connection-dialog footer { display: flex; justify-content: flex-end; gap: 9px; padding-top: 16px; }
+.connection-dialog footer { position: sticky; bottom: -24px; z-index: 1; display: flex; justify-content: flex-end; gap: 9px; margin: 0 -24px -24px; padding: 16px 24px 24px; border-top: 1px solid var(--line); background: var(--surface); }
 .connection-warning,.connection-error { padding: 12px; border-radius: 9px; background: var(--surface-raised); color: var(--warning); font-size: 12px; line-height: 1.5; }
 .disconnect-confirm { display: grid; justify-items: start; gap: 8px; color: var(--ink); font-size: 12px; font-weight: 700; }
 .disconnect-confirm input { width: 160px; min-height: 38px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
