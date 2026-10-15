@@ -33,6 +33,8 @@ const MODULE_ROOT_SWITCH: Record<ModuleId, string | null> = {
 const FEATURE_ROOT_SWITCH: Record<FeatureId, string | null> = {
   'home/overview': null,
   'publishing/posts': 'publishing/posts',
+  'publishing/compose': 'publishing/posts',
+  'publishing/import': 'publishing/posts',
   'publishing/calendar': 'publishing/calendar',
   'publishing/queue': 'publishing/queue',
   'publishing/approvals': 'publishing/approvals',

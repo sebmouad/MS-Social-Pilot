@@ -24,12 +24,28 @@ export interface PlatformModule {
   readonly capabilities: CapabilityDeclaration;
   /** Kinds of channel the module discovers, with their customer-facing labels. */
   readonly channelKinds: readonly { readonly kind: string; readonly label: string }[];
+  /**
+   * What a post to this platform may contain. The composer reads it to count
+   * characters, offer only supported formats and options, and label the preview.
+   * Absent means the module cannot be published to.
+   */
+  readonly publishing?: PublishingTraits;
   /** Root setting that switches the module on or off (`platforms.<id>.enabled`). */
   readonly enabledKey: string;
   /** Root settings that must be filled in before customers can connect. */
   readonly requiredSettings: readonly string[];
   /** Settings group prefix used on Root's configuration screen. */
   readonly settingsGroup: string;
+}
+
+/** Post limits and formats of one platform, used by the shared composer. */
+export interface PublishingTraits {
+  /** Maximum characters of post text the platform accepts. */
+  readonly maxTextLength: number;
+  /** Attachment formats a post may use (one of them per post). */
+  readonly formats: readonly ('link' | 'image' | 'video')[];
+  /** The platform can add a first comment after publishing. */
+  readonly firstComment: boolean;
 }
 
 /** The on/off switch every module gets, so all modules behave the same way. */

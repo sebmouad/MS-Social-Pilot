@@ -19,8 +19,8 @@ export async function GET(request: Request) {
     return NextResponse.json(result, { headers: { 'cache-control': 'private, no-store' } });
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
-    const status = message === 'Invalid media cursor.' ? 400 : message.includes('configured storage root') ? 503 : 500;
-    return NextResponse.json({ error: status === 503 ? 'Image storage is not configured.' : status === 500 ? 'Could not load images.' : message }, { status, headers: { 'cache-control': 'no-store' } });
+    const status = message === 'Invalid media cursor.' ? 400 : /storage root/i.test(message) ? 503 : 500;
+    return NextResponse.json({ error: status === 503 ? 'Image storage is not available right now.' : status === 500 ? 'Could not load images.' : message }, { status, headers: { 'cache-control': 'no-store' } });
   }
 }
 
@@ -39,8 +39,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ...image, reference: `media:${image.id}`, url: `/api/media/${image.id}` }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
-    const status = error instanceof MediaBodyTooLarge ? 413 : message.includes('configured storage root') ? 503 : 400;
-    return NextResponse.json({ error: status === 503 ? 'Image storage is not configured.' : message }, { status, headers: { 'cache-control': 'no-store' } });
+    const status = error instanceof MediaBodyTooLarge ? 413 : /storage root/i.test(message) ? 503 : 400;
+    return NextResponse.json({ error: status === 503 ? 'Image storage is not available right now.' : message }, { status, headers: { 'cache-control': 'no-store' } });
   }
 }
 

@@ -30,6 +30,8 @@ const MODULES: readonly PermissionModule[] = ['publishing', 'inbox', 'analytics'
 const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'home/overview': null,
   'publishing/posts': 'publishing/posts',
+  'publishing/compose': 'publishing/posts',
+  'publishing/import': 'publishing/posts',
   'publishing/calendar': 'publishing/calendar',
   'publishing/queue': 'publishing/queue',
   'publishing/approvals': 'publishing/approvals',
@@ -57,6 +59,10 @@ const MODULE_ROOT_SWITCH: Record<PermissionModule, string | null> = {
 
 function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: ReadonlySet<string>): Permission {
   if (role === 'owner' || role === 'admin') return { read: true, write: true };
+
+  // Composing and importing are authoring tools: read-only roles never see them.
+  if (feature === 'publishing/import' && role !== 'editor') return DENIED;
+  if (feature === 'publishing/compose' && role !== 'editor' && role !== 'contributor') return DENIED;
 
   if (role === 'client') {
     if (feature === 'publishing/posts' || feature === 'publishing/calendar' || feature === 'publishing/approvals') {

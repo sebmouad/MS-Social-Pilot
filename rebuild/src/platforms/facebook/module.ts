@@ -16,6 +16,7 @@ export const facebookModule = {
   mark: { text: 'f', color: '#1877f2' },
   capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
   channelKinds: [{ kind: 'page', label: 'Facebook Page' }],
+  publishing: { maxTextLength: 63206, formats: ['link', 'image', 'video'], firstComment: true },
   enabledKey: 'platforms.facebook.enabled',
   requiredSettings: ['meta.appId', 'meta.appSecret', 'meta.oauthRedirectUri', 'meta.oauthScopes'],
   settingsGroup: 'Facebook',

@@ -34,6 +34,20 @@ describe('scoped permissions', () => {
     expect(canAccessFeature(viewer, 'settings/account', 'read')).toBe(true);
   });
 
+  it('keeps the composer and CSV import to the roles that author or manage posts', () => {
+    const can = (role: string, feature: 'publishing/compose' | 'publishing/import', action: 'read' | 'write' = 'read') => canAccessFeature(resolvePermissions(source({ role })), feature, action);
+    for (const role of ['owner', 'admin', 'editor']) {
+      expect(can(role, 'publishing/compose', 'write')).toBe(true);
+      expect(can(role, 'publishing/import', 'write')).toBe(true);
+    }
+    expect(can('contributor', 'publishing/compose', 'write')).toBe(true);
+    expect(can('contributor', 'publishing/import')).toBe(false);
+    for (const role of ['viewer', 'client']) {
+      expect(can(role, 'publishing/compose')).toBe(false);
+      expect(can(role, 'publishing/import')).toBe(false);
+    }
+  });
+
   it('lets clients see only base features and explicitly granted client areas', () => {
     const client = resolvePermissions(source({ role: 'client', clientAccess: ['analytics'] }));
     expect(canAccessFeature(client, 'publishing/calendar', 'read')).toBe(true);

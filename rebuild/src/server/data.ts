@@ -29,7 +29,7 @@ export type PostSummary = {
     status: string;
     remotePostId: string | null;
     remoteUrl: string | null;
-    target: { id: string; type: string; name: string; pictureUrl: string | null };
+    target: { id: string; type: string; name: string; pictureUrl: string | null; socialAccount?: { provider: string } | null };
   }>;
 };
 
@@ -143,10 +143,33 @@ export async function listPostPage(workspaceId: string, page: number, pageSize: 
     select: {
       id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true,
       firstComment: true, authorId: true, link: true, media: true,
-      targets: { select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, type: true, name: true, pictureUrl: true } } } },
+      targets: { select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, type: true, name: true, pictureUrl: true, socialAccount: { select: { provider: true } } } } } },
     },
   });
   return { posts, total, page: currentPage, pages };
+}
+
+/** Statuses a post can be edited from in the composer. */
+export const EDITABLE_POST_STATUSES = ['draft', 'rejected'] as const;
+
+/**
+ * Load one post for the composer. Returns null unless the post is an editable
+ * draft inside the viewer's workspace and channel scope (and, for contributors,
+ * authored by the viewer) — the same boundary the update itself enforces.
+ */
+export async function getPostForEditing(workspaceId: string, postId: string, allowedTargetIds: readonly string[] | null, userId: string, role: string) {
+  const post = await prisma.post.findFirst({
+    where: { id: postId, workspaceId, status: { in: [...EDITABLE_POST_STATUSES] }, publishedAt: null },
+    select: { id: true, message: true, firstComment: true, link: true, media: true, status: true, authorId: true, targets: { select: { targetId: true, remotePostId: true } } },
+  });
+  if (!post) return null;
+  if (role === 'contributor' && post.authorId !== userId) return null;
+  if (post.targets.some(row => row.remotePostId)) return null;
+  if (allowedTargetIds !== null) {
+    if (post.targets.some(row => !allowedTargetIds.includes(row.targetId))) return null;
+    if (!post.targets.length && post.authorId !== userId) return null;
+  }
+  return post;
 }
 
 /** Read a calendar month without truncating it to the newest workspace posts. */
