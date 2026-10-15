@@ -29,8 +29,8 @@ describe('customer module manifests', () => {
     expect(PAGES.some(({ href }) => href === '/root' || href.startsWith('/root/'))).toBe(false);
   });
 
-  it('offers one consolidated Analytics destination', () => {
-    expect(PAGES.filter(({ module }) => module === 'analytics').map(({ href }) => href)).toEqual(['/analytics']);
+  it('offers Analytics and Reports under the shared analytics module', () => {
+    expect(PAGES.filter(({ module }) => module === 'analytics').map(({ href }) => href)).toEqual(['/analytics', '/reports']);
   });
 
   it('uses a compact mobile title for Publishing', () => {

@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 22;
+export const CONFIG_SCHEMA_VERSION = 23;
 
 const cron = z.string().min(9).max(100).refine((value) => {
   const fields = value.trim().split(/\s+/);
@@ -52,6 +52,8 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'meta.maxImageUploadBytes', group: 'Publishing limits', label: 'Maximum Meta image upload size (bytes)', kind: 'number', description: 'Maximum local image bytes sent to Meta for one Page photo.', defaultValue: 8388608, schema: z.number().int().min(1).max(26214400), consumption: 'active' }),
   entry({ key: 'meta.allowedImageMimeTypes', group: 'Publishing limits', label: 'Meta image upload MIME allowlist', kind: 'json', description: 'Allowed image MIME types for local Page photo uploads.', defaultValue: ['image/jpeg', 'image/png'], schema: z.array(z.enum(['image/jpeg', 'image/png', 'image/gif'])).min(1).max(3), consumption: 'active' }),
   entry({ key: 'analytics.maxRangeDays', group: 'Analytics metrics', label: 'Maximum MCP analytics range (days)', kind: 'number', description: 'Largest date range accepted by MCP analytics overview requests.', defaultValue: 366, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
+  entry({ key: 'analytics.reportExportRows', group: 'Analytics metrics', label: 'Report CSV row limit', kind: 'number', description: 'Maximum data rows included in a report CSV download; truncated exports are marked.', defaultValue: 5000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
+  entry({ key: 'analytics.reportMaxChannels', group: 'Analytics metrics', label: 'Maximum report channels', kind: 'number', description: 'Maximum selected channels accepted in one report CSV URL.', defaultValue: 500, schema: z.number().int().min(1).max(5000), consumption: 'active' }),
   entry({ key: 'meta.appId', group: 'API credentials', label: 'Meta app ID', kind: 'text', description: 'Public OAuth application identifier.', defaultValue: '', schema: z.string().max(200), consumption: 'active' }),
   entry({ key: 'meta.appSecret', group: 'API credentials', label: 'Meta app secret', kind: 'secret', description: 'Encrypted at rest. The saved value is never returned by the configuration API.', defaultValue: '', schema: z.string().max(2048), consumption: 'active' }),
   entry({ key: 'meta.oauthRedirectUri', group: 'API credentials', label: 'Meta OAuth callback URL', kind: 'text', description: 'HTTPS callback URL registered with the Meta application.', defaultValue: '', schema: z.union([z.literal(''), url]), consumption: 'active' }),

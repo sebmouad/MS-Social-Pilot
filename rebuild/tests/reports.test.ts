@@ -1,0 +1,38 @@
+import { describe, expect, it } from 'vitest';
+import { buildReportOverview, reportOverviewCsv } from '../src/server/analytics/reports';
+
+describe('reports overview and CSV', () => {
+  it('adds audience once for each selected channel and excludes unselected audience', () => {
+    const data = {
+      targets: [], selectedTargets: [
+        { id: 'page-a', type: 'page', name: 'Page A' },
+        { id: 'ig-a', type: 'instagram', name: '@account-a', providerId: 'ig-provider-a' },
+      ],
+      pageRows: [], adRows: [],
+      audienceRows: [{ metric: 'page_follows', numeric: 12, endTime: new Date('2026-10-14T00:00:00Z'), fetchedAt: new Date('2026-10-14T01:00:00Z'), target: { id: 'page-a', name: 'Page A' } }],
+      instagramRows: [],
+      selectedInstagramAudience: [{ igUserId: 'ig-provider-a', followersCount: 30, lastSyncedAt: new Date('2026-10-14T00:00:00Z'), updatedAt: new Date('2026-10-14T00:00:00Z') }],
+      adAccountCount: 0,
+      range: { from: new Date('2026-10-01T00:00:00Z'), to: new Date('2026-10-31T23:59:59Z') },
+    } as unknown as Parameters<typeof buildReportOverview>[0];
+    const view = buildReportOverview(data);
+    expect(view.audience.total).toBe(42);
+    expect(view.audience.entries.map(row => row.id)).toEqual(['page-a', 'ig-a']);
+    expect(view.audience.selected).toBe(2);
+  });
+
+  it('quotes provider text and caps large exports with an explicit truncation marker', () => {
+    const view = {
+      audience: { entries: [], total: 0, covered: 0, selected: 0 },
+      metrics: [{ key: 'reach::day', label: '=Injected', source: 'page', unit: 'count', kind: 'flow', total: 5, latestAt: null, coverage: 1, available: 1,
+        points: [{ date: '2026-10-01', label: 'Oct 1', value: 5 }, { date: '2026-10-02', label: 'Oct 2', value: 6 }], rows: [] }],
+    } as ReturnType<typeof buildReportOverview>;
+    const result = reportOverviewCsv(view, 1);
+    expect(result.rowCount).toBe(1);
+    expect(result.truncated).toBe(true);
+    expect(result.csv).toContain("'=Injected");
+    expect(result.csv).toContain('"truncated","true"');
+    const capped = reportOverviewCsv(view, 5001);
+    expect(capped.truncated).toBe(false);
+  });
+});

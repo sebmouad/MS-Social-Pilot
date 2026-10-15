@@ -40,10 +40,12 @@ describe('scoped permissions', () => {
     expect(canAccessFeature(client, 'publishing/approvals', 'write')).toBe(true);
     expect(canAccessFeature(client, 'publishing/posts', 'write')).toBe(false);
     expect(canAccessFeature(client, 'analytics/overview', 'read')).toBe(true);
+    expect(canAccessFeature(client, 'analytics/reports', 'read')).toBe(true);
     expect(canAccessFeature(client, 'inbox/conversations', 'read')).toBe(false);
     expect(canAccessFeature(client, 'ads/overview', 'read')).toBe(false);
     expect(canAccessFeature(client, 'settings/account', 'write')).toBe(true);
     expect(client.visibleFeatures).toContain('analytics/overview');
+    expect(client.visibleFeatures).toContain('analytics/reports');
     expect(client.visibleFeatures).not.toContain('inbox/conversations');
   });
 
