@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const purgeGuard = vi.hoisted(() => vi.fn());
-vi.mock('../src/server/platforms/registry', () => ({ enabledSocialAccountWhere: async () => ({ provider: { in: ['facebook'] } }) }));
+vi.mock('../src/server/platforms/registry', () => ({ enabledSocialAccountWhere: async () => ({ provider: { in: ['facebook'] } }), platformAds: vi.fn(async () => ({ ui: { campaign: { options: [{ value: 'OUTCOME_TRAFFIC', label: 'Traffic' }], defaultOption: 'OUTCOME_TRAFFIC', confirmationTemplate: 'CREATE PAUSED FACEBOOK CAMPAIGN {nameJson} IN ACCOUNT {adAccountId} WITH OBJECTIVE {objective}' }, adSet: { options: [{ value: 'LINK_CLICKS', label: 'Link clicks' }, { value: 'IMPRESSIONS', label: 'Impressions' }], defaultOption: 'LINK_CLICKS', confirmationTemplate: 'CREATE PAUSED FACEBOOK AD SET {nameJson} UNDER CAMPAIGN {campaignId} IN ACCOUNT {adAccountId} WITH DAILY BUDGET {dailyBudgetMinor} MINOR UNITS TARGETING {countryCode} OPTIMIZED FOR {optimizationGoal}' } }, adSetConfirmation: (input: { adAccountId: string; campaignId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }) => `CREATE PAUSED FACEBOOK AD SET ${JSON.stringify(input.name)} UNDER CAMPAIGN ${input.campaignId} IN ACCOUNT ${input.adAccountId} WITH DAILY BUDGET ${input.dailyBudgetMinor} MINOR UNITS TARGETING ${input.countryCode} OPTIMIZED FOR ${input.optimizationGoal}` })) }));
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: purgeGuard, withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
 
 const db = vi.hoisted(() => ({
@@ -25,16 +25,18 @@ const analytics = vi.hoisted(() => ({ load: vi.fn(), build: vi.fn() }));
 vi.mock('../src/server/analytics/data', () => ({ analyticsRange: (start?: string, end?: string) => ({ from: new Date(`${start ?? '2026-10-01'}T00:00:00`), to: new Date(`${end ?? '2026-10-15'}T23:59:59.999`) }), loadAnalytics: analytics.load }));
 vi.mock('../src/server/analytics/aggregate', () => ({ buildAnalytics: analytics.build }));
 const adsQueries = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn() }));
-vi.mock('../src/server/ads/queries', () => ({ getAdsAccounts: adsQueries.accounts, getAdsDataset: adsQueries.dataset }));
+vi.mock('../src/server/ads/queries', () => ({ getAdsAccounts: adsQueries.accounts, getAdsDataset: adsQueries.dataset, getAdsAccountWhere: async (workspaceId: string, allowedTargetIds?: string[]) => ({ workspaceId, enabled: true, socialAccount: { is: { workspaceId, invalidatedAt: null, provider: { in: ['facebook'] } } }, ...(allowedTargetIds === undefined ? {} : { socialAccountId: { in: ['social-a'] } }) }) }));
 const dataControls = vi.hoisted(() => ({ preview: vi.fn(), export: vi.fn(), remove: vi.fn() }));
 vi.mock('../src/server/data-control', () => ({ previewWorkspaceDataDeletion: dataControls.preview, exportWorkspaceData: dataControls.export, deleteWorkspaceData: dataControls.remove }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
 vi.mock('../src/server/inbox/actions', () => ({ replyToInbox: inboxMutations.reply, setInboxResolved: inboxMutations.resolve, moderateInboxComment: inboxMutations.moderate }));
-const adsMutations = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), read: vi.fn() }));
+const adsMutations = vi.hoisted(() => ({ create: vi.fn(), createAdSet: vi.fn(), update: vi.fn(), read: vi.fn() }));
 vi.mock('../src/server/ads/actions', () => ({
   createWorkspaceAdCampaign: adsMutations.create,
+  createWorkspaceAdSet: adsMutations.createAdSet,
   updateWorkspaceAd: adsMutations.update,
   readWorkspaceAdObject: adsMutations.read,
+  canManageWorkspaceAds: vi.fn().mockResolvedValue(true),
   campaignCreationConfirmation: (_workspaceId: string, adAccountId: string, name: string, objective: string) => `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(name.trim())} IN ACCOUNT ${adAccountId} WITH OBJECTIVE ${objective}`,
 }));
 const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
@@ -71,6 +73,7 @@ beforeEach(() => {
   inboxMutations.resolve.mockResolvedValue({ ok: true });
   inboxMutations.moderate.mockResolvedValue({ ok: true });
   adsMutations.create.mockResolvedValue({ campaignId: 'campaign-1' });
+  adsMutations.createAdSet.mockResolvedValue({ adSetId: 'adset-1', auditRecorded: true });
   adsMutations.update.mockResolvedValue(undefined);
   adsMutations.read.mockResolvedValue({ id: 'campaign-a', configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED' });
   publishingMutations.publish.mockResolvedValue({ published: 1, failed: 0, needsReconciliation: 0 });
@@ -260,6 +263,7 @@ describe('MCP workspace boundaries', () => {
     const second = (await (await readPage(1)).json()).result.structuredContent;
     expect(second.accounts).toEqual([{ id: 'account-b' }]);
     expect(second.nextOffset).toBeNull();
+    expect(db.adAccount.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ workspaceId: 'workspace-a', enabled: true, socialAccount: { is: expect.objectContaining({ workspaceId: 'workspace-a', invalidatedAt: null, provider: { in: ['facebook'] } }) } }), skip: 1, take: 1 }));
   });
   it('paginates every point and row for an authorized Analytics metric', async () => {
     const limited = { ...viewer, maxResultItems: 1, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
@@ -293,13 +297,79 @@ describe('MCP workspace boundaries', () => {
     expect(adsMutations.create).not.toHaveBeenCalled();
     const confirmation = 'CREATE PAUSED FACEBOOK CAMPAIGN "Autumn launch" IN ACCOUNT account-1 WITH OBJECTIVE OUTCOME_TRAFFIC';
     const created = await call('create_ad_campaign', { ...campaign, confirmation });
-    expect((await created.json()).result.structuredContent).toEqual({ campaignId: 'campaign-1' });
+    expect((await created.json()).result.structuredContent).toMatchObject({ campaignId: 'campaign-1', confirmedSuccess: true, mcpAuditRecorded: true });
     expect(adsMutations.create).toHaveBeenCalledWith(viewer, { ...campaign, confirmation });
 
     const change = { adAccountId: 'account-1', objectId: 'campaign-1', objectType: 'campaign', status: 'paused' };
     const updated = await call('update_ad', { ...change, confirmation: 'SET AD STATUS campaign-1 TO PAUSED' });
     expect((await updated.json()).result.structuredContent.updated).toBe(true);
     expect(adsMutations.update).toHaveBeenCalledWith(viewer, { ...change, dailyBudgetMinor: undefined, lifetimeBudgetMinor: undefined, confirmation: 'SET AD STATUS campaign-1 TO PAUSED' });
+  });
+  it('returns confirmed remote Ads receipts when MCP audit persistence fails', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    adsMutations.create.mockResolvedValueOnce({ created: true, campaignId: 'remote-campaign-9', status: 'paused', auditRecorded: true });
+    db.$executeRaw.mockRejectedValueOnce(new Error('database unavailable'));
+    const campaign = await call('create_ad_campaign', { adAccountId: 'account-1', name: 'Autumn launch', objective: 'OUTCOME_TRAFFIC', confirmation: 'CREATE PAUSED FACEBOOK CAMPAIGN "Autumn launch" IN ACCOUNT account-1 WITH OBJECTIVE OUTCOME_TRAFFIC' });
+    const campaignResult = (await campaign.json()).result.structuredContent;
+    expect(campaignResult).toMatchObject({ confirmedSuccess: true, campaignId: 'remote-campaign-9', status: 'paused', auditRecorded: true, mcpAuditRecorded: false });
+    expect(campaignResult.warning).toContain('Do not submit this creation again.');
+    expect(adsMutations.create).toHaveBeenCalledTimes(1);
+
+    db.adAccount.findFirst.mockResolvedValue({ id: 'account-1', currency: 'USD', socialAccount: { provider: 'facebook' } });
+    adsMutations.createAdSet.mockResolvedValueOnce({ created: true, adSetId: 'remote-adset-7', status: 'paused', auditRecorded: true });
+    db.$executeRaw.mockRejectedValueOnce(new Error('database unavailable'));
+    const adSet = await call('create_ad_set', { adAccountId: 'account-1', campaignId: 'campaign-1', name: 'Prospecting', dailyBudgetMinor: 5000, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS', confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-1 IN ACCOUNT account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' });
+    const adSetResult = (await adSet.json()).result.structuredContent;
+    expect(adSetResult).toMatchObject({ confirmedSuccess: true, adSetId: 'remote-adset-7', status: 'paused', auditRecorded: true, mcpAuditRecorded: false });
+    expect(adSetResult.warning).toContain('Do not submit this creation again.');
+    expect(adsMutations.createAdSet).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('MCP Ads creation succeeded but its audit record could not be saved.', expect.objectContaining({ tool: 'create_ad_set', adSetId: 'remote-adset-7' }));
+    log.mockRestore();
+  });
+  it('discovers safe selected-account Ads options and creates ad sets only with all-page scope and exact confirmation', async () => {
+    const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 70, method: 'tools/list' });
+    expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('create_ad_set');
+    db.adAccount.findFirst.mockResolvedValue({ id: 'account-1', currency: 'USD', socialAccount: { provider: 'facebook' } });
+    const options = await call('get_ad_creation_options', { adAccountId: 'account-1' });
+    const optionsResult = (await options.json()).result.structuredContent;
+    expect(optionsResult.adSet.options).toEqual([{ value: 'LINK_CLICKS', label: 'Link clicks' }, { value: 'IMPRESSIONS', label: 'Impressions' }]);
+    expect(JSON.stringify(optionsResult)).not.toContain('accessToken');
+    const { canManageWorkspaceAds } = await import('../src/server/ads/actions');
+    expect(canManageWorkspaceAds).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'account-1');
+
+    const values = { adAccountId: 'account-1', campaignId: 'campaign-1', name: 'Autumn audience', dailyBudgetMinor: 2500, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' };
+    const exact = 'CREATE PAUSED FACEBOOK AD SET "Autumn audience" UNDER CAMPAIGN campaign-1 IN ACCOUNT account-1 WITH DAILY BUDGET 2500 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS';
+    const bad = await call('create_ad_set', { ...values, confirmation: 'CREATE AD SET' });
+    expect((await bad.json()).result.isError).toBe(true);
+    expect(adsMutations.createAdSet).not.toHaveBeenCalled();
+    const invalidBudget = await call('create_ad_set', { ...values, dailyBudgetMinor: '2500', confirmation: exact });
+    expect((await invalidBudget.json()).result.isError).toBe(true);
+    expect(adsMutations.createAdSet).not.toHaveBeenCalled();
+    const created = await call('create_ad_set', { ...values, confirmation: exact });
+    expect((await created.json()).result.structuredContent.adSetId).toBe('adset-1');
+    expect(adsMutations.createAdSet).toHaveBeenCalledWith(viewer, { ...values, confirmation: exact }, true);
+
+    const limited = { ...viewer, permissions: { ...viewer.permissions!, pageScope: { all: false, ids: ['page-a'] } } };
+    const denied = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 71, method: 'tools/call', params: { name: 'create_ad_set', arguments: { ...values, confirmation: exact } } });
+    expect((await denied.json()).result.isError).toBe(true);
+    expect(adsMutations.createAdSet).toHaveBeenCalledTimes(1);
+  });
+  it('limits Ads creation metadata to resources in scope and hides it when management is unavailable', async () => {
+    db.target.findMany.mockResolvedValue([{ socialAccountId: 'social-a' }]);
+    db.adAccount.findFirst.mockResolvedValue({ id: 'account-1', currency: 'USD', socialAccount: { provider: 'facebook' } });
+    const scopedViewer = { ...viewer, permissions: { ...viewer.permissions!, pageScope: { all: false, ids: ['page-a'] } } };
+    const scoped = await handleMcpMessage(scopedViewer, { jsonrpc: '2.0', id: 72, method: 'tools/call', params: { name: 'get_ad_creation_options', arguments: { adAccountId: 'account-1' } } });
+    const scopedResult = (await scoped.json()).result.structuredContent;
+    expect(scopedResult.campaign.options).toBeDefined();
+    expect(scopedResult.adSet).toBeNull();
+    expect(db.adAccount.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ socialAccountId: { in: ['social-a'] } }) }));
+
+    const { canManageWorkspaceAds } = await import('../src/server/ads/actions');
+    vi.mocked(canManageWorkspaceAds).mockResolvedValueOnce(false);
+    const unavailable = await call('get_ad_creation_options', { adAccountId: 'account-1' });
+    const unavailableResult = (await unavailable.json()).result;
+    expect(unavailableResult.isError).toBe(true);
+    expect(unavailableResult.structuredContent.error).toBe('The selected advertising account is unavailable.');
   });
   it('exposes workspace data controls only to managers and requires exact deletion confirmation', async () => {
     const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 40, method: 'tools/list' });

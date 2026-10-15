@@ -13,9 +13,10 @@ import { buildAnalytics } from '../analytics/aggregate';
 import { CONFIG_SCHEMA_VERSION, safeConfigShape } from '@/lib/config/registry';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
-import { campaignCreationConfirmation, createWorkspaceAdCampaign, readWorkspaceAdObject, updateWorkspaceAd } from '../ads/actions';
+import { campaignCreationConfirmation, canManageWorkspaceAds, createWorkspaceAdCampaign, createWorkspaceAdSet, readWorkspaceAdObject, updateWorkspaceAd } from '../ads/actions';
 import type { AdMutationRequest } from '@/platforms/types';
-import { getAdsAccounts, getAdsDataset } from '../ads/queries';
+import { getAdsAccountWhere, getAdsAccounts, getAdsDataset } from '../ads/queries';
+import { platformAds } from '../platforms/registry';
 import { summarizeInsights } from '../ads/summary';
 import { deleteUnusedWorkspaceImage, getWorkspaceImageMetadata, listWorkspaceImages, uploadWorkspaceImage } from '../media/storage';
 
@@ -44,9 +45,11 @@ const tools = [
   { name: 'get_analytics_overview', description: 'Read available metrics and combined audience for selected channels. Metrics, audience entries, and selected channels have independent offsets; each response is bounded.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel.' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, audienceOffset: { type: 'integer', minimum: 0 }, targetOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
   { name: 'get_analytics_metric_details', description: 'Read a bounded page of stored date points or channel/breakdown rows for one Analytics metric. Continue with nextOffset until null.', inputSchema: { type: 'object', required: ['metricKey', 'kind'], properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel.' }, metricKey: { type: 'string', minLength: 1 }, kind: { type: 'string', enum: ['points', 'rows'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'list_ad_accounts', description: 'List advertising accounts in this workspace using bounded offset pagination.', inputSchema: { type: 'object', properties: { offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
+  { name: 'get_ad_creation_options', description: 'Read safe Ads creation choices and exact confirmation formats for one enabled, connected advertising account. Only workspace owners and admins can use this tool.', inputSchema: { type: 'object', required: ['adAccountId'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' } }, additionalProperties: false } },
   { name: 'get_ads_performance', description: 'Read stored campaign, ad set, and ad performance for accessible ad accounts. Performance rows and account summaries have independent offsets.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, accountId: { type: 'string', description: 'Accessible ad account ID.' }, level: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, accountOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
   { name: 'get_live_ad_status', description: 'Read live configured and effective status for a campaign, ad set, or ad verified in stored insights. Requires Ads read access and an enabled connected account visible to your page scope.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, objectId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] } }, additionalProperties: false } },
   { name: 'create_ad_campaign', description: 'Create a paused campaign in the selected advertising account. Use the selected platform objective and exact confirmation format.', inputSchema: { type: 'object', required: ['adAccountId', 'name', 'objective', 'confirmation'], properties: { adAccountId: { type: 'string' }, name: { type: 'string' }, objective: { type: 'string', minLength: 1, maxLength: 100 }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'create_ad_set', description: 'Create a paused ad set under a campaign verified in the selected account. Requires all Pages in scope. Confirmation must exactly match the account platform format.', inputSchema: { type: 'object', required: ['adAccountId', 'campaignId', 'name', 'dailyBudgetMinor', 'countryCode', 'optimizationGoal', 'confirmation'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, campaignId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, name: { type: 'string', minLength: 1, maxLength: 100 }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, countryCode: { type: 'string', pattern: '^[A-Z]{2}$' }, optimizationGoal: { type: 'string', minLength: 1, maxLength: 100 }, confirmation: { type: 'string', maxLength: 500 } }, additionalProperties: false } },
   { name: 'update_ad', description: 'Change the status or one budget of a verified ad campaign, ad set, or ad. Confirmation must exactly match SET AD STATUS <objectId> TO <ACTIVE|PAUSED> or SET AD BUDGET <objectId> TO <amount> MINOR UNITS.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType', 'confirmation'], properties: { adAccountId: { type: 'string' }, objectId: { type: 'string' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, status: { type: 'string', enum: ['active', 'paused'] }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, lifetimeBudgetMinor: { type: 'integer', minimum: 1 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'preview_workspace_data_deletion', description: 'Count workspace records that a data deletion would remove. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'export_workspace_data', description: 'Export the current workspace JSON snapshot, including directly workspace-owned legacy tables with credential fields redacted. Indirect records and media bytes are not included. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -70,7 +73,7 @@ const tools = [
 const rootTools = new Set(['get_root_config', 'set_root_config']);
 const canUseRootTool = (viewer: McpViewer) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
 const dataTools = new Set(['preview_workspace_data_deletion', 'export_workspace_data', 'delete_workspace_data']);
-const adsManagerTools = new Set(['list_ad_accounts', 'create_ad_campaign', 'update_ad']);
+const adsManagerTools = new Set(['list_ad_accounts', 'get_ad_creation_options', 'create_ad_campaign', 'create_ad_set', 'update_ad']);
 const canManageData = (viewer: McpViewer) => viewer.role === 'owner' || viewer.role === 'admin';
 const dataResource = (uri: string) => uri === 'msp://data/deletion-preview';
 
@@ -91,7 +94,9 @@ const toolFeatures: Record<string, string> = {
   get_ads_performance: 'ads/campaigns',
   get_live_ad_status: 'ads/campaigns',
   list_ad_accounts: 'ads/campaigns',
+  get_ad_creation_options: 'ads/campaigns',
   create_ad_campaign: 'ads/campaigns',
+  create_ad_set: 'ads/campaigns',
   update_ad: 'ads/campaigns',
   preview_workspace_data_deletion: 'settings/data',
   export_workspace_data: 'settings/data',
@@ -111,10 +116,33 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'create_ad_campaign', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image']);
+const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
+}
+
+async function auditConfirmedAdsWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
+  try {
+    await auditWrite(viewer, tool, detail);
+    return true;
+  } catch {
+    console.error('MCP Ads creation succeeded but its audit record could not be saved.', { workspaceId: viewer.workspaceId, actorId: viewer.userId, tool, ...detail });
+    return false;
+  }
+}
+
+function confirmedAdsReceipt(result: Record<string, unknown>, mcpAuditRecorded: boolean) {
+  const auditRecorded = result.auditRecorded !== false;
+  return {
+    ...result,
+    confirmedSuccess: true,
+    auditRecorded,
+    mcpAuditRecorded,
+    ...(!auditRecorded || !mcpAuditRecorded ? {
+      warning: 'Creation succeeded and the object is paused, but one or more audit records could not be saved. Do not submit this creation again.',
+    } : {}),
+  };
 }
 
 function requireConfirmation(args: Record<string, unknown>, expected: string) {
@@ -309,7 +337,7 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const limit = args.limit === undefined ? cap : Number(args.limit);
       if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('offset and limit must be valid integers.');
       const pageLimit = Math.min(limit, cap);
-      const where = { workspaceId: viewer.workspaceId };
+      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer));
       const [accounts, accountCount] = await Promise.all([
         prisma.adAccount.findMany({ where, orderBy: { name: 'asc' }, skip: offset, take: pageLimit, select: { id: true, actId: true, name: true, enabled: true, currency: true } }),
         prisma.adAccount.count({ where }),
@@ -362,6 +390,26 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(objectId) || !['campaign', 'adset', 'ad'].includes(objectType)) throw new Error('Invalid ad object request.');
       return readWorkspaceAdObject({ userId: viewer.userId, workspaceId: viewer.workspaceId }, { adAccountId, objectId, objectType }, pageIdsFor(viewer));
     }
+    case 'get_ad_creation_options': {
+      const adAccountId = requiredString(args, 'adAccountId');
+      if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId)) throw new Error('Invalid ad account ID.');
+      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer));
+      const account = await prisma.adAccount.findFirst({
+        where: { ...where, id: adAccountId },
+        select: { id: true, currency: true, socialAccount: { select: { provider: true } } },
+      });
+      const provider = account?.socialAccount?.provider;
+      const host = provider ? await platformAds(provider) : null;
+      const manageable = account && await canManageWorkspaceAds({ userId: viewer.userId, workspaceId: viewer.workspaceId }, adAccountId);
+      if (!account || !provider || !host || !manageable) throw new Error('The selected advertising account is unavailable.');
+      return {
+        adAccountId: account.id,
+        provider,
+        currency: account.currency,
+        campaign: host.ui.campaign ? { options: host.ui.campaign.options, defaultOption: host.ui.campaign.defaultOption, confirmationTemplate: host.ui.campaign.confirmationTemplate } : null,
+        adSet: viewer.permissions?.pageScope.all === true && host.ui.adSet ? { options: host.ui.adSet.options, defaultOption: host.ui.adSet.defaultOption, confirmationTemplate: host.ui.adSet.confirmationTemplate, countryCodeFormat: 'Two uppercase letters, for example MA', dailyBudgetFormat: 'Positive integer in minor currency units' } : null,
+      };
+    }
     case 'create_ad_campaign': {
       const adAccountId = requiredString(args, 'adAccountId');
       const nameValue = requiredString(args, 'name');
@@ -369,8 +417,30 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const confirmation = requiredString(args, 'confirmation');
       requireConfirmation(args, await campaignCreationConfirmation(viewer.workspaceId, adAccountId, nameValue, objective));
       const result = await createWorkspaceAdCampaign(viewer, { adAccountId, name: nameValue, objective, confirmation });
-      await auditWrite(viewer, name, { adAccountId, campaignId: result.campaignId });
-      return result;
+      const mcpAuditRecorded = await auditConfirmedAdsWrite(viewer, name, { adAccountId, campaignId: result.campaignId });
+      return confirmedAdsReceipt(result, mcpAuditRecorded);
+    }
+    case 'create_ad_set': {
+      const adAccountId = requiredString(args, 'adAccountId');
+      const campaignId = requiredString(args, 'campaignId');
+      const nameValue = requiredString(args, 'name');
+      const dailyBudgetMinor = args.dailyBudgetMinor;
+      const countryCode = requiredString(args, 'countryCode');
+      const optimizationGoal = requiredString(args, 'optimizationGoal');
+      const confirmation = requiredString(args, 'confirmation');
+      if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(campaignId) || typeof dailyBudgetMinor !== 'number' || !Number.isSafeInteger(dailyBudgetMinor) || dailyBudgetMinor < 1 || !/^[A-Z]{2}$/.test(countryCode)) throw new Error('Invalid ad set request.');
+      if (viewer.permissions?.pageScope.all !== true) throw new Error('Ad set creation is unavailable for limited page access.');
+      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer));
+      const account = await prisma.adAccount.findFirst({
+        where: { ...where, id: adAccountId },
+        select: { socialAccount: { select: { provider: true } } },
+      });
+      const host = account?.socialAccount ? await platformAds(account.socialAccount.provider) : null;
+      if (!host) throw new Error('The selected advertising account is unavailable.');
+      requireConfirmation(args, host.adSetConfirmation({ adAccountId, campaignId, name: nameValue.trim(), dailyBudgetMinor, countryCode, optimizationGoal }));
+      const result = await createWorkspaceAdSet(viewer, { adAccountId, campaignId, name: nameValue, dailyBudgetMinor, countryCode, optimizationGoal, confirmation }, true);
+      const mcpAuditRecorded = await auditConfirmedAdsWrite(viewer, name, { adAccountId, campaignId, adSetId: result.adSetId });
+      return confirmedAdsReceipt(result, mcpAuditRecorded);
     }
     case 'update_ad': {
       const adAccountId = requiredString(args, 'adAccountId');
