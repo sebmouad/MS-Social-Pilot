@@ -1,5 +1,7 @@
 # Architecture
 
+> **Legacy application document.** Active rebuild work follows [../AGENTS.md](../AGENTS.md), [../rebuild/docs/ARCHITECTURE_CONTRACT.md](../rebuild/docs/ARCHITECTURE_CONTRACT.md), and [../rebuild/docs/ARCHITECTURE.md](../rebuild/docs/ARCHITECTURE.md). Legacy styling, routes, settings paths and deploy instructions do not define the replacement.
+
 ## Processes
 
 Two processes share one PostgreSQL database:

@@ -1,5 +1,7 @@
 # Plan: what is still open
 
+> **Legacy application document.** Active rebuild work follows [../AGENTS.md](../AGENTS.md), [../rebuild/docs/ARCHITECTURE_CONTRACT.md](../rebuild/docs/ARCHITECTURE_CONTRACT.md), and [../rebuild/docs/ARCHITECTURE.md](../rebuild/docs/ARCHITECTURE.md). Legacy styling, routes, settings paths and deploy instructions do not define the replacement.
+
 Only open items. Everything else in [FEATURES.md](FEATURES.md) is built. When an
 item is done, remove it here and describe it in the matching doc. Each item:
 build, unit and browser tests, deploy, check live with real data.

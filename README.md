@@ -1,5 +1,9 @@
 # MS Social Pilot
 
+## Active rebuild
+
+The replacement application lives in [`rebuild/`](rebuild/). Codex and Claude must read [AGENTS.md](AGENTS.md), the [architecture contract](rebuild/docs/ARCHITECTURE_CONTRACT.md), and [implementation architecture](rebuild/docs/ARCHITECTURE.md) before working on it. The instructions below describe the legacy production application. Rebuild cutover follows [rebuild/docs/CUTOVER.md](rebuild/docs/CUTOVER.md).
+
 A self-hosted social media scheduler and analytics tool for agencies that run
 many Facebook Pages, plus Instagram, Bluesky, Mastodon, LinkedIn, Threads, X,
 Pinterest, YouTube, TikTok and Telegram. Write once and publish to many

@@ -1,5 +1,7 @@
 # MS Social Pilot: handbook
 
+> **Legacy application document.** Active rebuild work follows [../AGENTS.md](../AGENTS.md), [../rebuild/docs/ARCHITECTURE_CONTRACT.md](../rebuild/docs/ARCHITECTURE_CONTRACT.md), and [../rebuild/docs/ARCHITECTURE.md](../rebuild/docs/ARCHITECTURE.md). Legacy styling, routes, settings paths and deploy instructions do not define the replacement.
+
 MS Social Pilot is a self-hosted social media scheduler and analytics tool for
 agencies that run many Facebook Pages, plus Instagram, Bluesky, Mastodon,
 LinkedIn, Threads, X, Pinterest, YouTube, TikTok and Telegram. It is a generic

@@ -1,5 +1,7 @@
 # Social Pilot rebuild
 
+**Start here:** [agent instructions](AGENTS.md), [mandatory architecture contract](docs/ARCHITECTURE_CONTRACT.md), and [current implementation/gaps](docs/ARCHITECTURE.md). The contract defines the target; partial implementation is not a replacement specification.
+
 This is a new Next.js application with a new route map, shell, design system, and feature pages. It is isolated from the production app. The legacy app remains the live service while replacement capabilities are built and verified.
 
 ## Local checks
