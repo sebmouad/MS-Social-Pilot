@@ -1,4 +1,5 @@
 .page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 25px; }
+.postPagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .postWorkbench { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, .85fr); align-items: start; gap: 18px; }
 .postWorkbench > :only-child { grid-column: 1 / -1; }
 .importCard { position: sticky; top: 20px; }

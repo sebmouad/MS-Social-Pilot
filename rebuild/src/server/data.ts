@@ -1,4 +1,4 @@
-import { PrismaClient } from "../../generated/client";
+import { PrismaClient, type Prisma } from "../../generated/client";
 
 const globalForPrisma = globalThis as typeof globalThis & {
   rebuildPrisma?: PrismaClient;
@@ -114,6 +114,34 @@ export async function listPosts(workspaceId: string, limit = 100): Promise<PostS
     },
   });
   return posts;
+}
+
+/** Paginate posts after workspace and channel scope have been enforced in the query. */
+export async function listPostPage(workspaceId: string, page: number, pageSize: number, allowedTargetIds: readonly string[] | null, authorId: string) {
+  const size = Math.max(1, Math.min(Math.trunc(pageSize), 100));
+  const requestedPage = Number.isSafeInteger(page) && page > 0 ? page : 1;
+  const where: Prisma.PostWhereInput = {
+    workspaceId,
+    ...(allowedTargetIds === null ? {} : { OR: [
+      { targets: { some: { targetId: { in: [...allowedTargetIds] } }, every: { targetId: { in: [...allowedTargetIds] } } } },
+      { targets: { none: {} }, authorId },
+    ] }),
+  };
+  const total = await prisma.post.count({ where });
+  const pages = Math.max(1, Math.ceil(total / size));
+  const currentPage = Math.min(requestedPage, pages);
+  const posts = await prisma.post.findMany({
+    where,
+    orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+    skip: (currentPage - 1) * size,
+    take: size,
+    select: {
+      id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true,
+      firstComment: true, authorId: true, link: true, media: true,
+      targets: { select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, type: true, name: true, pictureUrl: true } } } },
+    },
+  });
+  return { posts, total, page: currentPage, pages };
 }
 
 /** Read the basic workspace details used by the new app shell. */

@@ -1,6 +1,6 @@
 import { DataTable, type TableColumn } from "@/components";
 import { requireViewer } from "@/server/context";
-import { getTargets, listPosts, prisma } from "@/server/data";
+import { getTargets, listPostPage } from "@/server/data";
 import { PageHeading, PostMessage, PostTargets, StatusBadge, formatDate } from "../publishing-ui";
 import styles from "../publishing.module.css";
 import { CsvImportForm, PostEditorForm, PostRowActions } from "./PostActions";
@@ -26,19 +26,16 @@ const NOTICE_TEXT: Record<string, string> = {
   synced: "Remote status sync completed.",
 };
 
-export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
+export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; page?: string }> }) {
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
+  const { notice, page: pageParam } = await searchParams;
   const [allowedMimeTypes, maxUploadBytes, maxAltCharacters] = await Promise.all([
     runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'), runtimeConfig('publishing.maxImageAltCharacters'),
   ]);
   const imageRules = { allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters) };
   const allowedTargetIds = viewer.permissions.pageScope.all ? null : viewer.permissions.pageScope.ids;
-  const rawPosts = await listPosts(viewer.workspaceId);
-  const extraPosts = await prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, id: { in: rawPosts.map(post => post.id) } }, select: { id: true, firstComment: true, authorId: true, link: true, media: true } });
-  const byPost = new Map(extraPosts.map(post => [post.id, post]));
-  const posts = allowedTargetIds === null ? rawPosts : rawPosts.filter(post => post.targets.length
-    ? post.targets.every(item => allowedTargetIds.includes(item.target.id))
-    : byPost.get(post.id)?.authorId === viewer.user.id);
+  const requestedPage = pageParam && /^\d+$/.test(pageParam) ? Number(pageParam) : 1;
+  const listing = await listPostPage(viewer.workspaceId, requestedPage, 50, allowedTargetIds, viewer.user.id);
   const targetRows = await getTargets(viewer.workspaceId);
   const scopedTargetRows = allowedTargetIds === null ? targetRows : targetRows.filter(target => allowedTargetIds.includes(target.id));
   const targetChoices = await Promise.all(scopedTargetRows.map(async target => {
@@ -46,8 +43,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     const adapter = provider && hasPlatformCapability(viewer.entitlements, provider) ? await platformFor(provider, 'publishing') : null;
     return { id: target.id, name: target.name, type: target.type, provider, canPublish: Boolean(target.canPublish && !target.socialAccount?.invalidatedAt && adapter?.publish && adapter.supportsTargetKind?.(target.type, 'publishing')) };
   }));
-  const rows = posts.map(post => ({ ...post, firstComment: byPost.get(post.id)?.firstComment ?? null, authorId: byPost.get(post.id)?.authorId ?? '', link: byPost.get(post.id)?.link ?? null, media: (byPost.get(post.id)?.media ?? []) as Array<{ kind: string; url: string }> }));
-  const { notice } = await searchParams;
+  const rows = listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string }> }));
   const noticeText = notice ? NOTICE_TEXT[notice] ?? (notice.startsWith('imported-') ? `${notice.slice('imported-'.length)} posts imported as drafts.` : undefined) : undefined;
   const canManageDrafts = ["owner", "admin", "editor"].includes(viewer.membership.role);
   const canAuthorDrafts = canManageDrafts || viewer.membership.role === "contributor";
@@ -63,12 +59,18 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     return canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish} imageRules={imageRules}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>;
   } });
   return <>
-    <PageHeading title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary={`${posts.length} ${posts.length === 1 ? "post" : "posts"} · up to 100 recent`}/>
+    <PageHeading title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary={`${listing.total} ${listing.total === 1 ? "post" : "posts"} · page ${listing.page} of ${listing.pages}`}/>
     {noticeText ? <p className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} role={notice?.startsWith('failed') ? 'alert' : 'status'}>{noticeText}</p> : null}
     {(canAuthorDrafts || canManageDrafts) ? <div className={styles.postWorkbench}>
       {canAuthorDrafts ? <section className={`${styles.card} ${styles.createCard}`}><h2>Create a post</h2><p>Choose an enabled destination now or save this as a local draft.</p><PostEditorForm targets={targetChoices} imageRules={imageRules}/></section> : null}
       {canManageDrafts ? <section className={`${styles.card} ${styles.createCard} ${styles.importCard}`}><h2>Import a batch</h2><p>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section> : null}
     </div> : null}
-    <section className={styles.card}><DataTable columns={columns} rows={rows} rowKey={post => post.id} caption="Recent posts" emptyMessage="No posts have been created in this workspace yet."/></section>
+    <section className={styles.card}><DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage="No posts have been created in this workspace yet."/>
+      {listing.pages > 1 ? <nav className={styles.postPagination} aria-label="Post pages">
+        {listing.page > 1 ? <a className="ui-button ui-button--secondary" href={`/publishing/posts?page=${listing.page - 1}`}>Previous page</a> : <span />}
+        <span>Page {listing.page} of {listing.pages}</span>
+        {listing.page < listing.pages ? <a className="ui-button ui-button--secondary" href={`/publishing/posts?page=${listing.page + 1}`}>Next page</a> : <span />}
+      </nav> : null}
+    </section>
   </>;
 }
