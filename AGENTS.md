@@ -23,6 +23,7 @@ These files govern the rebuild. Do not silently replace them with legacy docs, a
 - Update the architecture status and affected UX/operation documents in the same batch when behavior or ownership changes. Change the target contract only to reflect an explicit user architecture decision, with its reason recorded.
 - Run checks from `rebuild/` for rebuild changes: targeted tests, `npm run typecheck`, and the appropriate full suite/build. Root package commands validate or deploy the legacy app unless explicitly changed and reviewed.
 - Real data/API testing and identifiable test content are authorized. Verify remote outcomes and clean up test content. Never expose tokens, passwords, or customer records in logs or reports.
+- Local app previews and browser tests use realistic synthetic example data in a dedicated local database, as the user requested. Do not use production customer data as the default local fixture. Keep live-provider/release verification distinct from example-data UI testing.
 - Keep production running until the documented migration, authorization, feature, live integration, backup, and rollback gates pass. Existing `socialpilot-deploy` still deploys legacy; do not mistake it for a rebuild cutover.
 - Do not declare completion from passing tests or manifests alone. Every requirement in the contract needs evidence at its actual scope.
 

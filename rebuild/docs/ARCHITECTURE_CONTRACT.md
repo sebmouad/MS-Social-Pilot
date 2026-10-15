@@ -133,6 +133,8 @@ Full authenticated MCP tools and resources cover the same authorized capabilitie
 
 The user authorized settings changes, deployment, real data/API tests, and identifiable remote test content with verification and cleanup. Do not repeatedly request permission already granted. Use that authorization within the requested rebuild and test scope; protect credentials and customer data.
 
+Local preview and browser testing must use realistic synthetic example data in a dedicated local database. Seed useful posts, channels, conversations, analytics and ads states so the UI can be assessed as a working product. Keep example-data checks separate from real-provider and production migration/release verification; never present synthetic outcomes as live-platform evidence.
+
 Work in reviewable batches using independent lower-cost agents where useful. Commit working batches to `main`; update evidence and remaining limitations. Each delegated task receives this contract and explicit file ownership.
 
 User update, 2026-10-16: **Always publish completed work to GitHub before the session ends.** Push verified commits to `origin/main` and verify remote state. Do not force-push or misrepresent unfinished work as complete. Report any push blocker and unpushed commits explicitly. GitHub publication is separate from production cutover; it does not bypass the release gates below.
