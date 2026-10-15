@@ -271,16 +271,24 @@ model PageInsight {
 
 /// Read-only compatibility mapping to existing Instagram account snapshots.
 model InstagramAccount {
-  id          String   @id
-  workspaceId String
-  igUserId    String
-  username    String
-  enabled     Boolean
-  followersCount Int?
-  lastSyncedAt DateTime?
-  updatedAt   DateTime @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
-  insights    InstagramInsight[]
+  id                String   @id
+  workspaceId       String
+  socialAccountId   String?
+  targetId          String?
+  igUserId          String
+  username          String
+  name              String?
+  profilePictureUrl String?
+  followersCount    Int?
+  followsCount      Int?
+  mediaCount        Int?
+  enabled           Boolean
+  lastSyncedAt      DateTime?
+  createdAt         DateTime
+  updatedAt         DateTime @updatedAt
+  workspace         Workspace @relation(fields: [workspaceId], references: [id])
+  insights          InstagramInsight[]
+  media             InstagramMedia[]
 
   @@unique([workspaceId, igUserId])
   @@index([workspaceId])
@@ -302,6 +310,30 @@ model InstagramInsight {
   @@unique([accountId, metric, period, endTime])
   @@index([accountId, metric, endTime])
   @@map("instagram_insights")
+}
+
+/// Stored post-level Instagram metrics and media metadata.
+model InstagramMedia {
+  id               String   @id
+  accountId        String
+  remoteId         String
+  caption          String?
+  mediaType        String?
+  mediaProductType String?
+  mediaUrl         String?
+  permalink        String?
+  thumbnailUrl     String?
+  timestamp        DateTime
+  likeCount        Int?
+  commentsCount    Int?
+  insights         Json?
+  insightsSyncedAt DateTime?
+  fetchedAt        DateTime
+  account          InstagramAccount @relation(fields: [accountId], references: [id])
+
+  @@unique([accountId, remoteId])
+  @@index([accountId, timestamp])
+  @@map("instagram_media")
 }
 
 model Post {

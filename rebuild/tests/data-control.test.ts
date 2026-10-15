@@ -35,6 +35,7 @@ function makePurgeClient(role: string = 'owner') {
     },
     target: { findMany: vi.fn().mockResolvedValue([{ id: 't1' }]) },
     adAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'a1' }]) },
+    instagramAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'ig1' }]) },
     post: { findMany: vi.fn().mockResolvedValue([{ id: 'p1' }]) },
     postTarget: { findMany: vi.fn().mockResolvedValue([{ id: 'pt1', postId: 'p1' }]) },
     conversation: { findMany: vi.fn().mockResolvedValue([{ id: 'c1' }]) },
@@ -42,8 +43,9 @@ function makePurgeClient(role: string = 'owner') {
     conversationMessage: { count: vi.fn().mockResolvedValue(3) },
     pageInsight: { count: vi.fn().mockResolvedValue(4) },
     adInsight: { count: vi.fn().mockResolvedValue(5) },
+    instagramInsight: { count: vi.fn().mockResolvedValue(6) },
     socialAccount: { count: vi.fn().mockResolvedValue(1) },
-    $queryRaw: vi.fn().mockResolvedValue([{ tableName: 'posts' }, { tableName: 'targets' }, { tableName: 'ad_accounts' }, { tableName: 'social_accounts' }, { tableName: 'media' }]),
+    $queryRaw: vi.fn().mockResolvedValue([{ tableName: 'bio_pages' }, { tableName: 'custom_fields' }, { tableName: 'feed_sources' }, { tableName: 'labels' }, { tableName: 'page_groups' }, { tableName: 'posts' }, { tableName: 'share_links' }, { tableName: 'short_links' }, { tableName: 'targets' }, { tableName: 'ad_accounts' }, { tableName: 'social_accounts' }, { tableName: 'instagram_accounts' }, { tableName: 'media' }]),
     $queryRawUnsafe: vi.fn().mockImplementation(async (sql: string) => [{ count: BigInt(sql.includes('"media"') ? 2 : 1) }]),
     $executeRawUnsafe: vi.fn(async (sql: string) => { events.push(sql); return 1; }),
     $executeRaw: vi.fn(async (parts: TemplateStringsArray, ...values: unknown[]) => { events.push('audit'); return { parts, values }; }),
@@ -69,20 +71,32 @@ describe('workspace data controls', () => {
       membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }), findMany: vi.fn().mockResolvedValue([]) },
       workspace: { findUnique: vi.fn().mockResolvedValue({ id: 'w1', name: 'Studio' }) },
       socialAccount: { findMany: vi.fn().mockResolvedValue([{ id: 's1', name: 'Meta', accessToken: 'secret-token' }]) },
-      target: { findMany: vi.fn().mockResolvedValue([{ id: 't1', accessToken: 'page-secret', name: 'Page' }]) },
+      target: { findMany: vi.fn().mockResolvedValue([{ id: 't1', accessToken: 'page-secret', name: 'Page', insights: [], conversations: [], postTargets: [] }]) },
       adAccount: { findMany: vi.fn().mockResolvedValue([]) },
+      instagramAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'ig1', workspaceId: 'w1', socialAccountId: 's1', targetId: 't1', igUserId: 'ig-user', username: 'studio', name: 'Studio IG', profilePictureUrl: 'https://cdn.test/profile.jpg', followersCount: 8, followsCount: 4, mediaCount: 2, enabled: true, lastSyncedAt: new Date('2026-01-01'), createdAt: new Date('2025-01-01'), updatedAt: new Date('2026-01-01'), insights: [{ id: 'ii1', metric: 'followers', value: { count: 8, access_token: 'must-redact' } }], media: [{ id: 'im1', remoteId: 'remote1', caption: 'A post', mediaUrl: 'https://cdn.test/media.jpg', insights: { reach: 20 }, timestamp: new Date('2026-01-01') }] }]) },
       post: { findMany: vi.fn().mockResolvedValue([]) },
       $queryRaw: vi.fn().mockResolvedValue([{ tableName: 'media' }]),
-      $queryRawUnsafe: vi.fn().mockResolvedValue([{ id: 'm1', workspaceId: 'w1', ordinal: BigInt(5), accessToken: 'legacy-secret', settings: { client_secret: 'nested-secret', label: 'ok' } }]),
+      $queryRawUnsafe: vi.fn().mockImplementation(async (sql: string) => {
+        if (sql.startsWith('SELECT COUNT')) return [{ count: BigInt(0) }];
+        if (sql.includes('"media"')) return [{ id: 'm1', workspaceId: 'w1', ordinal: BigInt(5), accessToken: 'legacy-secret', settings: { client_secret: 'nested-secret', label: 'ok' } }];
+        if (sql.includes('"external_posts"')) return [{ id: 'ep1', message: 'outside post', insights: { reach: 5, api_key: 'nested-legacy-secret' } }];
+        return [];
+      }),
     });
     const { exportWorkspaceData } = await import('../src/server/data-control');
     const data = await exportWorkspaceData({ userId: 'u1', workspaceId: 'w1' });
     expect(data.socialAccounts[0]).not.toHaveProperty('accessToken');
     expect(data.targets[0]).not.toHaveProperty('accessToken');
+    expect(data.instagramAccounts[0]).toMatchObject({ socialAccountId: 's1', targetId: 't1', igUserId: 'ig-user', name: 'Studio IG', profilePictureUrl: 'https://cdn.test/profile.jpg', followsCount: 4, mediaCount: 2 });
+    expect(data.instagramMedia).toHaveLength(1);
+    expect(data.indirectTables.external_posts[0]).toMatchObject({ id: 'ep1', message: 'outside post', insights: { reach: 5, api_key: '[REDACTED]' } });
+    expect(data.instagramAccounts[0].insights[0].value.access_token).toBe('[REDACTED]');
+    expect(data.coverage.includedIndirectTables).toContain('instagram_insights');
     expect(JSON.stringify(data)).not.toContain('secret-token');
     expect(data.legacyTables.media[0]).toMatchObject({ id: 'm1', ordinal: '5', accessToken: '[REDACTED]', settings: { client_secret: '[REDACTED]', label: 'ok' } });
     expect(JSON.stringify(data)).not.toContain('legacy-secret');
     expect(JSON.stringify(data)).not.toContain('nested-secret');
+    expect(JSON.stringify(data)).not.toContain('nested-legacy-secret');
     expect(data.coverage).toMatchObject({ directlyOwnedLegacyTables: ['media'], directlyOwnedLegacyRowCounts: { media: 1 }, directlyOwnedLegacyTablesComplete: true, complete: false });
     expect(mocks.prisma.$queryRawUnsafe).toHaveBeenCalledWith('SELECT * FROM "public"."media" WHERE "workspaceId" = $1', 'w1');
     expect(data.security).toMatchObject({ credentialsExcluded: true, auditLogExcluded: true });
@@ -96,6 +110,7 @@ describe('workspace data controls', () => {
       workspace: { findUnique: vi.fn().mockResolvedValue({ id: 'w1' }) },
       target: { findMany: vi.fn().mockResolvedValue([{ id: 't1' }]) },
       adAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'a1' }]) },
+      instagramAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'ig1' }]) },
       post: { findMany: vi.fn().mockResolvedValue([{ id: 'p1' }]) },
       postTarget: { findMany: vi.fn().mockResolvedValue([{ id: 'pt1' }]) },
       conversation: { findMany: vi.fn().mockResolvedValue([{ id: 'c1' }]) },
@@ -103,17 +118,35 @@ describe('workspace data controls', () => {
       conversationMessage: { count: vi.fn().mockResolvedValue(3) },
       pageInsight: { count: vi.fn().mockResolvedValue(4) },
       adInsight: { count: vi.fn().mockResolvedValue(5) },
+      instagramInsight: { count: vi.fn().mockResolvedValue(6) },
       socialAccount: { count: vi.fn().mockResolvedValue(1) },
-      $queryRaw: vi.fn().mockResolvedValue([{ tableName: 'media' }, { tableName: 'posts' }]),
-      $queryRawUnsafe: vi.fn().mockImplementation(async (sql: string) => [{ count: BigInt(sql.includes('"media"') ? 2 : 1) }]),
+      $queryRaw: vi.fn().mockResolvedValue([{ tableName: 'instagram_accounts' }, { tableName: 'media' }, { tableName: 'posts' }]),
+      $queryRawUnsafe: vi.fn().mockImplementation(async (sql: string) => [{ count: BigInt(sql.includes('"link_clicks"') ? 9 : sql.includes('"instagram_media"') ? 3 : sql.includes('"media"') ? 2 : 0) }]),
       $transaction: vi.fn(),
     });
     const { previewWorkspaceDataDeletion } = await import('../src/server/data-control');
-    await expect(previewWorkspaceDataDeletion({ userId: 'u1', workspaceId: 'w1' })).resolves.toEqual({
+    await expect(previewWorkspaceDataDeletion({ userId: 'u1', workspaceId: 'w1' })).resolves.toMatchObject({
       posts: 1, postTargets: 1, comments: 2, targets: 1, conversations: 1,
-      conversationMessages: 3, pageInsights: 4, adAccounts: 1, adInsights: 5, socialAccounts: 1,
+      conversationMessages: 3, pageInsights: 4, adAccounts: 1, adInsights: 5, instagramAccounts: 1, instagramInsights: 6, socialAccounts: 1,
       'other:media': 2,
+      'indirect:instagram_media': 3,
+      'indirect:link_clicks': 9,
+      'indirect:bio_links': 0,
+      'indirect:external_posts': 0,
+      'indirect:feed_items': 0,
+      'indirect:member_page_access': 0,
+      'indirect:metric_availability': 0,
+      'indirect:notification_mutes': 0,
+      'indirect:page_group_targets': 0,
+      'indirect:page_reviews': 0,
+      'indirect:page_videos': 0,
+      'indirect:post_field_values': 0,
+      'indirect:post_labels': 0,
+      'indirect:post_notes': 0,
+      'indirect:post_versions': 0,
+      'indirect:review_decisions': 0,
     });
+    expect(mocks.prisma.postTarget.findMany).toHaveBeenCalledWith({ where: { OR: [{ postId: { in: ['p1'] } }, { targetId: { in: ['t1'] } }] }, select: { id: true } });
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -134,14 +167,17 @@ describe('workspace data controls', () => {
     expect(transaction).toHaveBeenCalledTimes(3);
     expect((transaction as any).mock.calls.map((call: unknown[]) => call[1])).toEqual([{ timeout: 120000 }, { timeout: 120000 }, { timeout: 120000 }]);
     expect(job.status).toBe('completed');
-    expect(result).toMatchObject({ posts: 1, postTargets: 1, comments: 2, targets: 1, adAccounts: 1, socialAccounts: 1, 'other:media': 2, storedFiles: 2, storedBytes: 17 });
-    expect(events.filter(item => typeof item === 'string' && item.startsWith('DELETE FROM'))).toEqual([
-      'DELETE FROM "public"."posts" WHERE "workspaceId" = $1',
-      'DELETE FROM "public"."targets" WHERE "workspaceId" = $1',
-      'DELETE FROM "public"."ad_accounts" WHERE "workspaceId" = $1',
-      'DELETE FROM "public"."social_accounts" WHERE "workspaceId" = $1',
-      'DELETE FROM "public"."media" WHERE "workspaceId" = $1',
-    ]);
+    expect(result).toMatchObject({ posts: 1, postTargets: 1, comments: 2, targets: 1, adAccounts: 1, adInsights: 5, instagramAccounts: 1, instagramInsights: 6, socialAccounts: 1, 'other:media': 2, storedFiles: 2, storedBytes: 17 });
+    const deleteCalls = tx.$executeRawUnsafe.mock.calls.filter((call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).startsWith('DELETE FROM'));
+    const deleteSql = deleteCalls.map((call: unknown[]) => call[0] as string);
+    for (const table of ['bio_links', 'external_posts', 'feed_items', 'instagram_media', 'link_clicks', 'member_page_access', 'metric_availability', 'notification_mutes', 'page_group_targets', 'page_reviews', 'page_videos', 'post_field_values', 'post_labels', 'post_notes', 'post_versions', 'review_decisions']) {
+      expect(deleteSql.some(sql => sql.startsWith(`DELETE FROM "public"."${table}"`))).toBe(true);
+    }
+    expect(deleteCalls.every((call: unknown[]) => call[1] === 'w1')).toBe(true);
+    expect(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."post_versions"'))).toBeLessThan(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."posts" WHERE')));
+    expect(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."instagram_media"'))).toBeLessThan(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."instagram_accounts" WHERE')));
+    expect(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."link_clicks"'))).toBeLessThan(deleteSql.findIndex(sql => sql.startsWith('DELETE FROM "public"."short_links" WHERE')));
+    expect(tx.$executeRawUnsafe.mock.calls[0][0]).toContain('UPDATE "public"."posts" SET "sourceFeedItemId" = NULL');
     expect(events.filter(item => item === 'audit')).toHaveLength(2);
     const auditValues = tx.$executeRaw.mock.calls.flat().filter((value: unknown): value is string => typeof value === 'string');
     expect(auditValues.some(value => value.includes('"apiKeyId":"key-a"'))).toBe(true);

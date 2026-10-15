@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   runtimeConfig: vi.fn(async (key: string) => key === 'data.maxArchiveBytes' ? 268435456 : '/media-root'),
   rows: vi.fn(async () => [{ storageKey: 'workspace-a/photo.bin' }]),
-  data: vi.fn(async () => ({ format: 'ms-social-pilot-workspace-export', workspace: { id: 'workspace-a' }, security: { credentialsExcluded: true }, coverage: { directlyOwnedLegacyTables: ['media'], directlyOwnedLegacyRowCounts: { media: 2 }, directlyOwnedLegacyTablesComplete: true, complete: false, omitted: ['indirect data'] } })),
+  data: vi.fn(async () => ({ format: 'ms-social-pilot-workspace-export', workspace: { id: 'workspace-a' }, security: { credentialsExcluded: true }, indirectTables: { external_posts: [], link_clicks: [] }, coverage: { directlyOwnedLegacyTables: ['media'], directlyOwnedLegacyRowCounts: { media: 2 }, directlyOwnedLegacyTablesComplete: true, complete: false, omitted: ['indirect data'] } })),
   files: vi.fn(async () => [{ path: 'media/photo.bin', content: Buffer.from([1, 2, 3]) }]),
 }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.runtimeConfig }));
@@ -36,6 +36,9 @@ describe('workspace ZIP export', () => {
     expect(manifest.coverage.directlyOwnedLegacyTablesComplete).toBe(true);
     expect(manifest.database.legacyTables).toEqual([{ table: 'media', rows: 2 }]);
     expect(manifest.database.includedDatasets).toContain('legacy table: media');
+    expect(manifest.database.includedDatasets).toContain('Instagram accounts, media and insights');
+    expect(manifest.database.includedDatasets).toContain('indirect table: external_posts');
+    expect(manifest.database.includedDatasets).toContain('indirect table: link_clicks');
     expect(manifest.database.omitted).toEqual(['indirect data']);
     expect(manifest.security).toEqual({ providerCredentialsExcluded: true, secretsExcluded: true });
     expect(db.workspace.id).toBe('workspace-a');

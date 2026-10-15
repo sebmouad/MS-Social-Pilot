@@ -50,7 +50,7 @@ export async function exportWorkspaceArchive(actor: DataControlActor): Promise<B
       exportedAt: new Date().toISOString(), workspaceId: actor.workspaceId,
       database: {
         file: 'database/workspace.json', complete: false,
-        includedDatasets: ['workspace', 'memberships', 'socialAccounts', 'targets', 'target insights', 'conversations and messages', 'post targets and comments', 'ad accounts and insights', 'posts', ...legacyTables.map((table: string) => `legacy table: ${table}`)],
+        includedDatasets: ['workspace', 'memberships', 'socialAccounts', 'targets', 'target insights', 'Instagram accounts, media and insights', 'conversations and messages', 'post targets and comments', 'ad accounts and insights', 'posts', ...Object.keys(data.indirectTables ?? {}).map((table: string) => `indirect table: ${table}`), ...legacyTables.map((table: string) => `legacy table: ${table}`)],
         legacyTables: legacyTables.map((table: string) => ({ table, rows: legacyRowCounts[table] ?? 0 })),
         omitted: data.coverage?.omitted ?? ['instance-wide audit and authentication records', 'records owned indirectly through non-workspace foreign keys'],
       },
