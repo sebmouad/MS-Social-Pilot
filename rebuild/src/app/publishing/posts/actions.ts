@@ -96,6 +96,7 @@ async function run(operation: (viewer: Awaited<ReturnType<typeof requireViewer>>
     revalidatePath('/publishing/approvals');
   } catch (error) {
     if (isRedirect(error)) throw error;
+    notice = failureNotice(error);
   }
   redirect(`${path}?notice=${encodeURIComponent(notice)}`);
 }
@@ -129,3 +130,12 @@ function stringField(data: FormData, key: string, optional = false) {
   return value;
 }
 function isRedirect(error: unknown) { return typeof error === 'object' && error !== null && 'digest' in error && typeof error.digest === 'string' && error.digest.startsWith('NEXT_REDIRECT'); }
+function failureNotice(error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  if (/CSV|import batch/i.test(message)) return 'failed-import';
+  if (/image|media attachment/i.test(message)) return 'failed-image';
+  if (/remote deletion|delete remote|reconnect this source before remote deletion|platform could not confirm/i.test(message)) return 'failed-remote-delete';
+  if (/permission|cannot manage posts|outside your channel access|cannot review posts/i.test(message)) return 'failed-access';
+  if (/current state|can no longer|cannot be (edited|scheduled|submitted|published)|no longer awaiting/i.test(message)) return 'failed-state';
+  return 'failed';
+}

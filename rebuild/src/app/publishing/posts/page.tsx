@@ -13,6 +13,11 @@ const NOTICE_TEXT: Record<string, string> = {
   updated: "Post saved.",
   deleted: "Post deleted locally.",
   failed: "The publishing action could not be completed. Check permissions, connection status, and post state, then try again.",
+  'failed-import': "The CSV could not be imported. Check its header, row format, and file size, then try again.",
+  'failed-image': "The image could not be used for every selected destination. Check its type and size, or choose another image.",
+  'failed-remote-delete': "Remote deletion could not be confirmed. The local post and delivery history were preserved. Reconnect the source or try again.",
+  'failed-access': "Your role or channel access does not permit this action.",
+  'failed-state': "This post is no longer eligible for that action. Refresh the page and review its current status.",
   published: "Publishing completed.",
   submitted: "Post submitted for approval.",
   scheduled: "Post added to the queue.",
@@ -59,7 +64,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   } });
   return <>
     <PageHeading title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary={`${posts.length} ${posts.length === 1 ? "post" : "posts"} · up to 100 recent`}/>
-    {noticeText ? <p className={notice === "failed" ? styles.errorNotice : styles.successNotice} role="status">{noticeText}</p> : null}
+    {noticeText ? <p className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} role={notice?.startsWith('failed') ? 'alert' : 'status'}>{noticeText}</p> : null}
     {canAuthorDrafts ? <section className={`${styles.card} ${styles.createCard}`}><h2>Create a post</h2><p>Choose an enabled destination now or save this as a local draft.</p><PostEditorForm targets={targetChoices} imageRules={imageRules}/></section> : null}
     {canManageDrafts ? <section className={`${styles.card} ${styles.createCard}`}><h2>Import a batch</h2><p>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section> : null}
     <section className={styles.card}><DataTable columns={columns} rows={rows} rowKey={post => post.id} caption="Recent posts" emptyMessage="No posts have been created in this workspace yet."/></section>
