@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components";
 import { ModalDialog } from "@/components/ModalDialog";
 import styles from "../publishing.module.css";
+import { csvDestinationLabel } from '@/lib/publishing/csv-destinations';
 
 type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean };
 type PostRow = { id: string; message: string; firstComment: string | null; link: string | null; media: Array<{kind: string; url: string}>; status: string; publishedAt: Date | null; targets: Array<{ status: string; remotePostId: string | null; target: { id: string } }> };
@@ -33,8 +34,8 @@ export function PostEditorForm({ targets }: { targets: TargetChoice[] }) {
 export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
   return <form action={importPostsAction} className={styles.draftForm}>
     <label htmlFor="posts-csv">Import posts from CSV</label>
-    <p className={styles.help}>Required header: <code>message,firstComment,targetIds</code>. Separate multiple target IDs with semicolons. Imported posts remain drafts.</p>
-    <ul className={styles.targetReference}>{targets.filter(target => target.canPublish).map(target => <li key={target.id}>{target.name}: <code>{target.id}</code></li>)}</ul>
+    <p className={styles.help}>Required header: <code>message,firstComment,channels</code>. Use the channel labels below; separate multiple channels with semicolons. Leave channels empty to import a local draft. Imported posts remain drafts.</p>
+    <ul className={styles.targetReference}>{targets.filter(target => target.canPublish).map(target => <li key={target.id}>{csvDestinationLabel(target)}</li>)}</ul>
     <input id="posts-csv" type="file" name="csv" accept=".csv,text/csv" required />
     <button className="ui-button ui-button--secondary" type="submit">Import CSV</button>
   </form>;

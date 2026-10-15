@@ -6,6 +6,7 @@ import { platformFor } from '@/server/platforms/registry';
 import { runtimeConfig } from '@/server/config/store';
 import { hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
 import type { PublishMedia } from '@/platforms/types';
+import { resolveCsvDestinationIds } from '@/lib/publishing/csv-destinations';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
@@ -297,7 +298,7 @@ export async function syncPostStatus(actor: PublishingActor, postId: string) {
   return { synced };
 }
 
-/** Strict CSV: header columns `message,firstComment,targetIds`; targetIds are semicolon-separated local target IDs. */
+/** Strict CSV with readable, semicolon-separated channel labels. */
 export async function importPostsCsv(actor: PublishingActor, csv: string) {
   const role = await membership(actor);
   if (!MANAGERS.has(role.role)) throw new Error('Only workspace managers can import batches of posts.');
@@ -306,10 +307,12 @@ export async function importPostsCsv(actor: PublishingActor, csv: string) {
   const rows = parsePublishingCsv(csv);
   if (rows.length < 2 || rows.length > config.maxImportRows + 1) throw new Error(`CSV must include a header and contain at most ${config.maxImportRows} posts.`);
   const header = rows[0]!.map(value => value.trim());
-  if (header.length !== 3 || header[0] !== 'message' || header[1] !== 'firstComment' || header[2] !== 'targetIds') throw new Error('CSV header must be message,firstComment,targetIds.');
+  if (header.length !== 3 || header[0] !== 'message' || header[1] !== 'firstComment' || header[2] !== 'channels') throw new Error('CSV header must be message,firstComment,channels.');
+  const available = await prisma.target.findMany({ where: { workspaceId: actor.workspaceId, enabled: true, canPublish: true, ...(actor.allowedTargetIds ? { id: { in: [...actor.allowedTargetIds] } } : {}) }, select: { id: true, name: true, type: true, socialAccount: { select: { provider: true } } } });
+  const choices = available.map(target => ({ id: target.id, name: target.name, type: target.type, provider: target.socialAccount?.provider ?? null }));
   const inputs = rows.slice(1).map((row, index) => {
     if (row.length !== 3) throw new Error(`CSV row ${index + 2} must have exactly three columns.`);
-    return { message: validText(row[0]!, config.maxText), firstComment: validFirstComment(row[1]!, config.maxText), targetIds: row[2]!.split(';').map(id => id.trim()).filter(Boolean) };
+    return { message: validText(row[0]!, config.maxText), firstComment: validFirstComment(row[1]!, config.maxText), targetIds: resolveCsvDestinationIds(row[2]!, choices, index + 2) };
   });
   for (const input of inputs) await validateTargets(actor, input.targetIds, config.maxTargets);
   const targetCount = new Set(inputs.flatMap(row => row.targetIds)).size;

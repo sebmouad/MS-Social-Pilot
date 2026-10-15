@@ -67,8 +67,8 @@ describe('cutover rehearsal safety gates', () => {
 
   it('pins exactly the two reviewed migration files and applies them before mapped-schema checks', () => {
     const source = readFileSync(script, 'utf8');
-    const root = readFileSync('../prisma/migrations/20261015120000_mcp_api_keys/migration.sql');
-    const worker = readFileSync('../prisma/migrations/20261023100000_rebuild_worker_jobs/migration.sql');
+    const root = readFileSync('../prisma/migrations/20261015120000_mcp_api_keys/migration.sql', 'utf8');
+    const worker = readFileSync('../prisma/migrations/20261023100000_rebuild_worker_jobs/migration.sql', 'utf8');
     const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 
     expect(source).toContain(hash(root));
