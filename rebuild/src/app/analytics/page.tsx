@@ -30,15 +30,16 @@ function MetricChart({ metric }: { metric: ReturnType<typeof buildAnalytics>['me
 }
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const { workspaceId } = await requireViewer({ feature: 'analytics/overview' });
+  const { workspaceId, permissions } = await requireViewer({ feature: 'analytics/overview' });
+  const allowedTargetIds = permissions.pageScope.all ? undefined : permissions.pageScope.ids;
   const params = await searchParams;
   const range = analyticsRange(params.start, params.end);
   let data: Awaited<ReturnType<typeof loadAnalytics>> | null = null;
   try {
-    const targets = await loadAnalytics(workspaceId, [], range);
+    const targets = await loadAnalytics(workspaceId, [], range, allowedTargetIds);
     const requested = new Set(Array.isArray(params.channel) ? params.channel : params.channel ? [params.channel] : []);
     const selectedIds = targets.targets.filter(target => params.filter !== '1' || requested.has(target.id)).map(target => target.id);
-    data = await loadAnalytics(workspaceId, selectedIds, range);
+    data = await loadAnalytics(workspaceId, selectedIds, range, allowedTargetIds);
   } catch (error) {
     console.error('Analytics data could not be loaded', error);
   }

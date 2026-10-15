@@ -10,16 +10,17 @@ export function analyticsRange(start?: string, end?: string, now = new Date()): 
   return { from, to };
 }
 
-export async function loadAnalytics(workspaceId: string, targetIds: string[], range: AnalyticsRange) {
+export async function loadAnalytics(workspaceId: string, targetIds: string[], range: AnalyticsRange, allowedTargetIds?: readonly string[]) {
   const instagramAccounts = await prisma.instagramAccount.findMany({
     where: { workspaceId, enabled: true },
     select: { igUserId: true, followersCount: true, lastSyncedAt: true, updatedAt: true },
   });
-  const targets = await prisma.target.findMany({
+  const allowedIds = allowedTargetIds === undefined ? undefined : new Set(allowedTargetIds);
+  const targets = (await prisma.target.findMany({
     where: { workspaceId, OR: [{ enabled: true, type: { not: 'instagram' } }, { type: 'instagram', providerId: { in: instagramAccounts.map(account => account.igUserId) } }] }, orderBy: [{ type: 'asc' }, { name: 'asc' }],
     select: { id: true, type: true, name: true, providerId: true, socialAccountId: true },
-  });
-  const selectedTargets = targets.filter(target => targetIds.includes(target.id));
+  })).filter(target => allowedIds === undefined || allowedIds.has(target.id));
+  const selectedTargets = targets.filter(target => targetIds.includes(target.id) && (allowedIds === undefined || allowedIds.has(target.id)));
   const selectedIds = selectedTargets.map(target => target.id);
   const socialAccountIds = [...new Set(selectedTargets.map(target => target.socialAccountId).filter((id): id is string => Boolean(id)))];
   const selectedInstagramIds = selectedTargets.filter(target => target.type === 'instagram').map(target => target.providerId);

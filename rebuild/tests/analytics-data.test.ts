@@ -52,6 +52,19 @@ describe('rebuild Instagram analytics data selection', () => {
     expect(result.selectedInstagramAudience.map(row => row.igUserId)).toEqual(['ig-provider-1']);
   });
 
+  it('limits available and selected targets to the allowed target IDs', async () => {
+    const range = { from: date('2026-10-01'), to: date('2026-10-31') };
+    const available = await loadAnalytics('workspace-1', [], range, ['page-1']);
+    const result = await loadAnalytics('workspace-1', ['page-1', 'ig-target-1'], range, ['page-1']);
+
+    expect(available.targets.map(target => target.id)).toEqual(['page-1']);
+    expect(result.targets.map(target => target.id)).toEqual(['page-1']);
+    expect(result.selectedTargets.map(target => target.id)).toEqual(['page-1']);
+    expect(state.instagramInsights).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: { account: { workspaceId: 'workspace-1', enabled: true, igUserId: { in: [] } }, endTime: { gte: range.from, lte: range.to } },
+    }));
+  });
+
   it('sums current Page and Instagram followers for the selected channels', () => {
     const result = buildAnalytics([], [], [
       { metric: 'page_follows', numeric: 120, endTime: date('2026-10-02'), fetchedAt: date('2026-10-03'), target: { id: 'page-1', name: 'Page One' } },
