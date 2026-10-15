@@ -90,22 +90,31 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       const data = object(payload).data;
       if (!Array.isArray(data)) throw new FacebookApiError('Facebook returned an invalid paginated response.', response.status);
       results.push(...data as T[]);
-      const paging = object(object(payload).paging); const cursors = object(paging.cursors);
-      const after = typeof cursors.after === 'string' ? cursors.after : undefined;
+      const paging = object(object(payload).paging);
       const link = typeof paging.next === 'string' ? paging.next : undefined;
-      if (!link || !after || seen.has(after)) { next = undefined; break; }
+      if (!link) { next = undefined; break; }
+      if (seen.has(link)) throw new FacebookApiError('Facebook pagination returned a repeated next URL.', 0);
       const nextUrl = new URL(link);
       const configuredBase = new URL(config.graphBaseUrl);
       if (nextUrl.protocol !== 'https:' || nextUrl.origin !== configuredBase.origin || !nextUrl.pathname.startsWith(`/${config.graphVersion}/`)) {
         throw new FacebookApiError('Facebook returned a pagination URL outside the configured Graph endpoint.', 0);
       }
-      seen.add(after); next = link;
+      seen.add(link); next = link;
       if (page === config.maxPages - 1) throw new FacebookApiError('Facebook pagination exceeded the configured page limit.', 0);
     }
     return results;
   }
   function collectionUrl(path: string, token: string, fields: string): string {
     const url = graphObjectUrl(config, path); url.searchParams.set('access_token', token); url.searchParams.set('fields', fields); url.searchParams.set('limit', String(config.pageSize)); return url.toString();
+  }
+  async function pageInsightRows(token: string, pageId: string, since?: Date, until?: Date): Promise<JsonObject[]> {
+    const url = graphObjectUrl(config, `${encodeURIComponent(pageId)}/insights`);
+    url.searchParams.set('access_token', token);
+    url.searchParams.set('metric', config.pageInsightMetrics.join(','));
+    url.searchParams.set('limit', String(config.pageSize));
+    if (since) url.searchParams.set('since', String(Math.floor(since.getTime() / 1000)));
+    if (until) url.searchParams.set('until', String(Math.floor(until.getTime() / 1000)));
+    return pages<JsonObject>(url.toString(), token);
   }
   const toPage = (raw: unknown): FacebookPage | null => {
     const p = object(raw); if (typeof p.id !== 'string' || typeof p.access_token !== 'string') return null;
@@ -244,18 +253,24 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     },
     async getPageAnalytics(token, pageId, since, until) {
       if (!config.pageInsightMetrics.length) return {};
-      const raw = object(await request(`${encodeURIComponent(pageId)}/insights`, { token, params: { metric: config.pageInsightMetrics.join(','),
-        since: since ? Math.floor(since.getTime() / 1000) : undefined, until: until ? Math.floor(until.getTime() / 1000) : undefined } }));
-      const data = Array.isArray(raw.data) ? raw.data : []; const metrics: Record<string, number | null> = {};
-      for (const item of data) { const x = object(item); if (typeof x.name !== 'string') continue; const values = Array.isArray(x.values) ? x.values : []; const value = object(values[values.length - 1]).value;
-        metrics[x.name] = typeof value === 'number' ? value : typeof value === 'string' && Number.isFinite(Number(value)) ? Number(value) : null; }
+      const data = await pageInsightRows(token, pageId, since, until); const metrics: Record<string, number | null> = {};
+      const latest = new Map<string, number>();
+      for (const item of data) {
+        const x = object(item); if (typeof x.name !== 'string') continue;
+        const values = Array.isArray(x.values) ? x.values : [];
+        for (const entry of values) {
+          const point = object(entry); const timestamp = date(point.end_time)?.getTime() ?? 0;
+          if (latest.has(x.name) && timestamp <= latest.get(x.name)!) continue;
+          const value = point.value;
+          metrics[x.name] = typeof value === 'number' ? value : typeof value === 'string' && Number.isFinite(Number(value)) ? Number(value) : null;
+          latest.set(x.name, timestamp);
+        }
+      }
       return metrics;
     },
     async getPageInsightObservations(token, pageId, since, until) {
       if (!config.pageInsightMetrics.length) return [];
-      const raw = object(await request(`${encodeURIComponent(pageId)}/insights`, { token, params: { metric: config.pageInsightMetrics.join(','),
-        since: since ? Math.floor(since.getTime() / 1000) : undefined, until: until ? Math.floor(until.getTime() / 1000) : undefined } }));
-      const data = Array.isArray(raw.data) ? raw.data : [];
+      const data = await pageInsightRows(token, pageId, since, until);
       const observations: FacebookPageInsightObservation[] = [];
       for (const item of data) {
         const metric = object(item);

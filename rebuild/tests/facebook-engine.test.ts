@@ -158,6 +158,24 @@ describe('Facebook Graph adapter', () => {
     ]);
   });
 
+  it('follows bounded Page Insights pagination for historical observations', async () => {
+    const next = 'https://graph.facebook.test/v99.0/p1/insights?after=older&access_token=token';
+    const fetcher = mockFetch(
+      response({ data: [{ name: 'page_views_total', period: 'day', values: [{ end_time: '2026-01-03T00:00:00Z', value: 7 }] }], paging: { next } }),
+      response({ data: [{ name: 'page_views_total', period: 'day', values: [{ end_time: '2026-01-02T00:00:00Z', value: 4 }] }] }),
+    );
+    const engine = createFacebookEngine(config, fetcher);
+    const observations = await engine.getPageInsightObservations('token', 'p1');
+    expect(observations.map(point => point.numeric)).toEqual([7, 4]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(String(vi.mocked(fetcher).mock.calls[1][0])).toBe(next);
+    const latestFetcher = mockFetch(
+      response({ data: [{ name: 'page_views_total', values: [{ end_time: '2026-01-03T00:00:00Z', value: 7 }] }], paging: { next } }),
+      response({ data: [{ name: 'page_views_total', values: [{ end_time: '2026-01-02T00:00:00Z', value: 4 }] }] }),
+    );
+    expect(await createFacebookEngine(config, latestFetcher).getPageAnalytics('token', 'p1')).toEqual({ page_views_total: 7 });
+  });
+
   it('fails closed on Graph errors and declares adapter capabilities', async () => {
     const engine = createFacebookEngine(config, mockFetch(response({ error: { message: 'No permission', code: 200 } }, 400)));
     await expect(engine.deletePost('token', 'p1_2')).rejects.toMatchObject({ message: 'No permission', status: 400 });
