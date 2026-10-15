@@ -11,18 +11,29 @@ export function analyticsRange(start?: string, end?: string, now = new Date()): 
 }
 
 export async function loadAnalytics(workspaceId: string, targetIds: string[], range: AnalyticsRange) {
+  const instagramAccounts = await prisma.instagramAccount.findMany({
+    where: { workspaceId, enabled: true },
+    select: { igUserId: true, followersCount: true, lastSyncedAt: true, updatedAt: true },
+  });
   const targets = await prisma.target.findMany({
-    where: { workspaceId, enabled: true }, orderBy: [{ type: 'asc' }, { name: 'asc' }],
-    select: { id: true, type: true, name: true, socialAccountId: true },
+    where: { workspaceId, OR: [{ enabled: true, type: { not: 'instagram' } }, { type: 'instagram', providerId: { in: instagramAccounts.map(account => account.igUserId) } }] }, orderBy: [{ type: 'asc' }, { name: 'asc' }],
+    select: { id: true, type: true, name: true, providerId: true, socialAccountId: true },
   });
   const selectedTargets = targets.filter(target => targetIds.includes(target.id));
   const selectedIds = selectedTargets.map(target => target.id);
   const socialAccountIds = [...new Set(selectedTargets.map(target => target.socialAccountId).filter((id): id is string => Boolean(id)))];
-  const [pageRows, audienceRows, adRows, adAccountCount] = await Promise.all([
+  const selectedInstagramIds = selectedTargets.filter(target => target.type === 'instagram').map(target => target.providerId);
+  const selectedInstagramAudience = instagramAccounts.filter(account => selectedInstagramIds.includes(account.igUserId));
+  const [pageRows, instagramRows, audienceRows, adRows, adAccountCount] = await Promise.all([
     prisma.pageInsight.findMany({
       where: { targetId: { in: selectedIds }, target: { workspaceId, type: 'page' }, endTime: { gte: range.from, lte: range.to } },
       orderBy: [{ endTime: 'asc' }, { metric: 'asc' }],
       select: { metric: true, period: true, endTime: true, numeric: true, value: true, fetchedAt: true, target: { select: { id: true, name: true } } },
+    }),
+    prisma.instagramInsight.findMany({
+      where: { account: { workspaceId, enabled: true, igUserId: { in: selectedInstagramIds } }, endTime: { gte: range.from, lte: range.to } },
+      orderBy: [{ endTime: 'asc' }, { metric: 'asc' }],
+      select: { metric: true, period: true, endTime: true, numeric: true, value: true, fetchedAt: true, account: { select: { id: true, igUserId: true, username: true } } },
     }),
     prisma.pageInsight.findMany({
       where: { targetId: { in: selectedTargets.filter(target => target.type === 'page').map(target => target.id) }, target: { workspaceId, type: 'page' }, metric: { in: ['page_follows', 'page_fans'] }, numeric: { not: null } },
@@ -36,5 +47,5 @@ export async function loadAnalytics(workspaceId: string, targetIds: string[], ra
     }) : Promise.resolve([]),
     socialAccountIds.length ? prisma.adAccount.count({ where: { workspaceId, socialAccountId: { in: socialAccountIds }, enabled: true } }) : Promise.resolve(0),
   ]);
-  return { targets, selectedTargets, pageRows, audienceRows, adRows, adAccountCount, range };
+  return { targets, selectedTargets, pageRows, audienceRows, instagramRows, selectedInstagramAudience, adRows, adAccountCount, range };
 }

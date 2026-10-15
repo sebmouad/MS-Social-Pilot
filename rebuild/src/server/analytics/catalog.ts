@@ -1,7 +1,7 @@
 export type AnalyticsMetric = {
   key: string;
   label: string;
-  source: 'page' | 'ads';
+  source: 'page' | 'instagram' | 'ads';
   kind: 'stock' | 'flow' | 'ratio' | 'breakdown';
   unit: 'count' | 'currency' | 'percent' | 'multiple';
 };
@@ -13,6 +13,8 @@ const names: Record<string, string> = {
   page_impressions_unique: 'Unique impressions', page_impressions: 'Impressions',
   page_media_view: 'Media views', page_post_engagements: 'Post engagements',
   page_views_total: 'Page views', page_video_views: 'Video views',
+  views: 'Views', profile_views: 'Profile views',
+  follower_count: 'New followers', follows_and_unfollows: 'Follows and unfollows',
   spend: 'Spend', impressions: 'Impressions', clicks: 'Clicks', reach: 'Reach',
   cpc: 'Cost per click', cpm: 'Cost per 1,000 impressions', cpp: 'Cost per person reached',
   ctr: 'Click-through rate', frequency: 'Frequency',
@@ -25,6 +27,12 @@ export function metricLabel(key: string): string {
 export function pageMetricKind(key: string): AnalyticsMetric['kind'] {
   if (['page_follows', 'page_fans', 'page_fans_online_per_day'].includes(key)) return 'stock';
   if (/country|city|locale|gender_age|source/.test(key)) return 'breakdown';
+  return 'flow';
+}
+
+export function instagramMetricKind(key: string): AnalyticsMetric['kind'] {
+  if (key === 'follower_count') return 'flow';
+  if (/demographics|online_followers|follows_and_unfollows/.test(key)) return 'breakdown';
   return 'flow';
 }
 

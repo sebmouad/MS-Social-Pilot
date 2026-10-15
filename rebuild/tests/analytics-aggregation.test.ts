@@ -29,6 +29,7 @@ describe('analytics aggregation', () => {
     expect(result.metrics.map(metric => metric.key)).toEqual(expect.arrayContaining(['page_follows::day', 'page_daily_follows_unique::day']));
   });
 
+
   it('builds ad metrics from account-level stored delivery and discovers retained fields and actions', () => {
     const base = { date: date('2026-10-01'), spend: 20, impressions: 1000, clicks: 25, reach: 700, cpc: 0.8, cpm: 20, cpp: 0.03, ctr: 2.5, frequency: 1.4, fetchedAt: date('2026-10-02'), adAccount: { id: 'a1', name: 'Account One', currency: 'USD' } };
     const rows = [

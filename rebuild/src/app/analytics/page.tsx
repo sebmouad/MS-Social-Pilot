@@ -14,15 +14,18 @@ function formatValue(value: number | null, unit: string) {
 }
 
 function MetricChart({ metric }: { metric: ReturnType<typeof buildAnalytics>['metrics'][number] }) {
+  const sourceLabel = metric.source === 'page' ? 'Page performance' : metric.source === 'instagram' ? 'Instagram performance' : 'Advertising';
+  const detailLabel = metric.source === 'page' ? 'Page' : metric.source === 'instagram' ? 'Instagram account' : 'ad account';
+  const coverageLabel = metric.source === 'page' ? 'Pages' : metric.source === 'instagram' ? 'Instagram accounts' : 'ad accounts';
   const maximum = Math.max(1, ...metric.points.map(point => point.value));
   return <div className="analytics-metric" key={metric.key}>
-    <div className="analytics-metric__heading"><div><h3>{metric.label}</h3><p>{metric.source === 'page' ? 'Page performance' : 'Advertising'} · {metric.coverage} of {metric.available} covered{metric.latestAt ? ` · data ${metric.latestAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}{metric.updatedAt ? ` · synced ${metric.updatedAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</p></div><strong>{metric.displayTotal ?? (metric.kind === 'breakdown' ? 'By category' : formatValue(metric.total, metric.unit))}</strong></div>
+    <div className="analytics-metric__heading"><div><h3>{metric.label}</h3><p>{sourceLabel} · {metric.coverage} of {metric.available} covered{metric.latestAt ? ` · data ${metric.latestAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}{metric.updatedAt ? ` · synced ${metric.updatedAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</p></div><strong>{metric.displayTotal ?? (metric.kind === 'breakdown' ? 'By category' : formatValue(metric.total, metric.unit))}</strong></div>
     {metric.points.length > 0 && <div className="analytics-spark" role="img" aria-label={`${metric.label} over the selected date range`}>
       {metric.points.slice(-28).map(point => <span key={point.date} title={`${point.label}: ${formatValue(point.value, metric.unit)}`} style={{ height: `${Math.max(4, point.value / maximum * 100)}%` }} />)}
     </div>}
-    {metric.rows.length > 0 && <details className="analytics-metric__details"><summary>{metric.kind === 'breakdown' ? 'View breakdown' : `View ${metric.rows.length} ${metric.source === 'page' ? 'Page' : 'account'} details`}</summary><div className="report-list">{metric.rows.slice(0, 30).map(row => <div className="report-row" key={row.label}><span>{row.label}</span><strong>{formatValue(row.value, metric.unit)}{row.asOf ? ` · ${row.asOf.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</strong></div>)}</div></details>}
+    {metric.rows.length > 0 && <details className="analytics-metric__details"><summary>{metric.kind === 'breakdown' ? 'View breakdown' : `View ${metric.rows.length} ${detailLabel} details`}</summary><div className="report-list">{metric.rows.slice(0, 30).map(row => <div className="report-row" key={row.label}><span>{row.label}</span><strong>{formatValue(row.value, metric.unit)}{row.asOf ? ` · ${row.asOf.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</strong></div>)}</div></details>}
     {metric.points.length === 0 && metric.rows.length === 0 && <p className="empty-note">No values are available for this metric in the selected period.</p>}
-    {metric.coverage < metric.available && <p className="analytics-coverage">Values were found for {metric.coverage} of {metric.available} selected {metric.source === 'page' ? 'Pages' : 'ad accounts'} in this date range.</p>}
+    {metric.coverage < metric.available && <p className="analytics-coverage">Values were found for {metric.coverage} of {metric.available} selected {coverageLabel} in this date range.</p>}
   </div>;
 }
 
@@ -42,8 +45,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
   const selected = data?.selectedTargets ?? [];
   const selectedSet = new Set(selected.map(target => target.id));
-  const view = data ? buildAnalytics(data.pageRows, data.adRows, data.audienceRows, selected, data.adAccountCount) : null;
-  const audienceMissing = selected.filter(channel => !view?.audience.entries.some(entry => entry.id === channel.id));
+  const view = data ? buildAnalytics(data.pageRows, data.adRows, data.audienceRows, selected, data.adAccountCount, data.instagramRows, data.selectedInstagramAudience) : null;
+  const audienceMissing = selected.filter(channel => ['page', 'instagram'].includes(channel.type) && !view?.audience.entries.some(entry => entry.id === channel.id));
   const publishingByStatus = selected.length ? await prisma.post.groupBy({
     by: ['status'],
     where: {
@@ -78,7 +81,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       {!selected.length ? <section className="panel analytics-state"><h2>No channels selected</h2><p>Choose one or more channels in the sidebar to see available metrics.</p></section> : <>
         <section className="panel analytics-audience"><div className="analytics-panel-title"><div><h2>Selected channel audience</h2><p className="small-note">The latest stored follower or Page-like count is included once for each channel with audience data.</p></div><span className="badge">{view.audience.covered} of {view.audience.selected} channels</span></div>
           <div className="analytics-audience__total"><strong>{new Intl.NumberFormat().format(view.audience.total)}</strong><span>total audience across channels with data</span></div>
-          {view.audience.entries.length ? <div className="report-list">{view.audience.entries.map(entry => <div className="report-row" key={entry.id}><span>{entry.name}<small> {entry.metric === 'page_follows' ? 'Followers' : 'Page likes'}</small></span><strong>{new Intl.NumberFormat().format(entry.value)} · data {entry.asOf.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · synced {entry.fetchedAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</strong></div>)}</div> : <p className="empty-note">No audience counts are stored for the selected channels.</p>}
+          {view.audience.entries.length ? <div className="report-list">{view.audience.entries.map(entry => <div className="report-row" key={entry.id}><span>{entry.name}<small> {entry.metric === 'page_fans' ? 'Page likes' : 'Followers'}</small></span><strong>{new Intl.NumberFormat().format(entry.value)} · data {entry.asOf.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · synced {entry.fetchedAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</strong></div>)}</div> : <p className="empty-note">No audience counts are stored for the selected channels.</p>}
           {audienceMissing.length > 0 && <p className="analytics-coverage">No stored audience count for: {audienceMissing.map(channel => channel.name).join(', ')}.</p>}
           <p className="small-note">Counts are added across channels. People who follow more than one selected Page may be counted more than once.</p>
         </section>

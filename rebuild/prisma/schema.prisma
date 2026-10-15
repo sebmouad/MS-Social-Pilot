@@ -143,6 +143,7 @@ model Workspace {
   posts          Post[]
   socialAccounts SocialAccount[]
   adAccounts     AdAccount[]
+  instagramAccounts InstagramAccount[]
   mcpApiKeys     McpApiKey[]
 
   @@map("workspaces")
@@ -217,6 +218,8 @@ model Target {
   accessToken     String?
   enabled         Boolean
   canPublish      Boolean
+  followersCount Int?
+  profileSyncedAt DateTime?
   createdAt       DateTime
   updatedAt       DateTime @updatedAt
   workspace       Workspace      @relation(fields: [workspaceId], references: [id])
@@ -245,6 +248,41 @@ model PageInsight {
   @@unique([targetId, metric, period, endTime])
   @@index([targetId, metric, endTime])
   @@map("page_insights")
+}
+
+/// Read-only compatibility mapping to existing Instagram account snapshots.
+model InstagramAccount {
+  id          String   @id
+  workspaceId String
+  igUserId    String
+  username    String
+  enabled     Boolean
+  followersCount Int?
+  lastSyncedAt DateTime?
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  insights    InstagramInsight[]
+
+  @@unique([workspaceId, igUserId])
+  @@index([workspaceId])
+  @@map("instagram_accounts")
+}
+
+/// Stored Instagram account metrics captured by the existing Meta sync.
+model InstagramInsight {
+  id        String   @id
+  accountId String
+  metric    String
+  period    String
+  endTime   DateTime
+  value     Json
+  numeric   Float?
+  fetchedAt DateTime
+  account   InstagramAccount @relation(fields: [accountId], references: [id])
+
+  @@unique([accountId, metric, period, endTime])
+  @@index([accountId, metric, endTime])
+  @@map("instagram_insights")
 }
 
 model Post {
