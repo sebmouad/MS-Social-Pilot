@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 
-export function ModalDialog({ children, className, labelledBy, onDismiss, busy = false, initialFocus = '[data-dialog-cancel]' }: {
+export function ModalDialog({ children, className, labelledBy, describedBy, onDismiss, busy = false, initialFocus = '[data-dialog-cancel]' }: {
   children: ReactNode;
   className?: string;
   labelledBy: string;
+  describedBy?: string;
   onDismiss: () => void;
   busy?: boolean;
   initialFocus?: string;
@@ -27,7 +28,7 @@ export function ModalDialog({ children, className, labelledBy, onDismiss, busy =
     };
   }, [initialFocus]);
 
-  return <dialog ref={dialogRef} className={className} aria-labelledby={labelledBy}
+  return <dialog ref={dialogRef} className={className} aria-labelledby={labelledBy} aria-describedby={describedBy}
     onCancel={event => { event.preventDefault(); if (!busy) dismissRef.current(); }}
     onMouseDown={event => {
       if (event.target !== event.currentTarget || busy) return;
