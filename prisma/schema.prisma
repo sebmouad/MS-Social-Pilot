@@ -303,6 +303,7 @@ model Workspace {
   bestTimeMode   String    @default("suggest")
   /// When the weekly best-time job last looked at this workspace.
   bestTimesRunAt DateTime?
+  dataPurge WorkspaceDataPurge?
   /// Content mix (H1): the worker schedules labelled drafts into queue times
   /// to meet each Page's weekly mix. Off: the mix is only shown and warned on.
   mixAutoFill    Boolean   @default(false)
@@ -2254,6 +2255,26 @@ model WorkspaceExport {
   @@index([workspaceId, createdAt])
   @@index([status])
   @@map("workspace_exports")
+}
+
+/// Resumable local data erasure. The workspace and memberships stay so the
+/// owner can see/retry a failed filesystem phase without losing authorization.
+model WorkspaceDataPurge {
+  workspaceId  String   @id
+  status       String   @default("requested")
+  requestedById String
+  apiKeyId     String?
+  mediaRoot    String
+  counts       Json?
+  error        String?
+  requestedAt  DateTime @default(now())
+  dbDeletedAt  DateTime?
+  completedAt  DateTime?
+  updatedAt    DateTime @updatedAt
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([status, updatedAt])
+  @@map("workspace_data_purges")
 }
 
 /// Public holidays of one country (H2), from the worldwide holidays dataset.

@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
+import { canonicalMediaRoot, removeWorkspaceStorage, validateWorkspaceId } from './storage';
 
 export type DataControlActor = { userId: string; workspaceId: string; apiKeyId?: string };
 const MANAGER_ROLES = new Set(['owner', 'admin']);
@@ -17,7 +18,8 @@ async function workspaceTables(tx: DataControlTransaction | typeof prisma): Prom
     JOIN pg_class AS child ON child.oid = fk.conrelid
     JOIN pg_namespace AS ns ON ns.oid = child.relnamespace
     WHERE fk.contype = 'f' AND fk.confrelid = 'public.workspaces'::regclass
-      AND ns.nspname = 'public' AND child.relkind = 'r' AND child.relname <> 'memberships'
+      AND ns.nspname = 'public' AND child.relkind = 'r'
+      AND child.relname NOT IN ('memberships', 'workspace_data_purges')
     ORDER BY child.relname
   `;
   return [...new Set(rows.map(row => row.tableName))];
@@ -109,26 +111,63 @@ async function collectWorkspaceDeletionCounts(tx: DataControlTransaction | typeo
   };
 }
 
-/** Delete content represented by this compatibility schema in one transaction. Workspace identity and memberships remain. */
+function savedCounts(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, number] => typeof entry[1] === 'number'));
+}
+
+/** Queue a resumable purge, erase database rows, then remove the two workspace storage trees. */
 export async function deleteWorkspaceData(actor: DataControlActor, confirmation: string) {
   if (confirmation !== 'DELETE') throw new Error('Type DELETE to confirm this action.');
+  validateWorkspaceId(actor.workspaceId);
   const timeout = await runtimeConfig('data.deleteTransactionTimeoutMs');
-  return prisma.$transaction(async tx => {
+  await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${actor.workspaceId} FOR UPDATE`;
     const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
     if (!membership) throw new Error('You are no longer a member of this workspace.');
     if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can manage workspace data.');
     const workspace = await tx.workspace.findUnique({ where: { id: actor.workspaceId }, select: { id: true } });
     if (!workspace) throw new Error('This workspace is unavailable.');
+    const existing = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId } });
+    if (existing?.status === 'requested' || existing?.status === 'db_deleted') return;
+    const configuredRoot = await runtimeConfig('storage.mediaRoot');
+    if (!configuredRoot) throw new Error('Set the media storage root in Root before deleting workspace data. No data was deleted.');
+    const mediaRoot = await canonicalMediaRoot(configuredRoot);
+    const values = { status: 'requested', requestedById: actor.userId, apiKeyId: actor.apiKeyId ?? null, mediaRoot, counts: undefined, error: null, requestedAt: new Date(), dbDeletedAt: null, completedAt: null };
+    if (existing) await tx.workspaceDataPurge.update({ where: { workspaceId: actor.workspaceId }, data: values });
+    else await tx.workspaceDataPurge.create({ data: { workspaceId: actor.workspaceId, ...values } });
+  }, { timeout });
 
+  const counts = await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${actor.workspaceId} FOR UPDATE`;
+    const job = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId } });
+    if (!job) throw new Error('Workspace data purge state is missing.');
+    if (job.status === 'db_deleted' || job.status === 'completed') return savedCounts(job.counts);
+    if (job.status !== 'requested') throw new Error('Workspace data purge state is invalid.');
     const counts: Record<string, number> = { ...await collectWorkspaceDeletionCounts(tx, actor.workspaceId), ...await directWorkspaceCounts(tx, actor.workspaceId) };
-    if ((counts['other:media'] ?? 0) > 0 || (counts['other:workspace_exports'] ?? 0) > 0) {
-      throw new Error('Stored files must be removed through a verified cleanup before this workspace can be erased. No database rows were deleted.');
-    }
     for (const table of await workspaceTables(tx)) {
       await tx.$executeRawUnsafe(`DELETE FROM ${tableSql(table)} WHERE "workspaceId" = $1`, actor.workspaceId);
     }
+    await tx.workspaceDataPurge.update({ where: { workspaceId: actor.workspaceId }, data: { status: 'db_deleted', counts, dbDeletedAt: new Date(), error: null } });
     await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`data_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'workspace.data_deleted', ${JSON.stringify({ workspaceId: actor.workspaceId, ...(actor.apiKeyId ? { apiKeyId: actor.apiKeyId } : {}), counts })}::jsonb, NOW())`;
     return counts;
   }, { timeout });
+
+  const job = await prisma.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId }, select: { status: true, mediaRoot: true, counts: true } });
+  if (!job) throw new Error('Workspace data purge state is missing.');
+  if (job.status === 'completed') return savedCounts(job.counts);
+  await canonicalMediaRoot(job.mediaRoot);
+  let storage;
+  try { storage = await removeWorkspaceStorage(job.mediaRoot, actor.workspaceId); }
+  catch (error) {
+    await prisma.workspaceDataPurge.update({ where: { workspaceId: actor.workspaceId }, data: { error: (error instanceof Error ? error.message : String(error)).slice(0, 1000) } });
+    throw error;
+  }
+  const result = { ...counts, storedFiles: storage.files, storedBytes: storage.bytes };
+  await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${actor.workspaceId} FOR UPDATE`;
+    await tx.workspaceDataPurge.update({ where: { workspaceId: actor.workspaceId }, data: { status: 'completed', counts: result, completedAt: new Date(), error: null } });
+    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`data_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'workspace.storage_deleted', ${JSON.stringify({ workspaceId: actor.workspaceId, ...(actor.apiKeyId ? { apiKeyId: actor.apiKeyId } : {}), files: storage.files, bytes: storage.bytes })}::jsonb, NOW())`;
+  }, { timeout });
+  return result;
 }

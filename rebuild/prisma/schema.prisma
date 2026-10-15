@@ -145,8 +145,27 @@ model Workspace {
   adAccounts     AdAccount[]
   instagramAccounts InstagramAccount[]
   mcpApiKeys     McpApiKey[]
+  dataPurge      WorkspaceDataPurge?
 
   @@map("workspaces")
+}
+
+model WorkspaceDataPurge {
+  workspaceId   String   @id
+  status        String   @default("requested")
+  requestedById String
+  apiKeyId      String?
+  mediaRoot     String
+  counts        Json?
+  error         String?
+  requestedAt   DateTime @default(now())
+  dbDeletedAt   DateTime?
+  completedAt   DateTime?
+  updatedAt     DateTime @updatedAt
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([status, updatedAt])
+  @@map("workspace_data_purges")
 }
 
 model McpApiKey {

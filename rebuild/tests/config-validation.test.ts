@@ -24,7 +24,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(8);
+    expect(CONFIG_SCHEMA_VERSION).toBe(9);
     for (const prefix of ['meta.', 'youtube.', 'linkedin.', 'x.', 'sync.', 'api.', 'entitlements.', 'retention.', 'logging.', 'mcp.', 'theme.']) {
       expect(CONFIG_REGISTRY.some((item) => item.key.startsWith(prefix))).toBe(true);
     }
@@ -53,6 +53,9 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('auth.passwordMinLength')!.schema.safeParse(4).success).toBe(false);
     expect(CONFIG_BY_KEY.get('auth.passwordMaxBytes')!.schema.safeParse(800).success).toBe(true);
     expect(CONFIG_BY_KEY.get('auth.passwordMaxBytes')!.schema.safeParse(16).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('storage.mediaRoot')!.schema.safeParse('/srv/social-pilot/media').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('storage.mediaRoot')!.schema.safeParse('../media').success).toBe(false);
+    expect(CONFIG_BY_KEY.get('storage.mediaRoot')!.schema.safeParse('/').success).toBe(false);
   });
 
   it('audits changes with key, change type, and registry version only', () => {

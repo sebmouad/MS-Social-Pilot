@@ -14,7 +14,7 @@ export default async function DataSettingsPage() {
       <DataControls workspaceName={viewer.membership.workspace.name} />
     </SettingsPanel>
     <SettingsPanel title="Delete workspace data" detail="Remove the workspace’s content and connected account records from this application.">
-      <p className={styles['settings-note']}>This removes workspace-owned database records, including older feature data, while keeping workspace identity and member access. The JSON download above covers core records only; older feature records may not be in it. Deletion is blocked when stored media or export files need separate cleanup. Content already published to social networks remains there, and provider authorization is not revoked.</p>
+      <p className={styles['settings-note']}>This removes workspace-owned database records, stored media, and export files while keeping workspace identity and member access. The JSON download above covers core records only; older feature records and file bytes may not be in it. Content already published to social networks remains there, and provider authorization is not revoked.</p>
       <DataControls workspaceName={viewer.membership.workspace.name} destructive />
     </SettingsPanel>
   </SettingsPage></PageFrame>;
