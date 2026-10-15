@@ -3,6 +3,7 @@ import { createHash, randomBytes, scryptSync } from 'node:crypto';
 import { verifyLegacyPassword, hashLegacySessionToken, LEGACY_SESSION_COOKIE } from './auth';
 import { prisma } from './data';
 import { runtimeConfig } from './config/store';
+import { needsTwoStepEnrollment } from './auth-policy';
 
 const cookieOptions = { httpOnly: true, sameSite: 'lax' as const, secure: process.env.NODE_ENV === 'production', path: '/' };
 let dummyPasswordHash: string | null = null;
@@ -52,13 +53,13 @@ export async function signIn(email: string, password: string): Promise<'signed-i
     : configuredPolicy === undefined ? 'admins' : 'everyone';
   const hasTotp = Boolean(user.totpEnabledAt);
   const hasPasskey = user._count.passkeys > 0;
-  const privileged = user.isInstanceOwner || Boolean(await prisma.membership.findFirst({
-    where: { userId: user.id, role: { in: ['owner', 'admin'] }, workspace: { targets: { some: {} } } },
-    select: { id: true },
-  }));
+  const privilegedMembership = policy === 'admins' && !user.isInstanceOwner ? await prisma.membership.findFirst({
+    where: { userId: user.id, role: { in: ['owner', 'admin'] } },
+    select: { role: true },
+  }) : null;
   // Passkey verification is not yet supported by this login flow. Give
   // passkey-only accounts a TOTP enrollment path after password verification.
-  const next = hasTotp ? 'verify' : hasPasskey || policy === 'everyone' || (policy === 'admins' && privileged) ? 'enroll' : null;
+  const next = hasTotp ? 'verify' : hasPasskey || needsTwoStepEnrollment(policy, user.isInstanceOwner, privilegedMembership ? [privilegedMembership.role] : []) ? 'enroll' : null;
 
   const [sessionDays, pendingMinutes] = await Promise.all([
     runtimeConfig('auth.sessionDays') as Promise<number>,
