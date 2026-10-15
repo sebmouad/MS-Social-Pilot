@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ModalDialog } from '@/components/ModalDialog';
 import styles from '../settings.module.css';
+import { summarizeDisconnectCounts } from './preview';
 
 type Channel = { id: string; name: string; type: string; enabled: boolean };
 type AdAccount = { id: string; name: string; actId: string; enabled: boolean };
@@ -20,6 +21,7 @@ export function ConnectionManager({ sources, canManage, canConnectFacebook, init
   const [deletePreview, setDeletePreview] = useState<Record<string, number> | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const deleteSummary = deletePreview ? summarizeDisconnectCounts(deletePreview) : null;
   useEffect(() => {
     if (!initialSource || !initialAction) return;
     const url = new URL(window.location.href);
@@ -104,14 +106,15 @@ export function ConnectionManager({ sources, canManage, canConnectFacebook, init
       </fieldset>
       {disconnectMode === 'delete' && <>
         {!deletePreview ? <button type="button" onClick={() => previewDisconnect(disconnect)} disabled={busy || previewBusy}>{previewBusy ? 'Counting rows…' : 'Preview related rows'}</button> : <>
-          <p className={styles['settings-note']}>Current rows in the mapped related tables:</p>
-          <ul>{Object.entries(deletePreview).map(([name, count]) => <li key={name}>{name}: {count}</li>)}</ul>
+          <p className={styles['settings-note']}>Local records linked to this source:</p>
+          {deleteSummary?.rows.length ? <ul className={styles['data-preview-list']}>{deleteSummary.rows.map(row => <li key={row.label}><span>{row.label}</span><strong>{new Intl.NumberFormat().format(row.count)}</strong></li>)}</ul> : <p className={styles['settings-note']}>No related local records were found.</p>}
+          {Boolean(deleteSummary?.scheduledRemote) && <p className={styles['connection-warning']} role="alert">{deleteSummary?.scheduledRemote} post {deleteSummary?.scheduledRemote === 1 ? 'is' : 'are'} still scheduled at the provider. Cancel or reconcile {deleteSummary?.scheduledRemote === 1 ? 'it' : 'them'} before deleting local records.</p>}
           <button type="button" onClick={() => previewDisconnect(disconnect)} disabled={busy || previewBusy}>{previewBusy ? 'Counting rows…' : 'Refresh preview'}</button>
           <label className={styles['disconnect-confirm']}>Type DELETE to confirm<input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.currentTarget.value)} autoComplete="off" disabled={busy} /></label>
         </>}
       </>}
       {notice && <p role="alert" className={styles['connection-error']}>{notice}</p>}
-      <footer><button type="button" data-dialog-cancel onClick={() => setDisconnect(null)} disabled={busy}>Cancel</button><button type="button" className={styles['connection-danger-button']} onClick={disconnectSource} disabled={busy || (disconnectMode === 'delete' && (!deletePreview || deleteConfirmation !== 'DELETE'))}>{busy ? 'Disconnecting…' : disconnectMode === 'delete' ? 'Disconnect and delete data' : 'Disconnect and retain data'}</button></footer>
+      <footer><button type="button" data-dialog-cancel onClick={() => setDisconnect(null)} disabled={busy}>Cancel</button><button type="button" className={styles['connection-danger-button']} onClick={disconnectSource} disabled={busy || (disconnectMode === 'delete' && (!deletePreview || deleteConfirmation !== 'DELETE' || Boolean(deleteSummary?.scheduledRemote)))}>{busy ? 'Disconnecting…' : disconnectMode === 'delete' ? 'Disconnect and delete data' : 'Disconnect and retain data'}</button></footer>
     </ModalDialog>}
   </>;
 }
