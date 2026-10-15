@@ -306,15 +306,18 @@ export async function publishPost(actor: PublishingActor, postId: string) {
 export async function syncPostStatus(actor: PublishingActor, postId: string) {
   const role = await membership(actor);
   await assertPostScope(actor, postId);
-  const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
+  const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, accessToken: true, socialAccount: { select: { provider: true, scopes: true, invalidatedAt: true } } } } } } } });
   if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new Error('This post is unavailable in the current workspace.');
   const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
   if (!entitlements) throw new Error('This workspace is unavailable.');
+  const requiredScopes = new Set(((await runtimeConfig('meta.postReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean));
   let synced = 0;
   for (const item of post.targets) {
     const provider = item.target.socialAccount?.provider;
     const adapter = provider ? await platformFor(provider, 'remoteStatus') : null;
+    const grantedScopes = new Set((item.target.socialAccount?.scopes ?? '').split(',').map(scope => scope.trim()).filter(Boolean));
     if (!item.remotePostId || !provider || !hasPlatformCapability(entitlements, provider) || !adapter?.getRemoteStatus || !item.target.accessToken || item.target.socialAccount?.invalidatedAt) continue;
+    if (provider === 'facebook' && (!requiredScopes.size || [...requiredScopes].some(scope => !grantedScopes.has(scope)))) continue;
     const status = await adapter.getRemoteStatus({ credential: { accessToken: decryptSecret(item.target.accessToken) }, remoteId: item.remotePostId });
     if (status.state === 'unknown') continue;
     await prisma.$transaction(async tx => {
@@ -323,6 +326,7 @@ export async function syncPostStatus(actor: PublishingActor, postId: string) {
     });
     synced++;
   }
+  if (synced === 0) return { synced };
   const counts = await prisma.postTarget.groupBy({ by: ['status'], where: { postId: post.id }, _count: true });
   const published = counts.find(row => row.status === 'published')?._count ?? 0;
   const scheduled = counts.find(row => row.status === 'scheduled_remote')?._count ?? 0;

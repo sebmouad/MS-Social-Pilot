@@ -14,6 +14,7 @@ export class FacebookApiError extends Error {
 
 export interface FacebookPage { id: string; name: string; category: string | null; accessToken: string }
 export interface FacebookCurrentUser { id: string; name: string; pictureUrl: string | null }
+export interface FacebookGrantedPermission { permission: string; status: 'granted' | 'declined' | string }
 export interface FacebookTokenExchangeInput { accessToken: string; appId: string; appSecret: string }
 export interface FacebookLongLivedToken { accessToken: string; expiresAt: Date }
 export interface FacebookAdAccount { id: string; name: string; currency: string | null; status: number | null }
@@ -33,6 +34,7 @@ export interface FacebookEngine {
   exchangeCode(input: OAuthExchangeRequest): Promise<{ accessToken: string; expiresAt: Date | null }>;
   exchangeForLongLivedToken(input: FacebookTokenExchangeInput): Promise<FacebookLongLivedToken>;
   getCurrentUser(accessToken: string): Promise<FacebookCurrentUser>;
+  getGrantedPermissions(accessToken: string): Promise<string[]>;
   discoverPages(accessToken: string): Promise<FacebookPage[]>;
   discoverAdAccounts(accessToken: string): Promise<FacebookAdAccount[]>;
   publish(input: FacebookPublishInput): Promise<FacebookPublished>;
@@ -179,6 +181,10 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       const picture = object(raw.picture);
       const pictureData = object(picture.data);
       return { id: raw.id, name: raw.name, pictureUrl: typeof pictureData.url === 'string' ? pictureData.url : null };
+    },
+    async getGrantedPermissions(token) {
+      const rows = await pages<FacebookGrantedPermission>(collectionUrl('me/permissions', token, 'permission,status'), token);
+      return [...new Set(rows.filter(row => typeof row.permission === 'string' && row.status === 'granted').map(row => row.permission))];
     },
     async discoverPages(token) {
       const raw = await pages<JsonObject>(collectionUrl('me/accounts', token, 'id,name,category,access_token'), token);

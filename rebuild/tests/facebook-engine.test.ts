@@ -43,6 +43,22 @@ describe('Facebook Graph adapter', () => {
     expect(await engine.getCurrentUser('user-token')).toEqual({ id: 'u7', name: 'Jordan', pictureUrl: 'https://cdn.test/profile.jpg' });
   });
 
+  it('persists only permissions Meta reports as granted and follows the permissions edge', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      expect(url.pathname).toBe('/v99.0/me/permissions');
+      expect(url.searchParams.get('fields')).toBe('permission,status');
+      expect(url.searchParams.get('access_token')).toBe('user-token');
+      return response({ data: [
+        { permission: 'pages_read_engagement', status: 'granted' },
+        { permission: 'pages_manage_posts', status: 'declined' },
+        { permission: 'pages_read_engagement', status: 'granted' },
+      ] });
+    }) as unknown as typeof fetch;
+    const engine = createFacebookEngine(config, fetcher);
+    expect(await engine.getGrantedPermissions('user-token')).toEqual(['pages_read_engagement']);
+  });
+
   it('exchanges a short-lived user token for a long-lived token and validates expiry', async () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input));

@@ -36,14 +36,15 @@ export async function GET(request: NextRequest) {
       const shortLived = await engine.exchangeCode({ appId: oauth.appId, appSecret: oauth.appSecret, redirectUri: oauth.redirectUri, code });
       const longLived = await engine.exchangeForLongLivedToken({ accessToken: shortLived.accessToken, appId: oauth.appId, appSecret: oauth.appSecret });
       stage = 'discovery';
-      const [user, pages, adAccounts] = await Promise.all([
+      const [user, grantedScopes, pages, adAccounts] = await Promise.all([
         engine.getCurrentUser(longLived.accessToken),
+        engine.getGrantedPermissions(longLived.accessToken),
         engine.discoverPages(longLived.accessToken),
         engine.discoverAdAccounts(longLived.accessToken),
       ]);
       const result = await persistFacebookDiscovery({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, {
         user, accessToken: longLived.accessToken, expiresAt: longLived.expiresAt,
-        scopes: pending.scopes, pages, adAccounts,
+        scopes: grantedScopes, pages, adAccounts,
       });
       return finish(request, result.skippedPages || result.skippedAdAccounts ? 'connected_partial' : 'connected', true);
     });

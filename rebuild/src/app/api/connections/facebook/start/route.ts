@@ -21,8 +21,9 @@ export async function POST(request: Request) {
 
   try {
     await assertWorkspaceNotPurging(viewer.workspaceId);
-    const [oauth, engine, adsReadScopes, adsManageScopes, adsManagementEnabled, stateMinutes] = await Promise.all([
+    const [oauth, engine, postReadScopes, adsReadScopes, adsManageScopes, adsManagementEnabled, stateMinutes] = await Promise.all([
       configuredFacebookOAuth(), configuredFacebookEngine(),
+      runtimeConfig('meta.postReadScopes') as Promise<string[]>,
       runtimeConfig('meta.adsReadScopes') as Promise<string[]>,
       runtimeConfig('meta.adsManageScopes') as Promise<string[]>,
       runtimeConfig('ads.managementEnabled') as Promise<boolean>,
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
       await recordFacebookConnectionFailure({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, 'configuration', 'internal_error');
       return NextResponse.json({ error: 'Connection unavailable. Try again or contact support.' }, { status: 503 });
     }
-    const scopes = [...new Set([...oauth.scopes, ...adsReadScopes, ...(adsManagementEnabled ? adsManageScopes : [])])];
+    const scopes = [...new Set([...oauth.scopes, ...postReadScopes, ...adsReadScopes, ...(adsManagementEnabled ? adsManageScopes : [])])];
     const stateTtlSeconds = stateMinutes * 60;
     const pending = createFacebookOAuthState(viewer.user.id, viewer.workspaceId, scopes, stateTtlSeconds);
     if (pending.cookieValue.length > 3000) {

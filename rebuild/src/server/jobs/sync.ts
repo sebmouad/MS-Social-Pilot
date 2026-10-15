@@ -83,10 +83,11 @@ export async function publishDuePosts(now = new Date()): Promise<JobSummary> {
 /** Refresh provider-side scheduled posts that already have remote IDs. */
 export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
+  const requiredScopes = new Set(((await runtimeConfig('meta.postReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean));
   const rows = await prisma.postTarget.findMany({
     where: { status: 'scheduled_remote', remotePostId: { not: null }, target: { enabled: true, type: 'page', socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } } },
     orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }], take: limit,
-    select: { id: true, postId: true, remotePostId: true, target: { select: { workspaceId: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, tokenExpiresAt: true, invalidatedAt: true } } } } },
+    select: { id: true, postId: true, remotePostId: true, target: { select: { workspaceId: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } } },
   });
   const result: JobSummary = { examined: rows.length, updated: 0, skipped: 0, failed: 0 };
   if (!rows.length) return result;
@@ -95,6 +96,8 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
     const account = row.target.socialAccount;
     const encrypted = row.target.accessToken ?? account?.accessToken;
     if (!account || account.workspaceId !== row.target.workspaceId || account.invalidatedAt || (account.tokenExpiresAt && account.tokenExpiresAt <= now) || !encrypted || !row.remotePostId) { result.skipped++; continue; }
+    const grantedScopes = new Set((account.scopes ?? '').split(',').map(scope => scope.trim()).filter(Boolean));
+    if (!requiredScopes.size || [...requiredScopes].some(scope => !grantedScopes.has(scope))) { result.skipped++; continue; }
     try {
       await assertWorkspaceNotPurging(row.target.workspaceId);
       const status = await withRetries(() => engine.getStatus(decryptSecret(encrypted), row.remotePostId!), retryLimit, retryBackoff);

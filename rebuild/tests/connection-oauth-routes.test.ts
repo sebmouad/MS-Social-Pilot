@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   recordFacebookConnectionFailure: vi.fn(),
   engine: {
     getAuthorizationUrl: vi.fn(), exchangeCode: vi.fn(), exchangeForLongLivedToken: vi.fn(), getCurrentUser: vi.fn(),
-    discoverPages: vi.fn(), discoverAdAccounts: vi.fn(),
+    discoverPages: vi.fn(), discoverAdAccounts: vi.fn(), getGrantedPermissions: vi.fn(),
   },
 }));
 vi.mock('../src/server/context', () => ({ requireViewer: mocks.requireViewer }));
@@ -42,13 +42,14 @@ afterEach(() => {
 beforeEach(() => {
   process.env.ENCRYPTION_KEY = validKey;
   mocks.requireViewer.mockResolvedValue({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' } });
-  mocks.runtimeConfig.mockImplementation((key: string) => Promise.resolve(key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.oauthStateMinutes' ? 10 : key === 'platforms.facebook.enabled' ? true : undefined));
+  mocks.runtimeConfig.mockImplementation((key: string) => Promise.resolve(key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.adsManageScopes' ? ['ads_management'] : key === 'meta.postReadScopes' ? ['pages_read_engagement'] : key === 'meta.oauthStateMinutes' ? 10 : key === 'platforms.facebook.enabled' ? true : key === 'ads.managementEnabled' ? false : undefined));
   mocks.configuredFacebookAdapter.mockResolvedValue({ id: 'facebook', capabilities: { connection: 'supported' }, getAuthorizationUrl: vi.fn() });
   mocks.engine.getAuthorizationUrl.mockImplementation((input: { state: string; scopes: string[] }) => `https://www.facebook.com/dialog/oauth?state=${input.state}&scope=${input.scopes.join(',')}`);
   mocks.configuredFacebookOAuth.mockResolvedValue({ appId: 'app-id', appSecret: 'app-secret', redirectUri: callbackUrl, scopes: ['pages_show_list'] });
   mocks.engine.exchangeCode.mockResolvedValue({ accessToken: 'short-token', expiresAt: null });
   mocks.engine.exchangeForLongLivedToken.mockResolvedValue({ accessToken: 'long-token', expiresAt: new Date('2027-01-01T00:00:00Z') });
   mocks.engine.getCurrentUser.mockResolvedValue({ id: 'meta-user', name: 'Meta User', pictureUrl: null });
+  mocks.engine.getGrantedPermissions.mockResolvedValue(['pages_show_list', 'ads_read']);
   mocks.engine.discoverPages.mockResolvedValue([{ id: 'page-1', name: 'Page One', category: null, accessToken: 'page-token' }]);
   mocks.engine.discoverAdAccounts.mockResolvedValue([{ id: 'act_1', name: 'Ads One', currency: 'USD', status: 1 }]);
   mocks.configuredFacebookEngine.mockResolvedValue(mocks.engine);
@@ -62,7 +63,7 @@ describe('Meta OAuth start route', () => {
     const body = await response.json();
     const state = new URL(body.authorizationUrl).searchParams.get('state');
     expect(response.status).toBe(200);
-    expect(new URL(body.authorizationUrl).searchParams.get('scope')).toBe('pages_show_list,ads_read');
+    expect(new URL(body.authorizationUrl).searchParams.get('scope')).toBe('pages_show_list,pages_read_engagement,ads_read');
     expect(state).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(response.headers.get('set-cookie')).toContain(`${FACEBOOK_OAUTH_STATE_COOKIE}=`);
     expect(response.headers.get('set-cookie')).toContain('HttpOnly');
@@ -90,6 +91,7 @@ describe('Meta OAuth callback route', () => {
     expect(mocks.engine.exchangeCode).toHaveBeenCalledWith({ appId: 'app-id', appSecret: 'app-secret', redirectUri: callbackUrl, code: 'oauth-code' });
     expect(mocks.engine.exchangeForLongLivedToken).toHaveBeenCalledWith({ accessToken: 'short-token', appId: 'app-id', appSecret: 'app-secret' });
     expect(mocks.engine.getCurrentUser).toHaveBeenCalledWith('long-token');
+    expect(mocks.engine.getGrantedPermissions).toHaveBeenCalledWith('long-token');
     expect(mocks.engine.discoverPages).toHaveBeenCalledWith('long-token');
     expect(mocks.engine.discoverAdAccounts).toHaveBeenCalledWith('long-token');
     expect(mocks.persistFacebookDiscovery).toHaveBeenCalledWith({ userId: 'user-1', workspaceId: 'workspace-1' }, expect.objectContaining({
@@ -98,6 +100,18 @@ describe('Meta OAuth callback route', () => {
     expect(response.headers.get('location')).toBe('https://social.example.test/settings/connections?notice=connected&select=1');
     expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
     expect(response.headers.get('location')).not.toContain('token');
+  });
+
+  it('stores Meta granted permissions rather than the OAuth scopes that were requested', async () => {
+    const pending = createFacebookOAuthState('user-1', 'workspace-1', ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts'], 600);
+    mocks.engine.getGrantedPermissions.mockResolvedValueOnce(['pages_show_list', 'pages_manage_posts']);
+    const request = new NextRequest(`${callbackUrl}?code=oauth-code&state=${pending.state}`, {
+      headers: { cookie: `${FACEBOOK_OAUTH_STATE_COOKIE}=${pending.cookieValue}` },
+    });
+    await GET(request);
+    expect(mocks.persistFacebookDiscovery).toHaveBeenCalledWith({ userId: 'user-1', workspaceId: 'workspace-1' }, expect.objectContaining({
+      scopes: ['pages_show_list', 'pages_manage_posts'],
+    }));
   });
 
   it('rejects mismatched state before calling Meta or persisting', async () => {

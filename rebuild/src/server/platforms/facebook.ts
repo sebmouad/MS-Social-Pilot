@@ -27,15 +27,14 @@ export async function configuredFacebookEngine() { return createFacebookEngine(a
 export async function configuredFacebookAdapter() { return createFacebookAdapter(await configuredFacebookConfig()); }
 
 export async function configuredFacebookOAuth() {
-  const [appId, appSecret, redirectUri, scopes, inboxReadScopes, inboxWriteScopes, adsManageScopes] = await Promise.all([
+  const [appId, appSecret, redirectUri, scopes, inboxReadScopes, inboxWriteScopes] = await Promise.all([
     configured<string>('meta.appId'),
     runtimeSecret('meta.appSecret'),
     configured<string>('meta.oauthRedirectUri'),
     configured<string[]>('meta.oauthScopes'),
     configured<string[]>('meta.inboxReadScopes'),
     configured<string[]>('meta.inboxWriteScopes'),
-    configured<string[]>('meta.adsManageScopes'),
   ]);
   if (!appId || !appSecret || !redirectUri || !scopes.length) throw new Error('Meta connection is not configured.');
-  return { appId, appSecret, redirectUri, scopes: [...new Set([...scopes, ...inboxReadScopes, ...inboxWriteScopes, ...adsManageScopes])] };
+  return { appId, appSecret, redirectUri, scopes: [...new Set([...scopes, ...inboxReadScopes, ...inboxWriteScopes])] };
 }
