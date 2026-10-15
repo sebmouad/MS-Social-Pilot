@@ -28,11 +28,13 @@ export async function GET(request: Request) {
   const channels = params.getAll('channel');
   const maxChannels = await runtimeConfig('analytics.reportMaxChannels');
   if (channels.length > maxChannels) return NextResponse.json({ error: `Select at most ${maxChannels} channels for one export.` }, { status: 400 });
+  const adAccounts = params.getAll('adAccount');
+  if (adAccounts.length > maxChannels) return NextResponse.json({ error: `Select at most ${maxChannels} ad accounts for one export.` }, { status: 400 });
   const requested = new Set(channels);
   const selectedIds = params.get('filter') === '1'
     ? initial.targets.filter(target => requested.has(target.id)).map(target => target.id)
     : initial.targets.map(target => target.id);
-  const data = await loadAnalytics(viewer.workspaceId, selectedIds, range, allowedTargetIds);
+  const data = await loadAnalytics(viewer.workspaceId, selectedIds, range, allowedTargetIds, params.get('adFilter') === '1' ? adAccounts : undefined);
   const result = reportOverviewCsv(buildReportOverview(data), await runtimeConfig('analytics.reportExportRows'));
   const filename = `report-${start ?? 'last-30-days'}-${end ?? 'today'}.csv`;
   return new NextResponse(result.csv, { headers: {

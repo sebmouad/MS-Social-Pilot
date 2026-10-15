@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
-  targets: vi.fn(), instagramAccounts: vi.fn(), pageInsights: vi.fn(), instagramInsights: vi.fn(), adInsights: vi.fn(), adCount: vi.fn(),
+  targets: vi.fn(), instagramAccounts: vi.fn(), pageInsights: vi.fn(), instagramInsights: vi.fn(), adInsights: vi.fn(), adAccounts: vi.fn(),
 }));
 
 vi.mock('../src/server/data', () => ({
@@ -11,7 +11,7 @@ vi.mock('../src/server/data', () => ({
     pageInsight: { findMany: state.pageInsights },
     instagramInsight: { findMany: state.instagramInsights },
     adInsight: { findMany: state.adInsights },
-    adAccount: { count: state.adCount },
+    adAccount: { findMany: state.adAccounts },
   },
 }));
 
@@ -35,7 +35,7 @@ describe('rebuild Instagram analytics data selection', () => {
     state.pageInsights.mockResolvedValue([]);
     state.instagramInsights.mockResolvedValue([]);
     state.adInsights.mockResolvedValue([]);
-    state.adCount.mockResolvedValue(0);
+    state.adAccounts.mockResolvedValue([]);
   });
 
   it('offers selected Instagram targets and selects insights by Instagram provider id, not linked Page targetId', async () => {
@@ -63,6 +63,24 @@ describe('rebuild Instagram analytics data selection', () => {
     expect(state.instagramInsights).toHaveBeenLastCalledWith(expect.objectContaining({
       where: { account: { workspaceId: 'workspace-1', enabled: true, igUserId: { in: [] } }, endTime: { gte: range.from, lte: range.to } },
     }));
+  });
+
+  it('loads only selected linked ad accounts for analytics and exports', async () => {
+    const range = { from: date('2026-10-01'), to: date('2026-10-31') };
+    state.targets.mockResolvedValue([{ id: 'page-1', type: 'page', name: 'Page One', providerId: 'fb-provider-1', socialAccountId: 'social-1' }]);
+    state.adAccounts.mockResolvedValue([
+      { id: 'ad-1', name: 'Account One', currency: 'USD' },
+      { id: 'ad-2', name: 'Account Two', currency: 'USD' },
+    ]);
+    const result = await loadAnalytics('workspace-1', ['page-1'], range, ['page-1'], ['ad-2', 'not-linked']);
+    expect(state.adAccounts).toHaveBeenCalledWith(expect.objectContaining({ where: { workspaceId: 'workspace-1', socialAccountId: { in: ['social-1'] }, enabled: true } }));
+    expect(state.adInsights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: expect.objectContaining({ id: { in: ['ad-2'] }, workspaceId: 'workspace-1' }) }) }));
+    expect(result.selectedAdIds).toEqual(['ad-2']);
+    expect(result.adAccountCount).toBe(1);
+    state.adInsights.mockClear();
+    const none = await loadAnalytics('workspace-1', ['page-1'], range, ['page-1'], []);
+    expect(none.adAccountCount).toBe(0);
+    expect(state.adInsights).not.toHaveBeenCalled();
   });
 
   it('sums current Page and Instagram followers for the selected channels', () => {

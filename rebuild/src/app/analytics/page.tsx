@@ -6,7 +6,7 @@ import { prisma } from '@/server/data';
 import { canUseFeature } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 
-type Search = { start?: string; end?: string; filter?: string; channel?: string | string[] };
+type Search = { start?: string; end?: string; filter?: string; channel?: string | string[]; adFilter?: string; adAccount?: string | string[] };
 const inputDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 function formatValue(value: number | null, unit: string) {
@@ -42,7 +42,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const targets = await loadAnalytics(workspaceId, [], range, allowedTargetIds);
     const requested = new Set(Array.isArray(params.channel) ? params.channel : params.channel ? [params.channel] : []);
     const selectedIds = targets.targets.filter(target => params.filter !== '1' || requested.has(target.id)).map(target => target.id);
-    data = await loadAnalytics(workspaceId, selectedIds, range, allowedTargetIds);
+    const requestedAdIds = Array.isArray(params.adAccount) ? params.adAccount : params.adAccount ? [params.adAccount] : [];
+    data = await loadAnalytics(workspaceId, selectedIds, range, allowedTargetIds, params.adFilter === '1' ? requestedAdIds : undefined);
   } catch (error) {
     console.error('Analytics data could not be loaded', error);
   }
@@ -72,6 +73,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   };
   const exportParams = new URLSearchParams({ start: inputDate(range.from), end: inputDate(range.to), filter: '1' });
   selected.forEach(target => exportParams.append('channel', target.id));
+  exportParams.set('adFilter', '1');
+  data?.selectedAdIds.forEach(id => exportParams.append('adAccount', id));
   const canExport = selected.length > 0 && canUseFeature(entitlements, 'analytics/reports') && canAccessFeature(permissions, 'analytics/reports');
   const sidebar = <form action="/analytics" method="get" className="analytics-sidebar-filter">
     <p className="analytics-filter-heading">Filters</p>
@@ -80,6 +83,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     <label className="analytics-date-filter">To<input type="date" name="end" defaultValue={inputDate(range.to)} /></label>
     <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">Channels</legend><input type="hidden" name="filter" value="1" />
     {data?.targets.length ? data.targets.map(target => <label key={target.id}><input type="checkbox" name="channel" value={target.id} defaultChecked={selectedSet.has(target.id)} /><span>{target.name}</span></label>) : <p className="small-note">No channels connected.</p>}</fieldset>
+    {data?.adAccounts.length ? <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">Ad accounts</legend><input type="hidden" name="adFilter" value="1" />
+      {data.adAccounts.map(account => <label key={account.id}><input type="checkbox" name="adAccount" value={account.id} defaultChecked={data.selectedAdIds.includes(account.id)} /><span>{account.name}{account.currency ? ` · ${account.currency}` : ''}</span></label>)}
+    </fieldset> : null}
     <button type="submit">Apply filters</button>
     <a className="analytics-filter-reset" href="/analytics">Reset filters</a>
   </form>;
@@ -94,7 +100,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           {audienceMissing.length > 0 && <p className="analytics-coverage">No stored audience count for: {audienceMissing.map(channel => channel.name).join(', ')}.</p>}
           <p className="small-note">Counts are added across channels. People who follow more than one selected Page may be counted more than once.</p>
         </section>
-        {data.adAccountCount > 0 && <p className="small-note analytics-ad-coverage">Advertising data was found for {new Set(data.adRows.map(row => row.adAccount.id)).size} of {data.adAccountCount} linked ad accounts in this date range.</p>}
+        {data.adAccounts.length > 0 && <p className="small-note analytics-ad-coverage">{data.adAccountCount ? `Advertising data was found for ${new Set(data.adRows.map(row => row.adAccount.id)).size} of ${data.adAccountCount} selected ad accounts in this date range.` : 'No ad accounts selected. Choose accounts in the sidebar to include advertising metrics.'}</p>}
         {view.metrics.length ? <section className="panel"><div className="analytics-panel-title"><div><h2>Available metrics</h2><p className="small-note">Each chart and table is built from metrics already stored for this workspace.</p></div><span className="badge">{view.metrics.length} metrics</span></div>
           <div className="analytics-metrics">{view.metrics.map(metric => <MetricChart metric={metric} key={`${metric.source}:${metric.key}`} />)}</div>
         </section> : <section className="panel analytics-state"><h2>No metrics for this selection yet</h2><p>Try another date range or channel. New connections may take time to show performance data; advertising results appear when a connected ad account has data.</p></section>}
