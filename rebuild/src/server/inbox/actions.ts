@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { configuredFacebookEngine } from '@/server/platforms/facebook';
+import { isPlatformEnabled } from '@/server/platforms/registry';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { loadEntitlements, canUseFeature } from '@/server/entitlements';
@@ -28,6 +29,7 @@ async function access(actor: InboxActor, write = false) {
 
 async function page(actor: InboxActor, targetId: string, write: boolean) {
   const { permissions } = await access(actor, write);
+  if (!await isPlatformEnabled('facebook')) throw new Error('This channel is unavailable in the inbox.');
   const target = await prisma.target.findFirst({
     where: { id: targetId, workspaceId: actor.workspaceId, type: 'page', enabled: true, socialAccount: { is: { workspaceId: actor.workspaceId, provider: 'facebook', invalidatedAt: null } } },
     select: { id: true, providerId: true, accessToken: true, socialAccount: { select: { scopes: true, tokenExpiresAt: true, invalidatedAt: true } } },
@@ -54,6 +56,7 @@ export async function canManageFacebookInbox(actor: InboxActor, targetId: string
 /** Upsert one Page's current conversations and the messages returned by Graph. */
 export async function syncFacebookInbox(actor: InboxActor, targetId?: string) {
   await access(actor);
+  if (!await isPlatformEnabled('facebook')) throw new Error('This channel is unavailable in the inbox.');
   const postSyncLimit = (await runtimeConfig('meta.pageSize') as number) * (await runtimeConfig('meta.maxPages') as number);
   const targets = await prisma.target.findMany({
     where: { workspaceId: actor.workspaceId, type: 'page', enabled: true, ...(targetId ? { id: targetId } : {}), socialAccount: { is: { workspaceId: actor.workspaceId, provider: 'facebook', invalidatedAt: null } } },

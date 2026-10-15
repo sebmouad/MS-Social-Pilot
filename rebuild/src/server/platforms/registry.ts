@@ -3,6 +3,8 @@ import { PLATFORM_MODULES, platformModule } from '@/platforms';
 import type { PlatformModule } from '@/platforms/module';
 import { runtimeConfig } from '@/server/config/store';
 import { PLATFORM_HOSTS, type PlatformHost } from './index';
+import type { PlatformJobName, JobSummary } from '@/server/jobs/types';
+import type { RetryBackoff } from '@/server/jobs/retry';
 
 /**
  * Product code reaches platforms only through here: by provider ID and
@@ -68,4 +70,17 @@ export async function enabledPlatformIds(): Promise<string[]> {
  */
 export async function enabledSocialAccountWhere() {
   return { provider: { in: await enabledPlatformIds() } };
+}
+
+/** Run a job hook for each installed and enabled module that provides it. */
+export async function runEnabledPlatformJob(job: PlatformJobName, now: Date, retryLimit: number, retryBackoff: RetryBackoff): Promise<JobSummary> {
+  const results = await Promise.all((PLATFORM_MODULES as readonly PlatformModule[]).map(async module => {
+    if (!await isPlatformEnabled(module.id)) return null;
+    const hook = hostFor(module.id)?.jobs?.[job];
+    return hook ? hook(now, retryLimit, retryBackoff) : null;
+  }));
+  return results.filter((value): value is JobSummary => value !== null).reduce((total, value) => ({
+    examined: total.examined + value.examined, updated: total.updated + value.updated,
+    skipped: total.skipped + value.skipped, failed: total.failed + value.failed,
+  }), { examined: 0, updated: 0, skipped: 0, failed: 0 });
 }

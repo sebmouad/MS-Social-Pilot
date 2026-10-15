@@ -8,7 +8,7 @@ vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) =
 let facebookEnabled = true;
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'platforms.facebook.enabled' ? facebookEnabled : 100 }));
 
-import { syncPageAnalytics } from '../src/server/jobs/sync';
+import { syncPageAnalytics } from '../src/platforms/facebook/jobs';
 
 beforeEach(() => {
   vi.clearAllMocks();

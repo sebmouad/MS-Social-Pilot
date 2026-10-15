@@ -12,6 +12,7 @@ untouched; switching it back on restores everything.
 | Engine | `src/platforms/<id>/` | Provider operations behind the neutral contract in `src/platforms/types.ts` |
 | Manifest + settings | `src/platforms/<id>/module.ts` | Name, badge, capabilities, channel kinds, required settings, and all of the module's Root settings (including `platforms.<id>.enabled`) |
 | Server wiring | `src/server/platforms/<id>.ts` (+ `<id>-connect.ts`) | Building the engine from Root settings; the connection start/callback flow |
+| Background work | `src/platforms/<id>/jobs.ts` | Provider-specific status, analytics, ads, and inbox sync hooks dispatched by the shared worker |
 | Installed list | `src/platforms/index.ts` and `src/server/platforms/index.ts` | The only places that name platforms; TypeScript keeps the two in step |
 
 Generated from the installed list: the Root configuration groups
@@ -22,14 +23,17 @@ up), the generic routes `/api/connections/<id>/start|callback`, and the
 Product code reaches a platform only through `src/server/platforms/registry.ts`
 (`platformFor(id, capability)`, `isPlatformEnabled`, `connectionFlow`).
 
-To add a platform: build its engine and `module.ts`, add it to both installed
-lists, and add its tests. Nothing else needs to change for it to appear in Root.
+To add a platform: build its engine, `module.ts`, host connection flow, and job
+hooks, then add it to both installed lists and add its tests. This makes it
+available in Root; customer capabilities must be wired and verified before
+the module advertises them as supported.
 
-Still Facebook-specific outside the module (next step): background sync jobs
-(`src/server/jobs/sync.ts`), ads actions (`src/server/ads/*`), inbox actions and
-their MCP tools. They now check the module switch, but should move behind
-module-level sync/ads/inbox hooks so a second platform plugs in without editing
-them.
+The shared worker dispatches provider jobs through
+`runEnabledPlatformJob()`; Facebook's implementations live in
+`src/platforms/facebook/jobs.ts`. The remaining boundary work is to move
+Facebook-specific ads actions, inbox actions, metric mappings and persistence
+out of shared product paths. Until those interfaces and their tests exist,
+another module must not claim those capabilities merely by adding a manifest.
 
 # Platform adapters
 

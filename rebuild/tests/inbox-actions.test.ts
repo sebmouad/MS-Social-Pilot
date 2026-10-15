@@ -6,13 +6,14 @@ const mocks = vi.hoisted(() => ({
     conversationMessage: { create: vi.fn(), findFirst: vi.fn() }, postComment: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn() }, $executeRaw: vi.fn(), $transaction: vi.fn(), postTarget: { findMany: vi.fn() },
   },
   config: vi.fn(), decrypt: vi.fn(), engine: { replyToConversation: vi.fn(), replyToComment: vi.fn(), moderateComment: vi.fn(), deleteComment: vi.fn(), listInbox: vi.fn(), listComments: vi.fn() },
-  configuredEngine: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), canUseFeature: vi.fn(), canAccessFeature: vi.fn(), canAccessPage: vi.fn(),
+  configuredEngine: vi.fn(), platformEnabled: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), canUseFeature: vi.fn(), canAccessFeature: vi.fn(), canAccessPage: vi.fn(),
 }));
 
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: mocks.decrypt }));
 vi.mock('../src/server/platforms/facebook', () => ({ configuredFacebookEngine: mocks.configuredEngine }));
+vi.mock('../src/server/platforms/registry', () => ({ isPlatformEnabled: mocks.platformEnabled }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: mocks.canUseFeature }));
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature, canAccessPage: mocks.canAccessPage }));
@@ -26,6 +27,7 @@ beforeEach(() => {
   mocks.prisma.membership.findUnique.mockResolvedValue({ id: 'membership-1', role: 'owner' });
   mocks.entitlements.mockResolvedValue({}); mocks.permissions.mockResolvedValue({});
   mocks.canUseFeature.mockReturnValue(true); mocks.canAccessFeature.mockReturnValue(true); mocks.canAccessPage.mockReturnValue(true);
+  mocks.platformEnabled.mockResolvedValue(true);
   mocks.prisma.target.findFirst.mockResolvedValue({ id: 'target-1', providerId: 'page-1', accessToken: 'encrypted', socialAccount: { scopes: 'pages_messaging,pages_manage_engagement', tokenExpiresAt: null, invalidatedAt: null } });
   mocks.config.mockImplementation(async key => key === 'inbox.messengerReplyWindowHours' ? 24 : key === 'meta.inboxWriteScopes' ? ['pages_messaging', 'pages_manage_engagement'] : ['pages_messaging']);
   mocks.decrypt.mockReturnValue('page-secret'); mocks.configuredEngine.mockResolvedValue(mocks.engine);
@@ -40,6 +42,11 @@ beforeEach(() => {
 });
 
 describe('workspace Facebook inbox actions', () => {
+  it('blocks provider reads when Root disables the platform', async () => {
+    mocks.platformEnabled.mockResolvedValue(false);
+    await expect(syncFacebookInbox(actor, 'target-1')).rejects.toThrow(/unavailable in the inbox/);
+    expect(mocks.configuredEngine).not.toHaveBeenCalled();
+  });
   it('sends and stores a reply only after scoped page, feature, entitlement, and provider-scope checks', async () => {
     await replyToFacebookInbox(actor, { kind: 'message', id: 'conversation-1', text: '  Hello there  ' });
     expect(mocks.engine.replyToConversation).toHaveBeenCalledWith('page-secret', 'remote-conversation-1', 'Hello there');

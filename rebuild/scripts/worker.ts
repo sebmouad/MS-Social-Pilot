@@ -21,19 +21,19 @@ const dependencies: WorkerDependencies = {
       const result = await cleanupOrphanImages(now);
       return `removed=${result.removed} bytes=${result.bytes} failed=${result.errors}`;
     }
-    const { publishDuePosts, syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } = await import('../src/server/jobs/sync');
+    const { publishDuePosts } = await import('../src/server/jobs/sync');
+    const { runEnabledPlatformJob } = await import('../src/server/platforms/registry');
     if (job === 'posts') {
       const due = await publishDuePosts(now);
-      const remote = await syncScheduledPostStatus(now, retryLimit, retryBackoff);
-      return `due=${due.examined}/${due.updated} remote=${remote.examined}/${remote.updated} skipped=${due.skipped + remote.skipped} failed=${due.failed + remote.failed}`;
+      const remote = await runEnabledPlatformJob('posts', now, retryLimit, retryBackoff);
+      return `due=${due.examined}/${due.updated} platform=${remote.examined}/${remote.updated} skipped=${due.skipped + remote.skipped} failed=${due.failed + remote.failed}`;
     }
     if (job === 'analytics') {
-      const page = await syncPageAnalytics(now, retryLimit, retryBackoff);
-      const ads = await syncAdsAnalytics(now, retryLimit, retryBackoff);
-      return `pages=${page.examined}/${page.updated} ads=${ads.examined}/${ads.updated} skipped=${page.skipped + ads.skipped} failed=${page.failed + ads.failed}`;
+      const result = await runEnabledPlatformJob('analytics', now, retryLimit, retryBackoff);
+      return `examined=${result.examined} updated=${result.updated} skipped=${result.skipped} failed=${result.failed}`;
     }
-    const result = await syncInbox(now, retryLimit, retryBackoff);
-    return `pages=${result.examined} records=${result.updated} skipped=${result.skipped} failed=${result.failed}`;
+    const result = await runEnabledPlatformJob('inbox', now, retryLimit, retryBackoff);
+    return `examined=${result.examined} updated=${result.updated} skipped=${result.skipped} failed=${result.failed}`;
   },
   async tryLease(job, leaseOwner, token, until) {
     const rows = await prisma.$queryRaw<Array<{ name: string }>>`

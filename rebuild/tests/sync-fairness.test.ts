@@ -26,7 +26,7 @@ vi.mock('../src/server/data', () => ({ prisma: {
   $transaction: state.transaction,
 } }));
 
-import { syncAdsAnalytics, syncInbox, syncPageAnalytics } from '../src/server/jobs/sync';
+import { syncAdsAnalytics, syncInbox, syncPageAnalytics } from '../src/platforms/facebook/jobs';
 
 function applyQuery(rows: Array<{ id: string }>, query: { where: { AND: Array<Record<string, unknown>> }; take: number }) {
   const cursorClause = query.where.AND.find(clause => 'id' in clause) as { id?: { gt?: string; lte?: string } } | undefined;
@@ -91,7 +91,7 @@ describe('fair sync batches', () => {
       workspaceId: 'w', providerId: 'page1', accessToken: 'page-token',
       socialAccount: { workspaceId: 'w', accessToken: 'user-token', scopes: 'pages_show_list', tokenExpiresAt: null, invalidatedAt: null },
     } }]);
-    const { syncScheduledPostStatus } = await import('../src/server/jobs/sync');
+    const { syncScheduledPostStatus } = await import('../src/platforms/facebook/jobs');
     expect(await syncScheduledPostStatus()).toEqual({ examined: 1, updated: 0, skipped: 1, failed: 0 });
     expect(state.remoteStatus).not.toHaveBeenCalled();
   });
@@ -101,7 +101,7 @@ describe('fair sync batches', () => {
       workspaceId: 'w', providerId: 'page1', accessToken: 'page-token',
       socialAccount: { workspaceId: 'w', accessToken: 'user-token', scopes: 'pages_show_list,pages_read_engagement', tokenExpiresAt: null, invalidatedAt: null },
     } }]);
-    const { syncScheduledPostStatus } = await import('../src/server/jobs/sync');
+    const { syncScheduledPostStatus } = await import('../src/platforms/facebook/jobs');
     expect(await syncScheduledPostStatus(new Date('2026-10-15T12:00:00Z'))).toEqual({ examined: 1, updated: 1, skipped: 0, failed: 0 });
     expect(state.remoteStatus).toHaveBeenCalledWith('page-token', 'remote1');
     expect(state.targetUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'published' }) }));

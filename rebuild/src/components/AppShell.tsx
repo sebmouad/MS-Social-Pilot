@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { MODULES, PAGES, type ModuleId } from "@/lib/product";
 
@@ -24,13 +24,31 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const pathname = usePathname();
   const visibleSidebar = sidebar && (!sidebarWhen || sidebarWhen.includes(pathname));
   const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+  const filterToggleRef = useRef<HTMLButtonElement>(null);
+  const closeFilters = useCallback(() => {
+    setFilterOpen(false);
+    requestAnimationFrame(() => filterToggleRef.current?.focus());
+  }, []);
   useEffect(() => setFilterOpen(false), [pathname]);
   useEffect(() => {
     if (!filterOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setFilterOpen(false); };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [filterOpen]);
+    const panel = filterRef.current;
+    const focusable = () => [...(panel?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])].filter(item => item.getClientRects().length > 0);
+    (focusable()[0] ?? panel)?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); closeFilters(); }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      if (!items.length) { event.preventDefault(); panel?.focus(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (!panel?.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); return; }
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [filterOpen, closeFilters]);
   const modulePages = PAGES.filter(page => page.module === activeModule && page.navigation !== false && enabledFeatures.includes(page.id));
   const enabledModuleSet = new Set(enabledModules);
   const enabledModulePages = new Set(enabledFeatures.map(id => PAGES.find(page => page.id === id && page.navigation !== false)?.module).filter(Boolean));
@@ -55,10 +73,10 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
         {modulePages.map(page => <a key={page.id} href={page.href} className={`shell-subnav__link${pathname === page.href ? " is-active" : ""}`} aria-current={pathname === page.href ? "page" : undefined}>{page.title}</a>)}
         {rootAccess && activeModule === 'settings' && <a className="shell-subnav__link shell-root-mobile" href="/root/config">Root controls</a>}
       </nav>}
-      {visibleSidebar && filterOpen && <button className="shell-filter-scrim" type="button" aria-label="Close filters" onClick={() => setFilterOpen(false)} />}
-      {visibleSidebar && <div id="shell-filters" className={`shell-sidebar-filter${filterOpen ? " is-open" : ""}`} onSubmitCapture={() => setFilterOpen(false)} onClickCapture={event => { if ((event.target as Element).closest('a[href]')) setFilterOpen(false); }}>{sidebar}</div>}
+      {visibleSidebar && filterOpen && <button className="shell-filter-scrim" type="button" aria-label="Close filters" onClick={closeFilters} />}
+      {visibleSidebar && <div ref={filterRef} id="shell-filters" className={`shell-sidebar-filter${filterOpen ? " is-open" : ""}`} role={filterOpen ? 'dialog' : undefined} aria-modal={filterOpen ? 'true' : undefined} aria-label={filterOpen ? 'Filters' : undefined} tabIndex={filterOpen ? -1 : undefined} onSubmitCapture={() => setFilterOpen(false)} onClickCapture={event => { if ((event.target as Element).closest('a[href]')) setFilterOpen(false); }}>{sidebar}</div>}
       {rootAccess && !installationMode && <a className="shell-subnav__link shell-root-link" href="/root/config">Root controls</a>}
     </aside>
-    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions">{visibleSidebar && <button className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => setFilterOpen(open => !open)}>{filterOpen ? "Close filters" : "Filters"}</button>}<span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main id="main-content" className="shell-content" tabIndex={-1}>{children}</main></div>
+    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions">{visibleSidebar && <button ref={filterToggleRef} className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => filterOpen ? closeFilters() : setFilterOpen(true)}>{filterOpen ? "Close filters" : "Filters"}</button>}<span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main id="main-content" className="shell-content" tabIndex={-1}>{children}</main></div>
   </div>;
 }

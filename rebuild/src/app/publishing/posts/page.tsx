@@ -74,7 +74,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
       {canAuthorDrafts ? <section className={`${styles.card} ${styles.createCard}`}><h2>Create a post</h2><p>Choose an enabled destination now or save this as a local draft.</p><PostEditorForm targets={targetChoices} imageRules={imageRules}/></section> : null}
       {canManageDrafts ? <section className={`${styles.card} ${styles.createCard} ${styles.importCard}`}><h2>Import a batch</h2><p>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section> : null}
     </div> : null}
-    <section className={styles.card}><DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage="No posts have been created in this workspace yet."/>
+    <section className={styles.card}><DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage={selectedStatus || selectedChannel ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}/>
       {listing.pages > 1 ? <nav className={styles.postPagination} aria-label="Post pages">
         {listing.page > 1 ? <a className="ui-button ui-button--secondary" href={pageLink(listing.page - 1)}>Previous page</a> : <span />}
         <span>Page {listing.page} of {listing.pages}</span>
