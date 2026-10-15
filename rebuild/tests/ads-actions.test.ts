@@ -66,7 +66,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.prisma.membership.findUnique.mockResolvedValue({ role: 'owner' });
   mocks.entitlements.mockResolvedValue({});
-  mocks.permissions.mockResolvedValue({});
+  mocks.permissions.mockResolvedValue({ pageScope: { all: true } });
   mocks.canUseFeature.mockReturnValue(true);
   mocks.canAccessFeature.mockReturnValue(true);
   mocks.prisma.adAccount.findFirst.mockResolvedValue({
@@ -134,6 +134,25 @@ describe('workspace Ads actions', () => {
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(false);
   });
 
+  it('limits manage visibility and mutations to ad accounts linked to permitted channels', async () => {
+    mocks.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['target-allowed'] } });
+    expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(true);
+    const scopedWhere = mocks.prisma.adAccount.findFirst.mock.calls[0][0].where;
+    expect(scopedWhere.socialAccount.is.targets.some).toEqual({ workspaceId: actor.workspaceId, id: { in: ['target-allowed'] } });
+    mocks.prisma.adAccount.findFirst.mockResolvedValueOnce(null);
+    expect(await canManageWorkspaceAds(actor, 'account-linked-only-to-forbidden-channel')).toBe(false);
+
+    mocks.prisma.adAccount.findFirst.mockResolvedValueOnce(null);
+    await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/unavailable/);
+    const mutationWhere = mocks.prisma.adAccount.findFirst.mock.calls[2][0].where;
+    expect(mutationWhere.socialAccount.is.targets.some).toEqual({ workspaceId: actor.workspaceId, id: { in: ['target-allowed'] } });
+    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
+
+    mocks.prisma.adAccount.findFirst.mockResolvedValueOnce(null);
+    await expect(createWorkspaceAdCampaign(actor, { adAccountId: 'local-account-1', name: 'Spring', objective: 'OUTCOME_TRAFFIC', confirmation: 'anything' })).rejects.toThrow(/unavailable/);
+    expect(mocks.engine.createCampaign).not.toHaveBeenCalled();
+  });
+
   it('requires exact confirmation, sends a paused campaign, and audits without the credential', async () => {
     mocks.engine.createCampaign.mockClear().mockResolvedValue({ remoteId: 'campaign-new' });
     const input = { adAccountId: 'local-account-1', name: 'Spring launch', objective: 'OUTCOME_TRAFFIC' as const,
@@ -183,11 +202,12 @@ describe('workspace Ads actions', () => {
     expect(mocks.createFacebookAdSet).not.toHaveBeenCalled();
   });
 
-  it('fails closed for ad set creation when the workspace has limited page scope', async () => {
+  it('enforces all-page scope inside ad set creation even when the caller claims full scope', async () => {
     const input = { adAccountId: 'local-account-1', campaignId: 'campaign-44', name: 'Prospecting', dailyBudgetMinor: 5000,
       countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' as const,
       confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-44 IN ACCOUNT local-account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' };
-    await expect(createWorkspaceAdSet(actor, input, false)).rejects.toThrow(/unavailable for limited page access/);
+    mocks.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['target-a'] } });
+    await expect(createWorkspaceAdSet(actor, input, true)).rejects.toThrow(/unavailable for limited page access/);
     expect(mocks.prisma.adAccount.findFirst).not.toHaveBeenCalled();
     expect(mocks.createFacebookAdSet).not.toHaveBeenCalled();
   });

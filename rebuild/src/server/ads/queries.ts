@@ -1,4 +1,5 @@
 import { prisma } from "@/server/data";
+import { enabledSocialAccountWhere } from "@/server/platforms/registry";
 
 export type AdsPeriod = "7d" | "30d" | "90d" | "custom";
 
@@ -64,14 +65,26 @@ export async function getAdsDataset(workspaceId: string, filters: AdsFilters, al
   return { accounts, insights };
 }
 
-export async function getAdsAccounts(workspaceId: string, allowedTargetIds?: readonly string[]) {
+/** Query predicate for enabled, selected ad accounts from installed and enabled platform modules. */
+export async function getAdsAccountWhere(workspaceId: string, allowedTargetIds?: readonly string[]) {
   const socialAccountIds = allowedTargetIds === undefined ? undefined : (await prisma.target.findMany({
     where: { workspaceId, id: { in: [...allowedTargetIds] } },
     select: { socialAccountId: true },
   })).map(target => target.socialAccountId).filter((id): id is string => Boolean(id));
+  const enabledProviderWhere = await enabledSocialAccountWhere();
+  return {
+    workspaceId,
+    enabled: true,
+    socialAccount: { is: { workspaceId, invalidatedAt: null, ...enabledProviderWhere } },
+    ...(socialAccountIds !== undefined ? { socialAccountId: { in: socialAccountIds } } : {}),
+  };
+}
+
+export async function getAdsAccounts(workspaceId: string, allowedTargetIds?: readonly string[]) {
+  const where = await getAdsAccountWhere(workspaceId, allowedTargetIds);
   return prisma.adAccount.findMany({
-    where: { workspaceId, ...(socialAccountIds ? { socialAccountId: { in: socialAccountIds } } : {}) },
+    where,
     orderBy: { name: "asc" },
-    select: { id: true, actId: true, name: true, currency: true, accountStatus: true, enabled: true, lastSyncedAt: true },
+    select: { id: true, actId: true, name: true, currency: true, accountStatus: true, enabled: true, lastSyncedAt: true, socialAccount: { select: { provider: true } } },
   });
 }

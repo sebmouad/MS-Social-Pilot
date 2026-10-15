@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({ targets: vi.fn(), accounts: vi.fn(), insights: vi.fn() }));
+vi.mock('../src/server/platforms/registry', () => ({ enabledSocialAccountWhere: vi.fn(async () => ({ provider: { in: ['facebook'] } })) }));
 vi.mock('../src/server/data', () => ({ prisma: {
   target: { findMany: db.targets },
   adAccount: { findMany: db.accounts },
@@ -22,7 +23,10 @@ describe('Ads channel scope', () => {
     const data = await getAdsDataset('workspace-a', filters, ['target-allowed']);
     expect(data.accounts).toHaveLength(1);
     expect(db.targets).toHaveBeenCalledWith({ where: { workspaceId: 'workspace-a', id: { in: ['target-allowed'] } }, select: { socialAccountId: true } });
-    expect(db.accounts).toHaveBeenCalledWith(expect.objectContaining({ where: { workspaceId: 'workspace-a', socialAccountId: { in: ['social-allowed'] } } }));
+    expect(db.accounts).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      workspaceId: 'workspace-a', enabled: true, socialAccountId: { in: ['social-allowed'] },
+      socialAccount: { is: { workspaceId: 'workspace-a', invalidatedAt: null, provider: { in: ['facebook'] } } },
+    } }));
     expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: { workspaceId: 'workspace-a', id: { in: ['ad-allowed'] } } }) }));
   });
 
@@ -30,8 +34,20 @@ describe('Ads channel scope', () => {
     db.targets.mockResolvedValue([]);
     db.accounts.mockResolvedValue([]);
     await getAdsAccounts('workspace-a', []);
-    expect(db.accounts).toHaveBeenCalledWith(expect.objectContaining({ where: { workspaceId: 'workspace-a', socialAccountId: { in: [] } } }));
+    expect(db.accounts).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      workspaceId: 'workspace-a', enabled: true, socialAccountId: { in: [] },
+      socialAccount: { is: { workspaceId: 'workspace-a', invalidatedAt: null, provider: { in: ['facebook'] } } },
+    } }));
     await getAdsDataset('workspace-a', parseAdsFilters({}, [], new Date('2026-10-15T00:00:00Z')), []);
     expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: { workspaceId: 'workspace-a', id: { in: [] } } }) }));
+  });
+
+  it('applies account and connection visibility even when no channel restriction is supplied', async () => {
+    await getAdsAccounts('workspace-a');
+    expect(db.targets).not.toHaveBeenCalled();
+    expect(db.accounts).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      workspaceId: 'workspace-a', enabled: true,
+      socialAccount: { is: { workspaceId: 'workspace-a', invalidatedAt: null, provider: { in: ['facebook'] } } },
+    } }));
   });
 });
