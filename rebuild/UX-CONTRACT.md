@@ -26,9 +26,9 @@ There is no released billing or legal-copy contract for the rebuild. Do not inve
 |---|---|---|---|---|
 | Navigation | `src/components/AppShell.tsx` | Module manifests | Desktop sidebar, phone bottom rail | Browser keyboard and viewport checks |
 | Theme and Scrollbar | `src/styles/tokens.css` | `DESIGN.md` | Grove, Coast, Clay, Nightfall | Publishing mobile Lighthouse accessibility 100 in all four themes; shared muted-text contrast test passes; other screens and scrollbar checks pending |
-| Read-only table | `src/components/DataTable.tsx` | Server list query | Sortable or static columns | Caption/header checks; pagination parity pending |
+| Read-only table | `src/components/DataTable.tsx` | Server list query | Sortable or static columns | Posts now has scoped database pagination; other table pagination parity pending |
 | Table Selection | No shared owner yet | `UX-CONTRACT.md` | None until a shared owner exists | Define before bulk table actions |
-| Select/Listbox | Native `<select>` | `DESIGN.md` and this contract | Browser-owned popup in English UI | Keyboard and popup checks pending |
+| Select/Listbox | Native `<select>` | `DESIGN.md` and this contract | Browser-owned popup in English UI | Posts filter selection persisted after navigation in a 390px Chrome mobile preview; keyboard checks pending |
 | Date | Native date/time inputs | Workspace timezone policy | Date or datetime-local | Date-only parsing and browser checks pending |
 | Form | Screen-local forms plus server validation | Server validation | Create or edit | Shared field error and first-invalid-focus owner pending |
 | Dialog | `src/components/ModalDialog.tsx` | This contract | Confirmation or selection | Focus, Escape, restoration browser checks pending |
@@ -60,6 +60,8 @@ Ads daily details render every stored action and additional measure as a labeled
 Use a real link for navigation and a button for mutation. Pending states disable duplicate submission without changing button geometry. Success copy repeats the action verb; inline errors stay near the action and preserve recoverable input. Destructive dialogs initially focus Cancel, keep the object and consequence visible, and close only after confirmed success. Escape and focus restoration must work. One shared dialog and notification pattern should replace screen-local overlays and ad hoc notices.
 
 The post composer and CSV importer validate required text, optional URL syntax, attachment exclusivity, and file selection before submitting. A failed local check keeps the entered draft, shows an associated inline error, and focuses the field requiring correction. Server publishing and CSV checks remain authoritative. Empty data-table copy sits outside the horizontally scrolling table so it remains readable at phone widths.
+
+The Posts screen counts and pages after workspace and channel authorization. Its status and channel filters live in the sidebar and persist in the URL across pages. On 2026-10-15 the local 390px mobile preview showed the filter drawer without horizontal overflow; applying Draft changed the URL and retained the selected value after navigation. A mobile Lighthouse navigation audit of that filtered route scored 100 for accessibility, best practices, SEO, and agentic browsing. This is local fixture evidence, not a large-data or provider test.
 
 Client-handled forms that contain credentials, recovery codes, or other private input declare `method="post"` in the rendered HTML. This prevents an early submission before hydration from placing values in a GET URL. Authentication forms own validation with `noValidate`, visible field errors, `aria-invalid`, and focus on the first invalid field. The server remains the authority for credentials and rate limits.
 
