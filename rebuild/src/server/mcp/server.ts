@@ -5,7 +5,7 @@ import { createLocalDraft, deleteLocalDraft, updateLocalDraft } from '../post-mu
 import { setConnectionSelections } from '../connection-mutations';
 import { randomBytes } from 'node:crypto';
 import { canAccessFeature, canAccessPage, type ScopedPermissions } from '../permissions';
-import { moderateFacebookComment, replyToFacebookInbox, setFacebookInboxResolved } from '../inbox/actions';
+import { moderateInboxComment, replyToInbox, setInboxResolved } from '../inbox/actions';
 import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '../publishing/lifecycle';
 import { readConfig, runtimeConfig, saveConfig } from '../config/store';
 import { analyticsRange, loadAnalytics } from '../analytics/data';
@@ -237,7 +237,7 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       if (!kind || !id) throw new Error('kind and id are required.');
       requireConfirmation(args, `REPLY ${kind} ${id}`);
       const text = typeof args.text === 'string' ? args.text.trim() : '';
-      const result = await replyToFacebookInbox(viewer, { kind, id, text });
+      const result = await replyToInbox(viewer, { kind, id, text });
       await auditWrite(viewer, name, { kind, itemId: id });
       return { ...result, kind, itemId: id };
     }
@@ -247,7 +247,7 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       if (!kind || !id || typeof args.resolved !== 'boolean') throw new Error('kind, id, and resolved are required.');
       const verb = args.resolved ? 'RESOLVE' : 'REOPEN';
       requireConfirmation(args, `${verb} ${kind} ${id}`);
-      const result = await setFacebookInboxResolved(viewer, { kind, id, resolved: args.resolved });
+      const result = await setInboxResolved(viewer, { kind, id, resolved: args.resolved });
       await auditWrite(viewer, name, { kind, itemId: id, resolved: args.resolved });
       return { ...result, kind, itemId: id, resolved: args.resolved };
     }
@@ -255,7 +255,7 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const id = typeof args.id === 'string' ? args.id : '';
       if (!id || typeof args.hidden !== 'boolean') throw new Error('id and hidden are required.');
       requireConfirmation(args, `${args.hidden ? 'HIDE' : 'UNHIDE'} COMMENT ${id}`);
-      const result = await moderateFacebookComment(viewer, { id, hidden: args.hidden });
+      const result = await moderateInboxComment(viewer, { id, hidden: args.hidden });
       await auditWrite(viewer, name, { itemId: id, hidden: args.hidden });
       return { ...result, itemId: id, hidden: args.hidden };
     }

@@ -28,6 +28,22 @@ export async function platformFor(provider: string, capability: keyof Capability
   return adapter.capabilities[capability] === 'supported' ? adapter : null;
 }
 
+
+/** The enabled server implementation for a module that owns inbox actions. */
+export async function platformInbox(provider: string): Promise<PlatformHost['inbox'] | null> {
+  const module = platformModule(provider);
+  const inbox = hostFor(provider)?.inbox;
+  if (!module || module.capabilities.inbox !== 'supported' || !inbox || !await isPlatformEnabled(provider)) return null;
+  return inbox;
+}
+
+/** Installed, enabled modules with a real server inbox host and inbox capability. */
+export async function inboxPlatformIds(): Promise<string[]> {
+  return Promise.all((PLATFORM_MODULES as readonly PlatformModule[]).map(async module =>
+    module.capabilities.inbox === 'supported' && hostFor(module.id)?.inbox && await isPlatformEnabled(module.id) ? module.id : null))
+    .then(ids => ids.filter((id): id is string => id !== null));
+}
+
 export interface PlatformStatus {
   module: PlatformModule;
   enabled: boolean;

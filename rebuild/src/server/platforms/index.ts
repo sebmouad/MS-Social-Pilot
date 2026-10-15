@@ -3,9 +3,11 @@ import type { PlatformId } from '@/platforms';
 import type { PlatformAdapter } from '@/platforms/types';
 import { configuredFacebookAdapter, configuredFacebookOAuth } from './facebook';
 import { finishFacebookConnection, startFacebookConnection } from './facebook-connect';
+import { canManageFacebookInbox, syncFacebookInbox, replyToFacebookInbox, setFacebookInboxResolved, moderateFacebookComment, deleteFacebookComment } from '@/platforms/facebook/inbox';
 import { syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } from '@/platforms/facebook/jobs';
 import type { PlatformJobName, JobSummary } from '@/server/jobs/types';
 import type { RetryBackoff } from '@/server/jobs/retry';
+import type { InboxActor } from '@/server/inbox/actions';
 
 /** The viewer fields a connection flow needs; the routes check role and access first. */
 export interface ConnectionViewer {
@@ -14,7 +16,17 @@ export interface ConnectionViewer {
 }
 
 /** Server wiring of one installed platform module. */
+export interface PlatformInboxHost {
+  canManage(actor: InboxActor, targetId: string): Promise<boolean>;
+  sync(actor: InboxActor, targetId?: string): Promise<{ targetCount: number; failedCount: number; conversationCount: number; messageCount: number; commentCount: number; syncedAt: string }>;
+  reply(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; text: string }): Promise<{ ok: boolean }>;
+  resolve(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; resolved: boolean }): Promise<{ ok: boolean }>;
+  moderate(actor: InboxActor, input: { id: string; hidden: boolean }): Promise<{ ok: boolean }>;
+  deleteComment(actor: InboxActor, input: { id: string }): Promise<{ ok: boolean }>;
+}
+
 export interface PlatformHost {
+  inbox?: PlatformInboxHost;
   /** Build the engine from Root settings. */
   adapter(): Promise<PlatformAdapter>;
   jobs?: Partial<Record<PlatformJobName, (now: Date, retryLimit: number, retryBackoff: RetryBackoff) => Promise<JobSummary>>>;
@@ -30,6 +42,7 @@ export interface PlatformHost {
 export const PLATFORM_HOSTS: Readonly<Record<PlatformId, PlatformHost>> = {
   facebook: {
     adapter: configuredFacebookAdapter,
+    inbox: { canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, resolve: setFacebookInboxResolved, moderate: moderateFacebookComment, deleteComment: deleteFacebookComment },
     connection: {
       isReady: () => configuredFacebookOAuth().then(() => true, () => false),
       start: startFacebookConnection,

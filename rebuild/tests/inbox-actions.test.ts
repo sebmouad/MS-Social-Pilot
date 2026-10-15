@@ -6,19 +6,18 @@ const mocks = vi.hoisted(() => ({
     conversationMessage: { create: vi.fn(), findFirst: vi.fn() }, postComment: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn() }, $executeRaw: vi.fn(), $transaction: vi.fn(), postTarget: { findMany: vi.fn() },
   },
   config: vi.fn(), decrypt: vi.fn(), engine: { replyToConversation: vi.fn(), replyToComment: vi.fn(), moderateComment: vi.fn(), deleteComment: vi.fn(), listInbox: vi.fn(), listComments: vi.fn() },
-  configuredEngine: vi.fn(), platformEnabled: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), canUseFeature: vi.fn(), canAccessFeature: vi.fn(), canAccessPage: vi.fn(),
+  configuredEngine: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), canUseFeature: vi.fn(), canAccessFeature: vi.fn(), canAccessPage: vi.fn(),
 }));
 
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: mocks.decrypt }));
 vi.mock('../src/server/platforms/facebook', () => ({ configuredFacebookEngine: mocks.configuredEngine }));
-vi.mock('../src/server/platforms/registry', () => ({ isPlatformEnabled: mocks.platformEnabled }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: mocks.canUseFeature }));
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature, canAccessPage: mocks.canAccessPage }));
 
-import { deleteFacebookComment, moderateFacebookComment, replyToFacebookInbox, syncFacebookInbox } from '../src/server/inbox/actions';
+import { deleteFacebookComment, moderateFacebookComment, replyToFacebookInbox, syncFacebookInbox } from '../src/platforms/facebook/inbox';
 
 const actor = { userId: 'user-1', workspaceId: 'workspace-1' };
 
@@ -27,9 +26,8 @@ beforeEach(() => {
   mocks.prisma.membership.findUnique.mockResolvedValue({ id: 'membership-1', role: 'owner' });
   mocks.entitlements.mockResolvedValue({}); mocks.permissions.mockResolvedValue({});
   mocks.canUseFeature.mockReturnValue(true); mocks.canAccessFeature.mockReturnValue(true); mocks.canAccessPage.mockReturnValue(true);
-  mocks.platformEnabled.mockResolvedValue(true);
   mocks.prisma.target.findFirst.mockResolvedValue({ id: 'target-1', providerId: 'page-1', accessToken: 'encrypted', socialAccount: { scopes: 'pages_messaging,pages_manage_engagement', tokenExpiresAt: null, invalidatedAt: null } });
-  mocks.config.mockImplementation(async key => key === 'inbox.messengerReplyWindowHours' ? 24 : key === 'meta.inboxWriteScopes' ? ['pages_messaging', 'pages_manage_engagement'] : ['pages_messaging']);
+  mocks.config.mockImplementation(async key => key === 'platforms.facebook.enabled' ? true : key === 'inbox.messengerReplyWindowHours' ? 24 : key === 'meta.inboxWriteScopes' ? ['pages_messaging', 'pages_manage_engagement'] : ['pages_messaging']);
   mocks.decrypt.mockReturnValue('page-secret'); mocks.configuredEngine.mockResolvedValue(mocks.engine);
   mocks.prisma.conversation.findFirst.mockResolvedValue({ id: 'conversation-1', remoteId: 'remote-conversation-1', targetId: 'target-1' });
   mocks.prisma.conversationMessage.findFirst.mockResolvedValue({ fromId: 'visitor-1', createdTime: new Date(Date.now() - 60 * 60 * 1000) });
@@ -43,7 +41,7 @@ beforeEach(() => {
 
 describe('workspace Facebook inbox actions', () => {
   it('blocks provider reads when Root disables the platform', async () => {
-    mocks.platformEnabled.mockResolvedValue(false);
+    mocks.config.mockImplementation(async key => key === 'platforms.facebook.enabled' ? false : []);
     await expect(syncFacebookInbox(actor, 'target-1')).rejects.toThrow(/unavailable in the inbox/);
     expect(mocks.configuredEngine).not.toHaveBeenCalled();
   });
@@ -66,7 +64,7 @@ describe('workspace Facebook inbox actions', () => {
   });
 
   it('blocks replies outside the configured Messenger window before contacting Facebook', async () => {
-    mocks.config.mockImplementation(async key => key === 'inbox.messengerReplyWindowHours' ? 1 : key === 'meta.inboxWriteScopes' ? ['pages_messaging', 'pages_manage_engagement'] : ['pages_messaging']);
+    mocks.config.mockImplementation(async key => key === 'platforms.facebook.enabled' ? true : key === 'inbox.messengerReplyWindowHours' ? 1 : key === 'meta.inboxWriteScopes' ? ['pages_messaging', 'pages_manage_engagement'] : ['pages_messaging']);
     mocks.prisma.conversationMessage.findFirst.mockResolvedValue({ fromId: 'visitor-1', createdTime: new Date(Date.now() - 2 * 60 * 60 * 1000) });
     await expect(replyToFacebookInbox(actor, { kind: 'message', id: 'conversation-1', text: 'Hello' })).rejects.toThrow(/reply window closed/i);
     expect(mocks.prisma.conversationMessage.findFirst).toHaveBeenCalledWith(expect.objectContaining({
@@ -85,7 +83,7 @@ describe('workspace Facebook inbox actions', () => {
   it('denies a requested channel read when the page is outside the member scope', async () => {
     mocks.prisma.target.findMany.mockResolvedValue([{ id: 'target-foreign' }]);
     mocks.canAccessPage.mockReturnValue(false);
-    mocks.config.mockImplementation(async key => key === 'meta.pageSize' ? 25 : key === 'meta.maxPages' ? 2 : []);
+    mocks.config.mockImplementation(async key => key === 'platforms.facebook.enabled' ? true : key === 'meta.pageSize' ? 25 : key === 'meta.maxPages' ? 2 : []);
     await expect(syncFacebookInbox(actor, 'target-foreign')).rejects.toThrow(/do not have access/);
     expect(mocks.configuredEngine).not.toHaveBeenCalled();
   });
@@ -142,7 +140,7 @@ describe('workspace Facebook inbox actions', () => {
   });
 
   it('syncs the channels it can read, reports the ones it cannot, and fails only when none can be read', async () => {
-    mocks.config.mockImplementation(async key => key === 'meta.pageSize' ? 25 : key === 'meta.maxPages' ? 2 : key === 'meta.inboxReadScopes' ? ['pages_messaging'] : []);
+    mocks.config.mockImplementation(async key => key === 'platforms.facebook.enabled' ? true : key === 'meta.pageSize' ? 25 : key === 'meta.maxPages' ? 2 : key === 'meta.inboxReadScopes' ? ['pages_messaging'] : []);
     mocks.prisma.target.findMany.mockResolvedValue([{ id: 'target-1' }, { id: 'target-2' }]);
     mocks.prisma.target.findFirst.mockImplementation(async ({ where }: { where: { id: string } }) => where.id === 'target-1'
       ? { id: 'target-1', providerId: 'page-1', accessToken: 'encrypted', socialAccount: { scopes: 'pages_messaging', tokenExpiresAt: null, invalidatedAt: null } }

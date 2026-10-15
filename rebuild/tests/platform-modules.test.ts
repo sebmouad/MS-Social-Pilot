@@ -11,7 +11,7 @@ vi.mock('../src/server/platforms/facebook', () => ({
 import { PLATFORM_CONFIG, PLATFORM_MODULES } from '../src/platforms';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
 import { PLATFORM_HOSTS } from '../src/server/platforms/index';
-import { connectablePlatforms, connectionFlow, isPlatformEnabled, platformFor, platformStatuses } from '../src/server/platforms/registry';
+import { connectablePlatforms, connectionFlow, inboxPlatformIds, isPlatformEnabled, platformFor, platformInbox, platformStatuses } from '../src/server/platforms/registry';
 
 const enabled = new Map<string, boolean>();
 beforeEach(() => {
@@ -39,6 +39,14 @@ describe('platform modules', () => {
     expect(await connectionFlow('facebook')).toBeNull();
     expect(await connectablePlatforms()).toEqual([]);
     expect(mocks.adapter).not.toHaveBeenCalled();
+  });
+
+  it('lists inbox providers only when an installed inbox host is enabled', async () => {
+    expect(await inboxPlatformIds()).toEqual([]);
+    expect(await platformInbox('facebook')).toBeNull();
+    enabled.set('platforms.facebook.enabled', true);
+    expect(await inboxPlatformIds()).toEqual(['facebook']);
+    expect(await platformInbox('facebook')).toBe(PLATFORM_HOSTS.facebook.inbox);
   });
 
   it('a switched-on module answers only for the capabilities its engine supports', async () => {

@@ -4,10 +4,10 @@ import { enabledSocialAccountWhere } from '@/server/platforms/registry';
 import { requireViewer } from '@/server/context';
 import { prisma } from '@/server/data';
 import { canAccessPage } from '@/server/permissions';
-import { canManageFacebookInbox } from '@/server/inbox/actions';
+import { canManageInbox } from '@/server/inbox/actions';
 import { runtimeConfig } from '@/server/config/store';
 import { messengerReplyWindow } from '@/server/inbox/reply-window';
-import { INBOX_PROVIDERS, inboxCapabilities, inboxChannelKinds } from '@/server/inbox/providers';
+import { inboxProviders, inboxCapabilities, inboxChannelKinds } from '@/server/inbox/providers';
 import { inboxLastSynced, listInboxItems, loadThread, type InboxFilters } from '@/server/inbox/overview';
 import { formatInboxTime, replyRule } from '@/server/inbox/threads';
 import { channelBadgeInfo } from '@/lib/channel-badge';
@@ -27,7 +27,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const hidden = valid(params.hidden, ['visible', 'all'] as const, 'visible');
 
   const channels = await prisma.target.findMany({
-    where: { workspaceId: viewer.workspaceId, type: { in: inboxChannelKinds() }, enabled: true, socialAccount: { is: { provider: { in: [...INBOX_PROVIDERS] }, invalidatedAt: null, AND: [await enabledSocialAccountWhere()] } } },
+    where: { workspaceId: viewer.workspaceId, type: { in: await inboxChannelKinds() }, enabled: true, socialAccount: { is: { provider: { in: await inboxProviders() }, invalidatedAt: null, AND: [await enabledSocialAccountWhere()] } } },
     orderBy: { name: 'asc' }, select: { id: true, name: true },
   });
   const visibleChannels = channels.filter(channel => canAccessPage(viewer.permissions, channel.id));
@@ -59,7 +59,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   let threadView = null;
   if (thread) {
     const [canWrite, capabilities] = await Promise.all([
-      canManageFacebookInbox({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, thread.target.id),
+      canManageInbox({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, thread.target.id),
       thread.target.provider ? inboxCapabilities(thread.target.provider) : Promise.resolve({ reply: false, hide: false, remove: false }),
     ]);
     const badge = channelBadgeInfo(thread.target.provider);

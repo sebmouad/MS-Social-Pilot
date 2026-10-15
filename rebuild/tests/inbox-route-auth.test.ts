@@ -7,8 +7,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../src/server/context', () => ({ requireViewer: mocks.requireViewer }));
 vi.mock('../src/server/inbox/actions', () => ({
-  syncFacebookInbox: mocks.sync, replyToFacebookInbox: mocks.reply,
-  setFacebookInboxResolved: mocks.resolve, moderateFacebookComment: mocks.moderate, deleteFacebookComment: mocks.remove,
+  syncInbox: mocks.sync, replyToInbox: mocks.reply,
+  setInboxResolved: mocks.resolve, moderateInboxComment: mocks.moderate, deleteInboxComment: mocks.remove,
 }));
 
 import { POST } from '../src/app/api/inbox/actions/route';
