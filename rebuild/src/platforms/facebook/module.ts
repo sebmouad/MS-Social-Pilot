@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { entry, url, stringList } from '@/lib/config/entry';
 import { enabledEntry, type PlatformModule } from '../module';
+import { FACEBOOK_METRICS, inferFacebookMetric } from './metrics';
 
 /**
  * The Facebook platform module: Facebook Pages and Meta ad accounts.
@@ -16,6 +17,8 @@ export const facebookModule = {
   mark: { text: 'f', color: '#1877f2' },
   capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
   channelKinds: [{ kind: 'page', label: 'Facebook Page' }],
+  metrics: FACEBOOK_METRICS,
+  inferMetric: inferFacebookMetric,
   enabledKey: 'platforms.facebook.enabled',
   requiredSettings: ['meta.appId', 'meta.appSecret', 'meta.oauthRedirectUri', 'meta.oauthScopes'],
   settingsGroup: 'Facebook',

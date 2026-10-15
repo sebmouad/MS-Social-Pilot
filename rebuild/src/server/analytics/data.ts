@@ -1,14 +1,14 @@
 import { prisma } from '@/server/data';
 import { enabledSocialAccountWhere } from '@/server/platforms/registry';
+import { dayEndInstant, dayStartInstant, resolveDayRange, safeTimeZone, type DayRange } from './time';
 
-export type AnalyticsRange = { from: Date; to: Date };
+/** `from`/`to` are the first and last instants of the first and last day in the workspace time zone; `days` are those calendar days. */
+export type AnalyticsRange = { from: Date; to: Date; days?: DayRange; timeZone?: string };
 
-export function analyticsRange(start?: string, end?: string, now = new Date()): AnalyticsRange {
-  const valid = (value?: string) => value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
-  const to = valid(end) ? new Date(`${end}T23:59:59.999`) : new Date(now);
-  const from = valid(start) ? new Date(`${start}T00:00:00`) : new Date(to.getTime() - 29 * 86_400_000);
-  if (from > to) return { from: new Date(to.getTime() - 29 * 86_400_000), to };
-  return { from, to };
+export function analyticsRange(start?: string, end?: string, now = new Date(), timeZone = 'UTC', maxDays = 400): AnalyticsRange {
+  const zone = safeTimeZone(timeZone);
+  const days = resolveDayRange(start, end, now, zone, { maxDays });
+  return { from: dayStartInstant(days.start, zone), to: dayEndInstant(days.end, zone), days, timeZone: zone };
 }
 
 export async function loadAnalytics(workspaceId: string, targetIds: string[], range: AnalyticsRange, allowedTargetIds?: readonly string[], selectedAdAccountIds?: readonly string[]) {

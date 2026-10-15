@@ -1,5 +1,6 @@
 import type { Entry } from '@/lib/config/entry';
 import type { CapabilityDeclaration } from './types';
+import type { MetricDefinition, MetricScope } from './metrics';
 
 /**
  * A platform module: everything one social network brings to the product.
@@ -24,6 +25,10 @@ export interface PlatformModule {
   readonly capabilities: CapabilityDeclaration;
   /** Kinds of channel the module discovers, with their customer-facing labels. */
   readonly channelKinds: readonly { readonly kind: string; readonly label: string }[];
+  /** Plain-language catalogue of the metrics this module stores (see `./metrics.ts`). */
+  readonly metrics: readonly MetricDefinition[];
+  /** Describes stored metric names the catalogue does not list, or returns nothing. */
+  readonly inferMetric?: (scope: MetricScope, key: string) => MetricDefinition | undefined;
   /** Root setting that switches the module on or off (`platforms.<id>.enabled`). */
   readonly enabledKey: string;
   /** Root settings that must be filled in before customers can connect. */
