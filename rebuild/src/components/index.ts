@@ -5,3 +5,5 @@ export type { TableColumn } from "./DataTable";
 export { FilterBar, FilterSelect } from "./Filters";
 export type { FilterChoice } from "./Filters";
 export { Dialog } from "./Dialog";
+export { ChannelChip, PlatformMark } from "./ChannelChip";
+export { EmptyState } from "./EmptyState";
