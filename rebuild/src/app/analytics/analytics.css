@@ -48,5 +48,8 @@
 .analytics-state { text-align: center; padding-block: 48px; }
 .analytics-state h2 { margin-bottom: 8px; }
 .analytics-state p { margin: 0; color: var(--ink-soft); }
+.analytics-state__action { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; margin-top: 18px; padding: 0 15px; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent, white); font-size: 13px; font-weight: 700; }
+.analytics-state__action:hover { background: var(--accent-hover); }
+.analytics-panel-title + .metric-grid { margin-top: 20px; }
 @media (max-width: 620px) { .activity-chart { gap: 5px; } .activity-chart__item small { font-size: 9px; white-space: normal; } .analytics-panel-title { align-items: flex-start; flex-direction: column; } }
 @media (max-width: 900px) { .analytics-metrics { grid-template-columns: 1fr; } }

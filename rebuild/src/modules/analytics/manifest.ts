@@ -6,6 +6,6 @@ export const analyticsManifest = {
   href: '/analytics',
   pages: [
     { id: 'analytics/overview', title: 'Analytics', href: '/analytics', description: 'Explore every available metric in one place.' },
-    { id: 'analytics/reports', title: 'Reports', href: '/reports', description: 'Review a date and channel scoped report, and export its data.' },
+    { id: 'analytics/reports', title: 'CSV export', href: '/reports', navigation: false, description: 'Export the selected Analytics range and channels.' },
   ],
 } as const satisfies ModuleManifest;

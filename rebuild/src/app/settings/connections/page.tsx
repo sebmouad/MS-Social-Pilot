@@ -32,6 +32,9 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
     {params.notice === 'oauth_invalid_state' && <p className={styles['settings-note']} role="alert">The authorization session expired or changed. Start again from this page.</p>}
     {params.notice === 'saved' && <p className={styles['settings-note']} role="status">Selection saved.</p>}
     {params.notice === 'failed' && <p className={styles['settings-note']} role="alert">The selection could not be saved. Check your workspace access and try again.</p>}
+    {!accounts.length && !adRows.length ? <SettingsPanel title="No connections yet" detail="Channels and ad accounts you select will appear here.">
+      <p className={styles['settings-empty']}>{facebookReady && canManage ? 'Connect a source above to choose what this workspace uses.' : 'There are no channels or advertising accounts in this workspace yet.'}</p>
+    </SettingsPanel> : <>
     <SettingsPanel title="Social accounts" detail={`${accounts.length} connected account${accounts.length === 1 ? '' : 's'} in this workspace`}>
       {accounts.length ? <div className={styles['settings-table-wrap']}><table className={styles['settings-table']}><thead><tr><th scope="col">Account</th><th scope="col">Platform</th><th scope="col">Channels</th><th scope="col">Status</th></tr></thead><tbody>
         {accounts.map(account => { const status = accountStatus(account.invalidatedAt); return <tr key={account.id}>
@@ -43,12 +46,12 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
       </tbody></table></div> : <div className={styles['settings-empty']}>No social accounts are connected to this workspace.</div>}
       {!canManage && <p className={styles['settings-note']}>Only workspace owners and admins can change these selections.</p>}
     </SettingsPanel>
-
     <SettingsPanel title="Advertising accounts" detail={`${adRows.length} discovered account${adRows.length === 1 ? '' : 's'}`}>
       {adRows.length ? <div className={styles['settings-table-wrap']}><table className={styles['settings-table']}><thead><tr><th scope="col">Ad account</th><th scope="col">Linked profile</th><th scope="col">Account ID</th><th scope="col">Status</th><th scope="col">Selection</th></tr></thead><tbody>
         {adRows.map(ad => <tr key={ad.id}><td><span className={styles['settings-table__primary']}>{ad.name}</span><span className={styles['settings-table__secondary']}>{ad.provider ? providerName(ad.provider) : 'Platform not recorded'}</span></td><td>{ad.owner ?? 'No linked profile'}</td><td>{ad.actId}</td><td><Status tone={ad.enabled && !ad.invalidatedAt ? 'good' : 'warning'}>{!ad.enabled ? 'Not selected' : ad.invalidatedAt ? 'Linked profile needs attention' : 'Selected'}</Status></td><td>{ad.socialAccountId ? (ad.enabled ? 'Selected' : 'Not selected') : 'Reconnect source first'}</td></tr>)}
       </tbody></table></div> : <div className={styles['settings-empty']}>No advertising accounts are linked to the social accounts in this workspace.</div>}
     </SettingsPanel>
+    </>}
     <p className={styles['settings-note']}>Selection changes only the workspace’s local enabled state. They do not change access at the provider. Credentials are never shown here.</p>
   </SettingsPage></PageFrame>;
 }

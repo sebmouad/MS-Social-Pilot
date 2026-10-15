@@ -3,6 +3,8 @@ import { requireViewer } from '@/server/context';
 import { buildAnalytics } from '@/server/analytics/aggregate';
 import { analyticsRange, loadAnalytics } from '@/server/analytics/data';
 import { prisma } from '@/server/data';
+import { canUseFeature } from '@/server/entitlements';
+import { canAccessFeature } from '@/server/permissions';
 
 type Search = { start?: string; end?: string; filter?: string; channel?: string | string[] };
 const inputDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -31,7 +33,7 @@ function MetricChart({ metric }: { metric: ReturnType<typeof buildAnalytics>['me
 }
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<Search> }) {
-  const { workspaceId, permissions } = await requireViewer({ feature: 'analytics/overview' });
+  const { workspaceId, permissions, entitlements } = await requireViewer({ feature: 'analytics/overview' });
   const allowedTargetIds = permissions.pageScope.all ? undefined : permissions.pageScope.ids;
   const params = await searchParams;
   const range = analyticsRange(params.start, params.end);
@@ -68,6 +70,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     scheduled: countStatus('scheduled'),
     failed: countStatus('failed') + countStatus('partially_failed'),
   };
+  const exportParams = new URLSearchParams({ start: inputDate(range.from), end: inputDate(range.to), filter: '1' });
+  selected.forEach(target => exportParams.append('channel', target.id));
+  const canExport = selected.length > 0 && canUseFeature(entitlements, 'analytics/reports') && canAccessFeature(permissions, 'analytics/reports');
   const sidebar = <form action="/analytics" method="get" className="analytics-sidebar-filter">
     <p className="analytics-filter-heading">Filters</p>
     <p className="shell-subnav__label">Date range</p>
@@ -80,9 +85,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   </form>;
 
   return <PageFrame module="analytics" sidebar={sidebar}><div className="page-stack">
-    <header className="page-heading"><div><p className="eyebrow">Analytics</p><h1>Performance</h1><p>Stored channel and advertising metrics from {range.from.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} to {range.to.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}.</p></div></header>
+    <header className="page-heading"><div><p className="eyebrow">Analytics</p><h1>Performance</h1><p>Stored channel and advertising metrics from {range.from.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} to {range.to.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}.</p></div>{canExport && <a className="button button-secondary" href={`/api/reports/export?${exportParams}`}>Export CSV</a>}</header>
     {!data || !view ? <section className="panel analytics-state"><h2>Analytics could not be loaded</h2><p>Please try again in a moment.</p></section> : <>
-      {!selected.length ? <section className="panel analytics-state"><h2>{data.targets.length ? 'No channels selected' : 'No channels connected'}</h2><p>{data.targets.length ? 'Choose one or more channels in the sidebar to see available metrics.' : 'Connect a channel in Settings to see its audience and available metrics here.'}</p></section> : <>
+      {!selected.length ? <section className="panel analytics-state"><h2>{data.targets.length ? 'No channels selected' : 'No channels connected'}</h2><p>{data.targets.length ? 'Choose one or more channels in the sidebar to see available metrics.' : 'Connect a channel to see its audience and available metrics here.'}</p>{!data.targets.length && canUseFeature(entitlements, 'settings/connections') && <a className="analytics-state__action" href="/settings/connections">View connections</a>}</section> : <>
         <section className="panel analytics-audience"><div className="analytics-panel-title"><div><h2>Selected channel audience</h2><p className="small-note">The latest stored follower or Page-like count is included once for each channel with audience data.</p></div><span className="badge">{view.audience.covered} of {view.audience.selected} channels</span></div>
           <div className="analytics-audience__total"><strong>{new Intl.NumberFormat().format(view.audience.total)}</strong><span>total audience across channels with data</span></div>
           {view.audience.entries.length ? <div className="report-list">{view.audience.entries.map(entry => <div className="report-row" key={entry.id}><span>{entry.name}<small> {entry.metric === 'page_fans' ? 'Page likes' : 'Followers'}</small></span><strong>{new Intl.NumberFormat().format(entry.value)} · data {entry.asOf.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · synced {entry.fetchedAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</strong></div>)}</div> : <p className="empty-note">No audience counts are stored for the selected channels.</p>}
@@ -93,10 +98,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         {view.metrics.length ? <section className="panel"><div className="analytics-panel-title"><div><h2>Available metrics</h2><p className="small-note">Each chart and table is built from metrics already stored for this workspace.</p></div><span className="badge">{view.metrics.length} metrics</span></div>
           <div className="analytics-metrics">{view.metrics.map(metric => <MetricChart metric={metric} key={`${metric.source}:${metric.key}`} />)}</div>
         </section> : <section className="panel analytics-state"><h2>No metrics for this selection yet</h2><p>Try another date range or channel. New connections may take time to show performance data; advertising results appear when a connected ad account has data.</p></section>}
-      </>}
       <section className="panel"><div className="analytics-panel-title"><div><h2>Publishing records</h2><p className="small-note">Workspace posts matched to the selected channels and date range. Published posts use their publish date, scheduled posts use their scheduled date, and failed posts use their creation date.</p></div></div>
         <div className="metric-grid"><article className="metric-card"><dl><dt>Published</dt><dd>{publishingCounts.published}</dd></dl></article><article className="metric-card"><dl><dt>Scheduled</dt><dd>{publishingCounts.scheduled}</dd></dl></article><article className="metric-card"><dl><dt>Failed or partial</dt><dd>{publishingCounts.failed}</dd></dl></article></div>
       </section>
+      </>}
     </>}
   </div></PageFrame>;
 }

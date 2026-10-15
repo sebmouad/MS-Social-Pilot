@@ -29,8 +29,9 @@ describe('customer module manifests', () => {
     expect(PAGES.some(({ href }) => href === '/root' || href.startsWith('/root/'))).toBe(false);
   });
 
-  it('offers Analytics and Reports under the shared analytics module', () => {
-    expect(PAGES.filter(({ module }) => module === 'analytics').map(({ href }) => href)).toEqual(['/analytics', '/reports']);
+  it('shows one Analytics page while retaining scoped CSV export as a capability', () => {
+    expect(PAGES.filter(({ module, navigation }) => module === 'analytics' && navigation !== false).map(({ href }) => href)).toEqual(['/analytics']);
+    expect(PAGES.find(({ id }) => id === 'analytics/reports')?.navigation).toBe(false);
   });
 
   it('uses a compact mobile title for Publishing', () => {

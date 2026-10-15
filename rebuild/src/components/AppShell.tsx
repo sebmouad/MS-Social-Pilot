@@ -30,13 +30,13 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [filterOpen]);
-  const modulePages = PAGES.filter(page => page.module === activeModule && enabledFeatures.includes(page.id));
+  const modulePages = PAGES.filter(page => page.module === activeModule && page.navigation !== false && enabledFeatures.includes(page.id));
   const enabledModuleSet = new Set(enabledModules);
-  const enabledModulePages = new Set(enabledFeatures.map(id => PAGES.find(page => page.id === id)?.module).filter(Boolean));
+  const enabledModulePages = new Set(enabledFeatures.map(id => PAGES.find(page => page.id === id && page.navigation !== false)?.module).filter(Boolean));
   const navigationModules = MODULES.filter(module => enabledModuleSet.has(module.id) && enabledModulePages.has(module.id));
   const primaryMobileModules = navigationModules.length > 5 ? navigationModules.slice(0, 4) : navigationModules;
   const moreMobileModules = navigationModules.length > 5 ? navigationModules.slice(4) : [];
-  const moduleHref = (module: (typeof MODULES)[number]) => PAGES.find(page => page.module === module.id && enabledFeatures.includes(page.id))?.href ?? module.href;
+  const moduleHref = (module: (typeof MODULES)[number]) => PAGES.find(page => page.module === module.id && page.navigation !== false && enabledFeatures.includes(page.id))?.href ?? module.href;
   return <div className="shell">
     <a className="shell-skip-link" href="#main-content">Skip to content</a>
     <aside className="shell-sidebar" aria-label="Main navigation">

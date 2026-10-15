@@ -10,6 +10,7 @@ export interface ProductPage {
   href: string;
   module: ModuleId;
   description: string;
+  navigation?: boolean;
 }
 
 export interface ProductModule {

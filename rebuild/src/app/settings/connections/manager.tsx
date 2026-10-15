@@ -73,9 +73,9 @@ export function ConnectionManager({ sources, canManage, canConnectFacebook, init
     finally { setPreviewBusy(false); }
   }
 
-  if (!canManage) return null;
+  if (!canManage || (!sources.length && !canConnectFacebook)) return null;
   return <>
-    <div className={styles['connection-toolbar']}><p>Choose the channels and advertising accounts this workspace uses.</p><div>{canConnectFacebook && <button type="button" onClick={connectFacebook} disabled={connecting}>{connecting ? 'Connecting…' : 'Connect Facebook'}</button>}<button type="button" className={styles['connection-primary-button']} onClick={() => setOpen(true)}>Manage selections</button></div></div>
+    <div className={styles['connection-toolbar']}><p>{sources.length ? 'Choose the channels and advertising accounts this workspace uses.' : 'Connect a source to choose its channels and advertising accounts.'}</p><div>{canConnectFacebook && <button type="button" onClick={connectFacebook} disabled={connecting}>{connecting ? 'Connecting…' : 'Connect Facebook'}</button>}{sources.length > 0 && <button type="button" className={styles['connection-primary-button']} onClick={() => setOpen(true)}>Manage selections</button>}</div></div>
     {notice && !open && !disconnect && <p role="alert" className={styles['connection-error']}>{notice}</p>}
     {open && <ModalDialog className={styles['connection-dialog']} labelledBy="connection-dialog-title" onDismiss={() => setOpen(false)} busy={busy} initialFocus="[aria-label='Close']">
       <header><div><p className={styles['settings-eyebrow']}>Workspace connections</p><h2 id="connection-dialog-title">Choose channels and ad accounts</h2><p>Turn discovered channels and advertising accounts on or off for this workspace.</p></div><button type="button" aria-label="Close" onClick={() => setOpen(false)}>×</button></header>

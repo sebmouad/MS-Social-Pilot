@@ -4,6 +4,7 @@ export interface ModulePageManifest {
   readonly title: string;
   readonly href: string;
   readonly description: string;
+  readonly navigation?: boolean;
 }
 
 /** Source of truth for one independently available customer module. */
