@@ -21,16 +21,15 @@ function hashToken(token: string) {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }
 
-/** Root-managed limits retain the existing environment fallbacks. */
+/** Root-managed sign-in limits use validated registry values. */
 export async function authRateLimit() {
-  const rows = await prisma.appSetting.findMany({ where: { key: { in: ['auth.loginAttempts', 'auth.loginWindowMinutes'] } }, select: { key: true, value: true } });
-  const values = new Map(rows.map(row => [row.key, row.value]));
-  const safeInteger = (value: unknown, fallback: number, min: number, max: number) => typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : fallback;
-  const envAttempts = safeInteger(Number(process.env.LOGIN_ATTEMPTS), 10, 1, 1000);
-  const envWindow = safeInteger(Number(process.env.LOGIN_WINDOW_MINUTES), 15, 1, 1440);
+  const [attempts, windowMinutes] = await Promise.all([
+    runtimeConfig('auth.loginAttempts'),
+    runtimeConfig('auth.loginWindowMinutes'),
+  ]);
   return {
-    limit: safeInteger(values.get('auth.loginAttempts'), envAttempts, 1, 1000),
-    windowMs: safeInteger(values.get('auth.loginWindowMinutes'), envWindow, 1, 1440) * 60_000,
+    limit: attempts,
+    windowMs: windowMinutes * 60_000,
   };
 }
 
@@ -43,14 +42,9 @@ export async function signIn(email: string, password: string): Promise<'signed-i
   const valid = verifyLegacyPassword(password, user?.passwordHash ?? getDummyPasswordHash());
   if (!user || !valid || user.disabledAt) throw new Error('Invalid email or password.');
 
-  // SECURITY_TWO_STEP mirrors the legacy policy's values. Unknown/missing means
-  // the legacy default ('admins'); configured factors always require verification.
-  const configuredPolicy = (await prisma.appSetting.findUnique({
-    where: { key: 'security.twoStep' }, select: { value: true },
-  }))?.value ?? process.env.SECURITY_TWO_STEP;
-  const policy = configuredPolicy === 'off' || configuredPolicy === 'everyone' || configuredPolicy === 'admins'
-    ? configuredPolicy
-    : configuredPolicy === undefined ? 'admins' : 'everyone';
+  // Config registry validates the policy and supplies its default.
+  // Enrolled factors still require verification even when policy is off.
+  const policy = await runtimeConfig('security.twoStep');
   const hasTotp = Boolean(user.totpEnabledAt);
   const hasPasskey = user._count.passkeys > 0;
   const privilegedMembership = policy === 'admins' && !user.isInstanceOwner ? await prisma.membership.findFirst({

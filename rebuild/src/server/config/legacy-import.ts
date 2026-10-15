@@ -19,7 +19,13 @@ export const legacyFacebookSettingKeys = [
 
 export function legacyConfigCandidates(
   rows: readonly LegacySettingRow[],
-  options: { appUrl?: string; decrypt: (encrypted: string) => string },
+  options: {
+    appUrl?: string;
+    authPolicy?: string;
+    loginAttempts?: string;
+    loginWindowMinutes?: string;
+    decrypt: (encrypted: string) => string;
+  },
 ): LegacyConfigCandidate[] {
   const byKey = new Map(rows.map(row => [row.key, row]));
   const candidates: LegacyConfigCandidate[] = [];
@@ -44,5 +50,12 @@ export function legacyConfigCandidates(
     if (base.protocol !== 'https:') throw new Error('Legacy APP_URL must use HTTPS before importing an OAuth redirect.');
     candidates.push({ key: 'meta.oauthRedirectUri', source: 'APP_URL', value: new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, base).toString(), secret: false });
   }
+  if (options.authPolicy !== undefined) {
+    // Legacy sign-in treated any defined, unrecognized value as "everyone".
+    const policy = ['off', 'admins', 'everyone'].includes(options.authPolicy) ? options.authPolicy : 'everyone';
+    candidates.push({ key: 'security.twoStep', source: 'SECURITY_TWO_STEP', value: policy, secret: false });
+  }
+  if (options.loginAttempts) candidates.push({ key: 'auth.loginAttempts', source: 'LOGIN_ATTEMPTS', value: Number(options.loginAttempts), secret: false });
+  if (options.loginWindowMinutes) candidates.push({ key: 'auth.loginWindowMinutes', source: 'LOGIN_WINDOW_MINUTES', value: Number(options.loginWindowMinutes), secret: false });
   return candidates;
 }

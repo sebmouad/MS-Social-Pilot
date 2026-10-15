@@ -74,6 +74,11 @@ cutover runbook and host configuration are supplied.
    storage, do not print or inspect record contents during this run, and
    retain only the aggregate evidence needed for review. This rehearsal is
    bounded to a local clone and cannot serve as production authorization.
+   Rehearse `scripts/import-legacy-config.ts` on that copy before app traffic
+   moves. Verify the imported `security.twoStep`, sign-in limits, Meta
+   credentials, and OAuth redirect against the legacy environment. The rebuild
+   reads Root registry values for authentication and no longer reads the
+   legacy authentication environment variables at request time.
 4. **Prove backup and recovery.** Before any eventual production switch,
    perform the configured backup and verify its artifact, timestamp, and
    restore into an isolated database. Include media and environment recovery

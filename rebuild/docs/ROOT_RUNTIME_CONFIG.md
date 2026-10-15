@@ -4,7 +4,7 @@ Registry entries retain literal key types and infer value types from their
 validation schemas. Server readers accept these typed keys; dynamic keys still
 pass through the same runtime validation.
 
-The legacy Facebook configuration can be mapped into this registry on a
+Legacy Facebook configuration and authentication environment settings can be mapped into this registry on a
 staging copy with `node --env-file-if-exists=../.env --import tsx
 scripts/import-legacy-config.ts` from `app/rebuild`. The default is a dry run
 that prints only source and destination key names. `--apply` validates every
@@ -12,6 +12,11 @@ candidate, skips Root keys already present, encrypts the app secret again, and
 records value-free changes under the installation owner. It must be rehearsed
 on a production-shaped copy before any production use. The importer never
 enables ads management automatically.
+If `SECURITY_TWO_STEP`, `LOGIN_ATTEMPTS`, or `LOGIN_WINDOW_MINUTES` is set,
+the importer validates and records it before the rebuild stops reading those
+legacy environment values. Missing values use the registry defaults.
+An explicitly set but unrecognized legacy two-step value imports as `everyone`,
+matching the legacy sign-in policy's fail-closed behavior.
 
 The private `/root/config` screen is guarded by the installation owner flag (`User.isInstanceOwner`) and the validated session cookie. Its API returns 404 to signed-in non-owners. Secret values are write-only: the API reports only whether a value is set, never its plaintext or ciphertext. The screen groups settings in a sidebar and supports key/description search.
 

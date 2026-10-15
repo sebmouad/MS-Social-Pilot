@@ -12,7 +12,13 @@ const apply = args[0] === '--apply';
 async function main() {
 try {
   const rows = await prisma.appSetting.findMany({ where: { key: { in: [...legacyFacebookSettingKeys] } }, select: { key: true, value: true, encrypted: true } });
-  const candidates = legacyConfigCandidates(rows, { appUrl: process.env.APP_URL, decrypt: decryptSecret });
+  const candidates = legacyConfigCandidates(rows, {
+    appUrl: process.env.APP_URL,
+    authPolicy: process.env.SECURITY_TWO_STEP,
+    loginAttempts: process.env.LOGIN_ATTEMPTS,
+    loginWindowMinutes: process.env.LOGIN_WINDOW_MINUTES,
+    decrypt: decryptSecret,
+  });
   const planned = [];
   for (const candidate of candidates) {
     const definition = CONFIG_BY_KEY.get(candidate.key);

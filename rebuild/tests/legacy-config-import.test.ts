@@ -21,4 +21,20 @@ describe('legacy Facebook configuration import plan', () => {
     expect(() => legacyConfigCandidates([{ key: 'facebook.appSecret', value: 'plain', encrypted: false }], { decrypt: value => value })).toThrow(/encrypted format/);
     expect(() => legacyConfigCandidates([], { appUrl: 'http://example.test', decrypt: value => value })).toThrow(/HTTPS/);
   });
+
+  it('plans legacy authentication policy import without embedding defaults', () => {
+    expect(legacyConfigCandidates([], {
+      authPolicy: 'everyone', loginAttempts: '7', loginWindowMinutes: '12', decrypt: value => value,
+    })).toEqual([
+      { key: 'security.twoStep', source: 'SECURITY_TWO_STEP', value: 'everyone', secret: false },
+      { key: 'auth.loginAttempts', source: 'LOGIN_ATTEMPTS', value: 7, secret: false },
+      { key: 'auth.loginWindowMinutes', source: 'LOGIN_WINDOW_MINUTES', value: 12, secret: false },
+    ]);
+  });
+
+  it('preserves fail-closed legacy behavior for an explicitly invalid policy', () => {
+    expect(legacyConfigCandidates([], { authPolicy: '', decrypt: value => value })).toContainEqual({
+      key: 'security.twoStep', source: 'SECURITY_TWO_STEP', value: 'everyone', secret: false,
+    });
+  });
 });
