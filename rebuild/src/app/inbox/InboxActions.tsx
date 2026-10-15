@@ -43,7 +43,7 @@ export function InboxActions({ id, kind, resolved, hidden = false, canWrite, rep
   </div>;
 }
 
-export function InboxSyncButton({ targetId, disabled }: { targetId?: string; disabled: boolean }) {
+export function InboxSyncButton({ targetId, disabled = false }: { targetId?: string; disabled?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const router = useRouter();

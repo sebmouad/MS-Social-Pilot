@@ -52,9 +52,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     <button className="ui-button ui-button--primary ui-button--md" type="submit">Apply filters</button><a href="/inbox">Reset filters</a>
   </form></aside>;
 
-  return <PageFrame module="inbox" sidebar={sidebar}><div className="page-stack inbox-page">
-    <header className="page-heading inbox-page-heading"><div><p className="eyebrow">Inbox</p><h1>Conversations</h1><p>Page messages and post comments from the Facebook channels you can access.</p></div><InboxSyncButton targetId={selectedChannel === 'all' ? undefined : selectedChannel} disabled={!visibleChannels.length} /></header>
-    {!total ? <section className="panel"><h2>{visibleChannels.length ? 'No inbox activity matches these filters' : 'No Facebook Pages are available'}</h2><p className="empty-note">Sync connected Facebook Pages to load conversations and comments on posts published through this app. Comments on posts made elsewhere are not synced yet.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <section className="panel">
+  return <PageFrame module="inbox" sidebar={visibleChannels.length ? sidebar : undefined}><div className="page-stack inbox-page">
+    <header className="page-heading inbox-page-heading"><div><p className="eyebrow">Inbox</p><h1>Conversations</h1><p>Messages and post comments from the selected channels you can access.</p></div>{visibleChannels.length > 0 && <InboxSyncButton targetId={selectedChannel === 'all' ? undefined : selectedChannel} />}</header>
+    {!total ? <section className="panel"><h2>{visibleChannels.length ? 'No inbox activity matches these filters' : 'No channels with inbox access'}</h2><p className="empty-note">{visibleChannels.length ? 'Try another channel or status, or sync again to check for new activity.' : 'Connect and select a channel that supports messages or comments to see its activity here.'}</p><a className="text-link" href={visibleChannels.length ? '/inbox' : '/settings/connections'}>{visibleChannels.length ? 'Reset filters' : 'View connections'}</a></section> : <section className="panel">
       <div className="inbox-summary"><h2>Recent activity</h2><span>{total} items · up to 50 per type</span></div>
       {conversations.length > 0 && <div className="inbox-group"><h3>Messages <span>{conversations.length}</span></h3><div className="inbox-list">{conversations.map(item => {
         const latest = item.messages[0];

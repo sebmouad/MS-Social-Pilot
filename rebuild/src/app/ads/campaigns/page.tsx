@@ -31,8 +31,9 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   ] as const)));
   const createAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, account.id)] as const)));
   const sidebar = <AdsFiltersSidebar accounts={accounts} filters={filters} action="/ads/campaigns" />;
-  return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack">
-    <header className="page-heading"><div><p className="eyebrow">Ads / Performance</p><h1>Campaign, ad set, and ad results</h1><p>Stored daily insight records · {dateRangeLabel(filters)}. Select an account and date range in the sidebar.</p></div></header>
+  return <PageFrame module="ads" sidebar={accounts.length ? sidebar : undefined}><div className="page-stack">
+    <header className="page-heading"><div><p className="eyebrow">Ads / Performance</p><h1>Campaign, ad set, and ad results</h1><p>{accounts.length ? `Stored daily insight records · ${dateRangeLabel(filters)}. Select an account and date range in the sidebar.` : 'Connect an advertising account to review and manage its campaigns.'}</p></div></header>
+    {!accounts.length ? <section className="panel empty-state"><h2>No ad accounts connected</h2><p>Connect and select an advertising account to see campaign results and available actions here.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <>
     {byAccount.size ? [...byAccount].map(([accountId, rows]) => {
       const account = accounts.find(item => item.id === accountId);
       const levels = [
@@ -72,5 +73,6 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
       {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id)).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} />)}
     </section> : null}
     <p className="ads-read-only-note">Review delivery and adjust eligible campaigns, ad sets, and ads. Changes require confirmation before they are sent.</p>
+    </>}
   </div></PageFrame>;
 }
