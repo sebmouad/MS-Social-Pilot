@@ -4,7 +4,7 @@ import type { FacebookConfig } from '../src/platforms/facebook/config';
 
 const config: FacebookConfig = {
   graphBaseUrl: 'https://graph.facebook.test', oauthBaseUrl: 'https://www.facebook.test', graphVersion: 'v99.0', requestTimeoutMs: 2_000,
-  maxPages: 4, pageSize: 25, pageInsightMetrics: ['page_views_total'], adInsightFields: ['spend', 'impressions'],
+  maxPages: 4, pageSize: 25, pageInsightMetrics: ['page_views_total'], adInsightFields: ['spend', 'impressions'], maxImageUploadBytes: 1024, allowedImageMimeTypes: ['image/jpeg', 'image/png'],
 };
 const response = (payload: unknown, status = 200) => new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
 const mockFetch = (...replies: Response[]) => vi.fn(async () => replies.shift() ?? response({ data: [] })) as unknown as typeof fetch;
@@ -85,6 +85,39 @@ describe('Facebook Graph adapter', () => {
     expect(calls.map(c => c.url)).toEqual(expect.arrayContaining([expect.stringContaining('/p1/photos'), expect.stringContaining('/p1/feed')]));
     expect(calls[0].body).toContain('published=false');
     expect(calls[2].body).toContain('attached_media%5B0%5D');
+  });
+
+  it('uploads local Page images as bounded multipart bytes and uses returned ids for album posts', async () => {
+    const calls: Array<{ url: string; body: BodyInit | null | undefined }> = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), body: init?.body });
+      return response({ id: calls.length === 3 ? 'post-local' : `photo-${calls.length}` });
+    }) as unknown as typeof fetch;
+    const engine = createFacebookEngine(config, fetcher);
+    const jpeg = { bytes: new Uint8Array([0xff, 0xd8, 0xff, 1]), mimeType: 'image/jpeg', fileName: 'launch.jpg' };
+    await engine.publish({ targetId: 'p1', accessToken: 'page-token', text: 'local album', media: [
+      { kind: 'image', url: 'https://unused.test/a.jpg', localFile: jpeg },
+      { kind: 'image', url: 'https://unused.test/b.jpg', localFile: { ...jpeg, fileName: 'second.jpg' } },
+    ] });
+    const firstForm = calls[0].body as FormData;
+    expect(firstForm).toBeInstanceOf(FormData);
+    expect(firstForm.get('access_token')).toBe('page-token');
+    expect(firstForm.get('published')).toBe('false');
+    expect(firstForm.get('temporary')).toBe('true');
+    expect(firstForm.get('source')).toBeInstanceOf(File);
+    expect((calls[2].body as URLSearchParams).get('attached_media[0]')).toBe(JSON.stringify({ media_fbid: 'photo-1' }));
+  });
+
+  it('rejects oversized or content-mismatched local files before any provider request', async () => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+    const engine = createFacebookEngine(config, fetcher);
+    await expect(engine.publish({ targetId: 'p1', accessToken: 'page-token', text: 'too big', media: [
+      { kind: 'image', url: 'https://unused.test/a.jpg', localFile: { bytes: new Uint8Array(1025), mimeType: 'image/jpeg', fileName: 'a.jpg' } },
+    ] })).rejects.toThrow(/size limit/);
+    await expect(engine.publish({ targetId: 'p1', accessToken: 'page-token', text: 'wrong type', media: [
+      { kind: 'image', url: 'https://unused.test/a.jpg', localFile: { bytes: new Uint8Array([0, 1, 2]), mimeType: 'image/jpeg', fileName: 'a.jpg' } },
+    ] })).rejects.toThrow(/does not match/);
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it('reads remote status and sends auth on delete', async () => {

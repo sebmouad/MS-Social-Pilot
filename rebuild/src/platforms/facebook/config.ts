@@ -9,6 +9,10 @@ export interface FacebookConfig {
   /** Metric names approved for the configured app and its permissions. */
   pageInsightMetrics: readonly string[];
   adInsightFields: readonly string[];
+  /** Root-managed ceiling for an image uploaded from local storage. */
+  maxImageUploadBytes: number;
+  /** Root-managed MIME allowlist for binary Page photo uploads. */
+  allowedImageMimeTypes: readonly string[];
 }
 
 export function validateFacebookConfig(config: FacebookConfig): FacebookConfig {
@@ -21,6 +25,8 @@ export function validateFacebookConfig(config: FacebookConfig): FacebookConfig {
   if (!Number.isInteger(config.maxPages) || config.maxPages < 1 || config.maxPages > 100) throw new Error('Facebook page limit is out of range.');
   if (!Number.isInteger(config.pageSize) || config.pageSize < 1 || config.pageSize > 100) throw new Error('Facebook page size is out of range.');
   if (!Array.isArray(config.pageInsightMetrics) || !Array.isArray(config.adInsightFields)) throw new Error('Facebook insight fields must be configured.');
+  if (!Number.isInteger(config.maxImageUploadBytes) || config.maxImageUploadBytes < 1 || config.maxImageUploadBytes > 25 * 1024 * 1024) throw new Error('Facebook image upload limit is out of range.');
+  if (!Array.isArray(config.allowedImageMimeTypes) || !config.allowedImageMimeTypes.length || config.allowedImageMimeTypes.some(type => !['image/jpeg', 'image/png', 'image/gif'].includes(type))) throw new Error('Facebook image MIME allowlist is invalid.');
   if (base.username || base.password || oauth.username || oauth.password || oauth.search || oauth.hash) throw new Error('Facebook endpoints cannot contain credentials, query strings, or fragments.');
   return config;
 }

@@ -8,7 +8,7 @@ async function configured<T>(key: string): Promise<T> {
 
 /** Server-only adapter construction; all operational inputs come from Root. */
 async function configuredFacebookConfig(): Promise<FacebookConfig> {
-  const [graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields] = await Promise.all([
+  const [graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes] = await Promise.all([
     configured<string>('meta.graphBaseUrl'),
     configured<string>('meta.oauthBaseUrl'),
     configured<string>('meta.graphVersion'),
@@ -17,8 +17,10 @@ async function configuredFacebookConfig(): Promise<FacebookConfig> {
     configured<number>('meta.pageSize'),
     configured<string[]>('meta.pageInsightMetrics'),
     configured<string[]>('meta.adInsightFields'),
+    configured<number>('meta.maxImageUploadBytes'),
+    configured<string[]>('meta.allowedImageMimeTypes'),
   ]);
-  return { graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields };
+  return { graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes };
 }
 
 export async function configuredFacebookEngine() { return createFacebookEngine(await configuredFacebookConfig()); }

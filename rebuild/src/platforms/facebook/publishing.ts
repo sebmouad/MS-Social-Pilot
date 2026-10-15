@@ -17,7 +17,7 @@ export interface FacebookCurrentUser { id: string; name: string; pictureUrl: str
 export interface FacebookTokenExchangeInput { accessToken: string; appId: string; appSecret: string }
 export interface FacebookLongLivedToken { accessToken: string; expiresAt: Date }
 export interface FacebookAdAccount { id: string; name: string; currency: string | null; status: number | null }
-export type FacebookMedia = { kind: 'image' | 'video'; url: string; altText?: string };
+export type FacebookMedia = { kind: 'image' | 'video'; url: string; altText?: string; localFile?: { bytes: Uint8Array; mimeType: string; fileName: string } };
 export interface FacebookPublishInput {
   targetId: string; accessToken: string; text?: string; link?: string | null;
   media?: readonly FacebookMedia[]; firstComment?: string | null;
@@ -63,16 +63,24 @@ function graphError(payload: unknown, status: number): FacebookApiError {
 /** Create a bounded Graph client. Tokens are sent in form/query parameters and never logged. */
 export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: FacebookFetch = fetch): FacebookEngine {
   const config = validateFacebookConfig(rawConfig);
-  async function request<T = unknown>(path: string, options: { method?: string; token: string; params?: Record<string, string | number | undefined>; body?: Record<string, string | undefined> } ): Promise<T> {
+  async function request<T = unknown>(path: string, options: { method?: string; token: string; params?: Record<string, string | number | undefined>; body?: Record<string, string | undefined>; file?: { bytes: Uint8Array; mimeType: string; fileName: string } } ): Promise<T> {
     const url = graphObjectUrl(config, path);
     if (options.method !== 'POST') {
       url.searchParams.set('access_token', options.token);
       for (const [key, value] of Object.entries(options.params ?? {})) if (value !== undefined) url.searchParams.set(key, String(value));
     }
-    const body = options.method === 'POST' ? new URLSearchParams({ access_token: options.token, ...(options.body ?? {}) }) : undefined;
+    const form = options.method === 'POST' && options.file ? new FormData() : undefined;
+    if (form) {
+      form.set('access_token', options.token);
+      for (const [key, value] of Object.entries(options.body ?? {})) if (value !== undefined) form.set(key, value);
+      const { bytes, mimeType, fileName } = options.file!;
+      form.set('source', new Blob([bytes], { type: mimeType }), fileName);
+    }
+    const body = options.method === 'POST' ? form ?? new URLSearchParams({ access_token: options.token, ...(options.body ?? {}) }) : undefined;
+    const headers = body instanceof URLSearchParams ? { 'content-type': 'application/x-www-form-urlencoded' } : undefined;
     let response: Response;
     try {
-      response = await fetchImpl(url, { method: options.method ?? 'GET', headers: body ? { 'content-type': 'application/x-www-form-urlencoded' } : undefined,
+      response = await fetchImpl(url, { method: options.method ?? 'GET', headers,
         body, redirect: 'error', signal: AbortSignal.timeout(config.requestTimeoutMs) });
     } catch (error) { throw new FacebookApiError(error instanceof Error ? error.message : 'Facebook request failed.', 0); }
     const payload: unknown = await response.json().catch(() => null);
@@ -182,18 +190,30 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       const media = input.media ?? []; const images = media.filter(m => m.kind === 'image'); const videos = media.filter(m => m.kind === 'video');
       if (videos.length > 1 || (videos.length && images.length)) throw new FacebookApiError('A Facebook post can contain one video or images, not both.', 0);
       if (!input.text?.trim() && !input.link && media.length === 0) throw new FacebookApiError('A Facebook post needs text, a link, or media.', 0);
+      for (const image of images) {
+        if (!image.localFile) continue;
+        const file = image.localFile;
+        if (!(file.bytes instanceof Uint8Array) || file.bytes.byteLength < 1 || file.bytes.byteLength > config.maxImageUploadBytes) throw new FacebookApiError('Local image exceeds the configured Facebook upload size limit.', 0);
+        if (!config.allowedImageMimeTypes.includes(file.mimeType)) throw new FacebookApiError('Local image MIME type is not allowed by Root configuration.', 0);
+        const bytes = file.bytes;
+        const signatureMatches = file.mimeType === 'image/jpeg' ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+          : file.mimeType === 'image/png' ? bytes.length >= 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((value, i) => bytes[i] === value)
+            : file.mimeType === 'image/gif' ? String.fromCharCode(...bytes.slice(0, 6)) === 'GIF87a' || String.fromCharCode(...bytes.slice(0, 6)) === 'GIF89a' : false;
+        if (!signatureMatches) throw new FacebookApiError('Local image content does not match its allowed MIME type.', 0);
+        if (!/^[A-Za-z0-9._-]{1,120}$/.test(file.fileName)) throw new FacebookApiError('Local image filename is invalid.', 0);
+      }
       let payload: JsonObject;
       if (videos.length) {
         payload = await request(`${encodeURIComponent(input.targetId)}/videos`, { method: 'POST', token: input.accessToken,
           body: { file_url: videos[0].url, description: input.text?.trim() || undefined } });
       } else if (images.length === 1) {
         payload = await request(`${encodeURIComponent(input.targetId)}/photos`, { method: 'POST', token: input.accessToken,
-          body: { url: images[0].url, caption: input.text?.trim() || undefined, alt_text_custom: images[0].altText } });
+          body: { url: images[0].localFile ? undefined : images[0].url, caption: input.text?.trim() || undefined, alt_text_custom: images[0].altText }, file: images[0].localFile });
       } else if (images.length > 1) {
         const attached: string[] = [];
         for (const image of images) {
           const photo = object(await request(`${encodeURIComponent(input.targetId)}/photos`, { method: 'POST', token: input.accessToken,
-            body: { url: image.url, published: 'false', temporary: 'true', alt_text_custom: image.altText } }));
+            body: { url: image.localFile ? undefined : image.url, published: 'false', temporary: 'true', alt_text_custom: image.altText }, file: image.localFile }));
           if (typeof photo.id !== 'string') throw new FacebookApiError('Facebook did not return a photo id.', 200);
           attached.push(JSON.stringify({ media_fbid: photo.id }));
         }

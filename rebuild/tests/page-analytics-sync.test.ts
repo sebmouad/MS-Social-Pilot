@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: vi.fn() }));
 
-const state = vi.hoisted(() => ({ targets: vi.fn(), upsert: vi.fn(), observations: vi.fn() }));
-vi.mock('../src/server/data', () => ({ prisma: { target: { findMany: state.targets }, pageInsight: { upsert: state.upsert } } }));
+const state = vi.hoisted(() => ({ targets: vi.fn(), upsert: vi.fn(), observations: vi.fn(), settingRead: vi.fn(), settingWrite: vi.fn() }));
+vi.mock('../src/server/data', () => ({ prisma: { target: { findMany: state.targets }, pageInsight: { upsert: state.upsert }, appSetting: { findUnique: state.settingRead, upsert: state.settingWrite } } }));
 vi.mock('../src/server/platforms/facebook', () => ({ configuredFacebookEngine: async () => ({ getPageInsightObservations: state.observations }), configuredFacebookAdapter: vi.fn() }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
 let facebookEnabled = true;
@@ -15,6 +15,8 @@ beforeEach(() => {
   facebookEnabled = true;
   state.targets.mockResolvedValue([{ id: 'target-1', workspaceId: 'workspace-1', providerId: 'provider-1', accessToken: 'encrypted-token', socialAccount: { workspaceId: 'workspace-1', accessToken: 'encrypted-token', tokenExpiresAt: null, invalidatedAt: null } }]);
   state.upsert.mockResolvedValue({});
+  state.settingRead.mockResolvedValue(null);
+  state.settingWrite.mockResolvedValue({});
 });
 
 describe('Page analytics ingestion', () => {

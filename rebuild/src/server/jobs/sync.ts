@@ -14,6 +14,29 @@ import { assertWorkspaceNotPurging, withWorkspaceOperation } from '@/server/data
 
 export type JobSummary = { examined: number; updated: number; skipped: number; failed: number };
 const DAY_MS = 86_400_000;
+type FairRow = { id: string };
+
+/** Persist a per-job keyset cursor so bounded runs eventually visit every row. */
+async function fairBatch<Row extends FairRow>(
+  key: string,
+  limit: number,
+  find: (cursor: string | null, direction: 'after' | 'before', take: number) => Promise<Row[]>,
+): Promise<Row[]> {
+  const settingKey = `sync.cursor.${key}`;
+  const saved = await prisma.appSetting.findUnique({ where: { key: settingKey }, select: { value: true } });
+  const cursor = typeof saved?.value === 'string' ? saved.value : null;
+  let rows = await find(cursor, 'after', limit);
+  if (cursor && rows.length < limit) rows = rows.concat(await find(cursor, 'before', limit - rows.length));
+  if (rows.length) {
+    await prisma.appSetting.upsert({
+      where: { key: settingKey },
+      create: { key: settingKey, value: rows[rows.length - 1].id, encrypted: false, updatedAt: new Date() },
+      update: { value: rows[rows.length - 1].id, encrypted: false, updatedAt: new Date() },
+    });
+  }
+  return rows;
+}
+
 const finite = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value);
@@ -101,11 +124,12 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
 export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
   if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
-  const targets = await prisma.target.findMany({
-    where: { type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
-    orderBy: [{ workspaceId: 'asc' }, { id: 'asc' }], take: limit,
+  const targetWhere = { type: 'page' as const, enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } };
+  const targets = await fairBatch('page-analytics', limit, (cursor, direction, take) => prisma.target.findMany({
+    where: { AND: [targetWhere, ...(cursor ? [{ id: { [direction === 'after' ? 'gt' : 'lte']: cursor } }] : [])] },
+    orderBy: { id: 'asc' }, take,
     select: { id: true, workspaceId: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, tokenExpiresAt: true, invalidatedAt: true } } },
-  });
+  }));
   const engine = await configuredFacebookEngine();
   const result: JobSummary = { examined: targets.length, updated: 0, skipped: 0, failed: 0 };
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -135,11 +159,12 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
 export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
   if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
-  const accounts = await prisma.adAccount.findMany({
-    where: { enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
-    orderBy: [{ workspaceId: 'asc' }, { id: 'asc' }], take: limit,
+  const accountWhere = { enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } };
+  const accounts = await fairBatch('ads-analytics', limit, (cursor, direction, take) => prisma.adAccount.findMany({
+    where: { AND: [accountWhere, ...(cursor ? [{ id: { [direction === 'after' ? 'gt' : 'lte']: cursor } }] : [])] },
+    orderBy: { id: 'asc' }, take,
     select: { id: true, workspaceId: true, actId: true, name: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } },
-  });
+  }));
   const requiredScopes = new Set((await runtimeConfig('meta.adsReadScopes') as string[]).map(scope => scope.trim()).filter(Boolean));
   const engine = await configuredFacebookEngine();
   const result: JobSummary = { examined: accounts.length, updated: 0, skipped: 0, failed: 0 };
@@ -182,11 +207,12 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
     runtimeConfig('meta.inboxReadScopes') as Promise<string[]>, runtimeConfig('sync.maxItemsPerJob') as Promise<number>,
   ]);
   const required = new Set(readScopes.map(scope => scope.trim()).filter(Boolean));
-  const targets = await prisma.target.findMany({
-    where: { type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
-    orderBy: [{ workspaceId: 'asc' }, { id: 'asc' }], take: limit,
+  const targetWhere = { type: 'page' as const, enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } };
+  const targets = await fairBatch('inbox', limit, (cursor, direction, take) => prisma.target.findMany({
+    where: { AND: [targetWhere, ...(cursor ? [{ id: { [direction === 'after' ? 'gt' : 'lte']: cursor } }] : [])] },
+    orderBy: { id: 'asc' }, take,
     select: { id: true, workspaceId: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } },
-  });
+  }));
   const engine = await configuredFacebookEngine();
   const result: JobSummary = { examined: targets.length, updated: 0, skipped: 0, failed: 0 };
   for (const target of targets) {

@@ -50,6 +50,8 @@ export interface PublishMedia {
   kind: 'image' | 'video';
   url: string;
   altText?: string;
+  /** Ephemeral server-only bytes for uploading a locally stored image; never persisted with a draft. */
+  localFile?: { bytes: Uint8Array; mimeType: string; fileName: string };
 }
 
 export interface DiscoveryRequest { credential: PlatformCredential }
