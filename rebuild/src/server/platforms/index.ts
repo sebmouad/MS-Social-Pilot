@@ -4,16 +4,22 @@ import type { PlatformAdapter } from '@/platforms/types';
 import { configuredFacebookAdapter, configuredFacebookOAuth } from './facebook';
 import { finishFacebookConnection, startFacebookConnection } from './facebook-connect';
 import { facebookAdsHost } from '@/platforms/facebook/ads';
+import { facebookAnalyticsHost } from '@/platforms/facebook/analytics';
 import { canManageFacebookInbox, syncFacebookInbox, replyToFacebookInbox, setFacebookInboxResolved, moderateFacebookComment, deleteFacebookComment } from '@/platforms/facebook/inbox';
 import { syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } from '@/platforms/facebook/jobs';
 import type { PlatformJobName, JobSummary } from '@/server/jobs/types';
 import type { RetryBackoff } from '@/server/jobs/retry';
 import type { InboxActor } from '@/server/inbox/actions';
 import type { AdMutationRequest, AdObjectReadRequest, PlatformCredential } from '@/platforms/types';
+import type { AnalyticsProviderData, AnalyticsProviderRequest } from '@/server/analytics/catalog';
 import type { AdsUiSchema } from '@/platforms/ads-ui';
 
+export interface PlatformAnalyticsHost {
+  load(request: AnalyticsProviderRequest): Promise<AnalyticsProviderData>;
+}
+
 export interface PlatformAdsHost {
-  /** Safe creation metadata; provider credentials and functions never reach the browser. */
+  /** Safe, serializable UI configuration; never contains credentials or server functions. */
   ui: AdsUiSchema;
   readScopes(): Promise<string[]>;
   manageScopes(): Promise<string[]>;
@@ -48,6 +54,7 @@ export interface PlatformInboxHost {
 export interface PlatformHost {
   inbox?: PlatformInboxHost;
   ads?: PlatformAdsHost;
+  analytics?: PlatformAnalyticsHost;
   /** Build the engine from Root settings. */
   adapter(): Promise<PlatformAdapter>;
   jobs?: Partial<Record<PlatformJobName, (now: Date, retryLimit: number, retryBackoff: RetryBackoff) => Promise<JobSummary>>>;
@@ -64,6 +71,7 @@ export const PLATFORM_HOSTS: Readonly<Record<PlatformId, PlatformHost>> = {
   facebook: {
     adapter: configuredFacebookAdapter,
     ads: facebookAdsHost,
+    analytics: facebookAnalyticsHost,
     inbox: { canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, resolve: setFacebookInboxResolved, moderate: moderateFacebookComment, deleteComment: deleteFacebookComment },
     connection: {
       isReady: () => configuredFacebookOAuth().then(() => true, () => false),

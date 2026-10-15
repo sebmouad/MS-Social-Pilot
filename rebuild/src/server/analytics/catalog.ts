@@ -1,16 +1,71 @@
-export type AnalyticsMetric = {
+/** Shared vocabulary for stored analytics, independent of any provider SDK or schema. */
+export type AnalyticsKind = 'stock' | 'flow' | 'ratio' | 'breakdown';
+export type AnalyticsUnit = 'count' | 'currency' | 'percent' | 'multiple';
+
+export type AnalyticsTarget = { id: string; name: string; type: string; providerId?: string };
+export type AnalyticsAdAccount = { id: string; name: string; currency: string | null };
+export type AnalyticsObservation = { date: Date; channelId: string; channelLabel: string; value: number };
+export type AnalyticsMetricRow = { label: string; value: number; asOf: Date | null };
+
+/** Provider-mapped input to the shared chart and total aggregator. */
+export type AnalyticsMetricInput = {
   key: string;
   label: string;
-  source: 'page' | 'instagram' | 'ads';
-  kind: 'stock' | 'flow' | 'ratio' | 'breakdown';
-  unit: 'count' | 'currency' | 'percent' | 'multiple';
+  /** Human-readable provenance shown to customers, such as "Community" or "Advertising". */
+  sourceLabel: string;
+  /** Cross-platform resource domain, independent of translated provenance labels. */
+  resourceKind?: 'channel' | 'ad-account';
+  kind: AnalyticsKind;
+  unit: AnalyticsUnit;
+  observations: AnalyticsObservation[];
+  /** How a module says observations combine across a stored window. */
+  rollup?: 'sum' | 'latest-per-channel';
+  /** Ratios can use a separately weighted overall series while retaining account rows. */
+  totalObservations?: Array<{ date: Date; value: number }>;
+  /** Provider-supplied account rows for weighted ratios or pre-normalized breakdowns. */
+  rows?: AnalyticsMetricRow[];
+  available: number;
+  covered?: number;
+  latestAt?: Date | null;
+  updatedAt?: Date | null;
+  totalOverride?: number | null;
+  displayTotal?: string;
+};
+
+export type AnalyticsAudienceEntry = {
+  id: string;
+  name: string;
+  metric: string;
+  metricLabel: string;
+  sourceLabel: string;
+  value: number;
+  asOf: Date;
+  fetchedAt: Date;
+};
+
+export type AnalyticsProviderRequest = {
+  workspaceId: string;
+  range: { from: Date; to: Date };
+  selectedTargetIds: readonly string[];
+  allowedTargetIds?: readonly string[];
+  selectedAdAccountIds?: readonly string[];
+};
+
+export type AnalyticsProviderData = {
+  targets: AnalyticsTarget[];
+  selectedTargets: AnalyticsTarget[];
+  adAccounts: AnalyticsAdAccount[];
+  selectedAdAccountIds: string[];
+  metrics: AnalyticsMetricInput[];
+  audienceEntries: AnalyticsAudienceEntry[];
+  audienceSelected: number;
 };
 
 export function genericMetricLabel(key: string): string {
-  return key.replace(/^page_/, '').replace(/[:_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return key.replace(/[:_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-export function aggregateValues(values: number[], kind: AnalyticsMetric['kind']): number | null {
+export function aggregateValues(values: number[], kind: AnalyticsKind): number | null {
   if (!values.length) return null;
   if (kind === 'stock' || kind === 'ratio') return values[values.length - 1] ?? null;
   return values.reduce((sum, value) => sum + value, 0);

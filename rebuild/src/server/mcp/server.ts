@@ -147,7 +147,7 @@ async function loadScopedAnalytics(viewer: McpViewer, args: Record<string, unkno
   if (args.targetIds !== undefined && (!Array.isArray(args.targetIds) || args.targetIds.length > cap || args.targetIds.some(id => typeof id !== 'string' || !availableIds.has(id)))) throw new Error('One or more selected channels are unavailable or exceed the configured result limit.');
   const selectedIds = args.targetIds === undefined ? available.targets.map(target => target.id) : [...new Set(args.targetIds as string[])];
   const data = await loadAnalytics(viewer.workspaceId, selectedIds, range, allowedTargetIds);
-  const overview = buildAnalytics(data.pageRows, data.adRows, data.audienceRows, data.selectedTargets, data.adAccountCount, data.instagramRows, data.selectedInstagramAudience);
+  const overview = buildAnalytics(data.metrics, data.audienceEntries, data.audienceSelected);
   return { range, data, overview };
 }
 
@@ -301,7 +301,7 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const pageLimit = Math.min(limit, cap);
       const details = metric[kind];
       const items = details.slice(offset, offset + pageLimit);
-      return { range, metric: { key: metric.key, label: metric.label, source: metric.source, unit: metric.unit, kind: metric.kind }, detailKind: kind, totalCount: details.length, offset, items, nextOffset: offset + items.length < details.length ? offset + items.length : null };
+      return { range, metric: { key: metric.key, label: metric.label, sourceLabel: metric.sourceLabel, unit: metric.unit, kind: metric.kind }, detailKind: kind, totalCount: details.length, offset, items, nextOffset: offset + items.length < details.length ? offset + items.length : null };
     }
     case 'list_ad_accounts': {
       if (viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can list advertising accounts.');

@@ -45,6 +45,21 @@ export async function platformAds(provider: string): Promise<NonNullable<Platfor
   return ads;
 }
 
+/** Enabled module-owned storage loader and analytics normalizer. */
+export async function platformAnalytics(provider: string): Promise<NonNullable<PlatformHost['analytics']> | null> {
+  const module = platformModule(provider);
+  const analytics = hostFor(provider)?.analytics;
+  if (!module || module.capabilities.analytics !== 'supported' || !analytics || !await isPlatformEnabled(provider)) return null;
+  return analytics;
+}
+
+/** Installed and enabled modules that implement analytics, not only declare it. */
+export async function analyticsPlatformIds(): Promise<string[]> {
+  const ids = await Promise.all((PLATFORM_MODULES as readonly PlatformModule[]).map(async module =>
+    await platformAnalytics(module.id) ? module.id : null));
+  return ids.filter((id): id is string => id !== null);
+}
+
 /** Installed, enabled modules with a real server inbox host and inbox capability. */
 export async function inboxPlatformIds(): Promise<string[]> {
   return Promise.all((PLATFORM_MODULES as readonly PlatformModule[]).map(async module =>

@@ -62,7 +62,7 @@ Current locations:
 - `src/server/platforms/`: configuration-to-engine wiring, connection orchestration, installed host registration, and capability dispatch.
 - `src/platforms/types.ts`: common operation contracts; remaining provider-specific types must be removed from this shared contract.
 
-The intended strict boundary is not fully achieved yet: analytics queries/aggregation still know legacy Page/Instagram storage shapes; some shared contract types and route error mappings still name Facebook. Moving files alone does not close these gaps.
+Shared analytics now consumes normalized module outputs: provider storage queries, metric interpretation and currency partitions live in the Facebook module. The strict final boundary is still incomplete: some shared contract types and route error mappings name Facebook, provider host wiring remains outside its final module directory, and operation declarations are too coarse to prove every sub-capability. Moving files alone does not close these gaps.
 
 ## Connection and data lifecycle
 
@@ -101,6 +101,6 @@ The legacy app remains the production service. The existing `socialpilot-deploy`
 
 ## Verified progress and remaining scope
 
-The latest committed boundary batch dispatches shared Ads actions by selected-account provider. Facebook discovery persistence, jobs, Inbox operations, Ads operations/validation/scopes, and metric metadata have been separated into provider-owned implementations. The last full check at that batch passed 345 tests, TypeScript checking, and the production build. Provider-driven Ads form metadata is under review after that check.
+Shared Ads dispatches by selected-account provider, uses module-owned creation metadata, and enforces current resource scope in services and lists. Shared analytics loading and aggregation consume neutral metric/audience inputs; the enabled Facebook host owns storage reads and semantics. Monetary series are separated by currency, ratios derive from source totals, unknown numeric measures use snapshots, and duplicate retained fields are not double-counted. The integrated worktree passed 364 tests, TypeScript checking, and the production build before the additional analytics-registry test. Browser/live verification is separate and pending.
 
-Remaining work includes strict analytics/persistence boundaries, granular capability declarations, complete Facebook media and Ads lifecycles, legacy capability parity, comprehensive Root configuration coverage, complete MCP parity, design/browser checks, production-shaped data/permission checks, live provider verification and cleanup, migration/rollback rehearsal, and rebuild deployment.
+Remaining work includes complete platform-directory consolidation and shared-contract cleanup, granular capability declarations, full metric/provider-operation coverage beyond the current stored account-level Analytics inputs, complete Facebook media and Ads lifecycles, legacy capability parity, comprehensive Root configuration coverage, complete MCP parity, design/browser checks, production-shaped data/permission checks, live provider verification and cleanup, migration/rollback rehearsal, and rebuild deployment.

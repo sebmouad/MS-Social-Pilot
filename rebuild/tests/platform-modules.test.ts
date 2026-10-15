@@ -11,7 +11,7 @@ vi.mock('../src/server/platforms/facebook', () => ({
 import { PLATFORM_CONFIG, PLATFORM_MODULES } from '../src/platforms';
 import { CONFIG_BY_KEY } from '../src/lib/config/registry';
 import { PLATFORM_HOSTS } from '../src/server/platforms/index';
-import { connectablePlatforms, connectionFlow, inboxPlatformIds, isPlatformEnabled, platformFor, platformInbox, platformStatuses } from '../src/server/platforms/registry';
+import { analyticsPlatformIds, connectablePlatforms, connectionFlow, inboxPlatformIds, isPlatformEnabled, platformAnalytics, platformFor, platformInbox, platformStatuses } from '../src/server/platforms/registry';
 
 const enabled = new Map<string, boolean>();
 beforeEach(() => {
@@ -47,6 +47,15 @@ describe('platform modules', () => {
     enabled.set('platforms.facebook.enabled', true);
     expect(await inboxPlatformIds()).toEqual(['facebook']);
     expect(await platformInbox('facebook')).toBe(PLATFORM_HOSTS.facebook.inbox);
+  });
+
+  it('does not expose an installed analytics loader until its module is enabled', async () => {
+    expect(await analyticsPlatformIds()).toEqual([]);
+    expect(await platformAnalytics('facebook')).toBeNull();
+    expect(await platformAnalytics('unknown')).toBeNull();
+    enabled.set('platforms.facebook.enabled', true);
+    expect(await analyticsPlatformIds()).toEqual(['facebook']);
+    expect(await platformAnalytics('facebook')).toBe(PLATFORM_HOSTS.facebook.analytics);
   });
 
   it('a switched-on module answers only for the capabilities its engine supports', async () => {

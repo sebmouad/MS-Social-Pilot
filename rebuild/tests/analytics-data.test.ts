@@ -1,111 +1,71 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({
-  targets: vi.fn(), instagramAccounts: vi.fn(), pageInsights: vi.fn(), instagramInsights: vi.fn(), adInsights: vi.fn(), adAccounts: vi.fn(),
-}));
-
-vi.mock('../src/server/platforms/registry', () => ({ enabledSocialAccountWhere: async () => ({ provider: { in: ['facebook'] } }) }));
-vi.mock('../src/server/data', () => ({
-  prisma: {
-    target: { findMany: state.targets },
-    instagramAccount: { findMany: state.instagramAccounts },
-    pageInsight: { findMany: state.pageInsights },
-    instagramInsight: { findMany: state.instagramInsights },
-    adInsight: { findMany: state.adInsights },
-    adAccount: { findMany: state.adAccounts },
-  },
+const state = vi.hoisted(() => ({ ids: vi.fn(), analytics: vi.fn(), load: vi.fn() }));
+vi.mock('../src/server/platforms/registry', () => ({
+  analyticsPlatformIds: state.ids,
+  platformAnalytics: state.analytics,
 }));
 
 import { loadAnalytics } from '../src/server/analytics/data';
-import { buildAnalytics } from '../src/server/analytics/aggregate';
 
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
+const facebookData = (request: { selectedTargetIds: readonly string[]; allowedTargetIds?: readonly string[]; selectedAdAccountIds?: readonly string[] }) => {
+  const allTargets = [{ id: 'page-1', type: 'page', name: 'Page One', providerId: 'fb-page-1' }];
+  const targets = allTargets.filter(item => request.allowedTargetIds === undefined || request.allowedTargetIds.includes(item.id));
+  const selectedTargets = targets.filter(item => request.selectedTargetIds.includes(item.id));
+  const accounts = [{ id: 'ad-1', name: 'Account One', currency: 'USD' }, { id: 'ad-2', name: 'Account Two', currency: 'EUR' }];
+  const selectedAdAccountIds = request.selectedAdAccountIds === undefined ? accounts.map(item => item.id) : accounts.filter(item => request.selectedAdAccountIds!.includes(item.id)).map(item => item.id);
+  return {
+    targets, selectedTargets, adAccounts: accounts, selectedAdAccountIds,
+    metrics: selectedTargets.length ? [{ key: 'page_follows::day', label: 'Followers', sourceLabel: 'Page performance', kind: 'stock' as const, unit: 'count' as const, observations: [{ date: date('2026-10-02'), channelId: 'page-1', channelLabel: 'Page One', value: 120 }], available: selectedTargets.length }] : [],
+    audienceEntries: selectedTargets.map(item => ({ id: item.id, name: item.name, metric: 'page_follows', metricLabel: 'Followers', sourceLabel: 'Page performance', value: 120, asOf: date('2026-10-02'), fetchedAt: date('2026-10-03') })),
+    audienceSelected: selectedTargets.length,
+  };
+};
 
-describe('rebuild Instagram analytics data selection', () => {
+describe('shared analytics loading', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    state.instagramAccounts.mockResolvedValue([
-      { igUserId: 'ig-provider-1', followersCount: 91, lastSyncedAt: null, updatedAt: date('2026-10-03') },
-      { igUserId: 'ig-provider-2', followersCount: 42, lastSyncedAt: date('2026-10-03') },
-    ]);
-    state.targets.mockResolvedValue([
-      { id: 'page-1', type: 'page', name: 'Page One', providerId: 'fb-provider-1', socialAccountId: 'social-1' },
-      { id: 'ig-target-1', type: 'instagram', name: '@one', providerId: 'ig-provider-1', socialAccountId: 'social-1' },
-      { id: 'ig-target-2', type: 'instagram', name: '@two', providerId: 'ig-provider-2', socialAccountId: 'social-2' },
-    ]);
-    state.pageInsights.mockResolvedValue([]);
-    state.instagramInsights.mockResolvedValue([]);
-    state.adInsights.mockResolvedValue([]);
-    state.adAccounts.mockResolvedValue([]);
+    state.ids.mockResolvedValue(['facebook']);
+    state.analytics.mockResolvedValue({ load: state.load });
+    state.load.mockImplementation(async (request: Parameters<typeof facebookData>[0]) => facebookData(request));
   });
 
-  it('offers selected Instagram targets and selects insights by Instagram provider id, not linked Page targetId', async () => {
+  it('delegates scoped storage reads and normalization to the installed analytics host', async () => {
     const range = { from: date('2026-10-01'), to: date('2026-10-31') };
-    const result = await loadAnalytics('workspace-1', ['ig-target-1'], range);
-
-    expect(state.targets).toHaveBeenCalledWith(expect.objectContaining({
-      where: { workspaceId: 'workspace-1', enabled: true, socialAccount: { is: { provider: { in: ['facebook'] } } }, OR: [{ type: { not: 'instagram' } }, { type: 'instagram', providerId: { in: ['ig-provider-1', 'ig-provider-2'] } }] },
-    }));
-    expect(result.selectedTargets.map(target => target.id)).toEqual(['ig-target-1']);
-    expect(state.instagramInsights).toHaveBeenCalledWith(expect.objectContaining({
-      where: { account: { workspaceId: 'workspace-1', enabled: true, igUserId: { in: ['ig-provider-1'] } }, endTime: { gte: range.from, lte: range.to } },
-    }));
-    expect(result.selectedInstagramAudience.map(row => row.igUserId)).toEqual(['ig-provider-1']);
-  });
-
-  it('limits available and selected targets to the allowed target IDs', async () => {
-    const range = { from: date('2026-10-01'), to: date('2026-10-31') };
-    const available = await loadAnalytics('workspace-1', [], range, ['page-1']);
-    const result = await loadAnalytics('workspace-1', ['page-1', 'ig-target-1'], range, ['page-1']);
-
+    const available = await loadAnalytics('workspace-a', [], range, ['page-1']);
+    expect(state.ids).toHaveBeenCalledOnce();
+    expect(state.analytics).toHaveBeenCalledWith('facebook');
+    expect(state.load).toHaveBeenCalledWith({ workspaceId: 'workspace-a', range, selectedTargetIds: [], allowedTargetIds: ['page-1'], selectedAdAccountIds: undefined });
     expect(available.targets.map(target => target.id)).toEqual(['page-1']);
-    expect(result.targets.map(target => target.id)).toEqual(['page-1']);
-    expect(result.selectedTargets.map(target => target.id)).toEqual(['page-1']);
-    expect(state.instagramInsights).toHaveBeenLastCalledWith(expect.objectContaining({
-      where: { account: { workspaceId: 'workspace-1', enabled: true, igUserId: { in: [] } }, endTime: { gte: range.from, lte: range.to } },
-    }));
+    expect(available.metrics).toEqual([]);
   });
 
-  it('loads only selected linked ad accounts for analytics and exports', async () => {
+  it('merges only normalized selected-channel and ad-account data into the shared result', async () => {
     const range = { from: date('2026-10-01'), to: date('2026-10-31') };
-    state.targets.mockResolvedValue([{ id: 'page-1', type: 'page', name: 'Page One', providerId: 'fb-provider-1', socialAccountId: 'social-1' }]);
-    state.adAccounts.mockResolvedValue([
-      { id: 'ad-1', name: 'Account One', currency: 'USD' },
-      { id: 'ad-2', name: 'Account Two', currency: 'USD' },
-    ]);
-    const result = await loadAnalytics('workspace-1', ['page-1'], range, ['page-1'], ['ad-2', 'not-linked']);
-    expect(state.adAccounts).toHaveBeenCalledWith(expect.objectContaining({ where: { workspaceId: 'workspace-1', socialAccountId: { in: ['social-1'] }, enabled: true } }));
-    expect(state.adInsights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: expect.objectContaining({ id: { in: ['ad-2'] }, workspaceId: 'workspace-1' }) }) }));
+    const result = await loadAnalytics('workspace-a', ['page-1'], range, ['page-1'], ['ad-2']);
+    expect(result.selectedTargets.map(target => target.id)).toEqual(['page-1']);
     expect(result.selectedAdIds).toEqual(['ad-2']);
     expect(result.adAccountCount).toBe(1);
-    state.adInsights.mockClear();
-    const none = await loadAnalytics('workspace-1', ['page-1'], range, ['page-1'], []);
-    expect(none.adAccountCount).toBe(0);
-    expect(state.adInsights).not.toHaveBeenCalled();
+    expect(result.metrics.map(metric => metric.sourceLabel)).toEqual(['Page performance']);
+    expect(result.audienceEntries).toMatchObject([{ id: 'page-1', value: 120, sourceLabel: 'Page performance' }]);
+    expect(result.audienceSelected).toBe(1);
   });
 
-  it('sums current Page and Instagram followers for the selected channels', () => {
-    const result = buildAnalytics([], [], [
-      { metric: 'page_follows', numeric: 120, endTime: date('2026-10-02'), fetchedAt: date('2026-10-03'), target: { id: 'page-1', name: 'Page One' } },
-    ], [
-      { id: 'page-1', type: 'page', name: 'Page One', providerId: 'fb-provider-1' },
-      { id: 'ig-target-1', type: 'instagram', name: '@one', providerId: 'ig-provider-1' },
-    ], 0, [], [
-      { igUserId: 'ig-provider-1', followersCount: 91, lastSyncedAt: null, updatedAt: date('2026-10-03') },
-      { igUserId: 'ig-provider-2', followersCount: 42, lastSyncedAt: date('2026-10-03') },
-    ]);
-    expect(result.audience).toMatchObject({ total: 211, covered: 2, selected: 2 });
-    expect(result.audience.entries.map(row => row.id)).toEqual(['page-1', 'ig-target-1']);
+  it('returns empty neutral inputs when no installed provider exposes analytics', async () => {
+    state.ids.mockResolvedValue([]);
+    const result = await loadAnalytics('workspace-a', [], { from: date('2026-10-01'), to: date('2026-10-31') });
+    expect(result).toMatchObject({ targets: [], selectedTargets: [], adAccounts: [], selectedAdIds: [], metrics: [], audienceEntries: [], audienceSelected: 0 });
+    expect(state.load).not.toHaveBeenCalled();
   });
 
-  it('aggregates Instagram account metrics across selected accounts using the target provider id', () => {
-    const result = buildAnalytics([], [], [], [
-      { id: 'ig-target-1', type: 'instagram', name: '@one', providerId: 'ig-provider-1' },
-      { id: 'ig-target-2', type: 'instagram', name: '@two', providerId: 'ig-provider-2' },
-    ], 0, [
-      { metric: 'views', period: 'day', endTime: date('2026-10-01'), fetchedAt: date('2026-10-02'), numeric: 12, value: 12, account: { id: 'account-1', igUserId: 'ig-provider-1', username: 'one' } },
-      { metric: 'views', period: 'day', endTime: date('2026-10-02'), fetchedAt: date('2026-10-03'), numeric: 7, value: 7, account: { id: 'account-2', igUserId: 'ig-provider-2', username: 'two' } },
-    ]);
-    expect(result.metrics.find(metric => metric.key === 'views::day')).toMatchObject({ source: 'instagram', total: 19, coverage: 2, available: 2 });
+  it('namespaces identical local metric keys from different installed modules', async () => {
+    state.ids.mockResolvedValue(['provider-a', 'provider-b']);
+    state.analytics.mockImplementation((provider: string) => ({ load: async () => ({
+      targets: [], selectedTargets: [], adAccounts: [], selectedAdAccountIds: [], audienceEntries: [], audienceSelected: 0,
+      metrics: [{ key: 'reach', label: 'Reach', sourceLabel: provider === 'provider-a' ? 'Community' : 'Video', kind: 'stock', unit: 'count', observations: [], available: 0 }],
+    }) }));
+    const result = await loadAnalytics('workspace-a', [], { from: date('2026-10-01'), to: date('2026-10-31') });
+    expect(result.metrics.map(metric => metric.key)).toEqual(['provider-a:reach', 'provider-b:reach']);
   });
 });

@@ -5,7 +5,7 @@ type AnalyticsData = Awaited<ReturnType<typeof loadAnalytics>>;
 
 /** Builds one report view from the exact same scoped stored analytics snapshot as Analytics. */
 export function buildReportOverview(data: AnalyticsData) {
-  return buildAnalytics(data.pageRows, data.adRows, data.audienceRows, data.selectedTargets, data.adAccountCount, data.instagramRows, data.selectedInstagramAudience);
+  return buildAnalytics(data.metrics, data.audienceEntries, data.audienceSelected);
 }
 
 function csvCell(value: unknown): string {
@@ -19,10 +19,10 @@ function csvCell(value: unknown): string {
 export function reportOverviewCsv(view: ReturnType<typeof buildReportOverview>, limit: number) {
   const cap = Math.max(0, Math.floor(limit));
   const rows: unknown[][] = [['record_type', 'metric', 'source', 'channel', 'date', 'value', 'unit']];
-  for (const entry of view.audience.entries) rows.push(['audience', entry.metric, entry.metric.startsWith('instagram') ? 'instagram' : 'page', entry.name, entry.asOf, entry.value, 'people']);
+  for (const entry of view.audience.entries) rows.push(['audience', entry.metric, entry.sourceLabel, entry.name, entry.asOf, entry.value, 'people']);
   for (const metric of view.metrics) {
-    for (const point of metric.points) rows.push(['metric', metric.label, metric.source, '', point.date, point.value, metric.unit]);
-    for (const row of metric.rows) rows.push(['channel', metric.label, metric.source, row.label, row.asOf, row.value, metric.unit]);
+    for (const point of metric.points) rows.push(['metric', metric.label, metric.sourceLabel, '', point.date, point.value, metric.unit]);
+    for (const row of metric.rows) rows.push(['channel', metric.label, metric.sourceLabel, row.label, row.asOf, row.value, metric.unit]);
   }
   const body = rows.slice(1, cap + 1).map(row => row.map(csvCell).join(','));
   const truncated = rows.length - 1 > cap;

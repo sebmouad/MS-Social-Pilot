@@ -1,5 +1,5 @@
-import { prisma } from '@/server/data';
-import { enabledSocialAccountWhere } from '@/server/platforms/registry';
+import { analyticsPlatformIds, platformAnalytics } from '@/server/platforms/registry';
+import type { AnalyticsAdAccount, AnalyticsAudienceEntry, AnalyticsMetricInput, AnalyticsProviderRequest, AnalyticsTarget } from './catalog';
 
 export type AnalyticsRange = { from: Date; to: Date };
 
@@ -11,49 +11,22 @@ export function analyticsRange(start?: string, end?: string, now = new Date()): 
   return { from, to };
 }
 
+/** Provider modules own storage reads and map them to the shared analytics vocabulary. */
 export async function loadAnalytics(workspaceId: string, targetIds: string[], range: AnalyticsRange, allowedTargetIds?: readonly string[], selectedAdAccountIds?: readonly string[]) {
-  const instagramAccounts = await prisma.instagramAccount.findMany({
-    where: { workspaceId, enabled: true },
-    select: { igUserId: true, followersCount: true, lastSyncedAt: true, updatedAt: true },
-  });
-  const allowedIds = allowedTargetIds === undefined ? undefined : new Set(allowedTargetIds);
-  const targets = (await prisma.target.findMany({
-    where: { workspaceId, enabled: true, socialAccount: { is: await enabledSocialAccountWhere() }, OR: [{ type: { not: 'instagram' } }, { type: 'instagram', providerId: { in: instagramAccounts.map(account => account.igUserId) } }] }, orderBy: [{ type: 'asc' }, { name: 'asc' }],
-    select: { id: true, type: true, name: true, providerId: true, socialAccountId: true },
-  })).filter(target => allowedIds === undefined || allowedIds.has(target.id));
-  const selectedTargets = targets.filter(target => targetIds.includes(target.id) && (allowedIds === undefined || allowedIds.has(target.id)));
-  const selectedIds = selectedTargets.map(target => target.id);
-  const socialAccountIds = [...new Set(selectedTargets.map(target => target.socialAccountId).filter((id): id is string => Boolean(id)))];
-  const adAccounts = socialAccountIds.length ? await prisma.adAccount.findMany({
-    where: { workspaceId, socialAccountId: { in: socialAccountIds }, enabled: true },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true, currency: true },
-  }) : [];
-  const selectedAdIds = selectedAdAccountIds === undefined ? adAccounts.map(account => account.id)
-    : adAccounts.filter(account => selectedAdAccountIds.includes(account.id)).map(account => account.id);
-  const selectedInstagramIds = selectedTargets.filter(target => target.type === 'instagram').map(target => target.providerId);
-  const selectedInstagramAudience = instagramAccounts.filter(account => selectedInstagramIds.includes(account.igUserId));
-  const [pageRows, instagramRows, audienceRows, adRows] = await Promise.all([
-    prisma.pageInsight.findMany({
-      where: { targetId: { in: selectedIds }, target: { workspaceId, type: 'page' }, endTime: { gte: range.from, lte: range.to } },
-      orderBy: [{ endTime: 'asc' }, { metric: 'asc' }],
-      select: { metric: true, period: true, endTime: true, numeric: true, value: true, fetchedAt: true, target: { select: { id: true, name: true } } },
-    }),
-    prisma.instagramInsight.findMany({
-      where: { account: { workspaceId, enabled: true, igUserId: { in: selectedInstagramIds } }, endTime: { gte: range.from, lte: range.to } },
-      orderBy: [{ endTime: 'asc' }, { metric: 'asc' }],
-      select: { metric: true, period: true, endTime: true, numeric: true, value: true, fetchedAt: true, account: { select: { id: true, igUserId: true, username: true } } },
-    }),
-    prisma.pageInsight.findMany({
-      where: { targetId: { in: selectedTargets.filter(target => target.type === 'page').map(target => target.id) }, target: { workspaceId, type: 'page' }, metric: { in: ['page_follows', 'page_fans'] }, numeric: { not: null } },
-      orderBy: [{ endTime: 'desc' }, { fetchedAt: 'desc' }],
-      select: { metric: true, numeric: true, endTime: true, fetchedAt: true, target: { select: { id: true, name: true } } },
-    }),
-    selectedAdIds.length ? prisma.adInsight.findMany({
-      where: { adAccount: { workspaceId, id: { in: selectedAdIds }, socialAccountId: { in: socialAccountIds }, enabled: true }, level: 'account', date: { gte: range.from, lte: range.to } },
-      orderBy: [{ date: 'asc' }],
-      select: { date: true, spend: true, impressions: true, clicks: true, reach: true, cpc: true, cpm: true, cpp: true, ctr: true, frequency: true, actions: true, fields: true, fetchedAt: true, adAccount: { select: { id: true, name: true, currency: true, socialAccountId: true } } },
-    }) : Promise.resolve([]),
-  ]);
-  return { targets, selectedTargets, pageRows, audienceRows, instagramRows, selectedInstagramAudience, adRows, adAccounts, selectedAdIds, adAccountCount: selectedAdIds.length, range };
+  const ids = await analyticsPlatformIds();
+  const loaded = await Promise.all(ids.map(async provider => {
+    const host = await platformAnalytics(provider);
+    if (!host) return null;
+    const data = await host.load({ workspaceId, range, selectedTargetIds: targetIds, allowedTargetIds, selectedAdAccountIds } satisfies AnalyticsProviderRequest);
+    return { ...data, metrics: data.metrics.map(metric => ({ ...metric, key: `${provider}:${metric.key}` })) };
+  }));
+  const providers = loaded.filter((value): value is NonNullable<typeof value> => value !== null);
+  const targets = providers.flatMap(provider => provider.targets);
+  const selectedTargets = providers.flatMap(provider => provider.selectedTargets);
+  const adAccounts: AnalyticsAdAccount[] = providers.flatMap(provider => provider.adAccounts);
+  const selectedAdIds = providers.flatMap(provider => provider.selectedAdAccountIds);
+  const metrics: AnalyticsMetricInput[] = providers.flatMap(provider => provider.metrics);
+  const audienceEntries: AnalyticsAudienceEntry[] = providers.flatMap(provider => provider.audienceEntries);
+  const audienceSelected = providers.reduce((sum, provider) => sum + provider.audienceSelected, 0);
+  return { targets, selectedTargets, adAccounts, selectedAdIds, adAccountCount: selectedAdIds.length, metrics, audienceEntries, audienceSelected, range };
 }
