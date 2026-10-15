@@ -148,6 +148,24 @@ export async function listPostPage(workspaceId: string, page: number, pageSize: 
   return { posts, total, page: currentPage, pages };
 }
 
+/** Read a calendar month without truncating it to the newest workspace posts. */
+export function listCalendarPosts(workspaceId: string, year: number, month: number, allowedTargetIds: readonly string[] | null, authorId: string) {
+  const from = new Date(Date.UTC(year, month - 1, -1));
+  const to = new Date(Date.UTC(year, month, 3));
+  const scope: Prisma.PostWhereInput = allowedTargetIds === null ? {} : { OR: [
+    { targets: { some: { targetId: { in: [...allowedTargetIds] } }, every: { targetId: { in: [...allowedTargetIds] } } } },
+    { targets: { none: {} }, authorId },
+  ] };
+  return prisma.post.findMany({
+    where: { workspaceId, AND: [scope, { OR: [
+      { scheduledAt: { gte: from, lt: to } },
+      { publishedAt: { gte: from, lt: to } },
+    ] }] },
+    orderBy: [{ scheduledAt: 'asc' }, { publishedAt: 'asc' }, { id: 'asc' }],
+    select: { id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true },
+  });
+}
+
 /** Read the basic workspace details used by the new app shell. */
 export function workspaceSummary(workspaceId: string) {
   return prisma.workspace.findUnique({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import styles from '../publishing.module.css';
 
 const statuses = [
@@ -9,8 +9,16 @@ const statuses = [
   ['partially_failed', 'Partially Failed'], ['failed', 'Failed'], ['cancelled', 'Cancelled'],
 ] as const;
 
-export function PostFilters({ channels }: { channels: Array<{ id: string; name: string }> }) {
+export function PostFilters({ channels, currentMonth }: { channels: Array<{ id: string; name: string }>; currentMonth: string }) {
+  const pathname = usePathname();
   const params = useSearchParams();
+  if (pathname === '/publishing/calendar') return <form action="/publishing/calendar" method="get" className={styles.postFilters} key={params.toString()}>
+    <p className="shell-subnav__label">Calendar</p>
+    <label htmlFor="calendar-month-filter">Month</label>
+    <input id="calendar-month-filter" type="month" name="month" defaultValue={params.get('month') ?? currentMonth} />
+    <button type="submit">Show Month</button>
+    <a href="/publishing/calendar">Current Month</a>
+  </form>;
   return <form action="/publishing/posts" method="get" className={styles.postFilters} key={params.toString()}>
     <p className="shell-subnav__label">Post Filters</p>
     <label htmlFor="post-status-filter">Status</label>

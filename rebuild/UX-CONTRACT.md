@@ -63,6 +63,8 @@ The post composer and CSV importer validate required text, optional URL syntax, 
 
 The Posts screen counts and pages after workspace and channel authorization. Its status and channel filters live in the sidebar and persist in the URL across pages. On 2026-10-15 the local 390px mobile preview showed the filter drawer without horizontal overflow; applying Draft changed the URL and retained the selected value after navigation. A mobile Lighthouse navigation audit of that filtered route scored 100 for accessibility, best practices, SEO, and agentic browsing. This is local fixture evidence, not a large-data or provider test.
 
+Calendar selects its month through a URL parameter and sidebar month picker. Previous and next month links preserve direct navigation. Its database query covers timestamps near the workspace-local month boundary before exact timezone grouping, without truncating to recent posts. Published posts use their actual publish time when present; scheduled posts use their scheduled time. The September 2026 route and picker were checked in the local 390px Chrome preview. High-volume and real-provider calendar checks remain open.
+
 Client-handled forms that contain credentials, recovery codes, or other private input declare `method="post"` in the rendered HTML. This prevents an early submission before hydration from placing values in a GET URL. Authentication forms own validation with `noValidate`, visible field errors, `aria-invalid`, and focus on the first invalid field. The server remains the authority for credentials and rate limits.
 
 ## Resilience and verification

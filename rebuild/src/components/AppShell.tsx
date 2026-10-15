@@ -20,9 +20,9 @@ function Mark() {
   return <svg className="shell-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23.5 12.2 8l4 9 3.2-5.3L27 23.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="23.5" cy="8.5" r="2.5" fill="currentColor"/></svg>;
 }
 
-export function AppShell({ children, activeModule, enabledModules, enabledFeatures, rootAccess, userName, workspaceName, sidebar, sidebarWhen, installationMode = false }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; rootAccess: boolean; userName: string; workspaceName: string; sidebar?: ReactNode; sidebarWhen?: string; installationMode?: boolean }) {
+export function AppShell({ children, activeModule, enabledModules, enabledFeatures, rootAccess, userName, workspaceName, sidebar, sidebarWhen, installationMode = false }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; rootAccess: boolean; userName: string; workspaceName: string; sidebar?: ReactNode; sidebarWhen?: readonly string[]; installationMode?: boolean }) {
   const pathname = usePathname();
-  const visibleSidebar = sidebar && (!sidebarWhen || pathname === sidebarWhen);
+  const visibleSidebar = sidebar && (!sidebarWhen || sidebarWhen.includes(pathname));
   const [filterOpen, setFilterOpen] = useState(false);
   useEffect(() => setFilterOpen(false), [pathname]);
   useEffect(() => {
