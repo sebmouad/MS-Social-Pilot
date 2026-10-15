@@ -45,11 +45,12 @@ export function parseAdsFilters(params: AdsSearchParams, accountIds: readonly st
 }
 
 /** Read only the accounts and stored insight rows belonging to this workspace. */
-export async function getAdsDataset(workspaceId: string, filters: AdsFilters) {
-  const accounts = await getAdsAccounts(workspaceId);
+export async function getAdsDataset(workspaceId: string, filters: AdsFilters, allowedTargetIds?: readonly string[]) {
+  const accounts = await getAdsAccounts(workspaceId, allowedTargetIds);
+  const visibleAccountIds = accounts.map(account => account.id);
   const insights = await prisma.adInsight.findMany({
     where: {
-      adAccount: { workspaceId, ...(filters.accountId ? { id: filters.accountId } : {}) },
+      adAccount: { workspaceId, id: { in: filters.accountId ? visibleAccountIds.filter(id => id === filters.accountId) : visibleAccountIds } },
       date: { gte: filters.since, lt: filters.until },
     },
     orderBy: [{ level: "asc" }, { objectName: "asc" }, { date: "desc" }],
@@ -63,9 +64,13 @@ export async function getAdsDataset(workspaceId: string, filters: AdsFilters) {
   return { accounts, insights };
 }
 
-export function getAdsAccounts(workspaceId: string) {
+export async function getAdsAccounts(workspaceId: string, allowedTargetIds?: readonly string[]) {
+  const socialAccountIds = allowedTargetIds === undefined ? undefined : (await prisma.target.findMany({
+    where: { workspaceId, id: { in: [...allowedTargetIds] } },
+    select: { socialAccountId: true },
+  })).map(target => target.socialAccountId).filter((id): id is string => Boolean(id));
   return prisma.adAccount.findMany({
-    where: { workspaceId },
+    where: { workspaceId, ...(socialAccountIds ? { socialAccountId: { in: socialAccountIds } } : {}) },
     orderBy: { name: "asc" },
     select: { id: true, actId: true, name: true, currency: true, accountStatus: true, enabled: true, lastSyncedAt: true },
   });

@@ -14,9 +14,10 @@ const date = (value: Date) => new Intl.DateTimeFormat(undefined, { dateStyle: 'm
 export default async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams> }) {
   const viewer = await requireViewer({ feature: 'ads/campaigns' });
   const { workspaceId } = viewer;
-  const [params, accounts] = await Promise.all([searchParams, getAdsAccounts(workspaceId)]);
+  const allowedTargetIds = viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids;
+  const [params, accounts] = await Promise.all([searchParams, getAdsAccounts(workspaceId, allowedTargetIds)]);
   const filters = parseAdsFilters(params, accounts.map(account => account.id));
-  const { insights } = await getAdsDataset(workspaceId, filters);
+  const { insights } = await getAdsDataset(workspaceId, filters, allowedTargetIds);
   const summaries = summarizeInsights(insights).filter(row => ['campaign', 'adset', 'ad'].includes(row.level));
   const byAccount = groupSummariesByAccount(summaries);
   const actionAvailability = new Map(await Promise.all([...byAccount.keys()].map(async accountId => [

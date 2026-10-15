@@ -8,11 +8,12 @@ const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const money = (value: number | null, currency: string | null) => value === null ? '—' : `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
 
 export default async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams> }) {
-  const { workspaceId } = await requireViewer({ feature: 'ads/overview' });
+  const { workspaceId, permissions } = await requireViewer({ feature: 'ads/overview' });
+  const allowedTargetIds = permissions.pageScope.all ? undefined : permissions.pageScope.ids;
   const params = await searchParams;
-  const accounts = await getAdsAccounts(workspaceId);
+  const accounts = await getAdsAccounts(workspaceId, allowedTargetIds);
   const filters = parseAdsFilters(params, accounts.map(account => account.id));
-  const dataset = await getAdsDataset(workspaceId, filters);
+  const dataset = await getAdsDataset(workspaceId, filters, allowedTargetIds);
   const accountSummaries = summarizeInsights(dataset.insights, 'account');
   const campaigns = summarizeInsights(dataset.insights, 'campaign');
   const adsets = summarizeInsights(dataset.insights, 'adset');
