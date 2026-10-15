@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CONFIG_BY_KEY, CONFIG_REGISTRY, CONFIG_SCHEMA_VERSION, safeConfigShape } from '../src/lib/config/registry';
 import { configAuditDetail } from '../src/server/config/store';
@@ -24,7 +27,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(27);
+    expect(CONFIG_SCHEMA_VERSION).toBe(28);
     expect(CONFIG_BY_KEY.get('publishing.maxImageAltCharacters')!.schema.safeParse(500).success).toBe(true);
     expect(CONFIG_BY_KEY.get('publishing.maxImageUploadRequestOverheadBytes')!.schema.safeParse(65536).success).toBe(true);
     expect(CONFIG_BY_KEY.get('publishing.maxImageUploadBytes')!.schema.parse(26214400)).toBe(26214400);
@@ -91,6 +94,23 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('storage.mediaRoot')!.schema.safeParse('/srv/social-pilot/media').success).toBe(true);
     expect(CONFIG_BY_KEY.get('storage.mediaRoot')!.schema.safeParse('../media').success).toBe(false);
     expect(CONFIG_BY_KEY.get('storage.mediaRoot')!.schema.safeParse('/').success).toBe(false);
+  });
+
+  it('declares the Ads management policy as a Root-managed boolean that defaults off', () => {
+    const definition = CONFIG_BY_KEY.get('ads.managementEnabled');
+    expect(definition).toMatchObject({ kind: 'boolean', defaultValue: false, consumption: 'active' });
+    expect(definition!.schema.safeParse(true).success).toBe(true);
+    expect(definition!.schema.safeParse('true').success).toBe(false);
+  });
+
+  it('registers every literal runtime setting read in application source', () => {
+    const source = fileURLToPath(new URL('../src', import.meta.url));
+    const files = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? files(join(directory, entry.name)) : /\.tsx?$/.test(entry.name) ? [join(directory, entry.name)] : []);
+    const missing = files(source).flatMap(file => [...readFileSync(file, 'utf8').matchAll(/runtime(Config|Secret)\(\s*['"]([^'"]+)['"]/g)].flatMap(match => {
+      const definition = CONFIG_BY_KEY.get(match[2]);
+      return !definition || (match[1] === 'Secret') !== (definition.kind === 'secret') ? [`${file}: ${match[2]}`] : [];
+    }));
+    expect(missing).toEqual([]);
   });
 
   it('audits changes with key, change type, and registry version only', () => {

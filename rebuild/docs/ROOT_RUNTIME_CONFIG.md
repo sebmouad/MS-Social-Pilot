@@ -33,3 +33,5 @@ Consumption labels are operationally significant:
 Module and feature availability is generated from manifests and enforced by `src/server/entitlements/index.ts` alongside workspace, member, and plan rules. A saved false disables the module or feature from the next request. The Root default theme applies when a visitor has no theme cookie; an unavailable registry read falls back to the first bundled theme. Root settings marked pending must not be presented as live controls.
 
 This registry does not configure `DATABASE_URL`, `ENCRYPTION_KEY`, session authentication, or process-level logging sinks. Runtime settings must not be presented as active until the corresponding consumer reads and validates the persisted setting.
+
+Registry version 28 restores the shared `ads.managementEnabled` policy used by Ads services and connection scope selection. It is a validated Root boolean, defaults off, and is audited through the normal configuration write service. Enabling it does not grant roles, account access or provider permissions. A source-read regression check now rejects unregistered literal runtime setting reads.

@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 27;
+export const CONFIG_SCHEMA_VERSION = 28;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -30,6 +30,8 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'root.directoryPageSize', group: 'Root', label: 'Root directory page size', kind: 'number', description: 'Users and workspaces shown per page in the private Root directory.', defaultValue: 25, schema: z.number().int().min(1).max(200), consumption: 'active' }),
   entry({ key: 'root.defaultWorkspaceTimezone', group: 'Root', label: 'New workspace timezone', kind: 'text', description: 'IANA timezone assigned when Root creates a workspace.', defaultValue: 'UTC', schema: z.string().min(1).max(100).refine(value => { try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; } }, 'Use an IANA timezone.'), consumption: 'active' }),
   entry({ key: 'root.workspaceNameMaxCharacters', group: 'Root', label: 'Workspace name character limit', kind: 'number', description: 'Maximum characters Root accepts for newly created or renamed workspaces.', defaultValue: 100, schema: z.number().int().min(1).max(500), consumption: 'active' }),
+
+  entry({ key: 'ads.managementEnabled', group: 'Ads controls', label: 'Ads management enabled', kind: 'boolean', description: 'Allow authorized workspace owners and admins to use supported advertising management operations. Platform grants, account scope and confirmations are still required.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
 
   entry({ key: 'analytics.maxRangeDays', group: 'Analytics metrics', label: 'Maximum MCP analytics range (days)', kind: 'number', description: 'Largest date range accepted by MCP analytics overview requests.', defaultValue: 366, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
   entry({ key: 'analytics.reportExportRows', group: 'Analytics metrics', label: 'Report CSV row limit', kind: 'number', description: 'Maximum data rows included in a report CSV download; truncated exports are marked.', defaultValue: 5000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
