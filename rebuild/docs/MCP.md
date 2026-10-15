@@ -18,6 +18,7 @@ API keys do not create browser sessions and never expose social credentials or a
 - `moderate_inbox_comment`: hide or unhide a synced Facebook comment. This contacts Facebook and requires `HIDE COMMENT <id>` or `UNHIDE COMMENT <id>`.
 - `get_page_analytics`: stored daily insights for a Page in the current workspace.
 - `list_ad_accounts`: advertising accounts in the current workspace.
+- `create_ad_campaign` and `update_ad`: owner/admin Ads actions use the same workspace, entitlement, connection, scope, object-ownership, Root switch, and provider checks as the UI. Creation starts paused; updates can change status or one budget. Both require the exact confirmation described by each tool and produce an additional MCP audit record.
 - `create_draft`, `update_draft`, `delete_draft`: operate only on local, unpublished, unconnected drafts through the same server mutations as the UI. They do not schedule, publish, or contact providers. Each call requires an exact confirmation value: `CREATE DRAFT`, `UPDATE DRAFT <postId>`, or `DELETE DRAFT <postId>`. Delete is permanent.
 - `publish_post`: publish an existing post immediately to its configured destinations. This contacts providers and requires `PUBLISH POST <postId>`.
 - `sync_post_status`: refresh a post's status from providers and update local publishing state. Requires `SYNC POST STATUS <postId>`.

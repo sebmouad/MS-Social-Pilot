@@ -10,6 +10,8 @@ import { readConfig, saveConfig } from '../config/store';
 import { CONFIG_SCHEMA_VERSION, safeConfigShape } from '@/lib/config/registry';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
+import { campaignCreationConfirmation, createWorkspaceAdCampaign, updateWorkspaceAd } from '../ads/actions';
+import type { AdMutationRequest, FacebookCampaignObjective } from '@/platforms/types';
 
 export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number; apiKeyId?: string; isInstanceOwner?: boolean };
 type JsonRpcId = string | number | null;
@@ -30,6 +32,8 @@ const tools = [
   { name: 'moderate_inbox_comment', description: 'Hide or unhide a synced Facebook comment. This contacts Facebook. Confirmation must exactly match HIDE COMMENT <id> or UNHIDE COMMENT <id>.', inputSchema: { type: 'object', required: ['id', 'hidden', 'confirmation'], properties: { id: { type: 'string' }, hidden: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_page_analytics', description: 'Read stored daily insights for one workspace Page.', inputSchema: { type: 'object', required: ['pageId'], properties: { pageId: { type: 'string' }, days: { type: 'integer', minimum: 1, maximum: 365 } }, additionalProperties: false } },
   { name: 'list_ad_accounts', description: 'List advertising accounts in this workspace.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'create_ad_campaign', description: 'Create a paused Facebook campaign in a selected account. The confirmation must match CREATE PAUSED FACEBOOK CAMPAIGN <JSON-quoted name> IN ACCOUNT <adAccountId> WITH OBJECTIVE <objective>.', inputSchema: { type: 'object', required: ['adAccountId', 'name', 'objective', 'confirmation'], properties: { adAccountId: { type: 'string' }, name: { type: 'string' }, objective: { type: 'string', enum: ['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'update_ad', description: 'Change the status or one budget of a verified Facebook campaign, ad set, or ad. Confirmation must exactly match SET AD STATUS <objectId> TO <ACTIVE|PAUSED> or SET AD BUDGET <objectId> TO <amount> MINOR UNITS.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType', 'confirmation'], properties: { adAccountId: { type: 'string' }, objectId: { type: 'string' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, status: { type: 'string', enum: ['active', 'paused'] }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, lifetimeBudgetMinor: { type: 'integer', minimum: 1 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'preview_workspace_data_deletion', description: 'Count workspace records that a data deletion would remove. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'export_workspace_data', description: 'Export the current workspace JSON snapshot, excluding provider credentials and installation audit history. This snapshot does not yet include every legacy record or media bytes. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'delete_workspace_data', description: 'Delete workspace records and stored files while retaining workspace identity and members. A failed file cleanup can be retried. Confirmation must exactly match DELETE WORKSPACE DATA <workspaceId>. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', required: ['confirmation'], properties: { confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -52,6 +56,7 @@ const tools = [
 const rootTools = new Set(['get_root_config', 'set_root_config']);
 const canUseRootTool = (viewer: McpViewer) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
 const dataTools = new Set(['preview_workspace_data_deletion', 'export_workspace_data', 'delete_workspace_data']);
+const adsManagerTools = new Set(['list_ad_accounts', 'create_ad_campaign', 'update_ad']);
 const canManageData = (viewer: McpViewer) => viewer.role === 'owner' || viewer.role === 'admin';
 const dataResource = (uri: string) => uri === 'msp://data/deletion-preview';
 
@@ -64,6 +69,8 @@ const toolFeatures: Record<string, string> = {
   moderate_inbox_comment: 'inbox/conversations',
   get_page_analytics: 'analytics/overview',
   list_ad_accounts: 'ads/campaigns',
+  create_ad_campaign: 'ads/campaigns',
+  update_ad: 'ads/campaigns',
   preview_workspace_data_deletion: 'settings/data',
   export_workspace_data: 'settings/data',
   delete_workspace_data: 'settings/data',
@@ -82,7 +89,7 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'set_root_config']);
+const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'create_ad_campaign', 'update_ad', 'set_root_config']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -101,6 +108,7 @@ function requiredString(args: Record<string, unknown>, key: string) {
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
   if (rootTools.has(name) && !canUseRootTool(viewer)) throw new Error('Root configuration is unavailable.');
   if (dataTools.has(name) && !canManageData(viewer)) throw new Error('Only workspace owners and admins can manage workspace data.');
+  if (adsManagerTools.has(name) && !canManageData(viewer)) throw new Error('Only workspace owners and admins can manage ads.');
   const feature = toolFeatures[name];
   if (feature) requireFeature(viewer.entitlements, feature);
   if (feature && (!viewer.permissions || !canAccessFeature(viewer.permissions, feature, writeTools.has(name) ? 'write' : 'read'))) throw new Error('You do not have permission to use this feature.');
@@ -186,6 +194,31 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
     case 'list_ad_accounts':
       if (viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can list advertising accounts.');
       return prisma.adAccount.findMany({ where: { workspaceId: viewer.workspaceId }, orderBy: { name: 'asc' }, take: cap, select: { id: true, actId: true, name: true, enabled: true, currency: true } });
+    case 'create_ad_campaign': {
+      const adAccountId = requiredString(args, 'adAccountId');
+      const nameValue = requiredString(args, 'name');
+      const objective = requiredString(args, 'objective') as FacebookCampaignObjective;
+      const confirmation = requiredString(args, 'confirmation');
+      requireConfirmation(args, campaignCreationConfirmation(adAccountId, nameValue, objective));
+      const result = await createWorkspaceAdCampaign(viewer, { adAccountId, name: nameValue, objective, confirmation });
+      await auditWrite(viewer, name, { adAccountId, campaignId: result.campaignId });
+      return result;
+    }
+    case 'update_ad': {
+      const adAccountId = requiredString(args, 'adAccountId');
+      const objectId = requiredString(args, 'objectId');
+      const objectType = requiredString(args, 'objectType') as AdMutationRequest['objectType'];
+      const status = args.status === undefined ? undefined : requiredString(args, 'status') as AdMutationRequest['status'];
+      const dailyBudgetMinor = args.dailyBudgetMinor === undefined ? undefined : Number(args.dailyBudgetMinor);
+      const lifetimeBudgetMinor = args.lifetimeBudgetMinor === undefined ? undefined : Number(args.lifetimeBudgetMinor);
+      const confirmation = requiredString(args, 'confirmation');
+      const budget = dailyBudgetMinor ?? lifetimeBudgetMinor;
+      if (budget !== undefined) requireConfirmation(args, `SET AD BUDGET ${objectId} TO ${budget} MINOR UNITS`);
+      else if (status === 'active' || status === 'paused') requireConfirmation(args, `SET AD STATUS ${objectId} TO ${status.toUpperCase()}`);
+      await updateWorkspaceAd(viewer, { adAccountId, objectId, objectType, status, dailyBudgetMinor, lifetimeBudgetMinor, confirmation });
+      await auditWrite(viewer, name, { adAccountId, objectId, objectType });
+      return { adAccountId, objectId, updated: true };
+    }
     case 'preview_workspace_data_deletion':
       return previewWorkspaceDataDeletion({ userId: viewer.userId, workspaceId: viewer.workspaceId });
     case 'export_workspace_data':
@@ -331,7 +364,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     const requested = String(params.protocolVersion ?? '');
     return reply({ protocolVersion: versions.includes(requested) ? requested : versions[0], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } }, serverInfo: { name: 'ms-social-pilot', version: '0.1.0' }, instructions: `Workspace-scoped access for ${viewer.workspace.name}. Writes can manage local posts, publish posts, sync provider status, change channel/ad account selections, or manage Facebook Inbox items. Publishing, remote post deletion, Inbox replies, and comment moderation contact social platforms. Every write requires an explicit confirmation string. Times use ${viewer.workspace.timezone}.` });
   }
-  if (method === 'tools/list') return reply({ tools: tools.filter(tool => rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (tool.name !== 'list_ad_accounts' || viewer.role === 'owner' || viewer.role === 'admin') && (!dataTools.has(tool.name) || canManageData(viewer))) });
+  if (method === 'tools/list') return reply({ tools: tools.filter(tool => rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (!adsManagerTools.has(tool.name) || canManageData(viewer)) && (!dataTools.has(tool.name) || canManageData(viewer))) });
   if (method === 'tools/call') {
     const name = String(params.name ?? '');
     if (!tools.some(tool => tool.name === name)) return error(-32602, `Unknown tool: ${name}`);

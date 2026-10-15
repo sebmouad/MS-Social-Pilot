@@ -24,6 +24,12 @@ const dataControls = vi.hoisted(() => ({ preview: vi.fn(), export: vi.fn(), remo
 vi.mock('../src/server/data-control', () => ({ previewWorkspaceDataDeletion: dataControls.preview, exportWorkspaceData: dataControls.export, deleteWorkspaceData: dataControls.remove }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
 vi.mock('../src/server/inbox/actions', () => ({ replyToFacebookInbox: inboxMutations.reply, setFacebookInboxResolved: inboxMutations.resolve, moderateFacebookComment: inboxMutations.moderate }));
+const adsMutations = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn() }));
+vi.mock('../src/server/ads/actions', () => ({
+  createWorkspaceAdCampaign: adsMutations.create,
+  updateWorkspaceAd: adsMutations.update,
+  campaignCreationConfirmation: (adAccountId: string, name: string, objective: string) => `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(name.trim())} IN ACCOUNT ${adAccountId} WITH OBJECTIVE ${objective}`,
+}));
 const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
 vi.mock('../src/server/publishing/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
 
@@ -55,6 +61,8 @@ beforeEach(() => {
   inboxMutations.reply.mockResolvedValue({ ok: true });
   inboxMutations.resolve.mockResolvedValue({ ok: true });
   inboxMutations.moderate.mockResolvedValue({ ok: true });
+  adsMutations.create.mockResolvedValue({ campaignId: 'campaign-1' });
+  adsMutations.update.mockResolvedValue(undefined);
   publishingMutations.publish.mockResolvedValue({ published: 1, failed: 0, needsReconciliation: 0 });
   publishingMutations.sync.mockResolvedValue({ synced: 1 });
   publishingMutations.remove.mockResolvedValue(undefined);
@@ -72,6 +80,30 @@ beforeEach(() => {
 });
 
 describe('MCP workspace boundaries', () => {
+  it('applies ads write scope, manager role, and exact confirmations before shared ads services', async () => {
+    const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 60, method: 'tools/list' });
+    expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('create_ad_campaign');
+    const limited = { ...viewer, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: true, pageAccess: [] }) };
+    const hidden = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 61, method: 'tools/list' });
+    expect((await hidden.json()).result.tools.map((tool: { name: string }) => tool.name)).not.toContain('update_ad');
+    const denied = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 62, method: 'tools/call', params: { name: 'update_ad', arguments: {} } });
+    expect((await denied.json()).result.isError).toBe(true);
+    expect(adsMutations.update).not.toHaveBeenCalled();
+
+    const campaign = { adAccountId: 'account-1', name: 'Autumn launch', objective: 'OUTCOME_TRAFFIC' };
+    const bad = await call('create_ad_campaign', { ...campaign, confirmation: 'CREATE CAMPAIGN' });
+    expect((await bad.json()).result.isError).toBe(true);
+    expect(adsMutations.create).not.toHaveBeenCalled();
+    const confirmation = 'CREATE PAUSED FACEBOOK CAMPAIGN "Autumn launch" IN ACCOUNT account-1 WITH OBJECTIVE OUTCOME_TRAFFIC';
+    const created = await call('create_ad_campaign', { ...campaign, confirmation });
+    expect((await created.json()).result.structuredContent).toEqual({ campaignId: 'campaign-1' });
+    expect(adsMutations.create).toHaveBeenCalledWith(viewer, { ...campaign, confirmation });
+
+    const change = { adAccountId: 'account-1', objectId: 'campaign-1', objectType: 'campaign', status: 'paused' };
+    const updated = await call('update_ad', { ...change, confirmation: 'SET AD STATUS campaign-1 TO PAUSED' });
+    expect((await updated.json()).result.structuredContent.updated).toBe(true);
+    expect(adsMutations.update).toHaveBeenCalledWith(viewer, { ...change, dailyBudgetMinor: undefined, lifetimeBudgetMinor: undefined, confirmation: 'SET AD STATUS campaign-1 TO PAUSED' });
+  });
   it('exposes workspace data controls only to managers and requires exact deletion confirmation', async () => {
     const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 40, method: 'tools/list' });
     expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('delete_workspace_data');
