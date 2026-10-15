@@ -57,14 +57,13 @@ export async function signIn(email: string, password: string): Promise<'signed-i
     where: { userId: user.id, role: { in: ['owner', 'admin'] } },
     select: { role: true },
   }) : null;
-  // Passkey verification is not yet supported by this login flow. Give
-  // passkey-only accounts a TOTP enrollment path after password verification.
-  const next = hasTotp ? 'verify' : hasPasskey || needsTwoStepEnrollment(policy, user.isInstanceOwner, privilegedMembership ? [privilegedMembership.role] : []) ? 'enroll' : null;
-
-  const [sessionDays, pendingMinutes] = await Promise.all([
+  const [sessionDays, pendingMinutes, passkeyOrigin] = await Promise.all([
     runtimeConfig('auth.sessionDays') as Promise<number>,
     runtimeConfig('auth.pendingMinutes') as Promise<number>,
+    hasPasskey ? runtimeConfig('auth.passkeyOrigin') as Promise<string> : Promise.resolve(''),
   ]);
+  const next = hasTotp || (hasPasskey && Boolean(passkeyOrigin)) ? 'verify'
+    : hasPasskey || needsTwoStepEnrollment(policy, user.isInstanceOwner, privilegedMembership ? [privilegedMembership.role] : []) ? 'enroll' : null;
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + (next ? pendingMinutes * 60 * 1000 : sessionDays * 24 * 60 * 60 * 1000));
   await prisma.session.create({ data: { id: randomBytes(18).toString('base64url'), userId: user.id, tokenHash: hashToken(token), expiresAt, pending: next, challenge: null } });

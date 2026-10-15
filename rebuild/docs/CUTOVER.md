@@ -11,6 +11,21 @@ that clone. The cutover rehearsal then verified every mapped column and enum,
 and a second custom-format backup restored with matching row counts. The
 schema-only dump contained zero customer rows, so this check does not prove
 data migration, permissions, application writes, media, or provider behavior.
+The rehearsal now compares exact counts for every public table in its source
+and restored scratch databases. A read-only production catalog inspection on
+2026-10-15 showed nonempty legacy feature tables outside the rebuild Prisma
+view, including `external_posts`, `metric_availability`, `page_insights`, and
+`ad_insights`; it also showed an enrolled passkey. The counts were estimates
+from PostgreSQL statistics, not copied customer records or migration proof.
+The latest production custom-format backup observed on 2026-10-15
+(`db-20261015-0415.dump`, 683900 bytes) was restored into a temporary database
+on the production host with `pg_restore --exit-on-error`. The restored database
+had 92 public tables, 2 workspaces, 2 users, and 9884 Page insight rows. The
+temporary database was removed; zero restore-check databases remained, all
+three relevant services remained active, and the public health endpoint
+returned 200. This proves that particular backup can be restored, but it does
+not prove the exact future cutover backup, application behavior on restored
+data, media restoration, or proxy/service rollback.
 
 The rebuild currently listens on port 3200; production OpenLiteSpeed proxies to
 the legacy service on port 3100. No rebuild systemd units, proxy-switch
@@ -73,8 +88,10 @@ cutover runbook and host configuration are supplied.
 
 ## Current blockers
 
-- Rebuild feature coverage is incomplete. Current gaps include passkey
-  verification, complete provider disconnect/data deletion, full Facebook
+- Rebuild feature coverage is incomplete. Passkey verification now has a
+  challenge-bound implementation, but its Root-managed origin and a real
+  enrolled credential still need production-shaped validation. Other gaps
+  include complete provider disconnect/data deletion, full Facebook
   media and Ads lifecycles, broad scoped-role access, Root coverage of all
   operational options, MCP parity, and live provider integration tests.
 - Production currently has no rebuild web or worker systemd unit and no

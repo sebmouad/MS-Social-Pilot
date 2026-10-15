@@ -24,7 +24,13 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(13);
+    expect(CONFIG_SCHEMA_VERSION).toBe(15);
+    expect(CONFIG_BY_KEY.get('auth.passkeyChallengeMinutes')!.schema.safeParse(5).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('auth.passkeyChallengeMinutes')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('auth.passkeyOrigin')!.schema.safeParse('https://social.example.test').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('auth.passkeyOrigin')!.schema.safeParse('http://localhost:3200').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('auth.passkeyOrigin')!.schema.safeParse('http://social.example.test').success).toBe(false);
+    expect(CONFIG_BY_KEY.get('auth.passkeyOrigin')!.schema.safeParse('https://social.example.test/path').success).toBe(false);
     expect(CONFIG_BY_KEY.get('data.maxArchiveBytes')!.schema.parse(268435456)).toBe(268435456);
     expect(CONFIG_BY_KEY.get('data.workspaceOperationTimeoutMs')!.schema.safeParse(300000).success).toBe(true);
     expect(CONFIG_BY_KEY.get('data.workspaceOperationLockWaitMs')!.schema.safeParse(30000).success).toBe(true);

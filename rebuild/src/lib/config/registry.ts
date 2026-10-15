@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 13;
+export const CONFIG_SCHEMA_VERSION = 15;
 
 const cron = z.string().min(9).max(100).refine((value) => {
   const fields = value.trim().split(/\s+/);
@@ -36,6 +36,8 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'auth.recoveryCodeCount', group: 'Security · sessions', label: 'Recovery codes per enrollment', kind: 'number', description: 'Number of one-time recovery codes issued when enrolling an authenticator.', defaultValue: 10, schema: z.number().int().min(1).max(50), consumption: 'active' }),
   entry({ key: 'auth.passwordMinLength', group: 'Security · passwords', label: 'Minimum password length', kind: 'number', description: 'Minimum number of characters required when a user changes a password.', defaultValue: 12, schema: z.number().int().min(8).max(64), consumption: 'active' }),
   entry({ key: 'auth.passwordMaxBytes', group: 'Security · passwords', label: 'Maximum password bytes', kind: 'number', description: 'Maximum UTF-8 byte length accepted for a new password.', defaultValue: 800, schema: z.number().int().min(64).max(4096), consumption: 'active' }),
+  entry({ key: 'auth.passkeyOrigin', group: 'Security · passkeys', label: 'Passkey public origin', kind: 'text', description: 'Exact public HTTPS origin used for passkey challenges. Localhost HTTP is allowed for isolated testing. Leave empty to disable passkey verification.', defaultValue: '', schema: z.string().max(300).refine(value => value === '' || (() => { try { const parsed = new URL(value); return parsed.origin === value && (parsed.protocol === 'https:' || (parsed.protocol === 'http:' && parsed.hostname === 'localhost')); } catch { return false; } })(), 'Use an exact HTTPS origin or localhost HTTP origin.'), consumption: 'active' }),
+  entry({ key: 'auth.passkeyChallengeMinutes', group: 'Security · passkeys', label: 'Passkey challenge lifetime (minutes)', kind: 'number', description: 'Maximum age of one WebAuthn challenge within a password-verified sign-in session.', defaultValue: 5, schema: z.number().int().min(1).max(30), consumption: 'active' }),
   entry({ key: 'security.twoStep', group: 'Security', label: 'Two-step requirement', kind: 'select', description: 'Admins, everyone, or off. Enrolled factors still require verification.', defaultValue: 'admins', schema: z.enum(['admins', 'everyone', 'off']), consumption: 'active', options: [{ value: 'admins', label: 'Admins' }, { value: 'everyone', label: 'Everyone' }, { value: 'off', label: 'Off' }] }),
   entry({ key: 'security.apiRequestsPerMinute', group: 'Security · rate limits', label: 'API requests per minute', kind: 'number', description: 'Default per-actor request budget for application APIs.', defaultValue: 120, schema: z.number().int().min(1).max(100000), consumption: 'planned' }),
 
