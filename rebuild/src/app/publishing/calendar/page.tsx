@@ -1,6 +1,7 @@
 import { requireViewer } from "@/server/context";
 import { listPosts } from "@/server/data";
 import { PageHeading } from "../publishing-ui";
+import { workspaceDateKey } from "@/lib/calendar-dates";
 import styles from "../publishing.module.css";
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -17,12 +18,11 @@ export default async function CalendarPage() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstWeekday = new Date(year, month, 1).getDay();
   const cells = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
-  const formatter = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
   const postsByDay = new Map<string, typeof posts>();
   for (const post of posts) {
     const date = post.scheduledAt ?? post.publishedAt;
     if (!date) continue;
-    const key = formatter.format(date);
+    const key = workspaceDateKey(date, timeZone);
     postsByDay.set(key, [...(postsByDay.get(key) ?? []), post]);
   }
   for (const items of postsByDay.values()) items.sort((a, b) => (a.scheduledAt ?? a.publishedAt)!.getTime() - (b.scheduledAt ?? b.publishedAt)!.getTime());
@@ -33,8 +33,7 @@ export default async function CalendarPage() {
     {Array.from({ length: cells }, (_, index) => {
       const day = index - firstWeekday + 1;
       const inMonth = day >= 1 && day <= daysInMonth;
-      const date = new Date(year, month, Math.min(daysInMonth, Math.max(1, day)));
-      const key = formatter.format(date);
+      const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const dayPosts = inMonth ? postsByDay.get(key) ?? [] : [];
       return <div key={index} className={`${styles.day}${inMonth ? "" : ` ${styles.outside}`}`} role="gridcell" aria-label={inMonth ? `${monthLabel} ${day}, ${dayPosts.length} posts` : undefined}>
         <div className={styles.dayNumber}>{inMonth ? day : ""}</div>

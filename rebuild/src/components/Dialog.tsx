@@ -1,18 +1,14 @@
 "use client";
-import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { useId, type ReactNode } from "react";
 import { Button } from "./Button";
+import { ModalDialog } from "./ModalDialog";
 
 export function Dialog({ open, title, description, children, onClose, actions }: { open: boolean; title: string; description?: string; children: ReactNode; onClose: () => void; actions?: ReactNode }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
-  return <dialog ref={ref} className="ui-dialog" aria-labelledby="dialog-title" aria-describedby={description ? "dialog-description" : undefined} onClose={onClose} onCancel={event => { event.preventDefault(); onClose(); }}>
-    <div className="ui-dialog__header"><div><h2 id="dialog-title">{title}</h2>{description && <p id="dialog-description">{description}</p>}</div><Button variant="quiet" size="sm" aria-label="Close dialog" onClick={onClose}>Close</Button></div>
+  const titleId = useId();
+  const descriptionId = useId();
+  if (!open) return null;
+  return <ModalDialog className="ui-dialog" labelledBy={titleId} onDismiss={onClose} initialFocus="[data-dialog-cancel]">
+    <div className="ui-dialog__header"><div><h2 id={titleId}>{title}</h2>{description && <p id={descriptionId}>{description}</p>}</div><Button variant="quiet" size="sm" data-dialog-cancel aria-label="Close dialog" onClick={onClose}>Close</Button></div>
     <div className="ui-dialog__body">{children}</div>{actions && <div className="ui-dialog__actions">{actions}</div>}
-  </dialog>;
+  </ModalDialog>;
 }

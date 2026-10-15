@@ -1,8 +1,9 @@
 "use client";
 
 import { cancelScheduledPostAction, createPostAction, deletePostAction, importPostsAction, publishPostAction, schedulePostAction, submitForApprovalAction, syncPostAction, updatePostAction } from "./actions";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components";
+import { ModalDialog } from "@/components/ModalDialog";
 import styles from "../publishing.module.css";
 
 type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean };
@@ -41,15 +42,10 @@ export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
 
 export function PostRowActions({ post, targets, canEdit, canPublish }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null);
   const selected = new Set(post.targets.map(item => item.target.id));
   const hasRemote = post.targets.some(item => Boolean(item.remotePostId));
   const isDraft = post.status === 'draft' && !post.publishedAt;
   const isQueued = post.status === 'scheduled';
-  useEffect(() => {
-    if (deleteOpen && !dialog.current?.open) dialog.current?.showModal();
-    if (!deleteOpen && dialog.current?.open) dialog.current.close();
-  }, [deleteOpen]);
   return <div className={styles.rowActions}>
     {canEdit && isDraft && post.media.length <= 1 ? <details className={styles.editDetails}>
       <summary>Edit post</summary>
@@ -77,7 +73,7 @@ export function PostRowActions({ post, targets, canEdit, canPublish }: { post: P
     {hasRemote ? <form action={syncPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Sync status</button></form> : null}
     {post.targets.some(item => item.status === 'processing' && !item.remotePostId) ? <span className={styles.noActions}>A publish result needs review on the destination before retrying.</span> : null}
     <Button variant="danger" size="sm" type="button" onClick={() => setDeleteOpen(true)}>Delete locally</Button>
-    <dialog className="ui-dialog" aria-labelledby={`delete-title-${post.id}`} ref={dialog} onClose={() => setDeleteOpen(false)} onCancel={event => { event.preventDefault(); setDeleteOpen(false); }}>
+    {deleteOpen && <ModalDialog className="ui-dialog" labelledBy={`delete-title-${post.id}`} onDismiss={() => setDeleteOpen(false)}>
       <form action={deletePostAction}>
         <input type="hidden" name="postId" value={post.id} />
         <div className="ui-dialog__header"><div><h2 id={`delete-title-${post.id}`}>Delete this post locally?</h2><p>This permanently removes the post and its local publishing history.</p></div></div>
@@ -85,9 +81,9 @@ export function PostRowActions({ post, targets, canEdit, canPublish }: { post: P
           <p>{hasRemote ? 'Remote posts will remain on their platforms unless you also select remote deletion.' : 'No remote post is recorded for this item.'}</p>
           {hasRemote ? <label className={styles.confirmCheck}><input type="checkbox" name="deleteRemote" /> Also delete recorded remote posts. This cannot be undone.</label> : null}
         </div>
-        <div className="ui-dialog__actions"><Button type="button" onClick={() => setDeleteOpen(false)}>Cancel</Button><Button variant="danger" type="submit">Delete locally</Button></div>
+        <div className="ui-dialog__actions"><Button type="button" data-dialog-cancel onClick={() => setDeleteOpen(false)}>Cancel</Button><Button variant="danger" type="submit">Delete locally</Button></div>
       </form>
-    </dialog>
+    </ModalDialog>}
   </div>;
 }
 

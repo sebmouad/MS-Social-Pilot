@@ -29,7 +29,11 @@ export function ModalDialog({ children, className, labelledBy, onDismiss, busy =
 
   return <dialog ref={dialogRef} className={className} aria-labelledby={labelledBy}
     onCancel={event => { event.preventDefault(); if (!busy) dismissRef.current(); }}
-    onMouseDown={event => { if (event.target === event.currentTarget && !busy) dismissRef.current(); }}>
+    onMouseDown={event => {
+      if (event.target !== event.currentTarget || busy) return;
+      const bounds = event.currentTarget.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dismissRef.current();
+    }}>
     {children}
   </dialog>;
 }

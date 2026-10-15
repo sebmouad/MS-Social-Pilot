@@ -31,7 +31,7 @@ There is no released billing or legal-copy contract for the rebuild. Do not inve
 | Select/listbox | Native `<select>` for current English UI | Browser owns open popup; revisit for localized/authored popup requirements |
 | Date | Native date/time input where used | Workspace timezone and date-only parsing need route tests |
 | Forms | Screen-local forms plus server validation | Shared field error/first-invalid-focus owner remains to be built |
-| Dialog | `src/components/ModalDialog.tsx` when present; older overlays are migration targets | Focus, Escape, restoration, and destructive flow browser tests required |
+| Dialog | `src/components/ModalDialog.tsx` owns the native modal lifecycle; `Dialog.tsx` supplies the standard frame | Connections and post deletion use it; focus, Escape, restoration, and destructive flow browser tests remain required |
 | Toast/status | Inline `role=status`/`role=alert` today | One shared notification owner remains to be built |
 | CRUD | Server services are authoritative; screens keep context until confirmed | Full create/edit/delete and failure E2E coverage remains incomplete |
 
