@@ -15,6 +15,11 @@ button, input, select { font: inherit; }
 .auth-card input { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); }
 .auth-card button { min-height: 42px; padding: 0 14px; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: white; font-weight: 700; cursor: pointer; }
 .auth-card button:disabled { opacity: .55; cursor: not-allowed; }
+.auth-card form button[type="submit"] { width: 100%; }
+.auth-card input[aria-invalid="true"] { border-color: var(--danger); }
+.auth-card .auth-field-error { margin: -5px 0 3px; color: var(--danger); font-size: 12px; line-height: 1.4; }
+.auth-card > button[type="button"] { width: 100%; margin-top: 14px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-soft); font-size: 12px; }
+.auth-card > button[type="button"]:hover { background: var(--surface-muted); color: var(--ink); }
 .auth-card .setup-secret { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-muted); overflow-wrap: anywhere; }
 .eyebrow { color: var(--accent) !important; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
 .muted { font-size: 13px; }

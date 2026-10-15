@@ -49,7 +49,7 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
     finally { setBusy(false); }
   }
 
-  return <form className="ads-campaign-create" onSubmit={handleSubmit} aria-label={`Create ad set under ${campaignName}`}>
+  return <form method="post" className="ads-campaign-create" onSubmit={handleSubmit} aria-label={`Create ad set under ${campaignName}`}>
     <h4>Create paused ad set under {campaignName}</h4>
     <p className="small-note">Uses impressions billing. Enter a daily amount{currency ? ` in ${currency}` : ''}; delivery targets one country.</p>
     <div className="ads-campaign-create__fields">

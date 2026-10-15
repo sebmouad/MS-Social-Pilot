@@ -55,14 +55,14 @@ export function AccountManager({ initialName, email, passwordPolicy }: { initial
 
   return <>
     <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>Profile</h2><p>Update the name shown to your team.</p></div></div>
-      <form className={styles['mcp-key-form']} onSubmit={saveName}>
+      <form method="post" className={styles['mcp-key-form']} onSubmit={saveName}>
         <div className={styles['mcp-key-fields']}><label>Name<input required maxLength={100} value={name} onChange={event => setName(event.currentTarget.value)} disabled={busy} /></label><label>Email<input value={email} readOnly aria-describedby="account-email-note" /></label></div>
         <p id="account-email-note" className={styles['settings-note']}>Email changes require a verified address and are not available yet.</p>
         <button type="submit" disabled={busy || !name.trim() || name.trim() === initialName}>Save profile</button>
       </form>
     </section>
     <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>Password</h2><p>Changing your password signs out other active sessions.</p></div></div>
-      <form className={styles['mcp-key-form']} onSubmit={changePassword}><div className={styles['mcp-key-fields']}>
+      <form method="post" className={styles['mcp-key-form']} onSubmit={changePassword}><div className={styles['mcp-key-fields']}>
         <label>Current password<input type="password" autoComplete="current-password" required value={currentPassword} onChange={event => setCurrentPassword(event.currentTarget.value)} disabled={busy} /></label>
         <label>New password<input type="password" autoComplete="new-password" minLength={passwordPolicy.minLength} maxLength={passwordPolicy.maxBytes} required value={newPassword} onChange={event => setNewPassword(event.currentTarget.value)} disabled={busy} /></label>
       </div><p className={styles['settings-note']}>Use at least {passwordPolicy.minLength} characters, up to {passwordPolicy.maxBytes} bytes.</p><button type="submit" disabled={busy || !currentPassword || newPassword.length < passwordPolicy.minLength}>Change password</button></form>

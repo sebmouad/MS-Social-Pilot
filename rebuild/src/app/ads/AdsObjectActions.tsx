@@ -80,7 +80,7 @@ export function AdsObjectActions({ adAccountId, objectId, objectType, currency, 
         <button type="button" disabled={busy} onClick={() => changeStatus('paused')}>Pause</button>
         <button type="button" disabled={busy} onClick={() => changeStatus('active')}>Resume</button>
       </div>
-      <form className="ads-object-actions__budget" onSubmit={event => { event.preventDefault(); changeBudget(); }}>
+      <form method="post" className="ads-object-actions__budget" onSubmit={event => { event.preventDefault(); changeBudget(); }}>
         <label><span className="sr-only">Budget period</span><select value={budgetKind} onChange={event => setBudgetKind(event.target.value as 'daily' | 'lifetime')} disabled={busy}>
           <option value="daily">Daily</option><option value="lifetime">Lifetime</option>
         </select></label>

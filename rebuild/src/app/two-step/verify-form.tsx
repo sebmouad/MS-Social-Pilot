@@ -2,12 +2,17 @@
 
 import { startAuthentication } from '@simplewebauthn/browser';
 import { FormEvent, useState } from 'react';
+import { validateFields } from '@/lib/ui/form-validation';
 
 export function VerifyForm({ hasPasskey }: { hasPasskey: boolean }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [fieldError, setFieldError] = useState('');
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const errors = validateFields(event.currentTarget, { code: { empty: 'Enter a verification or recovery code.' } });
+    setFieldError(errors.code ?? '');
+    if (errors.code) return;
     setBusy(true);
     setError('');
     const form = new FormData(event.currentTarget);
@@ -34,7 +39,8 @@ export function VerifyForm({ hasPasskey }: { hasPasskey: boolean }) {
   }
   return <main className="auth-screen"><div className="auth-card"><p className="eyebrow">Social Pilot</p><h1>Verify your sign-in</h1><p>Use a passkey, six-digit authenticator code, or recovery code.</p>
     {hasPasskey && <button type="button" disabled={busy} onClick={verifyPasskey}>Use a passkey</button>}
-    <form onSubmit={submit}><label htmlFor="two-step-code">Verification code</label><input id="two-step-code" name="code" autoComplete="one-time-code" required minLength={6} maxLength={32} />
+    <form method="post" noValidate onSubmit={submit}><label htmlFor="two-step-code">Verification code</label><input id="two-step-code" name="code" autoComplete="one-time-code" required minLength={6} maxLength={32} spellCheck={false} aria-invalid={Boolean(fieldError)} aria-describedby={fieldError ? 'two-step-code-error' : undefined} />
+      {fieldError && <p id="two-step-code-error" className="auth-field-error">{fieldError}</p>}
       {error && <p role="alert" className="muted">{error}</p>}<button type="submit" disabled={busy}>{busy ? 'Verifying…' : 'Verify'}</button></form>
   </div></main>;
 }

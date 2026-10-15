@@ -35,7 +35,7 @@ export function CampaignCreateForm({ adAccountId, accountName }: { adAccountId: 
     finally { setBusy(false); }
   }
 
-  return <form className="ads-campaign-create" onSubmit={create} aria-label={`Create campaign in ${accountName}`}>
+  return <form method="post" className="ads-campaign-create" onSubmit={create} aria-label={`Create campaign in ${accountName}`}>
     <h3>Create paused campaign</h3>
     <p className="small-note">This creates a draft campaign only. Add an ad set and ads in Meta Ads Manager before activating delivery.</p>
     <div className="ads-campaign-create__fields">

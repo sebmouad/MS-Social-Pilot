@@ -48,7 +48,7 @@ export function McpKeyManager({ features, initialKeys, maxLifetimeDays }: { feat
     finally { setBusy(false); }
   }
   return <>
-    <form className={styles['mcp-key-form']} onSubmit={createKey}>
+    <form method="post" className={styles['mcp-key-form']} onSubmit={createKey}>
       <div className={styles['mcp-key-fields']}>
         <label>Key name<input required maxLength={100} value={name} onChange={event => setName(event.currentTarget.value)} placeholder="Automation client" disabled={busy} /></label>
         <label>Lifetime in days<input type="number" min={1} max={maxLifetimeDays} value={expiresInDays} onChange={event => setExpiresInDays(Number(event.currentTarget.value))} disabled={busy} /></label>

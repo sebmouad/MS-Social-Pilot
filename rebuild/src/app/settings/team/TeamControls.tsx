@@ -32,7 +32,7 @@ export function TeamControls({ members, targets, actorId, actorRole }: { members
   }
 
   return <div className={styles['team-management']}>
-    <form className={styles['team-add-form']} onSubmit={event => { event.preventDefault(); void mutate('POST', { email, role, targetIds: allPages ? [] : selected, allPages }); }}>
+    <form method="post" className={styles['team-add-form']} onSubmit={event => { event.preventDefault(); void mutate('POST', { email, role, targetIds: allPages ? [] : selected, allPages }); }}>
       <h3>Add an existing account</h3><p>They must already have an active account. New account invitations are unavailable until email invitations are configured.</p>
       <div className={styles['team-add-fields']}><label>Email address<input type="email" value={email} onChange={event => setEmail(event.currentTarget.value)} required maxLength={320} /></label><label>Role<select value={role} onChange={event => setRole(event.currentTarget.value)}>{actorRole === 'owner' && <option value="owner">owner</option>}{roles.map(item => <option key={item} value={item}>{item}</option>)}</select></label></div>
       <label className={styles['team-all-channels']}><input type="checkbox" checked={allPages} onChange={event => setAllPages(event.currentTarget.checked)} /> Access to all channels</label>
