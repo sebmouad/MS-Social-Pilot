@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import styles from '../settings.module.css';
+import { summarizeDeletionCounts } from './preview';
 
 export function DataControls({ workspaceName, destructive = false }: { workspaceName: string; destructive?: boolean }) {
   const [confirmation, setConfirmation] = useState('');
@@ -9,6 +10,7 @@ export function DataControls({ workspaceName, destructive = false }: { workspace
   const [previewBusy, setPreviewBusy] = useState(false);
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const [notice, setNotice] = useState('');
+  const previewRows = counts ? summarizeDeletionCounts(counts) : [];
 
   async function previewDeletion() {
     setPreviewBusy(true); setNotice(''); setCounts(null); setConfirmation('');
@@ -37,8 +39,8 @@ export function DataControls({ workspaceName, destructive = false }: { workspace
 
   return <div className={styles['data-controls']}>
     {!counts ? <button type="button" onClick={previewDeletion} disabled={busy || previewBusy}>{previewBusy ? 'Counting rows…' : 'Preview rows to delete'}</button> : <>
-      <p className={styles['settings-note']}>Current workspace records, including older feature tables when present:</p>
-      <ul>{Object.entries(counts).map(([name, count]) => <li key={name}>{name}: {count}</li>)}</ul>
+      <p className={styles['settings-note']}>Records found in this workspace, grouped by what they contain:</p>
+      {previewRows.length ? <ul className={styles['data-preview-list']}>{previewRows.map(row => <li key={row.label}><span>{row.label}</span><strong>{new Intl.NumberFormat().format(row.count)}</strong></li>)}</ul> : <p className={styles['settings-note']}>No content records were found. Stored files and linked settings may still be removed.</p>}
       <button type="button" onClick={previewDeletion} disabled={busy || previewBusy}>{previewBusy ? 'Counting rows…' : 'Refresh preview'}</button>
       <label className={styles['data-confirm-label']} htmlFor="delete-workspace-data">Type DELETE to confirm</label>
       <div className={styles['data-delete-row']}><input id="delete-workspace-data" value={confirmation} onChange={event => setConfirmation(event.currentTarget.value)} autoComplete="off" disabled={busy} /><button type="button" className={styles['data-danger-button']} disabled={busy || confirmation !== 'DELETE'} onClick={removeData}>{busy ? 'Deleting…' : 'Delete workspace data'}</button></div>
