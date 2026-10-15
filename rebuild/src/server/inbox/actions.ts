@@ -112,7 +112,7 @@ export async function syncFacebookInbox(actor: InboxActor, targetId?: string) {
       }
     }
   }
-    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`inbox_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'inbox.synced', ${JSON.stringify({ workspaceId: actor.workspaceId, targetCount: batches.length, failedCount: failures.length, conversationCount, messageCount, commentCount })}::jsonb, NOW())`;
+    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`inbox_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'inbox.synced', ${JSON.stringify({ workspaceId: actor.workspaceId, targetIds: batches.map(batch => batch.targetId), targetCount: batches.length, failedCount: failures.length, conversationCount, messageCount, commentCount })}::jsonb, NOW())`;
   });
   return { targetCount: batches.length, failedCount: failures.length, conversationCount, messageCount, commentCount, syncedAt: new Date().toISOString() };
 }

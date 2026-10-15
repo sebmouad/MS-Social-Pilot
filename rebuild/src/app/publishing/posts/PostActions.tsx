@@ -116,7 +116,7 @@ function AttachmentFields({ post, imageRules, errors = {} }: { post?: PostRow; i
   </>;
 }
 
-export function PostEditorForm({ targets, imageRules }: { targets: TargetChoice[]; imageRules: ImageRules }) {
+export function PostEditorForm({ targets, imageRules, schedule }: { targets: TargetChoice[]; imageRules: ImageRules; schedule?: { date: string; time: string; timeZone: string } }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   return <form action={createPostAction} noValidate className={styles.draftForm} onSubmit={event => submitPost(event, setErrors)}>
     <label htmlFor="new-post-message">Post text</label>
@@ -126,7 +126,8 @@ export function PostEditorForm({ targets, imageRules }: { targets: TargetChoice[
     <textarea id="new-post-first-comment" name="firstComment" rows={2} placeholder="Add a link or follow-up as the first comment…" />
     <AttachmentFields imageRules={imageRules} errors={errors} />
     <TargetPicker targets={targets} />
-    <div className={styles.formFooter}><span>Saved locally until you publish it.</span><button className="ui-button ui-button--primary" type="submit">Create post</button></div>
+    {schedule && <fieldset className={styles.targetPicker}><legend>Publishing time</legend><p>Times use {schedule.timeZone.replaceAll('_', ' ')}.</p><label>Date<input type="date" name="scheduleDate" defaultValue={schedule.date} required /></label><label>Time<input type="time" name="scheduleTime" defaultValue={schedule.time} required /></label></fieldset>}
+    <div className={styles.formFooter}><span>{schedule ? 'Save a draft or add it to the queue.' : 'Saved locally until you publish it.'}</span>{schedule && <button className="ui-button ui-button--secondary" type="submit" name="intent" value="draft">Save draft</button>}<button className="ui-button ui-button--primary" type="submit" name="intent" value={schedule ? 'schedule' : 'draft'}>{schedule ? 'Add to queue' : 'Create post'}</button></div>
   </form>;
 }
 

@@ -6,6 +6,7 @@ import { requireViewer } from '@/server/context';
 import { canAccessFeature } from '@/server/permissions';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { cancelScheduledPost, createPost, deletePost, importPostsCsv, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '@/server/publishing/lifecycle';
+import { wallTimeToInstant } from '@/lib/calendar-dates';
 
 const PATH = '/publishing/posts';
 type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published' | 'publish-review' | 'synced' | 'failed';
@@ -13,8 +14,15 @@ type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published'
 export async function createPostAction(data: FormData) {
   await run(async viewer => {
     const postActor = actor(viewer);
-    await createPost(postActor, { message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') });
-    return 'created';
+    const intent = stringField(data, 'intent', true);
+    if (intent && intent !== 'draft' && intent !== 'schedule') throw new Error('Choose a valid post action.');
+    const scheduledAt = intent === 'schedule' ? (() => {
+      const result = wallTimeToInstant(stringField(data, 'scheduleDate'), stringField(data, 'scheduleTime'), viewer.membership.workspace.timezone);
+      if (!result.ok) throw new Error('Choose a valid publishing time in your workspace time zone.');
+      return result.instant;
+    })() : undefined;
+    await createPost(postActor, { message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string'), scheduledAt });
+    return scheduledAt ? 'scheduled' : 'created';
   });
 }
 

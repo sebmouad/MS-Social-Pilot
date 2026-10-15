@@ -198,7 +198,7 @@ export async function cancelScheduledPost(actor: PublishingActor, postId: string
   });
 }
 
-export async function createPost(actor: PublishingActor, input: { message: string; firstComment: string; targetIds: string[] } & PostAttachments) {
+export async function createPost(actor: PublishingActor, input: { message: string; firstComment: string; targetIds: string[]; scheduledAt?: Date } & PostAttachments) {
   await membership(actor);
   const config = await limits();
   const text = validText(input.message, config.maxText);
@@ -206,12 +206,14 @@ export async function createPost(actor: PublishingActor, input: { message: strin
   const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
   const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
   const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia);
+  if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new Error('Choose a future publishing time and at least one destination.');
   const now = new Date();
   const id = randomUUID();
   await prisma.$transaction(async tx => {
-    await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, link: attachments.link, media: attachments.media, status: 'draft', scheduledAt: null, publishedAt: null, createdAt: now, updatedAt: now,
+    await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, link: attachments.link, media: attachments.media, status: input.scheduledAt ? 'scheduled' : 'draft', scheduledAt: input.scheduledAt ?? null, publishedAt: null, createdAt: now, updatedAt: now,
       targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
     await audit(tx, actor, 'publishing.post_created', { postId: id, targetCount: targets.length });
+    if (input.scheduledAt) await audit(tx, actor, 'publishing.post_scheduled', { postId: id, scheduledAt: input.scheduledAt.toISOString() });
   });
   return { id };
 }
