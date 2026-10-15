@@ -1,6 +1,7 @@
 import { requireRootPage } from '@/server/config/access';
 import { readConfig } from '@/server/config/store';
 import { safeConfigShape, AVAILABILITY_CATALOG } from '@/lib/config/registry';
+import { AppShell } from '@/components';
 import { RootConfigForm } from './root-config-form';
 import { RootJobHealth } from '@/server/jobs/RootJobHealth';
 import './root-config.css';
@@ -8,14 +9,27 @@ import './root-config.css';
 export const metadata = { title: 'Runtime configuration' };
 
 export default async function RootConfigPage() {
-  await requireRootPage();
+  // Root access is checked before rendering the shared shell. This route must
+  // not depend on workspace membership: an installation owner may have none.
+  const actor = await requireRootPage();
   const [definitions, values] = [safeConfigShape(), await readConfig()];
-  return <main className="root-config">
-    <a className="root-config__back" href="/home">← Back to Social Pilot</a>
-    <p className="root-config__eyebrow">Root · Installation</p>
-    <h1>Runtime configuration</h1>
-    <p className="root-config__intro">Operational settings are validated against a versioned registry. Each option states whether rebuilt runtime paths consume it yet.</p>
-    <RootConfigForm definitions={definitions} initialValues={values} availability={AVAILABILITY_CATALOG} />
-    <RootJobHealth />
-  </main>;
+  return <AppShell
+    activeModule="settings"
+    enabledModules={[]}
+    enabledFeatures={[]}
+    rootAccess
+    installationMode
+    userName={actor.name}
+    workspaceName="Installation"
+  >
+    <div className="root-config">
+      <header className="root-config__heading">
+        <p className="root-config__eyebrow">Root · Installation</p>
+        <h1>Runtime configuration</h1>
+        <p className="root-config__intro">Operational settings are validated against a versioned registry. Each option states whether rebuilt runtime paths consume it yet.</p>
+      </header>
+      <RootConfigForm definitions={definitions} initialValues={values} availability={AVAILABILITY_CATALOG} />
+      <RootJobHealth />
+    </div>
+  </AppShell>;
 }

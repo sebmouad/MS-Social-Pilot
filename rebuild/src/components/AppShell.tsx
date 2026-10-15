@@ -20,7 +20,7 @@ function Mark() {
   return <svg className="shell-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23.5 12.2 8l4 9 3.2-5.3L27 23.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="23.5" cy="8.5" r="2.5" fill="currentColor"/></svg>;
 }
 
-export function AppShell({ children, activeModule, enabledModules, enabledFeatures, rootAccess, userName, workspaceName, sidebar }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; rootAccess: boolean; userName: string; workspaceName: string; sidebar?: ReactNode }) {
+export function AppShell({ children, activeModule, enabledModules, enabledFeatures, rootAccess, userName, workspaceName, sidebar, installationMode = false }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; rootAccess: boolean; userName: string; workspaceName: string; sidebar?: ReactNode; installationMode?: boolean }) {
   const pathname = usePathname();
   const [filterOpen, setFilterOpen] = useState(false);
   useEffect(() => setFilterOpen(false), [pathname]);
@@ -33,12 +33,19 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const modulePages = PAGES.filter(page => page.module === activeModule && enabledFeatures.includes(page.id));
   const enabledModuleSet = new Set(enabledModules);
   const enabledModulePages = new Set(enabledFeatures.map(id => PAGES.find(page => page.id === id)?.module).filter(Boolean));
+  const navigationModules = MODULES.filter(module => enabledModuleSet.has(module.id) && enabledModulePages.has(module.id));
+  const primaryMobileModules = navigationModules.length > 5 ? navigationModules.slice(0, 4) : navigationModules;
+  const moreMobileModules = navigationModules.length > 5 ? navigationModules.slice(4) : [];
+  const moduleHref = (module: (typeof MODULES)[number]) => PAGES.find(page => page.module === module.id && enabledFeatures.includes(page.id))?.href ?? module.href;
   return <div className="shell">
     <aside className="shell-sidebar" aria-label="Main navigation">
-      <a className="shell-brand" href="/home" aria-label="Social Pilot, home"><Mark/><span>Social Pilot</span></a>
-      <nav className="shell-nav">{MODULES.filter(module => enabledModuleSet.has(module.id) && enabledModulePages.has(module.id)).map((module) => <a key={module.id} href={PAGES.find(page => page.module === module.id && enabledFeatures.includes(page.id))?.href ?? module.href} className={`shell-nav__link${activeModule === module.id ? " is-active" : ""}`} aria-current={activeModule === module.id ? "page" : undefined}>
+      <a className="shell-brand" href={installationMode ? '/root/config' : '/home'} aria-label={installationMode ? 'Social Pilot, Root controls' : 'Social Pilot, home'}><Mark/><span>Social Pilot</span></a>
+      <nav className="shell-nav shell-nav--desktop">{installationMode && <a href="/root/config" className="shell-nav__link is-active" aria-current="page"><span className="shell-nav__glyph"><ModuleIcon name="Settings"/></span><span>Root controls</span></a>}{navigationModules.map((module) => <a key={module.id} href={moduleHref(module)} className={`shell-nav__link${activeModule === module.id ? " is-active" : ""}`} aria-current={activeModule === module.id ? "page" : undefined}>
         <span className="shell-nav__glyph"><ModuleIcon name={module.title}/></span><span>{module.title}</span>
       </a>)}</nav>
+      <nav className="shell-nav shell-nav--mobile" aria-label="Main sections">{installationMode && <a href="/root/config" className="shell-nav__link is-active" aria-current="page"><span className="shell-nav__glyph"><ModuleIcon name="Settings"/></span><span>Root controls</span></a>}{primaryMobileModules.map((module) => <a key={module.id} href={moduleHref(module)} className={`shell-nav__link${activeModule === module.id ? " is-active" : ""}`} aria-current={activeModule === module.id ? "page" : undefined}>
+        <span className="shell-nav__glyph"><ModuleIcon name={module.title}/></span><span>{module.title}</span>
+      </a>)}{moreMobileModules.length > 0 && <details className="shell-nav-more"><summary className={`shell-nav__link${moreMobileModules.some(module => module.id === activeModule) ? " is-active" : ""}`}><span className="shell-nav__glyph" aria-hidden="true">•••</span><span>More</span></summary><div className="shell-nav-more__menu">{moreMobileModules.map(module => <a key={module.id} href={moduleHref(module)} aria-current={activeModule === module.id ? "page" : undefined}><ModuleIcon name={module.title}/>{module.title}</a>)}</div></details>}</nav>
       {modulePages.length > 1 && <nav className="shell-subnav" aria-label={`${MODULES.find(module => module.id === activeModule)?.title} pages`}>
         <p className="shell-subnav__label">{MODULES.find(module => module.id === activeModule)?.title}</p>
         {modulePages.map(page => <a key={page.id} href={page.href} className={`shell-subnav__link${pathname === page.href ? " is-active" : ""}`} aria-current={pathname === page.href ? "page" : undefined}>{page.title}</a>)}
@@ -46,8 +53,8 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       </nav>}
       {sidebar && filterOpen && <button className="shell-filter-scrim" type="button" aria-label="Close filters" onClick={() => setFilterOpen(false)} />}
       {sidebar && <div id="shell-filters" className={`shell-sidebar-filter${filterOpen ? " is-open" : ""}`} onSubmitCapture={() => setFilterOpen(false)} onClickCapture={event => { if ((event.target as Element).closest('a[href]')) setFilterOpen(false); }}>{sidebar}</div>}
-      {rootAccess && <a className="shell-subnav__link shell-root-link" href="/root/config">Root controls</a>}
+      {rootAccess && !installationMode && <a className="shell-subnav__link shell-root-link" href="/root/config">Root controls</a>}
     </aside>
-    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions">{sidebar && <button className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => setFilterOpen(open => !open)}>{filterOpen ? "Close filters" : "Filters"}</button>}<span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main className="shell-content">{children}</main></div>
+    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions">{sidebar && <button className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => setFilterOpen(open => !open)}>{filterOpen ? "Close filters" : "Filters"}</button>}<span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main className="shell-content">{children}</main></div>
   </div>;
 }
