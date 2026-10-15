@@ -36,6 +36,7 @@ const FEATURE_ROOT_SWITCH: Record<FeatureId, string | null> = {
   'publishing/calendar': 'publishing/calendar',
   'publishing/queue': 'publishing/queue',
   'publishing/approvals': 'publishing/approvals',
+  'publishing/media': null,
   'inbox/conversations': 'analytics/inbox',
   'analytics/overview': 'analytics/overview',
   'ads/overview': 'ads/performance',

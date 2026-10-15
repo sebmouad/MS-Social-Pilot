@@ -24,7 +24,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(20);
+    expect(CONFIG_SCHEMA_VERSION).toBe(21);
     expect(CONFIG_BY_KEY.get('publishing.maxImageAltCharacters')!.schema.safeParse(500).success).toBe(true);
     expect(CONFIG_BY_KEY.get('publishing.maxImageUploadRequestOverheadBytes')!.schema.safeParse(65536).success).toBe(true);
     expect(CONFIG_BY_KEY.get('publishing.maxImageUploadBytes')!.schema.parse(26214400)).toBe(26214400);
@@ -49,6 +49,8 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('storage.orphanMediaRetentionDays')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('storage.orphanMediaBatchLimit')!.schema.parse(500)).toBe(500);
     expect(CONFIG_BY_KEY.get('storage.orphanMediaBatchLimit')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('storage.mediaLibraryBatchLimit')!.schema.parse(100)).toBe(100);
+    expect(CONFIG_BY_KEY.get('storage.mediaLibraryBatchLimit')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('storage.orphanMediaCleanupSchedule')!.schema.safeParse('17 3 * * *').success).toBe(true);
     for (const prefix of ['meta.', 'youtube.', 'linkedin.', 'x.', 'sync.', 'api.', 'entitlements.', 'retention.', 'logging.', 'mcp.', 'theme.']) {
       expect(CONFIG_REGISTRY.some((item) => item.key.startsWith(prefix))).toBe(true);

@@ -45,14 +45,16 @@ describe('workspace media route', () => {
   });
 
   it('denies anonymous previews and scopes authenticated reads to the current workspace', async () => {
-    mocks.viewer.mockRejectedValueOnce(new Error('sign in'));
+    mocks.viewer.mockRejectedValue(new Error('sign in'));
     const params = { params: Promise.resolve({ id: '123e4567-e89b-42d3-a456-426614174000' }) };
     expect((await GET(new Request('http://localhost/api/media/123'), params)).status).toBe(401);
     expect(mocks.read).not.toHaveBeenCalled();
+    mocks.viewer.mockResolvedValue({ user: { id: 'user-a' }, workspaceId: 'workspace-a' });
     const response = await GET(new Request('http://localhost/api/media/123'), params);
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/png');
     expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(mocks.viewer).toHaveBeenCalledWith({ feature: 'publishing/media', channelScoped: true });
     expect(mocks.read).toHaveBeenCalledWith('workspace-a', '123e4567-e89b-42d3-a456-426614174000');
   });
 });

@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 20;
+export const CONFIG_SCHEMA_VERSION = 21;
 
 const cron = z.string().min(9).max(100).refine((value) => {
   const fields = value.trim().split(/\s+/);
@@ -102,6 +102,7 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'storage.mediaRoot', group: 'Storage', label: 'Media storage root', kind: 'text', description: 'Absolute server directory containing workspace uploads and exports. Set this before workspace data erasure. Existing purge jobs retain the root used when requested.', defaultValue: '', schema: z.string().max(4096).refine(value => value === '' || (value.startsWith('/') && value !== '/' && !value.split('/').includes('..') && !value.includes('\0')), 'Use an absolute storage directory below the filesystem root.'), consumption: 'active' }),
   entry({ key: 'storage.orphanMediaRetentionDays', group: 'Storage', label: 'Unused image retention (days)', kind: 'number', description: 'Minimum age before a local image that no post references may be reclaimed.', defaultValue: 30, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
   entry({ key: 'storage.orphanMediaBatchLimit', group: 'Storage', label: 'Unused image cleanup batch limit', kind: 'number', description: 'Maximum old unreferenced image files removed from each workspace per cleanup run.', defaultValue: 500, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
+  entry({ key: 'storage.mediaLibraryBatchLimit', group: 'Storage', label: 'Image library page size', kind: 'number', description: 'Maximum workspace images listed per media library request.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'storage.orphanMediaCleanupSchedule', group: 'Storage', label: 'Unused image cleanup schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone for bounded cleanup of unreferenced local images.', defaultValue: '17 3 * * *', schema: cron, consumption: 'active' }),
 
   ...MODULES.map((module) => entry({ key: `entitlements.modules.${module.id}` as const, group: 'Entitlements · modules', label: `${module.title} available`, kind: 'boolean' as const, description: `Installation-wide default availability for the ${module.title} module. Existing workspace and plan restrictions remain in force.`, defaultValue: true, schema: z.boolean(), consumption: 'active' as const })),

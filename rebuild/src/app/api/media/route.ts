@@ -1,12 +1,28 @@
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
-import { uploadWorkspaceImage } from '@/server/media/storage';
+import { listWorkspaceImages, uploadWorkspaceImage } from '@/server/media/storage';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { runtimeConfig } from '@/server/config/store';
 import { MediaBodyTooLarge, readBoundedImageForm } from '@/server/media/body';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+export async function GET(request: Request) {
+  let viewer;
+  try { viewer = await requireViewer({ feature: 'publishing/media', channelScoped: true }); }
+  catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
+  try {
+    const limit = Number(await runtimeConfig('storage.mediaLibraryBatchLimit'));
+    const cursor = new URL(request.url).searchParams.get('cursor') || undefined;
+    const result = await listWorkspaceImages(viewer.workspaceId, { limit, cursor });
+    return NextResponse.json(result, { headers: { 'cache-control': 'private, no-store' } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const status = message === 'Invalid media cursor.' ? 400 : message.includes('configured storage root') ? 503 : 500;
+    return NextResponse.json({ error: status === 503 ? 'Image storage is not configured.' : status === 500 ? 'Could not load images.' : message }, { status, headers: { 'cache-control': 'no-store' } });
+  }
+}
 
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 });

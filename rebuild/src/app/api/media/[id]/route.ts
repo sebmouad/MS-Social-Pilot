@@ -8,8 +8,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   let viewer;
-  try { viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true }); }
-  catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
+  try { viewer = await requireViewer({ feature: 'publishing/media', channelScoped: true }); }
+  catch {
+    try { viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true }); }
+    catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
+  }
   try {
     const { id } = await params;
     const image = await readWorkspaceImage(viewer.workspaceId, id);
@@ -22,8 +25,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 });
   let viewer;
-  try { viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true }); }
-  catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
+  try { viewer = await requireViewer({ feature: 'publishing/media', channelScoped: true, write: true }); }
+  catch {
+    try { viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true }); }
+    catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
+  }
   try {
     const { id } = await params;
     const outcome = await withWorkspaceOperation(viewer.workspaceId, () => deleteUnusedWorkspaceImage(viewer.workspaceId, id));

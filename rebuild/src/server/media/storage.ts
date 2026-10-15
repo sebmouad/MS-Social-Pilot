@@ -10,6 +10,7 @@ import { withWorkspaceOperation } from '@/server/data-control/guard';
 export type MediaActor = { userId: string; workspaceId: string };
 export type WorkspaceImage = { id: string; mimeType: string; fileName: string };
 export type WorkspaceImageBytes = WorkspaceImage & { bytes: Buffer };
+export type WorkspaceImageListing = { id: string; mimeType: string; size: number; createdAt: Date; inUse: boolean };
 export type OrphanCleanupResult = { removed: number; bytes: number; errors: number };
 const IMAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -111,6 +112,67 @@ async function referenceSet(workspaceId: string): Promise<Set<string>> {
   const ids = new Set<string>();
   for (const post of posts) for (const id of mediaReferences(post.media)) ids.add(id);
   return ids;
+}
+
+function detectedImageMime(bytes: Buffer): string | undefined {
+  return Object.keys(allowedSignatures).find(type => allowedSignatures[type]!(bytes));
+}
+
+/** Return a bounded, tenant-scoped page of stored image metadata without reading image bytes. */
+export async function listWorkspaceImages(workspaceId: string, options: { limit: number; cursor?: string }): Promise<{ items: WorkspaceImageListing[]; nextCursor: string | null }> {
+  const { limit, cursor } = options;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error('Invalid media listing limit.');
+  let after: { mtimeMs: number; id: string } | undefined;
+  if (cursor) {
+    try {
+      const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { mtimeMs?: unknown; id?: unknown };
+      if (typeof parsed.mtimeMs !== 'number' || !Number.isFinite(parsed.mtimeMs) || typeof parsed.id !== 'string' || !IMAGE_ID.test(parsed.id)) throw new Error();
+      after = { mtimeMs: parsed.mtimeMs, id: parsed.id };
+    } catch { throw new Error('Invalid media cursor.'); }
+  }
+  const dir = await workspaceImageDirectory(workspaceId, false).catch(error => {
+    if (typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (!dir) return { items: [], nextCursor: null };
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files: Array<{ id: string; size: number; modifiedAt: Date; mtimeMs: number }> = [];
+  for (const entry of entries) {
+    if (!IMAGE_ID.test(entry.name)) continue;
+    const filePath = path.join(dir, entry.name);
+    const info = await lstat(filePath);
+    if (info.isSymbolicLink() || !info.isFile() || info.size < 1) continue;
+    files.push({ id: entry.name, size: info.size, modifiedAt: info.mtime, mtimeMs: info.mtimeMs });
+  }
+  files.sort((a, b) => b.mtimeMs - a.mtimeMs || a.id.localeCompare(b.id));
+  const refs = await referenceSet(workspaceId);
+  const remaining = after ? files.filter(file => file.mtimeMs < after!.mtimeMs || (file.mtimeMs === after!.mtimeMs && file.id.localeCompare(after!.id) > 0)) : files;
+  const page = remaining.slice(0, limit);
+  const checked = await Promise.all(page.map(async ({ id, size, modifiedAt }) => {
+    try {
+      const filePath = path.join(dir, id);
+      const handle = await open(filePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+      try {
+        const signature = Buffer.alloc(8);
+        const { bytesRead } = await handle.read(signature, 0, signature.length, 0);
+        const mimeType = detectedImageMime(signature.subarray(0, bytesRead));
+        if (!mimeType) return null;
+        return { id, mimeType, size, createdAt: modifiedAt, inUse: refs.has(id.toLowerCase()) };
+      } finally { await handle.close(); }
+    } catch { return null; }
+  }));
+  const items = checked.filter((item): item is WorkspaceImageListing => item !== null);
+  return {
+    items,
+    nextCursor: remaining.length > page.length && page.length ? Buffer.from(JSON.stringify({ mtimeMs: page[page.length - 1]!.mtimeMs, id: page[page.length - 1]!.id })).toString('base64url') : null,
+  };
+}
+
+export async function getWorkspaceImageMetadata(workspaceId: string, id: string): Promise<WorkspaceImageListing> {
+  const file = await safeImageFile(workspaceId, id);
+  if (!file) throw new Error('Image not found.');
+  const [image, refs, info] = await Promise.all([readWorkspaceImage(workspaceId, id), referenceSet(workspaceId), lstat(file.path)]);
+  return { id, mimeType: image.mimeType, size: info.size, createdAt: info.mtime, inUse: refs.has(id.toLowerCase()) };
 }
 
 async function safeImageFile(workspaceId: string, id: string): Promise<{ path: string; size: number } | null> {

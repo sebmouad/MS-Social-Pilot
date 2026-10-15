@@ -11,6 +11,11 @@ API keys do not create browser sessions and never expose social credentials or a
 ## Tools
 
 - `list_pages`: enabled destinations in the current workspace.
+- `list_workspace_images` and `get_workspace_image`: bounded image metadata for the current workspace. These return opaque IDs, MIME type, byte size, creation time, and whether a post references the image; image bytes are not returned by metadata reads.
+- `upload_workspace_image`: stores standard padded base64 image data in the current workspace. The exact confirmation is `UPLOAD WORKSPACE IMAGE <fileName>`. Root's allowed image MIME types and per-image byte cap apply, and the MCP request envelope limit can impose a lower effective cap because base64 expands the payload.
+- `delete_workspace_image`: permanently removes an unused workspace image after exact `DELETE WORKSPACE IMAGE <imageId>` confirmation. Images referenced by any post are protected. Successful upload and deletion create MCP audit records.
+
+Image tools and the `msp://media/images` resource require the workspace's `publishing/media` feature, current read/write permissions, and the corresponding API-key feature grant. Listing is bounded by Root's MCP result cap and uses a pagination cursor; the service returns only files in the active workspace.
 - `list_posts`: workspace posts with optional status and scheduled-date filters.
 - `list_inbox`: synced conversations and comments with optional type and resolution filters.
 - `reply_to_inbox`: reply to a synced Facebook conversation or comment. This contacts Facebook and requires `REPLY <message|comment> <id>`.
@@ -30,7 +35,7 @@ API keys do not create browser sessions and never expose social credentials or a
 
 Key creation and revocation, and all MCP writes, create a `root_activities` audit entry with actor and workspace identifiers; write records include the tool and affected record identifiers. Inbox actions also keep their existing operation-specific audit event and verify the actor's current membership, Inbox feature access, Page scope, Facebook connection state, and configured token scopes. Token values and token hashes are never included in audit details. Tools are filtered by current workspace entitlements and key grants; unknown or denied actions fail closed.
 
-The resources `msp://workspace`, `msp://targets`, `msp://posts`, and `msp://inbox` expose workspace-scoped JSON. Posts and inbox resources return bounded recent records. A signed-in instance owner also has `get_root_config`, `set_root_config`, and `msp://root/config`; configuration values use the same masked-secret representation as the Root UI. Root MCP access requires a browser session and is deliberately unavailable to workspace bearer keys, including keys created by the instance owner. Writes use the registry's validation, encryption, and audit flow plus exact `SET ROOT CONFIG <key>` or `CLEAR ROOT SECRET <key>` confirmation.
+The resources `msp://workspace`, `msp://targets`, `msp://posts`, `msp://media/images`, and `msp://inbox` expose workspace-scoped JSON. Posts, media, and inbox resources return bounded recent records. A signed-in instance owner also has `get_root_config`, `set_root_config`, and `msp://root/config`; configuration values use the same masked-secret representation as the Root UI. Root MCP access requires a browser session and is deliberately unavailable to workspace bearer keys, including keys created by the instance owner. Writes use the registry's validation, encryption, and audit flow plus exact `SET ROOT CONFIG <key>` or `CLEAR ROOT SECRET <key>` confirmation.
 
 ## Parity boundaries
 

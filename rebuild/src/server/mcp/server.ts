@@ -16,6 +16,7 @@ import { campaignCreationConfirmation, createWorkspaceAdCampaign, updateWorkspac
 import type { AdMutationRequest, FacebookCampaignObjective } from '@/platforms/types';
 import { getAdsAccounts, getAdsDataset } from '../ads/queries';
 import { summarizeInsights } from '../ads/summary';
+import { deleteUnusedWorkspaceImage, getWorkspaceImageMetadata, listWorkspaceImages, uploadWorkspaceImage } from '../media/storage';
 
 export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number; apiKeyId?: string; isInstanceOwner?: boolean };
 type JsonRpcId = string | number | null;
@@ -28,6 +29,10 @@ const textResult = (value: unknown) => ({
 });
 
 const tools = [
+  { name: 'list_workspace_images', description: 'List bounded workspace image metadata. Image bytes remain in workspace storage and are not included.', inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 200 }, cursor: { type: 'string' } }, additionalProperties: false } },
+  { name: 'get_workspace_image', description: 'Read metadata for one image stored in this workspace.', inputSchema: { type: 'object', required: ['imageId'], properties: { imageId: { type: 'string' } }, additionalProperties: false } },
+  { name: 'delete_workspace_image', description: 'Permanently delete an unused workspace image. Images attached to posts cannot be deleted. Confirmation must exactly match DELETE WORKSPACE IMAGE <imageId>.', inputSchema: { type: 'object', required: ['imageId', 'confirmation'], properties: { imageId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'upload_workspace_image', description: 'Store a workspace image from standard base64 data. Root image MIME and byte limits apply. Confirmation must exactly match UPLOAD WORKSPACE IMAGE <fileName>.', inputSchema: { type: 'object', required: ['fileName', 'mimeType', 'base64', 'confirmation'], properties: { fileName: { type: 'string', minLength: 1, maxLength: 180 }, mimeType: { type: 'string' }, base64: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'list_pages', description: 'List enabled workspace destinations and their publishing availability.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'list_posts', description: 'List workspace posts, newest first. Filter by status and scheduled date.', inputSchema: { type: 'object', properties: { status: { type: 'string', description: 'Comma-separated post statuses.' }, from: { type: 'string', description: 'ISO date or date-time lower bound for scheduledAt.' }, to: { type: 'string', description: 'ISO date or date-time upper bound for scheduledAt.' }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'list_inbox', description: 'List synced comments and conversations visible in the workspace inbox.', inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['comment', 'message'] }, state: { type: 'string', enum: ['open', 'resolved', 'all'] }, limit: { type: 'integer', minimum: 1, maximum: 100 } }, additionalProperties: false } },
@@ -67,6 +72,10 @@ const canManageData = (viewer: McpViewer) => viewer.role === 'owner' || viewer.r
 const dataResource = (uri: string) => uri === 'msp://data/deletion-preview';
 
 const toolFeatures: Record<string, string> = {
+  list_workspace_images: 'publishing/media',
+  get_workspace_image: 'publishing/media',
+  delete_workspace_image: 'publishing/media',
+  upload_workspace_image: 'publishing/media',
   list_pages: 'settings/connections',
   list_posts: 'publishing/posts',
   list_inbox: 'inbox/conversations',
@@ -97,7 +106,7 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'create_ad_campaign', 'update_ad', 'set_root_config']);
+const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'create_ad_campaign', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -125,6 +134,37 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
   }
   const cap = viewer.maxResultItems ?? 100;
   switch (name) {
+    case 'list_workspace_images': {
+      const limit = Math.max(1, Math.min(cap, 200, Math.trunc(Number(args.limit) || cap)));
+      const cursor = args.cursor === undefined ? undefined : requiredString(args, 'cursor');
+      return listWorkspaceImages(viewer.workspaceId, { limit, cursor });
+    }
+    case 'get_workspace_image':
+      return getWorkspaceImageMetadata(viewer.workspaceId, requiredString(args, 'imageId'));
+    case 'delete_workspace_image': {
+      const imageId = requiredString(args, 'imageId');
+      requireConfirmation(args, `DELETE WORKSPACE IMAGE ${imageId}`);
+      const outcome = await deleteUnusedWorkspaceImage(viewer.workspaceId, imageId);
+      if (outcome === 'in_use') throw new Error('This image is attached to a post and cannot be deleted.');
+      if (outcome === 'missing') throw new Error('Image not found in this workspace.');
+      await auditWrite(viewer, name, { imageId });
+      return { imageId, deleted: true };
+    }
+    case 'upload_workspace_image': {
+      const fileName = requiredString(args, 'fileName');
+      const mimeType = requiredString(args, 'mimeType');
+      const encoded = requiredString(args, 'base64');
+      if (fileName.length > 180) throw new Error('fileName must contain at most 180 characters.');
+      requireConfirmation(args, `UPLOAD WORKSPACE IMAGE ${fileName}`);
+      const maxBytes = Number(await runtimeConfig('publishing.maxImageUploadBytes'));
+      if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || encoded.length > Math.ceil(maxBytes / 3) * 4) throw new Error('Image exceeds the configured upload size limit.');
+      if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) throw new Error('base64 must contain standard padded base64 data.');
+      const bytes = Buffer.from(encoded, 'base64');
+      if (!bytes.length || bytes.length > maxBytes || bytes.toString('base64') !== encoded) throw new Error('Image exceeds the configured upload size limit or has invalid base64 data.');
+      const image = await uploadWorkspaceImage({ userId: viewer.userId, workspaceId: viewer.workspaceId }, new File([bytes], fileName, { type: mimeType }));
+      await auditWrite(viewer, name, { imageId: image.id, mimeType: image.mimeType, size: bytes.length });
+      return { ...image, size: bytes.length, reference: `media:${image.id}`, url: `/api/media/${image.id}` };
+    }
     case 'get_root_config':
       return { schemaVersion: CONFIG_SCHEMA_VERSION, definitions: safeConfigShape(), values: await readConfig() };
     case 'set_root_config': {
@@ -453,11 +493,12 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     { uri: 'msp://workspace', name: 'Workspace', description: 'Current workspace details.', mimeType: 'application/json' },
     { uri: 'msp://targets', name: 'Destinations', description: 'Enabled workspace destinations.', mimeType: 'application/json' },
     { uri: 'msp://posts', name: 'Posts', description: 'Recent workspace posts.', mimeType: 'application/json' },
+    { uri: 'msp://media/images', name: 'Workspace images', description: 'Bounded workspace image metadata; image bytes are excluded.', mimeType: 'application/json' },
     { uri: 'msp://inbox', name: 'Inbox', description: 'Recent synced inbox activity.', mimeType: 'application/json' },
     { uri: 'msp://data/deletion-preview', name: 'Data deletion preview', description: 'Current workspace record counts before deletion.', mimeType: 'application/json' },
     ...(canUseRootTool(viewer) ? [{ uri: 'msp://root/config', name: 'Root configuration', description: 'Installation setting definitions and safe values.', mimeType: 'application/json' }] : []),
   ].filter(resource => {
-    const feature = resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
+    const feature = resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
     return (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
   }) });
   if (method === 'resources/read') {
@@ -467,6 +508,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     if (uri === 'msp://workspace') contents = viewer.workspace;
     else if (uri === 'msp://targets') contents = await runTool(viewer, 'list_pages', {});
     else if (uri === 'msp://posts') contents = await runTool(viewer, 'list_posts', { limit: 100 });
+    else if (uri === 'msp://media/images') contents = await runTool(viewer, 'list_workspace_images', { limit: 100 });
     else if (uri === 'msp://inbox') contents = await runTool(viewer, 'list_inbox', { limit: 50 });
     else if (uri === 'msp://data/deletion-preview') contents = await runTool(viewer, 'preview_workspace_data_deletion', {});
     else if (uri === 'msp://root/config') contents = await runTool(viewer, 'get_root_config', {});

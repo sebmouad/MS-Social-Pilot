@@ -37,6 +37,8 @@ vi.mock('../src/server/ads/actions', () => ({
 }));
 const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
 vi.mock('../src/server/publishing/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
+const media = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), remove: vi.fn(), upload: vi.fn() }));
+vi.mock('../src/server/media/storage', () => ({ listWorkspaceImages: media.list, getWorkspaceImageMetadata: media.get, deleteUnusedWorkspaceImage: media.remove, uploadWorkspaceImage: media.upload }));
 
 import { handleMcpMessage, type McpViewer } from '../src/server/mcp/server';
 import { resolvePermissions } from '../src/server/permissions';
@@ -47,7 +49,7 @@ const viewer: McpViewer = {
   entitlements: {
     workspaceId: 'workspace-a',
     modules: { home: true, publishing: true, inbox: true, analytics: true, ads: true, settings: true },
-    features: { 'home/overview': true, 'publishing/posts': true, 'publishing/calendar': true, 'publishing/queue': true, 'publishing/approvals': true, 'inbox/conversations': true, 'analytics/overview': true, 'ads/overview': true, 'ads/campaigns': true, 'settings/connections': true, 'settings/team': true, 'settings/mcp': true, 'settings/account': true, 'settings/appearance': true, 'settings/data': true },
+    features: { 'home/overview': true, 'publishing/posts': true, 'publishing/calendar': true, 'publishing/queue': true, 'publishing/approvals': true, 'publishing/media': true, 'inbox/conversations': true, 'analytics/overview': true, 'ads/overview': true, 'ads/campaigns': true, 'settings/connections': true, 'settings/team': true, 'settings/mcp': true, 'settings/account': true, 'settings/appearance': true, 'settings/data': true },
     platformCapabilities: {},
   },
   permissions: resolvePermissions({ role: 'owner', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: true, pageAccess: [] }),
@@ -77,6 +79,10 @@ beforeEach(() => {
   publishingMutations.review.mockResolvedValue(undefined);
   publishingMutations.schedule.mockResolvedValue(undefined);
   publishingMutations.cancel.mockResolvedValue(undefined);
+  media.list.mockResolvedValue({ items: [{ id: 'image-a', mimeType: 'image/png', size: 123, createdAt: '2026-10-14T00:00:00.000Z', inUse: false }], nextCursor: null });
+  media.get.mockResolvedValue({ id: 'image-a', mimeType: 'image/png', size: 123, createdAt: '2026-10-14T00:00:00.000Z', inUse: false });
+  media.remove.mockResolvedValue('deleted');
+  media.upload.mockResolvedValue({ id: 'image-b', mimeType: 'image/png', fileName: 'new.png' });
   rootConfig.read.mockResolvedValue([{ key: 'meta.appSecret', value: '', isSet: true, source: 'database' }]);
   rootConfig.save.mockResolvedValue(undefined);
   dataControls.preview.mockResolvedValue({ posts: 2 });
@@ -93,6 +99,53 @@ beforeEach(() => {
 });
 
 describe('MCP workspace boundaries', () => {
+  it('lists and reads image metadata only inside the authenticated workspace scope', async () => {
+    const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 30, method: 'tools/list' });
+    expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('list_workspace_images');
+    const response = await call('list_workspace_images', { limit: 25, cursor: 'cursor-1' });
+    expect((await response.json()).result.structuredContent.items[0]).toMatchObject({ id: 'image-a', size: 123, inUse: false });
+    expect(media.list).toHaveBeenCalledWith('workspace-a', { limit: 25, cursor: 'cursor-1' });
+    const got = await call('get_workspace_image', { imageId: 'image-a' });
+    expect((await got.json()).result.structuredContent).toMatchObject({ id: 'image-a', mimeType: 'image/png' });
+    expect(media.get).toHaveBeenCalledWith('workspace-a', 'image-a');
+
+    const scoped = { ...viewer, permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
+    const hidden = await handleMcpMessage({ ...scoped, permissions: { ...scoped.permissions!, features: { ...scoped.permissions!.features, 'publishing/media': { read: false, write: false } } } }, { jsonrpc: '2.0', id: 31, method: 'tools/list' });
+    expect((await hidden.json()).result.tools.map((tool: { name: string }) => tool.name)).not.toContain('list_workspace_images');
+    const readOnly = { ...viewer, permissions: { ...viewer.permissions!, features: { ...viewer.permissions!.features, 'publishing/media': { read: true, write: false } } } };
+    const readTools = await handleMcpMessage(readOnly, { jsonrpc: '2.0', id: 32, method: 'tools/list' });
+    const readNames = (await readTools.json()).result.tools.map((tool: { name: string }) => tool.name);
+    expect(readNames).toContain('list_workspace_images');
+    expect(readNames).not.toContain('delete_workspace_image');
+    const deniedWrite = await handleMcpMessage(readOnly, { jsonrpc: '2.0', id: 33, method: 'tools/call', params: { name: 'delete_workspace_image', arguments: { imageId: 'image-a', confirmation: 'DELETE WORKSPACE IMAGE image-a' } } });
+    expect((await deniedWrite.json()).result.isError).toBe(true);
+    expect(media.remove).not.toHaveBeenCalled();
+  });
+  it('deletes only unused workspace images after exact confirmation and audits the write', async () => {
+    const bad = await call('delete_workspace_image', { imageId: 'image-a', confirmation: 'DELETE IMAGE image-a' });
+    expect((await bad.json()).result.isError).toBe(true);
+    expect(media.remove).not.toHaveBeenCalled();
+    const deleted = await call('delete_workspace_image', { imageId: 'image-a', confirmation: 'DELETE WORKSPACE IMAGE image-a' });
+    expect((await deleted.json()).result.structuredContent).toEqual({ imageId: 'image-a', deleted: true });
+    expect(media.remove).toHaveBeenCalledWith('workspace-a', 'image-a');
+    expect(db.$executeRaw).toHaveBeenCalledTimes(1);
+
+    media.remove.mockResolvedValueOnce('in_use');
+    const inUse = await call('delete_workspace_image', { imageId: 'image-a', confirmation: 'DELETE WORKSPACE IMAGE image-a' });
+    expect((await inUse.json()).result.isError).toBe(true);
+    expect(db.$executeRaw).toHaveBeenCalledTimes(1);
+  });
+  it('uploads validated base64 data with Root byte cap, storage signature checks, and audit', async () => {
+    const confirmation = 'UPLOAD WORKSPACE IMAGE new.png';
+    const bad = await call('upload_workspace_image', { fileName: 'new.png', mimeType: 'image/png', base64: 'not-base64', confirmation });
+    expect((await bad.json()).result.isError).toBe(true);
+    expect(media.upload).not.toHaveBeenCalled();
+    const bytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    const uploaded = await call('upload_workspace_image', { fileName: 'new.png', mimeType: 'image/png', base64: bytes.toString('base64'), confirmation });
+    expect((await uploaded.json()).result.structuredContent).toMatchObject({ id: 'image-b', reference: 'media:image-b', size: 8 });
+    expect(media.upload).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ name: 'new.png', type: 'image/png', size: 8 }));
+    expect(db.$executeRaw).toHaveBeenCalledTimes(1);
+  });
   it('reads paginated Ads performance through workspace and channel scoped services', async () => {
     const scoped = { ...viewer, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
     const listed = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 48, method: 'tools/list' });
