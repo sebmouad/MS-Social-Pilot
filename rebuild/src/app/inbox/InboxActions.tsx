@@ -4,8 +4,9 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Kind = 'message' | 'comment';
+type ReplyWindowState = 'open' | 'closed' | 'no_recipient';
 
-export function InboxActions({ id, kind, resolved, hidden = false, canWrite }: { id: string; kind: Kind; resolved: boolean; hidden?: boolean; canWrite: boolean }) {
+export function InboxActions({ id, kind, resolved, hidden = false, canWrite, replyWindow, replyUntil, replyWindowHours }: { id: string; kind: Kind; resolved: boolean; hidden?: boolean; canWrite: boolean; replyWindow?: ReplyWindowState; replyUntil?: string; replyWindowHours: number }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -32,7 +33,8 @@ export function InboxActions({ id, kind, resolved, hidden = false, canWrite }: {
   }
 
   return <div className="inbox-actions">
-    <form onSubmit={reply}><label><span className="sr-only">Reply</span><textarea name="reply" required maxLength={2000} rows={2} placeholder={kind === 'message' ? 'Write a message reply…' : 'Write a comment reply…'} /></label><button disabled={busy} type="submit">Reply</button></form>
+    {kind === 'message' && replyWindow && <small className={replyWindow === 'open' ? 'inbox-window-open' : 'inbox-window-closed'} role="status">{replyWindow === 'open' ? `Standard reply window open until ${replyUntil}, based on the latest stored visitor message.` : replyWindow === 'closed' ? `Standard reply window closed ${replyWindowHours} hours after the latest stored visitor message.` : 'No visitor message is stored, so this conversation cannot be replied to from Inbox.'}</small>}
+    <form onSubmit={reply}><label><span className="sr-only">Reply</span><textarea name="reply" required maxLength={2000} rows={2} disabled={kind === 'message' && replyWindow !== 'open'} placeholder={kind === 'message' ? 'Write a message reply…' : 'Write a comment reply…'} /></label><button disabled={busy || (kind === 'message' && replyWindow !== 'open')} type="submit">Reply</button></form>
     <div className="inbox-action-buttons">
       <button type="button" disabled={busy} onClick={() => void send({ action: 'resolve', id, kind, resolved: !resolved })}>{resolved ? 'Reopen' : 'Resolve'}</button>
       {kind === 'comment' && <button type="button" disabled={busy} onClick={() => void send({ action: 'moderate', id, hidden: !hidden })}>{hidden ? 'Unhide' : 'Hide comment'}</button>}

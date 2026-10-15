@@ -24,7 +24,10 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(16);
+    expect(CONFIG_SCHEMA_VERSION).toBe(17);
+    expect(CONFIG_BY_KEY.get('inbox.messengerReplyWindowHours')!.schema.safeParse(24).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('inbox.messengerReplyWindowHours')!.schema.safeParse(25).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('inbox.messengerReplyWindowHours')!.consumption).toBe('active');
     expect(CONFIG_BY_KEY.get('analytics.maxRangeDays')!.schema.safeParse(366).success).toBe(true);
     expect(CONFIG_BY_KEY.get('analytics.maxRangeDays')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('auth.passkeyChallengeMinutes')!.schema.safeParse(5).success).toBe(true);

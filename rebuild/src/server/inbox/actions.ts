@@ -6,6 +6,7 @@ import { loadEntitlements, canUseFeature } from '@/server/entitlements';
 import { canAccessFeature, canAccessPage } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { runtimeConfig } from '@/server/config/store';
+import { messengerReplyWindow } from './reply-window';
 
 const FEATURE = 'inbox/conversations';
 export type InboxActor = { userId: string; workspaceId: string };
@@ -114,11 +115,19 @@ export async function replyToFacebookInbox(actor: InboxActor, input: { kind: 'me
   const text = input.text.trim();
   if (!text || text.length > 2000) throw new Error('Write a reply of 1 to 2,000 characters.');
   if (!/^[A-Za-z0-9_-]{1,200}$/.test(input.id)) throw new Error('Invalid inbox item.');
-  const engine = await configuredFacebookEngine();
   if (input.kind === 'message') {
     const row = await prisma.conversation.findFirst({ where: { id: input.id, target: { workspaceId: actor.workspaceId } }, select: { id: true, remoteId: true, targetId: true } });
     if (!row) throw new Error('This conversation is unavailable in the current workspace.');
     const channel = await page(actor, row.targetId, true);
+    const windowHours = await runtimeConfig('inbox.messengerReplyWindowHours') as number;
+    const lastInbound = await prisma.conversationMessage.findFirst({
+      where: { conversationId: row.id, fromId: { not: null }, NOT: { fromId: channel.providerId } },
+      orderBy: { createdTime: 'desc' }, select: { fromId: true, createdTime: true },
+    });
+    const replyWindow = messengerReplyWindow({ messages: lastInbound ? [lastInbound] : [], pageId: channel.providerId, windowHours });
+    if (replyWindow.state === 'no_recipient') throw new Error('This conversation has no stored visitor message to reply to.');
+    if (replyWindow.state === 'closed') throw new Error(`The Messenger reply window closed ${windowHours} hours after the visitor’s last message. Facebook only accepts replies within this window.`);
+    const engine = await configuredFacebookEngine();
     const remoteId = await engine.replyToConversation(channel.token, row.remoteId, text);
     await prisma.conversationMessage.create({ data: { id: `msg_${randomBytes(12).toString('hex')}`, conversationId: row.id, remoteId, fromName: null, fromId: null, message: text, createdTime: new Date(), sentById: actor.userId } });
     await prisma.conversation.update({ where: { id: row.id }, data: { snippet: text, updatedTime: new Date(), fetchedAt: new Date() } });
@@ -128,6 +137,7 @@ export async function replyToFacebookInbox(actor: InboxActor, input: { kind: 'me
   const row = await prisma.postComment.findFirst({ where: { id: input.id, postTarget: { post: { workspaceId: actor.workspaceId }, target: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, postTargetId: true, postTarget: { select: { targetId: true } } } });
   if (!row) throw new Error('This comment is unavailable in the current workspace.');
   const channel = await page(actor, row.postTarget.targetId, true);
+  const engine = await configuredFacebookEngine();
   const remoteId = await engine.replyToComment(channel.token, row.remoteId, text);
   await prisma.postComment.create({ data: { id: `comment_${randomBytes(12).toString('hex')}`, postTargetId: row.postTargetId, remoteId, parentRemoteId: row.remoteId, message: text, fromName: null, fromId: null, createdTime: new Date(), sentById: actor.userId } });
   await prisma.postComment.update({ where: { id: row.id }, data: { replyCount: { increment: 1 }, fetchedAt: new Date() } });

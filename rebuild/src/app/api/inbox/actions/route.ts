@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : '';
     const known: Array<[string, number]> = [
       ['Invalid inbox item', 400], ['Write a reply', 400], ['no longer a member', 401], ['not have access', 403], ['not enabled', 403],
-      ['unavailable', 409], ['Reconnect this Facebook source', 403], ['Inbox is unavailable for this connection', 403],
+      ['unavailable', 409], ['reply window closed', 409], ['no stored visitor message', 409], ['Reconnect this Facebook source', 403], ['Inbox is unavailable for this connection', 403],
       ['Workspace data deletion is in progress.', 409],
     ];
     const match = known.find(([phrase]) => message.includes(phrase));

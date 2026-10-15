@@ -49,4 +49,11 @@ describe('inbox route scoped authorization', () => {
       { action: 'reply', kind: 'message', id: 'foreign-message', text: 'Hello' },
     );
   });
+
+  it('returns a conflict when the stored Messenger thread is outside the reply window', async () => {
+    mocks.reply.mockRejectedValueOnce(new Error('The Messenger reply window closed 24 hours after the visitor’s last message.'));
+    const response = await POST(request({ action: 'reply', kind: 'message', id: 'message-1', text: 'Hello' }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining('reply window closed') });
+  });
 });

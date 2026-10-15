@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 16;
+export const CONFIG_SCHEMA_VERSION = 17;
 
 const cron = z.string().min(9).max(100).refine((value) => {
   const fields = value.trim().split(/\s+/);
@@ -57,6 +57,7 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'meta.oauthScopes', group: 'API scopes', label: 'Meta Page and Instagram scopes', kind: 'json', description: 'JSON array of Page and Instagram scopes requested during Meta authorization. Keep aligned with app review approval.', defaultValue: ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'read_insights'], schema: stringList, consumption: 'active' }),
   entry({ key: 'meta.inboxReadScopes', group: 'API scopes · inbox', label: 'Meta inbox read scopes', kind: 'json', description: 'JSON array of Meta scopes required to read Page conversations and comments.', defaultValue: ['pages_messaging', 'pages_read_engagement'], schema: stringList, consumption: 'configured' }),
   entry({ key: 'meta.inboxWriteScopes', group: 'API scopes · inbox', label: 'Meta inbox write scopes', kind: 'json', description: 'JSON array of Meta scopes required to reply to Page conversations and moderate comments.', defaultValue: ['pages_messaging', 'pages_manage_engagement'], schema: stringList, consumption: 'configured' }),
+  entry({ key: 'inbox.messengerReplyWindowHours', group: 'Inbox', label: 'Messenger reply window (hours)', kind: 'number', description: 'Maximum time after the latest visitor message that the Inbox allows a Messenger reply. Meta allows at most 24 hours.', defaultValue: 24, schema: z.number().int().min(1).max(24), consumption: 'active' }),
   entry({ key: 'meta.adsReadScopes', group: 'API scopes · ads', label: 'Meta ads read scopes', kind: 'json', description: 'JSON array of ads reporting scopes. Request only scopes approved for this Meta app.', defaultValue: ['ads_read'], schema: stringList, consumption: 'active' }),
   entry({ key: 'meta.adsManageScopes', group: 'API scopes · ads', label: 'Meta ads management scopes', kind: 'json', description: 'JSON array of ads management scopes. These can enable spend-affecting actions and require an approved app and implemented controls.', defaultValue: ['ads_management'], schema: stringList, consumption: 'active' }),
   entry({ key: 'ads.managementEnabled', group: 'Ads management', label: 'Ads changes enabled', kind: 'boolean', description: 'Allow paused Facebook campaign creation and status or budget changes for supported connected ad accounts after required scopes are approved.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),

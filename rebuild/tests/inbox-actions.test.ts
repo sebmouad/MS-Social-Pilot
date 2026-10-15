@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   prisma: {
     membership: { findUnique: vi.fn() }, target: { findFirst: vi.fn(), findMany: vi.fn() }, conversation: { findFirst: vi.fn(), update: vi.fn() },
-    conversationMessage: { create: vi.fn() }, postComment: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() }, $executeRaw: vi.fn(),
+    conversationMessage: { create: vi.fn(), findFirst: vi.fn() }, postComment: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() }, $executeRaw: vi.fn(),
   },
   config: vi.fn(), decrypt: vi.fn(), engine: { replyToConversation: vi.fn(), replyToComment: vi.fn(), moderateComment: vi.fn() },
   configuredEngine: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), canUseFeature: vi.fn(), canAccessFeature: vi.fn(), canAccessPage: vi.fn(),
@@ -27,9 +27,10 @@ beforeEach(() => {
   mocks.entitlements.mockResolvedValue({}); mocks.permissions.mockResolvedValue({});
   mocks.canUseFeature.mockReturnValue(true); mocks.canAccessFeature.mockReturnValue(true); mocks.canAccessPage.mockReturnValue(true);
   mocks.prisma.target.findFirst.mockResolvedValue({ id: 'target-1', providerId: 'page-1', accessToken: 'encrypted', socialAccount: { scopes: 'pages_messaging,pages_manage_engagement', tokenExpiresAt: null, invalidatedAt: null } });
-  mocks.config.mockImplementation(async key => key === 'meta.inboxWriteScopes' ? ['pages_messaging', 'pages_manage_engagement'] : ['pages_messaging']);
+  mocks.config.mockImplementation(async key => key === 'inbox.messengerReplyWindowHours' ? 24 : key === 'meta.inboxWriteScopes' ? ['pages_messaging', 'pages_manage_engagement'] : ['pages_messaging']);
   mocks.decrypt.mockReturnValue('page-secret'); mocks.configuredEngine.mockResolvedValue(mocks.engine);
   mocks.prisma.conversation.findFirst.mockResolvedValue({ id: 'conversation-1', remoteId: 'remote-conversation-1', targetId: 'target-1' });
+  mocks.prisma.conversationMessage.findFirst.mockResolvedValue({ fromId: 'visitor-1', createdTime: new Date(Date.now() - 60 * 60 * 1000) });
   mocks.engine.replyToConversation.mockResolvedValue('remote-message-1');
   mocks.engine.moderateComment.mockResolvedValue(undefined);
   mocks.prisma.conversationMessage.create.mockResolvedValue({}); mocks.prisma.conversation.update.mockResolvedValue({});
@@ -54,6 +55,23 @@ describe('workspace Facebook inbox actions', () => {
     mocks.prisma.target.findFirst.mockResolvedValue({ id: 'target-1', providerId: 'page-1', accessToken: 'encrypted', socialAccount: { scopes: 'pages_messaging', tokenExpiresAt: null, invalidatedAt: null } });
     await expect(moderateFacebookComment(actor, { id: 'comment-1', hidden: true })).rejects.toThrow(/Inbox is unavailable for this connection/);
     expect(mocks.engine.moderateComment).not.toHaveBeenCalled();
+  });
+
+  it('blocks replies outside the configured Messenger window before contacting Facebook', async () => {
+    mocks.config.mockImplementation(async key => key === 'inbox.messengerReplyWindowHours' ? 1 : key === 'meta.inboxWriteScopes' ? ['pages_messaging', 'pages_manage_engagement'] : ['pages_messaging']);
+    mocks.prisma.conversationMessage.findFirst.mockResolvedValue({ fromId: 'visitor-1', createdTime: new Date(Date.now() - 2 * 60 * 60 * 1000) });
+    await expect(replyToFacebookInbox(actor, { kind: 'message', id: 'conversation-1', text: 'Hello' })).rejects.toThrow(/reply window closed/i);
+    expect(mocks.prisma.conversationMessage.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { conversationId: 'conversation-1', fromId: { not: null }, NOT: { fromId: 'page-1' } },
+      orderBy: { createdTime: 'desc' },
+    }));
+    expect(mocks.engine.replyToConversation).not.toHaveBeenCalled();
+  });
+
+  it('does not send when there is no stored inbound visitor message', async () => {
+    mocks.prisma.conversationMessage.findFirst.mockResolvedValue(null);
+    await expect(replyToFacebookInbox(actor, { kind: 'message', id: 'conversation-1', text: 'Hello' })).rejects.toThrow(/no stored visitor message/i);
+    expect(mocks.engine.replyToConversation).not.toHaveBeenCalled();
   });
 
   it('denies a requested channel read when the page is outside the member scope', async () => {
