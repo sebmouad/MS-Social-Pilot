@@ -6,10 +6,39 @@ import { Button } from "@/components";
 import { ModalDialog } from "@/components/ModalDialog";
 import styles from "../publishing.module.css";
 import { csvDestinationLabel } from '@/lib/publishing/csv-destinations';
+import { validateFields } from '@/lib/ui/form-validation';
 
 type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean };
 type ImageRules = { allowedMimeTypes: string[]; maxUploadBytes: number; maxAltCharacters: number };
 type PostRow = { id: string; message: string; firstComment: string | null; link: string | null; media: Array<{kind: string; url: string; altText?: string}>; status: string; publishedAt: Date | null; targets: Array<{ status: string; remotePostId: string | null; target: { id: string } }> };
+
+function validatePostForm(form: HTMLFormElement) {
+  const errors = validateFields(form, {
+    message: { empty: 'Write the post text before saving.' },
+    link: { invalid: 'Enter a complete link, such as https://example.com.' },
+    imageUrl: { invalid: 'Enter a complete image URL.' },
+    videoUrl: { invalid: 'Enter a complete video URL.' },
+  });
+  const attachmentFields = ['link', 'imageUrl', 'videoUrl'];
+  const selected = attachmentFields.filter(name => (form.elements.namedItem(name) as HTMLInputElement | null)?.value.trim());
+  const imageFile = form.querySelector<HTMLInputElement>('input[type="file"]')?.files?.[0];
+  if (imageFile) selected.push('imageFile');
+  if (selected.length > 1) {
+    errors.attachment = 'Choose one attachment: a link, image, or video. Clear the others before saving.';
+    if (Object.keys(errors).length === 1) {
+      const conflict = selected[1] === 'imageFile' ? form.querySelector<HTMLInputElement>('input[type="file"]') : form.elements.namedItem(selected[1]);
+      if (conflict instanceof HTMLElement) conflict.focus();
+    }
+  }
+  return errors;
+}
+
+function submitPost(event: FormEvent<HTMLFormElement>, setErrors: (errors: Record<string, string>) => void) {
+  const errors = validatePostForm(event.currentTarget);
+  setErrors(errors);
+  if (Object.keys(errors).length) { event.preventDefault(); return; }
+  uploadImageBeforeSubmit(event);
+}
 
 function uploadImageBeforeSubmit(event: FormEvent<HTMLFormElement>) {
   const form = event.currentTarget;
@@ -75,40 +104,52 @@ function ImageAttachment({ post, imageRules }: { post?: PostRow; imageRules: Ima
   </div>;
 }
 
-function AttachmentFields({ post, imageRules }: { post?: PostRow; imageRules: ImageRules }) {
+function AttachmentFields({ post, imageRules, errors = {} }: { post?: PostRow; imageRules: ImageRules; errors?: Record<string, string> }) {
+  const prefix = post?.id ?? 'new-post';
   return <>
-    <label>Link <span>(optional)</span><input name="link" type="url" placeholder="https://example.com" defaultValue={post?.link ?? ''} /></label>
+    <label htmlFor={`${prefix}-link`}>Link <span>(optional)</span></label><input id={`${prefix}-link`} name="link" type="url" placeholder="https://example.com" defaultValue={post?.link ?? ''} aria-invalid={Boolean(errors.link)} aria-describedby={errors.link ? `${prefix}-link-error` : undefined} />{errors.link && <small id={`${prefix}-link-error`} className={styles.formError}>{errors.link}</small>}
     <ImageAttachment post={post} imageRules={imageRules} />
-    <label>Image URL <span>(optional)</span><input name="imageUrl" type="url" placeholder="https://example.com/image.jpg" defaultValue={post?.media.find(item => item.kind === 'image' && !item.url.startsWith('media:'))?.url ?? ''} /></label>
-    <label>Video URL <span>(optional)</span><input name="videoUrl" type="url" placeholder="https://example.com/video.mp4" defaultValue={post?.media.find(item => item.kind === 'video')?.url ?? ''} /></label>
+    <label htmlFor={`${prefix}-image-url`}>Image URL <span>(optional)</span></label><input id={`${prefix}-image-url`} name="imageUrl" type="url" placeholder="https://example.com/image.jpg" defaultValue={post?.media.find(item => item.kind === 'image' && !item.url.startsWith('media:'))?.url ?? ''} aria-invalid={Boolean(errors.imageUrl)} aria-describedby={errors.imageUrl ? `${prefix}-image-url-error` : undefined} />{errors.imageUrl && <small id={`${prefix}-image-url-error`} className={styles.formError}>{errors.imageUrl}</small>}
+    <label htmlFor={`${prefix}-video-url`}>Video URL <span>(optional)</span></label><input id={`${prefix}-video-url`} name="videoUrl" type="url" placeholder="https://example.com/video.mp4" defaultValue={post?.media.find(item => item.kind === 'video')?.url ?? ''} aria-invalid={Boolean(errors.videoUrl)} aria-describedby={errors.videoUrl ? `${prefix}-video-url-error` : undefined} />{errors.videoUrl && <small id={`${prefix}-video-url-error`} className={styles.formError}>{errors.videoUrl}</small>}
     <small>Choose a link, one uploaded image or image URL, or a video URL. Provider support varies by destination.</small>
+    {errors.attachment && <p role="alert" className={styles.formError}>{errors.attachment}</p>}
   </>;
 }
 
 export function PostEditorForm({ targets, imageRules }: { targets: TargetChoice[]; imageRules: ImageRules }) {
-  return <form action={createPostAction} className={styles.draftForm} onSubmit={uploadImageBeforeSubmit}>
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  return <form action={createPostAction} noValidate className={styles.draftForm} onSubmit={event => submitPost(event, setErrors)}>
     <label htmlFor="new-post-message">Post text</label>
-    <textarea id="new-post-message" name="message" required rows={4} placeholder="Write a post for your team…" />
+    <textarea id="new-post-message" name="message" required rows={4} placeholder="Write a post for your team…" aria-invalid={Boolean(errors.message)} aria-describedby={errors.message ? 'new-post-message-error' : undefined} />
+    {errors.message && <p id="new-post-message-error" className={styles.formError}>{errors.message}</p>}
     <label htmlFor="new-post-first-comment">First comment <span>(optional)</span></label>
     <textarea id="new-post-first-comment" name="firstComment" rows={2} placeholder="Add a link or follow-up as the first comment…" />
-    <AttachmentFields imageRules={imageRules} />
+    <AttachmentFields imageRules={imageRules} errors={errors} />
     <TargetPicker targets={targets} />
     <div className={styles.formFooter}><span>Saved locally until you publish it.</span><button className="ui-button ui-button--primary" type="submit">Create post</button></div>
   </form>;
 }
 
 export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
-  return <form action={importPostsAction} className={styles.draftForm}>
+  const [error, setError] = useState('');
+  return <form action={importPostsAction} noValidate className={styles.draftForm} onSubmit={event => {
+    const input = event.currentTarget.elements.namedItem('csv');
+    if (!(input instanceof HTMLInputElement) || !input.files?.[0]?.size) {
+      event.preventDefault(); setError('Choose a non-empty CSV file to import.'); input instanceof HTMLInputElement && input.focus();
+    } else setError('');
+  }}>
     <label htmlFor="posts-csv">Import posts from CSV</label>
     <p className={styles.help}>Required header: <code>message,firstComment,channels</code>. Use the channel labels below; separate multiple channels with semicolons. Leave channels empty to import a local draft. Imported posts remain drafts.</p>
     <ul className={styles.targetReference}>{targets.filter(target => target.canPublish).map(target => <li key={target.id}>{csvDestinationLabel(target)}</li>)}</ul>
-    <input id="posts-csv" type="file" name="csv" accept=".csv,text/csv" required />
+    <input id="posts-csv" type="file" name="csv" accept=".csv,text/csv" required aria-invalid={Boolean(error)} aria-describedby={error ? 'posts-csv-error' : undefined} />
+    {error && <p id="posts-csv-error" className={styles.formError}>{error}</p>}
     <button className="ui-button ui-button--secondary" type="submit">Import CSV</button>
   </form>;
 }
 
 export function PostRowActions({ post, targets, canEdit, canPublish, imageRules }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
   const selected = new Set(post.targets.map(item => item.target.id));
   const hasRemote = post.targets.some(item => Boolean(item.remotePostId));
   const isDraft = post.status === 'draft' && !post.publishedAt;
@@ -116,13 +157,14 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules 
   return <div className={styles.rowActions}>
     {canEdit && isDraft && post.media.length <= 1 ? <details className={styles.editDetails}>
       <summary>Edit post</summary>
-      <form action={updatePostAction} className={styles.editForm} onSubmit={uploadImageBeforeSubmit}>
+      <form action={updatePostAction} noValidate className={styles.editForm} onSubmit={event => submitPost(event, setEditErrors)}>
         <input type="hidden" name="postId" value={post.id} />
         <label htmlFor={`message-${post.id}`}>Post text</label>
-        <textarea id={`message-${post.id}`} name="message" defaultValue={post.message} required rows={4} />
+        <textarea id={`message-${post.id}`} name="message" defaultValue={post.message} required rows={4} aria-invalid={Boolean(editErrors.message)} aria-describedby={editErrors.message ? `message-error-${post.id}` : undefined} />
+        {editErrors.message && <p id={`message-error-${post.id}`} className={styles.formError}>{editErrors.message}</p>}
         <label htmlFor={`comment-${post.id}`}>First comment <span>(optional)</span></label>
         <textarea id={`comment-${post.id}`} name="firstComment" defaultValue={post.firstComment ?? ''} rows={2} />
-        <AttachmentFields post={post} imageRules={imageRules} />
+        <AttachmentFields post={post} imageRules={imageRules} errors={editErrors} />
         <TargetPicker targets={targets} selected={selected} />
         <button className="ui-button ui-button--secondary ui-button--sm" type="submit">Save post</button>
       </form>

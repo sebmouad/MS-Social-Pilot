@@ -40,6 +40,8 @@
 .draftForm input:not([type="checkbox"]), .editForm input:not([type="checkbox"]) { width: 100%; max-width: 100%; }
 .draftForm input:not([type="checkbox"]):not([type="file"]):not([type="hidden"]), .editForm input:not([type="checkbox"]):not([type="file"]):not([type="hidden"]) { min-height: 40px; padding: 9px 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-size: 13px; }
 .draftForm label, .editForm label { color: var(--ink-soft); font-size: 12px; font-weight: 700; }
+.formError { display: block; margin: 0 0 4px; color: var(--danger) !important; font-size: 12px; font-weight: 500; line-height: 1.4; }
+.draftForm [aria-invalid="true"], .editForm [aria-invalid="true"] { border-color: var(--danger) !important; }
 .imageAttachment { display: grid; gap: 7px; }
 .imageAttachment > input[type="file"] { width: 100%; max-width: 100%; padding: 8px; border: 1px dashed var(--line); border-radius: 9px; color: var(--ink-soft); background: var(--surface-raised); font: inherit; font-size: 12px; }
 .draftForm input[type="file"]::file-selector-button { min-height: 34px; margin-right: 12px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-weight: 650; cursor: pointer; }
