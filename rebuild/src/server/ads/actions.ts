@@ -29,6 +29,17 @@ export type AdsObjectReadInput = { adAccountId: string; objectId: string; object
 
 function scopes(value: string) { return value.split(',').map(scope => scope.trim()).filter(Boolean); }
 
+const creationAuditWarning = 'Creation succeeded and the object is paused, but its audit record could not be saved. Do not submit this creation again.';
+async function recordAdsCreationAudit(actor: AdsActionActor, action: 'ads.campaign_created' | 'ads.adset_created', detail: Record<string, unknown>, logContext: Record<string, unknown>) {
+  try {
+    await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`ads_${randomBytes(12).toString('hex')}`}, ${actor.userId}, ${action}, ${JSON.stringify({ workspaceId: actor.workspaceId, ...detail })}::jsonb, NOW())`;
+    return true;
+  } catch {
+    console.error('Ads creation succeeded but its audit record could not be saved.', { workspaceId: actor.workspaceId, actorId: actor.userId, ...logContext });
+    return false;
+  }
+}
+
 /** Resolve the selected account's module before producing provider-specific confirmation text. */
 export async function campaignCreationConfirmation(workspaceId: string, adAccountId: string, name: string, objective: string) {
   const account = await prisma.adAccount.findFirst({
@@ -164,8 +175,8 @@ export async function createWorkspaceAdCampaign(actor: AdsActionActor, input: Ad
   const confirmation = ads.campaignConfirmation(input.adAccountId, name, input.objective);
   if (input.confirmation !== confirmation) throw new Error(`Confirmation required. Repeat with confirmation exactly: ${confirmation}`);
   const result = await ads.createCampaign({ credential, accountId: account.actId, name, objective: input.objective });
-  await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`ads_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'ads.campaign_created', ${JSON.stringify({ workspaceId: actor.workspaceId, adAccountId: account.id, campaignId: result.remoteId, name, objective: input.objective, status: 'PAUSED' })}::jsonb, NOW())`;
-  return { campaignId: result.remoteId };
+  const auditRecorded = await recordAdsCreationAudit(actor, 'ads.campaign_created', { adAccountId: account.id, campaignId: result.remoteId, name, objective: input.objective, status: 'PAUSED' }, { adAccountId: account.id, campaignId: result.remoteId });
+  return { created: true as const, campaignId: result.remoteId, status: 'paused' as const, auditRecorded, ...(auditRecorded ? {} : { warning: creationAuditWarning }) };
 }
 
 /** Create a paused ad set under a campaign verified in this account's insight history. */
@@ -181,11 +192,6 @@ export async function createWorkspaceAdSet(actor: AdsActionActor, input: AdsAdSe
   const parentCampaign = await prisma.adInsight.findFirst({ where: { adAccountId: account.id, level: 'campaign', objectId: input.campaignId }, select: { id: true } });
   if (!parentCampaign) throw new Error('This campaign cannot be verified for the selected account.');
   const result = await ads.createAdSet({ credential, accountId: account.actId, campaignId: input.campaignId, name, dailyBudgetMinor: input.dailyBudgetMinor, countryCode: input.countryCode, optimizationGoal: input.optimizationGoal });
-  try {
-    await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`ads_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'ads.adset_created', ${JSON.stringify({ workspaceId: actor.workspaceId, adAccountId: account.id, campaignId: input.campaignId, adSetId: result.remoteId, name, dailyBudgetMinor: input.dailyBudgetMinor, countryCode: input.countryCode, optimizationGoal: input.optimizationGoal, status: 'PAUSED' })}::jsonb, NOW())`;
-    return { adSetId: result.remoteId, auditRecorded: true };
-  } catch {
-    console.error('Ad set created but its audit record could not be saved.', { adSetId: result.remoteId, adAccountId: account.id, campaignId: input.campaignId });
-    return { adSetId: result.remoteId, auditRecorded: false };
-  }
+  const auditRecorded = await recordAdsCreationAudit(actor, 'ads.adset_created', { adAccountId: account.id, campaignId: input.campaignId, adSetId: result.remoteId, name, dailyBudgetMinor: input.dailyBudgetMinor, countryCode: input.countryCode, optimizationGoal: input.optimizationGoal, status: 'PAUSED' }, { adAccountId: account.id, campaignId: input.campaignId, adSetId: result.remoteId });
+  return { created: true as const, adSetId: result.remoteId, status: 'paused' as const, auditRecorded, ...(auditRecorded ? {} : { warning: creationAuditWarning }) };
 }
