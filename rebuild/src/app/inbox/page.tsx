@@ -36,6 +36,12 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     }),
     runtimeConfig('inbox.messengerReplyWindowHours') as Promise<number>,
   ]);
+  // The preview keeps a short message history. Query the actual latest visitor
+  // message separately so a busy thread cannot incorrectly close its reply UI.
+  const lastInbound = new Map(await Promise.all(conversations.map(async item => [item.id, await prisma.conversationMessage.findFirst({
+    where: { conversationId: item.id, fromId: { not: null }, NOT: { fromId: item.target.providerId } },
+    orderBy: { createdTime: 'desc' }, select: { fromId: true, createdTime: true },
+  })] as const)));
   const writeMap = new Map(await Promise.all([...new Set([...conversations.map(item => item.target.id), ...comments.map(item => item.postTarget.target.id)])].map(async targetId => [targetId, await canManageFacebookInbox({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, targetId)] as const)));
   const total = conversations.length + comments.length;
   const sidebar = <aside className="inbox-filters"><h2>Filter inbox</h2><form method="get" action="/inbox">
@@ -48,11 +54,12 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   return <PageFrame module="inbox" sidebar={sidebar}><div className="page-stack inbox-page">
     <header className="page-heading inbox-page-heading"><div><p className="eyebrow">Inbox</p><h1>Conversations</h1><p>Page messages and post comments from the Facebook channels you can access.</p></div><InboxSyncButton targetId={selectedChannel === 'all' ? undefined : selectedChannel} disabled={!visibleChannels.length} /></header>
-    {!total ? <section className="panel"><h2>{visibleChannels.length ? 'No inbox activity matches these filters' : 'No Facebook Pages are available'}</h2><p className="empty-note">Sync connected Facebook Pages to load conversations and post comments.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <section className="panel">
+    {!total ? <section className="panel"><h2>{visibleChannels.length ? 'No inbox activity matches these filters' : 'No Facebook Pages are available'}</h2><p className="empty-note">Sync connected Facebook Pages to load conversations and comments on posts published through this app. Comments on posts made elsewhere are not synced yet.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <section className="panel">
       <div className="inbox-summary"><h2>Recent activity</h2><span>{total} items · up to 50 per type</span></div>
       {conversations.length > 0 && <div className="inbox-group"><h3>Messages <span>{conversations.length}</span></h3><div className="inbox-list">{conversations.map(item => {
         const latest = item.messages[0];
-        const replyWindow = messengerReplyWindow({ messages: item.messages, pageId: item.target.providerId, windowHours: replyWindowHours });
+        const inbound = lastInbound.get(item.id);
+        const replyWindow = messengerReplyWindow({ messages: inbound ? [inbound] : [], pageId: item.target.providerId, windowHours: replyWindowHours });
         return <article className="inbox-item" key={`conversation-${item.id}`}>
           <div className="inbox-item-head"><div><strong>{latest?.fromName || 'Conversation'}</strong><span className="inbox-channel">{item.target.name} · {item.target.type}</span></div><time dateTime={item.updatedTime.toISOString()}>{item.updatedTime.toLocaleString()}</time></div>
           <p>{latest?.message || item.snippet || 'No message text available.'}</p><small>{item.unreadCount > 0 ? `${item.unreadCount} unread` : item.resolvedAt ? 'Resolved' : 'Message thread'}</small>
