@@ -138,6 +138,7 @@ button, input, select { font: inherit; }
 .ui-dialog__header h2 { margin: 0; font-size: 18px; letter-spacing: -.3px; }
 .ui-dialog__header p { margin: 7px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
 .ui-dialog__body { padding: 24px; }
+.ui-error { color: var(--danger); font-size: 13px; line-height: 1.5; }
 .ui-dialog__actions { justify-content: end; border-top: 1px solid var(--line); }
 .route-state { min-height: 50vh; display: grid; align-content: center; justify-items: center; gap: 14px; padding: 32px; text-align: center; color: var(--ink-soft); }
 .route-state h1, .route-state p { margin: 0; }

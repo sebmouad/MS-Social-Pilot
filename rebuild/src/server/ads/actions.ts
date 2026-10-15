@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { AdMutationRequest, FacebookCampaignObjective } from '@/platforms/types';
 import { configuredFacebookEngine } from '@/server/platforms/facebook';
+import { configuredCreateFacebookAdSet, type AdSetOptimizationGoal } from '@/server/ads/facebook-ads';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { loadEntitlements, canUseFeature } from '@/server/entitlements';
@@ -23,11 +24,16 @@ export type AdsActionInput = {
   confirmation: string;
 };
 export type AdsCampaignCreateInput = { adAccountId: string; name: string; objective: FacebookCampaignObjective; confirmation: string };
+export type AdsAdSetCreateInput = { adAccountId: string; campaignId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: AdSetOptimizationGoal; confirmation: string };
 export type AdsObjectReadInput = { adAccountId: string; objectId: string; objectType: AdMutationRequest['objectType'] };
 const OBJECTIVES = new Set<FacebookCampaignObjective>(['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION']);
 
 export function campaignCreationConfirmation(adAccountId: string, name: string, objective: string) {
   return `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(name.trim())} IN ACCOUNT ${adAccountId} WITH OBJECTIVE ${objective}`;
+}
+
+export function adSetCreationConfirmation(input: Omit<AdsAdSetCreateInput, 'confirmation'>) {
+  return `CREATE PAUSED FACEBOOK AD SET ${JSON.stringify(input.name.trim())} UNDER CAMPAIGN ${input.campaignId} IN ACCOUNT ${input.adAccountId} WITH DAILY BUDGET ${input.dailyBudgetMinor} MINOR UNITS TARGETING ${input.countryCode} OPTIMIZED FOR ${input.optimizationGoal}`;
 }
 
 /** Server-rendering gate for action controls; mutation still repeats these checks. */
@@ -219,4 +225,55 @@ export async function createWorkspaceAdCampaign(actor: AdsActionActor, input: Ad
   const result = await engine.createCampaign({ credential: { accessToken }, accountId: account.actId, name, objective: input.objective });
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`ads_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'ads.campaign_created', ${JSON.stringify({ workspaceId: actor.workspaceId, adAccountId: account.id, campaignId: result.remoteId, name, objective: input.objective, status: 'PAUSED' })}::jsonb, NOW())`;
   return { campaignId: result.remoteId };
+}
+
+/** Create a paused ad set under a campaign verified in this account's insight history. */
+export async function createWorkspaceAdSet(actor: AdsActionActor, input: AdsAdSetCreateInput, pageScopeAll: boolean) {
+  if (!pageScopeAll) throw new Error('Ad set creation is unavailable for limited page access.');
+  const membership = await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
+  if (!membership) throw new Error('You are no longer a member of this workspace.');
+  if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can manage ads.');
+  const [entitlements, permissions] = await Promise.all([loadEntitlements(actor.userId, actor.workspaceId), loadPermissions(actor.userId, actor.workspaceId)]);
+  if (!entitlements || !permissions) throw new Error('Workspace access is unavailable.');
+  if (!canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', 'write')) throw new Error('Ads management is not enabled for this workspace.');
+
+  const name = input.name.trim();
+  if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name)) throw new Error('Ad set names must contain 1 to 100 printable characters.');
+  if (!Number.isSafeInteger(input.dailyBudgetMinor) || input.dailyBudgetMinor < 1) throw new Error('Daily budgets must be positive whole minor currency units.');
+  if (!/^[A-Z]{2}$/.test(input.countryCode)) throw new Error('Country code must be a two-letter uppercase code.');
+  const confirmation = adSetCreationConfirmation({ ...input, name });
+  if (input.confirmation !== confirmation) throw new Error(`Confirmation required. Repeat with confirmation exactly: ${confirmation}`);
+
+  const account = await prisma.adAccount.findFirst({
+    where: { id: input.adAccountId, workspaceId: actor.workspaceId, enabled: true, socialAccount: { is: { workspaceId: actor.workspaceId, provider: 'facebook', invalidatedAt: null } } },
+    select: { id: true, actId: true, socialAccount: { select: { accessToken: true, scopes: true, invalidatedAt: true, tokenExpiresAt: true } } },
+  });
+  if (!account?.socialAccount || account.socialAccount.invalidatedAt || (account.socialAccount.tokenExpiresAt && account.socialAccount.tokenExpiresAt <= new Date())) throw new Error('This advertising account or its connection is unavailable. Reconnect it before managing ads.');
+  const parentCampaign = await prisma.adInsight.findFirst({ where: { adAccountId: account.id, level: 'campaign', objectId: input.campaignId }, select: { id: true } });
+  if (!parentCampaign) throw new Error('This campaign cannot be verified for the selected account.');
+
+  const [configuredScopes, managementEnabled, facebookEnabled] = await Promise.all([
+    runtimeConfig('meta.adsManageScopes') as Promise<string[]>, runtimeConfig('ads.managementEnabled') as Promise<boolean>, runtimeConfig('platforms.facebook.enabled') as Promise<boolean>,
+  ]);
+  if (managementEnabled !== true) throw new Error('Ads management is disabled in Root configuration.');
+  if (facebookEnabled !== true) throw new Error('The Facebook platform is disabled in Root configuration.');
+  const requiredScopes = [...new Set(configuredScopes.map(scope => scope.trim()).filter(Boolean))];
+  if (!requiredScopes.length || !requiredScopes.includes(SCOPE_MANAGEMENT)) throw new Error('Root has not configured the ads_management scope.');
+  const grantedScopes = new Set(account.socialAccount.scopes.split(',').map(scope => scope.trim()).filter(Boolean));
+  if (requiredScopes.some(scope => !grantedScopes.has(scope))) throw new Error('Reconnect this Facebook source and grant the configured ads management scopes.');
+  const accessToken = decryptSecret(account.socialAccount.accessToken);
+  if (!accessToken) throw new Error('This Facebook connection is unavailable. Reconnect it before managing ads.');
+  const result = await configuredCreateFacebookAdSet({
+    credential: { accessToken }, accountId: account.actId, campaignId: input.campaignId, name, dailyBudgetMinor: input.dailyBudgetMinor,
+    countryCode: input.countryCode, optimizationGoal: input.optimizationGoal,
+  });
+  try {
+    await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`ads_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'ads.adset_created', ${JSON.stringify({ workspaceId: actor.workspaceId, adAccountId: account.id, campaignId: input.campaignId, adSetId: result.remoteId, name, dailyBudgetMinor: input.dailyBudgetMinor, countryCode: input.countryCode, optimizationGoal: input.optimizationGoal, status: 'PAUSED' })}::jsonb, NOW())`;
+    return { adSetId: result.remoteId, auditRecorded: true };
+  } catch {
+    // The provider operation already succeeded. Return that result so a client
+    // does not retry creation and generate a second remote ad set.
+    console.error('Ad set created but its audit record could not be saved.', { adSetId: result.remoteId, adAccountId: account.id, campaignId: input.campaignId });
+    return { adSetId: result.remoteId, auditRecorded: false };
+  }
 }

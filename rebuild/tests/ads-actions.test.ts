@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   decrypt: vi.fn(),
   engine: { updateAd: vi.fn(), createCampaign: vi.fn(), readAdObject: vi.fn() },
   configuredEngine: vi.fn(),
+  createFacebookAdSet: vi.fn(),
   entitlements: vi.fn(),
   permissions: vi.fn(),
   canUseFeature: vi.fn(),
@@ -21,11 +22,12 @@ vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.config }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: mocks.decrypt }));
 vi.mock('../src/server/platforms/facebook', () => ({ configuredFacebookEngine: mocks.configuredEngine }));
+vi.mock('../src/server/ads/facebook-ads', () => ({ configuredCreateFacebookAdSet: mocks.createFacebookAdSet }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: mocks.canUseFeature }));
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature }));
 
-import { canManageWorkspaceAds, canReadWorkspaceAds, createWorkspaceAdCampaign, readWorkspaceAdObject, updateWorkspaceAd } from '../src/server/ads/actions';
+import { canManageWorkspaceAds, canReadWorkspaceAds, createWorkspaceAdCampaign, createWorkspaceAdSet, readWorkspaceAdObject, updateWorkspaceAd } from '../src/server/ads/actions';
 
 const actor = { userId: 'user-1', workspaceId: 'workspace-1' };
 const statusChange = {
@@ -51,6 +53,7 @@ beforeEach(() => {
   mocks.engine.updateAd.mockResolvedValue(undefined);
   mocks.engine.createCampaign.mockResolvedValue({ remoteId: 'campaign-new' });
   mocks.engine.readAdObject.mockResolvedValue({ id: 'campaign-44', name: 'Spring', accountId: '99', configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED' });
+  mocks.createFacebookAdSet.mockResolvedValue({ remoteId: 'adset-new' });
   mocks.prisma.$executeRaw.mockResolvedValue(1);
 });
 
@@ -117,6 +120,51 @@ describe('workspace Ads actions', () => {
     mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : ['ads_read']);
     await expect(createWorkspaceAdCampaign(actor, input)).rejects.toThrow(/Root has not configured/);
     expect(mocks.engine.createCampaign).not.toHaveBeenCalled();
+  });
+
+  it('creates a paused ad set only for an account-owned campaign and audits without credentials', async () => {
+    const input = { adAccountId: 'local-account-1', campaignId: 'campaign-44', name: 'Prospecting', dailyBudgetMinor: 5000,
+      countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' as const,
+      confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-44 IN ACCOUNT local-account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' };
+    await expect(createWorkspaceAdSet(actor, { ...input, confirmation: 'yes' }, true)).rejects.toThrow(/confirmation exactly/);
+    expect(mocks.createFacebookAdSet).not.toHaveBeenCalled();
+    await expect(createWorkspaceAdSet(actor, input, true)).resolves.toEqual({ adSetId: 'adset-new', auditRecorded: true });
+    expect(mocks.prisma.adInsight.findFirst).toHaveBeenCalledWith({ where: { adAccountId: 'local-account-1', level: 'campaign', objectId: 'campaign-44' }, select: { id: true } });
+    expect(mocks.createFacebookAdSet).toHaveBeenCalledWith(expect.objectContaining({ credential: { accessToken: 'secret-token-value' }, accountId: 'act_99', campaignId: 'campaign-44', name: 'Prospecting', dailyBudgetMinor: 5000, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' }));
+    const rawValues = mocks.prisma.$executeRaw.mock.calls[0] as unknown[];
+    expect(JSON.stringify(rawValues)).toContain('adset-new');
+    expect(JSON.stringify(rawValues)).toContain('PAUSED');
+    expect(JSON.stringify(rawValues)).not.toContain('secret-token-value');
+  });
+
+  it('rejects an ad set with an unverified campaign and does not send it to Meta', async () => {
+    mocks.prisma.adInsight.findFirst.mockResolvedValue(null);
+    const input = { adAccountId: 'local-account-1', campaignId: 'campaign-foreign', name: 'Prospecting', dailyBudgetMinor: 5000,
+      countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' as const,
+      confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-foreign IN ACCOUNT local-account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' };
+    await expect(createWorkspaceAdSet(actor, input, true)).rejects.toThrow(/cannot be verified/);
+    expect(mocks.createFacebookAdSet).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for ad set creation when the workspace has limited page scope', async () => {
+    const input = { adAccountId: 'local-account-1', campaignId: 'campaign-44', name: 'Prospecting', dailyBudgetMinor: 5000,
+      countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' as const,
+      confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-44 IN ACCOUNT local-account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' };
+    await expect(createWorkspaceAdSet(actor, input, false)).rejects.toThrow(/unavailable for limited page access/);
+    expect(mocks.prisma.adAccount.findFirst).not.toHaveBeenCalled();
+    expect(mocks.createFacebookAdSet).not.toHaveBeenCalled();
+  });
+
+  it('returns a created result with audit recovery status instead of encouraging a duplicate retry', async () => {
+    const input = { adAccountId: 'local-account-1', campaignId: 'campaign-44', name: 'Prospecting', dailyBudgetMinor: 5000,
+      countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' as const,
+      confirmation: 'CREATE PAUSED FACEBOOK AD SET "Prospecting" UNDER CAMPAIGN campaign-44 IN ACCOUNT local-account-1 WITH DAILY BUDGET 5000 MINOR UNITS TARGETING MA OPTIMIZED FOR LINK_CLICKS' };
+    mocks.prisma.$executeRaw.mockRejectedValueOnce(new Error('database unavailable'));
+    const auditLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await expect(createWorkspaceAdSet(actor, input, true)).resolves.toEqual({ adSetId: 'adset-new', auditRecorded: false });
+    expect(mocks.createFacebookAdSet).toHaveBeenCalledTimes(1);
+    expect(auditLog).toHaveBeenCalledWith('Ad set created but its audit record could not be saved.', { adSetId: 'adset-new', adAccountId: 'local-account-1', campaignId: 'campaign-44' });
+    auditLog.mockRestore();
   });
 
   it('rechecks role and blocks a non-manager before looking up any account', async () => {

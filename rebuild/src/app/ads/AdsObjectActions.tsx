@@ -1,15 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import { ModalDialog } from '@/components/ModalDialog';
+import { budgetFractionDigits, formatBudgetMinor, parseBudgetAmount } from './budget';
 
-type Props = { adAccountId: string; objectId: string; objectType: 'campaign' | 'adset' | 'ad'; canRead: boolean; canManage: boolean };
+type Change = { status: 'active' | 'paused' } | { dailyBudgetMinor: number } | { lifetimeBudgetMinor: number };
+type PendingChange = { change: Change; confirmation: string; description: string };
+type Props = { adAccountId: string; objectId: string; objectType: 'campaign' | 'adset' | 'ad'; currency: string | null; canRead: boolean; canManage: boolean };
 
-export function AdsObjectActions({ adAccountId, objectId, objectType, canRead, canManage }: Props) {
-  const [budgetMinor, setBudgetMinor] = useState('');
+export function AdsObjectActions({ adAccountId, objectId, objectType, currency, canRead, canManage }: Props) {
+  const [budgetAmount, setBudgetAmount] = useState('');
   const [budgetKind, setBudgetKind] = useState<'daily' | 'lifetime'>('daily');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [liveStatus, setLiveStatus] = useState('');
+  const [pending, setPending] = useState<PendingChange | null>(null);
+  const dialogId = useId();
 
   async function refreshStatus() {
     setBusy(true); setMessage(''); setLiveStatus('');
@@ -39,27 +45,30 @@ export function AdsObjectActions({ adAccountId, objectId, objectType, canRead, c
       });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || 'The ads action could not be completed.');
-      setMessage('Change saved.');
+      setMessage('Change saved.'); setPending(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'The ads action could not be completed.');
+      setPending(null);
     } finally { setBusy(false); }
   }
 
   function changeStatus(status: 'active' | 'paused') {
     const confirmation = `SET AD STATUS ${objectId} TO ${status.toUpperCase()}`;
-    const entered = window.prompt(`This changes ad delivery. Type this exact confirmation to continue:\n\n${confirmation}`);
-    if (entered === confirmation) void submit({ status }, entered);
+    setPending({ change: { status }, confirmation, description: `${status === 'paused' ? 'Pause' : 'Resume'} delivery for this ${objectType}.` });
   }
 
   function changeBudget() {
-    const amount = Number(budgetMinor);
-    if (!Number.isSafeInteger(amount) || amount < 1) {
-      setMessage('Enter a positive whole amount in minor currency units.');
+    const amount = parseBudgetAmount(budgetAmount, currency);
+    if (amount === null) {
+      setMessage(`Enter a valid amount${currency ? ` in ${currency}` : ''} with up to ${budgetFractionDigits(currency)} decimal places.`);
       return;
     }
     const confirmation = `SET AD BUDGET ${objectId} TO ${amount} MINOR UNITS`;
-    const entered = window.prompt(`This can change campaign spend. Type this exact confirmation to continue:\n\n${confirmation}`);
-    if (entered === confirmation) void submit(budgetKind === 'daily' ? { dailyBudgetMinor: amount } : { lifetimeBudgetMinor: amount }, entered);
+    setPending({
+      change: budgetKind === 'daily' ? { dailyBudgetMinor: amount } : { lifetimeBudgetMinor: amount },
+      confirmation,
+      description: `Set the ${budgetKind} budget to ${formatBudgetMinor(amount, currency)} for this ${objectType}.`,
+    });
   }
 
   return <div className="ads-object-actions" aria-label={`Manage ${objectType} ${objectId}`}>
@@ -75,11 +84,16 @@ export function AdsObjectActions({ adAccountId, objectId, objectType, canRead, c
         <label><span className="sr-only">Budget period</span><select value={budgetKind} onChange={event => setBudgetKind(event.target.value as 'daily' | 'lifetime')} disabled={busy}>
           <option value="daily">Daily</option><option value="lifetime">Lifetime</option>
         </select></label>
-        <label><span className="sr-only">New budget in minor units</span><input aria-label="New budget in minor units" type="number" min="1" step="1" inputMode="numeric" placeholder="Minor units" value={budgetMinor} onChange={event => setBudgetMinor(event.target.value)} disabled={busy} /></label>
+        <label><span className="sr-only">New {budgetKind} budget{currency ? ` in ${currency}` : ''}</span><input aria-label={`New ${budgetKind} budget${currency ? ` in ${currency}` : ''}`} type="number" min={10 ** -budgetFractionDigits(currency)} step={10 ** -budgetFractionDigits(currency)} inputMode="decimal" placeholder={currency ?? 'Amount'} value={budgetAmount} onChange={event => setBudgetAmount(event.target.value)} disabled={busy} /></label>
         <button type="submit" disabled={busy}>Set budget</button>
       </form>
     </> : null}
     {liveStatus ? <p role="status" className="small-note">{liveStatus}</p> : null}
     {message ? <p role="status" className="small-note">{message}</p> : null}
+    {pending ? <ModalDialog className="ui-dialog" labelledBy={`ads-action-title-${dialogId}`} onDismiss={() => { if (!busy) setPending(null); }} busy={busy}>
+      <div className="ui-dialog__header"><div><h2 id={`ads-action-title-${dialogId}`}>Confirm ad change</h2><p>{pending.description}</p></div></div>
+      <div className="ui-dialog__body"><p>Target: {objectType} · {objectId}</p></div>
+      <div className="ui-dialog__actions"><button type="button" data-dialog-cancel onClick={() => setPending(null)} disabled={busy}>Cancel</button><button type="button" onClick={() => void submit(pending.change, pending.confirmation)} disabled={busy}>{busy ? 'Saving…' : 'Confirm change'}</button></div>
+    </ModalDialog> : null}
   </div>;
 }
