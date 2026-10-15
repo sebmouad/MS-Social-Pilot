@@ -34,6 +34,15 @@ describe('Page analytics ingestion', () => {
     expect(state.upsert.mock.calls[2][0].create).toMatchObject({ value: { MA: 12 }, numeric: null });
   });
 
+  it('persists supported metrics while counting isolated metric failures', async () => {
+    const observations = Object.assign([{ metric: 'page_views_total', period: 'day', endTime: new Date('2026-01-03T00:00:00Z'), value: 9, numeric: 9 }], {
+      failedMetrics: [{ metric: 'unsupported_metric', message: 'Unsupported metric' }],
+    });
+    state.observations.mockResolvedValue(observations);
+    expect(await syncPageAnalytics(new Date('2026-01-04T12:00:00Z'))).toEqual({ examined: 1, updated: 1, skipped: 0, failed: 1 });
+    expect(state.upsert).toHaveBeenCalledTimes(1);
+  });
+
   it('does not call Facebook or read connected data while the engine is disabled in Root', async () => {
     facebookEnabled = false;
     expect(await syncPageAnalytics(new Date('2026-01-04T12:00:00Z'))).toEqual({ examined: 0, updated: 0, skipped: 0, failed: 0 });

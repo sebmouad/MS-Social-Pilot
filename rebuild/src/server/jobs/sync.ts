@@ -117,6 +117,7 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
     try {
       await assertWorkspaceNotPurging(target.workspaceId);
       const observations = await withRetries(() => engine.getPageInsightObservations(decryptSecret(encrypted), target.providerId, since, now), retryLimit, retryBackoff);
+      if (observations.failedMetrics?.length) result.failed++;
       for (const { metric, period, endTime, value, numeric } of observations) {
         await prisma.pageInsight.upsert({
           where: { targetId_metric_period_endTime: { targetId: target.id, metric, period, endTime } },

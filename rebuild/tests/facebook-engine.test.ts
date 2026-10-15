@@ -171,6 +171,20 @@ describe('Facebook Graph adapter', () => {
     ]);
   });
 
+  it('isolates unsupported Page insight metrics and reports the metric failure', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      const metric = url.searchParams.get('metric');
+      if (metric === 'unsupported_metric') return response({ error: { message: 'Unsupported metric', code: 100 } }, 400);
+      return response({ data: [{ name: metric, period: 'day', values: [{ end_time: '2026-01-03T00:00:00Z', value: 9 }] }] });
+    }) as unknown as typeof fetch;
+    const engine = createFacebookEngine({ ...config, pageInsightMetrics: ['unsupported_metric', 'page_views_total'] }, fetcher);
+    const observations = await engine.getPageInsightObservations('token', 'p1');
+    expect(observations).toEqual([{ metric: 'page_views_total', period: 'day', endTime: new Date('2026-01-03T00:00:00Z'), value: 9, numeric: 9 }]);
+    expect(observations.failedMetrics).toEqual([{ metric: 'unsupported_metric', message: 'Unsupported metric' }]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it('follows bounded Page Insights pagination for historical observations', async () => {
     const next = 'https://graph.facebook.test/v99.0/p1/insights?after=older&access_token=token';
     const fetcher = mockFetch(

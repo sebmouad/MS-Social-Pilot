@@ -24,6 +24,7 @@ export interface FacebookPublishInput {
 }
 export interface FacebookPublished { remoteId: string; url: string | null }
 export interface FacebookPageInsightObservation { metric: string; period: string; endTime: Date; value: unknown; numeric: number | null }
+export type FacebookPageInsightObservations = FacebookPageInsightObservation[] & { failedMetrics?: Array<{ metric: string; message: string }> };
 export interface FacebookInboxMessage { id: string; text: string | null; createdAt: Date; fromName: string | null; fromId: string | null }
 export interface FacebookConversation { id: string; snippet: string | null; updatedAt: Date; unreadCount: number; messageCount: number; messages: FacebookInboxMessage[] }
 export interface FacebookComment { id: string; message: string; fromName: string | null; fromId: string | null; createdAt: Date; parentId: string | null; likeCount: number; replyCount: number; isHidden: boolean }
@@ -40,7 +41,7 @@ export interface FacebookEngine {
   listInbox(accessToken: string, pageId: string): Promise<FacebookConversation[]>;
   listComments(accessToken: string, postId: string): Promise<FacebookComment[]>;
   getPageAnalytics(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<Record<string, number | null>>;
-  getPageInsightObservations(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<FacebookPageInsightObservation[]>;
+  getPageInsightObservations(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<FacebookPageInsightObservations>;
   getAdInsights(accessToken: string, accountId: string, since: Date, until: Date): Promise<Array<Record<string, unknown>>>;
   updateAd(input: AdMutationRequest): Promise<void>;
   createCampaign(input: AdCampaignCreateRequest): Promise<{ remoteId: string }>;
@@ -107,10 +108,10 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
   function collectionUrl(path: string, token: string, fields: string): string {
     const url = graphObjectUrl(config, path); url.searchParams.set('access_token', token); url.searchParams.set('fields', fields); url.searchParams.set('limit', String(config.pageSize)); return url.toString();
   }
-  async function pageInsightRows(token: string, pageId: string, since?: Date, until?: Date): Promise<JsonObject[]> {
+  async function pageInsightRows(token: string, pageId: string, metricNames: readonly string[], since?: Date, until?: Date): Promise<JsonObject[]> {
     const url = graphObjectUrl(config, `${encodeURIComponent(pageId)}/insights`);
     url.searchParams.set('access_token', token);
-    url.searchParams.set('metric', config.pageInsightMetrics.join(','));
+    url.searchParams.set('metric', metricNames.join(','));
     url.searchParams.set('limit', String(config.pageSize));
     if (since) url.searchParams.set('since', String(Math.floor(since.getTime() / 1000)));
     if (until) url.searchParams.set('until', String(Math.floor(until.getTime() / 1000)));
@@ -253,7 +254,13 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     },
     async getPageAnalytics(token, pageId, since, until) {
       if (!config.pageInsightMetrics.length) return {};
-      const data = await pageInsightRows(token, pageId, since, until); const metrics: Record<string, number | null> = {};
+      const data: JsonObject[] = []; let firstError: unknown;
+      for (const metric of config.pageInsightMetrics) {
+        try { data.push(...await pageInsightRows(token, pageId, [metric], since, until)); }
+        catch (error) { firstError ??= error; }
+      }
+      if (!data.length && firstError) throw firstError;
+      const metrics: Record<string, number | null> = {};
       const latest = new Map<string, number>();
       for (const item of data) {
         const x = object(item); if (typeof x.name !== 'string') continue;
@@ -270,8 +277,14 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     },
     async getPageInsightObservations(token, pageId, since, until) {
       if (!config.pageInsightMetrics.length) return [];
-      const data = await pageInsightRows(token, pageId, since, until);
-      const observations: FacebookPageInsightObservation[] = [];
+      const data: JsonObject[] = []; const failedMetrics: Array<{ metric: string; message: string }> = [];
+      for (const metric of config.pageInsightMetrics) {
+        try { data.push(...await pageInsightRows(token, pageId, [metric], since, until)); }
+        catch (error) { failedMetrics.push({ metric, message: error instanceof Error ? error.message : 'Facebook insight request failed.' }); }
+      }
+      if (!data.length && failedMetrics.length) throw new FacebookApiError(failedMetrics[0].message, 0);
+      const observations: FacebookPageInsightObservations = [];
+      if (failedMetrics.length) Object.defineProperty(observations, 'failedMetrics', { value: failedMetrics, enumerable: false });
       for (const item of data) {
         const metric = object(item);
         if (typeof metric.name !== 'string' || !metric.name.trim()) continue;
