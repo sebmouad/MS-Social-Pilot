@@ -6,10 +6,34 @@ vi.mock('../src/server/data', () => ({ prisma: Object.assign(mocks.prisma, { $tr
 afterEach(() => vi.clearAllMocks());
 
 describe('disconnect local data choices', () => {
+  it('includes linked Instagram rows in preview and delete mode', async () => {
+    const tx = {
+      membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }) },
+      socialAccount: { findFirst: vi.fn().mockResolvedValue({ id: 's1', targets: [{ id: 'page-1' }], adAccounts: [] }), deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      instagramAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'ig-1' }]), deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      instagramInsight: { count: vi.fn().mockResolvedValue(2), deleteMany: vi.fn().mockResolvedValue({ count: 2 }) },
+      instagramMedia: { count: vi.fn().mockResolvedValue(3), deleteMany: vi.fn().mockResolvedValue({ count: 3 }) },
+      postTarget: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) },
+      post: { findMany: vi.fn().mockResolvedValue([]) }, conversation: { findMany: vi.fn().mockResolvedValue([]) },
+      pageInsight: { count: vi.fn().mockResolvedValue(0), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      adInsight: { count: vi.fn().mockResolvedValue(0), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      target: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) }, adAccount: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) }, $executeRaw: vi.fn(),
+    };
+    Object.assign(mocks.prisma, tx);
+    mocks.transaction.mockImplementation(async (run: (client: typeof tx) => Promise<unknown>) => run(tx));
+    const { previewSocialAccountDeletion, disconnectSocialAccount } = await import('../src/server/connection-mutations');
+    const preview = await previewSocialAccountDeletion({ userId: 'u1', workspaceId: 'w1' }, 's1');
+    expect(preview).toMatchObject({ instagramAccounts: 1, instagramInsights: 2, instagramMedia: 3 });
+    const result = await disconnectSocialAccount({ userId: 'u1', workspaceId: 'w1' }, 's1', 'delete', 'DELETE');
+    expect(result).toMatchObject({ deleted: { instagramAccounts: 1, instagramInsights: 2, instagramMedia: 3 } });
+    expect(tx.instagramMedia.deleteMany).toHaveBeenCalledWith({ where: { accountId: { in: ['ig-1'] } } });
+    expect(tx.instagramAccount.deleteMany).toHaveBeenCalledWith({ where: { workspaceId: 'w1', id: { in: ['ig-1'] } } });
+  });
   it('retains related records and only disables the source when retain mode is selected', async () => {
     const tx = {
       membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }) },
       socialAccount: { findFirst: vi.fn().mockResolvedValue({ id: 's1', targets: [{ id: 't1' }], adAccounts: [{ id: 'a1' }] }), updateMany: vi.fn() },
+      instagramAccount: { findMany: vi.fn().mockResolvedValue([]), updateMany: vi.fn() },
       postTarget: { count: vi.fn().mockResolvedValue(1) }, target: { updateMany: vi.fn() }, adAccount: { updateMany: vi.fn() }, $executeRaw: vi.fn(),
     };
     mocks.transaction.mockImplementation(async (run: (client: typeof tx) => Promise<unknown>) => run(tx));
@@ -32,6 +56,7 @@ describe('disconnect local data choices', () => {
     Object.assign(mocks.prisma, {
       membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }) },
       socialAccount: { findFirst: vi.fn().mockResolvedValue({ id: 's1', targets: [{ id: 't1' }], adAccounts: [{ id: 'a1' }] }) },
+      instagramAccount: { findMany: vi.fn().mockResolvedValue([]) },
       postTarget: { findMany: vi.fn().mockResolvedValue([{ id: 'pt1', postId: 'p1' }]), count: vi.fn().mockResolvedValue(1) },
       conversation: { findMany: vi.fn().mockResolvedValue([{ id: 'c1' }]) },
       post: { findMany: vi.fn().mockResolvedValue([{ id: 'p1' }]) },
@@ -43,7 +68,7 @@ describe('disconnect local data choices', () => {
     const { previewSocialAccountDeletion } = await import('../src/server/connection-mutations');
     await expect(previewSocialAccountDeletion({ userId: 'u1', workspaceId: 'w1' }, 's1')).resolves.toEqual({
       channels: 1, adAccounts: 1, postTargets: 1, orphanPosts: 1, comments: 2,
-      conversations: 1, conversationMessages: 3, pageInsights: 4, adInsights: 5, scheduledRemote: 1,
+      conversations: 1, conversationMessages: 3, pageInsights: 4, adInsights: 5, scheduledRemote: 1, instagramAccounts: 0, instagramInsights: 0, instagramMedia: 0,
     });
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
@@ -65,6 +90,7 @@ describe('disconnect local data choices', () => {
     const tx = {
       membership: { findUnique: vi.fn().mockResolvedValue({ role: 'admin' }) },
       socialAccount: { findFirst: vi.fn().mockResolvedValue({ id: 's1', targets: [{ id: 't1' }], adAccounts: [{ id: 'a1' }] }), deleteMany: vi.fn(async () => { order.push('source'); return { count: 1 }; }) },
+      instagramAccount: { findMany: vi.fn().mockResolvedValue([]) },
       postTarget: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([{ id: 'pt1', postId: 'p1' }]), deleteMany: vi.fn(async () => { order.push('postTargets'); return { count: 1 }; }) },
       postComment: { deleteMany: vi.fn(async () => { order.push('comments'); return { count: 1 }; }) },
       post: { deleteMany: vi.fn(async () => { order.push('orphanPosts'); return { count: 0 }; }) },

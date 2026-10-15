@@ -38,12 +38,12 @@ describe('rebuild Instagram analytics data selection', () => {
     state.adCount.mockResolvedValue(0);
   });
 
-  it('offers connected Instagram targets when publishing is disabled and selects insights by Instagram provider id, not linked Page targetId', async () => {
+  it('offers selected Instagram targets and selects insights by Instagram provider id, not linked Page targetId', async () => {
     const range = { from: date('2026-10-01'), to: date('2026-10-31') };
     const result = await loadAnalytics('workspace-1', ['ig-target-1'], range);
 
     expect(state.targets).toHaveBeenCalledWith(expect.objectContaining({
-      where: { workspaceId: 'workspace-1', OR: [{ enabled: true, type: { not: 'instagram' } }, { type: 'instagram', providerId: { in: ['ig-provider-1', 'ig-provider-2'] } }] },
+      where: { workspaceId: 'workspace-1', enabled: true, OR: [{ type: { not: 'instagram' } }, { type: 'instagram', providerId: { in: ['ig-provider-1', 'ig-provider-2'] } }] },
     }));
     expect(result.selectedTargets.map(target => target.id)).toEqual(['ig-target-1']);
     expect(state.instagramInsights).toHaveBeenCalledWith(expect.objectContaining({
