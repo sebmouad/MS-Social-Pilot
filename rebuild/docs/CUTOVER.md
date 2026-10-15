@@ -5,6 +5,13 @@ existing `scripts/deploy/deploy.sh` and `socialpilot-deploy` commands continue
 to publish the legacy root package. Do not use either command to deploy the
 rebuild.
 
+On 2026-10-15, a read-only schema-only dump from production restored into an
+isolated PostgreSQL 16 database. Both additive rebuild migrations applied to
+that clone. The cutover rehearsal then verified every mapped column and enum,
+and a second custom-format backup restored with matching row counts. The
+schema-only dump contained zero customer rows, so this check does not prove
+data migration, permissions, application writes, media, or provider behavior.
+
 The rebuild currently listens on port 3200; production OpenLiteSpeed proxies to
 the legacy service on port 3100. No rebuild systemd units, proxy-switch
 configuration, or rebuild-specific production rollback is checked in. The
