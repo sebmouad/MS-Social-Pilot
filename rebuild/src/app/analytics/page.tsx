@@ -23,6 +23,7 @@ function MetricChart({ metric }: { metric: ReturnType<typeof buildAnalytics>['me
     {metric.points.length > 0 && <div className="analytics-spark" role="img" aria-label={`${metric.label} over the selected date range`}>
       {metric.points.slice(-28).map(point => <span key={point.date} title={`${point.label}: ${formatValue(point.value, metric.unit)}`} style={{ height: `${Math.max(4, point.value / maximum * 100)}%` }} />)}
     </div>}
+    {metric.points.length > 0 && <details className="analytics-metric__details"><summary>View date and value series</summary><div className="report-list">{metric.points.map(point => <div className="report-row" key={point.date}><span>{point.label}</span><strong>{formatValue(point.value, metric.unit)}</strong></div>)}</div></details>}
     {metric.rows.length > 0 && <details className="analytics-metric__details"><summary>{metric.kind === 'breakdown' ? 'View breakdown' : `View ${metric.rows.length} ${detailLabel} details`}</summary><div className="report-list">{metric.rows.slice(0, 30).map(row => <div className="report-row" key={row.label}><span>{row.label}</span><strong>{formatValue(row.value, metric.unit)}{row.asOf ? ` · ${row.asOf.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</strong></div>)}</div></details>}
     {metric.points.length === 0 && metric.rows.length === 0 && <p className="empty-note">No values are available for this metric in the selected period.</p>}
     {metric.coverage < metric.available && <p className="analytics-coverage">Values were found for {metric.coverage} of {metric.available} selected {coverageLabel} in this date range.</p>}
@@ -71,8 +72,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     <p className="shell-subnav__label">Date range</p>
     <label className="analytics-date-filter">From<input type="date" name="start" defaultValue={inputDate(range.from)} /></label>
     <label className="analytics-date-filter">To<input type="date" name="end" defaultValue={inputDate(range.to)} /></label>
-    <p className="shell-subnav__label">Channels</p><input type="hidden" name="filter" value="1" />
-    {data?.targets.length ? data.targets.map(target => <label key={target.id}><input type="checkbox" name="channel" value={target.id} defaultChecked={selectedSet.has(target.id)} /><span>{target.name}</span></label>) : <p className="small-note">No channels connected.</p>}
+    <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">Channels</legend><input type="hidden" name="filter" value="1" />
+    {data?.targets.length ? data.targets.map(target => <label key={target.id}><input type="checkbox" name="channel" value={target.id} defaultChecked={selectedSet.has(target.id)} /><span>{target.name}</span></label>) : <p className="small-note">No channels connected.</p>}</fieldset>
     <button type="submit">Update analytics</button>
   </form>;
 

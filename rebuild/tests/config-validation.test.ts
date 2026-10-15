@@ -24,7 +24,9 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(15);
+    expect(CONFIG_SCHEMA_VERSION).toBe(16);
+    expect(CONFIG_BY_KEY.get('analytics.maxRangeDays')!.schema.safeParse(366).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('analytics.maxRangeDays')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('auth.passkeyChallengeMinutes')!.schema.safeParse(5).success).toBe(true);
     expect(CONFIG_BY_KEY.get('auth.passkeyChallengeMinutes')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('auth.passkeyOrigin')!.schema.safeParse('https://social.example.test').success).toBe(true);

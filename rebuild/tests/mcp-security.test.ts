@@ -19,7 +19,10 @@ const mutations = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), remove: 
 vi.mock('../src/server/post-mutations', () => ({ createLocalDraft: mutations.create, updateLocalDraft: mutations.update, deleteLocalDraft: mutations.remove }));
 vi.mock('../src/server/connection-mutations', () => ({ setConnectionSelections: mutations.select }));
 const rootConfig = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn() }));
-vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save }));
+vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save, runtimeConfig: vi.fn().mockResolvedValue(366) }));
+const analytics = vi.hoisted(() => ({ load: vi.fn(), build: vi.fn() }));
+vi.mock('../src/server/analytics/data', () => ({ analyticsRange: (start?: string, end?: string) => ({ from: new Date(`${start ?? '2026-10-01'}T00:00:00`), to: new Date(`${end ?? '2026-10-15'}T23:59:59.999`) }), loadAnalytics: analytics.load }));
+vi.mock('../src/server/analytics/aggregate', () => ({ buildAnalytics: analytics.build }));
 const dataControls = vi.hoisted(() => ({ preview: vi.fn(), export: vi.fn(), remove: vi.fn() }));
 vi.mock('../src/server/data-control', () => ({ previewWorkspaceDataDeletion: dataControls.preview, exportWorkspaceData: dataControls.export, deleteWorkspaceData: dataControls.remove }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
@@ -77,9 +80,26 @@ beforeEach(() => {
   dataControls.preview.mockResolvedValue({ posts: 2 });
   dataControls.export.mockResolvedValue({ format: 'ms-social-pilot-workspace-export', workspace: { id: 'workspace-a' } });
   dataControls.remove.mockResolvedValue({ posts: 2 });
+  const targets = [{ id: 'page-allowed', type: 'page', name: 'Allowed' }];
+  analytics.load.mockResolvedValue({ targets, selectedTargets: targets, pageRows: [], adRows: [], audienceRows: [], adAccountCount: 0, instagramRows: [], selectedInstagramAudience: [] });
+  analytics.build.mockReturnValue({ audience: { total: 12, covered: 1, selected: 1, entries: [] }, metrics: [{ key: 'reach' }, { key: 'clicks' }] });
 });
 
 describe('MCP workspace boundaries', () => {
+  it('paginates shared analytics and rejects channels outside the viewer scope', async () => {
+    const scoped = { ...viewer, permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
+    const denied = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 50, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { targetIds: ['page-other'] } } });
+    expect((await denied.json()).result.isError).toBe(true);
+    expect(analytics.load).toHaveBeenCalledTimes(1);
+    expect(analytics.load).toHaveBeenCalledWith('workspace-a', [], expect.any(Object), ['page-allowed']);
+    analytics.load.mockClear();
+    const response = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 51, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { targetIds: ['page-allowed'], limit: 1 } } });
+    const result = (await response.json()).result.structuredContent;
+    expect(result.audience.total).toBe(12);
+    expect(result.metrics).toEqual([{ key: 'reach' }]);
+    expect(result.nextOffset).toBe(1);
+    expect(analytics.load).toHaveBeenLastCalledWith('workspace-a', ['page-allowed'], expect.any(Object), ['page-allowed']);
+  });
   it('applies ads write scope, manager role, and exact confirmations before shared ads services', async () => {
     const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 60, method: 'tools/list' });
     expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('create_ad_campaign');

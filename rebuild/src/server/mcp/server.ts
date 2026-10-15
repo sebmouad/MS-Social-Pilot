@@ -6,7 +6,9 @@ import { randomBytes } from 'node:crypto';
 import { canAccessFeature, canAccessPage, type ScopedPermissions } from '../permissions';
 import { moderateFacebookComment, replyToFacebookInbox, setFacebookInboxResolved } from '../inbox/actions';
 import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '../publishing/lifecycle';
-import { readConfig, saveConfig } from '../config/store';
+import { readConfig, runtimeConfig, saveConfig } from '../config/store';
+import { analyticsRange, loadAnalytics } from '../analytics/data';
+import { buildAnalytics } from '../analytics/aggregate';
 import { CONFIG_SCHEMA_VERSION, safeConfigShape } from '@/lib/config/registry';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
@@ -31,6 +33,7 @@ const tools = [
   { name: 'set_inbox_resolved', description: 'Resolve or reopen a synced Facebook conversation or comment. Confirmation must exactly match RESOLVE <message|comment> <id> or REOPEN <message|comment> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'resolved', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment'] }, id: { type: 'string' }, resolved: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'moderate_inbox_comment', description: 'Hide or unhide a synced Facebook comment. This contacts Facebook. Confirmation must exactly match HIDE COMMENT <id> or UNHIDE COMMENT <id>.', inputSchema: { type: 'object', required: ['id', 'hidden', 'confirmation'], properties: { id: { type: 'string' }, hidden: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_page_analytics', description: 'Read stored daily insights for one workspace Page.', inputSchema: { type: 'object', required: ['pageId'], properties: { pageId: { type: 'string' }, days: { type: 'integer', minimum: 1, maximum: 365 } }, additionalProperties: false } },
+  { name: 'get_analytics_overview', description: 'Read all available analytics metrics and combined audience for selected channels. Metrics are paginated.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel.' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'list_ad_accounts', description: 'List advertising accounts in this workspace.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'create_ad_campaign', description: 'Create a paused Facebook campaign in a selected account. The confirmation must match CREATE PAUSED FACEBOOK CAMPAIGN <JSON-quoted name> IN ACCOUNT <adAccountId> WITH OBJECTIVE <objective>.', inputSchema: { type: 'object', required: ['adAccountId', 'name', 'objective', 'confirmation'], properties: { adAccountId: { type: 'string' }, name: { type: 'string' }, objective: { type: 'string', enum: ['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'update_ad', description: 'Change the status or one budget of a verified Facebook campaign, ad set, or ad. Confirmation must exactly match SET AD STATUS <objectId> TO <ACTIVE|PAUSED> or SET AD BUDGET <objectId> TO <amount> MINOR UNITS.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType', 'confirmation'], properties: { adAccountId: { type: 'string' }, objectId: { type: 'string' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, status: { type: 'string', enum: ['active', 'paused'] }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, lifetimeBudgetMinor: { type: 'integer', minimum: 1 }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -68,6 +71,7 @@ const toolFeatures: Record<string, string> = {
   set_inbox_resolved: 'inbox/conversations',
   moderate_inbox_comment: 'inbox/conversations',
   get_page_analytics: 'analytics/overview',
+  get_analytics_overview: 'analytics/overview',
   list_ad_accounts: 'ads/campaigns',
   create_ad_campaign: 'ads/campaigns',
   update_ad: 'ads/campaigns',
@@ -190,6 +194,33 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const days = Math.max(1, Math.min(365, Math.trunc(Number(args.days) || 30)));
       const rows = await prisma.pageInsight.findMany({ where: { targetId: pageId, period: 'day', endTime: { gte: new Date(Date.now() - days * 86_400_000) } }, orderBy: { endTime: 'desc' }, take: cap, select: { metric: true, period: true, endTime: true, numeric: true, value: true } });
       return { page, days, insights: rows };
+    }
+    case 'get_analytics_overview': {
+      const date = (key: 'start' | 'end') => {
+        const value = args[key];
+        if (value === undefined) return undefined;
+        if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(new Date(`${value}T00:00:00`).getTime())) throw new Error(`${key} must be a valid YYYY-MM-DD date.`);
+        return value;
+      };
+      const start = date('start');
+      const end = date('end');
+      if (start && end && start > end) throw new Error('start must not be after end.');
+      const range = analyticsRange(start, end);
+      const maxRangeDays = Number(await runtimeConfig('analytics.maxRangeDays'));
+      if ((range.to.getTime() - range.from.getTime()) / 86_400_000 > maxRangeDays) throw new Error(`Date range exceeds the configured ${maxRangeDays}-day maximum.`);
+      const allowedTargetIds = pageIdsFor(viewer);
+      const available = await loadAnalytics(viewer.workspaceId, [], range, allowedTargetIds);
+      const availableIds = new Set(available.targets.map(target => target.id));
+      if (args.targetIds !== undefined && (!Array.isArray(args.targetIds) || args.targetIds.some(id => typeof id !== 'string' || !availableIds.has(id)))) throw new Error('One or more selected channels are unavailable.');
+      const selectedIds = args.targetIds === undefined ? available.targets.map(target => target.id) : [...new Set(args.targetIds as string[])];
+      const data = await loadAnalytics(viewer.workspaceId, selectedIds, range, allowedTargetIds);
+      const overview = buildAnalytics(data.pageRows, data.adRows, data.audienceRows, data.selectedTargets, data.adAccountCount, data.instagramRows, data.selectedInstagramAudience);
+      const offset = args.offset === undefined ? 0 : Number(args.offset);
+      const limit = args.limit === undefined ? Math.min(cap, 50) : Number(args.limit);
+      if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('offset and limit must be valid integers.');
+      const pageLimit = Math.min(limit, cap);
+      const metrics = overview.metrics.slice(offset, offset + pageLimit);
+      return { range, selectedTargets: data.selectedTargets.map(target => ({ id: target.id, type: target.type, name: target.name })), audience: overview.audience, adAccountCount: data.adAccountCount, metricCount: overview.metrics.length, metrics, nextOffset: offset + metrics.length < overview.metrics.length ? offset + metrics.length : null };
     }
     case 'list_ad_accounts':
       if (viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can list advertising accounts.');

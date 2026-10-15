@@ -7,7 +7,7 @@
   --surface-hover: #fbfcfb;
   --ink: #18231e;
   --ink-soft: #526159;
-  --ink-faint: #78857d;
+  --ink-faint: #65736a;
   --line: #dce4de;
   --line-strong: #c6d2c9;
   --line-subtle: #edf1ed;
@@ -38,7 +38,7 @@
 
 :root[data-theme="coast"] {
   --canvas: #f2f7fa; --surface: #ffffff; --surface-muted: #e8f1f6; --surface-raised: #f8fbfd; --surface-hover: #f4f9fc;
-  --ink: #152734; --ink-soft: #496171; --ink-faint: #708693; --line: #d7e4eb; --line-strong: #b9cfdb; --line-subtle: #e8f0f4;
+  --ink: #152734; --ink-soft: #496171; --ink-faint: #5f7480; --line: #d7e4eb; --line-strong: #b9cfdb; --line-subtle: #e8f0f4;
   --accent: #17698a; --accent-hover: #10536e; --accent-soft: #dff0f7; --focus: #205eb5; --selection: #c6e7f3; --shadow-panel: 0 14px 38px rgb(21 39 52 / 9%); --scrim: rgb(14 31 43 / 40%);
 }
 :root[data-theme="clay"] {
