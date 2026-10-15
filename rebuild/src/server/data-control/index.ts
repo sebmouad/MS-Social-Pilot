@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 
-export type DataControlActor = { userId: string; workspaceId: string };
+export type DataControlActor = { userId: string; workspaceId: string; apiKeyId?: string };
 const MANAGER_ROLES = new Set(['owner', 'admin']);
 
 type DataControlTransaction = import('../../../generated/client').Prisma.TransactionClient;
@@ -128,7 +128,7 @@ export async function deleteWorkspaceData(actor: DataControlActor, confirmation:
     for (const table of await workspaceTables(tx)) {
       await tx.$executeRawUnsafe(`DELETE FROM ${tableSql(table)} WHERE "workspaceId" = $1`, actor.workspaceId);
     }
-    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`data_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'workspace.data_deleted', ${JSON.stringify({ workspaceId: actor.workspaceId, counts })}::jsonb, NOW())`;
+    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`data_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'workspace.data_deleted', ${JSON.stringify({ workspaceId: actor.workspaceId, ...(actor.apiKeyId ? { apiKeyId: actor.apiKeyId } : {}), counts })}::jsonb, NOW())`;
     return counts;
   }, { timeout });
 }

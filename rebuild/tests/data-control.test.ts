@@ -83,7 +83,7 @@ describe('workspace data controls', () => {
     const transaction = vi.fn(async (run: (client: typeof tx) => Promise<unknown>) => run(tx));
     Object.assign(mocks.prisma, { $transaction: transaction });
     const { deleteWorkspaceData } = await import('../src/server/data-control');
-    const result = await deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'DELETE');
+    const result = await deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1', apiKeyId: 'key-a' }, 'DELETE');
     expect(result).toMatchObject({ posts: 1, postTargets: 1, comments: 1, targets: 1, adAccounts: 1, socialAccounts: 1 });
     expect(order.filter(item => item.startsWith('DELETE FROM'))).toEqual([
       'DELETE FROM "public"."media" WHERE "workspaceId" = $1',
@@ -92,6 +92,7 @@ describe('workspace data controls', () => {
     ]);
     expect(result).not.toHaveProperty('other:media');
     expect(order.at(-1)).toBe('audit');
+    expect(tx.$executeRaw.mock.calls[0]?.some((value: unknown) => typeof value === 'string' && value.includes('"apiKeyId":"key-a"'))).toBe(true);
     expect(transaction).toHaveBeenCalledOnce();
   });
 

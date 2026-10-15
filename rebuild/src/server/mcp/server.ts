@@ -8,6 +8,7 @@ import { moderateFacebookComment, replyToFacebookInbox, setFacebookInboxResolved
 import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '../publishing/lifecycle';
 import { readConfig, saveConfig } from '../config/store';
 import { CONFIG_SCHEMA_VERSION, safeConfigShape } from '@/lib/config/registry';
+import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
 
 export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number; apiKeyId?: string; isInstanceOwner?: boolean };
 type JsonRpcId = string | number | null;
@@ -28,6 +29,9 @@ const tools = [
   { name: 'moderate_inbox_comment', description: 'Hide or unhide a synced Facebook comment. This contacts Facebook. Confirmation must exactly match HIDE COMMENT <id> or UNHIDE COMMENT <id>.', inputSchema: { type: 'object', required: ['id', 'hidden', 'confirmation'], properties: { id: { type: 'string' }, hidden: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_page_analytics', description: 'Read stored daily insights for one workspace Page.', inputSchema: { type: 'object', required: ['pageId'], properties: { pageId: { type: 'string' }, days: { type: 'integer', minimum: 1, maximum: 365 } }, additionalProperties: false } },
   { name: 'list_ad_accounts', description: 'List advertising accounts in this workspace.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'preview_workspace_data_deletion', description: 'Count workspace records that a data deletion would remove. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'export_workspace_data', description: 'Export the current workspace JSON snapshot, excluding provider credentials and installation audit history. This snapshot does not yet include every legacy record or media bytes. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'delete_workspace_data', description: 'Delete workspace database content while retaining workspace identity and members. Stored media can block deletion. Confirmation must exactly match DELETE WORKSPACE DATA <workspaceId>. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', required: ['confirmation'], properties: { confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'create_draft', description: 'Create an unpublished local draft. Confirmation is required: confirmation must be exactly CREATE DRAFT.', inputSchema: { type: 'object', required: ['message', 'confirmation'], properties: { message: { type: 'string', minLength: 1, maxLength: 10000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'update_draft', description: 'Edit an unconnected local draft. Confirmation must be exactly UPDATE DRAFT followed by its ID.', inputSchema: { type: 'object', required: ['postId', 'message', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string', minLength: 1, maxLength: 10000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'delete_draft', description: 'Permanently delete an unconnected local draft. Confirmation must be exactly DELETE DRAFT followed by its ID.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -46,6 +50,9 @@ const tools = [
 ];
 const rootTools = new Set(['get_root_config', 'set_root_config']);
 const canUseRootTool = (viewer: McpViewer) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
+const dataTools = new Set(['preview_workspace_data_deletion', 'export_workspace_data', 'delete_workspace_data']);
+const canManageData = (viewer: McpViewer) => viewer.role === 'owner' || viewer.role === 'admin';
+const dataResource = (uri: string) => uri === 'msp://data/deletion-preview';
 
 const toolFeatures: Record<string, string> = {
   list_pages: 'settings/connections',
@@ -56,6 +63,9 @@ const toolFeatures: Record<string, string> = {
   moderate_inbox_comment: 'inbox/conversations',
   get_page_analytics: 'analytics/overview',
   list_ad_accounts: 'ads/campaigns',
+  preview_workspace_data_deletion: 'settings/data',
+  export_workspace_data: 'settings/data',
+  delete_workspace_data: 'settings/data',
   create_draft: 'publishing/posts',
   update_draft: 'publishing/posts',
   delete_draft: 'publishing/posts',
@@ -71,7 +81,7 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'set_root_config']);
+const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'set_root_config']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -89,6 +99,7 @@ function requiredString(args: Record<string, unknown>, key: string) {
 
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
   if (rootTools.has(name) && !canUseRootTool(viewer)) throw new Error('Root configuration is unavailable.');
+  if (dataTools.has(name) && !canManageData(viewer)) throw new Error('Only workspace owners and admins can manage workspace data.');
   const feature = toolFeatures[name];
   if (feature) requireFeature(viewer.entitlements, feature);
   if (feature && (!viewer.permissions || !canAccessFeature(viewer.permissions, feature, writeTools.has(name) ? 'write' : 'read'))) throw new Error('You do not have permission to use this feature.');
@@ -171,6 +182,15 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
     case 'list_ad_accounts':
       if (viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can list advertising accounts.');
       return prisma.adAccount.findMany({ where: { workspaceId: viewer.workspaceId }, orderBy: { name: 'asc' }, take: cap, select: { id: true, actId: true, name: true, enabled: true, currency: true } });
+    case 'preview_workspace_data_deletion':
+      return previewWorkspaceDataDeletion({ userId: viewer.userId, workspaceId: viewer.workspaceId });
+    case 'export_workspace_data':
+      return exportWorkspaceData({ userId: viewer.userId, workspaceId: viewer.workspaceId });
+    case 'delete_workspace_data': {
+      requireConfirmation(args, `DELETE WORKSPACE DATA ${viewer.workspaceId}`);
+      const counts = await deleteWorkspaceData({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}) }, 'DELETE');
+      return { deleted: true, counts };
+    }
     case 'create_draft': {
       requireFeature(viewer.entitlements, 'publishing/posts');
       requireConfirmation(args, 'CREATE DRAFT');
@@ -307,7 +327,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     const requested = String(params.protocolVersion ?? '');
     return reply({ protocolVersion: versions.includes(requested) ? requested : versions[0], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } }, serverInfo: { name: 'ms-social-pilot', version: '0.1.0' }, instructions: `Workspace-scoped access for ${viewer.workspace.name}. Writes can manage local posts, publish posts, sync provider status, change channel/ad account selections, or manage Facebook Inbox items. Publishing, remote post deletion, Inbox replies, and comment moderation contact social platforms. Every write requires an explicit confirmation string. Times use ${viewer.workspace.timezone}.` });
   }
-  if (method === 'tools/list') return reply({ tools: tools.filter(tool => rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (tool.name !== 'list_ad_accounts' || viewer.role === 'owner' || viewer.role === 'admin')) });
+  if (method === 'tools/list') return reply({ tools: tools.filter(tool => rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (tool.name !== 'list_ad_accounts' || viewer.role === 'owner' || viewer.role === 'admin') && (!dataTools.has(tool.name) || canManageData(viewer))) });
   if (method === 'tools/call') {
     const name = String(params.name ?? '');
     if (!tools.some(tool => tool.name === name)) return error(-32602, `Unknown tool: ${name}`);
@@ -323,18 +343,21 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     { uri: 'msp://targets', name: 'Destinations', description: 'Enabled workspace destinations.', mimeType: 'application/json' },
     { uri: 'msp://posts', name: 'Posts', description: 'Recent workspace posts.', mimeType: 'application/json' },
     { uri: 'msp://inbox', name: 'Inbox', description: 'Recent synced inbox activity.', mimeType: 'application/json' },
+    { uri: 'msp://data/deletion-preview', name: 'Data deletion preview', description: 'Current workspace record counts before deletion.', mimeType: 'application/json' },
     ...(canUseRootTool(viewer) ? [{ uri: 'msp://root/config', name: 'Root configuration', description: 'Installation setting definitions and safe values.', mimeType: 'application/json' }] : []),
   ].filter(resource => {
-    const feature = resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : null;
-    return feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read')));
+    const feature = resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
+    return (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
   }) });
   if (method === 'resources/read') {
     const uri = String(params.uri ?? '');
+    if (dataResource(uri) && (!canManageData(viewer) || !canUseFeature(viewer.entitlements, 'settings/data') || !viewer.permissions || !canAccessFeature(viewer.permissions, 'settings/data', 'read'))) return error(-32602, 'Resource unavailable.');
     let contents: unknown;
     if (uri === 'msp://workspace') contents = viewer.workspace;
     else if (uri === 'msp://targets') contents = await runTool(viewer, 'list_pages', {});
     else if (uri === 'msp://posts') contents = await runTool(viewer, 'list_posts', { limit: 100 });
     else if (uri === 'msp://inbox') contents = await runTool(viewer, 'list_inbox', { limit: 50 });
+    else if (uri === 'msp://data/deletion-preview') contents = await runTool(viewer, 'preview_workspace_data_deletion', {});
     else if (uri === 'msp://root/config') contents = await runTool(viewer, 'get_root_config', {});
     else return error(-32602, `Unknown resource: ${uri}`);
     return reply({ contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(contents, null, 2) }] });

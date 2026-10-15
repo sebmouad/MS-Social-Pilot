@@ -18,6 +18,8 @@ vi.mock('../src/server/post-mutations', () => ({ createLocalDraft: mutations.cre
 vi.mock('../src/server/connection-mutations', () => ({ setConnectionSelections: mutations.select }));
 const rootConfig = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn() }));
 vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save }));
+const dataControls = vi.hoisted(() => ({ preview: vi.fn(), export: vi.fn(), remove: vi.fn() }));
+vi.mock('../src/server/data-control', () => ({ previewWorkspaceDataDeletion: dataControls.preview, exportWorkspaceData: dataControls.export, deleteWorkspaceData: dataControls.remove }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
 vi.mock('../src/server/inbox/actions', () => ({ replyToFacebookInbox: inboxMutations.reply, setFacebookInboxResolved: inboxMutations.resolve, moderateFacebookComment: inboxMutations.moderate }));
 const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
@@ -62,9 +64,43 @@ beforeEach(() => {
   publishingMutations.cancel.mockResolvedValue(undefined);
   rootConfig.read.mockResolvedValue([{ key: 'meta.appSecret', value: '', isSet: true, source: 'database' }]);
   rootConfig.save.mockResolvedValue(undefined);
+  dataControls.preview.mockResolvedValue({ posts: 2 });
+  dataControls.export.mockResolvedValue({ format: 'ms-social-pilot-workspace-export', workspace: { id: 'workspace-a' } });
+  dataControls.remove.mockResolvedValue({ posts: 2 });
 });
 
 describe('MCP workspace boundaries', () => {
+  it('exposes workspace data controls only to managers and requires exact deletion confirmation', async () => {
+    const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 40, method: 'tools/list' });
+    expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('delete_workspace_data');
+    const limited = { ...viewer, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: true, pageAccess: [] }) };
+    const hidden = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 41, method: 'tools/list' });
+    expect((await hidden.json()).result.tools.map((tool: { name: string }) => tool.name)).not.toContain('export_workspace_data');
+    const denied = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 42, method: 'tools/call', params: { name: 'export_workspace_data', arguments: {} } });
+    expect((await denied.json()).result.isError).toBe(true);
+    expect(dataControls.export).not.toHaveBeenCalled();
+    const resources = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 43, method: 'resources/list' });
+    expect((await resources.json()).result.resources.map((resource: { uri: string }) => resource.uri)).not.toContain('msp://data/deletion-preview');
+    const deniedResource = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 44, method: 'resources/read', params: { uri: 'msp://data/deletion-preview' } });
+    expect((await deniedResource.json()).error).toBeDefined();
+
+    await call('preview_workspace_data_deletion');
+    await call('export_workspace_data');
+    const permittedResource = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 45, method: 'resources/read', params: { uri: 'msp://data/deletion-preview' } });
+    expect((await permittedResource.json()).result.contents[0].text).toContain('"posts": 2');
+    expect(dataControls.preview).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' });
+    expect(dataControls.export).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' });
+    const missing = await call('delete_workspace_data', { confirmation: 'DELETE' });
+    expect((await missing.json()).result.isError).toBe(true);
+    expect(dataControls.remove).not.toHaveBeenCalled();
+    const deleted = await call('delete_workspace_data', { confirmation: 'DELETE WORKSPACE DATA workspace-a' });
+    expect((await deleted.json()).result.structuredContent).toEqual({ deleted: true, counts: { posts: 2 } });
+    expect(dataControls.remove).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, 'DELETE');
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+    const bearer = await handleMcpMessage({ ...viewer, apiKeyId: 'key-a' }, { jsonrpc: '2.0', id: 46, method: 'tools/call', params: { name: 'delete_workspace_data', arguments: { confirmation: 'DELETE WORKSPACE DATA workspace-a' } } });
+    expect((await bearer.json()).result.structuredContent.deleted).toBe(true);
+    expect(dataControls.remove).toHaveBeenLastCalledWith({ userId: 'user-a', workspaceId: 'workspace-a', apiKeyId: 'key-a' }, 'DELETE');
+  });
   it('scopes destination and post queries to the authenticated workspace and clamps limits', async () => {
     db.target.findMany.mockResolvedValue([]);
     db.post.findMany.mockResolvedValue([]);
