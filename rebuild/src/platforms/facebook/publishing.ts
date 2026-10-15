@@ -1,7 +1,7 @@
 import type { FacebookConfig } from './config';
 import { validateFacebookConfig } from './config';
 import { graphObjectUrl } from './protocol';
-import type { AdMutationRequest, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult } from '../types';
+import type { AdCampaignCreateRequest, AdMutationRequest, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult } from '../types';
 
 export type FacebookFetch = typeof fetch;
 
@@ -41,6 +41,7 @@ export interface FacebookEngine {
   getPageAnalytics(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<Record<string, number | null>>;
   getAdInsights(accessToken: string, accountId: string, since: Date, until: Date): Promise<Array<Record<string, unknown>>>;
   updateAd(input: AdMutationRequest): Promise<void>;
+  createCampaign(input: AdCampaignCreateRequest): Promise<{ remoteId: string }>;
   replyToConversation(accessToken: string, conversationId: string, text: string): Promise<string>;
   replyToComment(accessToken: string, commentId: string, text: string): Promise<string>;
   moderateComment(accessToken: string, commentId: string, hidden: boolean): Promise<void>;
@@ -264,6 +265,16 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       if (input.lifetimeBudgetMinor !== undefined) body.lifetime_budget = String(input.lifetimeBudgetMinor);
       await request(encodeURIComponent(input.objectId), { method: 'POST', token: input.credential.accessToken, body });
     },
+    async createCampaign(input) {
+      const name = input.name.trim();
+      if (!name || name.length > 100) throw new FacebookApiError('Campaign name must contain 1 to 100 characters.', 0);
+      const objectives = new Set(['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION']);
+      if (!objectives.has(input.objective)) throw new FacebookApiError('Choose a supported campaign objective.', 0);
+      const payload = object(await request(`${encodeURIComponent(input.accountId)}/campaigns`, { method: 'POST', token: input.credential.accessToken,
+        body: { name, objective: input.objective, status: 'PAUSED', special_ad_categories: '[]' } }));
+      if (typeof payload.id !== 'string' || !payload.id) throw new FacebookApiError('Facebook did not return a campaign id.', 200);
+      return { remoteId: payload.id };
+    },
   };
 }
 
@@ -309,5 +320,6 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
       return { items: await engine.getAdInsights(request.credential.accessToken, request.accountId, request.since, request.until) };
     },
     async updateAd(request) { await engine.updateAd(request); },
+    async createCampaign(request) { return engine.createCampaign(request); },
   };
 }

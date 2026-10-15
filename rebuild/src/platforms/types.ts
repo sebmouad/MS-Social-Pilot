@@ -96,6 +96,13 @@ export interface AdMutationRequest {
   dailyBudgetMinor?: number;
   lifetimeBudgetMinor?: number;
 }
+export type FacebookCampaignObjective = 'OUTCOME_AWARENESS' | 'OUTCOME_ENGAGEMENT' | 'OUTCOME_LEADS' | 'OUTCOME_SALES' | 'OUTCOME_TRAFFIC' | 'OUTCOME_APP_PROMOTION';
+export interface AdCampaignCreateRequest {
+  credential: PlatformCredential;
+  accountId: string;
+  name: string;
+  objective: FacebookCampaignObjective;
+}
 
 /** Optional members are intentionally absent when the provider slice does not implement them. */
 export interface PlatformAdapter {
@@ -115,4 +122,5 @@ export interface PlatformAdapter {
   getAnalytics?(request: AnalyticsRequest): Promise<AnalyticsResult>;
   listAds?(request: AdsRequest): Promise<AdsResult>;
   updateAd?(request: AdMutationRequest): Promise<void>;
+  createCampaign?(request: AdCampaignCreateRequest): Promise<{ remoteId: string }>;
 }

@@ -101,6 +101,27 @@ describe('Facebook Graph adapter', () => {
     await expect(engine.deletePost('token', 'p1_2')).rejects.toThrow('did not confirm post deletion');
   });
 
+  it('creates campaigns in a paused state with the selected objective and returns the provider id', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toContain('/v99.0/act_12/campaigns');
+      expect(init?.method).toBe('POST');
+      const body = new URLSearchParams(String(init?.body));
+      expect(body.get('status')).toBe('PAUSED');
+      expect(body.get('objective')).toBe('OUTCOME_TRAFFIC');
+      expect(body.get('special_ad_categories')).toBe('[]');
+      return response({ id: 'campaign-7' });
+    }) as unknown as typeof fetch;
+    const engine = createFacebookEngine(config, fetcher);
+    await expect(engine.createCampaign({ credential: { accessToken: 'token' }, accountId: 'act_12', name: 'Spring launch', objective: 'OUTCOME_TRAFFIC' })).resolves.toEqual({ remoteId: 'campaign-7' });
+  });
+
+  it('rejects invalid campaign names before making a provider request', async () => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+    const engine = createFacebookEngine(config, fetcher);
+    await expect(engine.createCampaign({ credential: { accessToken: 'token' }, accountId: 'act_12', name: '  ', objective: 'OUTCOME_TRAFFIC' })).rejects.toThrow(/Campaign name/);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it('reads analytics, inbox, and ad insights through configured fields', async () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

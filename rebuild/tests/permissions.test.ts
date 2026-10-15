@@ -50,11 +50,10 @@ describe('scoped permissions', () => {
   it('applies workspace and member disabled module and feature switches', () => {
     const permissions = resolvePermissions(source({
       workspaceDisabledModules: ['schedule'],
-      memberDisabledModules: ['analytics/reports'],
+      memberDisabledModules: ['analytics/overview'],
     }));
     expect(canAccessModule(permissions, 'publishing', 'read')).toBe(false);
-    expect(canAccessFeature(permissions, 'analytics/overview', 'read')).toBe(true);
-    expect(canAccessFeature(permissions, 'analytics/reports', 'read')).toBe(false);
+    expect(canAccessFeature(permissions, 'analytics/overview', 'read')).toBe(false);
   });
 
   it('limits channel access to assigned targets and gives owners the full scope', () => {

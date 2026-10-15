@@ -2,6 +2,7 @@ import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { buildAnalytics } from '@/server/analytics/aggregate';
 import { analyticsRange, loadAnalytics } from '@/server/analytics/data';
+import { listPosts } from '@/server/data';
 
 type Search = { start?: string; end?: string; filter?: string; channel?: string | string[] };
 const inputDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -43,6 +44,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const selectedSet = new Set(selected.map(target => target.id));
   const view = data ? buildAnalytics(data.pageRows, data.adRows, data.audienceRows, selected, data.adAccountCount) : null;
   const audienceMissing = selected.filter(channel => !view?.audience.entries.some(entry => entry.id === channel.id));
+  const recentPosts = await listPosts(workspaceId, 500);
+  const publishingCounts = {
+    published: recentPosts.filter(post => post.status === 'published').length,
+    scheduled: recentPosts.filter(post => post.status === 'scheduled').length,
+    failed: recentPosts.filter(post => post.status === 'failed' || post.status === 'partially_failed').length,
+  };
   const sidebar = <form action="/analytics" method="get" className="analytics-sidebar-filter">
     <p className="shell-subnav__label">Date range</p>
     <label className="analytics-date-filter">From<input type="date" name="start" defaultValue={inputDate(range.from)} /></label>
@@ -67,6 +74,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           <div className="analytics-metrics">{view.metrics.map(metric => <MetricChart metric={metric} key={`${metric.source}:${metric.key}`} />)}</div>
         </section> : <section className="panel analytics-state"><h2>No metrics in this period</h2><p>There are no stored Page or advertising insights for the selected channels and dates.</p></section>}
       </>}
+      <section className="panel"><div className="analytics-panel-title"><div><h2>Publishing records</h2><p className="small-note">Snapshot of the latest {recentPosts.length} workspace posts, independent of the metric date and channel filters.</p></div></div>
+        <div className="metric-grid"><article className="metric-card"><dl><dt>Published</dt><dd>{publishingCounts.published}</dd></dl></article><article className="metric-card"><dl><dt>Scheduled</dt><dd>{publishingCounts.scheduled}</dd></dl></article><article className="metric-card"><dl><dt>Failed or partial</dt><dd>{publishingCounts.failed}</dd></dl></article></div>
+      </section>
     </>}
   </div></PageFrame>;
 }

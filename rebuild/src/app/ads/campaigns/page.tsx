@@ -5,6 +5,7 @@ import { getAdsAccounts, getAdsDataset, parseAdsFilters, type AdsSearchParams } 
 import { formatMetricJson, groupSummariesByAccount, summarizeInsights } from '@/server/ads/summary';
 import { canManageWorkspaceAds } from '@/server/ads/actions';
 import { AdsObjectActions } from '../AdsObjectActions';
+import { CampaignCreateForm } from '../CampaignCreateForm';
 
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const money = (value: number | null, currency: string | null) => value === null ? '—' : `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
@@ -22,6 +23,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
     accountId,
     await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, accountId),
   ] as const)));
+  const createAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, account.id)] as const)));
   const sidebar = <AdsFiltersSidebar accounts={accounts} filters={filters} action="/ads/campaigns" />;
   return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack">
     <header className="page-heading"><div><p className="eyebrow">Ads / Performance</p><h1>Campaign, ad set, and ad results</h1><p>Stored daily insight records · {dateRangeLabel(filters)}. Select an account and date range in the sidebar.</p></div></header>
@@ -44,6 +46,9 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
         })}
       </section>;
     }) : <section className="panel"><div className="empty-state"><h2>No campaign, ad set, or ad insights stored</h2><p>When insight rows are captured for the selected ad accounts and dates, each level will appear here with its saved metrics.</p><a className="text-link" href="/ads">Return to ad accounts →</a></div></section>}
+    {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id)) ? <section className="panel"><h2>Create a campaign</h2><p className="small-note">Each campaign is created paused under one enabled Facebook ad account.</p>
+      {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id)).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} />)}
+    </section> : null}
     <p className="ads-read-only-note">Review delivery and adjust eligible campaigns, ad sets, and ads. Changes require confirmation before they are sent.</p>
   </div></PageFrame>;
 }

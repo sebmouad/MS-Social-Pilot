@@ -9,9 +9,8 @@ const source = {
 
 describe('Root installation availability', () => {
   it('keeps unset controls available and denies a disabled feature', () => {
-    const access = resolveEntitlements({ ...source, installationAvailability: { 'entitlements.features.analytics/reports': false } });
-    expect(access.features['analytics/overview']).toBe(true);
-    expect(access.features['analytics/reports']).toBe(false);
+    const access = resolveEntitlements({ ...source, installationAvailability: { 'entitlements.features.analytics/overview': false } });
+    expect(access.features['analytics/overview']).toBe(false);
     expect(access.modules.analytics).toBe(true);
   });
 

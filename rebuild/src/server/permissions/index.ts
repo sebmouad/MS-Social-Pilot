@@ -35,7 +35,6 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'publishing/approvals': 'publishing/approvals',
   'inbox/conversations': 'analytics/inbox',
   'analytics/overview': 'analytics/overview',
-  'analytics/reports': 'analytics/reports',
   'ads/overview': 'ads/performance',
   'ads/campaigns': 'ads/performance',
   'settings/connections': null,
@@ -61,7 +60,7 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
     if (feature === 'publishing/posts' || feature === 'publishing/calendar' || feature === 'publishing/approvals') {
       return { read: true, write: feature === 'publishing/approvals' };
     }
-    if (feature === 'analytics/overview' || feature === 'analytics/reports') {
+    if (feature === 'analytics/overview') {
       return { read: clientAccess.has('analytics'), write: false };
     }
     if (feature === 'inbox/conversations') return { read: clientAccess.has('inbox'), write: false };

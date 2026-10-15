@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   },
   config: vi.fn(),
   decrypt: vi.fn(),
-  engine: { updateAd: vi.fn() },
+  engine: { updateAd: vi.fn(), createCampaign: vi.fn() },
   configuredEngine: vi.fn(),
   entitlements: vi.fn(),
   permissions: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitleme
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature }));
 
-import { canManageWorkspaceAds, updateWorkspaceAd } from '../src/server/ads/actions';
+import { canManageWorkspaceAds, createWorkspaceAdCampaign, updateWorkspaceAd } from '../src/server/ads/actions';
 
 const actor = { userId: 'user-1', workspaceId: 'workspace-1' };
 const statusChange = {
@@ -45,21 +45,47 @@ beforeEach(() => {
     socialAccount: { id: 'social-1', accessToken: 'encrypted-token', scopes: 'ads_read,ads_management', invalidatedAt: null, tokenExpiresAt: null },
   });
   mocks.prisma.adInsight.findFirst.mockResolvedValue({ id: 'insight-1' });
-  mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? true : ['ads_management']);
+  mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : ['ads_management']);
   mocks.decrypt.mockReturnValue('secret-token-value');
   mocks.configuredEngine.mockResolvedValue(mocks.engine);
   mocks.engine.updateAd.mockResolvedValue(undefined);
+  mocks.engine.createCampaign.mockResolvedValue({ remoteId: 'campaign-new' });
   mocks.prisma.$executeRaw.mockResolvedValue(1);
 });
 
 describe('workspace Ads actions', () => {
   it('shows controls only when Root enablement and the recorded management grant are present', async () => {
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(true);
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? false : ['ads_management']);
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? false : key === 'platforms.facebook.enabled' ? true : ['ads_management']);
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(false);
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? true : ['ads_management']);
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : ['ads_management']);
     mocks.prisma.adAccount.findFirst.mockResolvedValue({ socialAccount: { scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null } });
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(false);
+  });
+
+  it('requires exact confirmation, sends a paused campaign, and audits without the credential', async () => {
+    mocks.engine.createCampaign.mockClear().mockResolvedValue({ remoteId: 'campaign-new' });
+    const input = { adAccountId: 'local-account-1', name: 'Spring launch', objective: 'OUTCOME_TRAFFIC' as const,
+      confirmation: 'CREATE PAUSED FACEBOOK CAMPAIGN "Spring launch" IN ACCOUNT local-account-1 WITH OBJECTIVE OUTCOME_TRAFFIC' };
+    await expect(createWorkspaceAdCampaign(actor, { ...input, confirmation: 'yes' })).rejects.toThrow(/confirmation exactly/);
+    expect(mocks.engine.createCampaign).not.toHaveBeenCalled();
+    await expect(createWorkspaceAdCampaign(actor, input)).resolves.toEqual({ campaignId: 'campaign-new' });
+    expect(mocks.engine.createCampaign).toHaveBeenCalledWith({ credential: { accessToken: 'secret-token-value' }, accountId: 'act_99', name: 'Spring launch', objective: 'OUTCOME_TRAFFIC' });
+    const rawValues = mocks.prisma.$executeRaw.mock.calls[0] as unknown[];
+    expect(JSON.stringify(rawValues)).toContain('campaign-new');
+    expect(JSON.stringify(rawValues)).toContain('PAUSED');
+    expect(JSON.stringify(rawValues)).not.toContain('secret-token-value');
+  });
+
+  it('blocks campaign creation when the Facebook channel is disabled or the scope is absent', async () => {
+    mocks.engine.createCampaign.mockClear();
+    const input = { adAccountId: 'local-account-1', name: 'Spring launch', objective: 'OUTCOME_TRAFFIC' as const,
+      confirmation: 'CREATE PAUSED FACEBOOK CAMPAIGN "Spring launch" IN ACCOUNT local-account-1 WITH OBJECTIVE OUTCOME_TRAFFIC' };
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? true : key === 'platforms.facebook.enabled' ? false : ['ads_management']);
+    await expect(createWorkspaceAdCampaign(actor, input)).rejects.toThrow(/Facebook platform is disabled/);
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : ['ads_read']);
+    await expect(createWorkspaceAdCampaign(actor, input)).rejects.toThrow(/Root has not configured/);
+    expect(mocks.engine.createCampaign).not.toHaveBeenCalled();
   });
 
   it('rechecks role and blocks a non-manager before looking up any account', async () => {
@@ -70,11 +96,11 @@ describe('workspace Ads actions', () => {
   });
 
   it('requires Root management enablement and the configured scope grant', async () => {
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? false : ['ads_management']);
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? false : key === 'platforms.facebook.enabled' ? true : ['ads_management']);
     await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/disabled in Root/);
     expect(mocks.engine.updateAd).not.toHaveBeenCalled();
 
-    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? true : ['ads_management']);
+    mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : ['ads_management']);
     mocks.prisma.adAccount.findFirst.mockResolvedValue({
       id: 'local-account-1', actId: 'act_99',
       socialAccount: { id: 'social-1', accessToken: 'encrypted-token', scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null },

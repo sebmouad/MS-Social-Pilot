@@ -47,6 +47,7 @@ function actionError(error: unknown) {
     ['Only workspace owners and admins', 403],
     ['Ads management is not enabled', 403],
     ['Ads management is disabled in Root configuration', 403],
+    ['Facebook platform is disabled', 403],
     ['Root has not configured', 403],
     ['Reconnect this Facebook source', 403],
     ['no longer a member', 401],

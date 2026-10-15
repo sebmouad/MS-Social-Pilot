@@ -5,7 +5,7 @@
  * supply records read from the legacy database; these helpers never create,
  * update, migrate, or delete users or sessions.
  */
-import { createHash, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 export const LEGACY_SESSION_COOKIE = 'msp_session';
 
@@ -49,6 +49,14 @@ export function verifyLegacyPassword(password: string, encoded: string): boolean
   } catch {
     return false;
   }
+}
+
+/** Create a password hash using the format accepted by the legacy sign-in flow. */
+export function hashLegacyPassword(password: string): string {
+  if (Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_BYTES) throw new Error('Password is too long.');
+  const salt = randomBytes(LEGACY_SCRYPT_SALT_BYTES);
+  const digest = scryptSync(password, salt, LEGACY_SCRYPT_KEY_BYTES, { N: LEGACY_SCRYPT_COST });
+  return `scrypt:${LEGACY_SCRYPT_COST}:${salt.toString('base64url')}:${digest.toString('base64url')}`;
 }
 
 /** Match the legacy session token storage rule: SHA-256 hex of the cookie value. */

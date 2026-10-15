@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { AdMutationRequest } from '@/platforms/types';
+import type { AdMutationRequest, FacebookCampaignObjective } from '@/platforms/types';
 import { configuredFacebookEngine } from '@/server/platforms/facebook';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
@@ -22,17 +22,24 @@ export type AdsActionInput = {
   lifetimeBudgetMinor?: number;
   confirmation: string;
 };
+export type AdsCampaignCreateInput = { adAccountId: string; name: string; objective: FacebookCampaignObjective; confirmation: string };
+const OBJECTIVES = new Set<FacebookCampaignObjective>(['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION']);
+
+export function campaignCreationConfirmation(adAccountId: string, name: string, objective: string) {
+  return `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(name.trim())} IN ACCOUNT ${adAccountId} WITH OBJECTIVE ${objective}`;
+}
 
 /** Server-rendering gate for action controls; mutation still repeats these checks. */
 export async function canManageWorkspaceAds(actor: AdsActionActor, adAccountId: string): Promise<boolean> {
-  const [membership, entitlements, permissions, configuredScopes, managementEnabled] = await Promise.all([
+  const [membership, entitlements, permissions, configuredScopes, managementEnabled, facebookEnabled] = await Promise.all([
     prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } }),
     loadEntitlements(actor.userId, actor.workspaceId),
     loadPermissions(actor.userId, actor.workspaceId),
     runtimeConfig('meta.adsManageScopes') as Promise<string[]>,
     runtimeConfig('ads.managementEnabled') as Promise<boolean>,
+    runtimeConfig('platforms.facebook.enabled') as Promise<boolean>,
   ]);
-  if (!membership || !MANAGER_ROLES.has(membership.role) || managementEnabled !== true || !entitlements || !permissions) return false;
+  if (!membership || !MANAGER_ROLES.has(membership.role) || managementEnabled !== true || facebookEnabled !== true || !entitlements || !permissions) return false;
   if (!canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', 'write')) return false;
   const requiredScopes = [...new Set(configuredScopes.map(scope => scope.trim()).filter(Boolean))];
   if (!requiredScopes.includes(SCOPE_MANAGEMENT)) return false;
@@ -95,9 +102,13 @@ export async function updateWorkspaceAd(actor: AdsActionActor, input: AdsActionI
   });
   if (!ownedObject) throw new Error('This ad object cannot be verified for the selected account.');
 
-  const configuredScopes = await runtimeConfig('meta.adsManageScopes') as string[];
-  const managementEnabled = await runtimeConfig('ads.managementEnabled') as boolean;
+  const [configuredScopes, managementEnabled, facebookEnabled] = await Promise.all([
+    runtimeConfig('meta.adsManageScopes') as Promise<string[]>,
+    runtimeConfig('ads.managementEnabled') as Promise<boolean>,
+    runtimeConfig('platforms.facebook.enabled') as Promise<boolean>,
+  ]);
   if (managementEnabled !== true) throw new Error('Ads management is disabled in Root configuration.');
+  if (facebookEnabled !== true) throw new Error('The Facebook platform is disabled in Root configuration.');
   const requiredScopes = [...new Set(configuredScopes.map(scope => scope.trim()).filter(Boolean))];
   if (!requiredScopes.length || !requiredScopes.includes(SCOPE_MANAGEMENT)) throw new Error('Root has not configured the ads_management scope.');
   const grantedScopes = new Set(account.socialAccount.scopes.split(',').map(scope => scope.trim()).filter(Boolean));
@@ -113,4 +124,42 @@ export async function updateWorkspaceAd(actor: AdsActionActor, input: AdsActionI
     ...(hasLifetimeBudget ? { lifetimeBudgetMinor: input.lifetimeBudgetMinor } : {}),
   });
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`ads_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'ads.object_updated', ${JSON.stringify({ workspaceId: actor.workspaceId, adAccountId: account.id, objectId: input.objectId, objectType: input.objectType, ...(hasStatus ? { status: input.status } : {}), ...(hasDailyBudget ? { dailyBudgetMinor: input.dailyBudgetMinor } : {}), ...(hasLifetimeBudget ? { lifetimeBudgetMinor: input.lifetimeBudgetMinor } : {}) })}::jsonb, NOW())`;
+}
+
+/** Create one paused campaign after rechecking workspace, account, Root and provider boundaries. */
+export async function createWorkspaceAdCampaign(actor: AdsActionActor, input: AdsCampaignCreateInput) {
+  const membership = await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
+  if (!membership) throw new Error('You are no longer a member of this workspace.');
+  if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can manage ads.');
+  const [entitlements, permissions] = await Promise.all([loadEntitlements(actor.userId, actor.workspaceId), loadPermissions(actor.userId, actor.workspaceId)]);
+  if (!entitlements || !permissions) throw new Error('Workspace access is unavailable.');
+  if (!canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', 'write')) throw new Error('Ads management is not enabled for this workspace.');
+
+  const name = input.name.trim();
+  if (!name || name.length > 100 || /[\u0000-\u001f\u007f]/.test(name)) throw new Error('Campaign names must contain 1 to 100 printable characters.');
+  if (!OBJECTIVES.has(input.objective)) throw new Error('Choose a supported campaign objective.');
+  const confirmation = campaignCreationConfirmation(input.adAccountId, name, input.objective);
+  if (input.confirmation !== confirmation) throw new Error(`Confirmation required. Repeat with confirmation exactly: ${confirmation}`);
+
+  const account = await prisma.adAccount.findFirst({
+    where: { id: input.adAccountId, workspaceId: actor.workspaceId, enabled: true, socialAccount: { is: { workspaceId: actor.workspaceId, provider: 'facebook', invalidatedAt: null } } },
+    select: { id: true, actId: true, socialAccount: { select: { accessToken: true, scopes: true, invalidatedAt: true, tokenExpiresAt: true } } },
+  });
+  if (!account?.socialAccount || account.socialAccount.invalidatedAt || (account.socialAccount.tokenExpiresAt && account.socialAccount.tokenExpiresAt <= new Date())) throw new Error('This advertising account or its connection is unavailable. Reconnect it before managing ads.');
+  const [configuredScopes, managementEnabled, facebookEnabled] = await Promise.all([
+    runtimeConfig('meta.adsManageScopes') as Promise<string[]>, runtimeConfig('ads.managementEnabled') as Promise<boolean>, runtimeConfig('platforms.facebook.enabled') as Promise<boolean>,
+  ]);
+  if (managementEnabled !== true) throw new Error('Ads management is disabled in Root configuration.');
+  if (facebookEnabled !== true) throw new Error('The Facebook platform is disabled in Root configuration.');
+  const requiredScopes = [...new Set(configuredScopes.map(scope => scope.trim()).filter(Boolean))];
+  if (!requiredScopes.length || !requiredScopes.includes(SCOPE_MANAGEMENT)) throw new Error('Root has not configured the ads_management scope.');
+  const grantedScopes = new Set(account.socialAccount.scopes.split(',').map(scope => scope.trim()).filter(Boolean));
+  if (requiredScopes.some(scope => !grantedScopes.has(scope))) throw new Error('Reconnect this Facebook source and grant the configured ads management scopes.');
+  const accessToken = decryptSecret(account.socialAccount.accessToken);
+  if (!accessToken) throw new Error('This Facebook connection is unavailable. Reconnect it before managing ads.');
+  const engine = await configuredFacebookEngine();
+  if (!engine.createCampaign) throw new Error('Facebook campaign creation is unavailable.');
+  const result = await engine.createCampaign({ credential: { accessToken }, accountId: account.actId, name, objective: input.objective });
+  await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`ads_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'ads.campaign_created', ${JSON.stringify({ workspaceId: actor.workspaceId, adAccountId: account.id, campaignId: result.remoteId, name, objective: input.objective, status: 'PAUSED' })}::jsonb, NOW())`;
+  return { campaignId: result.remoteId };
 }

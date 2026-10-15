@@ -70,3 +70,9 @@
 .ads-day-details p { margin: 7px 0; line-height: 1.5; }
 @media (max-width: 620px) { .ads-account-card__heading { flex-direction: column; } .ads-account-card__sync { white-space: normal; } }
 @media (max-width: 620px) { .account-grid { grid-template-columns: 1fr; } .analytics-panel-title { align-items: flex-start; flex-direction: column; } }
+.ads-campaign-create { margin: 1rem 0; padding: 1rem; border: 1px solid var(--border, #d7ded9); border-radius: .75rem; background: var(--surface-soft, #f7f9f7); }
+.ads-campaign-create h3 { margin: 0 0 .35rem; }
+.ads-campaign-create__fields { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; margin-top: .75rem; }
+.ads-campaign-create__fields label { display: grid; gap: .3rem; min-width: 12rem; }
+.ads-campaign-create__fields input, .ads-campaign-create__fields select { min-height: 2.5rem; padding: .4rem .55rem; }
+.ads-campaign-create__fields button { min-height: 2.5rem; }

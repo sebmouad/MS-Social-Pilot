@@ -28,4 +28,8 @@ describe('customer module manifests', () => {
     expect(MODULES.map(({ id }) => String(id))).not.toContain('root');
     expect(PAGES.some(({ href }) => href === '/root' || href.startsWith('/root/'))).toBe(false);
   });
+
+  it('offers one consolidated Analytics destination', () => {
+    expect(PAGES.filter(({ module }) => module === 'analytics').map(({ href }) => href)).toEqual(['/analytics']);
+  });
 });
