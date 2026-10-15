@@ -53,13 +53,27 @@ cutover runbook and host configuration are supplied.
    directory. The worker expects its lease and run tables, and MCP uses a key
    table; their additive migrations exist in the root migration directory and
    have passed only on an isolated local database.
-   No `prisma db push` or `migrate deploy` is permitted from the rebuild until
-   a reviewed forward migration, data impact analysis, and recovery plan exist.
-   Verify mapped columns, enum labels, row counts, and representative record
-   behavior on the sanitized staging copy. The existing
-   `rebuild/scripts/cutover-rehearsal.sh` tests a staging dump's mapped schema
-   and backup/restore mechanics on local scratch databases; it does not test
-   application workflows or apply rebuild migrations.
+   No `prisma db push` or `migrate deploy` is permitted from the rebuild against
+   production. For the local rehearsal, use a sanitized, pre-migration custom
+   format dump and a loopback-only PostgreSQL admin URL. Set
+   `CUTOVER_DUMP_SANITIZED=YES` only after a separate sanitization review, and
+   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs`.
+   `rebuild/scripts/cutover-rehearsal.sh` pins those two SQL files by SHA-256,
+   restores the dump into local scratch databases, refuses migration objects
+   or success records already present, applies only those files, checks the
+   explicitly enumerated mapped columns and enum labels, reports aggregate
+   public-table row counts, and compares counts after an independent
+   backup/restore. Review the verifier whenever the rebuild Prisma schema
+   changes; it does not automatically discover new fields. It
+   drops both scratch databases on exit. It never starts the rebuild app and
+   does not verify authentication, application workflows, writes, media,
+   provider callbacks, or the meaning of the source data.
+
+   The sanitization flag is an operator attestation, not a sanitizer or proof
+   that sensitive values were removed. Keep the source dump in approved
+   storage, do not print or inspect record contents during this run, and
+   retain only the aggregate evidence needed for review. This rehearsal is
+   bounded to a local clone and cannot serve as production authorization.
 4. **Prove backup and recovery.** Before any eventual production switch,
    perform the configured backup and verify its artifact, timestamp, and
    restore into an isolated database. Include media and environment recovery
@@ -96,9 +110,9 @@ cutover runbook and host configuration are supplied.
   operational options, MCP parity, and live provider integration tests.
 - Production currently has no rebuild web or worker systemd unit and no
   verified proxy switch from 3100 to 3200.
-- The rebuild schema is not a migration schema. Its two additive root
-  migrations passed on the isolated test database but still need review
-  against a production-shaped copy and a restore-aware plan.
+- The rebuild schema is not a migration schema. Its two checksum-pinned
+  additive migrations still need application and data-impact review against a
+  sanitized production-shaped copy and a restore-aware plan.
 - There is no sanitized production-shaped staging evidence covering the full
   authorization and write workflows, media, and provider callbacks.
 - A verified production backup/restore rehearsal for the exact cutover

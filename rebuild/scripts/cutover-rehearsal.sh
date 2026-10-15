@@ -8,7 +8,29 @@ fail() { echo "cutover rehearsal: $*" >&2; exit 1; }
 
 : "${CUTOVER_STAGING_DUMP:?Set CUTOVER_STAGING_DUMP to a sanitized staging pg_dump -Fc file}"
 : "${CUTOVER_ADMIN_URL:?Set CUTOVER_ADMIN_URL to a local PostgreSQL admin URL ending in /postgres}"
+: "${CUTOVER_DUMP_SANITIZED:?Set CUTOVER_DUMP_SANITIZED=YES only after confirming the dump is sanitized}"
+: "${CUTOVER_APPROVED_MIGRATION_SET:?Set CUTOVER_APPROVED_MIGRATION_SET to the reviewed migration set}"
+[ "$CUTOVER_DUMP_SANITIZED" = YES ] || fail "CUTOVER_DUMP_SANITIZED must be YES"
+approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs'
+[ "$CUTOVER_APPROVED_MIGRATION_SET" = "$approved_migrations" ] || fail "migration set must exactly match the reviewed staging allowlist"
 [ -f "$CUTOVER_STAGING_DUMP" ] || fail "staging dump does not exist"
+
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+migration_dir="$ROOT/prisma/migrations"
+verify_migration() {
+  local name="$1" expected="$2" path="$migration_dir/$1/migration.sql" actual
+  [ -f "$path" ] || fail "reviewed migration is missing: $name"
+  if command -v sha256sum >/dev/null; then
+    actual="$(sha256sum "$path" | awk '{print $1}')"
+  elif command -v shasum >/dev/null; then
+    actual="$(shasum -a 256 "$path" | awk '{print $1}')"
+  else
+    fail "sha256sum or shasum is required to verify reviewed migrations"
+  fi
+  [ "$actual" = "$expected" ] || fail "reviewed migration checksum changed: $name"
+}
+verify_migration 20261015120000_mcp_api_keys 988d873c33229b439818d079d72c8bc49ffec93cbfe081ee4061ef93d2b2b3f4
+verify_migration 20261023100000_rebuild_worker_jobs 5fb7962a2c720f8a3f30480c4c5afa6f0d48c92a8f2ee58047fb96ccf04a7205
 
 # Only loopback TCP or the standard local PostgreSQL socket and database
 # /postgres are accepted. A copied production DATABASE_URL must fail closed.
@@ -40,6 +62,32 @@ created_source=1
 source_url="$(db_url "$source_db")"
 pg_restore --no-owner --no-privileges --exit-on-error --dbname "$source_url" "$CUTOVER_STAGING_DUMP"
 
+# The supplied dump must be a pre-migration baseline. Refuse already-applied
+# or partially-applied targets so this run cannot silently skip or duplicate
+# migration effects. Only these checksum-pinned SQL files are executed.
+psql "$source_url" -q -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+DECLARE already_applied boolean := false;
+BEGIN
+  IF to_regclass('public.mcp_api_keys') IS NOT NULL
+     OR to_regclass('public.rebuild_job_leases') IS NOT NULL
+     OR to_regclass('public.rebuild_sync_runs') IS NOT NULL THEN
+    RAISE EXCEPTION 'staging dump already contains reviewed migration objects; use a pre-migration sanitized baseline';
+  END IF;
+  IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
+    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
+      INTO already_applied
+      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs';
+    IF already_applied THEN
+      RAISE EXCEPTION 'staging dump migration history already contains an allowlisted migration';
+    END IF;
+  END IF;
+END $$;
+SQL
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261015120000_mcp_api_keys/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261023100000_rebuild_worker_jobs/migration.sql"
+echo "reviewed additive migrations applied to local scratch database"
+
 # Required tables/columns are taken from rebuild/prisma/schema.prisma. This
 # verifies the client view against the legacy database layout without applying
 # or generating DDL. The omitted legacy columns and tables remain untouched.
@@ -66,6 +114,8 @@ BEGIN
     ARRAY['conversation_messages','id'], ARRAY['conversation_messages','conversationId'], ARRAY['conversation_messages','remoteId'], ARRAY['conversation_messages','fromName'], ARRAY['conversation_messages','fromId'], ARRAY['conversation_messages','message'], ARRAY['conversation_messages','createdTime'], ARRAY['conversation_messages','firstSeenAt'], ARRAY['conversation_messages','sentById'],
     ARRAY['ad_accounts','id'], ARRAY['ad_accounts','workspaceId'], ARRAY['ad_accounts','socialAccountId'], ARRAY['ad_accounts','actId'], ARRAY['ad_accounts','name'], ARRAY['ad_accounts','currency'], ARRAY['ad_accounts','accountStatus'], ARRAY['ad_accounts','enabled'], ARRAY['ad_accounts','lastSyncedAt'], ARRAY['ad_accounts','createdAt'], ARRAY['ad_accounts','updatedAt'],
     ARRAY['ad_insights','id'], ARRAY['ad_insights','adAccountId'], ARRAY['ad_insights','level'], ARRAY['ad_insights','objectId'], ARRAY['ad_insights','objectName'], ARRAY['ad_insights','date'], ARRAY['ad_insights','spend'], ARRAY['ad_insights','impressions'], ARRAY['ad_insights','clicks'], ARRAY['ad_insights','reach'], ARRAY['ad_insights','cpc'], ARRAY['ad_insights','cpm'], ARRAY['ad_insights','cpp'], ARRAY['ad_insights','ctr'], ARRAY['ad_insights','frequency'], ARRAY['ad_insights','actions'], ARRAY['ad_insights','fields'], ARRAY['ad_insights','fetchedAt']
+    ,ARRAY['rebuild_job_leases','name'], ARRAY['rebuild_job_leases','owner'], ARRAY['rebuild_job_leases','token'], ARRAY['rebuild_job_leases','leaseExpiresAt'], ARRAY['rebuild_job_leases','updatedAt']
+    ,ARRAY['rebuild_sync_runs','id'], ARRAY['rebuild_sync_runs','job'], ARRAY['rebuild_sync_runs','owner'], ARRAY['rebuild_sync_runs','startedAt'], ARRAY['rebuild_sync_runs','finishedAt'], ARRAY['rebuild_sync_runs','outcome'], ARRAY['rebuild_sync_runs','attempts'], ARRAY['rebuild_sync_runs','summary'], ARRAY['rebuild_sync_runs','error']
   ] LOOP
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.columns
