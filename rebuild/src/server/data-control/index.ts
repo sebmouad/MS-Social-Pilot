@@ -1,10 +1,42 @@
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@/server/data';
+import { runtimeConfig } from '@/server/config/store';
 
 export type DataControlActor = { userId: string; workspaceId: string };
 const MANAGER_ROLES = new Set(['owner', 'admin']);
 
 type DataControlTransaction = import('../../../generated/client').Prisma.TransactionClient;
+type WorkspaceTable = { tableName: string };
+const MAPPED_DIRECT_TABLES = new Set(['posts', 'targets', 'ad_accounts', 'social_accounts']);
+
+/** Discover tables whose workspace ownership is enforced by a real FK, excluding identity and membership. */
+async function workspaceTables(tx: DataControlTransaction | typeof prisma): Promise<string[]> {
+  const rows = await tx.$queryRaw<WorkspaceTable[]>`
+    SELECT child.relname AS "tableName"
+    FROM pg_constraint AS fk
+    JOIN pg_class AS child ON child.oid = fk.conrelid
+    JOIN pg_namespace AS ns ON ns.oid = child.relnamespace
+    WHERE fk.contype = 'f' AND fk.confrelid = 'public.workspaces'::regclass
+      AND ns.nspname = 'public' AND child.relkind = 'r' AND child.relname <> 'memberships'
+    ORDER BY child.relname
+  `;
+  return [...new Set(rows.map(row => row.tableName))];
+}
+
+function tableSql(table: string) {
+  // Names originate from pg_catalog, and are quoted before interpolation into a SQL identifier.
+  return `"public"."${table.replaceAll('"', '""')}"`;
+}
+
+async function directWorkspaceCounts(tx: DataControlTransaction | typeof prisma, workspaceId: string) {
+  const counts: Record<string, number> = {};
+  for (const table of await workspaceTables(tx)) {
+    const rows = await tx.$queryRawUnsafe<Array<{ count: bigint }>>(`SELECT COUNT(*)::bigint AS count FROM ${tableSql(table)} WHERE "workspaceId" = $1`, workspaceId);
+    const count = Number(rows[0]?.count ?? 0);
+    if (!MAPPED_DIRECT_TABLES.has(table) && count > 0) counts[`other:${table}`] = count;
+  }
+  return counts;
+}
 
 async function assertManager(actor: DataControlActor) {
   const membership = await prisma.membership.findUnique({
@@ -47,7 +79,7 @@ export async function previewWorkspaceDataDeletion(actor: DataControlActor) {
   await assertManager(actor);
   const workspace = await prisma.workspace.findUnique({ where: { id: actor.workspaceId }, select: { id: true } });
   if (!workspace) throw new Error('This workspace is unavailable.');
-  return collectWorkspaceDeletionCounts(prisma, actor.workspaceId);
+  return { ...await collectWorkspaceDeletionCounts(prisma, actor.workspaceId), ...await directWorkspaceCounts(prisma, actor.workspaceId) };
 }
 
 async function collectWorkspaceDeletionCounts(tx: DataControlTransaction | typeof prisma, workspaceId: string) {
@@ -80,6 +112,7 @@ async function collectWorkspaceDeletionCounts(tx: DataControlTransaction | typeo
 /** Delete content represented by this compatibility schema in one transaction. Workspace identity and memberships remain. */
 export async function deleteWorkspaceData(actor: DataControlActor, confirmation: string) {
   if (confirmation !== 'DELETE') throw new Error('Type DELETE to confirm this action.');
+  const timeout = await runtimeConfig('data.deleteTransactionTimeoutMs');
   return prisma.$transaction(async tx => {
     const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
     if (!membership) throw new Error('You are no longer a member of this workspace.');
@@ -87,29 +120,15 @@ export async function deleteWorkspaceData(actor: DataControlActor, confirmation:
     const workspace = await tx.workspace.findUnique({ where: { id: actor.workspaceId }, select: { id: true } });
     if (!workspace) throw new Error('This workspace is unavailable.');
 
-    const targetRows = await tx.target.findMany({ where: { workspaceId: actor.workspaceId }, select: { id: true } });
-    const targetIds = targetRows.map(row => row.id);
-    const adRows = await tx.adAccount.findMany({ where: { workspaceId: actor.workspaceId }, select: { id: true } });
-    const adAccountIds = adRows.map(row => row.id);
-    const workspacePostRows = await tx.post.findMany({ where: { workspaceId: actor.workspaceId }, select: { id: true } });
-    const workspacePostIds = workspacePostRows.map(row => row.id);
-    const postTargetRows = workspacePostIds.length ? await tx.postTarget.findMany({ where: { postId: { in: workspacePostIds } }, select: { id: true, postId: true } }) : [];
-    const postTargetIds = postTargetRows.map(row => row.id);
-    const conversationRows = targetIds.length ? await tx.conversation.findMany({ where: { targetId: { in: targetIds } }, select: { id: true } }) : [];
-    const conversationIds = conversationRows.map(row => row.id);
-    const comments = postTargetIds.length ? await tx.postComment.deleteMany({ where: { postTargetId: { in: postTargetIds } } }) : { count: 0 };
-    if (postTargetIds.length) await tx.postTarget.deleteMany({ where: { id: { in: postTargetIds } } });
-    const messages = conversationIds.length ? await tx.conversationMessage.deleteMany({ where: { conversationId: { in: conversationIds } } }) : { count: 0 };
-    const conversations = conversationIds.length ? await tx.conversation.deleteMany({ where: { id: { in: conversationIds } } }) : { count: 0 };
-    const pageInsights = targetIds.length ? await tx.pageInsight.deleteMany({ where: { targetId: { in: targetIds } } }) : { count: 0 };
-    const adInsights = adAccountIds.length ? await tx.adInsight.deleteMany({ where: { adAccountId: { in: adAccountIds } } }) : { count: 0 };
-    const posts = await tx.post.deleteMany({ where: { workspaceId: actor.workspaceId } });
-    const targets = await tx.target.deleteMany({ where: { workspaceId: actor.workspaceId } });
-    const adAccounts = await tx.adAccount.deleteMany({ where: { workspaceId: actor.workspaceId } });
-    const socialAccounts = await tx.socialAccount.deleteMany({ where: { workspaceId: actor.workspaceId } });
-
-    const counts = { posts: posts.count, postTargets: postTargetRows.length, comments: comments.count, targets: targets.count, conversations: conversations.count, conversationMessages: messages.count, pageInsights: pageInsights.count, adAccounts: adAccounts.count, adInsights: adInsights.count, socialAccounts: socialAccounts.count };
+    await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${actor.workspaceId} FOR UPDATE`;
+    const counts: Record<string, number> = { ...await collectWorkspaceDeletionCounts(tx, actor.workspaceId), ...await directWorkspaceCounts(tx, actor.workspaceId) };
+    if ((counts['other:media'] ?? 0) > 0 || (counts['other:workspace_exports'] ?? 0) > 0) {
+      throw new Error('Stored files must be removed through a verified cleanup before this workspace can be erased. No database rows were deleted.');
+    }
+    for (const table of await workspaceTables(tx)) {
+      await tx.$executeRawUnsafe(`DELETE FROM ${tableSql(table)} WHERE "workspaceId" = $1`, actor.workspaceId);
+    }
     await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`data_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'workspace.data_deleted', ${JSON.stringify({ workspaceId: actor.workspaceId, counts })}::jsonb, NOW())`;
     return counts;
-  });
+  }, { timeout });
 }

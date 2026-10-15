@@ -27,7 +27,7 @@ export function DataControls({ workspaceName, destructive = false }: { workspace
       const response = await fetch('/api/settings/data', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation }) });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? 'Workspace data could not be deleted.');
-      setNotice('Workspace data was deleted. The workspace and its member access remain available.');
+      setNotice('Workspace database records were deleted. Workspace and member access remain available. Remote platform content was not changed.');
       setConfirmation('');
     } catch (error) { setNotice(error instanceof Error ? error.message : 'Workspace data could not be deleted.'); }
     finally { setBusy(false); }
@@ -37,13 +37,13 @@ export function DataControls({ workspaceName, destructive = false }: { workspace
 
   return <div className={styles['data-controls']}>
     {!counts ? <button type="button" onClick={previewDeletion} disabled={busy || previewBusy}>{previewBusy ? 'Counting rows…' : 'Preview rows to delete'}</button> : <>
-      <p className={styles['settings-note']}>Current rows in the mapped data-control tables:</p>
+      <p className={styles['settings-note']}>Current workspace records, including older feature tables when present:</p>
       <ul>{Object.entries(counts).map(([name, count]) => <li key={name}>{name}: {count}</li>)}</ul>
       <button type="button" onClick={previewDeletion} disabled={busy || previewBusy}>{previewBusy ? 'Counting rows…' : 'Refresh preview'}</button>
       <label className={styles['data-confirm-label']} htmlFor="delete-workspace-data">Type DELETE to confirm</label>
       <div className={styles['data-delete-row']}><input id="delete-workspace-data" value={confirmation} onChange={event => setConfirmation(event.currentTarget.value)} autoComplete="off" disabled={busy} /><button type="button" className={styles['data-danger-button']} disabled={busy || confirmation !== 'DELETE'} onClick={removeData}>{busy ? 'Deleting…' : 'Delete workspace data'}</button></div>
     </>}
-    {notice && <p role={notice.startsWith('Workspace data was') ? 'status' : 'alert'} className={styles['settings-note']}>{notice}</p>}
+    {notice && <p role={notice.startsWith('Workspace database records were') ? 'status' : 'alert'} className={styles['settings-note']}>{notice}</p>}
     <span className={styles['settings-note']}>This is permanent after the database transaction commits. Download an export above first if you need a recoverable copy. {workspaceName} remains as an empty workspace.</span>
   </div>;
 }

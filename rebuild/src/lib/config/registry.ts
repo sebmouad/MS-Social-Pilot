@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 7;
+export const CONFIG_SCHEMA_VERSION = 8;
 
 const cron = z.string().min(9).max(100).refine((value) => {
   const fields = value.trim().split(/\s+/);
@@ -81,6 +81,7 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'publishing.maxImportBytes', group: 'Publishing limits', label: 'Maximum import file size', kind: 'number', description: 'Maximum CSV bytes accepted in one bulk import.', defaultValue: 256000, schema: z.number().int().min(1024).max(100000000), consumption: 'active' }),
   entry({ key: 'publishing.maxTargetsPerPost', group: 'Publishing limits', label: 'Maximum channels per post', kind: 'number', description: 'Maximum selected destinations for one post.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'publishing.maxRemoteMediaPerPost', group: 'Publishing limits', label: 'Maximum remote media per post', kind: 'number', description: 'Maximum HTTPS media URLs accepted in one post.', defaultValue: 2, schema: z.number().int().min(0).max(20), consumption: 'active' }),
+  entry({ key: 'data.deleteTransactionTimeoutMs', group: 'Data controls', label: 'Workspace deletion timeout (ms)', kind: 'number', description: 'Maximum time allowed for one transactional workspace database deletion.', defaultValue: 120000, schema: z.number().int().min(5000).max(3600000), consumption: 'active' }),
 
   ...MODULES.map((module) => entry({ key: `entitlements.modules.${module.id}` as const, group: 'Entitlements · modules', label: `${module.title} available`, kind: 'boolean' as const, description: `Installation-wide default availability for the ${module.title} module. Existing workspace and plan restrictions remain in force.`, defaultValue: true, schema: z.boolean(), consumption: 'active' as const })),
   ...PAGES.map((page) => entry({ key: `entitlements.features.${page.id}` as const, group: 'Entitlements · features', label: `${page.title} available`, kind: 'boolean' as const, description: `Installation-wide default availability for ${page.title}. Existing workspace and plan restrictions remain in force.`, defaultValue: true, schema: z.boolean(), consumption: 'active' as const })),

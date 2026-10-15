@@ -49,7 +49,7 @@ function sameOrigin(request: Request) {
 function dataError(error: unknown, fallback: string) {
   if (error instanceof z.ZodError || error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid data request.' }, { status: 400 });
   if (!(error instanceof Error)) return NextResponse.json({ error: fallback }, { status: 500 });
-  const known: Array<[string, number]> = [['no longer a member', 401], ['owners and admins', 403], ['Type DELETE', 400], ['unavailable in the current workspace', 404]];
+  const known: Array<[string, number]> = [['no longer a member', 401], ['owners and admins', 403], ['Type DELETE', 400], ['unavailable in the current workspace', 404], ['Stored files must be removed', 409]];
   const match = known.find(([phrase]) => error.message.includes(phrase));
   return match ? NextResponse.json({ error: error.message }, { status: match[1] }) : NextResponse.json({ error: fallback }, { status: 500 });
 }

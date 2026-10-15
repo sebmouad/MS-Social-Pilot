@@ -14,7 +14,7 @@ export default async function DataSettingsPage() {
       <DataControls workspaceName={viewer.membership.workspace.name} />
     </SettingsPanel>
     <SettingsPanel title="Delete workspace data" detail="Remove the workspace’s content and connected account records from this application.">
-      <p className={styles['settings-note']}>This removes rows represented by the rebuild data-control schema: posts and destination links, connected accounts, inbox conversations and comments, and stored page and ad metrics. Workspace identity and member access remain. The compatibility schema does not cover every legacy table, so this is not a complete database erasure. It does not delete content already published to social networks or revoke provider authorization. Export a copy first if you may need this data.</p>
+      <p className={styles['settings-note']}>This removes workspace-owned database records, including older feature data, while keeping workspace identity and member access. The JSON download above covers core records only; older feature records may not be in it. Deletion is blocked when stored media or export files need separate cleanup. Content already published to social networks remains there, and provider authorization is not revoked.</p>
       <DataControls workspaceName={viewer.membership.workspace.name} destructive />
     </SettingsPanel>
   </SettingsPage></PageFrame>;
