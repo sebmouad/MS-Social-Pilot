@@ -69,12 +69,14 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     failed: countStatus('failed') + countStatus('partially_failed'),
   };
   const sidebar = <form action="/analytics" method="get" className="analytics-sidebar-filter">
+    <p className="analytics-filter-heading">Filters</p>
     <p className="shell-subnav__label">Date range</p>
     <label className="analytics-date-filter">From<input type="date" name="start" defaultValue={inputDate(range.from)} /></label>
     <label className="analytics-date-filter">To<input type="date" name="end" defaultValue={inputDate(range.to)} /></label>
     <fieldset className="analytics-channel-group"><legend className="shell-subnav__label">Channels</legend><input type="hidden" name="filter" value="1" />
     {data?.targets.length ? data.targets.map(target => <label key={target.id}><input type="checkbox" name="channel" value={target.id} defaultChecked={selectedSet.has(target.id)} /><span>{target.name}</span></label>) : <p className="small-note">No channels connected.</p>}</fieldset>
-    <button type="submit">Update analytics</button>
+    <button type="submit">Apply filters</button>
+    <a className="analytics-filter-reset" href="/analytics">Reset filters</a>
   </form>;
 
   return <PageFrame module="analytics" sidebar={sidebar}><div className="page-stack">

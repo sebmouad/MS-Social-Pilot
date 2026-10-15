@@ -6,7 +6,7 @@ export function AdsFiltersSidebar({ accounts, filters, action = "/ads" }: { acco
   const value = (date: Date) => date.toISOString().slice(0, 10);
   const untilInclusive = new Date(filters.until.getTime() - 24 * 60 * 60 * 1000);
   return <form action={action} method="get" className="ads-sidebar-filter">
-    <p className="shell-subnav__label">Ads filters</p>
+    <p className="ads-filter-heading">Filters</p>
     <label><span>Date range</span><select name="period" defaultValue={filters.period}>
       <option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="90d">Last 90 days</option><option value="custom">Custom dates</option>
     </select></label>
@@ -16,7 +16,7 @@ export function AdsFiltersSidebar({ accounts, filters, action = "/ads" }: { acco
       <option value="all">All accounts</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
     </select></label>
     <button type="submit">Apply filters</button>
-    <a className="ads-filter-reset" href="/ads">Reset</a>
+    <a className="ads-filter-reset" href={action}>Reset filters</a>
   </form>;
 }
 
