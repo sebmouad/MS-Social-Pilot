@@ -85,9 +85,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           <p>{entry.text || 'No text in this message.'}</p>
         </li>)}
       </ol>
-      <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canWrite} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={query()} />
+      {canWrite ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canWrite} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={query()} /> : null}
       {canWrite && capabilities.reply ? <ReplyBox key={thread.id} id={thread.id} kind={thread.kind} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} />
-        : <p className={styles.readOnly}>{canWrite ? 'Replies are not available for this channel.' : 'You can read this conversation. Ask a workspace manager if you need to reply.'}</p>}
+        : <p className={styles.readOnly}>{canWrite ? 'Replies are not available for this channel.' : 'You can read this conversation, but replying and moderation are unavailable right now. Your role may be read-only, or the channel may need to be reconnected in Connections.'}</p>}
     </section>;
   }
 
@@ -95,7 +95,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     <p className={styles.filterHeading}>Filters</p>
     <form method="get" action="/inbox">
       <label>Channel<select name="channel" defaultValue={selectedChannel}><option value="all">All channels</option>{visibleChannels.map(channel => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></label>
-      <label>Type<select name="type" defaultValue={kind}><option value="all">Messages and comments</option><option value="message">Messages</option><option value="comment">Comments</option></select></label>
+      <label>Type<select name="type" defaultValue={kind}><option value="all">All types</option><option value="message">Messages</option><option value="comment">Comments</option></select></label>
       <label>Status<select name="status" defaultValue={status}><option value="open">Open</option><option value="resolved">Resolved</option><option value="all">All</option></select></label>
       <label>Hidden comments<select name="hidden" defaultValue={hidden}><option value="visible">Hide them</option><option value="all">Show them</option></select></label>
       <button className="ui-button ui-button--primary ui-button--md" type="submit">Apply filters</button>

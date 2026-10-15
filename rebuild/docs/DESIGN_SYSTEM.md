@@ -24,6 +24,8 @@ This interface uses a quiet editorial look for a focused social publishing works
 - `DataTable<T>`: semantic table with a required caption and stable row key. Columns can align values, render custom cells, and optionally sort through the caller-provided sort callback. It includes an empty state and horizontal scrolling on small screens.
 - `FilterBar` and `FilterSelect`: labeled native select filters with an optional reset action. The owning screen keeps filter state.
 - `Dialog`: native modal dialog, controlled by `open`, with title, optional description, body, and optional action row. Provide a clear action and handle `onClose` in the owner.
+- `StatusChip`: post status as a text label plus a distinct shape (never colour alone) in neutral, ok, warning or danger tone; `compact` for dense cells. Use it wherever a post status is shown.
+- `ChannelBadge`: a channel name with its platform mark. Resolve the mark and platform name from the platform registry (`src/lib/channel-badge.ts`) and pass them in; shared screens never name a platform. `compact` shows the mark alone with the full name for assistive technology.
 
 ## Composition guidance
 

@@ -12,7 +12,6 @@ import styles from "./calendar.module.css";
 type Move = { post: BoardPost; step: "choose" | "confirm"; date: string; time: string; busy: boolean; error: string };
 type Notice = { kind: "ok" | "error"; text: string } | null;
 
-const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const hourLabel = (hour: number) => new Intl.DateTimeFormat("en-US", { hour: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(2000, 0, 1, hour)));
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -50,6 +49,10 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
 
   const newPostHref = (date: string, time: string) => `/publishing/compose?date=${date}&time=${time}`;
   const rangeIsEmpty = days.every(day => day.posts.length === 0);
+  // Week view shows 6 AM to 11 PM, widened to include any hour that holds a post.
+  const postHours = days.flatMap(day => day.posts.map(post => Number(instantToWall(new Date(post.whenIso), timeZone).time.slice(0, 2))));
+  const firstHour = Math.min(6, ...postHours);
+  const hours = Array.from({ length: 24 - firstHour }, (_, index) => firstHour + index);
 
   async function confirmMove() {
     if (!move) return;
@@ -66,7 +69,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
   return <div className={styles.board}>
     <div className={styles.live} role="status" aria-live="polite">{notice?.kind === "ok" ? <p className={styles.noticeOk}>{notice.text}</p> : null}</div>
     {notice?.kind === "error" ? <p className={styles.noticeError} role="alert">{notice.text}</p> : null}
-    <p className={styles.hint}>{canCreate ? "Select a day or time to start a new post. " : ""}Drag a scheduled post to another {view === "week" ? "time slot" : "day"}, or use its Move button. Times are in {timeZone.replaceAll("_", " ")}.</p>
+    <p className={styles.hint}>{canCreate ? "Select a day or time to start a new post. " : ""}Drag a scheduled post to another {view === "week" ? "time slot" : "day"}, or use its Move button. Times are in {timeZone.replaceAll("_", " ")}.{view === "week" && firstHour > 0 ? " Earlier hours appear when they hold a post." : ""}</p>
 
     {view === "month" ? <div className={styles.monthWrap}>
       <div className={styles.weekdays} aria-hidden="true">{days.slice(0, 7).map(day => <span key={day.key}>{new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(`${day.key}T12:00:00Z`))}</span>)}</div>
@@ -82,7 +85,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
     </div> : <div className={styles.weekWrap}><div className={styles.week} style={{ gridTemplateColumns: "52px repeat(7, minmax(0, 1fr))" }}>
       <span className={styles.corner} aria-hidden="true" />
       {days.map(day => <div key={day.key} className={styles.weekHead} data-today={day.isToday || undefined}><time dateTime={day.key} aria-label={day.longLabel + (day.isToday ? " (today)" : "")}>{day.label}</time>{day.isToday && <span className={styles.todayTag}>Today</span>}</div>)}
-      {HOURS.map(hour => [
+      {hours.map(hour => [
         <span key={`h${hour}`} className={styles.hourLabel} aria-hidden="true">{hourLabel(hour)}</span>,
         ...days.map(day => {
           const time = `${pad(hour)}:00`;

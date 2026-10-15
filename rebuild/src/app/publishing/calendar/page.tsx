@@ -73,12 +73,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const rangeLabel = view === "month" ? formatUtc(firstOfMonth, { month: "long", year: "numeric" }) : (() => {
     const last = keys[6]!;
     const sameMonth = gridStart.slice(0, 7) === last.slice(0, 7);
-    return `${formatUtc(gridStart, { month: "short", day: "numeric" })} – ${formatUtc(last, sameMonth ? { day: "numeric", year: "numeric" } : { month: "short", day: "numeric", year: "numeric" })}`;
+    return sameMonth ? `${formatUtc(gridStart, { month: "short", day: "numeric" })} – ${Number(last.slice(8))}, ${last.slice(0, 4)}` : `${formatUtc(gridStart, { month: "short", day: "numeric" })} – ${formatUtc(last, { month: "short", day: "numeric", year: "numeric" })}`;
   })();
   const unit = view === "week" ? "week" : "month";
 
   return <>
-    <PageHeading title="Calendar" description="Plan, check and reschedule posts in your workspace time zone." summary={rangeLabel} />
+    <PageHeading title="Calendar" description="Plan, check and reschedule posts in your workspace time zone." />
     <div className={styles.toolbar}>
       <nav className={styles.nav} aria-label={`Calendar ${unit}s`}>
         <a className="ui-button ui-button--secondary ui-button--md" href={href(view, previous)}>Previous<span className="ui-visually-hidden"> {unit}</span></a>
@@ -86,10 +86,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         <a className="ui-button ui-button--secondary ui-button--md" href={href(view, next)}>Next<span className="ui-visually-hidden"> {unit}</span></a>
         <h2 className={styles.range} aria-live="polite">{rangeLabel}</h2>
       </nav>
+      <div className={styles.toolbarEnd}>
+      {canCreate && <a className="ui-button ui-button--primary ui-button--md" href="/publishing/compose">New post</a>}
       <nav className={styles.switch} aria-label="Calendar view">
         <a href={href("month", anchor)} aria-current={view === "month" ? "page" : undefined}>Month</a>
         <a href={href("week", anchor)} aria-current={view === "week" ? "page" : undefined}>Week</a>
       </nav>
+      </div>
     </div>
     <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} />
   </>;
