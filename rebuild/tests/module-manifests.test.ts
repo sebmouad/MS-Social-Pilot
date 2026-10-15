@@ -32,4 +32,8 @@ describe('customer module manifests', () => {
   it('offers one consolidated Analytics destination', () => {
     expect(PAGES.filter(({ module }) => module === 'analytics').map(({ href }) => href)).toEqual(['/analytics']);
   });
+
+  it('uses a compact mobile title for Publishing', () => {
+    expect(MODULES.find(({ id }) => id === 'publishing')?.mobileTitle).toBe('Publish');
+  });
 });

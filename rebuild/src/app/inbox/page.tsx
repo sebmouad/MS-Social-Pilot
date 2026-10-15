@@ -46,7 +46,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const total = conversations.length + comments.length;
   const sidebar = <aside className="inbox-filters"><p className="inbox-filter-heading">Filters</p><form method="get" action="/inbox">
     <label className="ui-filter">Channel<select name="channel" defaultValue={selectedChannel}><option value="all">All channels</option>{visibleChannels.map(channel => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></label>
-    <label className="ui-filter">Activity<select name="type" defaultValue={kind}><option value="all">Messages and comments</option><option value="message">Messages</option><option value="comment">Comments</option></select></label>
+    <label className="ui-filter">Activity<select name="type" defaultValue={kind}><option value="all">All activity</option><option value="message">Messages</option><option value="comment">Comments</option></select></label>
     <label className="ui-filter">Status<select name="status" defaultValue={status}><option value="open">Open</option><option value="resolved">Resolved</option><option value="all">All</option></select></label>
     <label className="ui-filter">Comments<select name="hidden" defaultValue={hiddenFilter}><option value="visible">Visible only</option><option value="all">Include hidden</option></select></label>
     <button className="ui-button ui-button--primary ui-button--md" type="submit">Apply filters</button><a href="/inbox">Reset filters</a>

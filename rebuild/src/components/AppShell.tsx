@@ -44,7 +44,7 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
         <span className="shell-nav__glyph"><ModuleIcon name={module.title}/></span><span>{module.title}</span>
       </a>)}</nav>
       <nav className="shell-nav shell-nav--mobile" aria-label="Main sections">{installationMode && <a href="/root/config" className="shell-nav__link is-active" aria-current="page"><span className="shell-nav__glyph"><ModuleIcon name="Settings"/></span><span>Root controls</span></a>}{primaryMobileModules.map((module) => <a key={module.id} href={moduleHref(module)} className={`shell-nav__link${activeModule === module.id ? " is-active" : ""}`} aria-current={activeModule === module.id ? "page" : undefined}>
-        <span className="shell-nav__glyph"><ModuleIcon name={module.title}/></span><span>{module.title}</span>
+        <span className="shell-nav__glyph"><ModuleIcon name={module.title}/></span><span>{module.mobileTitle ?? module.title}</span>
       </a>)}{moreMobileModules.length > 0 && <details className="shell-nav-more"><summary className={`shell-nav__link${moreMobileModules.some(module => module.id === activeModule) ? " is-active" : ""}`}><span className="shell-nav__glyph" aria-hidden="true">•••</span><span>More</span></summary><div className="shell-nav-more__menu">{moreMobileModules.map(module => <a key={module.id} href={moduleHref(module)} aria-current={activeModule === module.id ? "page" : undefined}><ModuleIcon name={module.title}/>{module.title}</a>)}</div></details>}</nav>
       {modulePages.length > 1 && <nav className="shell-subnav" aria-label={`${MODULES.find(module => module.id === activeModule)?.title} pages`}>
         <p className="shell-subnav__label">{MODULES.find(module => module.id === activeModule)?.title}</p>

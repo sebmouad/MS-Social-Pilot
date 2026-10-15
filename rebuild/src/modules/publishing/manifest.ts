@@ -3,6 +3,7 @@ import type { ModuleManifest } from '../types';
 export const publishingManifest = {
   id: 'publishing',
   title: 'Publishing',
+  mobileTitle: 'Publish',
   href: '/publishing/posts',
   pages: [
     { id: 'publishing/posts', title: 'Posts', href: '/publishing/posts', description: 'Create and manage content across your channels.' },

@@ -10,6 +10,7 @@ export interface ModulePageManifest {
 export interface ModuleManifest {
   readonly id: string;
   readonly title: string;
+  readonly mobileTitle?: string;
   readonly href: string;
   readonly pages: readonly ModulePageManifest[];
 }

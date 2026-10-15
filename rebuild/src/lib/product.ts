@@ -15,10 +15,16 @@ export interface ProductPage {
 export interface ProductModule {
   id: ModuleId;
   title: string;
+  mobileTitle?: string;
   href: string;
 }
 
-export const MODULES: readonly ProductModule[] = moduleManifests.map(({ id, title, href }) => ({ id, title, href }));
+export const MODULES: readonly ProductModule[] = moduleManifests.map((module) => ({
+  id: module.id,
+  title: module.title,
+  mobileTitle: 'mobileTitle' in module ? module.mobileTitle : undefined,
+  href: module.href,
+}));
 
 export const PAGES: readonly ProductPage[] = moduleManifests.flatMap(({ id: module, pages }) =>
   pages.map((page) => ({ ...page, module })),

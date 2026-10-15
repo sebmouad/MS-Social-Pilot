@@ -95,6 +95,15 @@ button, input, select { font: inherit; }
 .shell-signout:hover { background: var(--surface-muted); color: var(--ink); }
 .shell-filter-toggle { display: none; padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 650; cursor: pointer; }
 .shell-content { max-width: 1440px; margin: 0 auto; padding: 36px; }
+@media (min-width: 761px) and (max-width: 900px) {
+  .shell { grid-template-columns: 208px minmax(0, 1fr); }
+  .shell-sidebar { padding-inline: 12px; }
+  .shell-subnav { margin-left: 32px; }
+  .shell-sidebar-filter { padding-inline: 10px; }
+  .shell-sidebar-filter .ui-filter select { width: 100%; min-width: 0; }
+  .shell-topbar { padding-inline: 22px; }
+  .shell-content { padding: 24px; }
+}
 .ui-button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; border: 1px solid transparent; border-radius: 9px; font-weight: 650; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
 .ui-button:disabled { opacity: .5; cursor: not-allowed; }
 .ui-button--md { min-height: 40px; padding: 0 15px; font-size: 13px; }
@@ -141,9 +150,9 @@ button, input, select { font: inherit; }
   .shell-brand { display: none; }
   .shell-nav--desktop { display: none; }
   .shell-nav--mobile { display: flex; height: 100%; justify-content: space-around; gap: 2px; margin-top: 0; }
-  .shell-nav__link { min-width: 0; flex: 1; flex-direction: column; justify-content: center; gap: 2px; padding: 4px 2px; font-size: 9px; }
-  .shell-nav__glyph { font-size: 16px; }
-  .shell-nav__link > span:last-child { white-space: nowrap; }
+  .shell-nav__link { min-width: 0; flex: 1; flex-direction: column; justify-content: center; gap: 3px; padding: 4px 2px; font-size: 10px; line-height: 1.1; }
+  .shell-nav__glyph { flex: 0 0 auto; font-size: 16px; }
+  .shell-nav__link > span:last-child { max-width: 100%; text-align: center; white-space: normal; overflow-wrap: anywhere; }
   .shell-nav-more { min-width: 0; flex: 1; }
   .shell-nav-more summary { display: flex; height: 100%; list-style: none; cursor: pointer; }
   .shell-nav-more summary::-webkit-details-marker { display: none; }
