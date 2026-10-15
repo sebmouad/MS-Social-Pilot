@@ -66,7 +66,11 @@
 .ads-detail-content p { margin: 0 0 8px; color: var(--ink-faint); font-size: 11px; }
 .ads-detail-content ul { display: grid; gap: 5px; margin: 0 0 12px; padding: 0; list-style: none; font-size: 11px; }
 .ads-detail-content li { display: flex; justify-content: space-between; gap: 12px; }
-.ads-detail-content pre { max-width: 100%; margin: 0; overflow: auto; color: var(--ink-soft); font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ads-field-group h5 { margin: 10px 0 5px; color: var(--ink); font-size: 11px; }
+.ads-field-group dl { display: grid; gap: 0; margin: 0 0 8px; }
+.ads-field-group dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--line-subtle); font-size: 11px; }
+.ads-field-group dt { min-width: 0; overflow-wrap: anywhere; color: var(--ink-soft); }
+.ads-field-group dd { margin: 0; flex: 0 0 auto; max-width: 55%; overflow-wrap: anywhere; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
 .ads-day-details { padding: 8px 0; border-top: 1px solid var(--line-subtle); }
 .ads-day-details summary { color: var(--ink-soft); font-size: 10px; font-weight: 650; cursor: pointer; }
 .ads-day-details p { margin: 7px 0; line-height: 1.5; }

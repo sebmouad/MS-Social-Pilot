@@ -103,8 +103,3 @@ export function groupSummariesByAccount(summaries: readonly AdsSummary[]) {
   for (const summary of summaries) groups.set(summary.accountId, [...(groups.get(summary.accountId) ?? []), summary]);
   return groups;
 }
-
-export function formatMetricJson(value: unknown): string {
-  if (value === null || value === undefined) return "No additional stored fields";
-  try { return JSON.stringify(value, null, 2); } catch { return String(value); }
-}
