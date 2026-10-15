@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 9;
+export const CONFIG_SCHEMA_VERSION = 10;
 
 const cron = z.string().min(9).max(100).refine((value) => {
   const fields = value.trim().split(/\s+/);
@@ -68,6 +68,7 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'sync.posts.schedule', group: 'Sync schedules', label: 'Post and publishing sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '*/5 * * * *', schema: cron, consumption: 'active' }),
   entry({ key: 'sync.analytics.schedule', group: 'Sync schedules', label: 'Analytics sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '15 * * * *', schema: cron, consumption: 'active' }),
   entry({ key: 'sync.inbox.schedule', group: 'Sync schedules', label: 'Inbox sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '*/2 * * * *', schema: cron, consumption: 'active' }),
+  entry({ key: 'data.purgeRecoverySchedule', group: 'Data controls', label: 'Workspace erasure recovery schedule', kind: 'text', description: 'Five-field cron schedule for resuming already-confirmed workspace deletions after interruption.', defaultValue: '*/7 * * * *', schema: cron, consumption: 'active' }),
   entry({ key: 'sync.maxConcurrentJobs', group: 'Sync schedules', label: 'Maximum concurrent sync jobs', kind: 'number', description: 'Upper bound for simultaneously running sync tasks.', defaultValue: 4, schema: z.number().int().min(1).max(100), consumption: 'active' }),
   entry({ key: 'sync.retryLimit', group: 'Sync schedules', label: 'Sync retry limit', kind: 'number', description: 'Maximum retry attempts before a sync task is marked failed.', defaultValue: 5, schema: z.number().int().min(0).max(50), consumption: 'active' }),
   entry({ key: 'sync.maxItemsPerJob', group: 'Sync schedules', label: 'Maximum records per sync job', kind: 'number', description: 'Maximum local records a single sync job examines in one run.', defaultValue: 10000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),

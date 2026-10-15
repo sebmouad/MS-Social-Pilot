@@ -26,7 +26,7 @@ function parseField(source: string, min: number, max: number, weekday = false): 
     if (!Number.isInteger(start) || !Number.isInteger(end) || start < min || start > fieldMax || end < min || end > fieldMax || start > end) {
       throw new Error('Cron value is outside the supported range.');
     }
-    for (let value = start; value <= fieldMax; value += step) values.add(weekday && value === 7 ? 0 : value);
+    for (let value = start; value <= end; value += step) values.add(weekday && value === 7 ? 0 : value);
   }
   return { values, wildcard };
 }

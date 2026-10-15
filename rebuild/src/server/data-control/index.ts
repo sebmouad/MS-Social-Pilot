@@ -138,6 +138,11 @@ export async function deleteWorkspaceData(actor: DataControlActor, confirmation:
     else await tx.workspaceDataPurge.create({ data: { workspaceId: actor.workspaceId, ...values } });
   }, { timeout });
 
+  return finishWorkspaceDataPurge(actor, timeout);
+}
+
+/** Resume an already-confirmed purge using the identity captured when it was requested. */
+async function finishWorkspaceDataPurge(actor: DataControlActor, timeout: number) {
   const counts = await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${actor.workspaceId} FOR UPDATE`;
     const job = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId } });
@@ -164,10 +169,36 @@ export async function deleteWorkspaceData(actor: DataControlActor, confirmation:
     throw error;
   }
   const result = { ...counts, storedFiles: storage.files, storedBytes: storage.bytes };
-  await prisma.$transaction(async tx => {
+  return prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${actor.workspaceId} FOR UPDATE`;
+    const current = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId } });
+    if (!current) throw new Error('Workspace data purge state is missing.');
+    if (current.status === 'completed') return savedCounts(current.counts);
     await tx.workspaceDataPurge.update({ where: { workspaceId: actor.workspaceId }, data: { status: 'completed', counts: result, completedAt: new Date(), error: null } });
     await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`data_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'workspace.storage_deleted', ${JSON.stringify({ workspaceId: actor.workspaceId, ...(actor.apiKeyId ? { apiKeyId: actor.apiKeyId } : {}), files: storage.files, bytes: storage.bytes })}::jsonb, NOW())`;
+    return result;
   }, { timeout });
-  return result;
+}
+
+/** Recover work requested before a crash; no new deletion is initiated here. */
+export async function resumePendingWorkspaceDataPurges(): Promise<{ examined: number; completed: number; failed: number }> {
+  const limit = await runtimeConfig('sync.maxItemsPerJob');
+  const timeout = await runtimeConfig('data.deleteTransactionTimeoutMs');
+  const jobs = await prisma.workspaceDataPurge.findMany({
+    where: { status: { in: ['requested', 'db_deleted'] } },
+    orderBy: [{ requestedAt: 'asc' }, { workspaceId: 'asc' }], take: limit,
+    select: { workspaceId: true, requestedById: true, apiKeyId: true },
+  });
+  let completed = 0; let failed = 0;
+  for (const job of jobs) {
+    try {
+      validateWorkspaceId(job.workspaceId);
+      await finishWorkspaceDataPurge({ userId: job.requestedById, workspaceId: job.workspaceId, ...(job.apiKeyId ? { apiKeyId: job.apiKeyId } : {}) }, timeout);
+      completed++;
+    } catch (error) {
+      failed++;
+      await prisma.workspaceDataPurge.update({ where: { workspaceId: job.workspaceId }, data: { error: (error instanceof Error ? error.message : String(error)).slice(0, 1000) } }).catch(() => undefined);
+    }
+  }
+  return { examined: jobs.length, completed, failed };
 }

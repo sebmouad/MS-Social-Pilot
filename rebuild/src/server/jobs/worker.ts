@@ -3,7 +3,7 @@ import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { cronMatches } from './cron';
 
-export type JobName = 'posts' | 'analytics' | 'inbox';
+export type JobName = 'posts' | 'analytics' | 'inbox' | 'purges';
 export type WorkerLogger = (message: string, detail?: unknown) => void;
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1_000;
@@ -12,6 +12,7 @@ const jobs: Job[] = [
   { name: 'posts', configKey: 'sync.posts.schedule' },
   { name: 'analytics', configKey: 'sync.analytics.schedule' },
   { name: 'inbox', configKey: 'sync.inbox.schedule' },
+  { name: 'purges', configKey: 'data.purgeRecoverySchedule' },
 ];
 
 export type WorkerDependencies = {

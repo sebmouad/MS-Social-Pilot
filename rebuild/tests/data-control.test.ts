@@ -51,6 +51,7 @@ function makePurgeClient(role: string = 'owner') {
   const transaction = vi.fn(async (run: (client: typeof tx) => Promise<unknown>) => run(tx));
   const workspaceDataPurge = {
     findUnique: tx.workspaceDataPurge.findUnique,
+    findMany: vi.fn(async () => job.created && ['requested', 'db_deleted'].includes(job.status) ? [{ workspaceId: 'w1', requestedById: 'u1', apiKeyId: null }] : []),
     update: tx.workspaceDataPurge.update,
     create: tx.workspaceDataPurge.create,
   };
@@ -188,5 +189,31 @@ describe('workspace data controls', () => {
     expect(tx.workspaceDataPurge.create).not.toHaveBeenCalled();
     expect(mocks.canonicalMediaRoot).toHaveBeenCalledWith('/tmp/original-media');
     expect(mocks.removeWorkspaceStorage).toHaveBeenCalledWith('/tmp/original-media', 'w1');
+  });
+
+  it('worker recovery completes a previously confirmed purge after a crash', async () => {
+    const { job, tx } = makePurgeClient();
+    job.created = true;
+    job.status = 'db_deleted';
+    job.counts = { posts: 3 };
+    const { resumePendingWorkspaceDataPurges } = await import('../src/server/data-control');
+    await expect(resumePendingWorkspaceDataPurges()).resolves.toEqual({ examined: 1, completed: 1, failed: 0 });
+    expect(job.status).toBe('completed');
+    expect(tx.$executeRawUnsafe).not.toHaveBeenCalled();
+    expect(mocks.removeWorkspaceStorage).toHaveBeenCalledWith('/tmp/media', 'w1');
+  });
+
+  it('worker recovery keeps a failed cleanup pending for the next run', async () => {
+    const { job } = makePurgeClient();
+    job.created = true;
+    job.status = 'db_deleted';
+    job.counts = { posts: 3 };
+    mocks.removeWorkspaceStorage.mockRejectedValueOnce(new Error('disk busy'));
+    const { resumePendingWorkspaceDataPurges } = await import('../src/server/data-control');
+    await expect(resumePendingWorkspaceDataPurges()).resolves.toEqual({ examined: 1, completed: 0, failed: 1 });
+    expect(job.status).toBe('db_deleted');
+    expect(job.error).toBe('disk busy');
+    await expect(resumePendingWorkspaceDataPurges()).resolves.toEqual({ examined: 1, completed: 1, failed: 0 });
+    expect(job.status).toBe('completed');
   });
 });

@@ -10,6 +10,11 @@ const log = (message: string, detail?: unknown) => console.log(`${new Date().toI
 const dependencies: WorkerDependencies = {
   readConfig: runtimeConfig,
   async execute(job: JobName, now: Date, retryLimit: number) {
+    if (job === 'purges') {
+      const { resumePendingWorkspaceDataPurges } = await import('../src/server/data-control');
+      const result = await resumePendingWorkspaceDataPurges();
+      return `examined=${result.examined} completed=${result.completed} failed=${result.failed}`;
+    }
     const { publishDuePosts, syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } = await import('../src/server/jobs/sync');
     if (job === 'posts') {
       const due = await publishDuePosts(now);
