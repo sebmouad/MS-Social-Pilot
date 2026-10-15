@@ -1,0 +1,42 @@
+# Legacy capability parity gate
+
+Every customer and operator capability in the legacy app must have a working,
+authorized, tested equivalent in the rebuild before production cutover. Routes,
+icons, and stored settings alone do not establish parity. The new app may use
+different navigation and URLs. Internal E2E fixture routes are outside the
+customer feature inventory. This is a living crosswalk; mark an item complete
+only after exercising its UI, API, permissions, persisted data, and relevant
+provider behavior on production-shaped staging.
+
+Status legend: **partial** means a real subset works; **missing** means no
+equivalent workflow; **unverified** means code exists without adequate evidence.
+
+| Priority | Legacy capability and source | Rebuild state | Required proof |
+| --- | --- | --- | --- |
+| P0 | Eleven network connectors and publishing destinations in `src/lib/networks/index.ts` and `src/lib/networks/connect.ts` | Partial: `rebuild/src/server/platforms/registry.ts` registers Facebook only; Instagram and the other legacy destinations have no rebuild engines. | Adapter-level connection, discovery, publishing/status/delete, analytics, inbox, and ads where provider supports them; scoped UI/API/MCP and live tests. |
+| P0 | Facebook feed, photo, carousel, video, Reel, Story, Group and native scheduling in `src/lib/facebook/publish.ts` | Partial: `rebuild/src/platforms/facebook` handles basic Page content and remote video URLs. Local video, Reel/Story, Group, and native scheduling are missing. | Provider fixture and live create/status/delete tests for each supported format; visible choices limited to available capabilities. |
+| P0 | Analytics views, comparisons, post explorer, demographics, network analysis, pinned metrics and coverage in `src/app/(app)/analytics/AnalyticsScreen.tsx` and `src/lib/analytics-views.ts` | Partial: `rebuild/src/app/analytics/page.tsx` exposes stored metrics and selected-channel audience totals. | Shared metric catalog feeding full UI, export, and MCP with date/channel scope, comparison, availability, and refresh evidence. |
+| P0 | Reports and CSV exports in `src/app/(app)/reports/page.tsx`, `src/lib/reports.ts`, and `src/lib/analytics-export.ts` | Partial: `rebuild/src/app/reports` now shows scoped stored metrics and selected-channel audience totals, with a bounded long-form CSV. Ranked posts, destination summaries, other export formats, schedules and templates are absent. | Complete relevant report sections and exports, schedule/template workflows, UI/API/MCP parity and provider-shaped tests. |
+| P1 | Composer overrides, queue slots, approvals, labels, custom fields, notes, versions, templates, first-comment retries, and UTM/link preparation in `src/lib/posts.ts` and related API routes | Partial: `rebuild/src/server/publishing/lifecycle.ts` provides drafts, approval, one timestamp, publish, first comment, status and delete. | End-to-end workflow tests, per-target behavior, bulk actions, scheduling rules, and provider verification. |
+| P1 | Post list filters, saved views, pagination, bulk actions, retry/duplicate, CSV export and public Posts v1 API in `src/app/(app)/posts/page.tsx` and `src/app/api/posts` | Partial: `rebuild/src/app/publishing/posts/page.tsx` reads a bounded recent list with basic actions. | Full list/action/API parity with workspace authorization and large-data pagination tests. |
+| P1 | Inbox assignment, private notes, saved replies, moderation rules, comment deletion and full discovery in `src/lib/inbox.ts` and `src/app/api/inbox` | Partial: `rebuild/src/app/inbox/page.tsx` supports basic reply, resolve and hide on connected Page activity. | Multi-user assignment, notes, moderation log/undo, all relevant posts/reviews, and provider/MCP tests. |
+| P1 | Image/video media library, import, usage/quota, holder attribution and stream/raw delivery in `src/lib/media.ts` | Partial: `rebuild/src/server/media/storage.ts` handles workspace images only. | Video upload/library, imports, quotas, usage and reference display, secure retrieval/deletion tests. |
+| P1 | Connections for Groups, Instagram and other networks, token health and lifecycle callbacks in `src/app/(app)/connections/page.tsx` and `src/app/api/facebook` | Partial: `rebuild/src/app/settings/connections` supports Facebook Pages/ad accounts and local retain/delete. | Channel/ad-account selection, token/grant status, remote lifecycle callbacks, retain/delete semantics and complete provider discovery. |
+| P1 | Ads comparison/trends, findings, sorting, export and freshness in `src/app/(app)/ads/page.tsx`, `src/lib/ads-analysis.ts` | Partial: `rebuild/src/app/ads` has stored summaries and new management controls but lacks these reporting workflows. | Date/account-scoped trends, deltas, findings, CSV, coverage and live sync checks. |
+| P0 | Root users, workspaces, plans, registration, connections, errors, worker, backups, privileges and audit console in `src/app/(root)/root` and `src/app/api/root` | Partial: rebuild Root exposes runtime configuration and job health only. | Role-guarded operator UI/API for each function, with change audit and isolated production-shaped checks. |
+| P0 | Workspace operations settings: approvals, queue rules, hours, links, UTM, spacing, undo, audience, AI voice and moderation in `src/app/(app)/settings/page.tsx` | Missing: rebuild settings cover account, appearance, connections, data, MCP and team. | Versioned, validated workspace configuration with runtime consumers and migration of needed legacy values. |
+| P0 | Invitations, registration, email verification, password recovery and OAuth authorization in `src/app/(auth)`, `src/app/invite`, and `src/app/api/auth` | Partial: rebuild has sign-in, two-step/passkey verification, password/profile and sessions; onboarding/recovery are absent. | Full account and invitation lifecycle with scoped roles, token expiry, abuse protection, mail delivery and browser/API tests. |
+| P1 | Client review/calendar/portal links and public bio pages with tracked clicks in `src/app/share`, `src/app/bio`, and `src/app/(app)/settings/sharing` | Missing. | Secure public-link creation, review decisions, data control, expiry/revocation, public pages and scoped tests. |
+| P1 | Agency views, feed ingestion, post templates and tasks in `src/app/(app)/agency`, `feeds`, `templates`, `tasks` | Missing. | Full CRUD/workflow parity, workspace permissions, provider-side behavior where relevant, and MCP/API parity. |
+| P1 | Notifications, webhooks, REST v1 API tokens and OAuth clients in `src/app/(app)/settings/notifications`, `webhooks`, `api` and `src/app/api/v1` | Missing; rebuild MCP keys are additive rather than substitutes. | Delivery preferences, retries/redelivery, secret handling, scoped REST/OAuth contracts and audit tests. |
+| P1 | Page profiles/groups/labels, media/watermark, custom fields, AI agents, history and owner export screens under `src/app/(app)/settings` | Partial: image library and data export exist; the other controls are absent. | Working feature screens and shared services, migrated data, permission and visual checks. |
+| P2 | Asynchronous owner ZIP export with job status and expiry in `src/app/(app)/settings/export` | Partial: rebuild has synchronous export and workspace deletion. | Large-data async export, durable status, expiry/cleanup and completeness reporting. |
+
+The route-based inventory is a first pass; inspect each legacy API and worker
+before claiming the crosswalk exhaustive. Each provider must be modular, but retaining legacy
+capability does not require preserving a legacy route or visual design.
+
+The cutover blocker is the **capability**, not simply the missing screen. If
+legacy data is needed to implement it, map and migrate that data with backup and
+recovery evidence. Unavailable provider permissions must produce a clear,
+customer-safe state rather than a false claim of support.

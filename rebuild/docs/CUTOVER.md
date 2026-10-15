@@ -45,6 +45,9 @@ cutover runbook and host configuration are supplied.
 2. **Verify on isolated staging.** Deploy the build only to an isolated host
    with a sanitized database copy and test media. Run the application's unit,
    type, browser, workflow, authorization, and provider checks there. The
+   capability crosswalk in `docs/LEGACY_CAPABILITY_PARITY.md` must be complete:
+   every customer and operator workflow from the legacy app needs a working
+   tested equivalent, alongside the new modular platform and MCP capabilities.
    read-only `rebuild-verify-staging.sh` requires a loopback URL by default and
    checks HTTP health. It must never be pointed
    at production as a substitute for staging evidence.
@@ -107,7 +110,8 @@ cutover runbook and host configuration are supplied.
 
 ## Current blockers
 
-- Rebuild feature coverage is incomplete. Passkey verification now has a
+- Rebuild feature coverage and legacy capability parity are incomplete; see
+  `docs/LEGACY_CAPABILITY_PARITY.md`. Passkey verification now has a
   challenge-bound implementation, but its Root-managed origin and a real
   enrolled credential still need production-shaped validation. Other gaps
   include complete provider disconnect/data deletion, full Facebook
