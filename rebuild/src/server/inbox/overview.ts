@@ -1,5 +1,4 @@
 import { prisma } from '@/server/data';
-import { Prisma } from '../../../generated/client';
 import { commentNeedsReply, conversationNeedsReply } from './threads';
 
 export type InboxFilters = { channelIds: string[]; kind: 'all' | 'message' | 'comment'; status: 'open' | 'resolved' | 'all'; hidden: 'visible' | 'all' };
@@ -150,7 +149,7 @@ export async function inboxLastSynced(workspaceId: string, channelIds: string[])
   const [conversations, comments, audited] = await Promise.all([
     prisma.conversation.aggregate({ where: { targetId: { in: channelIds } }, _max: { fetchedAt: true } }),
     prisma.postComment.aggregate({ where: { postTarget: { targetId: { in: channelIds } } }, _max: { fetchedAt: true } }),
-    prisma.$queryRaw<Array<{ at: Date | null }>>`SELECT MAX("createdAt") AS at FROM root_activities WHERE action = 'inbox.synced' AND detail->>'workspaceId' = ${workspaceId} AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(detail->'targetIds', '[]'::jsonb)) AS channel(id) WHERE channel.id IN (${Prisma.join(channelIds)}))`,
+    prisma.$queryRaw<Array<{ at: Date | null }>>`SELECT MAX("createdAt") AS at FROM root_activities WHERE action = 'inbox.synced' AND detail->>'workspaceId' = ${workspaceId} AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(detail->'targetIds', '[]'::jsonb)) AS channel(id) WHERE channel.id = ANY(${channelIds}::text[]))`,
   ]);
   const times = [conversations._max.fetchedAt, comments._max.fetchedAt, audited[0]?.at ?? null].filter((value): value is Date => value instanceof Date);
   return times.length ? new Date(Math.max(...times.map(value => value.getTime()))) : null;
