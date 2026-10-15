@@ -2,7 +2,7 @@ import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { buildAnalytics } from '@/server/analytics/aggregate';
 import { analyticsRange, loadAnalytics } from '@/server/analytics/data';
-import { listPosts } from '@/server/data';
+import { prisma } from '@/server/data';
 
 type Search = { start?: string; end?: string; filter?: string; channel?: string | string[] };
 const inputDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -22,7 +22,7 @@ function MetricChart({ metric }: { metric: ReturnType<typeof buildAnalytics>['me
     </div>}
     {metric.rows.length > 0 && <details className="analytics-metric__details"><summary>{metric.kind === 'breakdown' ? 'View breakdown' : `View ${metric.rows.length} ${metric.source === 'page' ? 'Page' : 'account'} details`}</summary><div className="report-list">{metric.rows.slice(0, 30).map(row => <div className="report-row" key={row.label}><span>{row.label}</span><strong>{formatValue(row.value, metric.unit)}{row.asOf ? ` · ${row.asOf.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}</strong></div>)}</div></details>}
     {metric.points.length === 0 && metric.rows.length === 0 && <p className="empty-note">No values are available for this metric in the selected period.</p>}
-    {metric.coverage < metric.available && <p className="analytics-coverage">Data is available for {metric.coverage} of {metric.available} selected {metric.source === 'page' ? 'Pages' : 'ad accounts'}.</p>}
+    {metric.coverage < metric.available && <p className="analytics-coverage">Values were found for {metric.coverage} of {metric.available} selected {metric.source === 'page' ? 'Pages' : 'ad accounts'} in this date range.</p>}
   </div>;
 }
 
@@ -44,11 +44,24 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const selectedSet = new Set(selected.map(target => target.id));
   const view = data ? buildAnalytics(data.pageRows, data.adRows, data.audienceRows, selected, data.adAccountCount) : null;
   const audienceMissing = selected.filter(channel => !view?.audience.entries.some(entry => entry.id === channel.id));
-  const recentPosts = await listPosts(workspaceId, 500);
+  const publishingByStatus = selected.length ? await prisma.post.groupBy({
+    by: ['status'],
+    where: {
+      workspaceId,
+      targets: { some: { targetId: { in: selected.map(channel => channel.id) } } },
+      OR: [
+        { status: 'published', publishedAt: { gte: range.from, lte: range.to } },
+        { status: 'scheduled', scheduledAt: { gte: range.from, lte: range.to } },
+        { status: { in: ['failed', 'partially_failed'] }, createdAt: { gte: range.from, lte: range.to } },
+      ],
+    },
+    _count: { _all: true },
+  }) : [];
+  const countStatus = (status: string) => publishingByStatus.find(row => row.status === status)?._count._all ?? 0;
   const publishingCounts = {
-    published: recentPosts.filter(post => post.status === 'published').length,
-    scheduled: recentPosts.filter(post => post.status === 'scheduled').length,
-    failed: recentPosts.filter(post => post.status === 'failed' || post.status === 'partially_failed').length,
+    published: countStatus('published'),
+    scheduled: countStatus('scheduled'),
+    failed: countStatus('failed') + countStatus('partially_failed'),
   };
   const sidebar = <form action="/analytics" method="get" className="analytics-sidebar-filter">
     <p className="shell-subnav__label">Date range</p>
@@ -69,12 +82,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           {audienceMissing.length > 0 && <p className="analytics-coverage">No stored audience count for: {audienceMissing.map(channel => channel.name).join(', ')}.</p>}
           <p className="small-note">Counts are added across channels. People who follow more than one selected Page may be counted more than once.</p>
         </section>
-        {data.adAccountCount > 0 && <p className="small-note analytics-ad-coverage">Advertising insight rows are stored for {new Set(data.adRows.map(row => row.adAccount.id)).size} of {data.adAccountCount} selected ad accounts.</p>}
+        {data.adAccountCount > 0 && <p className="small-note analytics-ad-coverage">Advertising data was found for {new Set(data.adRows.map(row => row.adAccount.id)).size} of {data.adAccountCount} linked ad accounts in this date range.</p>}
         {view.metrics.length ? <section className="panel"><div className="analytics-panel-title"><div><h2>Available metrics</h2><p className="small-note">Each chart and table is built from metrics already stored for this workspace.</p></div><span className="badge">{view.metrics.length} metrics</span></div>
           <div className="analytics-metrics">{view.metrics.map(metric => <MetricChart metric={metric} key={`${metric.source}:${metric.key}`} />)}</div>
-        </section> : <section className="panel analytics-state"><h2>No metrics in this period</h2><p>There are no stored Page or advertising insights for the selected channels and dates.</p></section>}
+        </section> : <section className="panel analytics-state"><h2>No metrics for this selection yet</h2><p>Try another date range or channel. New connections may take time to show performance data; advertising results appear when a connected ad account has data.</p></section>}
       </>}
-      <section className="panel"><div className="analytics-panel-title"><div><h2>Publishing records</h2><p className="small-note">Snapshot of the latest {recentPosts.length} workspace posts, independent of the metric date and channel filters.</p></div></div>
+      <section className="panel"><div className="analytics-panel-title"><div><h2>Publishing records</h2><p className="small-note">Workspace posts matched to the selected channels and date range. Published posts use their publish date, scheduled posts use their scheduled date, and failed posts use their creation date.</p></div></div>
         <div className="metric-grid"><article className="metric-card"><dl><dt>Published</dt><dd>{publishingCounts.published}</dd></dl></article><article className="metric-card"><dl><dt>Scheduled</dt><dd>{publishingCounts.scheduled}</dd></dl></article><article className="metric-card"><dl><dt>Failed or partial</dt><dd>{publishingCounts.failed}</dd></dl></article></div>
       </section>
     </>}

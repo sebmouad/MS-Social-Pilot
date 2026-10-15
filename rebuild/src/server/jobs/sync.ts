@@ -95,6 +95,7 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0):
 
 /** Refresh current daily Page snapshots for enabled connections in their own workspace. */
 export async function syncPageAnalytics(now = new Date(), retryLimit = 0): Promise<JobSummary> {
+  if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
   const targets = await prisma.target.findMany({
     where: { type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
@@ -110,12 +111,12 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0): Promi
     const encrypted = target.accessToken ?? account?.accessToken;
     if (!account || account.workspaceId !== target.workspaceId || account.invalidatedAt || (account.tokenExpiresAt && account.tokenExpiresAt <= now) || !encrypted) { result.skipped++; continue; }
     try {
-      const metrics = await withRetries(() => engine.getPageAnalytics(decryptSecret(encrypted), target.providerId, since, now), retryLimit);
-      for (const [metric, value] of Object.entries(metrics)) {
+      const observations = await withRetries(() => engine.getPageInsightObservations(decryptSecret(encrypted), target.providerId, since, now), retryLimit);
+      for (const { metric, period, endTime, value, numeric } of observations) {
         await prisma.pageInsight.upsert({
-          where: { targetId_metric_period_endTime: { targetId: target.id, metric, period: 'day', endTime: today } },
-          create: { id: `rebuild_${randomUUID()}`, targetId: target.id, metric, period: 'day', endTime: today, value: value === null ? Prisma.JsonNull : value, numeric: value, fetchedAt: now },
-          update: { value: value === null ? Prisma.JsonNull : value, numeric: value, fetchedAt: now },
+          where: { targetId_metric_period_endTime: { targetId: target.id, metric, period, endTime } },
+          create: { id: `rebuild_${randomUUID()}`, targetId: target.id, metric, period, endTime, value: value === null ? Prisma.JsonNull : value as Prisma.InputJsonValue, numeric, fetchedAt: now },
+          update: { value: value === null ? Prisma.JsonNull : value as Prisma.InputJsonValue, numeric, fetchedAt: now },
         });
         result.updated++;
       }
@@ -126,6 +127,7 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0): Promi
 
 /** Refresh account-level Ads Insights for each enabled account in its own workspace. */
 export async function syncAdsAnalytics(now = new Date(), retryLimit = 0): Promise<JobSummary> {
+  if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
   const accounts = await prisma.adAccount.findMany({
     where: { enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
@@ -168,6 +170,7 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0): Promis
 
 /** Sync conversations/messages and post comments through the Facebook platform engine. */
 export async function syncInbox(now = new Date(), retryLimit = 0): Promise<JobSummary> {
+  if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const [readScopes, limit] = await Promise.all([
     runtimeConfig('meta.inboxReadScopes') as Promise<string[]>, runtimeConfig('sync.maxItemsPerJob') as Promise<number>,
   ]);

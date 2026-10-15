@@ -23,6 +23,7 @@ export interface FacebookPublishInput {
   media?: readonly FacebookMedia[]; firstComment?: string | null;
 }
 export interface FacebookPublished { remoteId: string; url: string | null }
+export interface FacebookPageInsightObservation { metric: string; period: string; endTime: Date; value: unknown; numeric: number | null }
 export interface FacebookInboxMessage { id: string; text: string | null; createdAt: Date; fromName: string | null; fromId: string | null }
 export interface FacebookConversation { id: string; snippet: string | null; updatedAt: Date; unreadCount: number; messageCount: number; messages: FacebookInboxMessage[] }
 export interface FacebookComment { id: string; message: string; fromName: string | null; fromId: string | null; createdAt: Date; parentId: string | null; likeCount: number; replyCount: number; isHidden: boolean }
@@ -39,6 +40,7 @@ export interface FacebookEngine {
   listInbox(accessToken: string, pageId: string): Promise<FacebookConversation[]>;
   listComments(accessToken: string, postId: string): Promise<FacebookComment[]>;
   getPageAnalytics(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<Record<string, number | null>>;
+  getPageInsightObservations(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<FacebookPageInsightObservation[]>;
   getAdInsights(accessToken: string, accountId: string, since: Date, until: Date): Promise<Array<Record<string, unknown>>>;
   updateAd(input: AdMutationRequest): Promise<void>;
   createCampaign(input: AdCampaignCreateRequest): Promise<{ remoteId: string }>;
@@ -248,6 +250,27 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       for (const item of data) { const x = object(item); if (typeof x.name !== 'string') continue; const values = Array.isArray(x.values) ? x.values : []; const value = object(values[values.length - 1]).value;
         metrics[x.name] = typeof value === 'number' ? value : typeof value === 'string' && Number.isFinite(Number(value)) ? Number(value) : null; }
       return metrics;
+    },
+    async getPageInsightObservations(token, pageId, since, until) {
+      if (!config.pageInsightMetrics.length) return [];
+      const raw = object(await request(`${encodeURIComponent(pageId)}/insights`, { token, params: { metric: config.pageInsightMetrics.join(','),
+        since: since ? Math.floor(since.getTime() / 1000) : undefined, until: until ? Math.floor(until.getTime() / 1000) : undefined } }));
+      const data = Array.isArray(raw.data) ? raw.data : [];
+      const observations: FacebookPageInsightObservation[] = [];
+      for (const item of data) {
+        const metric = object(item);
+        if (typeof metric.name !== 'string' || !metric.name.trim()) continue;
+        const period = typeof metric.period === 'string' && metric.period.trim() ? metric.period : 'day';
+        const values = Array.isArray(metric.values) ? metric.values : [];
+        for (const entry of values) {
+          const point = object(entry); const endTime = date(point.end_time);
+          if (!endTime || !Object.hasOwn(point, 'value')) continue;
+          const value = point.value;
+          const numeric = typeof value === 'number' && Number.isFinite(value) ? value : typeof value === 'string' && value.trim() && Number.isFinite(Number(value)) ? Number(value) : null;
+          observations.push({ metric: metric.name, period, endTime, value, numeric });
+        }
+      }
+      return observations;
     },
     async getAdInsights(token, accountId, since, until) {
       const params = new URLSearchParams({ access_token: token, fields: config.adInsightFields.join(','), level: 'account', time_increment: '1',

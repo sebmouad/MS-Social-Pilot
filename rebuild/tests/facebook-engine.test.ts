@@ -140,6 +140,24 @@ describe('Facebook Graph adapter', () => {
     expect(await engine.getAdInsights('token', 'act_1', new Date('2026-01-01Z'), new Date('2026-01-02Z'))).toEqual([{ spend: '4.2' }]);
   });
 
+  it('retains every dated Page insight value and its provider period or breakdown', async () => {
+    const fetcher = mockFetch(response({ data: [
+      { name: 'page_media_view', period: 'day', values: [
+        { end_time: '2026-01-02T00:00:00+0000', value: 4 },
+        { end_time: '2026-01-03T00:00:00+0000', value: 7 },
+      ] },
+      { name: 'page_views_by_country', period: 'week', values: [
+        { end_time: '2026-01-03T00:00:00+0000', value: { MA: 12, FR: 2 } },
+      ] },
+    ] }));
+    const engine = createFacebookEngine(config, fetcher);
+    expect(await engine.getPageInsightObservations('token', 'p1')).toEqual([
+      { metric: 'page_media_view', period: 'day', endTime: new Date('2026-01-02T00:00:00Z'), value: 4, numeric: 4 },
+      { metric: 'page_media_view', period: 'day', endTime: new Date('2026-01-03T00:00:00Z'), value: 7, numeric: 7 },
+      { metric: 'page_views_by_country', period: 'week', endTime: new Date('2026-01-03T00:00:00Z'), value: { MA: 12, FR: 2 }, numeric: null },
+    ]);
+  });
+
   it('fails closed on Graph errors and declares adapter capabilities', async () => {
     const engine = createFacebookEngine(config, mockFetch(response({ error: { message: 'No permission', code: 200 } }, 400)));
     await expect(engine.deletePost('token', 'p1_2')).rejects.toMatchObject({ message: 'No permission', status: 400 });

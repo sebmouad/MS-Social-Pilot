@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 6;
+export const CONFIG_SCHEMA_VERSION = 7;
 
 const cron = z.string().min(9).max(100).refine((value) => {
   const fields = value.trim().split(/\s+/);
@@ -45,7 +45,7 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'meta.requestTimeoutMs', group: 'API endpoints', label: 'Meta request timeout (ms)', kind: 'number', description: 'Maximum time allowed for one Meta API request.', defaultValue: 15000, schema: z.number().int().min(1000).max(120000), consumption: 'active' }),
   entry({ key: 'meta.maxPages', group: 'API endpoints', label: 'Meta pagination limit', kind: 'number', description: 'Maximum Graph response pages read per collection request.', defaultValue: 20, schema: z.number().int().min(1).max(100), consumption: 'active' }),
   entry({ key: 'meta.pageSize', group: 'API endpoints', label: 'Meta response page size', kind: 'number', description: 'Items requested per Graph response page.', defaultValue: 100, schema: z.number().int().min(1).max(100), consumption: 'active' }),
-  entry({ key: 'meta.pageInsightMetrics', group: 'Analytics metrics', label: 'Meta Page insight metrics', kind: 'json', description: 'JSON array of Page insight metric names approved for this app.', defaultValue: [], schema: stringList, consumption: 'active' }),
+  entry({ key: 'meta.pageInsightMetrics', group: 'Analytics metrics', label: 'Meta Page insight metrics', kind: 'json', description: 'JSON array of Page insight metric names approved for this app. Unsupported metrics may need removal after provider changes.', defaultValue: ['page_follows', 'page_media_view', 'page_post_engagements', 'page_views_total'], schema: stringList, consumption: 'active' }),
   entry({ key: 'meta.adInsightFields', group: 'Analytics metrics', label: 'Meta ad insight fields', kind: 'json', description: 'JSON array of Ads Insights fields approved for this app.', defaultValue: ['impressions', 'reach', 'spend', 'clicks', 'cpc', 'cpm'], schema: stringList, consumption: 'active' }),
   entry({ key: 'meta.appId', group: 'API credentials', label: 'Meta app ID', kind: 'text', description: 'Public OAuth application identifier.', defaultValue: '', schema: z.string().max(200), consumption: 'active' }),
   entry({ key: 'meta.appSecret', group: 'API credentials', label: 'Meta app secret', kind: 'secret', description: 'Encrypted at rest. The saved value is never returned by the configuration API.', defaultValue: '', schema: z.string().max(2048), consumption: 'active' }),

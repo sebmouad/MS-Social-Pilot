@@ -24,7 +24,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(6);
+    expect(CONFIG_SCHEMA_VERSION).toBe(7);
     for (const prefix of ['meta.', 'youtube.', 'linkedin.', 'x.', 'sync.', 'api.', 'entitlements.', 'retention.', 'logging.', 'mcp.', 'theme.']) {
       expect(CONFIG_REGISTRY.some((item) => item.key.startsWith(prefix))).toBe(true);
     }
