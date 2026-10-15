@@ -5,6 +5,10 @@ import { configuredFacebookEngine } from '@/server/platforms/facebook';
 import { runtimeConfig } from '@/server/config/store';
 import { Prisma } from '../../../generated/client';
 import { withRetries } from './retry';
+import { publishPost } from '@/server/publishing/lifecycle';
+import { canAccessFeature } from '@/server/permissions';
+import { loadPermissions } from '@/server/permissions/loader';
+import { loadEntitlements, canUseFeature } from '@/server/entitlements';
 
 export type JobSummary = { examined: number; updated: number; skipped: number; failed: number };
 const DAY_MS = 86_400_000;
@@ -20,7 +24,37 @@ function validDate(value: unknown): Date | null {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
 }
 
-/** Only read remote status; this job never calls a publishing method. */
+/** Publish due local queue items through the same guarded lifecycle as the UI. */
+export async function publishDuePosts(now = new Date()): Promise<JobSummary> {
+  const limit = await runtimeConfig('sync.maxItemsPerJob');
+  const rows = await prisma.post.findMany({
+    where: { status: 'scheduled', scheduledAt: { lte: now }, targets: { some: { status: 'pending' } } },
+    orderBy: [{ scheduledAt: 'asc' }, { id: 'asc' }], take: limit,
+    select: { id: true, authorId: true, workspaceId: true },
+  });
+  const result: JobSummary = { examined: rows.length, updated: 0, skipped: 0, failed: 0 };
+  for (const row of rows) {
+    try {
+      const [permissions, entitlements] = await Promise.all([
+        loadPermissions(row.authorId, row.workspaceId), loadEntitlements(row.authorId, row.workspaceId),
+      ]);
+      if (!permissions || !entitlements || !canAccessFeature(permissions, 'publishing/posts', 'write') || !canUseFeature(entitlements, 'publishing/posts')) {
+        result.skipped++;
+        continue;
+      }
+      const actor = { userId: row.authorId, workspaceId: row.workspaceId, ...(permissions.pageScope.all ? {} : { allowedTargetIds: permissions.pageScope.ids }) };
+      const outcome = await publishPost(actor, row.id);
+      result.updated += outcome.published;
+      result.failed += outcome.failed;
+      if (outcome.needsReconciliation) result.skipped++;
+    } catch {
+      result.failed++;
+    }
+  }
+  return result;
+}
+
+/** Refresh provider-side scheduled posts that already have remote IDs. */
 export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0): Promise<JobSummary> {
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
   const rows = await prisma.postTarget.findMany({
@@ -28,8 +62,9 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0):
     orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }], take: limit,
     select: { id: true, postId: true, remotePostId: true, target: { select: { workspaceId: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, tokenExpiresAt: true, invalidatedAt: true } } } } },
   });
-  const engine = await configuredFacebookEngine();
   const result: JobSummary = { examined: rows.length, updated: 0, skipped: 0, failed: 0 };
+  if (!rows.length) return result;
+  const engine = await configuredFacebookEngine();
   for (const row of rows) {
     const account = row.target.socialAccount;
     const encrypted = row.target.accessToken ?? account?.accessToken;

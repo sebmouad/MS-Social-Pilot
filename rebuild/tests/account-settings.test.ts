@@ -11,9 +11,10 @@ describe('account settings validation', () => {
   });
 
   it('requires a sufficiently long password while respecting the legacy byte limit', () => {
-    expect(validateNewPassword('short')).toBe(false);
-    expect(validateNewPassword('a'.repeat(12))).toBe(true);
-    expect(validateNewPassword('é'.repeat(401))).toBe(false);
+    const policy = { minLength: 12, maxBytes: 800 };
+    expect(validateNewPassword('short', policy)).toBe(false);
+    expect(validateNewPassword('a'.repeat(12), policy)).toBe(true);
+    expect(validateNewPassword('é'.repeat(401), policy)).toBe(false);
   });
 
   it('hashes new passwords in the existing sign-in format without storing the cleartext', () => {

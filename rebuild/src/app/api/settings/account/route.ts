@@ -40,7 +40,8 @@ export async function POST(request: Request) {
   try {
     const viewer = await requireViewer({ feature: 'settings/account', channelScoped: true });
     const input = z.object({ currentPassword: z.string().min(1).max(200), newPassword: z.string() }).strict().parse(await request.json());
-    if (!validateNewPassword(input.newPassword)) return NextResponse.json({ error: `New password must be at least ${accountPasswordPolicy.minLength} characters and no more than ${accountPasswordPolicy.maxBytes} bytes.` }, { status: 400 });
+    const policy = await accountPasswordPolicy();
+    if (!validateNewPassword(input.newPassword, policy)) return NextResponse.json({ error: `New password must be at least ${policy.minLength} characters and no more than ${policy.maxBytes} bytes.` }, { status: 400 });
     const user = await prisma.user.findUnique({ where: { id: viewer.user.id }, select: { passwordHash: true, disabledAt: true } });
     if (!user || user.disabledAt || !verifyLegacyPassword(input.currentPassword, user.passwordHash)) return NextResponse.json({ error: 'Current password is incorrect.' }, { status: 400 });
     const passwordHash = hashLegacyPassword(input.newPassword);

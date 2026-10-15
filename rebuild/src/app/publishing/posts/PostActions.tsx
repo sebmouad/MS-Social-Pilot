@@ -1,6 +1,6 @@
 "use client";
 
-import { createPostAction, deletePostAction, importPostsAction, publishPostAction, syncPostAction, updatePostAction } from "./actions";
+import { cancelScheduledPostAction, createPostAction, deletePostAction, importPostsAction, publishPostAction, schedulePostAction, submitForApprovalAction, syncPostAction, updatePostAction } from "./actions";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components";
 import styles from "../publishing.module.css";
@@ -35,6 +35,7 @@ export function PostRowActions({ post, targets, canEdit, canPublish }: { post: P
   const selected = new Set(post.targets.map(item => item.target.id));
   const hasRemote = post.targets.some(item => Boolean(item.remotePostId));
   const isDraft = post.status === 'draft' && !post.publishedAt;
+  const isQueued = post.status === 'scheduled';
   useEffect(() => {
     if (deleteOpen && !dialog.current?.open) dialog.current?.showModal();
     if (!deleteOpen && dialog.current?.open) dialog.current.close();
@@ -56,6 +57,11 @@ export function PostRowActions({ post, targets, canEdit, canPublish }: { post: P
       <input type="hidden" name="postId" value={post.id} />
       <button className="ui-button ui-button--primary ui-button--sm" type="submit">Publish now</button>
     </form> : null}
+    {canEdit && isDraft && post.targets.length ? <>
+      <form action={submitForApprovalAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Submit for approval</button></form>
+      <ScheduleForm postId={post.id}/>
+    </> : null}
+    {canEdit && isQueued ? <form action={cancelScheduledPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Cancel schedule</button></form> : null}
     {hasRemote ? <form action={syncPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Sync status</button></form> : null}
     {post.targets.some(item => item.status === 'processing' && !item.remotePostId) ? <span className={styles.noActions}>A publish result needs review on the destination before retrying.</span> : null}
     <Button variant="danger" size="sm" type="button" onClick={() => setDeleteOpen(true)}>Delete locally</Button>
@@ -71,6 +77,23 @@ export function PostRowActions({ post, targets, canEdit, canPublish }: { post: P
       </form>
     </dialog>
   </div>;
+}
+
+function ScheduleForm({ postId }: { postId: string }) {
+  return <form action={schedulePostAction} className={styles.scheduleForm} onSubmit={event => {
+    const form = event.currentTarget;
+    const input = form.elements.namedItem('localScheduledAt');
+    const hidden = form.elements.namedItem('scheduledAt');
+    if (input instanceof HTMLInputElement && hidden instanceof HTMLInputElement && input.value) {
+      const date = new Date(input.value);
+      if (Number.isFinite(date.getTime())) hidden.value = date.toISOString();
+    }
+  }}>
+    <input type="hidden" name="postId" value={postId}/>
+    <label>Schedule (your local time) <input type="datetime-local" name="localScheduledAt" required/></label>
+    <input type="hidden" name="scheduledAt"/>
+    <button className="ui-button ui-button--secondary ui-button--sm" type="submit">Add to queue</button>
+  </form>;
 }
 
 function TargetPicker({ targets, selected = new Set<string>() }: { targets: TargetChoice[]; selected?: Set<string> }) {

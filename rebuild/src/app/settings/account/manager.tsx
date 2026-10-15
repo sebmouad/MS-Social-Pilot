@@ -5,7 +5,7 @@ import styles from '../settings.module.css';
 
 type Session = { id: string; expiresAt: string; current: boolean };
 
-export function AccountManager({ initialName, email }: { initialName: string; email: string }) {
+export function AccountManager({ initialName, email, passwordPolicy }: { initialName: string; email: string; passwordPolicy: { minLength: number; maxBytes: number } }) {
   const [name, setName] = useState(initialName);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -64,8 +64,8 @@ export function AccountManager({ initialName, email }: { initialName: string; em
     <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>Password</h2><p>Changing your password signs out other active sessions.</p></div></div>
       <form className={styles['mcp-key-form']} onSubmit={changePassword}><div className={styles['mcp-key-fields']}>
         <label>Current password<input type="password" autoComplete="current-password" required value={currentPassword} onChange={event => setCurrentPassword(event.currentTarget.value)} disabled={busy} /></label>
-        <label>New password<input type="password" autoComplete="new-password" minLength={12} maxLength={200} required value={newPassword} onChange={event => setNewPassword(event.currentTarget.value)} disabled={busy} /></label>
-      </div><p className={styles['settings-note']}>Use at least 12 characters.</p><button type="submit" disabled={busy || !currentPassword || newPassword.length < 12}>Change password</button></form>
+        <label>New password<input type="password" autoComplete="new-password" minLength={passwordPolicy.minLength} maxLength={passwordPolicy.maxBytes} required value={newPassword} onChange={event => setNewPassword(event.currentTarget.value)} disabled={busy} /></label>
+      </div><p className={styles['settings-note']}>Use at least {passwordPolicy.minLength} characters, up to {passwordPolicy.maxBytes} bytes.</p><button type="submit" disabled={busy || !currentPassword || newPassword.length < passwordPolicy.minLength}>Change password</button></form>
     </section>
     <section className={styles['settings-panel']}><div className={styles['settings-panel__heading']}><div><h2>Active sessions</h2><p>Sign out sessions you no longer recognize. This browser is marked as current.</p></div></div>
       <div className={styles['settings-table-wrap']}><table className={styles['settings-table']}><thead><tr><th>Session</th><th>Expires</th><th /></tr></thead><tbody>

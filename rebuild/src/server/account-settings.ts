@@ -1,8 +1,16 @@
 import { randomBytes } from 'node:crypto';
 import type { Prisma } from '../../generated/client';
+import { runtimeConfig } from '@/server/config/store';
 
-const MIN_PASSWORD_LENGTH = 12;
-const MAX_PASSWORD_BYTES = 800;
+export type AccountPasswordPolicy = { minLength: number; maxBytes: number };
+
+export async function accountPasswordPolicy(): Promise<AccountPasswordPolicy> {
+  const [minLength, maxBytes] = await Promise.all([
+    runtimeConfig('auth.passwordMinLength'),
+    runtimeConfig('auth.passwordMaxBytes'),
+  ]);
+  return { minLength, maxBytes };
+}
 
 export function validateProfileName(value: unknown) {
   if (typeof value !== 'string') return null;
@@ -10,8 +18,8 @@ export function validateProfileName(value: unknown) {
   return name.length >= 1 && name.length <= 100 ? name : null;
 }
 
-export function validateNewPassword(value: unknown) {
-  if (typeof value !== 'string' || value.length < MIN_PASSWORD_LENGTH || Buffer.byteLength(value, 'utf8') > MAX_PASSWORD_BYTES) return false;
+export function validateNewPassword(value: unknown, policy: AccountPasswordPolicy) {
+  if (typeof value !== 'string' || value.length < policy.minLength || Buffer.byteLength(value, 'utf8') > policy.maxBytes) return false;
   return true;
 }
 
@@ -22,5 +30,3 @@ export function accountAuditId() {
 export async function auditAccountMutation(tx: Prisma.TransactionClient, actorId: string, action: string, detail: Record<string, unknown>) {
   await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${accountAuditId()}, ${actorId}, ${action}, ${JSON.stringify(detail)}::jsonb, NOW())`;
 }
-
-export const accountPasswordPolicy = { minLength: MIN_PASSWORD_LENGTH, maxBytes: MAX_PASSWORD_BYTES };

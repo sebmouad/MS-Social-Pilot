@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
-import { deleteWorkspaceData, exportWorkspaceData } from '@/server/data-control';
+import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '@/server/data-control';
 
 export const runtime = 'nodejs';
 const deleteSchema = z.object({ confirmation: z.string().max(20) });
+
+export async function POST() {
+  let viewer;
+  try { viewer = await requireViewer({ feature: 'settings/data' }); }
+  catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
+  try {
+    const counts = await previewWorkspaceDataDeletion({ userId: viewer.user.id, workspaceId: viewer.workspaceId });
+    return NextResponse.json({ counts }, { headers: { 'cache-control': 'no-store' } });
+  } catch (error) { return dataError(error, 'Could not preview workspace data deletion.'); }
+}
 
 export async function GET() {
   let viewer;

@@ -8,6 +8,40 @@ export type ConnectionMutationActor = { userId: string; workspaceId: string };
 
 export type ConnectionSelection = { kind: 'target' | 'adAccount'; id: string; enabled: boolean };
 
+/** Read-only estimate of the local rows removed by disconnect delete mode. */
+export async function previewSocialAccountDeletion(actor: ConnectionMutationActor, socialAccountId: string) {
+  const membership = await currentMembership(actor);
+  if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can change connections.');
+  const account = await prisma.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
+  if (!account) throw new Error('This source is unavailable in the current workspace.');
+  return countDisconnectRows(prisma, actor.workspaceId, account);
+}
+
+async function countDisconnectRows(tx: typeof prisma | import('../../generated/client').Prisma.TransactionClient, workspaceId: string, account: { id: string; targets: Array<{ id: string }>; adAccounts: Array<{ id: string }> }) {
+  const targetIds = account.targets.map(item => item.id);
+  const adAccountIds = account.adAccounts.map(item => item.id);
+  const targetLinks = targetIds.length ? await tx.postTarget.findMany({ where: { targetId: { in: targetIds } }, select: { id: true, postId: true } }) : [];
+  const postTargetIds = targetLinks.map(row => row.id);
+  const affectedPostIds = [...new Set(targetLinks.map(row => row.postId))];
+  const conversations = targetIds.length ? await tx.conversation.findMany({ where: { targetId: { in: targetIds } }, select: { id: true } }) : [];
+  const conversationIds = conversations.map(row => row.id);
+  const orphanPosts = affectedPostIds.length ? await tx.post.findMany({
+    where: { id: { in: affectedPostIds }, workspaceId, targets: { every: { targetId: { in: targetIds } } } }, select: { id: true },
+  }) : [];
+  const [comments, conversationMessages, pageInsights, adInsights, scheduledRemote] = await Promise.all([
+    postTargetIds.length ? tx.postComment.count({ where: { postTargetId: { in: postTargetIds } } }) : 0,
+    conversationIds.length ? tx.conversationMessage.count({ where: { conversationId: { in: conversationIds } } }) : 0,
+    targetIds.length ? tx.pageInsight.count({ where: { targetId: { in: targetIds } } }) : 0,
+    adAccountIds.length ? tx.adInsight.count({ where: { adAccountId: { in: adAccountIds } } }) : 0,
+    postTargetIds.length ? tx.postTarget.count({ where: { id: { in: postTargetIds }, status: 'scheduled_remote' } }) : 0,
+  ]);
+  return {
+    channels: targetIds.length, adAccounts: adAccountIds.length, postTargets: targetLinks.length,
+    orphanPosts: orphanPosts.length, comments, conversations: conversations.length,
+    conversationMessages, pageInsights, adInsights, scheduledRemote,
+  };
+}
+
 /** Apply a confirmed set of channel and ad account choices atomically. */
 export async function setConnectionSelections(actor: ConnectionMutationActor, items: ConnectionSelection[]) {
   const membership = await currentMembership(actor);
@@ -76,14 +110,14 @@ export async function disconnectSocialAccount(actor: ConnectionMutationActor, so
     const comments = targetLinkIds.length ? await tx.postComment.deleteMany({ where: { postTargetId: { in: targetLinkIds } } }) : { count: 0 };
     if (targetLinkIds.length) await tx.postTarget.deleteMany({ where: { id: { in: targetLinkIds } } });
     const orphanPosts = affectedPostIds.length ? await tx.post.deleteMany({ where: { id: { in: affectedPostIds }, workspaceId: actor.workspaceId, targets: { none: {} } } }) : { count: 0 };
-    if (conversationIds.length) await tx.conversationMessage.deleteMany({ where: { conversationId: { in: conversationIds } } });
+    const conversationMessages = conversationIds.length ? await tx.conversationMessage.deleteMany({ where: { conversationId: { in: conversationIds } } }) : { count: 0 };
     const deletedConversations = conversationIds.length ? await tx.conversation.deleteMany({ where: { id: { in: conversationIds } } }) : { count: 0 };
     const insights = targetIds.length ? await tx.pageInsight.deleteMany({ where: { targetId: { in: targetIds } } }) : { count: 0 };
     const adInsights = adAccountIds.length ? await tx.adInsight.deleteMany({ where: { adAccountId: { in: adAccountIds } } }) : { count: 0 };
     await tx.target.deleteMany({ where: { workspaceId: actor.workspaceId, id: { in: targetIds } } });
     await tx.adAccount.deleteMany({ where: { workspaceId: actor.workspaceId, id: { in: adAccountIds } } });
     await tx.socialAccount.deleteMany({ where: { id: account.id, workspaceId: actor.workspaceId } });
-    const counts = { channels: targetIds.length, adAccounts: adAccountIds.length, postTargets: targetLinks.length, orphanPosts: orphanPosts.count, comments: comments.count, conversations: deletedConversations.count, pageInsights: insights.count, adInsights: adInsights.count, scheduledRemote: stillScheduled };
+    const counts = { channels: targetIds.length, adAccounts: adAccountIds.length, postTargets: targetLinks.length, orphanPosts: orphanPosts.count, comments: comments.count, conversations: deletedConversations.count, conversationMessages: conversationMessages.count, pageInsights: insights.count, adInsights: adInsights.count, scheduledRemote: stillScheduled };
     await auditConnectionEvent(tx, actor, 'connection.local_disconnected', { socialAccountId: account.id, retained: false, counts });
     return { mode, deleted: counts, stillScheduled };
   });

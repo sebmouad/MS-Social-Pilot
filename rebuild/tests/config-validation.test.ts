@@ -24,7 +24,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(4);
+    expect(CONFIG_SCHEMA_VERSION).toBe(5);
     for (const prefix of ['meta.', 'youtube.', 'linkedin.', 'x.', 'sync.', 'api.', 'entitlements.', 'retention.', 'logging.', 'mcp.', 'theme.']) {
       expect(CONFIG_REGISTRY.some((item) => item.key.startsWith(prefix))).toBe(true);
     }
@@ -49,6 +49,10 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('sync.workerLeaseMinutes')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('sync.workerHeartbeatSeconds')!.schema.safeParse(30).success).toBe(true);
     expect(CONFIG_BY_KEY.get('sync.workerHeartbeatSeconds')!.schema.safeParse(1).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('auth.passwordMinLength')!.schema.safeParse(12).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('auth.passwordMinLength')!.schema.safeParse(4).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('auth.passwordMaxBytes')!.schema.safeParse(800).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('auth.passwordMaxBytes')!.schema.safeParse(16).success).toBe(false);
   });
 
   it('audits changes with key, change type, and registry version only', () => {

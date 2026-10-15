@@ -31,6 +31,31 @@ describe('workspace data controls', () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 
+  it('previews counts for every mapped dependent table without opening a deletion transaction', async () => {
+    const transaction = vi.fn();
+    Object.assign(mocks.prisma, {
+      membership: { findUnique: vi.fn().mockResolvedValue({ role: 'admin' }) },
+      workspace: { findUnique: vi.fn().mockResolvedValue({ id: 'w1' }) },
+      target: { findMany: vi.fn().mockResolvedValue([{ id: 't1' }]) },
+      adAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'a1' }]) },
+      post: { findMany: vi.fn().mockResolvedValue([{ id: 'p1' }]) },
+      postTarget: { findMany: vi.fn().mockResolvedValue([{ id: 'pt1' }]) },
+      conversation: { findMany: vi.fn().mockResolvedValue([{ id: 'c1' }]) },
+      postComment: { count: vi.fn().mockResolvedValue(2) },
+      conversationMessage: { count: vi.fn().mockResolvedValue(3) },
+      pageInsight: { count: vi.fn().mockResolvedValue(4) },
+      adInsight: { count: vi.fn().mockResolvedValue(5) },
+      socialAccount: { count: vi.fn().mockResolvedValue(1) },
+      $transaction: transaction,
+    });
+    const { previewWorkspaceDataDeletion } = await import('../src/server/data-control');
+    await expect(previewWorkspaceDataDeletion({ userId: 'u1', workspaceId: 'w1' })).resolves.toEqual({
+      posts: 1, postTargets: 1, comments: 2, targets: 1, conversations: 1,
+      conversationMessages: 3, pageInsights: 4, adAccounts: 1, adInsights: 5, socialAccounts: 1,
+    });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
   it('rechecks manager access and deletes dependent rows transactionally before auditing', async () => {
     const order: string[] = [];
     const tx = {

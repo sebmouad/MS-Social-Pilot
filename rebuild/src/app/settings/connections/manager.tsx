@@ -15,6 +15,8 @@ export function ConnectionManager({ sources, canManage, canConnectFacebook, init
   const [disconnect, setDisconnect] = useState<Source | null>(null);
   const [disconnectMode, setDisconnectMode] = useState<'retain' | 'delete'>('retain');
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletePreview, setDeletePreview] = useState<Record<string, number> | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const toggle = (kind: 'target' | 'adAccount', id: string, checked: boolean) => setSelected(current => ({ ...current, [`${kind}:${id}`]: checked }));
 
@@ -59,6 +61,17 @@ export function ConnectionManager({ sources, canManage, canConnectFacebook, init
     finally { setBusy(false); }
   }
 
+  async function previewDisconnect(source: Source) {
+    setPreviewBusy(true); setDeletePreview(null); setDeleteConfirmation(''); setNotice('');
+    try {
+      const response = await fetch('/api/connections', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ socialAccountId: source.id }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.counts) throw new Error(result.error ?? 'Could not preview related data.');
+      setDeletePreview(result.counts);
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Could not preview related data.'); }
+    finally { setPreviewBusy(false); }
+  }
+
   if (!canManage) return null;
   return <>
     <div className={styles['connection-toolbar']}><p>Choose the channels and advertising accounts this workspace uses.</p><div>{canConnectFacebook && <button type="button" onClick={connectFacebook} disabled={connecting}>{connecting ? 'Connecting…' : 'Connect Facebook'}</button>}<button type="button" className={styles['connection-primary-button']} onClick={() => setOpen(true)}>Manage selections</button></div></div>
@@ -78,11 +91,18 @@ export function ConnectionManager({ sources, canManage, canConnectFacebook, init
     {disconnect && <div className={styles['connection-backdrop']}><section className={styles['connection-dialog']} role="alertdialog" aria-modal="true" aria-labelledby="disconnect-title"><header><div><p className={styles['settings-eyebrow']}>Local disconnect</p><h2 id="disconnect-title">Disconnect {disconnect.name} locally?</h2><p>Neither choice revokes provider access or deletes content already published. Posts already handed to the provider may still publish.</p></div><button type="button" aria-label="Close" onClick={() => setDisconnect(null)}>×</button></header>
       <fieldset className={styles['connection-retention']}><legend>Related local data</legend>
         <label><input type="radio" name="disconnect-data" checked={disconnectMode === 'retain'} onChange={() => { setDisconnectMode('retain'); setDeleteConfirmation(''); }} disabled={busy} /><span>Retain history <small>Disable this source and keep its channels, account records, inbox, metrics, comments, and post links.</small></span></label>
-        <label><input type="radio" name="disconnect-data" checked={disconnectMode === 'delete'} onChange={() => setDisconnectMode('delete')} disabled={busy} /><span>Delete related local data <small>Remove {disconnect.targets.length} channel{disconnect.targets.length === 1 ? '' : 's'}, {disconnect.adAccounts.length} ad account{disconnect.adAccounts.length === 1 ? '' : 's'}, and their local history. A post remains if it still targets another channel.</small></span></label>
+        <label><input type="radio" name="disconnect-data" checked={disconnectMode === 'delete'} onChange={() => { setDisconnectMode('delete'); setDeletePreview(null); setDeleteConfirmation(''); }} disabled={busy} /><span>Delete related local data <small>Remove channels and accounts with their mapped local history. A post remains if it still targets another channel.</small></span></label>
       </fieldset>
-      {disconnectMode === 'delete' && <label className={styles['disconnect-confirm']}>Type DELETE to confirm<input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.currentTarget.value)} autoComplete="off" disabled={busy} /></label>}
+      {disconnectMode === 'delete' && <>
+        {!deletePreview ? <button type="button" onClick={() => previewDisconnect(disconnect)} disabled={busy || previewBusy}>{previewBusy ? 'Counting rows…' : 'Preview related rows'}</button> : <>
+          <p className={styles['settings-note']}>Current rows in the mapped related tables:</p>
+          <ul>{Object.entries(deletePreview).map(([name, count]) => <li key={name}>{name}: {count}</li>)}</ul>
+          <button type="button" onClick={() => previewDisconnect(disconnect)} disabled={busy || previewBusy}>{previewBusy ? 'Counting rows…' : 'Refresh preview'}</button>
+          <label className={styles['disconnect-confirm']}>Type DELETE to confirm<input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.currentTarget.value)} autoComplete="off" disabled={busy} /></label>
+        </>}
+      </>}
       {notice && <p role="alert" className={styles['connection-error']}>{notice}</p>}
-      <footer><button type="button" onClick={() => setDisconnect(null)} disabled={busy}>Cancel</button><button type="button" className={styles['connection-danger-button']} onClick={disconnectSource} disabled={busy || (disconnectMode === 'delete' && deleteConfirmation !== 'DELETE')}>{busy ? 'Disconnecting…' : disconnectMode === 'delete' ? 'Disconnect and delete data' : 'Disconnect and retain data'}</button></footer>
+      <footer><button type="button" onClick={() => setDisconnect(null)} disabled={busy}>Cancel</button><button type="button" className={styles['connection-danger-button']} onClick={disconnectSource} disabled={busy || (disconnectMode === 'delete' && (!deletePreview || deleteConfirmation !== 'DELETE'))}>{busy ? 'Disconnecting…' : disconnectMode === 'delete' ? 'Disconnect and delete data' : 'Disconnect and retain data'}</button></footer>
     </section></div>}
   </>;
 }

@@ -6,7 +6,7 @@ import { platformFor } from '@/server/platforms/registry';
 import { runtimeConfig } from '@/server/config/store';
 import { hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
 
-export type PublishingActor = { userId: string; workspaceId: string };
+export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
 const MANAGERS = new Set(['owner', 'admin', 'editor']);
 type PublishingLimits = { maxText: number; maxImportRows: number; maxImportBytes: number; maxTargets: number };
@@ -40,6 +40,7 @@ function validFirstComment(value: string, maxText: number) {
 
 async function validateTargets(actor: PublishingActor, ids: string[], maxTargets: number) {
   if (ids.length > maxTargets || new Set(ids).size !== ids.length) throw new Error(`Choose up to ${maxTargets} distinct destinations.`);
+  if (actor.allowedTargetIds && ids.some(id => !actor.allowedTargetIds!.includes(id))) throw new Error('One or more destinations are outside your channel access.');
   if (!ids.length) return [];
   const targets = await prisma.target.findMany({
     where: { id: { in: ids }, workspaceId: actor.workspaceId, enabled: true, canPublish: true },
@@ -56,6 +57,73 @@ async function validateTargets(actor: PublishingActor, ids: string[], maxTargets
     }
   }
   return targets;
+}
+
+async function assertPostScope(actor: PublishingActor, postId: string) {
+  if (!actor.allowedTargetIds) return;
+  const rows = await prisma.postTarget.findMany({ where: { postId, post: { workspaceId: actor.workspaceId } }, select: { targetId: true } });
+  if (rows.some(row => !actor.allowedTargetIds!.includes(row.targetId))) throw new Error('This post is unavailable in your channel scope.');
+}
+
+function canManage(role: string, authorId: string, userId: string) {
+  return MANAGERS.has(role) || authorId === userId;
+}
+
+/** Submit an authored draft for review. */
+export async function submitPostForApproval(actor: PublishingActor, postId: string) {
+  const role = await membership(actor);
+  await assertPostScope(actor, postId);
+  await prisma.$transaction(async tx => {
+    const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true } } } });
+    if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length) throw new Error('This post cannot be submitted for approval.');
+    await tx.post.update({ where: { id: post.id }, data: { status: 'pending_approval', scheduledAt: null, updatedAt: new Date() } });
+    await audit(tx, actor, 'publishing.post_submitted_for_approval', { postId: post.id });
+  });
+}
+
+/** Reviewers may approve to draft or reject; clients cannot review their own posts. */
+export async function reviewPost(actor: PublishingActor, postId: string, decision: 'approve' | 'reject') {
+  const member = await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
+  if (!member || !['owner', 'admin', 'editor', 'client'].includes(member.role)) throw new Error('You do not have permission to review posts.');
+  if (member.role === 'client') {
+    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { authorId: true } });
+    if (post?.authorId === actor.userId) throw new Error('You cannot review your own post.');
+  }
+  await assertPostScope(actor, postId);
+  await prisma.$transaction(async tx => {
+    const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, status: true } });
+    if (!post || post.status !== 'pending_approval') throw new Error('This post is no longer awaiting approval.');
+    const status = decision === 'approve' ? 'draft' : 'rejected';
+    const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'pending_approval' }, data: { status, updatedAt: new Date() } });
+    if (changed.count !== 1) throw new Error('This post is no longer awaiting approval.');
+    await audit(tx, actor, decision === 'approve' ? 'publishing.post_approved' : 'publishing.post_rejected', { postId: post.id });
+  });
+}
+
+/** Schedule a local queued post for a future time. */
+export async function schedulePost(actor: PublishingActor, postId: string, scheduledAt: Date) {
+  const role = await membership(actor);
+  await assertPostScope(actor, postId);
+  if (!(scheduledAt instanceof Date) || !Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) throw new Error('Choose a future publishing time.');
+  await prisma.$transaction(async tx => {
+    const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { status: true } } } });
+    if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length || post.targets.some(target => target.status !== 'pending')) throw new Error('This post cannot be scheduled.');
+    await tx.post.update({ where: { id: post.id }, data: { status: 'scheduled', scheduledAt, updatedAt: new Date() } });
+    await audit(tx, actor, 'publishing.post_scheduled', { postId: post.id, scheduledAt: scheduledAt.toISOString() });
+  });
+}
+
+/** Cancel a locally queued post back to draft while it is still pending delivery. */
+export async function cancelScheduledPost(actor: PublishingActor, postId: string) {
+  const role = await membership(actor);
+  await assertPostScope(actor, postId);
+  await prisma.$transaction(async tx => {
+    const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { status: true, remotePostId: true } } } });
+    if (!post || !canManage(role.role, post.authorId, actor.userId) || post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new Error('This queued post can no longer be cancelled locally.');
+    const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'scheduled' }, data: { status: 'draft', scheduledAt: null, updatedAt: new Date() } });
+    if (changed.count !== 1) throw new Error('This queued post can no longer be cancelled locally.');
+    await audit(tx, actor, 'publishing.post_schedule_cancelled', { postId: post.id });
+  });
 }
 
 export async function createPost(actor: PublishingActor, input: { message: string; firstComment: string; targetIds: string[] }) {
@@ -76,6 +144,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
 
 export async function updatePost(actor: PublishingActor, input: { postId: string; message: string; firstComment: string; targetIds: string[] }) {
   const role = await membership(actor);
+  await assertPostScope(actor, input.postId);
   const config = await limits();
   const text = validText(input.message, config.maxText);
   const firstComment = validFirstComment(input.firstComment, config.maxText);
@@ -93,6 +162,7 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
 /** Local deletion is always explicit. Requested remote deletion runs first through each destination adapter. */
 export async function deletePost(actor: PublishingActor, postId: string, deleteRemote: boolean) {
   const role = await membership(actor);
+  await assertPostScope(actor, postId);
   if (deleteRemote && !MANAGERS.has(role.role)) throw new Error('Only workspace owners, admins, and editors can delete remote posts.');
   const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, providerId: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
   if (!post || (role.role === 'contributor' && post.authorId !== actor.userId)) throw new Error('This post is unavailable in the current workspace.');
@@ -132,9 +202,12 @@ export async function deletePost(actor: PublishingActor, postId: string, deleteR
 
 /** Claim each destination before the provider call. `processing` remains as a manual-reconciliation marker on ambiguous failures. */
 export async function publishPost(actor: PublishingActor, postId: string) {
-  await membership(actor);
-  const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, message: true, firstComment: true, status: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
-  if (!post) throw new Error('This post is unavailable in the current workspace.');
+  const role = await membership(actor);
+  await assertPostScope(actor, postId);
+  const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, message: true, firstComment: true, status: true, scheduledAt: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
+  if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new Error('This post is unavailable in the current workspace.');
+  if (!['draft', 'scheduled', 'failed', 'partially_failed'].includes(post.status)) throw new Error('This post cannot be published in its current state.');
+  if (post.status === 'scheduled' && (!post.scheduledAt || post.scheduledAt > new Date())) throw new Error('This post is scheduled for a future time.');
   if (!post.targets.length) throw new Error('Select at least one destination before publishing.');
   const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
   if (!entitlements) throw new Error('This workspace is unavailable.');
@@ -173,9 +246,10 @@ export async function publishPost(actor: PublishingActor, postId: string) {
 }
 
 export async function syncPostStatus(actor: PublishingActor, postId: string) {
-  await membership(actor);
-  const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, status: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
-  if (!post) throw new Error('This post is unavailable in the current workspace.');
+  const role = await membership(actor);
+  await assertPostScope(actor, postId);
+  const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
+  if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new Error('This post is unavailable in the current workspace.');
   const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
   if (!entitlements) throw new Error('This workspace is unavailable.');
   let synced = 0;
@@ -206,7 +280,8 @@ export async function syncPostStatus(actor: PublishingActor, postId: string) {
 
 /** Strict CSV: header columns `message,firstComment,targetIds`; targetIds are semicolon-separated local target IDs. */
 export async function importPostsCsv(actor: PublishingActor, csv: string) {
-  await membership(actor);
+  const role = await membership(actor);
+  if (!MANAGERS.has(role.role)) throw new Error('Only workspace managers can import batches of posts.');
   const config = await limits();
   if (new TextEncoder().encode(csv).length > config.maxImportBytes) throw new Error(`CSV file must be ${Math.ceil(config.maxImportBytes / 1024)} KiB or smaller.`);
   const rows = parsePublishingCsv(csv);

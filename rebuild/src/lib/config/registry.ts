@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 4;
+export const CONFIG_SCHEMA_VERSION = 5;
 
 const cron = z.string().min(9).max(100).refine((value) => {
   const fields = value.trim().split(/\s+/);
@@ -19,7 +19,7 @@ type Entry = {
   key: string; group: string; label: string; kind: 'text' | 'secret' | 'boolean' | 'number' | 'select' | 'json';
   description: string; defaultValue: unknown; schema: z.ZodTypeAny; consumption: Consumption; options?: readonly Option[];
 };
-const entry = <T extends Entry>(value: T) => value;
+const entry = <const T extends Entry>(value: T) => value;
 const options = (values: readonly { id: string; name: string }[]): Option[] => values.map(({ id, name }) => ({ value: id, label: name }));
 
 /**
@@ -27,13 +27,15 @@ const options = (values: readonly { id: string; name: string }[]): Option[] => v
  * separates live controls from settings that are stored for upcoming runtime
  * integrations; the UI must preserve that distinction.
  */
-export const CONFIG_REGISTRY: Entry[] = [
+export const CONFIG_REGISTRY = [
   entry({ key: 'platforms.facebook.enabled', group: 'Platforms', label: 'Facebook engine enabled', kind: 'boolean', description: 'Make the installed Facebook adapter available to workspace features. Connected data remains stored when disabled.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'auth.loginAttempts', group: 'Security · rate limits', label: 'Sign-in attempts allowed', kind: 'number', description: 'Maximum password or verification attempts per account during one window.', defaultValue: 10, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'auth.loginWindowMinutes', group: 'Security · rate limits', label: 'Sign-in attempt window', kind: 'number', description: 'Minutes before failed sign-in attempts reset.', defaultValue: 15, schema: z.number().int().min(1).max(1440), consumption: 'active' }),
   entry({ key: 'auth.sessionDays', group: 'Security · sessions', label: 'Full session lifetime (days)', kind: 'number', description: 'Maximum age of a fully verified browser session.', defaultValue: 30, schema: z.number().int().min(1).max(365), consumption: 'active' }),
   entry({ key: 'auth.pendingMinutes', group: 'Security · sessions', label: 'Two-step challenge lifetime (minutes)', kind: 'number', description: 'Time allowed to complete a password-verified two-step challenge.', defaultValue: 15, schema: z.number().int().min(1).max(120), consumption: 'active' }),
   entry({ key: 'auth.recoveryCodeCount', group: 'Security · sessions', label: 'Recovery codes per enrollment', kind: 'number', description: 'Number of one-time recovery codes issued when enrolling an authenticator.', defaultValue: 10, schema: z.number().int().min(1).max(50), consumption: 'active' }),
+  entry({ key: 'auth.passwordMinLength', group: 'Security · passwords', label: 'Minimum password length', kind: 'number', description: 'Minimum number of characters required when a user changes a password.', defaultValue: 12, schema: z.number().int().min(8).max(64), consumption: 'active' }),
+  entry({ key: 'auth.passwordMaxBytes', group: 'Security · passwords', label: 'Maximum password bytes', kind: 'number', description: 'Maximum UTF-8 byte length accepted for a new password.', defaultValue: 800, schema: z.number().int().min(64).max(4096), consumption: 'active' }),
   entry({ key: 'security.twoStep', group: 'Security', label: 'Two-step requirement', kind: 'select', description: 'Admins, everyone, or off. Enrolled factors still require verification.', defaultValue: 'admins', schema: z.enum(['admins', 'everyone', 'off']), consumption: 'active', options: [{ value: 'admins', label: 'Admins' }, { value: 'everyone', label: 'Everyone' }, { value: 'off', label: 'Off' }] }),
   entry({ key: 'security.apiRequestsPerMinute', group: 'Security · rate limits', label: 'API requests per minute', kind: 'number', description: 'Default per-actor request budget for application APIs.', defaultValue: 120, schema: z.number().int().min(1).max(100000), consumption: 'planned' }),
 
@@ -79,8 +81,8 @@ export const CONFIG_REGISTRY: Entry[] = [
   entry({ key: 'publishing.maxImportBytes', group: 'Publishing limits', label: 'Maximum import file size', kind: 'number', description: 'Maximum CSV bytes accepted in one bulk import.', defaultValue: 256000, schema: z.number().int().min(1024).max(100000000), consumption: 'active' }),
   entry({ key: 'publishing.maxTargetsPerPost', group: 'Publishing limits', label: 'Maximum channels per post', kind: 'number', description: 'Maximum selected destinations for one post.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
 
-  ...MODULES.map((module) => entry({ key: `entitlements.modules.${module.id}`, group: 'Entitlements · modules', label: `${module.title} available`, kind: 'boolean' as const, description: `Installation-wide default availability for the ${module.title} module. Existing workspace and plan restrictions remain in force.`, defaultValue: true, schema: z.boolean(), consumption: 'active' as const })),
-  ...PAGES.map((page) => entry({ key: `entitlements.features.${page.id}`, group: 'Entitlements · features', label: `${page.title} available`, kind: 'boolean' as const, description: `Installation-wide default availability for ${page.title}. Existing workspace and plan restrictions remain in force.`, defaultValue: true, schema: z.boolean(), consumption: 'active' as const })),
+  ...MODULES.map((module) => entry({ key: `entitlements.modules.${module.id}` as const, group: 'Entitlements · modules', label: `${module.title} available`, kind: 'boolean' as const, description: `Installation-wide default availability for the ${module.title} module. Existing workspace and plan restrictions remain in force.`, defaultValue: true, schema: z.boolean(), consumption: 'active' as const })),
+  ...PAGES.map((page) => entry({ key: `entitlements.features.${page.id}` as const, group: 'Entitlements · features', label: `${page.title} available`, kind: 'boolean' as const, description: `Installation-wide default availability for ${page.title}. Existing workspace and plan restrictions remain in force.`, defaultValue: true, schema: z.boolean(), consumption: 'active' as const })),
 
   entry({ key: 'retention.auditDays', group: 'Retention', label: 'Audit history retention (days)', kind: 'number', description: 'How long Root and security audit records are retained.', defaultValue: 365, schema: z.number().int().min(1).max(3650), consumption: 'planned' }),
   entry({ key: 'retention.syncLogDays', group: 'Retention', label: 'Sync log retention (days)', kind: 'number', description: 'How long completed and failed sync logs are retained.', defaultValue: 30, schema: z.number().int().min(1).max(3650), consumption: 'planned' }),
@@ -98,11 +100,12 @@ export const CONFIG_REGISTRY: Entry[] = [
   entry({ key: 'mcp.keys.requestsPerMinute', group: 'MCP · API keys', label: 'API key requests per minute', kind: 'number', description: 'Request budget applied independently to each MCP bearer key.', defaultValue: 60, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
   entry({ key: 'theme.default', group: 'Theme defaults', label: 'Default workspace theme', kind: 'select', description: 'Theme used when a visitor has no saved theme preference.', defaultValue: 'grove', schema: optionList(THEMES.map((theme) => theme.id)), consumption: 'active', options: options(THEMES) }),
   entry({ key: 'operations.supportEmail', group: 'Operations', label: 'Support email', kind: 'text', description: 'Contact address shown to operators.', defaultValue: '', schema: z.union([z.literal(''), z.string().email()]), consumption: 'planned' }),
-];
+] as const satisfies readonly Entry[];
 
 export type ConfigKey = (typeof CONFIG_REGISTRY)[number]['key'];
+export type ConfigValue<K extends ConfigKey> = z.infer<Extract<(typeof CONFIG_REGISTRY)[number], { key: K }>['schema']>;
 export type ConfigKind = Entry['kind'];
-export const CONFIG_BY_KEY = new Map(CONFIG_REGISTRY.map((item) => [item.key, item]));
+export const CONFIG_BY_KEY = new Map<string, Entry>(CONFIG_REGISTRY.map((item) => [item.key, item]));
 
 /** Availability controls are generated from the actual rebuild catalog. */
 export const AVAILABILITY_CATALOG = {
@@ -111,7 +114,7 @@ export const AVAILABILITY_CATALOG = {
 } as const;
 
 export function safeConfigShape() {
-  return CONFIG_REGISTRY.map(({ key, group, label, kind, description, defaultValue, consumption, options: choices }) => ({
+  return (CONFIG_REGISTRY as readonly Entry[]).map(({ key, group, label, kind, description, defaultValue, consumption, options: choices }) => ({
     key, group, label, kind, description, defaultValue, consumption, options: choices,
   }));
 }

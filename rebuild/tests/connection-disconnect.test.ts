@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ transaction: vi.fn() }));
-vi.mock('../src/server/data', () => ({ prisma: { $transaction: mocks.transaction } }));
+const mocks = vi.hoisted(() => ({ transaction: vi.fn(), prisma: {} as Record<string, unknown> }));
+vi.mock('../src/server/data', () => ({ prisma: Object.assign(mocks.prisma, { $transaction: mocks.transaction }) }));
 
 afterEach(() => vi.clearAllMocks());
 
@@ -26,6 +26,26 @@ describe('disconnect local data choices', () => {
     mocks.transaction.mockImplementation(async (run: (client: typeof tx) => Promise<unknown>) => run(tx));
     const { disconnectSocialAccount } = await import('../src/server/connection-mutations');
     await expect(disconnectSocialAccount({ userId: 'u1', workspaceId: 'w1' }, 's1', 'delete')).rejects.toThrow(/Type DELETE/);
+  });
+
+  it('previews related deletion counts without starting a transaction', async () => {
+    Object.assign(mocks.prisma, {
+      membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }) },
+      socialAccount: { findFirst: vi.fn().mockResolvedValue({ id: 's1', targets: [{ id: 't1' }], adAccounts: [{ id: 'a1' }] }) },
+      postTarget: { findMany: vi.fn().mockResolvedValue([{ id: 'pt1', postId: 'p1' }]), count: vi.fn().mockResolvedValue(1) },
+      conversation: { findMany: vi.fn().mockResolvedValue([{ id: 'c1' }]) },
+      post: { findMany: vi.fn().mockResolvedValue([{ id: 'p1' }]) },
+      postComment: { count: vi.fn().mockResolvedValue(2) },
+      conversationMessage: { count: vi.fn().mockResolvedValue(3) },
+      pageInsight: { count: vi.fn().mockResolvedValue(4) },
+      adInsight: { count: vi.fn().mockResolvedValue(5) },
+    });
+    const { previewSocialAccountDeletion } = await import('../src/server/connection-mutations');
+    await expect(previewSocialAccountDeletion({ userId: 'u1', workspaceId: 'w1' }, 's1')).resolves.toEqual({
+      channels: 1, adAccounts: 1, postTargets: 1, orphanPosts: 1, comments: 2,
+      conversations: 1, conversationMessages: 3, pageInsights: 4, adInsights: 5, scheduledRemote: 1,
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
   it('preserves local records while provider-scheduled posts remain', async () => {

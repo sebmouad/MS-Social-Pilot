@@ -10,10 +10,11 @@ const log = (message: string, detail?: unknown) => console.log(`${new Date().toI
 const dependencies: WorkerDependencies = {
   readConfig: runtimeConfig,
   async execute(job: JobName, now: Date, retryLimit: number) {
-    const { syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } = await import('../src/server/jobs/sync');
+    const { publishDuePosts, syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } = await import('../src/server/jobs/sync');
     if (job === 'posts') {
-      const result = await syncScheduledPostStatus(now, retryLimit);
-      return `checked=${result.examined} updated=${result.updated} skipped=${result.skipped} failed=${result.failed}`;
+      const due = await publishDuePosts(now);
+      const remote = await syncScheduledPostStatus(now, retryLimit);
+      return `due=${due.examined}/${due.updated} remote=${remote.examined}/${remote.updated} skipped=${due.skipped + remote.skipped} failed=${due.failed + remote.failed}`;
     }
     if (job === 'analytics') {
       const page = await syncPageAnalytics(now, retryLimit);

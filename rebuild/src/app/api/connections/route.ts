@@ -1,11 +1,26 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
-import { disconnectSocialAccount, setConnectionSelections } from '@/server/connection-mutations';
+import { disconnectSocialAccount, previewSocialAccountDeletion, setConnectionSelections } from '@/server/connection-mutations';
 
 export const runtime = 'nodejs';
 const selectionSchema = z.object({ items: z.array(z.object({ kind: z.enum(['target', 'adAccount']), id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), enabled: z.boolean() })).max(250) });
 const disconnectSchema = z.object({ socialAccountId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/), mode: z.enum(['retain', 'delete']).default('retain'), confirmation: z.string().max(20).optional() });
+const previewSchema = z.object({ socialAccountId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/) });
+
+export async function POST(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 });
+  let viewer;
+  try { viewer = await requireViewer({ feature: 'settings/connections' }); }
+  catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
+  try {
+    const input = previewSchema.parse(await request.json());
+    const counts = await previewSocialAccountDeletion({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input.socialAccountId);
+    return NextResponse.json({ counts }, { headers: { 'cache-control': 'no-store' } });
+  } catch (error) {
+    return connectionError(error, 'Could not preview related data.');
+  }
+}
 
 export async function PATCH(request: Request) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 });

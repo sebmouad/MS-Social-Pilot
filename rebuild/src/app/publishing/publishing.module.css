@@ -33,6 +33,9 @@
 .hiddenForm { display: none; }
 .editDetails summary { cursor: pointer; color: var(--accent); font-size: 12px; font-weight: 700; }
 .editForm { min-width: min(360px, 72vw); margin-top: 10px; }
+.scheduleForm { display: grid; justify-items: start; gap: 6px; }
+.scheduleForm label { color: var(--ink-soft); font-size: 11px; }
+.scheduleForm input[type="datetime-local"] { display: block; max-width: 220px; margin-top: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--surface); font: inherit; }
 .help { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
 .targetReference { display: grid; gap: 4px; max-height: 120px; overflow: auto; margin: 0; padding-left: 20px; color: var(--ink-soft); font-size: 11px; }
 .targetPicker { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 6px 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; }

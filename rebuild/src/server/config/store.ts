@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import { CONFIG_BY_KEY, CONFIG_REGISTRY, CONFIG_SCHEMA_VERSION, type ConfigKey } from '@/lib/config/registry';
+import { CONFIG_BY_KEY, CONFIG_REGISTRY, CONFIG_SCHEMA_VERSION, type ConfigKey, type ConfigValue } from '@/lib/config/registry';
 import { prisma } from '@/server/data';
 import { Prisma } from '../../../generated/client';
 
@@ -29,6 +29,8 @@ function decrypt(value: string): string {
 }
 
 /** Runtime readers always validate stored values against the current registry. */
+export function runtimeConfig<K extends ConfigKey>(key: K): Promise<ConfigValue<K>>;
+export function runtimeConfig(key: string): Promise<unknown>;
 export async function runtimeConfig(key: string): Promise<unknown> {
   const definition = CONFIG_BY_KEY.get(key);
   if (!definition || definition.kind === 'secret') throw new Error('Unknown non-secret configuration key.');

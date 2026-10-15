@@ -13,21 +13,29 @@ const NOTICE_TEXT: Record<string, string> = {
   deleted: "Post deleted locally.",
   failed: "The publishing action could not be completed. Check permissions, connection status, and post state, then try again.",
   published: "Publishing completed.",
+  submitted: "Post submitted for approval.",
+  scheduled: "Post added to the queue.",
+  cancelled: "Scheduled post returned to drafts.",
   "publish-review": "Some destinations still need review. Their claimed publishing records were kept to prevent duplicate posts.",
   synced: "Remote status sync completed.",
 };
 
 export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
-  const viewer = await requireViewer({ feature: 'publishing/posts' });
-  const posts = await listPosts(viewer.workspaceId);
+  const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
+  const allowedTargetIds = viewer.permissions.pageScope.all ? null : viewer.permissions.pageScope.ids;
+  const rawPosts = await listPosts(viewer.workspaceId);
+  const extraPosts = await prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, id: { in: rawPosts.map(post => post.id) } }, select: { id: true, firstComment: true, authorId: true } });
+  const byPost = new Map(extraPosts.map(post => [post.id, post]));
+  const posts = allowedTargetIds === null ? rawPosts : rawPosts.filter(post => post.targets.length
+    ? post.targets.every(item => allowedTargetIds.includes(item.target.id))
+    : byPost.get(post.id)?.authorId === viewer.user.id);
   const targetRows = await getTargets(viewer.workspaceId);
-  const targetChoices = await Promise.all(targetRows.map(async target => {
+  const scopedTargetRows = allowedTargetIds === null ? targetRows : targetRows.filter(target => allowedTargetIds.includes(target.id));
+  const targetChoices = await Promise.all(scopedTargetRows.map(async target => {
     const provider = target.socialAccount?.provider ?? null;
     const adapter = provider && hasPlatformCapability(viewer.entitlements, provider) ? await platformFor(provider, 'publishing') : null;
     return { id: target.id, name: target.name, type: target.type, provider, canPublish: Boolean(target.canPublish && !target.socialAccount?.invalidatedAt && adapter?.publish && adapter.supportsTargetKind?.(target.type, 'publishing')) };
   }));
-  const extraPosts = await prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, id: { in: posts.map(post => post.id) } }, select: { id: true, firstComment: true, authorId: true } });
-  const byPost = new Map(extraPosts.map(post => [post.id, post]));
   const rows = posts.map(post => ({ ...post, firstComment: byPost.get(post.id)?.firstComment ?? null, authorId: byPost.get(post.id)?.authorId ?? '' }));
   const { notice } = await searchParams;
   const noticeText = notice ? NOTICE_TEXT[notice] ?? (notice.startsWith('imported-') ? `${notice.slice('imported-'.length)} posts imported as drafts.` : undefined) : undefined;
