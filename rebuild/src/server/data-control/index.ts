@@ -9,6 +9,8 @@ const MANAGER_ROLES = new Set(['owner', 'admin']);
 type DataControlTransaction = import('../../../generated/client').Prisma.TransactionClient;
 type WorkspaceTable = { tableName: string };
 const MAPPED_DIRECT_TABLES = new Set(['posts', 'targets', 'ad_accounts', 'social_accounts']);
+const EXCLUDED_WORKSPACE_TABLES = new Set(['memberships', 'workspace_data_purges']);
+const SENSITIVE_FIELD = /(?:access.?token|refresh.?token|token|secret|password|credential|private.?key|client.?secret|api.?key)/i;
 
 /** Discover tables whose workspace ownership is enforced by a real FK, excluding identity and membership. */
 async function workspaceTables(tx: DataControlTransaction | typeof prisma): Promise<string[]> {
@@ -23,6 +25,29 @@ async function workspaceTables(tx: DataControlTransaction | typeof prisma): Prom
     ORDER BY child.relname
   `;
   return [...new Set(rows.map(row => row.tableName))];
+}
+
+function scrubLegacyValue(value: unknown): unknown {
+  if (typeof value === 'bigint') return value.toString();
+  if (Array.isArray(value)) return value.map(scrubLegacyValue);
+  if (value && typeof value === 'object' && !(value instanceof Date) && !Buffer.isBuffer(value)) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, SENSITIVE_FIELD.test(key) ? '[REDACTED]' : scrubLegacyValue(item)]));
+  }
+  return value;
+}
+
+async function exportLegacyWorkspaceTables(workspaceId: string) {
+  const tables = (await workspaceTables(prisma)).filter(table => !MAPPED_DIRECT_TABLES.has(table) && !EXCLUDED_WORKSPACE_TABLES.has(table));
+  const datasets: Record<string, unknown[]> = {};
+  const rowCounts: Record<string, number> = {};
+  for (const table of tables) {
+    const rows = await prisma.$queryRawUnsafe<Record<string, unknown>[]>(
+      `SELECT * FROM ${tableSql(table)} WHERE "workspaceId" = $1`, workspaceId,
+    );
+    datasets[table] = rows.map(row => scrubLegacyValue(row) as Record<string, unknown>);
+    rowCounts[table] = rows.length;
+  }
+  return { datasets, rowCounts, tables };
 }
 
 function tableSql(table: string) {
@@ -52,6 +77,7 @@ async function assertManager(actor: DataControlActor) {
 /** Export workspace content and operational history while stripping provider credentials. */
 export async function exportWorkspaceData(actor: DataControlActor) {
   await assertManager(actor);
+  const maxBytes = await runtimeConfig('data.maxArchiveBytes') as number;
   const workspace = await prisma.workspace.findUnique({ where: { id: actor.workspaceId } });
   if (!workspace) throw new Error('This workspace is unavailable.');
   const [memberships, socialAccounts, targets, adAccounts, posts] = await Promise.all([
@@ -61,7 +87,8 @@ export async function exportWorkspaceData(actor: DataControlActor) {
     prisma.adAccount.findMany({ where: { workspaceId: actor.workspaceId }, include: { insights: true } }),
     prisma.post.findMany({ where: { workspaceId: actor.workspaceId }, include: { targets: { include: { comments: true, target: { select: { id: true, type: true, providerId: true, name: true } } } } } }),
   ]);
-  return {
+  const legacy = await exportLegacyWorkspaceTables(actor.workspaceId);
+  const exported = {
     format: 'ms-social-pilot-workspace-export', version: 1, exportedAt: new Date().toISOString(),
     workspace, memberships,
     socialAccounts: socialAccounts.map(account => ({
@@ -72,8 +99,18 @@ export async function exportWorkspaceData(actor: DataControlActor) {
     })),
     targets: targets.map(({ accessToken: _token, ...target }) => target),
     adAccounts, posts,
+    legacyTables: legacy.datasets,
+    coverage: {
+      directlyOwnedLegacyTables: legacy.tables,
+      directlyOwnedLegacyRowCounts: legacy.rowCounts,
+      directlyOwnedLegacyTablesComplete: true,
+      complete: false,
+      omitted: ['instance-wide audit and authentication records', 'records owned indirectly through non-workspace foreign keys'],
+    },
     security: { credentialsExcluded: true, auditLogExcluded: true, note: 'Provider access tokens and instance-wide audit records are excluded.' },
   };
+  if (Buffer.byteLength(JSON.stringify(exported)) > maxBytes) throw new Error('Workspace database export exceeds the configured archive size limit.');
+  return exported;
 }
 
 /** Read-only count preview for the rows deleteWorkspaceData will remove. */

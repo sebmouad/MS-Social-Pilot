@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   prisma: {} as Record<string, any>,
-  runtimeConfig: vi.fn(async (key: string) => key === 'storage.mediaRoot' ? '/tmp/media' : key === 'data.deleteTransactionTimeoutMs' ? 120000 : undefined),
+  runtimeConfig: vi.fn(async (key: string): Promise<string | number | undefined> => key === 'storage.mediaRoot' ? '/tmp/media' : key === 'data.deleteTransactionTimeoutMs' ? 120000 : key === 'data.maxArchiveBytes' ? 268435456 : undefined),
   canonicalMediaRoot: vi.fn(async (root: string) => root),
   removeWorkspaceStorage: vi.fn(async () => ({ files: 2, bytes: 17 })),
 }));
@@ -16,7 +16,7 @@ vi.mock('../src/server/data-control/storage', () => ({
 
 afterEach(() => {
   vi.clearAllMocks();
-  mocks.runtimeConfig.mockImplementation(async (key: string) => key === 'storage.mediaRoot' ? '/tmp/media' : key === 'data.deleteTransactionTimeoutMs' ? 120000 : undefined);
+  mocks.runtimeConfig.mockImplementation(async (key: string) => key === 'storage.mediaRoot' ? '/tmp/media' : key === 'data.deleteTransactionTimeoutMs' ? 120000 : key === 'data.maxArchiveBytes' ? 268435456 : undefined);
   mocks.canonicalMediaRoot.mockImplementation(async (root: string) => root);
   mocks.removeWorkspaceStorage.mockResolvedValue({ files: 2, bytes: 17 });
   for (const key of Object.keys(mocks.prisma)) delete mocks.prisma[key];
@@ -72,13 +72,22 @@ describe('workspace data controls', () => {
       target: { findMany: vi.fn().mockResolvedValue([{ id: 't1', accessToken: 'page-secret', name: 'Page' }]) },
       adAccount: { findMany: vi.fn().mockResolvedValue([]) },
       post: { findMany: vi.fn().mockResolvedValue([]) },
+      $queryRaw: vi.fn().mockResolvedValue([{ tableName: 'media' }]),
+      $queryRawUnsafe: vi.fn().mockResolvedValue([{ id: 'm1', workspaceId: 'w1', ordinal: BigInt(5), accessToken: 'legacy-secret', settings: { client_secret: 'nested-secret', label: 'ok' } }]),
     });
     const { exportWorkspaceData } = await import('../src/server/data-control');
     const data = await exportWorkspaceData({ userId: 'u1', workspaceId: 'w1' });
     expect(data.socialAccounts[0]).not.toHaveProperty('accessToken');
     expect(data.targets[0]).not.toHaveProperty('accessToken');
     expect(JSON.stringify(data)).not.toContain('secret-token');
+    expect(data.legacyTables.media[0]).toMatchObject({ id: 'm1', ordinal: '5', accessToken: '[REDACTED]', settings: { client_secret: '[REDACTED]', label: 'ok' } });
+    expect(JSON.stringify(data)).not.toContain('legacy-secret');
+    expect(JSON.stringify(data)).not.toContain('nested-secret');
+    expect(data.coverage).toMatchObject({ directlyOwnedLegacyTables: ['media'], directlyOwnedLegacyRowCounts: { media: 1 }, directlyOwnedLegacyTablesComplete: true, complete: false });
+    expect(mocks.prisma.$queryRawUnsafe).toHaveBeenCalledWith('SELECT * FROM "public"."media" WHERE "workspaceId" = $1', 'w1');
     expect(data.security).toMatchObject({ credentialsExcluded: true, auditLogExcluded: true });
+    mocks.runtimeConfig.mockImplementation(async (key: string) => key === 'data.maxArchiveBytes' ? 100 : undefined);
+    await expect(exportWorkspaceData({ userId: 'u1', workspaceId: 'w1' })).rejects.toThrow('exceeds the configured archive size limit');
   });
 
   it('previews counts for mapped and FK-owned tables without deleting', async () => {

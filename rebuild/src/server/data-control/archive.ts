@@ -43,17 +43,20 @@ export async function exportWorkspaceArchive(actor: DataControlActor): Promise<B
   try {
     await zip.add('database/workspace.json', databaseJson);
     for (const file of files) await zip.add(file.path, file.content);
+    const legacyTables = data.coverage?.directlyOwnedLegacyTables ?? [];
+    const legacyRowCounts = data.coverage?.directlyOwnedLegacyRowCounts ?? {};
     const manifest = {
       format: 'ms-social-pilot-workspace-archive', version: 1,
       exportedAt: new Date().toISOString(), workspaceId: actor.workspaceId,
       database: {
         file: 'database/workspace.json', complete: false,
-        includedDatasets: ['workspace', 'memberships', 'socialAccounts', 'targets', 'target insights', 'conversations and messages', 'post targets and comments', 'ad accounts and insights', 'posts'],
-        omitted: ['other legacy feature tables and records not represented by the rebuild data-control export', 'instance-wide audit and authentication records'],
+        includedDatasets: ['workspace', 'memberships', 'socialAccounts', 'targets', 'target insights', 'conversations and messages', 'post targets and comments', 'ad accounts and insights', 'posts', ...legacyTables.map((table: string) => `legacy table: ${table}`)],
+        legacyTables: legacyTables.map((table: string) => ({ table, rows: legacyRowCounts[table] ?? 0 })),
+        omitted: data.coverage?.omitted ?? ['instance-wide audit and authentication records', 'records owned indirectly through non-workspace foreign keys'],
       },
       media: { directory: 'media/', files: files.length, referencedFiles: referenced.length, complete: true },
       security: { providerCredentialsExcluded: true, secretsExcluded: true },
-      coverage: { complete: false, reason: 'The rebuild Prisma model covers only part of the application database; see database.omitted.' },
+      coverage: { complete: data.coverage?.complete ?? false, directlyOwnedLegacyTablesComplete: data.coverage?.directlyOwnedLegacyTablesComplete ?? false, reason: 'Direct workspace-owned tables are exported; see database.omitted for records outside that ownership boundary.' },
     };
     await zip.add('manifest.json', json(manifest));
     await zip.close();
