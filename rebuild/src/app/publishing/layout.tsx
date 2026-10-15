@@ -2,6 +2,8 @@ import { Suspense, type ReactNode } from "react";
 import { PageFrame } from "@/server/PageFrame";
 import { requireViewer } from '@/server/context';
 import { getTargets } from '@/server/data';
+import { canAccessFeature } from '@/server/permissions';
+import { canUseFeature } from '@/server/entitlements';
 import { workspaceDateKey } from '@/lib/calendar-dates';
 import { PostFilters } from './posts/PostFilters';
 import styles from "./publishing.module.css";
@@ -12,7 +14,8 @@ export default async function PublishingLayout({ children }: { children: ReactNo
   const targets = await getTargets(viewer.workspaceId);
   const channels = targets.filter(target => allowedIds === null || allowedIds.includes(target.id)).map(target => ({ id: target.id, name: target.name }));
   const sidebar = <Suspense fallback={null}><PostFilters channels={channels} currentMonth={workspaceDateKey(new Date(), viewer.membership.workspace.timezone).slice(0, 7)} /></Suspense>;
-  return <PageFrame module="publishing" scopedAccess sidebar={sidebar} sidebarWhen={['/publishing/posts', '/publishing/calendar']}><div className={styles.page}>
+  const canCompose = canUseFeature(viewer.entitlements, 'publishing/compose') && canAccessFeature(viewer.permissions, 'publishing/compose', 'write');
+  return <PageFrame module="publishing" scopedAccess sidebar={sidebar} sidebarWhen={['/publishing/posts', '/publishing/calendar']} primaryAction={canCompose ? { label: 'New post', href: '/publishing/compose' } : undefined}><div className={styles.page}>
     {children}
   </div></PageFrame>;
 }

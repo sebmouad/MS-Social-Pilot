@@ -1,4 +1,4 @@
-import { DataTable, type TableColumn } from "@/components";
+import { DataTable, EmptyState, type TableColumn } from "@/components";
 import { requireViewer } from "@/server/context";
 import { listPostPage } from "@/server/data";
 import { PageHeading, PostMessage, PostTargets, PublishingPagination, formatDate } from "../publishing-ui";
@@ -22,5 +22,5 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     <form action={reviewPostAction}><input type="hidden" name="postId" value={post.id}/><input type="hidden" name="decision" value="reject"/><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Reject</button></form>
   </div> });
   const noticeText = notice === 'approved' ? 'Post approved and returned to drafts.' : notice === 'rejected' ? 'Post rejected.' : notice === 'failed' ? 'The review could not be completed. Check the post state and your permissions.' : undefined;
-  return <><PageHeading title="Approvals" description="Posts currently marked as awaiting approval." summary={`${listing.total} awaiting ${listing.total === 1 ? "review" : "reviews"} · page ${listing.page} of ${listing.pages}`} />{noticeText ? <p className={notice === 'failed' ? styles.errorNotice : styles.successNotice} role="status">{noticeText}</p> : null}<section className={styles.card}><DataTable columns={columns} rows={posts} rowKey={post => post.id} caption={`Posts awaiting approval, page ${listing.page} of ${listing.pages}`} emptyMessage="No posts are waiting for approval."/><PublishingPagination path="/publishing/approvals" page={listing.page} pages={listing.pages}/></section></>;
+  return <><PageHeading title="Approvals" description="Posts currently marked as awaiting approval." summary={`${listing.total} awaiting ${listing.total === 1 ? "review" : "reviews"} · page ${listing.page} of ${listing.pages}`} />{noticeText ? <p className={notice === 'failed' ? styles.errorNotice : styles.successNotice} role="status">{noticeText}</p> : null}{posts.length ? <section className={styles.card}><DataTable columns={columns} rows={posts} rowKey={post => post.id} caption={`Posts awaiting approval, page ${listing.page} of ${listing.pages}`}/><PublishingPagination path="/publishing/approvals" page={listing.page} pages={listing.pages}/></section> : <EmptyState title="Nothing is waiting for approval">Posts submitted for approval appear here, where a reviewer can approve or reject them.</EmptyState>}</>;
 }

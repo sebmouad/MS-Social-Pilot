@@ -25,6 +25,11 @@ This interface uses a quiet editorial look for a focused social publishing works
 - `FilterBar` and `FilterSelect`: labeled native select filters with an optional reset action. The owning screen keeps filter state.
 - `Dialog`: native modal dialog, controlled by `open`, with title, optional description, body, and optional action row. Provide a clear action and handle `onClose` in the owner.
 
+- `EmptyState`: title, one sentence saying what fills the space, and at most one action.
+- `ChannelChip` and `PlatformMark`: a channel name with its platform module's badge; the platform name stays available to assistive technology.
+- `ui-status` (publishing `StatusChip`): status as text plus a distinct shape; colour only reinforces it.
+- `ui-field`, `ui-input`, `ui-textarea`, `ui-select`, `ui-label`, `ui-hint`, `ui-field-error`, `ui-notice`: shared form and message styles.
+
 ## Composition guidance
 
 Use a single clear page title followed by supporting context and actions. Keep filters adjacent to the data they affect. Place important actions first in the action group and destructive actions last. Use table captions even when visually hidden, label every filter, and keep keyboard focus inside native modal dialogs. Use text or shape alongside status colors.

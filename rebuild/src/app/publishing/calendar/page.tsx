@@ -1,6 +1,9 @@
 import { requireViewer } from "@/server/context";
 import { listCalendarPosts } from "@/server/data";
-import { PageHeading } from "../publishing-ui";
+import { EmptyState } from "@/components";
+import { canAccessFeature } from "@/server/permissions";
+import { canUseFeature } from "@/server/entitlements";
+import { PageHeading, NewPostLink } from "../publishing-ui";
 import { adjacentCalendarMonth, calendarMonth, postCalendarDate, workspaceDateKey } from "@/lib/calendar-dates";
 import styles from "../publishing.module.css";
 
@@ -31,8 +34,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   }
   for (const items of postsByDay.values()) items.sort((a, b) => postCalendarDate(a)!.getTime() - postCalendarDate(b)!.getTime());
   const monthLabel = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric", timeZone }).format(new Date(Date.UTC(year, month, 15, 12)));
+  const canCompose = canUseFeature(viewer.entitlements, 'publishing/compose') && canAccessFeature(viewer.permissions, 'publishing/compose', 'write');
   const monthPosts = [...postsByDay.entries()].sort(([a], [b]) => a.localeCompare(b));
-  return <><PageHeading title="Calendar" description="Posts with a scheduled or published date, shown in the workspace timezone." summary={monthLabel}/><nav className={styles.calendarNavigation} aria-label="Calendar months"><a href={`/publishing/calendar?month=${adjacentCalendarMonth(year, selected.month, -1)}`}>Previous month</a><span>{monthLabel}</span><a href={`/publishing/calendar?month=${adjacentCalendarMonth(year, selected.month, 1)}`}>Next month</a></nav><div className={styles.calendar} role="grid" aria-label={`${monthLabel} publishing calendar`}>
+  return <><PageHeading title="Calendar" description="Posts with a scheduled or published date, shown in the workspace timezone." summary={monthLabel} action={canCompose ? <NewPostLink /> : undefined}/>{monthPosts.length === 0 ? <EmptyState title={`Nothing planned in ${monthLabel}`} action={canCompose ? <NewPostLink label="Plan a post" /> : undefined}>Scheduled and published posts appear on their day here, in the workspace time zone.</EmptyState> : null}<nav className={styles.calendarNavigation} aria-label="Calendar months"><a href={`/publishing/calendar?month=${adjacentCalendarMonth(year, selected.month, -1)}`}>Previous month</a><span>{monthLabel}</span><a href={`/publishing/calendar?month=${adjacentCalendarMonth(year, selected.month, 1)}`}>Next month</a></nav><div className={styles.calendar} role="grid" aria-label={`${monthLabel} publishing calendar`}>
     {weekdays.map(day => <div key={day} className={styles.weekday} role="columnheader">{day}</div>)}
     {Array.from({ length: cells }, (_, index) => {
       const day = index - firstWeekday + 1;
