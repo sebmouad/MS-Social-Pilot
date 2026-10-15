@@ -5,7 +5,7 @@ function dependencies(overrides: Partial<WorkerDependencies> = {}) {
   const started: string[] = [];
   const runs: unknown[] = [];
   const deps: WorkerDependencies = {
-    readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 3 : key === 'sync.workerLeaseMinutes' ? 5 : key === 'sync.workerHeartbeatSeconds' ? 30 : key === 'sync.posts.schedule' ? '* * * * *' : key === 'sync.analytics.schedule' ? '0 * * * *' : '0 * * * *',
+    readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 3 : key === 'sync.retryBaseDelayMs' ? 200 : key === 'sync.retryMaxDelayMs' ? 900 : key === 'sync.workerLeaseMinutes' ? 5 : key === 'sync.workerHeartbeatSeconds' ? 30 : key === 'sync.workerPollSeconds' ? 7 : key === 'sync.posts.schedule' ? '* * * * *' : key === 'sync.analytics.schedule' ? '0 * * * *' : '0 * * * *',
     execute: async job => { started.push(job); return 'checked=1 updated=1 skipped=0 failed=0'; },
     tryLease: async () => true,
     renewLease: async () => true,
@@ -28,7 +28,7 @@ describe('replacement worker scheduling', () => {
     let resolveGate!: (value: string) => void;
     const gate = new Promise<string>(resolve => { resolveGate = resolve; });
     const state = dependencies({
-      readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 0 : key === 'sync.workerLeaseMinutes' ? 5 : key === 'sync.workerHeartbeatSeconds' ? 30 : '* * * * *',
+      readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 0 : key === 'sync.retryBaseDelayMs' ? 1000 : key === 'sync.retryMaxDelayMs' ? 60000 : key === 'sync.workerPollSeconds' ? 5 : key === 'sync.workerLeaseMinutes' ? 5 : key === 'sync.workerHeartbeatSeconds' ? 30 : '* * * * *',
       execute: async job => { state.started.push(job); return gate; },
     });
     const worker = createWorker(state.deps, 'test-worker');
@@ -66,7 +66,7 @@ describe('replacement worker scheduling', () => {
     const tryLease = vi.fn(async (_job: JobName, _owner: string, _token: string, _until: Date) => true);
     const writeHeartbeat = vi.fn(async () => undefined);
     const state = dependencies({
-      readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 0 : key === 'sync.workerLeaseMinutes' ? 2 : key === 'sync.workerHeartbeatSeconds' ? 5 : '* * * * *',
+      readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 0 : key === 'sync.retryBaseDelayMs' ? 1000 : key === 'sync.retryMaxDelayMs' ? 60000 : key === 'sync.workerPollSeconds' ? 5 : key === 'sync.workerLeaseMinutes' ? 2 : key === 'sync.workerHeartbeatSeconds' ? 5 : '* * * * *',
       tryLease,
       writeHeartbeat,
     });
@@ -80,9 +80,19 @@ describe('replacement worker scheduling', () => {
     expect(writeHeartbeat).toHaveBeenCalledTimes(1);
   });
 
+  it('uses Root polling and retry backoff settings', async () => {
+    const execute = vi.fn(async () => 'done');
+    const state = dependencies({ execute });
+    const worker = createWorker(state.deps, 'test-worker');
+    await worker.tick(new Date(2026, 0, 1, 12, 5));
+    await drain(worker);
+    expect(worker.pollIntervalMs).toBe(7000);
+    expect(execute).toHaveBeenCalledWith('posts', expect.any(Date), 3, { baseDelayMs: 200, maxDelayMs: 900 });
+  });
+
   it('runs purge recovery on its own Root-configured schedule', async () => {
     const state = dependencies({
-      readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 0 : key === 'sync.workerLeaseMinutes' ? 5 : key === 'sync.workerHeartbeatSeconds' ? 30 : key === 'data.purgeRecoverySchedule' ? '*/7 * * * *' : '0 * * * *',
+      readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 0 : key === 'sync.retryBaseDelayMs' ? 1000 : key === 'sync.retryMaxDelayMs' ? 60000 : key === 'sync.workerPollSeconds' ? 5 : key === 'sync.workerLeaseMinutes' ? 5 : key === 'sync.workerHeartbeatSeconds' ? 30 : key === 'data.purgeRecoverySchedule' ? '*/7 * * * *' : '0 * * * *',
     });
     const worker = createWorker(state.deps, 'test-worker');
     await worker.tick(new Date(2026, 0, 1, 12, 7));

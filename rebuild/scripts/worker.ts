@@ -2,6 +2,7 @@ import { hostname } from 'node:os';
 import { prisma } from '../src/server/data';
 import { runtimeConfig } from '../src/server/config/store';
 import { createWorker, type JobName, type WorkerDependencies } from '../src/server/jobs/worker';
+import type { RetryBackoff } from '../src/server/jobs/retry';
 
 const owner = `rebuild-${hostname()}-${process.pid}`;
 let stopping = false;
@@ -9,7 +10,7 @@ const log = (message: string, detail?: unknown) => console.log(`${new Date().toI
 
 const dependencies: WorkerDependencies = {
   readConfig: runtimeConfig,
-  async execute(job: JobName, now: Date, retryLimit: number) {
+  async execute(job: JobName, now: Date, retryLimit: number, retryBackoff: RetryBackoff) {
     if (job === 'purges') {
       const { resumePendingWorkspaceDataPurges } = await import('../src/server/data-control');
       const result = await resumePendingWorkspaceDataPurges();
@@ -18,15 +19,15 @@ const dependencies: WorkerDependencies = {
     const { publishDuePosts, syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } = await import('../src/server/jobs/sync');
     if (job === 'posts') {
       const due = await publishDuePosts(now);
-      const remote = await syncScheduledPostStatus(now, retryLimit);
+      const remote = await syncScheduledPostStatus(now, retryLimit, retryBackoff);
       return `due=${due.examined}/${due.updated} remote=${remote.examined}/${remote.updated} skipped=${due.skipped + remote.skipped} failed=${due.failed + remote.failed}`;
     }
     if (job === 'analytics') {
-      const page = await syncPageAnalytics(now, retryLimit);
-      const ads = await syncAdsAnalytics(now, retryLimit);
+      const page = await syncPageAnalytics(now, retryLimit, retryBackoff);
+      const ads = await syncAdsAnalytics(now, retryLimit, retryBackoff);
       return `pages=${page.examined}/${page.updated} ads=${ads.examined}/${ads.updated} skipped=${page.skipped + ads.skipped} failed=${page.failed + ads.failed}`;
     }
-    const result = await syncInbox(now, retryLimit);
+    const result = await syncInbox(now, retryLimit, retryBackoff);
     return `pages=${result.examined} records=${result.updated} skipped=${result.skipped} failed=${result.failed}`;
   },
   async tryLease(job, leaseOwner, token, until) {
@@ -73,7 +74,7 @@ async function main() {
   while (!stopping) {
     try { await worker.tick(new Date()); }
     catch (error) { log('worker tick failed', error); }
-    await new Promise(resolve => setTimeout(resolve, 5_000));
+    await new Promise(resolve => setTimeout(resolve, worker.pollIntervalMs));
   }
   while (worker.running.size > 0) await new Promise(resolve => setTimeout(resolve, 250));
   await prisma.$disconnect();

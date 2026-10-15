@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { cronMatches } from './cron';
+import type { RetryBackoff } from './retry';
 
 export type JobName = 'posts' | 'analytics' | 'inbox' | 'purges';
 export type WorkerLogger = (message: string, detail?: unknown) => void;
@@ -17,7 +18,7 @@ const jobs: Job[] = [
 
 export type WorkerDependencies = {
   readConfig: (key: string) => Promise<unknown>;
-  execute: (job: JobName, now: Date, retryLimit: number) => Promise<string>;
+  execute: (job: JobName, now: Date, retryLimit: number, retryBackoff: RetryBackoff) => Promise<string>;
   tryLease: (job: JobName, owner: string, token: string, until: Date) => Promise<boolean>;
   renewLease: (job: JobName, token: string, until: Date) => Promise<boolean>;
   releaseLease: (job: JobName, token: string) => Promise<void>;
@@ -31,8 +32,9 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
   const startedMinute = new Map<JobName, number>();
   const running = new Set<JobName>();
   let lastHeartbeat = 0;
+  let pollIntervalMs = 5_000;
 
-  async function launch(job: Job, now: Date, retryLimit: number, leaseMs: number): Promise<void> {
+  async function launch(job: Job, now: Date, retryLimit: number, retryBackoff: RetryBackoff, leaseMs: number): Promise<void> {
     if (running.has(job.name)) return;
     const minuteStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
     const minuteEnd = new Date(minuteStart.getTime() + 60_000);
@@ -60,7 +62,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     }, Math.floor(leaseMs / 3));
     try {
       attempts = 1;
-      summary = await deps.execute(job.name, new Date(), retryLimit);
+      summary = await deps.execute(job.name, new Date(), retryLimit, retryBackoff);
       if (/failed=[1-9]/.test(summary)) { outcome = 'failed'; errorText = `Some workspace sync items failed: ${summary}`; }
       deps.logger(`[${job.name}] ${summary}`);
     } catch (error) {
@@ -80,8 +82,13 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     const enabled = await deps.readConfig('jobs.enabled') as boolean;
     const maxConcurrent = await deps.readConfig('sync.maxConcurrentJobs') as number;
     const retryLimit = await deps.readConfig('sync.retryLimit') as number;
+    const retryBaseDelayMs = await deps.readConfig('sync.retryBaseDelayMs') as number;
+    const retryMaxDelayMs = await deps.readConfig('sync.retryMaxDelayMs') as number;
     const leaseMinutes = await deps.readConfig('sync.workerLeaseMinutes') as number;
     const heartbeatSeconds = await deps.readConfig('sync.workerHeartbeatSeconds') as number;
+    const workerPollSeconds = await deps.readConfig('sync.workerPollSeconds') as number;
+    pollIntervalMs = Math.max(1, Math.trunc(workerPollSeconds)) * SECOND_MS;
+    const retryBackoff = { baseDelayMs: Math.max(1, Math.trunc(retryBaseDelayMs)), maxDelayMs: Math.max(1, Math.trunc(retryMaxDelayMs)) };
     const leaseMs = Math.max(1, Math.trunc(leaseMinutes)) * MINUTE_MS;
     if (enabled) {
       let available = Math.max(0, Math.trunc(maxConcurrent) - running.size);
@@ -90,7 +97,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
         const expression = await deps.readConfig(job.configKey) as string;
         if (!cronMatches(expression, now)) continue;
         if (running.has(job.name)) continue;
-        void launch(job, now, Math.max(0, Math.trunc(retryLimit)), leaseMs).catch(error => deps.logger(`could not start ${job.name}`, error));
+        void launch(job, now, Math.max(0, Math.trunc(retryLimit)), retryBackoff, leaseMs).catch(error => deps.logger(`could not start ${job.name}`, error));
         // Lease acquisition is async; reserve a local slot before its result.
         available--;
       }
@@ -101,7 +108,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     }
   }
 
-  return { tick, get running() { return new Set(running); } };
+  return { tick, get running() { return new Set(running); }, get pollIntervalMs() { return pollIntervalMs; } };
 }
 
 export const workerConfigKeys = jobs.map(job => job.configKey);

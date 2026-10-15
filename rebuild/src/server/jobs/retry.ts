@@ -7,9 +7,13 @@ export function isRetryableSyncError(error: unknown): boolean {
   return error instanceof TypeError || (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name));
 }
 
+export type RetryBackoff = { baseDelayMs: number; maxDelayMs: number };
+const DEFAULT_BACKOFF: RetryBackoff = { baseDelayMs: 1000, maxDelayMs: 60_000 };
+
 export async function withRetries<T>(
   operation: () => Promise<T>,
   retryLimit: number,
+  backoff: RetryBackoff = DEFAULT_BACKOFF,
   delay: (milliseconds: number) => Promise<void> = sleep,
   shouldRetry: (error: unknown) => boolean = isRetryableSyncError,
 ): Promise<T> {
@@ -18,7 +22,7 @@ export async function withRetries<T>(
     try { return await operation(); }
     catch (error) {
       if (attempt >= retryLimit || !shouldRetry(error)) throw error;
-      const wait = Math.min(60_000, 1_000 * 2 ** attempt);
+      const wait = Math.min(backoff.maxDelayMs, backoff.baseDelayMs * 2 ** attempt);
       attempt += 1;
       await delay(wait);
     }

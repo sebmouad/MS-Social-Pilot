@@ -24,7 +24,8 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(11);
+    expect(CONFIG_SCHEMA_VERSION).toBe(13);
+    expect(CONFIG_BY_KEY.get('data.maxArchiveBytes')!.schema.parse(268435456)).toBe(268435456);
     expect(CONFIG_BY_KEY.get('data.workspaceOperationTimeoutMs')!.schema.safeParse(300000).success).toBe(true);
     expect(CONFIG_BY_KEY.get('data.workspaceOperationLockWaitMs')!.schema.safeParse(30000).success).toBe(true);
     expect(CONFIG_BY_KEY.get('data.purgeRecoverySchedule')!.schema.safeParse('*/7 * * * *').success).toBe(true);
@@ -52,6 +53,12 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('sync.workerLeaseMinutes')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('sync.workerHeartbeatSeconds')!.schema.safeParse(30).success).toBe(true);
     expect(CONFIG_BY_KEY.get('sync.workerHeartbeatSeconds')!.schema.safeParse(1).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('sync.workerPollSeconds')!.schema.safeParse(5).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('sync.workerPollSeconds')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('sync.retryBaseDelayMs')!.schema.safeParse(1000).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('sync.retryBaseDelayMs')!.schema.safeParse(50).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('sync.retryMaxDelayMs')!.schema.safeParse(60000).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('sync.retryMaxDelayMs')!.schema.safeParse(50).success).toBe(false);
     expect(CONFIG_BY_KEY.get('auth.passwordMinLength')!.schema.safeParse(12).success).toBe(true);
     expect(CONFIG_BY_KEY.get('auth.passwordMinLength')!.schema.safeParse(4).success).toBe(false);
     expect(CONFIG_BY_KEY.get('auth.passwordMaxBytes')!.schema.safeParse(800).success).toBe(true);
