@@ -21,6 +21,14 @@
 .event { display: block; margin: 5px 0; padding: 6px 7px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; }
 .event[data-status="pending_approval"] { background: var(--warning-soft); color: var(--warning); }
 .event[data-status="published"] { background: var(--surface-muted); color: var(--ink-soft); }
+.agenda { display: none; }
+.agenda h2 { margin: 0 0 16px; font-size: 18px; }
+.agendaDay { padding: 16px 0; border-top: 1px solid var(--line); }
+.agendaDay h3 { margin: 0 0 10px; color: var(--ink-soft); font-size: 13px; }
+.agendaDay ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.agendaDay li { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.agendaDay li p { margin: 5px 0 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.45; }
+.agendaStatus { color: var(--accent); font-size: 11px; font-weight: 700; text-transform: capitalize; }
 .empty { padding: 34px 20px; text-align: center; color: var(--ink-soft); font-size: 14px; line-height: 1.6; }
 .createCard h2 { margin: 0 0 6px; font-size: 17px; }
 .createCard > p { margin: 0 0 18px; color: var(--ink-soft); font-size: 13px; }
@@ -51,4 +59,4 @@
 .badge[data-status="published"] { background: var(--accent-soft); color: var(--accent); }
 .badge[data-status="pending_approval"], .badge[data-status="scheduled"] { background: var(--warning-soft); color: var(--warning); }
 .badge[data-status="failed"], .badge[data-status="partially_failed"] { background: var(--danger-soft); color: var(--danger); }
-@media (max-width: 720px) { .heading { align-items: start; flex-direction: column; } .day { min-height: 78px; padding: 6px; } .weekday { padding: 9px 3px; text-align: center; font-size: 8px; } .event { padding: 4px; font-size: 9px; } .formFooter { align-items: start; flex-direction: column; } }
+@media (max-width: 720px) { .heading { align-items: start; flex-direction: column; } .calendar { display: none; } .agenda { display: block; } .formFooter { align-items: start; flex-direction: column; } }

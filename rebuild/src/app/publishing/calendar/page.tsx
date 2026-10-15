@@ -25,7 +25,9 @@ export default async function CalendarPage() {
     const key = formatter.format(date);
     postsByDay.set(key, [...(postsByDay.get(key) ?? []), post]);
   }
+  for (const items of postsByDay.values()) items.sort((a, b) => (a.scheduledAt ?? a.publishedAt)!.getTime() - (b.scheduledAt ?? b.publishedAt)!.getTime());
   const monthLabel = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric", timeZone }).format(new Date(Date.UTC(year, month, 15, 12)));
+  const monthPosts = [...postsByDay.entries()].filter(([key]) => key.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`)).sort(([a], [b]) => a.localeCompare(b));
   return <><PageHeading title="Calendar" description="Posts with a scheduled or published date, shown in the workspace timezone." summary={monthLabel}/><div className={styles.calendar} role="grid" aria-label={`${monthLabel} publishing calendar`}>
     {weekdays.map(day => <div key={day} className={styles.weekday} role="columnheader">{day}</div>)}
     {Array.from({ length: cells }, (_, index) => {
@@ -40,5 +42,11 @@ export default async function CalendarPage() {
         {dayPosts.length > 3 ? <span className={styles.summary}>+{dayPosts.length - 3} more</span> : null}
       </div>;
     })}
-  </div></>;
+  </div><section className={styles.agenda} aria-label={`${monthLabel} publishing agenda`}>
+    <h2>{monthLabel} agenda</h2>
+    {monthPosts.length ? monthPosts.map(([day, items]) => <div className={styles.agendaDay} key={day}>
+      <h3><time dateTime={day}>{new Intl.DateTimeFormat(undefined, { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${day}T12:00:00Z`))}</time></h3>
+      <ul>{items.map(post => <li key={post.id}><span className={styles.agendaStatus}>{post.status.replaceAll('_', ' ')} · <time dateTime={(post.scheduledAt ?? post.publishedAt)!.toISOString()}>{new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', timeZone }).format(post.scheduledAt ?? post.publishedAt!)}</time></span><p>{post.message.trim() || 'Untitled post'}</p></li>)}</ul>
+    </div>) : <p className={styles.empty}>No scheduled or published posts this month.</p>}
+  </section></>;
 }

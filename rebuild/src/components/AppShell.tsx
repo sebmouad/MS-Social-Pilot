@@ -1,5 +1,5 @@
 "use client";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { MODULES, PAGES, type ModuleId } from "@/lib/product";
 
@@ -22,6 +22,8 @@ function Mark() {
 
 export function AppShell({ children, activeModule, enabledModules, enabledFeatures, rootAccess, userName, workspaceName, sidebar }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; rootAccess: boolean; userName: string; workspaceName: string; sidebar?: ReactNode }) {
   const pathname = usePathname();
+  const [filterOpen, setFilterOpen] = useState(false);
+  useEffect(() => setFilterOpen(false), [pathname]);
   const modulePages = PAGES.filter(page => page.module === activeModule && enabledFeatures.includes(page.id));
   const enabledModuleSet = new Set(enabledModules);
   const enabledModulePages = new Set(enabledFeatures.map(id => PAGES.find(page => page.id === id)?.module).filter(Boolean));
@@ -34,10 +36,11 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       {modulePages.length > 1 && <nav className="shell-subnav" aria-label={`${MODULES.find(module => module.id === activeModule)?.title} pages`}>
         <p className="shell-subnav__label">{MODULES.find(module => module.id === activeModule)?.title}</p>
         {modulePages.map(page => <a key={page.id} href={page.href} className={`shell-subnav__link${pathname === page.href ? " is-active" : ""}`} aria-current={pathname === page.href ? "page" : undefined}>{page.title}</a>)}
+        {rootAccess && activeModule === 'settings' && <a className="shell-subnav__link shell-root-mobile" href="/root/config">Root controls</a>}
       </nav>}
-      {sidebar && <div className="shell-sidebar-filter">{sidebar}</div>}
-      {rootAccess && <a className="shell-subnav__link" href="/root/config">Root controls</a>}
+      {sidebar && <div id="shell-filters" className={`shell-sidebar-filter${filterOpen ? " is-open" : ""}`} onSubmitCapture={() => setFilterOpen(false)} onClickCapture={event => { if ((event.target as Element).closest('a[href]')) setFilterOpen(false); }}>{sidebar}</div>}
+      {rootAccess && <a className="shell-subnav__link shell-root-link" href="/root/config">Root controls</a>}
     </aside>
-    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions"><span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main className="shell-content">{children}</main></div>
+    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions">{sidebar && <button className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => setFilterOpen(open => !open)}>{filterOpen ? "Close filters" : "Filters"}</button>}<span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main className="shell-content">{children}</main></div>
   </div>;
 }
