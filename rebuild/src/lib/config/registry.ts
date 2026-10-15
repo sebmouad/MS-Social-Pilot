@@ -3,24 +3,10 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 25;
+export const CONFIG_SCHEMA_VERSION = 26;
 
-const cron = z.string().min(9).max(100).refine((value) => {
-  const fields = value.trim().split(/\s+/);
-  return fields.length === 5 && fields.every((field) => /^[\d*/?,\-]+$/.test(field));
-}, 'Use a five-field cron expression.');
-const url = z.string().url().refine((value) => value.startsWith('https://'), 'Use an HTTPS URL.');
-const stringList = z.array(z.string().trim().min(1).max(200)).max(100);
-const optionList = (values: readonly string[]) => z.enum(values as [string, ...string[]]);
-
-type Consumption = 'active' | 'configured' | 'planned';
-type Option = { value: string; label: string };
-type Entry = {
-  key: string; group: string; label: string; kind: 'text' | 'secret' | 'boolean' | 'number' | 'select' | 'json';
-  description: string; defaultValue: unknown; schema: z.ZodTypeAny; consumption: Consumption; options?: readonly Option[];
-};
-const entry = <const T extends Entry>(value: T) => value;
-const options = (values: readonly { id: string; name: string }[]): Option[] => values.map(({ id, name }) => ({ value: id, label: name }));
+import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
+import { PLATFORM_CONFIG } from '@/platforms';
 
 /**
  * This is the sole source for Root-managed runtime settings. `consumption`
@@ -28,7 +14,8 @@ const options = (values: readonly { id: string; name: string }[]): Option[] => v
  * integrations; the UI must preserve that distinction.
  */
 export const CONFIG_REGISTRY = [
-  entry({ key: 'platforms.facebook.enabled', group: 'Platforms', label: 'Facebook engine enabled', kind: 'boolean', description: 'Make the installed Facebook adapter available to workspace features. Connected data remains stored when disabled.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
+  // Each installed platform module owns its settings (src/platforms/<id>/module.ts).
+  ...PLATFORM_CONFIG,
   entry({ key: 'auth.loginAttempts', group: 'Security · rate limits', label: 'Sign-in attempts allowed', kind: 'number', description: 'Maximum password or verification attempts per account during one window.', defaultValue: 10, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'auth.loginWindowMinutes', group: 'Security · rate limits', label: 'Sign-in attempt window', kind: 'number', description: 'Minutes before failed sign-in attempts reset.', defaultValue: 15, schema: z.number().int().min(1).max(1440), consumption: 'active' }),
   entry({ key: 'auth.sessionDays', group: 'Security · sessions', label: 'Full session lifetime (days)', kind: 'number', description: 'Maximum age of a fully verified browser session.', defaultValue: 30, schema: z.number().int().min(1).max(365), consumption: 'active' }),
@@ -44,36 +31,9 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'root.defaultWorkspaceTimezone', group: 'Root', label: 'New workspace timezone', kind: 'text', description: 'IANA timezone assigned when Root creates a workspace.', defaultValue: 'UTC', schema: z.string().min(1).max(100).refine(value => { try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; } }, 'Use an IANA timezone.'), consumption: 'active' }),
   entry({ key: 'root.workspaceNameMaxCharacters', group: 'Root', label: 'Workspace name character limit', kind: 'number', description: 'Maximum characters Root accepts for newly created or renamed workspaces.', defaultValue: 100, schema: z.number().int().min(1).max(500), consumption: 'active' }),
 
-  entry({ key: 'meta.graphBaseUrl', group: 'API endpoints', label: 'Meta Graph API base URL', kind: 'text', description: 'HTTPS origin and optional path used by Meta Graph requests.', defaultValue: 'https://graph.facebook.com', schema: url, consumption: 'active' }),
-  entry({ key: 'meta.oauthBaseUrl', group: 'API endpoints', label: 'Meta OAuth dialog base URL', kind: 'text', description: 'HTTPS origin used to display the Meta authorization dialog.', defaultValue: 'https://www.facebook.com', schema: url, consumption: 'active' }),
-  entry({ key: 'meta.graphVersion', group: 'API endpoints', label: 'Meta Graph API version', kind: 'text', description: 'Version used by Meta integrations when connected.', defaultValue: 'v25.0', schema: z.string().regex(/^v\d+\.\d+$/, 'Use a version such as v25.0.'), consumption: 'active' }),
-  entry({ key: 'meta.requestTimeoutMs', group: 'API endpoints', label: 'Meta request timeout (ms)', kind: 'number', description: 'Maximum time allowed for one Meta API request.', defaultValue: 15000, schema: z.number().int().min(1000).max(120000), consumption: 'active' }),
-  entry({ key: 'meta.maxPages', group: 'API endpoints', label: 'Meta pagination limit', kind: 'number', description: 'Maximum Graph response pages read per collection request.', defaultValue: 20, schema: z.number().int().min(1).max(100), consumption: 'active' }),
-  entry({ key: 'meta.pageSize', group: 'API endpoints', label: 'Meta response page size', kind: 'number', description: 'Items requested per Graph response page.', defaultValue: 100, schema: z.number().int().min(1).max(100), consumption: 'active' }),
-  entry({ key: 'meta.pageInsightMetrics', group: 'Analytics metrics', label: 'Meta Page insight metrics', kind: 'json', description: 'JSON array of Page insight metric names approved for this app. Unsupported metrics may need removal after provider changes.', defaultValue: ['page_follows', 'page_media_view', 'page_post_engagements', 'page_views_total'], schema: stringList, consumption: 'active' }),
-  entry({ key: 'meta.adInsightFields', group: 'Analytics metrics', label: 'Meta ad insight fields', kind: 'json', description: 'JSON array of Ads Insights fields approved for this app.', defaultValue: ['impressions', 'reach', 'spend', 'clicks', 'cpc', 'cpm'], schema: stringList, consumption: 'active' }),
-  entry({ key: 'meta.maxImageUploadBytes', group: 'Publishing limits', label: 'Maximum Meta image upload size (bytes)', kind: 'number', description: 'Maximum local image bytes sent to Meta for one Page photo.', defaultValue: 8388608, schema: z.number().int().min(1).max(26214400), consumption: 'active' }),
-  entry({ key: 'meta.allowedImageMimeTypes', group: 'Publishing limits', label: 'Meta image upload MIME allowlist', kind: 'json', description: 'Allowed image MIME types for local Page photo uploads.', defaultValue: ['image/jpeg', 'image/png'], schema: z.array(z.enum(['image/jpeg', 'image/png', 'image/gif'])).min(1).max(3), consumption: 'active' }),
   entry({ key: 'analytics.maxRangeDays', group: 'Analytics metrics', label: 'Maximum MCP analytics range (days)', kind: 'number', description: 'Largest date range accepted by MCP analytics overview requests.', defaultValue: 366, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
   entry({ key: 'analytics.reportExportRows', group: 'Analytics metrics', label: 'Report CSV row limit', kind: 'number', description: 'Maximum data rows included in a report CSV download; truncated exports are marked.', defaultValue: 5000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
   entry({ key: 'analytics.reportMaxChannels', group: 'Analytics metrics', label: 'Maximum report channels', kind: 'number', description: 'Maximum selected channels accepted in one report CSV URL.', defaultValue: 500, schema: z.number().int().min(1).max(5000), consumption: 'active' }),
-  entry({ key: 'meta.appId', group: 'API credentials', label: 'Meta app ID', kind: 'text', description: 'Public OAuth application identifier.', defaultValue: '', schema: z.string().max(200), consumption: 'active' }),
-  entry({ key: 'meta.appSecret', group: 'API credentials', label: 'Meta app secret', kind: 'secret', description: 'Encrypted at rest. The saved value is never returned by the configuration API.', defaultValue: '', schema: z.string().max(2048), consumption: 'active' }),
-  entry({ key: 'meta.oauthRedirectUri', group: 'API credentials', label: 'Meta OAuth callback URL', kind: 'text', description: 'HTTPS callback URL registered with the Meta application.', defaultValue: '', schema: z.union([z.literal(''), url]), consumption: 'active' }),
-  entry({ key: 'meta.oauthStateMinutes', group: 'API credentials', label: 'Meta connection challenge lifetime', kind: 'number', description: 'Minutes allowed between opening Meta authorization and returning to the callback.', defaultValue: 10, schema: z.number().int().min(1).max(60), consumption: 'active' }),
-  entry({ key: 'meta.oauthScopes', group: 'API scopes', label: 'Meta Page and Instagram scopes', kind: 'json', description: 'JSON array of Page and Instagram scopes requested during Meta authorization. Keep aligned with app review approval.', defaultValue: ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'read_insights'], schema: stringList, consumption: 'active' }),
-  entry({ key: 'meta.inboxReadScopes', group: 'API scopes · inbox', label: 'Meta inbox read scopes', kind: 'json', description: 'JSON array of Meta scopes required to read Page conversations and comments.', defaultValue: ['pages_messaging', 'pages_read_engagement'], schema: stringList, consumption: 'configured' }),
-  entry({ key: 'meta.postReadScopes', group: 'API scopes · publishing', label: 'Meta post status read scopes', kind: 'json', description: 'JSON array of Meta scopes required to refresh the status of Page posts.', defaultValue: ['pages_read_engagement'], schema: stringList.min(1), consumption: 'active' }),
-  entry({ key: 'meta.inboxWriteScopes', group: 'API scopes · inbox', label: 'Meta inbox write scopes', kind: 'json', description: 'JSON array of Meta scopes required to reply to Page conversations and moderate comments.', defaultValue: ['pages_messaging', 'pages_manage_engagement'], schema: stringList, consumption: 'configured' }),
-  entry({ key: 'inbox.messengerReplyWindowHours', group: 'Inbox', label: 'Messenger reply window (hours)', kind: 'number', description: 'Maximum time after the latest visitor message that the Inbox allows a Messenger reply. Meta allows at most 24 hours.', defaultValue: 24, schema: z.number().int().min(1).max(24), consumption: 'active' }),
-  entry({ key: 'meta.adsReadScopes', group: 'API scopes · ads', label: 'Meta ads read scopes', kind: 'json', description: 'JSON array of ads reporting scopes. Request only scopes approved for this Meta app.', defaultValue: ['ads_read'], schema: stringList, consumption: 'active' }),
-  entry({ key: 'meta.adsManageScopes', group: 'API scopes · ads', label: 'Meta ads management scopes', kind: 'json', description: 'JSON array of ads management scopes. These can enable spend-affecting actions and require an approved app and implemented controls.', defaultValue: ['ads_management'], schema: stringList, consumption: 'active' }),
-  entry({ key: 'ads.managementEnabled', group: 'Ads management', label: 'Ads changes enabled', kind: 'boolean', description: 'Allow paused Facebook campaign creation and status or budget changes for supported connected ad accounts after required scopes are approved.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
-  entry({ key: 'youtube.apiBaseUrl', group: 'API endpoints', label: 'YouTube Data API base URL', kind: 'text', description: 'HTTPS endpoint for YouTube Data API calls.', defaultValue: 'https://www.googleapis.com/youtube/v3', schema: url, consumption: 'planned' }),
-  entry({ key: 'youtube.oauthScopes', group: 'API scopes', label: 'YouTube OAuth scopes', kind: 'json', description: 'JSON array of OAuth scopes requested for YouTube access.', defaultValue: ['https://www.googleapis.com/auth/youtube.readonly'], schema: stringList, consumption: 'planned' }),
-  entry({ key: 'linkedin.apiBaseUrl', group: 'API endpoints', label: 'LinkedIn API base URL', kind: 'text', description: 'HTTPS endpoint for LinkedIn API calls.', defaultValue: 'https://api.linkedin.com', schema: url, consumption: 'planned' }),
-  entry({ key: 'linkedin.oauthScopes', group: 'API scopes', label: 'LinkedIn OAuth scopes', kind: 'json', description: 'JSON array of OAuth scopes requested for LinkedIn access.', defaultValue: ['openid', 'profile', 'w_member_social'], schema: stringList, consumption: 'planned' }),
-  entry({ key: 'x.apiBaseUrl', group: 'API endpoints', label: 'X API base URL', kind: 'text', description: 'HTTPS endpoint for X API calls.', defaultValue: 'https://api.x.com/2', schema: url, consumption: 'planned' }),
   entry({ key: 'x.oauthScopes', group: 'API scopes', label: 'X OAuth scopes', kind: 'json', description: 'JSON array of OAuth scopes requested for X access.', defaultValue: ['tweet.read', 'users.read', 'tweet.write', 'offline.access'], schema: stringList, consumption: 'planned' }),
 
   entry({ key: 'jobs.enabled', group: 'Sync schedules', label: 'Background jobs enabled', kind: 'boolean', description: 'Master availability switch for background work.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
@@ -90,8 +50,6 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'sync.workerHeartbeatSeconds', group: 'Sync schedules', label: 'Worker heartbeat interval (seconds)', kind: 'number', description: 'How often the background worker records its health heartbeat.', defaultValue: 30, schema: z.number().int().min(5).max(300), consumption: 'active' }),
   entry({ key: 'sync.workerPollSeconds', group: 'Sync schedules', label: 'Worker poll interval (seconds)', kind: 'number', description: 'How often the background worker checks schedules and Root settings.', defaultValue: 5, schema: z.number().int().min(1).max(60), consumption: 'active' }),
 
-  entry({ key: 'api.meta.requestsPerMinute', group: 'API rate limits', label: 'Meta requests per minute', kind: 'number', description: 'Application-side request budget for Meta API calls.', defaultValue: 200, schema: z.number().int().min(1).max(100000), consumption: 'planned' }),
-  entry({ key: 'api.youtube.requestsPerMinute', group: 'API rate limits', label: 'YouTube requests per minute', kind: 'number', description: 'Application-side request budget for YouTube API calls.', defaultValue: 100, schema: z.number().int().min(1).max(100000), consumption: 'planned' }),
   entry({ key: 'publishing.maxMessageCharacters', group: 'Publishing limits', label: 'Maximum post characters', kind: 'number', description: 'Maximum text length for a post in the shared composer; provider-specific limits may be lower.', defaultValue: 10000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
   entry({ key: 'publishing.maxImportRows', group: 'Publishing limits', label: 'Maximum import rows', kind: 'number', description: 'Maximum posts accepted in one bulk CSV import.', defaultValue: 100, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
   entry({ key: 'publishing.maxImportBytes', group: 'Publishing limits', label: 'Maximum import file size', kind: 'number', description: 'Maximum CSV bytes accepted in one bulk import.', defaultValue: 256000, schema: z.number().int().min(1024).max(100000000), consumption: 'active' }),

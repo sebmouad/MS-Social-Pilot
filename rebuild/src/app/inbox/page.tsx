@@ -1,4 +1,5 @@
 import { PageFrame } from '@/server/PageFrame';
+import { enabledSocialAccountWhere } from '@/server/platforms/registry';
 import { requireViewer } from '@/server/context';
 import { prisma } from '@/server/data';
 import { canAccessPage } from '@/server/permissions';
@@ -17,7 +18,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const status = valid(params.status, ['open', 'resolved', 'all'], 'open');
   const hiddenFilter = valid(params.hidden, ['visible', 'all'], 'visible');
   const channels = await prisma.target.findMany({
-    where: { workspaceId: viewer.workspaceId, type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
+    where: { workspaceId: viewer.workspaceId, type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null, AND: [await enabledSocialAccountWhere()] } } },
     orderBy: { name: 'asc' }, select: { id: true, name: true },
   });
   const visibleChannels = channels.filter(channel => canAccessPage(viewer.permissions, channel.id));

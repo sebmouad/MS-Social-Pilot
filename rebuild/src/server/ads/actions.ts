@@ -8,6 +8,7 @@ import { loadEntitlements, canUseFeature } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { runtimeConfig } from '@/server/config/store';
+import { isPlatformEnabled } from '@/server/platforms/registry';
 
 const MANAGER_ROLES = new Set(['owner', 'admin']);
 const OBJECT_TYPES = new Set<AdMutationRequest['objectType']>(['campaign', 'adset', 'ad']);
@@ -44,7 +45,7 @@ export async function canManageWorkspaceAds(actor: AdsActionActor, adAccountId: 
     loadPermissions(actor.userId, actor.workspaceId),
     runtimeConfig('meta.adsManageScopes') as Promise<string[]>,
     runtimeConfig('ads.managementEnabled') as Promise<boolean>,
-    runtimeConfig('platforms.facebook.enabled') as Promise<boolean>,
+    isPlatformEnabled('facebook'),
   ]);
   if (!membership || !MANAGER_ROLES.has(membership.role) || managementEnabled !== true || facebookEnabled !== true || !entitlements || !permissions) return false;
   if (!canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', 'write')) return false;
@@ -65,7 +66,7 @@ export async function canReadWorkspaceAds(actor: AdsActionActor, adAccountId: st
     loadEntitlements(actor.userId, actor.workspaceId),
     loadPermissions(actor.userId, actor.workspaceId),
     runtimeConfig('meta.adsReadScopes') as Promise<string[]>,
-    runtimeConfig('platforms.facebook.enabled') as Promise<boolean>,
+    isPlatformEnabled('facebook'),
   ]);
   if (facebookEnabled !== true || !entitlements || !permissions) return false;
   if (!canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', 'read')) return false;
@@ -168,7 +169,7 @@ export async function updateWorkspaceAd(actor: AdsActionActor, input: AdsActionI
   const [configuredScopes, managementEnabled, facebookEnabled] = await Promise.all([
     runtimeConfig('meta.adsManageScopes') as Promise<string[]>,
     runtimeConfig('ads.managementEnabled') as Promise<boolean>,
-    runtimeConfig('platforms.facebook.enabled') as Promise<boolean>,
+    isPlatformEnabled('facebook'),
   ]);
   if (managementEnabled !== true) throw new Error('Ads management is disabled in Root configuration.');
   if (facebookEnabled !== true) throw new Error('The Facebook platform is disabled in Root configuration.');
@@ -210,7 +211,7 @@ export async function createWorkspaceAdCampaign(actor: AdsActionActor, input: Ad
   });
   if (!account?.socialAccount || account.socialAccount.invalidatedAt || (account.socialAccount.tokenExpiresAt && account.socialAccount.tokenExpiresAt <= new Date())) throw new Error('This advertising account or its connection is unavailable. Reconnect it before managing ads.');
   const [configuredScopes, managementEnabled, facebookEnabled] = await Promise.all([
-    runtimeConfig('meta.adsManageScopes') as Promise<string[]>, runtimeConfig('ads.managementEnabled') as Promise<boolean>, runtimeConfig('platforms.facebook.enabled') as Promise<boolean>,
+    runtimeConfig('meta.adsManageScopes') as Promise<string[]>, runtimeConfig('ads.managementEnabled') as Promise<boolean>, isPlatformEnabled('facebook'),
   ]);
   if (managementEnabled !== true) throw new Error('Ads management is disabled in Root configuration.');
   if (facebookEnabled !== true) throw new Error('The Facebook platform is disabled in Root configuration.');
@@ -253,7 +254,7 @@ export async function createWorkspaceAdSet(actor: AdsActionActor, input: AdsAdSe
   if (!parentCampaign) throw new Error('This campaign cannot be verified for the selected account.');
 
   const [configuredScopes, managementEnabled, facebookEnabled] = await Promise.all([
-    runtimeConfig('meta.adsManageScopes') as Promise<string[]>, runtimeConfig('ads.managementEnabled') as Promise<boolean>, runtimeConfig('platforms.facebook.enabled') as Promise<boolean>,
+    runtimeConfig('meta.adsManageScopes') as Promise<string[]>, runtimeConfig('ads.managementEnabled') as Promise<boolean>, isPlatformEnabled('facebook'),
   ]);
   if (managementEnabled !== true) throw new Error('Ads management is disabled in Root configuration.');
   if (facebookEnabled !== true) throw new Error('The Facebook platform is disabled in Root configuration.');

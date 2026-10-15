@@ -9,11 +9,13 @@ type Channel = { id: string; name: string; type: string; enabled: boolean };
 type AdAccount = { id: string; name: string; actId: string; enabled: boolean };
 type Source = { id: string; name: string; provider: string; invalidatedAt: Date | null; targets: Channel[]; adAccounts: AdAccount[] };
 
-export function ConnectionManager({ sources, canManage, canConnectFacebook, initiallyOpen = false, initialSourceId, initialAction }: { sources: Source[]; canManage: boolean; canConnectFacebook: boolean; initiallyOpen?: boolean; initialSourceId?: string; initialAction?: 'manage' | 'disconnect' }) {
+type Connectable = { id: string; name: string; mark: { text: string; color: string } };
+
+export function ConnectionManager({ sources, canManage, platforms, initiallyOpen = false, initialSourceId, initialAction }: { sources: Source[]; canManage: boolean; platforms: Connectable[]; initiallyOpen?: boolean; initialSourceId?: string; initialAction?: 'manage' | 'disconnect' }) {
   const initialSource = sources.find(source => source.id === initialSourceId);
   const [open, setOpen] = useState(initiallyOpen || Boolean(initialSource && initialAction === 'manage'));
   const [busy, setBusy] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [connecting, setConnecting] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const [disconnect, setDisconnect] = useState<Source | null>(initialSource && initialAction === 'disconnect' ? initialSource : null);
   const [disconnectMode, setDisconnectMode] = useState<'retain' | 'delete'>('retain');
@@ -31,16 +33,16 @@ export function ConnectionManager({ sources, canManage, canConnectFacebook, init
   }, [initialSource, initialAction]);
   const toggle = (kind: 'target' | 'adAccount', id: string, checked: boolean) => setSelected(current => ({ ...current, [`${kind}:${id}`]: checked }));
 
-  async function connectFacebook() {
-    setConnecting(true); setNotice('');
+  async function connect(platform: Connectable) {
+    setConnecting(platform.id); setNotice('');
     try {
-      const response = await fetch('/api/connections/facebook/start', { method: 'POST' });
+      const response = await fetch(`/api/connections/${encodeURIComponent(platform.id)}/start`, { method: 'POST' });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok || typeof result.authorizationUrl !== 'string') throw new Error(result.error ?? 'Could not start Meta authorization.');
+      if (!response.ok || typeof result.authorizationUrl !== 'string') throw new Error(result.error ?? `Could not start ${platform.name} authorization.`);
       const authorizationUrl = new URL(result.authorizationUrl);
       if (authorizationUrl.protocol !== 'https:' && authorizationUrl.hostname !== 'localhost') throw new Error('Connection unavailable. Try again or contact support.');
       window.location.assign(authorizationUrl.toString());
-    } catch (error) { setNotice(error instanceof Error ? error.message : 'Could not start Meta authorization.'); setConnecting(false); }
+    } catch (error) { setNotice(error instanceof Error ? error.message : `Could not start ${platform.name} authorization.`); setConnecting(null); }
   }
 
   async function saveSelection() {
@@ -83,9 +85,9 @@ export function ConnectionManager({ sources, canManage, canConnectFacebook, init
     finally { setPreviewBusy(false); }
   }
 
-  if (!canManage || (!sources.length && !canConnectFacebook)) return null;
+  if (!canManage || (!sources.length && !platforms.length)) return null;
   return <>
-    <div className={styles['connection-toolbar']}><p>{sources.length ? 'Choose the channels and advertising accounts this workspace uses.' : 'Connect a source to choose its channels and advertising accounts.'}</p><div>{canConnectFacebook && <button type="button" onClick={connectFacebook} disabled={connecting}>{connecting ? 'Connecting…' : 'Connect Facebook'}</button>}{sources.length > 0 && <button type="button" className={styles['connection-primary-button']} onClick={() => setOpen(true)}>Manage selections</button>}</div></div>
+    <div className={styles['connection-toolbar']}><p>{sources.length ? 'Choose the channels and advertising accounts this workspace uses.' : 'Connect a source to choose its channels and advertising accounts.'}</p><div>{platforms.map(platform => <button type="button" key={platform.id} onClick={() => connect(platform)} disabled={connecting !== null}><span aria-hidden="true" className={styles['connection-mark']} style={{ background: platform.mark.color }}>{platform.mark.text}</span>{connecting === platform.id ? 'Connecting…' : `Connect ${platform.name}`}</button>)}{sources.length > 0 && <button type="button" className={styles['connection-primary-button']} onClick={() => setOpen(true)}>Manage selections</button>}</div></div>
     {notice && !open && !disconnect && <p role="alert" className={styles['connection-error']}>{notice}</p>}
     {open && <ModalDialog className={styles['connection-dialog']} labelledBy="connection-dialog-title" onDismiss={() => setOpen(false)} busy={busy} initialFocus={initialSource && initialAction === 'manage' ? '[data-connection-source-focus]' : '[data-dialog-cancel]'}>
       <header><div><p className={styles['settings-eyebrow']}>Workspace connections</p><h2 id="connection-dialog-title">Choose channels and ad accounts</h2><p>Turn discovered channels and advertising accounts on or off for this workspace.</p></div><button type="button" aria-label="Close" onClick={() => setOpen(false)}>×</button></header>

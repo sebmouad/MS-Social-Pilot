@@ -4,6 +4,7 @@ const state = vi.hoisted(() => ({
   targets: vi.fn(), instagramAccounts: vi.fn(), pageInsights: vi.fn(), instagramInsights: vi.fn(), adInsights: vi.fn(), adAccounts: vi.fn(),
 }));
 
+vi.mock('../src/server/platforms/registry', () => ({ enabledSocialAccountWhere: async () => ({ provider: { in: ['facebook'] } }) }));
 vi.mock('../src/server/data', () => ({
   prisma: {
     target: { findMany: state.targets },
@@ -43,7 +44,7 @@ describe('rebuild Instagram analytics data selection', () => {
     const result = await loadAnalytics('workspace-1', ['ig-target-1'], range);
 
     expect(state.targets).toHaveBeenCalledWith(expect.objectContaining({
-      where: { workspaceId: 'workspace-1', enabled: true, OR: [{ type: { not: 'instagram' } }, { type: 'instagram', providerId: { in: ['ig-provider-1', 'ig-provider-2'] } }] },
+      where: { workspaceId: 'workspace-1', enabled: true, socialAccount: { is: { provider: { in: ['facebook'] } } }, OR: [{ type: { not: 'instagram' } }, { type: 'instagram', providerId: { in: ['ig-provider-1', 'ig-provider-2'] } }] },
     }));
     expect(result.selectedTargets.map(target => target.id)).toEqual(['ig-target-1']);
     expect(state.instagramInsights).toHaveBeenCalledWith(expect.objectContaining({

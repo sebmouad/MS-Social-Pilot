@@ -6,6 +6,7 @@ import './root-directory.css';
 const sections = [
   { href: '/root/users', title: 'Users' },
   { href: '/root/workspaces', title: 'Workspaces' },
+  { href: '/root/platforms', title: 'Platforms' },
   { href: '/root/config', title: 'Runtime configuration' },
 ] as const;
 

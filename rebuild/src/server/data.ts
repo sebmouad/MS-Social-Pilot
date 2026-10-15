@@ -1,4 +1,5 @@
 import { PrismaClient, type Prisma, type PostStatus } from "../../generated/client";
+import { enabledSocialAccountWhere } from './platforms/registry';
 
 const globalForPrisma = globalThis as typeof globalThis & {
   rebuildPrisma?: PrismaClient;
@@ -71,9 +72,9 @@ export async function listWorkspaces(userId: string): Promise<WorkspaceSummary[]
 }
 
 /** Return connected destinations for a workspace without exposing access tokens. */
-export function getTargets(workspaceId: string) {
+export async function getTargets(workspaceId: string) {
   return prisma.target.findMany({
-    where: { workspaceId, enabled: true },
+    where: { workspaceId, enabled: true, socialAccount: { is: await enabledSocialAccountWhere() } },
     orderBy: [{ type: "asc" }, { name: "asc" }],
     select: {
       id: true,
@@ -174,9 +175,9 @@ export function workspaceSummary(workspaceId: string) {
   });
 }
 
-export function listConnections(workspaceId: string) {
+export async function listConnections(workspaceId: string) {
   return prisma.socialAccount.findMany({
-    where: { workspaceId },
+    where: { workspaceId, ...await enabledSocialAccountWhere() },
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -192,9 +193,9 @@ export function listConnections(workspaceId: string) {
 }
 
 /** Read linked advertising account metadata. */
-export function getAdAccounts(workspaceId: string) {
+export async function getAdAccounts(workspaceId: string) {
   return prisma.adAccount.findMany({
-    where: { workspaceId },
+    where: { workspaceId, socialAccount: { is: await enabledSocialAccountWhere() } },
     orderBy: { name: "asc" },
     select: { id: true, actId: true, name: true, currency: true, accountStatus: true, enabled: true, lastSyncedAt: true, socialAccountId: true },
   });

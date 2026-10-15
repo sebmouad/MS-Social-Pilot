@@ -4,18 +4,18 @@ import { requireViewer } from '@/server/context';
 import { getAdAccounts, listConnections } from '@/server/data';
 import { SettingsPage, SettingsPanel, Status, styles } from '../_components';
 import { ConnectionManager } from './manager';
-import { platformFor } from '@/server/platforms/registry';
-import { configuredFacebookOAuth } from '@/server/platforms/facebook';
+import { connectablePlatforms } from '@/server/platforms/registry';
+import { platformModule } from '@/platforms';
 
 export const metadata: Metadata = { title: 'Connections' };
 
-const providerName = (provider: string) => provider.replace(/[_-]/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+const providerName = (provider: string) => platformModule(provider)?.name ?? provider.replace(/[_-]/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
 const accountStatus = (invalidatedAt: Date | null) => invalidatedAt ? { label: 'Needs attention', tone: 'warning' as const } : { label: 'Connected', tone: 'good' as const };
 
 export default async function ConnectionsPage({ searchParams }: { searchParams: Promise<{ notice?: string; select?: string; source?: string; action?: string }> }) {
   const [viewer, params] = await Promise.all([requireViewer({ feature: 'settings/connections' }), searchParams]);
-  const [accounts, adAccounts, facebook] = await Promise.all([listConnections(viewer.workspaceId), getAdAccounts(viewer.workspaceId), platformFor('facebook', 'connection')]);
-  const facebookReady = facebook?.getAuthorizationUrl ? await configuredFacebookOAuth().then(() => true).catch(() => false) : false;
+  const [accounts, adAccounts, platforms] = await Promise.all([listConnections(viewer.workspaceId), getAdAccounts(viewer.workspaceId), connectablePlatforms()]);
+  const connectable = platforms.map(({ id, name, mark }) => ({ id, name, mark }));
   const socialById = new Map(accounts.map(account => [account.id, account]));
   const adRows = adAccounts.map(ad => {
     const social = ad.socialAccountId ? socialById.get(ad.socialAccountId) : undefined;
@@ -24,16 +24,16 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const canManage = viewer.membership.role === 'owner' || viewer.membership.role === 'admin';
 
   return <PageFrame module="settings"><SettingsPage active="settings/connections" title="Connections" description="Choose which discovered channels and advertising accounts this workspace uses.">
-    <ConnectionManager sources={accounts} canManage={canManage} canConnectFacebook={facebookReady} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
-    {params.notice === 'connected_partial' && <p className={styles['settings-note']} role="status">Meta connected. Newly discovered channels and ad accounts are ready for selection. Items already linked to another profile were left unchanged.</p>}
-    {params.notice === 'connected' && <p className={styles['settings-note']} role="status">Meta connected. Discovered channels and ad accounts are ready for your selection.</p>}
-    {params.notice === 'oauth_cancelled' && <p className={styles['settings-note']} role="status">Meta authorization was cancelled.</p>}
+    <ConnectionManager sources={accounts} canManage={canManage} platforms={connectable} initiallyOpen={params.select === '1'} initialSourceId={params.source} initialAction={params.action === 'disconnect' ? 'disconnect' : params.action === 'manage' ? 'manage' : undefined} />
+    {params.notice === 'connected_partial' && <p className={styles['settings-note']} role="status">Connected. Newly discovered channels and ad accounts are ready for selection. Items already linked to another profile were left unchanged.</p>}
+    {params.notice === 'connected' && <p className={styles['settings-note']} role="status">Connected. Discovered channels and ad accounts are ready for your selection.</p>}
+    {params.notice === 'oauth_cancelled' && <p className={styles['settings-note']} role="status">Authorization was cancelled.</p>}
     {params.notice === 'connect_failed' && <p className={styles['settings-note']} role="alert">Connection unavailable. Try again or contact support.</p>}
     {params.notice === 'oauth_invalid_state' && <p className={styles['settings-note']} role="alert">The authorization session expired or changed. Start again from this page.</p>}
     {params.notice === 'saved' && <p className={styles['settings-note']} role="status">Selection saved.</p>}
     {params.notice === 'failed' && <p className={styles['settings-note']} role="alert">The selection could not be saved. Check your workspace access and try again.</p>}
     {!accounts.length && !adRows.length ? <SettingsPanel title="No connections yet" detail="Channels and ad accounts you select will appear here.">
-      <p className={styles['settings-empty']}>{facebookReady && canManage ? 'Connect a source above to choose what this workspace uses.' : 'There are no channels or advertising accounts in this workspace yet.'}</p>
+      <p className={styles['settings-empty']}>{connectable.length && canManage ? 'Connect a source above to choose what this workspace uses.' : 'There are no channels or advertising accounts in this workspace yet.'}</p>
     </SettingsPanel> : <>
     <SettingsPanel title="Social accounts" detail={`${accounts.length} connected account${accounts.length === 1 ? '' : 's'} in this workspace`}>
       {accounts.length ? <div className={styles['settings-table-wrap']}><table className={styles['settings-table']}><thead><tr><th scope="col">Account</th><th scope="col">Platform</th><th scope="col">Channels</th><th scope="col">Status</th>{canManage && <th scope="col">Actions</th>}</tr></thead><tbody>

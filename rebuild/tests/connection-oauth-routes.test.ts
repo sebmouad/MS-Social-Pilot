@@ -25,8 +25,13 @@ vi.mock('../src/server/platforms/facebook', () => ({
 }));
 vi.mock('../src/server/connection-mutations', () => ({ persistFacebookDiscovery: mocks.persistFacebookDiscovery, recordFacebookConnectionFailure: mocks.recordFacebookConnectionFailure }));
 
-import { GET } from '../src/app/api/connections/facebook/callback/route';
-import { POST } from '../src/app/api/connections/facebook/start/route';
+import { GET as callbackRoute } from '../src/app/api/connections/[platform]/callback/route';
+import { POST as startRoute } from '../src/app/api/connections/[platform]/start/route';
+
+// The generic platform routes, exercised for the Facebook module.
+const facebook = { params: Promise.resolve({ platform: 'facebook' }) };
+const GET = (request: NextRequest) => callbackRoute(request, facebook);
+const POST = (request: Request) => startRoute(request, facebook);
 
 const originalKey = process.env.ENCRYPTION_KEY;
 const validKey = Buffer.alloc(32, 5).toString('base64');

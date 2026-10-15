@@ -1,19 +1,71 @@
 import type { CapabilityDeclaration, PlatformAdapter } from '@/platforms/types';
-import { configuredFacebookAdapter } from './facebook';
+import { PLATFORM_MODULES, platformModule } from '@/platforms';
+import type { PlatformModule } from '@/platforms/module';
 import { runtimeConfig } from '@/server/config/store';
+import { PLATFORM_HOSTS, type PlatformHost } from './index';
 
-type PlatformFactory = () => Promise<PlatformAdapter>;
+/**
+ * Product code reaches platforms only through here: by provider ID and
+ * capability. A module that Root switched off behaves as if it were not
+ * installed — customers cannot see, connect or use it; its data stays stored.
+ */
+function hostFor(provider: string): PlatformHost | undefined {
+  return platformModule(provider) ? (PLATFORM_HOSTS as Record<string, PlatformHost>)[provider] : undefined;
+}
 
-/** The installed adapters are private runtime wiring. Product code dispatches by
- * provider ID and capability; customers only see enabled destinations. */
-const factories: Readonly<Record<string, PlatformFactory>> = {
-  facebook: configuredFacebookAdapter,
-};
+export async function isPlatformEnabled(provider: string): Promise<boolean> {
+  const module = platformModule(provider);
+  if (!module || !hostFor(provider)) return false;
+  return await runtimeConfig(module.enabledKey as never) === true;
+}
 
 export async function platformFor(provider: string, capability: keyof CapabilityDeclaration): Promise<PlatformAdapter | null> {
-  const factory = factories[provider];
-  if (!factory) return null;
-  if (await runtimeConfig(`platforms.${provider}.enabled`) !== true) return null;
-  const adapter = await factory();
+  const host = hostFor(provider);
+  if (!host || !await isPlatformEnabled(provider)) return null;
+  const adapter = await host.adapter();
   return adapter.capabilities[capability] === 'supported' ? adapter : null;
+}
+
+export interface PlatformStatus {
+  module: PlatformModule;
+  enabled: boolean;
+  /** Root has filled in what a customer needs to connect. */
+  ready: boolean;
+}
+
+/** Every installed module with its switch and setup state — for Root. */
+export async function platformStatuses(): Promise<PlatformStatus[]> {
+  return Promise.all((PLATFORM_MODULES as readonly PlatformModule[]).map(async (module) => {
+    const host = hostFor(module.id)!;
+    const enabled = await isPlatformEnabled(module.id);
+    return { module, enabled, ready: await host.connection.isReady() };
+  }));
+}
+
+/** Modules a customer can connect now: switched on and set up. */
+export async function connectablePlatforms(): Promise<PlatformModule[]> {
+  return (await platformStatuses()).filter((status) => status.enabled && status.ready).map((status) => status.module);
+}
+
+/** The connection flow of an installed, switched-on module. */
+export async function connectionFlow(provider: string): Promise<PlatformHost['connection'] | null> {
+  const host = hostFor(provider);
+  if (!host || !await platformFor(provider, 'connection')) return null;
+  return host.connection;
+}
+
+/** IDs of the installed modules that Root has switched on. */
+export async function enabledPlatformIds(): Promise<string[]> {
+  const ids = (PLATFORM_MODULES as readonly PlatformModule[]).map((module) => module.id);
+  const on = await Promise.all(ids.map((id) => isPlatformEnabled(id)));
+  return ids.filter((_, index) => on[index]);
+}
+
+/**
+ * Prisma filter for channels, ad accounts and connections that belong to a
+ * switched-on platform. Every customer-facing list applies it, so a module that
+ * is off disappears everywhere at once while its data stays stored.
+ */
+export async function enabledSocialAccountWhere() {
+  return { provider: { in: await enabledPlatformIds() } };
 }

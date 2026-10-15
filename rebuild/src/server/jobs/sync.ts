@@ -3,6 +3,7 @@ import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { configuredFacebookEngine } from '@/server/platforms/facebook';
 import { runtimeConfig } from '@/server/config/store';
+import { isPlatformEnabled } from '@/server/platforms/registry';
 import { Prisma } from '../../../generated/client';
 import { withRetries } from './retry';
 import type { RetryBackoff } from './retry';
@@ -125,7 +126,7 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
 
 /** Refresh current daily Page snapshots for enabled connections in their own workspace. */
 export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
-  if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
+  if (!await isPlatformEnabled('facebook')) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
   const targetWhere = { type: 'page' as const, enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } };
   const targets = await fairBatch('page-analytics', limit, (cursor, direction, take) => prisma.target.findMany({
@@ -160,7 +161,7 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
 
 /** Refresh account-level Ads Insights for each enabled account in its own workspace. */
 export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
-  if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
+  if (!await isPlatformEnabled('facebook')) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
   const accountWhere = { enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } };
   const accounts = await fairBatch('ads-analytics', limit, (cursor, direction, take) => prisma.adAccount.findMany({
@@ -205,7 +206,7 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
 
 /** Sync conversations/messages and post comments through the Facebook platform engine. */
 export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?: RetryBackoff): Promise<JobSummary> {
-  if (await runtimeConfig('platforms.facebook.enabled') !== true) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
+  if (!await isPlatformEnabled('facebook')) return { examined: 0, updated: 0, skipped: 0, failed: 0 };
   const [readScopes, limit] = await Promise.all([
     runtimeConfig('meta.inboxReadScopes') as Promise<string[]>, runtimeConfig('sync.maxItemsPerJob') as Promise<number>,
   ]);

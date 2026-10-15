@@ -1,3 +1,36 @@
+# Platform modules
+
+Every social platform is a **module** that Root can switch on or off. A module
+that is off is invisible to customers — no connect button, channels, ad
+accounts, inbox items, analytics or MCP results — while its stored data stays
+untouched; switching it back on restores everything.
+
+## Anatomy of a module
+
+| Part | Where | Holds |
+| --- | --- | --- |
+| Engine | `src/platforms/<id>/` | Provider operations behind the neutral contract in `src/platforms/types.ts` |
+| Manifest + settings | `src/platforms/<id>/module.ts` | Name, badge, capabilities, channel kinds, required settings, and all of the module's Root settings (including `platforms.<id>.enabled`) |
+| Server wiring | `src/server/platforms/<id>.ts` (+ `<id>-connect.ts`) | Building the engine from Root settings; the connection start/callback flow |
+| Installed list | `src/platforms/index.ts` and `src/server/platforms/index.ts` | The only places that name platforms; TypeScript keeps the two in step |
+
+Generated from the installed list: the Root configuration groups
+(`<Name> · …`), the Root → Platforms screen with each module's switch and setup
+state, the customer Connections buttons (only modules that are on **and** set
+up), the generic routes `/api/connections/<id>/start|callback`, and the
+`enabledSocialAccountWhere()` filter applied to every customer-facing list.
+Product code reaches a platform only through `src/server/platforms/registry.ts`
+(`platformFor(id, capability)`, `isPlatformEnabled`, `connectionFlow`).
+
+To add a platform: build its engine and `module.ts`, add it to both installed
+lists, and add its tests. Nothing else needs to change for it to appear in Root.
+
+Still Facebook-specific outside the module (next step): background sync jobs
+(`src/server/jobs/sync.ts`), ads actions (`src/server/ads/*`), inbox actions and
+their MCP tools. They now check the module switch, but should move behind
+module-level sync/ads/inbox hooks so a second platform plugs in without editing
+them.
+
 # Platform adapters
 
 `src/platforms/types.ts` holds provider-neutral contracts. Each adapter declares usable capabilities; unsupported operations are omitted. Customer navigation is generated separately from module manifests and entitlements.

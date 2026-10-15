@@ -1,4 +1,5 @@
 import { prisma } from '@/server/data';
+import { enabledSocialAccountWhere } from '@/server/platforms/registry';
 
 export type AnalyticsRange = { from: Date; to: Date };
 
@@ -17,7 +18,7 @@ export async function loadAnalytics(workspaceId: string, targetIds: string[], ra
   });
   const allowedIds = allowedTargetIds === undefined ? undefined : new Set(allowedTargetIds);
   const targets = (await prisma.target.findMany({
-    where: { workspaceId, enabled: true, OR: [{ type: { not: 'instagram' } }, { type: 'instagram', providerId: { in: instagramAccounts.map(account => account.igUserId) } }] }, orderBy: [{ type: 'asc' }, { name: 'asc' }],
+    where: { workspaceId, enabled: true, socialAccount: { is: await enabledSocialAccountWhere() }, OR: [{ type: { not: 'instagram' } }, { type: 'instagram', providerId: { in: instagramAccounts.map(account => account.igUserId) } }] }, orderBy: [{ type: 'asc' }, { name: 'asc' }],
     select: { id: true, type: true, name: true, providerId: true, socialAccountId: true },
   })).filter(target => allowedIds === undefined || allowedIds.has(target.id));
   const selectedTargets = targets.filter(target => targetIds.includes(target.id) && (allowedIds === undefined || allowedIds.has(target.id)));

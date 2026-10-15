@@ -1,4 +1,5 @@
 import { PageFrame } from '@/server/PageFrame';
+import { enabledSocialAccountWhere } from '@/server/platforms/registry';
 import { requireViewer } from '@/server/context';
 import { prisma } from '@/server/data';
 import { canUseFeature } from '@/server/entitlements';
@@ -9,7 +10,7 @@ export default async function HomePage() {
   const showConnections = canUseFeature(viewer.entitlements, 'settings/connections');
   const showAds = canUseFeature(viewer.entitlements, 'ads/overview');
   const scope = viewer.permissions.pageScope;
-  const targetWhere = { workspaceId: viewer.workspaceId, enabled: true, ...(scope.all ? {} : { id: { in: [...scope.ids] } }) };
+  const targetWhere = { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: await enabledSocialAccountWhere() }, ...(scope.all ? {} : { id: { in: [...scope.ids] } }) };
   const visibleTargets = await prisma.target.findMany({ where: targetWhere, select: { socialAccountId: true } });
   const socialAccountIds = [...new Set(visibleTargets.map(target => target.socialAccountId).filter((id): id is string => Boolean(id)))];
   const postScope = scope.all ? {} : { targets: { some: { targetId: { in: [...scope.ids] } } } };
