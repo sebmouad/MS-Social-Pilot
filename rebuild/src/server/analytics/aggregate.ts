@@ -1,4 +1,6 @@
-import { adMetricUnit, aggregateValues, instagramMetricKind, metricLabel, pageMetricKind, safeNumber, type AnalyticsMetric } from './catalog';
+import { facebookAdMetricUnit, facebookMetricLabel, facebookPageMetricKind } from '@/platforms/facebook/analytics';
+import { instagramMetricKind, instagramMetricLabel } from '@/platforms/instagram/analytics';
+import { aggregateValues, genericMetricLabel, safeNumber, type AnalyticsMetric } from './catalog';
 
 type PageRow = { metric: string; period?: string; endTime: Date; fetchedAt?: Date; numeric: number | null; value: unknown; target: { id: string; name: string } };
 type AdRow = { date: Date; spend: number; impressions: number; clicks: number; reach: number; cpc: number | null; cpm: number | null; cpp: number | null; ctr: number | null; frequency: number | null; actions: unknown; fields: unknown; fetchedAt: Date; adAccount: { id: string; name: string; currency: string | null } };
@@ -17,6 +19,8 @@ export type MetricView = {
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 const formatDay = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const asMap = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+const metricLabel = (key: string, source: MetricView['source']) =>
+  (source === 'page' || source === 'ads' ? facebookMetricLabel(key) : instagramMetricLabel(key)) ?? genericMetricLabel(key);
 
 function pageValue(row: PageRow): number | null { return row.numeric ?? safeNumber(row.value); }
 
@@ -40,7 +44,7 @@ function metricSeries(key: string, source: 'page' | 'instagram' | 'ads', kind: A
   const total = kind === 'stock' ? values.reduce((sum, item) => sum + (item.latestValue ?? item.values.at(-1) ?? 0), 0) : aggregateValues(observations.map(row => row.value), kind);
   const latestAt = values.length ? new Date(Math.max(...values.map(item => item.latest.getTime()))) : null;
   const rows = [...channelValues].map(([key, item]) => ({ label: item.label ?? key, value: kind === 'stock' ? (item.latestValue ?? item.values.at(-1)!) : item.values.reduce((sum, value) => sum + value, 0), asOf: item.latest })).sort((a, b) => b.value - a.value);
-  return { key, label: metricLabel(key), source, unit, kind, total, latestAt, coverage: rows.length, available: selectedCount, points, rows };
+  return { key, label: metricLabel(key, source), source, unit, kind, total, latestAt, coverage: rows.length, available: selectedCount, points, rows };
 }
 
 export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRows: AudienceRow[], selectedTargets: Array<{ id: string; type: string; name: string; providerId?: string }>, adAvailableCount = new Set(adRows.map(row => row.adAccount.id)).size, instagramRows: InstagramRow[] = [], instagramAudienceRows: InstagramAudienceRow[] = []) {
@@ -63,7 +67,7 @@ export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRow
   for (const [seriesKey, groupRows] of pageGroups) {
     const key = groupRows[0]!.metric;
     const period = groupRows[0]!.period ?? 'day';
-    const kind = pageMetricKind(key);
+    const kind = facebookPageMetricKind(key);
     const channelValues = new Map<string, ChannelSeries>();
     const observations: Array<{ date: Date; label: string; value: number }> = [];
     const breakdownLatest = new Map<string, PageRow>();
@@ -88,7 +92,7 @@ export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRow
       for (const row of breakdownLatest.values()) for (const [label, value] of Object.entries(asMap(row.value))) { const n = safeNumber(value); if (n !== null) sums.set(label, (sums.get(label) ?? 0) + n); }
       const latestRows = [...breakdownLatest.values()];
       const fetchedAt = latestRows.flatMap(row => row.fetchedAt ? [row.fetchedAt.getTime()] : []);
-      metrics.push({ key: seriesKey, label: `${metricLabel(key)}${period !== 'day' ? ` · ${period}` : ''}`, source: 'page', unit: 'count', kind: 'breakdown', total: null, latestAt: new Date(Math.max(...latestRows.map(row => row.endTime.getTime()))), updatedAt: fetchedAt.length ? new Date(Math.max(...fetchedAt)) : null, coverage: breakdownLatest.size, available: selectedPages.length, points: [], rows: [...sums].map(([label, value]) => ({ label, value, asOf: null })).sort((a, b) => b.value - a.value) });
+      metrics.push({ key: seriesKey, label: `${metricLabel(key, 'page')}${period !== 'day' ? ` · ${period}` : ''}`, source: 'page', unit: 'count', kind: 'breakdown', total: null, latestAt: new Date(Math.max(...latestRows.map(row => row.endTime.getTime()))), updatedAt: fetchedAt.length ? new Date(Math.max(...fetchedAt)) : null, coverage: breakdownLatest.size, available: selectedPages.length, points: [], rows: [...sums].map(([label, value]) => ({ label, value, asOf: null })).sort((a, b) => b.value - a.value) });
     }
   }
 
@@ -138,7 +142,7 @@ export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRow
         if (n !== null) sums.set(label, (sums.get(label) ?? 0) + n);
       }
       const latestRows = [...breakdownLatest.values()];
-      metrics.push({ key: seriesKey, label: `${metricLabel(key)}${period !== 'day' ? ` · ${period}` : ''}`, source: 'instagram', unit: 'count', kind: 'breakdown', total: null, latestAt: new Date(Math.max(...latestRows.map(row => row.endTime.getTime()))), updatedAt: new Date(Math.max(...latestRows.map(row => row.fetchedAt.getTime()))), coverage: breakdownLatest.size, available: selectedInstagramCount, points: [], rows: [...sums].map(([label, value]) => ({ label, value, asOf: null })).sort((a, b) => b.value - a.value) });
+      metrics.push({ key: seriesKey, label: `${metricLabel(key, 'instagram')}${period !== 'day' ? ` · ${period}` : ''}`, source: 'instagram', unit: 'count', kind: 'breakdown', total: null, latestAt: new Date(Math.max(...latestRows.map(row => row.endTime.getTime()))), updatedAt: new Date(Math.max(...latestRows.map(row => row.fetchedAt.getTime()))), coverage: breakdownLatest.size, available: selectedInstagramCount, points: [], rows: [...sums].map(([label, value]) => ({ label, value, asOf: null })).sort((a, b) => b.value - a.value) });
     }
   }
 
@@ -184,9 +188,9 @@ export function buildAnalytics(pageRows: PageRow[], adRows: AdRow[], audienceRow
       const accountValue = ['cpp', 'frequency'].includes(key) ? calculate(group.filter(row => isoDay(row.date) === latestAccountDay)) : calculate(group);
       return accountValue === null ? [] : [{ label: group[0]!.adAccount.name, value: accountValue, asOf: new Date(group.reduce((latest, row) => row.date > latest ? row.date : latest, group[0]!.date).getTime()) }];
     });
-    const unit = adMetricUnit(key, adRows[0]?.adAccount.currency);
+    const unit = facebookAdMetricUnit(key, adRows[0]?.adAccount.currency);
     const currencies = new Set(adRows.map(row => row.adAccount.currency).filter(Boolean));
-    metrics.push({ key, label: metricLabel(key), source: 'ads', kind: 'ratio', unit, total: currencies.size > 1 && unit === 'currency' ? null : total, ...(currencies.size > 1 && unit === 'currency' ? { displayTotal: 'Multiple currencies' } : {}), latestAt: new Date(Math.max(...adRows.map(row => row.date.getTime()))), updatedAt: new Date(Math.max(...adRows.map(row => row.fetchedAt.getTime()))), coverage: rows.length, available: adAvailableCount, points: observations.map(row => ({ date: isoDay(row.date), label: formatDay(isoDay(row.date)), value: row.value })), rows });
+    metrics.push({ key, label: metricLabel(key, 'ads'), source: 'ads', kind: 'ratio', unit, total: currencies.size > 1 && unit === 'currency' ? null : total, ...(currencies.size > 1 && unit === 'currency' ? { displayTotal: 'Multiple currencies' } : {}), latestAt: new Date(Math.max(...adRows.map(row => row.date.getTime()))), updatedAt: new Date(Math.max(...adRows.map(row => row.fetchedAt.getTime()))), coverage: rows.length, available: adAvailableCount, points: observations.map(row => ({ date: isoDay(row.date), label: formatDay(isoDay(row.date)), value: row.value })), rows });
   }
 
   // Discover numeric fields retained in the JSON payload as well as typed columns.
