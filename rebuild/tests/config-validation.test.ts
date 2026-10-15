@@ -24,7 +24,12 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(17);
+    expect(CONFIG_SCHEMA_VERSION).toBe(20);
+    expect(CONFIG_BY_KEY.get('publishing.maxImageAltCharacters')!.schema.safeParse(500).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('publishing.maxImageUploadRequestOverheadBytes')!.schema.safeParse(65536).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('publishing.maxImageUploadBytes')!.schema.parse(26214400)).toBe(26214400);
+    expect(CONFIG_BY_KEY.get('publishing.allowedImageMimeTypes')!.schema.safeParse(['image/jpeg', 'image/png']).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('publishing.allowedImageMimeTypes')!.schema.safeParse(['image/svg+xml']).success).toBe(false);
     expect(CONFIG_BY_KEY.get('inbox.messengerReplyWindowHours')!.schema.safeParse(24).success).toBe(true);
     expect(CONFIG_BY_KEY.get('inbox.messengerReplyWindowHours')!.schema.safeParse(25).success).toBe(false);
     expect(CONFIG_BY_KEY.get('inbox.messengerReplyWindowHours')!.consumption).toBe('active');
@@ -40,6 +45,11 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('data.workspaceOperationTimeoutMs')!.schema.safeParse(300000).success).toBe(true);
     expect(CONFIG_BY_KEY.get('data.workspaceOperationLockWaitMs')!.schema.safeParse(30000).success).toBe(true);
     expect(CONFIG_BY_KEY.get('data.purgeRecoverySchedule')!.schema.safeParse('*/7 * * * *').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('storage.orphanMediaRetentionDays')!.schema.parse(30)).toBe(30);
+    expect(CONFIG_BY_KEY.get('storage.orphanMediaRetentionDays')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('storage.orphanMediaBatchLimit')!.schema.parse(500)).toBe(500);
+    expect(CONFIG_BY_KEY.get('storage.orphanMediaBatchLimit')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('storage.orphanMediaCleanupSchedule')!.schema.safeParse('17 3 * * *').success).toBe(true);
     for (const prefix of ['meta.', 'youtube.', 'linkedin.', 'x.', 'sync.', 'api.', 'entitlements.', 'retention.', 'logging.', 'mcp.', 'theme.']) {
       expect(CONFIG_REGISTRY.some((item) => item.key.startsWith(prefix))).toBe(true);
     }
