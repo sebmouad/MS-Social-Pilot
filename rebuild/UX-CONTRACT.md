@@ -25,7 +25,7 @@ There is no released billing or legal-copy contract for the rebuild. Do not inve
 | Capability | Canonical owner | Source of truth | Allowed variants | Verification |
 |---|---|---|---|---|
 | Navigation | `src/components/AppShell.tsx` | Module manifests | Desktop sidebar, phone bottom rail | Browser keyboard and viewport checks |
-| Theme and Scrollbar | `src/styles/tokens.css` | `DESIGN.md` | Grove, Coast, Clay, Nightfall | Theme screenshots and computed styles pending |
+| Theme and Scrollbar | `src/styles/tokens.css` | `DESIGN.md` | Grove, Coast, Clay, Nightfall | Publishing mobile Lighthouse accessibility 100 in all four themes; shared muted-text contrast test passes; other screens and scrollbar checks pending |
 | Read-only table | `src/components/DataTable.tsx` | Server list query | Sortable or static columns | Caption/header checks; pagination parity pending |
 | Table Selection | No shared owner yet | `UX-CONTRACT.md` | None until a shared owner exists | Define before bulk table actions |
 | Select/Listbox | Native `<select>` | `DESIGN.md` and this contract | Browser-owned popup in English UI | Keyboard and popup checks pending |
