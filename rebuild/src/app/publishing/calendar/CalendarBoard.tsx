@@ -15,7 +15,7 @@ type Notice = { kind: "ok" | "error"; text: string } | null;
 const hourLabel = (hour: number) => new Intl.DateTimeFormat("en-US", { hour: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(2000, 0, 1, hour)));
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQuery }: { view: "month" | "week"; days: BoardDay[]; timeZone: string; nowIso: string; canCreate: boolean; filterQuery: string }) {
+export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQuery, defaultScheduleTime }: { view: "month" | "week"; days: BoardDay[]; timeZone: string; nowIso: string; canCreate: boolean; filterQuery: string; defaultScheduleTime: string }) {
   const router = useRouter();
   const nowMs = Date.parse(nowIso);
   const [move, setMove] = useState<Move | null>(null);
@@ -79,7 +79,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
           <div className={styles.dayHead}><time dateTime={day.key} aria-label={day.longLabel + (day.isToday ? " (today)" : "")}>{Number(day.key.slice(8))}</time>{day.isToday && <span className={styles.todayTag}>Today</span>}</div>
           {day.posts.slice(0, 3).map(postCard)}
           {day.posts.length > 3 && <a className={styles.more} href={`/publishing/calendar?view=week&date=${day.key}${filterQuery}`}>+{day.posts.length - 3} more<span className="ui-visually-hidden"> on {day.longLabel}</span></a>}
-          {canCreate && !day.isPast && <a className={styles.add} href={newPostHref(day.key, "09:00")}>+ New post<span className="ui-visually-hidden"> on {day.longLabel}</span></a>}
+          {canCreate && !day.isPast && <a className={styles.add} href={newPostHref(day.key, defaultScheduleTime)}>+ New post<span className="ui-visually-hidden"> on {day.longLabel}</span></a>}
         </li>;
       })}</ol>
     </div> : <div className={styles.weekWrap}><div className={styles.week} style={{ gridTemplateColumns: "52px repeat(7, minmax(0, 1fr))" }}>
@@ -103,7 +103,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
 
     <section className={styles.agenda} aria-label="Agenda">
       {days.filter(day => view === "week" || day.posts.length > 0).map(day => <div className={styles.agendaDay} key={day.key}>
-        <div className={styles.agendaHead}><h3><time dateTime={day.key}>{day.longLabel}</time>{day.isToday && <span className={styles.todayTag}>Today</span>}</h3>{canCreate && !day.isPast && <a className={styles.agendaAdd} href={newPostHref(day.key, "09:00")}>+ New post<span className="ui-visually-hidden"> on {day.longLabel}</span></a>}</div>
+        <div className={styles.agendaHead}><h3><time dateTime={day.key}>{day.longLabel}</time>{day.isToday && <span className={styles.todayTag}>Today</span>}</h3>{canCreate && !day.isPast && <a className={styles.agendaAdd} href={newPostHref(day.key, defaultScheduleTime)}>+ New post<span className="ui-visually-hidden"> on {day.longLabel}</span></a>}</div>
         {day.posts.length ? <div className={styles.agendaPosts}>{day.posts.map(postCard)}</div> : <p className={styles.muted}>Nothing planned.</p>}
       </div>)}
       {rangeIsEmpty && view === "month" && <p className={styles.muted}>Nothing is scheduled or published this month.</p>}

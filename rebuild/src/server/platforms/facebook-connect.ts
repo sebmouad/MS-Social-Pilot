@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { FACEBOOK_CONNECTION_CALLBACK_PATH } from '@/platforms/facebook/protocol';
 import { FacebookApiError } from '@/platforms/facebook/publishing';
 import { createFacebookOAuthState, FACEBOOK_OAUTH_STATE_COOKIE, openFacebookOAuthState } from '@/server/connection-oauth-state';
-import { persistFacebookDiscovery, recordFacebookConnectionFailure } from '@/server/connection-mutations';
+import { persistFacebookDiscovery, recordFacebookConnectionFailure } from './facebook-discovery';
 import { runtimeConfig } from '@/server/config/store';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '@/server/data-control/guard';
 import { configuredFacebookEngine, configuredFacebookOAuth } from './facebook';

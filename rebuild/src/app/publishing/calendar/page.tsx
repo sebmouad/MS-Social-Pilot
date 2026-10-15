@@ -5,6 +5,7 @@ import { PageHeading } from "../publishing-ui";
 import { adjacentCalendarMonth, addDaysToKey, calendarMonth, isDateKey, postCalendarDate, weekStartKey, weekdayOfKey, workspaceDateKey } from "@/lib/calendar-dates";
 import { channelBadgeInfo } from "@/lib/channel-badge";
 import { CalendarBoard } from "./CalendarBoard";
+import { runtimeConfig } from '@/server/config/store';
 import type { BoardDay, BoardPost } from "./types";
 import styles from "./calendar.module.css";
 
@@ -18,6 +19,7 @@ const formatUtc = (key: string, options: Intl.DateTimeFormatOptions) => new Intl
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<Params> }) {
   const viewer = await requireViewer({ feature: "publishing/calendar", channelScoped: true });
+  const defaultScheduleTime = await runtimeConfig('publishing.defaultScheduleTime') as string;
   const timeZone = viewer.membership.workspace.timezone;
   const params = await searchParams;
   const now = new Date();
@@ -94,6 +96,6 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       </nav>
       </div>
     </div>
-    <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} />
+    <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime} />
   </>;
 }

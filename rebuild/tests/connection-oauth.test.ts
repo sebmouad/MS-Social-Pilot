@@ -42,7 +42,7 @@ describe('Meta discovery persistence', () => {
       $executeRaw: vi.fn(),
     };
     mocks.transaction.mockImplementation(async (run: (client: typeof tx) => Promise<unknown>) => run(tx));
-    const { persistFacebookDiscovery } = await import('../src/server/connection-mutations');
+    const { persistFacebookDiscovery } = await import('../src/server/platforms/facebook-discovery');
 
     const result = await persistFacebookDiscovery({ userId: 'user-1', workspaceId: 'workspace-1' }, {
       user: { id: 'meta-user', name: 'Meta User', pictureUrl: 'https://example.test/profile.png' },
@@ -67,7 +67,7 @@ describe('Meta discovery persistence', () => {
   it('rechecks owner/admin membership in the persistence transaction', async () => {
     const tx = { membership: { findUnique: vi.fn().mockResolvedValue({ role: 'editor' }) } };
     mocks.transaction.mockImplementation(async (run: (client: typeof tx) => Promise<unknown>) => run(tx));
-    const { persistFacebookDiscovery } = await import('../src/server/connection-mutations');
+    const { persistFacebookDiscovery } = await import('../src/server/platforms/facebook-discovery');
     await expect(persistFacebookDiscovery({ userId: 'user-1', workspaceId: 'workspace-1' }, {
       user: { id: 'meta-user', name: 'Meta User', pictureUrl: null }, accessToken: 'secret', expiresAt: null,
       scopes: [], pages: [], adAccounts: [],

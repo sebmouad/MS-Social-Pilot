@@ -24,7 +24,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(26);
+    expect(CONFIG_SCHEMA_VERSION).toBe(27);
     expect(CONFIG_BY_KEY.get('publishing.maxImageAltCharacters')!.schema.safeParse(500).success).toBe(true);
     expect(CONFIG_BY_KEY.get('publishing.maxImageUploadRequestOverheadBytes')!.schema.safeParse(65536).success).toBe(true);
     expect(CONFIG_BY_KEY.get('publishing.maxImageUploadBytes')!.schema.parse(26214400)).toBe(26214400);
@@ -72,6 +72,8 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('mcp.requestsPerMinute')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('sync.maxItemsPerJob')!.schema.safeParse(10000).success).toBe(true);
     expect(CONFIG_BY_KEY.get('sync.maxItemsPerJob')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('publishing.defaultScheduleTime')!.schema.safeParse('16:30').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('publishing.defaultScheduleTime')!.schema.safeParse('25:00').success).toBe(false);
     expect(CONFIG_BY_KEY.get('sync.workerLeaseMinutes')!.schema.safeParse(5).success).toBe(true);
     expect(CONFIG_BY_KEY.get('sync.workerLeaseMinutes')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('sync.workerHeartbeatSeconds')!.schema.safeParse(30).success).toBe(true);

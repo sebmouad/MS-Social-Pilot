@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 26;
+export const CONFIG_SCHEMA_VERSION = 27;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -51,6 +51,7 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'sync.workerPollSeconds', group: 'Sync schedules', label: 'Worker poll interval (seconds)', kind: 'number', description: 'How often the background worker checks schedules and Root settings.', defaultValue: 5, schema: z.number().int().min(1).max(60), consumption: 'active' }),
 
   entry({ key: 'publishing.maxMessageCharacters', group: 'Publishing limits', label: 'Maximum post characters', kind: 'number', description: 'Maximum text length for a post in the shared composer; provider-specific limits may be lower.', defaultValue: 10000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
+  entry({ key: 'publishing.defaultScheduleTime', group: 'Publishing defaults', label: 'Calendar post time', kind: 'text', description: 'Workspace-local HH:mm time prefilled when creating a post from a calendar day.', defaultValue: '09:00', schema: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a 24-hour time such as 09:00.'), consumption: 'active' }),
   entry({ key: 'publishing.maxImportRows', group: 'Publishing limits', label: 'Maximum import rows', kind: 'number', description: 'Maximum posts accepted in one bulk CSV import.', defaultValue: 100, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
   entry({ key: 'publishing.maxImportBytes', group: 'Publishing limits', label: 'Maximum import file size', kind: 'number', description: 'Maximum CSV bytes accepted in one bulk import.', defaultValue: 256000, schema: z.number().int().min(1024).max(100000000), consumption: 'active' }),
   entry({ key: 'publishing.maxTargetsPerPost', group: 'Publishing limits', label: 'Maximum channels per post', kind: 'number', description: 'Maximum selected destinations for one post.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),

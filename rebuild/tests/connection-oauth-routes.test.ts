@@ -23,7 +23,7 @@ vi.mock('../src/server/platforms/facebook', () => ({
   configuredFacebookOAuth: mocks.configuredFacebookOAuth,
   configuredFacebookAdapter: mocks.configuredFacebookAdapter,
 }));
-vi.mock('../src/server/connection-mutations', () => ({ persistFacebookDiscovery: mocks.persistFacebookDiscovery, recordFacebookConnectionFailure: mocks.recordFacebookConnectionFailure }));
+vi.mock('../src/server/platforms/facebook-discovery', () => ({ persistFacebookDiscovery: mocks.persistFacebookDiscovery, recordFacebookConnectionFailure: mocks.recordFacebookConnectionFailure }));
 
 import { GET as callbackRoute } from '../src/app/api/connections/[platform]/callback/route';
 import { POST as startRoute } from '../src/app/api/connections/[platform]/start/route';
