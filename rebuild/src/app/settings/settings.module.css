@@ -29,6 +29,14 @@
 .settings-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; color: var(--ink-soft); font-size: 11px; white-space: nowrap; }
 .settings-chip[data-disabled="true"] { color: var(--ink-faint); background: var(--surface-raised); }
 .settings-chip__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.mcp-key-form { display: grid; gap: 14px; margin-bottom: 22px; }
+.mcp-key-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.mcp-key-feature { display: grid; grid-template-columns: minmax(180px, 1fr) 90px 90px; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line-subtle); font-size: 13px; }
+.mcp-key-feature small { display: block; color: var(--ink-faint); }
+.mcp-key-token { display: grid; gap: 6px; margin: 12px 0; font-size: 12px; font-weight: 700; }
+.mcp-key-token textarea { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--ink); font: 12px/1.5 monospace; }
+.mcp-key-form button,.settings-panel button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.mcp-key-form button:disabled,.settings-panel button:disabled { opacity: .55; cursor: not-allowed; }
 .settings-chip[data-disabled="true"] .settings-chip__dot { background: var(--line-strong); }
 .settings-account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--line); }
 .settings-account-item { min-width: 0; padding: 16px; background: var(--surface); }

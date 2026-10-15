@@ -4,6 +4,8 @@ import { requireViewer } from '@/server/context';
 import { getAdAccounts, listConnections } from '@/server/data';
 import { SettingsPage, SettingsPanel, Status, styles } from '../_components';
 import { ConnectionManager } from './manager';
+import { platformFor } from '@/server/platforms/registry';
+import { configuredFacebookOAuth } from '@/server/platforms/facebook';
 
 export const metadata: Metadata = { title: 'Connections' };
 
@@ -12,7 +14,8 @@ const accountStatus = (invalidatedAt: Date | null) => invalidatedAt ? { label: '
 
 export default async function ConnectionsPage({ searchParams }: { searchParams: Promise<{ notice?: string; select?: string }> }) {
   const [viewer, params] = await Promise.all([requireViewer({ feature: 'settings/connections' }), searchParams]);
-  const [accounts, adAccounts] = await Promise.all([listConnections(viewer.workspaceId), getAdAccounts(viewer.workspaceId)]);
+  const [accounts, adAccounts, facebook] = await Promise.all([listConnections(viewer.workspaceId), getAdAccounts(viewer.workspaceId), platformFor('facebook', 'connection')]);
+  const facebookReady = facebook?.getAuthorizationUrl ? await configuredFacebookOAuth().then(() => true).catch(() => false) : false;
   const socialById = new Map(accounts.map(account => [account.id, account]));
   const adRows = adAccounts.map(ad => {
     const social = ad.socialAccountId ? socialById.get(ad.socialAccountId) : undefined;
@@ -21,7 +24,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const canManage = viewer.membership.role === 'owner' || viewer.membership.role === 'admin';
 
   return <PageFrame module="settings"><SettingsPage active="settings/connections" title="Connections" description="Choose which discovered channels and advertising accounts this workspace uses.">
-    <ConnectionManager sources={accounts} canManage={canManage} initiallyOpen={params.select === '1'} />
+    <ConnectionManager sources={accounts} canManage={canManage} canConnectFacebook={facebookReady} initiallyOpen={params.select === '1'} />
     {params.notice === 'connected_partial' && <p className={styles['settings-note']} role="status">Meta connected. Newly discovered channels and ad accounts are ready for selection. Items already linked to another profile were left unchanged.</p>}
     {params.notice === 'connected' && <p className={styles['settings-note']} role="status">Meta connected. Discovered channels and ad accounts are ready for your selection.</p>}
     {params.notice === 'oauth_cancelled' && <p className={styles['settings-note']} role="status">Meta authorization was cancelled.</p>}

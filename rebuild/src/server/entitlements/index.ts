@@ -43,6 +43,7 @@ const FEATURE_ROOT_SWITCH: Record<FeatureId, string | null> = {
   'ads/campaigns': 'ads/performance',
   'settings/connections': null,
   'settings/team': 'settings/team',
+  'settings/mcp': 'settings/team',
   'settings/account': null,
   'settings/data': null,
   'settings/appearance': null,
@@ -79,9 +80,9 @@ export function resolveEntitlements(source: EntitlementSource): Entitlements {
     return [id, modules[page.module] && !isOff(rootSwitch, disabled) && planAllowsFeature(id, source.planFeatures) && source.installationAvailability?.[`entitlements.features.${id}`] !== false];
   })) as Record<FeatureId, boolean>;
 
-  const platformCapabilities = Object.fromEntries((source.planFeatures ?? [])
+  const platformCapabilities = { facebook: true, ...Object.fromEntries((source.planFeatures ?? [])
     .filter((key) => key.startsWith('platform_'))
-    .map((key) => [key.slice('platform_'.length), true]));
+    .map((key) => [key.slice('platform_'.length), true])) };
 
   return { workspaceId: source.workspace.id, modules, features, platformCapabilities };
 }

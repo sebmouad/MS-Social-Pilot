@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 2;
+export const CONFIG_SCHEMA_VERSION = 3;
 
 const cron = z.string().min(9).max(100).refine((value) => {
   const fields = value.trim().split(/\s+/);
@@ -28,6 +28,7 @@ const options = (values: readonly { id: string; name: string }[]): Option[] => v
  * integrations; the UI must preserve that distinction.
  */
 export const CONFIG_REGISTRY: Entry[] = [
+  entry({ key: 'platforms.facebook.enabled', group: 'Platforms', label: 'Facebook engine enabled', kind: 'boolean', description: 'Make the installed Facebook adapter available to workspace features. Connected data remains stored when disabled.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'auth.loginAttempts', group: 'Security · rate limits', label: 'Sign-in attempts allowed', kind: 'number', description: 'Maximum password or verification attempts per account during one window.', defaultValue: 10, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'auth.loginWindowMinutes', group: 'Security · rate limits', label: 'Sign-in attempt window', kind: 'number', description: 'Minutes before failed sign-in attempts reset.', defaultValue: 15, schema: z.number().int().min(1).max(1440), consumption: 'active' }),
   entry({ key: 'auth.sessionDays', group: 'Security · sessions', label: 'Full session lifetime (days)', kind: 'number', description: 'Maximum age of a fully verified browser session.', defaultValue: 30, schema: z.number().int().min(1).max(365), consumption: 'active' }),
@@ -61,12 +62,12 @@ export const CONFIG_REGISTRY: Entry[] = [
   entry({ key: 'x.apiBaseUrl', group: 'API endpoints', label: 'X API base URL', kind: 'text', description: 'HTTPS endpoint for X API calls.', defaultValue: 'https://api.x.com/2', schema: url, consumption: 'planned' }),
   entry({ key: 'x.oauthScopes', group: 'API scopes', label: 'X OAuth scopes', kind: 'json', description: 'JSON array of OAuth scopes requested for X access.', defaultValue: ['tweet.read', 'users.read', 'tweet.write', 'offline.access'], schema: stringList, consumption: 'planned' }),
 
-  entry({ key: 'jobs.enabled', group: 'Sync schedules', label: 'Background jobs enabled', kind: 'boolean', description: 'Master availability switch for background work.', defaultValue: true, schema: z.boolean(), consumption: 'planned' }),
-  entry({ key: 'sync.posts.schedule', group: 'Sync schedules', label: 'Post and publishing sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '*/5 * * * *', schema: cron, consumption: 'planned' }),
-  entry({ key: 'sync.analytics.schedule', group: 'Sync schedules', label: 'Analytics sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '15 * * * *', schema: cron, consumption: 'planned' }),
-  entry({ key: 'sync.inbox.schedule', group: 'Sync schedules', label: 'Inbox sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '*/2 * * * *', schema: cron, consumption: 'planned' }),
-  entry({ key: 'sync.maxConcurrentJobs', group: 'Sync schedules', label: 'Maximum concurrent sync jobs', kind: 'number', description: 'Upper bound for simultaneously running sync tasks.', defaultValue: 4, schema: z.number().int().min(1).max(100), consumption: 'planned' }),
-  entry({ key: 'sync.retryLimit', group: 'Sync schedules', label: 'Sync retry limit', kind: 'number', description: 'Maximum retry attempts before a sync task is marked failed.', defaultValue: 5, schema: z.number().int().min(0).max(50), consumption: 'planned' }),
+  entry({ key: 'jobs.enabled', group: 'Sync schedules', label: 'Background jobs enabled', kind: 'boolean', description: 'Master availability switch for background work.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
+  entry({ key: 'sync.posts.schedule', group: 'Sync schedules', label: 'Post and publishing sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '*/5 * * * *', schema: cron, consumption: 'active' }),
+  entry({ key: 'sync.analytics.schedule', group: 'Sync schedules', label: 'Analytics sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '15 * * * *', schema: cron, consumption: 'active' }),
+  entry({ key: 'sync.inbox.schedule', group: 'Sync schedules', label: 'Inbox sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '*/2 * * * *', schema: cron, consumption: 'active' }),
+  entry({ key: 'sync.maxConcurrentJobs', group: 'Sync schedules', label: 'Maximum concurrent sync jobs', kind: 'number', description: 'Upper bound for simultaneously running sync tasks.', defaultValue: 4, schema: z.number().int().min(1).max(100), consumption: 'active' }),
+  entry({ key: 'sync.retryLimit', group: 'Sync schedules', label: 'Sync retry limit', kind: 'number', description: 'Maximum retry attempts before a sync task is marked failed.', defaultValue: 5, schema: z.number().int().min(0).max(50), consumption: 'active' }),
 
   entry({ key: 'api.meta.requestsPerMinute', group: 'API rate limits', label: 'Meta requests per minute', kind: 'number', description: 'Application-side request budget for Meta API calls.', defaultValue: 200, schema: z.number().int().min(1).max(100000), consumption: 'planned' }),
   entry({ key: 'api.youtube.requestsPerMinute', group: 'API rate limits', label: 'YouTube requests per minute', kind: 'number', description: 'Application-side request budget for YouTube API calls.', defaultValue: 100, schema: z.number().int().min(1).max(100000), consumption: 'planned' }),
@@ -89,7 +90,10 @@ export const CONFIG_REGISTRY: Entry[] = [
   entry({ key: 'mcp.maxRequestBytes', group: 'MCP', label: 'MCP request size limit (bytes)', kind: 'number', description: 'Maximum JSON-RPC request body size accepted by the MCP endpoint.', defaultValue: 1048576, schema: z.number().int().min(1024).max(10485760), consumption: 'active' }),
   entry({ key: 'mcp.requestsPerMinute', group: 'MCP', label: 'MCP requests per minute', kind: 'number', description: 'Per-user request budget for MCP operations.', defaultValue: 60, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
   entry({ key: 'mcp.maxResultItems', group: 'MCP', label: 'Maximum MCP result items', kind: 'number', description: 'Maximum rows returned by a single MCP list operation.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
-  entry({ key: 'theme.default', group: 'Theme defaults', label: 'Default workspace theme', kind: 'select', description: 'Theme used when a visitor has no saved theme preference.', defaultValue: 'grove', schema: optionList(THEMES.map((theme) => theme.id)), consumption: 'planned', options: options(THEMES) }),
+  entry({ key: 'mcp.keys.maxActivePerWorkspace', group: 'MCP · API keys', label: 'Active API keys per workspace', kind: 'number', description: 'Maximum non-expired, non-revoked MCP bearer keys in each workspace.', defaultValue: 10, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'mcp.keys.maxLifetimeDays', group: 'MCP · API keys', label: 'Maximum API key lifetime (days)', kind: 'number', description: 'Longest lifetime workspace admins may select when issuing an MCP key.', defaultValue: 365, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
+  entry({ key: 'mcp.keys.requestsPerMinute', group: 'MCP · API keys', label: 'API key requests per minute', kind: 'number', description: 'Request budget applied independently to each MCP bearer key.', defaultValue: 60, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
+  entry({ key: 'theme.default', group: 'Theme defaults', label: 'Default workspace theme', kind: 'select', description: 'Theme used when a visitor has no saved theme preference.', defaultValue: 'grove', schema: optionList(THEMES.map((theme) => theme.id)), consumption: 'active', options: options(THEMES) }),
   entry({ key: 'operations.supportEmail', group: 'Operations', label: 'Support email', kind: 'text', description: 'Contact address shown to operators.', defaultValue: '', schema: z.union([z.literal(''), z.string().email()]), consumption: 'planned' }),
 ];
 

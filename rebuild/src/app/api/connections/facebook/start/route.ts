@@ -4,6 +4,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { configuredFacebookEngine, configuredFacebookOAuth } from '@/server/platforms/facebook';
 import { createFacebookOAuthState, FACEBOOK_OAUTH_STATE_COOKIE } from '@/server/connection-oauth-state';
 import { recordFacebookConnectionFailure } from '@/server/connection-mutations';
+import { platformFor } from '@/server/platforms/registry';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
   try { viewer = await requireViewer({ feature: 'settings/connections' }); }
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   if (viewer.membership.role !== 'owner' && viewer.membership.role !== 'admin') return NextResponse.json({ error: 'Not authorized.' }, { status: 403 });
+  if (!await platformFor('facebook', 'connection')) return NextResponse.json({ error: 'This connection is unavailable.' }, { status: 404 });
 
   try {
     const [oauth, engine, adsReadScopes, adsManageScopes, adsManagementEnabled, stateMinutes] = await Promise.all([

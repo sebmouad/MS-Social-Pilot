@@ -4,7 +4,6 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireViewer } from '@/server/context';
 import { canAccessFeature } from '@/server/permissions';
-import { hasPlatformCapability } from '@/server/entitlements';
 import { createPost, deletePost, importPostsCsv, publishPost, syncPostStatus, updatePost } from '@/server/publishing/lifecycle';
 
 const PATH = '/publishing/posts';
@@ -27,7 +26,6 @@ export async function updatePostAction(data: FormData) {
 export async function deletePostAction(data: FormData) {
   await run(async viewer => {
     const remote = data.get('deleteRemote') === 'on';
-    if (remote) requireFacebook(viewer);
     await deletePost(actor(viewer), stringField(data, 'postId'), remote);
     return 'deleted';
   });
@@ -35,7 +33,6 @@ export async function deletePostAction(data: FormData) {
 
 export async function publishPostAction(data: FormData) {
   await run(async viewer => {
-    requireFacebook(viewer);
     const result = await publishPost(actor(viewer), stringField(data, 'postId'));
     return result.needsReconciliation || result.failed ? 'publish-review' : 'published';
   });
@@ -43,7 +40,6 @@ export async function publishPostAction(data: FormData) {
 
 export async function syncPostAction(data: FormData) {
   await run(async viewer => {
-    requireFacebook(viewer);
     await syncPostStatus(actor(viewer), stringField(data, 'postId'));
     return 'synced';
   });
@@ -72,9 +68,6 @@ async function run(operation: (viewer: Awaited<ReturnType<typeof requireViewer>>
 }
 
 function actor(viewer: Awaited<ReturnType<typeof requireViewer>>) { return { userId: viewer.user.id, workspaceId: viewer.workspaceId }; }
-function requireFacebook(viewer: Awaited<ReturnType<typeof requireViewer>>) {
-  if (!hasPlatformCapability(viewer.entitlements, 'facebook')) throw new Error('Facebook publishing is not enabled for this workspace plan.');
-}
 function stringField(data: FormData, key: string, optional = false) {
   const value = data.get(key);
   if (typeof value !== 'string') {

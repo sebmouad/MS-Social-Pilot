@@ -281,7 +281,8 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
   const engine = createFacebookEngine(config, fetchImpl);
   return {
     id: 'facebook',
-    capabilities: { connection: 'unsupported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
+    capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
+    supportsTargetKind: (kind, capability) => kind === 'page' && ['publishing', 'inbox', 'analytics'].includes(capability),
     getAuthorizationUrl: input => engine.getAuthorizationUrl(input),
     async exchangeCode(input) { return engine.exchangeCode(input); },
     async discover(request) {

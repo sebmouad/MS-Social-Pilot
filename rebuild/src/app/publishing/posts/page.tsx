@@ -5,6 +5,7 @@ import { PageHeading, PostMessage, PostTargets, StatusBadge, formatDate } from "
 import styles from "../publishing.module.css";
 import { CsvImportForm, PostEditorForm, PostRowActions } from "./PostActions";
 import { hasPlatformCapability } from "@/server/entitlements";
+import { platformFor } from '@/server/platforms/registry';
 
 const NOTICE_TEXT: Record<string, string> = {
   created: "Post saved.",
@@ -20,7 +21,11 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const viewer = await requireViewer({ feature: 'publishing/posts' });
   const posts = await listPosts(viewer.workspaceId);
   const targetRows = await getTargets(viewer.workspaceId);
-  const targetChoices = targetRows.map(target => ({ id: target.id, name: target.name, type: target.type, provider: target.socialAccount?.provider ?? null, canPublish: target.canPublish && !target.socialAccount?.invalidatedAt }));
+  const targetChoices = await Promise.all(targetRows.map(async target => {
+    const provider = target.socialAccount?.provider ?? null;
+    const adapter = provider && hasPlatformCapability(viewer.entitlements, provider) ? await platformFor(provider, 'publishing') : null;
+    return { id: target.id, name: target.name, type: target.type, provider, canPublish: Boolean(target.canPublish && !target.socialAccount?.invalidatedAt && adapter?.publish && adapter.supportsTargetKind?.(target.type, 'publishing')) };
+  }));
   const extraPosts = await prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, id: { in: posts.map(post => post.id) } }, select: { id: true, firstComment: true, authorId: true } });
   const byPost = new Map(extraPosts.map(post => [post.id, post]));
   const rows = posts.map(post => ({ ...post, firstComment: byPost.get(post.id)?.firstComment ?? null, authorId: byPost.get(post.id)?.authorId ?? '' }));
@@ -28,7 +33,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const noticeText = notice ? NOTICE_TEXT[notice] ?? (notice.startsWith('imported-') ? `${notice.slice('imported-'.length)} posts imported as drafts.` : undefined) : undefined;
   const canManageDrafts = ["owner", "admin", "editor"].includes(viewer.membership.role);
   const canAuthorDrafts = canManageDrafts || viewer.membership.role === "contributor";
-  const canPublish = hasPlatformCapability(viewer.entitlements, 'facebook');
+  const canPublish = targetChoices.some(target => target.canPublish);
   const columns: TableColumn<(typeof rows)[number]>[] = [
     { key: "post", label: "Post", render: post => <PostMessage message={post.message}/> },
     { key: "channels", label: "Channels", render: post => <PostTargets post={post}/> },
@@ -40,9 +45,9 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     return canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>;
   } });
   return <>
-    <PageHeading title="Posts" description="Create posts, choose destinations, publish through Facebook, and review delivery status." summary={`${posts.length} ${posts.length === 1 ? "post" : "posts"} · up to 100 recent`}/>
+    <PageHeading title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary={`${posts.length} ${posts.length === 1 ? "post" : "posts"} · up to 100 recent`}/>
     {noticeText ? <p className={notice === "failed" ? styles.errorNotice : styles.successNotice} role="status">{noticeText}</p> : null}
-    {canAuthorDrafts ? <section className={`${styles.card} ${styles.createCard}`}><h2>Create a post</h2><p>Choose an enabled Facebook Page now or save this as a local draft.</p><PostEditorForm targets={targetChoices}/></section> : null}
+    {canAuthorDrafts ? <section className={`${styles.card} ${styles.createCard}`}><h2>Create a post</h2><p>Choose an enabled destination now or save this as a local draft.</p><PostEditorForm targets={targetChoices}/></section> : null}
     {canManageDrafts ? <section className={`${styles.card} ${styles.createCard}`}><h2>Import a batch</h2><p>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section> : null}
     <section className={styles.card}><DataTable columns={columns} rows={rows} rowKey={post => post.id} caption="Recent posts" emptyMessage="No posts have been created in this workspace yet."/></section>
   </>;

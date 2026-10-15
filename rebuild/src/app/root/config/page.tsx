@@ -2,6 +2,7 @@ import { requireRootPage } from '@/server/config/access';
 import { readConfig } from '@/server/config/store';
 import { safeConfigShape, AVAILABILITY_CATALOG } from '@/lib/config/registry';
 import { RootConfigForm } from './root-config-form';
+import { RootJobHealth } from '@/server/jobs/RootJobHealth';
 import './root-config.css';
 
 export const metadata = { title: 'Runtime configuration' };
@@ -15,5 +16,6 @@ export default async function RootConfigPage() {
     <h1>Runtime configuration</h1>
     <p className="root-config__intro">Operational settings are validated against a versioned registry. Each option states whether rebuilt runtime paths consume it yet.</p>
     <RootConfigForm definitions={definitions} initialValues={values} availability={AVAILABILITY_CATALOG} />
+    <RootJobHealth />
   </main>;
 }

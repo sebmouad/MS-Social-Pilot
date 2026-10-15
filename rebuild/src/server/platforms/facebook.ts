@@ -1,4 +1,4 @@
-import { createFacebookEngine } from '@/platforms/facebook/publishing';
+import { createFacebookAdapter, createFacebookEngine } from '@/platforms/facebook/publishing';
 import type { FacebookConfig } from '@/platforms/facebook/config';
 import { runtimeConfig, runtimeSecret } from '@/server/config/store';
 
@@ -7,7 +7,7 @@ async function configured<T>(key: string): Promise<T> {
 }
 
 /** Server-only adapter construction; all operational inputs come from Root. */
-export async function configuredFacebookEngine() {
+async function configuredFacebookConfig(): Promise<FacebookConfig> {
   const [graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields] = await Promise.all([
     configured<string>('meta.graphBaseUrl'),
     configured<string>('meta.oauthBaseUrl'),
@@ -18,9 +18,11 @@ export async function configuredFacebookEngine() {
     configured<string[]>('meta.pageInsightMetrics'),
     configured<string[]>('meta.adInsightFields'),
   ]);
-  const config: FacebookConfig = { graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields };
-  return createFacebookEngine(config);
+  return { graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields };
 }
+
+export async function configuredFacebookEngine() { return createFacebookEngine(await configuredFacebookConfig()); }
+export async function configuredFacebookAdapter() { return createFacebookAdapter(await configuredFacebookConfig()); }
 
 export async function configuredFacebookOAuth() {
   const [appId, appSecret, redirectUri, scopes, inboxReadScopes, inboxWriteScopes] = await Promise.all([

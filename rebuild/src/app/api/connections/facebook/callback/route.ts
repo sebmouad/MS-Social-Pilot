@@ -4,6 +4,7 @@ import { configuredFacebookEngine, configuredFacebookOAuth } from '@/server/plat
 import { FACEBOOK_OAUTH_STATE_COOKIE, openFacebookOAuthState } from '@/server/connection-oauth-state';
 import { persistFacebookDiscovery, recordFacebookConnectionFailure } from '@/server/connection-mutations';
 import { FacebookApiError } from '@/platforms/facebook/publishing';
+import { platformFor } from '@/server/platforms/registry';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
   const state = params.get('state');
   const pending = openFacebookOAuthState(cookieState, state, viewer.user.id, viewer.workspaceId);
   if (!pending) return finish(request, 'oauth_invalid_state');
+  if (!await platformFor('facebook', 'connection')) return finish(request, 'connect_failed');
   if (params.has('error')) return finish(request, 'oauth_cancelled');
   const code = params.get('code');
   if (!code || code.length > 4096) return finish(request, 'connect_failed');

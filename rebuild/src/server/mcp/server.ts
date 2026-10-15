@@ -5,7 +5,7 @@ import { setConnectionSelections } from '../connection-mutations';
 import { randomBytes } from 'node:crypto';
 import { canAccessFeature, canAccessPage, type ScopedPermissions } from '../permissions';
 
-export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number };
+export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number; apiKeyId?: string };
 type JsonRpcId = string | number | null;
 
 const versions = ['2025-06-18', '2025-03-26', '2024-11-05'];
@@ -40,7 +40,7 @@ const toolFeatures: Record<string, string> = {
 };
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
-  await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, tool, ...detail })}::jsonb, NOW())`;
+  await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
 }
 
 function requireConfirmation(args: Record<string, unknown>, expected: string) {

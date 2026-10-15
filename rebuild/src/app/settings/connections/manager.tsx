@@ -7,7 +7,7 @@ type Channel = { id: string; name: string; type: string; enabled: boolean };
 type AdAccount = { id: string; name: string; actId: string; enabled: boolean };
 type Source = { id: string; name: string; provider: string; invalidatedAt: Date | null; targets: Channel[]; adAccounts: AdAccount[] };
 
-export function ConnectionManager({ sources, canManage, initiallyOpen = false }: { sources: Source[]; canManage: boolean; initiallyOpen?: boolean }) {
+export function ConnectionManager({ sources, canManage, canConnectFacebook, initiallyOpen = false }: { sources: Source[]; canManage: boolean; canConnectFacebook: boolean; initiallyOpen?: boolean }) {
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -61,7 +61,7 @@ export function ConnectionManager({ sources, canManage, initiallyOpen = false }:
 
   if (!canManage) return null;
   return <>
-    <div className={styles['connection-toolbar']}><p>Connect Meta to discover the Pages and ad accounts you can use, then choose them in the selection window.</p><div><button type="button" onClick={connectFacebook} disabled={connecting}>{connecting ? 'Connecting…' : 'Connect Facebook'}</button><button type="button" className={styles['connection-primary-button']} onClick={() => setOpen(true)}>Manage selections</button></div></div>
+    <div className={styles['connection-toolbar']}><p>Choose the channels and advertising accounts this workspace uses.</p><div>{canConnectFacebook && <button type="button" onClick={connectFacebook} disabled={connecting}>{connecting ? 'Connecting…' : 'Connect Facebook'}</button>}<button type="button" className={styles['connection-primary-button']} onClick={() => setOpen(true)}>Manage selections</button></div></div>
     {notice && !open && !disconnect && <p role="alert" className={styles['connection-error']}>{notice}</p>}
     {open && <div className={styles['connection-backdrop']} role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setOpen(false); }}><section className={styles['connection-dialog']} role="dialog" aria-modal="true" aria-labelledby="connection-dialog-title">
       <header><div><p className={styles['settings-eyebrow']}>Workspace connections</p><h2 id="connection-dialog-title">Choose channels and ad accounts</h2><p>Turn discovered channels and advertising accounts on or off for this workspace.</p></div><button type="button" aria-label="Close" onClick={() => setOpen(false)}>×</button></header>

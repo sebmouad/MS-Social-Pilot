@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   listWorkspaces: vi.fn(),
   userFindUnique: vi.fn(),
   queryRaw: vi.fn(),
+  executeRaw: vi.fn(),
   appSettingFindMany: vi.fn(),
 }));
 
@@ -18,7 +19,7 @@ vi.mock('next/headers', () => ({
 vi.mock('../src/server/data', () => ({
   getSessionByTokenHash: state.getSessionByTokenHash,
   listWorkspaces: state.listWorkspaces,
-  prisma: { user: { findUnique: state.userFindUnique }, appSetting: { findMany: state.appSettingFindMany }, $queryRaw: state.queryRaw },
+  prisma: { user: { findUnique: state.userFindUnique }, appSetting: { findMany: state.appSettingFindMany }, $queryRaw: state.queryRaw, $executeRaw: state.executeRaw },
 }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => key === 'mcp.enabled' ? true : key === 'mcp.authenticatedRoles' ? ['owner', 'admin'] : 1_048_576) }));
 
@@ -46,9 +47,11 @@ beforeEach(() => {
   state.userFindUnique.mockImplementation(async () => state.user);
   state.listWorkspaces.mockImplementation(async () => state.workspaces);
   state.appSettingFindMany.mockResolvedValue([]);
+  state.executeRaw.mockResolvedValue(1);
   state.queryRaw.mockImplementation(async (query: TemplateStringsArray, _userId: string, workspaceId: string) => query.join('').includes('AS role')
     ? [{ role: 'admin', allPages: true, workspaceDisabled: [], memberDisabled: [], clientAccess: [], pageIds: [] }]
-    : [{ workspaceId, workspaceDisabled: [], suspendedAt: null, memberDisabled: [], planFeatures: null, isInstanceOwner: false }]);
+    : query.join('').includes('FROM mcp_api_keys') ? [{ id: 'mk1', workspaceId: 'w1', createdById: 'u1', readFeatures: ['publishing/posts'], writeFeatures: [] }]
+      : [{ workspaceId, workspaceDisabled: [], suspendedAt: null, memberDisabled: [], planFeatures: null, isInstanceOwner: false }]);
 });
 
 describe('MCP route authentication', () => {
@@ -86,5 +89,17 @@ describe('MCP route authentication', () => {
     const body = await authorized.json();
     expect(body.result.instructions).toContain('Admin');
     expect(state.getSessionByTokenHash).toHaveBeenCalledWith(hashLegacySessionToken(token));
+  });
+
+  it('accepts a hashed bearer key and fixes it to its stored workspace and feature scopes', async () => {
+    const bearer = new Request('http://localhost/api/mcp', { method: 'POST', headers: { authorization: `Bearer mcp_${'a'.repeat(43)}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 8, method: 'tools/list' }) });
+    const response = await POST(bearer);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['list_posts']);
+    expect(state.executeRaw).toHaveBeenCalled();
+    const writeAttempt = new Request('http://localhost/api/mcp', { method: 'POST', headers: { authorization: `Bearer mcp_${'a'.repeat(43)}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'create_draft', arguments: { message: 'nope', confirmation: 'CREATE DRAFT' } } }) });
+    const denied = await POST(writeAttempt);
+    expect((await denied.json()).result.isError).toBe(true);
   });
 });

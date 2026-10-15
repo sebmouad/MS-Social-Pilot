@@ -40,6 +40,7 @@ const FEATURE_MODULE_SWITCH: Record<FeatureId, string | null> = {
   'ads/campaigns': 'ads/performance',
   'settings/connections': null,
   'settings/team': 'settings/team',
+  'settings/mcp': 'settings/team',
   'settings/account': null,
   'settings/data': null,
   'settings/appearance': null,
@@ -69,12 +70,12 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
   }
 
   if (role === 'viewer') {
-    if (feature === 'settings/team' || feature === 'settings/connections') return DENIED;
+    if (feature === 'settings/team' || feature === 'settings/mcp' || feature === 'settings/connections') return DENIED;
     return { read: true, write: false };
   }
 
   if (role === 'editor') {
-    if (feature === 'settings/team') return DENIED;
+    if (feature === 'settings/team' || feature === 'settings/mcp') return DENIED;
     if (feature === 'settings/connections') return { read: true, write: false };
     return {
       read: true,
@@ -83,7 +84,7 @@ function roleFeatureAccess(role: string, feature: FeatureId, clientAccess: Reado
   }
 
   if (role === 'contributor') {
-    if (feature === 'settings/team') return DENIED;
+    if (feature === 'settings/team' || feature === 'settings/mcp') return DENIED;
     if (feature === 'settings/connections') return { read: true, write: false };
     return {
       read: true,

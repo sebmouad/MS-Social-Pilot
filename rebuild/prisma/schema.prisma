@@ -75,6 +75,7 @@ model User {
   memberships  Membership[]
   posts        Post[]
   sessions     Session[]
+  mcpApiKeys   McpApiKey[]
 
   @@map("users")
 }
@@ -142,8 +143,30 @@ model Workspace {
   posts          Post[]
   socialAccounts SocialAccount[]
   adAccounts     AdAccount[]
+  mcpApiKeys     McpApiKey[]
 
   @@map("workspaces")
+}
+
+model McpApiKey {
+  id          String    @id
+  workspaceId String
+  createdById String
+  name        String
+  tokenHash   String    @unique
+  tokenPrefix String
+  readFeatures String[] @default([])
+  writeFeatures String[] @default([])
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt])
+  @@index([expiresAt])
+  @@map("mcp_api_keys")
 }
 
 model Membership {
@@ -370,4 +393,33 @@ model AdInsight {
   @@unique([adAccountId, level, objectId, date])
   @@index([adAccountId, date])
   @@map("ad_insights")
+}
+
+/// Atomic cross-process lock for one scheduled rebuild job.
+model RebuildJobLease {
+  name           String   @id
+  owner          String
+  token          String
+  leaseExpiresAt DateTime
+  updatedAt      DateTime @default(now())
+
+  @@index([leaseExpiresAt])
+  @@map("rebuild_job_leases")
+}
+
+/// Append-only operational history for Root job health and incident review.
+model RebuildSyncRun {
+  id         String    @id
+  job        String
+  owner      String
+  startedAt  DateTime
+  finishedAt DateTime?
+  outcome    String
+  attempts   Int       @default(0)
+  summary    String?
+  error      String?
+
+  @@index([job, startedAt])
+  @@index([finishedAt])
+  @@map("rebuild_sync_runs")
 }

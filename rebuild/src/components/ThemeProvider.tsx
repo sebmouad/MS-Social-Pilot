@@ -8,7 +8,7 @@ const ThemeContext = createContext<{ theme: ThemeId; setTheme: (theme: ThemeId) 
 const isThemeId = (value: string): value is ThemeId => THEMES.some(theme => theme.id === value);
 
 export function ThemeProvider({ initialTheme, children }: { initialTheme: string; children: ReactNode }) {
-  const [theme, setCurrentTheme] = useState<ThemeId>(isThemeId(initialTheme) ? initialTheme : 'grove');
+  const [theme, setCurrentTheme] = useState<ThemeId>(isThemeId(initialTheme) ? initialTheme : THEMES[0].id);
   const setTheme = useCallback((nextTheme: ThemeId) => {
     setCurrentTheme(nextTheme);
     document.documentElement.dataset.theme = nextTheme;

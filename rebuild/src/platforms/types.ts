@@ -101,6 +101,7 @@ export interface AdMutationRequest {
 export interface PlatformAdapter {
   readonly id: string;
   readonly capabilities: CapabilityDeclaration;
+  supportsTargetKind?(kind: string, capability: 'publishing' | 'inbox' | 'analytics'): boolean;
   getAuthorizationUrl?(request: OAuthStartRequest): string;
   exchangeCode?(request: OAuthExchangeRequest): Promise<OAuthToken>;
   discover?(request: DiscoveryRequest): Promise<DiscoveryResult>;

@@ -190,6 +190,7 @@ model User {
   aiGenerations        AiGeneration[]
   settingChanges       AppSetting[]
   apiTokens            ApiToken[]
+  mcpApiKeys           McpApiKey[]
   savedViews           SavedView[]
   inboxNotes           InboxNote[]
   rootActions          RootActivity[]
@@ -352,6 +353,7 @@ model Workspace {
   reportTemplates      ReportTemplate[]
   reportSchedules      ReportSchedule[]
   apiTokens            ApiToken[]
+  mcpApiKeys           McpApiKey[]
   chatChannels         ChatChannel[]
   webhookEndpoints     WebhookEndpoint[]
   contentMixRules      ContentMixRule[]
@@ -1920,6 +1922,29 @@ model ApiToken {
 
   @@index([workspaceId])
   @@map("api_tokens")
+}
+
+/// A workspace-scoped MCP bearer credential; only its token hash is stored.
+model McpApiKey {
+  id           String    @id
+  workspaceId  String
+  createdById  String
+  name         String
+  tokenHash    String    @unique
+  tokenPrefix  String
+  readFeatures String[]  @default([])
+  writeFeatures String[] @default([])
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User      @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt])
+  @@index([expiresAt])
+  @@map("mcp_api_keys")
 }
 
 /// Where alerts go besides email: a Slack incoming webhook or a Telegram chat.

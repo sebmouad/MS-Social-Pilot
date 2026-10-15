@@ -23,7 +23,7 @@ export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
   return <form action={importPostsAction} className={styles.draftForm}>
     <label htmlFor="posts-csv">Import posts from CSV</label>
     <p className={styles.help}>Required header: <code>message,firstComment,targetIds</code>. Separate multiple target IDs with semicolons. Imported posts remain drafts.</p>
-    <ul className={styles.targetReference}>{targets.filter(target => target.type === 'page' && target.provider === 'facebook' && target.canPublish).map(target => <li key={target.id}>{target.name}: <code>{target.id}</code></li>)}</ul>
+    <ul className={styles.targetReference}>{targets.filter(target => target.canPublish).map(target => <li key={target.id}>{target.name}: <code>{target.id}</code></li>)}</ul>
     <input id="posts-csv" type="file" name="csv" accept=".csv,text/csv" required />
     <button className="ui-button ui-button--secondary" type="submit">Import CSV</button>
   </form>;
@@ -57,15 +57,15 @@ export function PostRowActions({ post, targets, canEdit, canPublish }: { post: P
       <button className="ui-button ui-button--primary ui-button--sm" type="submit">Publish now</button>
     </form> : null}
     {hasRemote ? <form action={syncPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Sync status</button></form> : null}
-    {post.targets.some(item => item.status === 'processing' && !item.remotePostId) ? <span className={styles.noActions}>A publish result needs manual Facebook review before retrying.</span> : null}
+    {post.targets.some(item => item.status === 'processing' && !item.remotePostId) ? <span className={styles.noActions}>A publish result needs review on the destination before retrying.</span> : null}
     <Button variant="danger" size="sm" type="button" onClick={() => setDeleteOpen(true)}>Delete locally</Button>
     <dialog className="ui-dialog" aria-labelledby={`delete-title-${post.id}`} ref={dialog} onClose={() => setDeleteOpen(false)} onCancel={event => { event.preventDefault(); setDeleteOpen(false); }}>
       <form action={deletePostAction}>
         <input type="hidden" name="postId" value={post.id} />
         <div className="ui-dialog__header"><div><h2 id={`delete-title-${post.id}`}>Delete this post locally?</h2><p>This permanently removes the post and its local publishing history.</p></div></div>
         <div className="ui-dialog__body">
-          <p>{hasRemote ? 'Remote posts will remain on Facebook unless you also select remote deletion.' : 'No remote post is recorded for this item.'}</p>
-          {hasRemote ? <label className={styles.confirmCheck}><input type="checkbox" name="deleteRemote" /> Also delete recorded Facebook posts. This cannot be undone.</label> : null}
+          <p>{hasRemote ? 'Remote posts will remain on their platforms unless you also select remote deletion.' : 'No remote post is recorded for this item.'}</p>
+          {hasRemote ? <label className={styles.confirmCheck}><input type="checkbox" name="deleteRemote" /> Also delete recorded remote posts. This cannot be undone.</label> : null}
         </div>
         <div className="ui-dialog__actions"><Button type="button" onClick={() => setDeleteOpen(false)}>Cancel</Button><Button variant="danger" type="submit">Delete locally</Button></div>
       </form>
@@ -74,13 +74,13 @@ export function PostRowActions({ post, targets, canEdit, canPublish }: { post: P
 }
 
 function TargetPicker({ targets, selected = new Set<string>() }: { targets: TargetChoice[]; selected?: Set<string> }) {
-  const supported = targets.filter(target => target.type === 'page' && target.provider === 'facebook' && target.canPublish);
+  const supported = targets.filter(target => target.canPublish);
   return <fieldset className={styles.targetPicker}>
     <legend>Destinations <span>(optional)</span></legend>
     {supported.length ? supported.map(target => <label key={target.id}>
       <input type="checkbox" name="targetIds" value={target.id} defaultChecked={selected.has(target.id)} />
       <span>{target.name}</span>
-    </label>) : <p>No enabled Facebook Pages can publish right now.</p>}
-    <small>Only enabled Facebook Pages are available in this publishing flow.</small>
+    </label>) : <p>No enabled destinations can publish right now.</p>}
+    <small>Only enabled destinations that support publishing are shown.</small>
   </fieldset>;
 }

@@ -1,0 +1,189 @@
+import { randomUUID } from 'node:crypto';
+import { prisma } from '@/server/data';
+import { decryptSecret } from '@/server/secret-crypto';
+import { configuredFacebookEngine } from '@/server/platforms/facebook';
+import { runtimeConfig } from '@/server/config/store';
+import { Prisma } from '../../../generated/client';
+import { withRetries } from './retry';
+
+export type JobSummary = { examined: number; updated: number; skipped: number; failed: number };
+const DAY_MS = 86_400_000;
+const finite = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  return null;
+};
+
+function validDate(value: unknown): Date | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
+}
+
+/** Only read remote status; this job never calls a publishing method. */
+export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0): Promise<JobSummary> {
+  const limit = (await runtimeConfig('meta.pageSize') as number) * (await runtimeConfig('meta.maxPages') as number);
+  const rows = await prisma.postTarget.findMany({
+    where: { status: 'scheduled_remote', remotePostId: { not: null }, target: { enabled: true, type: 'page', socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } } },
+    orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }], take: Math.min(limit, 10_000),
+    select: { id: true, postId: true, remotePostId: true, target: { select: { workspaceId: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, tokenExpiresAt: true, invalidatedAt: true } } } } },
+  });
+  const engine = await configuredFacebookEngine();
+  const result: JobSummary = { examined: rows.length, updated: 0, skipped: 0, failed: 0 };
+  for (const row of rows) {
+    const account = row.target.socialAccount;
+    const encrypted = row.target.accessToken ?? account?.accessToken;
+    if (!account || account.workspaceId !== row.target.workspaceId || account.invalidatedAt || (account.tokenExpiresAt && account.tokenExpiresAt <= now) || !encrypted || !row.remotePostId) { result.skipped++; continue; }
+    try {
+      const status = await withRetries(() => engine.getStatus(decryptSecret(encrypted), row.remotePostId!), retryLimit);
+      if (status.state !== 'published') { result.skipped++; continue; }
+      const changed = await prisma.postTarget.updateMany({
+        where: { id: row.id, postId: row.postId, status: 'scheduled_remote', remotePostId: row.remotePostId },
+        data: { status: 'published', ...(status.publishedAt ? { publishedAt: status.publishedAt } : { publishedAt: now }) },
+      });
+      if (!changed.count) continue;
+      result.updated++;
+      const counts = await prisma.postTarget.groupBy({ by: ['status'], where: { postId: row.postId }, _count: true });
+      const total = counts.reduce((sum, item) => sum + item._count, 0);
+      const published = counts.find(item => item.status === 'published')?._count ?? 0;
+      const remote = counts.find(item => item.status === 'scheduled_remote')?._count ?? 0;
+      const failed = counts.find(item => item.status === 'failed')?._count ?? 0;
+      const processing = counts.find(item => item.status === 'processing')?._count ?? 0;
+      const nextStatus = processing ? (published + remote > 0 ? 'partially_failed' : 'publishing') : (published + remote === total ? (remote ? 'scheduled' : 'published') : published ? 'partially_failed' : failed ? 'failed' : undefined);
+      if (nextStatus) await prisma.post.updateMany({ where: { id: row.postId }, data: { status: nextStatus, ...(published && !remote ? { publishedAt: now } : {}), updatedAt: now } });
+    } catch {
+      result.failed++;
+    }
+  }
+  return result;
+}
+
+/** Refresh current daily Page snapshots for enabled connections in their own workspace. */
+export async function syncPageAnalytics(now = new Date(), retryLimit = 0): Promise<JobSummary> {
+  const limit = Math.min((await runtimeConfig('meta.pageSize') as number) * (await runtimeConfig('meta.maxPages') as number), 10_000);
+  const targets = await prisma.target.findMany({
+    where: { type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
+    orderBy: [{ workspaceId: 'asc' }, { id: 'asc' }], take: limit,
+    select: { id: true, workspaceId: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, tokenExpiresAt: true, invalidatedAt: true } } },
+  });
+  const engine = await configuredFacebookEngine();
+  const result: JobSummary = { examined: targets.length, updated: 0, skipped: 0, failed: 0 };
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const since = new Date(today.getTime() - 6 * DAY_MS);
+  for (const target of targets) {
+    const account = target.socialAccount;
+    const encrypted = target.accessToken ?? account?.accessToken;
+    if (!account || account.workspaceId !== target.workspaceId || account.invalidatedAt || (account.tokenExpiresAt && account.tokenExpiresAt <= now) || !encrypted) { result.skipped++; continue; }
+    try {
+      const metrics = await withRetries(() => engine.getPageAnalytics(decryptSecret(encrypted), target.providerId, since, now), retryLimit);
+      for (const [metric, value] of Object.entries(metrics)) {
+        await prisma.pageInsight.upsert({
+          where: { targetId_metric_period_endTime: { targetId: target.id, metric, period: 'day', endTime: today } },
+          create: { id: `rebuild_${randomUUID()}`, targetId: target.id, metric, period: 'day', endTime: today, value: value === null ? Prisma.JsonNull : value, numeric: value, fetchedAt: now },
+          update: { value: value === null ? Prisma.JsonNull : value, numeric: value, fetchedAt: now },
+        });
+        result.updated++;
+      }
+    } catch { result.failed++; }
+  }
+  return result;
+}
+
+/** Refresh account-level Ads Insights for each enabled account in its own workspace. */
+export async function syncAdsAnalytics(now = new Date(), retryLimit = 0): Promise<JobSummary> {
+  const limit = Math.min((await runtimeConfig('meta.pageSize') as number) * (await runtimeConfig('meta.maxPages') as number), 10_000);
+  const accounts = await prisma.adAccount.findMany({
+    where: { enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
+    orderBy: [{ workspaceId: 'asc' }, { id: 'asc' }], take: limit,
+    select: { id: true, workspaceId: true, actId: true, name: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } },
+  });
+  const requiredScopes = new Set((await runtimeConfig('meta.adsReadScopes') as string[]).map(scope => scope.trim()).filter(Boolean));
+  const engine = await configuredFacebookEngine();
+  const result: JobSummary = { examined: accounts.length, updated: 0, skipped: 0, failed: 0 };
+  const until = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const since = new Date(until.getTime() - 29 * DAY_MS);
+  for (const account of accounts) {
+    const connection = account.socialAccount;
+    const granted = new Set((connection?.scopes ?? '').split(',').map(scope => scope.trim()).filter(Boolean));
+    if (!connection || connection.workspaceId !== account.workspaceId || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= now) || !connection.accessToken || !requiredScopes.size || [...requiredScopes].some(scope => !granted.has(scope))) { result.skipped++; continue; }
+    try {
+      const rows = await withRetries(() => engine.getAdInsights(decryptSecret(connection.accessToken!), account.actId, since, until), retryLimit);
+      for (const row of rows) {
+        const date = validDate(row.date_start);
+        if (!date) continue;
+        const objectId = typeof row.account_id === 'string' ? row.account_id : account.actId;
+        const objectName = typeof row.account_name === 'string' ? row.account_name : account.name;
+        const spend = finite(row.spend) ?? 0;
+        const impressions = Math.max(0, Math.trunc(finite(row.impressions) ?? 0));
+        const clicks = Math.max(0, Math.trunc(finite(row.clicks) ?? 0));
+        const reach = Math.max(0, Math.trunc(finite(row.reach) ?? 0));
+        const cpc = finite(row.cpc); const cpm = finite(row.cpm); const cpp = finite(row.cpp); const ctr = finite(row.ctr); const frequency = finite(row.frequency);
+        await prisma.adInsight.upsert({
+          where: { adAccountId_level_objectId_date: { adAccountId: account.id, level: 'account', objectId, date } },
+          create: { id: `rebuild_${randomUUID()}`, adAccountId: account.id, level: 'account', objectId, objectName, date, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
+          update: { objectName, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
+        });
+        result.updated++;
+      }
+      await prisma.adAccount.updateMany({ where: { id: account.id, workspaceId: account.workspaceId, enabled: true }, data: { lastSyncedAt: now } });
+    } catch { result.failed++; }
+  }
+  return result;
+}
+
+/** Sync conversations/messages and post comments through the Facebook platform engine. */
+export async function syncInbox(now = new Date(), retryLimit = 0): Promise<JobSummary> {
+  const [readScopes, pageSize, maxPages] = await Promise.all([
+    runtimeConfig('meta.inboxReadScopes') as Promise<string[]>, runtimeConfig('meta.pageSize') as Promise<number>, runtimeConfig('meta.maxPages') as Promise<number>,
+  ]);
+  const required = new Set(readScopes.map(scope => scope.trim()).filter(Boolean));
+  const limit = Math.min(pageSize * maxPages, 10_000);
+  const targets = await prisma.target.findMany({
+    where: { type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
+    orderBy: [{ workspaceId: 'asc' }, { id: 'asc' }], take: limit,
+    select: { id: true, workspaceId: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } },
+  });
+  const engine = await configuredFacebookEngine();
+  const result: JobSummary = { examined: targets.length, updated: 0, skipped: 0, failed: 0 };
+  for (const target of targets) {
+    const account = target.socialAccount;
+    const encrypted = target.accessToken ?? account?.accessToken;
+    const granted = new Set((account?.scopes ?? '').split(',').map(scope => scope.trim()).filter(Boolean));
+    if (!account || account.workspaceId !== target.workspaceId || account.invalidatedAt || (account.tokenExpiresAt && account.tokenExpiresAt <= now) || !encrypted || !required.size || [...required].some(scope => !granted.has(scope))) { result.skipped++; continue; }
+    try {
+      const token = decryptSecret(encrypted);
+      const conversations = await withRetries(() => engine.listInbox(token, target.providerId), retryLimit);
+      const posts = await prisma.postTarget.findMany({ where: { targetId: target.id, status: 'published', remotePostId: { not: null } }, orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }], take: limit, select: { id: true, remotePostId: true } });
+      const commentBatches: Array<{ postTargetId: string; comments: Awaited<ReturnType<typeof engine.listComments>> }> = [];
+      for (const post of posts) if (post.remotePostId) commentBatches.push({ postTargetId: post.id, comments: await withRetries(() => engine.listComments(token, post.remotePostId!), retryLimit) });
+      await prisma.$transaction(async tx => {
+        for (const conversation of conversations) {
+          const stored = await tx.conversation.upsert({
+            where: { targetId_remoteId: { targetId: target.id, remoteId: conversation.id } },
+            create: { id: `rebuild_${randomUUID()}`, targetId: target.id, remoteId: conversation.id, snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: now },
+            update: { snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: now },
+            select: { id: true },
+          });
+          for (const message of conversation.messages) {
+            await tx.conversationMessage.upsert({
+              where: { conversationId_remoteId: { conversationId: stored.id, remoteId: message.id } },
+              create: { id: `rebuild_${randomUUID()}`, conversationId: stored.id, remoteId: message.id, fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
+              update: { fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
+            });
+            result.updated++;
+          }
+          result.updated++;
+        }
+        for (const batch of commentBatches) for (const comment of batch.comments) {
+          await tx.postComment.upsert({
+            where: { postTargetId_remoteId: { postTargetId: batch.postTargetId, remoteId: comment.id } },
+            create: { id: `rebuild_${randomUUID()}`, postTargetId: batch.postTargetId, remoteId: comment.id, parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, createdTime: comment.createdAt, fetchedAt: now },
+            update: { parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, fetchedAt: now },
+          });
+          result.updated++;
+        }
+      });
+    } catch { result.failed++; }
+  }
+  return result;
+}

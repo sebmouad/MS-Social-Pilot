@@ -69,3 +69,15 @@
 .root-config__card small { display: block; margin-top: var(--space-2); color: var(--ink-faint); }
 .root-config__catalog li { margin: 6px 0; }
 @media (max-width: 760px) { .root-config { padding: var(--space-6) var(--space-4); } .root-config__layout { grid-template-columns: 1fr; } .root-config__sidebar { position: static; max-height: 320px; } }
+.root-jobs { margin-top: var(--space-6); padding: var(--space-5); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.root-jobs h2 { margin: 4px 0 8px; font-size: 23px; }
+.root-jobs h3 { margin: 24px 0 8px; font-size: 16px; }
+.root-jobs__eyebrow { margin: 0; color: var(--ink-faint); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+.root-jobs__status { color: var(--ink-soft); }
+.root-jobs__latest { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
+.root-jobs__latest li { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.root-jobs__latest span, .root-jobs__latest small { color: var(--ink-soft); overflow-wrap: anywhere; }
+.root-jobs__table-wrap { overflow-x: auto; }
+.root-jobs table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.root-jobs th, .root-jobs td { padding: 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.root-jobs td:last-child { min-width: 240px; overflow-wrap: anywhere; }

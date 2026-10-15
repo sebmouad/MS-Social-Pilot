@@ -123,7 +123,7 @@ describe('Facebook Graph adapter', () => {
     const engine = createFacebookEngine(config, mockFetch(response({ error: { message: 'No permission', code: 200 } }, 400)));
     await expect(engine.deletePost('token', 'p1_2')).rejects.toMatchObject({ message: 'No permission', status: 400 });
     expect(await createFacebookAdapter(config, mockFetch()).capabilities).toEqual({
-      connection: 'unsupported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported',
+      connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported',
       remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported',
     });
     expect(new FacebookApiError('x', 0)).toBeInstanceOf(Error);

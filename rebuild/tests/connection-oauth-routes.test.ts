@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   runtimeConfig: vi.fn(),
   configuredFacebookEngine: vi.fn(),
   configuredFacebookOAuth: vi.fn(),
+  configuredFacebookAdapter: vi.fn(),
   persistFacebookDiscovery: vi.fn(),
   recordFacebookConnectionFailure: vi.fn(),
   engine: {
@@ -19,6 +20,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.runtimeConfi
 vi.mock('../src/server/platforms/facebook', () => ({
   configuredFacebookEngine: mocks.configuredFacebookEngine,
   configuredFacebookOAuth: mocks.configuredFacebookOAuth,
+  configuredFacebookAdapter: mocks.configuredFacebookAdapter,
 }));
 vi.mock('../src/server/connection-mutations', () => ({ persistFacebookDiscovery: mocks.persistFacebookDiscovery, recordFacebookConnectionFailure: mocks.recordFacebookConnectionFailure }));
 
@@ -39,7 +41,8 @@ afterEach(() => {
 beforeEach(() => {
   process.env.ENCRYPTION_KEY = validKey;
   mocks.requireViewer.mockResolvedValue({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' } });
-  mocks.runtimeConfig.mockImplementation((key: string) => Promise.resolve(key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.oauthStateMinutes' ? 10 : undefined));
+  mocks.runtimeConfig.mockImplementation((key: string) => Promise.resolve(key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.oauthStateMinutes' ? 10 : key === 'platforms.facebook.enabled' ? true : undefined));
+  mocks.configuredFacebookAdapter.mockResolvedValue({ id: 'facebook', capabilities: { connection: 'supported' }, getAuthorizationUrl: vi.fn() });
   mocks.engine.getAuthorizationUrl.mockImplementation((input: { state: string; scopes: string[] }) => `https://www.facebook.com/dialog/oauth?state=${input.state}&scope=${input.scopes.join(',')}`);
   mocks.configuredFacebookOAuth.mockResolvedValue({ appId: 'app-id', appSecret: 'app-secret', redirectUri: callbackUrl, scopes: ['pages_show_list'] });
   mocks.engine.exchangeCode.mockResolvedValue({ accessToken: 'short-token', expiresAt: null });

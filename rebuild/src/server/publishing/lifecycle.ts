@@ -2,8 +2,9 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../generated/client';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
-import { configuredFacebookEngine } from '@/server/platforms/facebook';
+import { platformFor } from '@/server/platforms/registry';
 import { runtimeConfig } from '@/server/config/store';
+import { hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
 
 export type PublishingActor = { userId: string; workspaceId: string };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
@@ -45,7 +46,15 @@ async function validateTargets(actor: PublishingActor, ids: string[], maxTargets
     select: { id: true, type: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } },
   });
   if (targets.length !== ids.length) throw new Error('One or more destinations are unavailable or cannot publish.');
-  if (targets.some(target => target.type !== 'page' || target.socialAccount?.provider !== 'facebook' || target.socialAccount.invalidatedAt || !target.accessToken)) throw new Error('This publishing flow currently supports connected Facebook Pages only.');
+  const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
+  if (!entitlements) throw new Error('This workspace is unavailable.');
+  for (const target of targets) {
+    const provider = target.socialAccount?.provider;
+    const adapter = provider ? await platformFor(provider, 'publishing') : null;
+    if (!provider || !hasPlatformCapability(entitlements, provider) || !adapter?.publish || !adapter.supportsTargetKind?.(target.type, 'publishing') || target.socialAccount?.invalidatedAt || !target.accessToken) {
+      throw new Error('One or more destinations are unavailable or cannot publish.');
+    }
+  }
   return targets;
 }
 
@@ -81,27 +90,33 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
   });
 }
 
-/** Local deletion is always explicit. Remote deletion is attempted first and only for Facebook rows when requested. */
+/** Local deletion is always explicit. Requested remote deletion runs first through each destination adapter. */
 export async function deletePost(actor: PublishingActor, postId: string, deleteRemote: boolean) {
   const role = await membership(actor);
   if (deleteRemote && !MANAGERS.has(role.role)) throw new Error('Only workspace owners, admins, and editors can delete remote posts.');
   const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, providerId: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
   if (!post || (role.role === 'contributor' && post.authorId !== actor.userId)) throw new Error('This post is unavailable in the current workspace.');
   const remoteRows = post.targets.filter(row => row.remotePostId);
-  if (deleteRemote && remoteRows.some(row => row.target.type !== 'page' || row.target.socialAccount?.provider !== 'facebook')) throw new Error('Remote deletion is not supported for every destination. No remote deletion was attempted.');
+  const entitlements = deleteRemote ? await loadEntitlements(actor.userId, actor.workspaceId) : null;
+  if (deleteRemote) for (const row of remoteRows) {
+    const provider = row.target.socialAccount?.provider;
+    const adapter = provider ? await platformFor(provider, 'remoteDelete') : null;
+    if (!provider || !entitlements || !hasPlatformCapability(entitlements, provider) || !adapter?.deleteRemote) throw new Error('Remote deletion is not supported for every destination. No remote deletion was attempted.');
+  }
   if (deleteRemote && remoteRows.length) {
-    const engine = await configuredFacebookEngine();
     for (const row of remoteRows) {
-      if (!row.target.accessToken || row.target.socialAccount?.invalidatedAt) throw new Error('Reconnect the Facebook source before remote deletion. The local post is preserved.');
+      const provider = row.target.socialAccount?.provider;
+      const adapter = provider ? await platformFor(provider, 'remoteDelete') : null;
+      if (!adapter?.deleteRemote || !row.target.accessToken || row.target.socialAccount?.invalidatedAt) throw new Error('Reconnect this source before remote deletion. The local post is preserved.');
       try {
-        await engine.deletePost(decryptSecret(row.target.accessToken), row.remotePostId!);
+        await adapter.deleteRemote({ credential: { accessToken: decryptSecret(row.target.accessToken) }, remoteId: row.remotePostId! });
         await prisma.$transaction(async tx => {
           await tx.postTarget.updateMany({ where: { id: row.id, postId: post.id, remotePostId: row.remotePostId }, data: { status: 'cancelled', remotePostId: null, remoteUrl: null } });
           await audit(tx, actor, 'publishing.remote_post_deleted', { postId: post.id, postTargetId: row.id });
         });
       } catch {
         await prisma.$transaction(tx => audit(tx, actor, 'publishing.remote_delete_failed', { postId: post.id, postTargetId: row.id }));
-        throw new Error('Facebook could not confirm remote deletion. The local post and publishing history are preserved.');
+        throw new Error('The platform could not confirm remote deletion. The local post and publishing history are preserved.');
       }
     }
   }
@@ -121,7 +136,8 @@ export async function publishPost(actor: PublishingActor, postId: string) {
   const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, message: true, firstComment: true, status: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
   if (!post) throw new Error('This post is unavailable in the current workspace.');
   if (!post.targets.length) throw new Error('Select at least one destination before publishing.');
-  const engine = await configuredFacebookEngine();
+  const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
+  if (!entitlements) throw new Error('This workspace is unavailable.');
   let published = 0;
   let failed = 0;
   let pending = 0;
@@ -129,19 +145,21 @@ export async function publishPost(actor: PublishingActor, postId: string) {
     if (item.status === 'published' || item.remotePostId) { published++; continue; }
     if (item.status === 'processing') { pending++; continue; }
     if (!['pending', 'failed'].includes(item.status)) { failed++; continue; }
-    const eligible = item.target.type === 'page' && item.target.socialAccount?.provider === 'facebook' && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount.invalidatedAt;
+    const provider = item.target.socialAccount?.provider;
+    const adapter = provider ? await platformFor(provider, 'publishing') : null;
+    const eligible = Boolean(provider && hasPlatformCapability(entitlements, provider) && adapter?.publish && adapter.supportsTargetKind?.(item.target.type, 'publishing') && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount?.invalidatedAt);
     if (!eligible) { failed++; await markTarget(actor, item.id, 'failed'); continue; }
     const claim = await prisma.$transaction(async tx => tx.postTarget.updateMany({ where: { id: item.id, postId: post.id, status: item.status, remotePostId: null }, data: { status: 'processing' } }));
     if (claim.count !== 1) { pending++; continue; }
     try {
-      const result = await engine.publish({ targetId: item.target.providerId, accessToken: decryptSecret(item.target.accessToken!), text: post.message, firstComment: post.firstComment });
+      const result = await adapter!.publish!({ credential: { accessToken: decryptSecret(item.target.accessToken!) }, target: { id: item.target.providerId, name: '', kind: item.target.type }, text: post.message, firstComment: post.firstComment });
       await prisma.$transaction(async tx => {
         await tx.postTarget.update({ where: { id: item.id }, data: { status: 'published', remotePostId: result.remoteId, remoteUrl: result.url, publishedAt: new Date() } });
         await audit(tx, actor, 'publishing.target_published', { postId: post.id, postTargetId: item.id });
       });
       published++;
     } catch (error) {
-      // A timeout or malformed response can happen after Facebook accepted the post. Keep the claim locked for manual reconciliation.
+      // A timeout or malformed response can happen after a provider accepted the post. Keep the claim locked for manual reconciliation.
       if (isDefiniteProviderRejection(error, Boolean(post.firstComment?.trim()))) { await markTarget(actor, item.id, 'failed'); failed++; }
       else pending++;
     }
@@ -158,11 +176,14 @@ export async function syncPostStatus(actor: PublishingActor, postId: string) {
   await membership(actor);
   const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, status: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
   if (!post) throw new Error('This post is unavailable in the current workspace.');
-  const engine = await configuredFacebookEngine();
+  const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
+  if (!entitlements) throw new Error('This workspace is unavailable.');
   let synced = 0;
   for (const item of post.targets) {
-    if (!item.remotePostId || item.target.type !== 'page' || item.target.socialAccount?.provider !== 'facebook' || !item.target.accessToken || item.target.socialAccount.invalidatedAt) continue;
-    const status = await engine.getStatus(decryptSecret(item.target.accessToken), item.remotePostId);
+    const provider = item.target.socialAccount?.provider;
+    const adapter = provider ? await platformFor(provider, 'remoteStatus') : null;
+    if (!item.remotePostId || !provider || !hasPlatformCapability(entitlements, provider) || !adapter?.getRemoteStatus || !item.target.accessToken || item.target.socialAccount?.invalidatedAt) continue;
+    const status = await adapter.getRemoteStatus({ credential: { accessToken: decryptSecret(item.target.accessToken) }, remoteId: item.remotePostId });
     if (status.state === 'unknown') continue;
     await prisma.$transaction(async tx => {
       await tx.postTarget.update({ where: { id: item.id }, data: { status: status.state === 'published' ? 'published' : 'scheduled_remote', ...(status.publishedAt ? { publishedAt: status.publishedAt } : {}) } });
