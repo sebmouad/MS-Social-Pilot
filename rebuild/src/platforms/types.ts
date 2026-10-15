@@ -112,6 +112,8 @@ export interface AdCampaignCreateRequest {
 export interface PlatformAdapter {
   readonly id: string;
   readonly capabilities: CapabilityDeclaration;
+  /** Adapter limits for ephemeral server-supplied image bytes during publish. */
+  readonly localImageUpload?: { maxBytes: number; mimeTypes: readonly string[] };
   supportsTargetKind?(kind: string, capability: 'publishing' | 'inbox' | 'analytics'): boolean;
   getAuthorizationUrl?(request: OAuthStartRequest): string;
   exchangeCode?(request: OAuthExchangeRequest): Promise<OAuthToken>;

@@ -363,6 +363,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
   const engine = createFacebookEngine(config, fetchImpl);
   return {
     id: 'facebook',
+    localImageUpload: { maxBytes: config.maxImageUploadBytes, mimeTypes: config.allowedImageMimeTypes },
     capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
     supportsTargetKind: (kind, capability) => kind === 'page' && ['publishing', 'inbox', 'analytics'].includes(capability),
     getAuthorizationUrl: input => engine.getAuthorizationUrl(input),

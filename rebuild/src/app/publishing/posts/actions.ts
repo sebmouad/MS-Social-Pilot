@@ -12,14 +12,16 @@ type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published'
 
 export async function createPostAction(data: FormData) {
   await run(async viewer => {
-    await createPost(actor(viewer), { message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') });
+    const postActor = actor(viewer);
+    await createPost(postActor, { message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') });
     return 'created';
   });
 }
 
 export async function updatePostAction(data: FormData) {
   await run(async viewer => {
-    await updatePost(actor(viewer), { postId: stringField(data, 'postId'), message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') });
+    const postActor = actor(viewer);
+    await updatePost(postActor, { postId: stringField(data, 'postId'), message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') });
     return 'updated';
   });
 }
@@ -102,7 +104,21 @@ function actor(viewer: Awaited<ReturnType<typeof requireViewer>>) { return { use
 function attachments(data: FormData) {
   const image = stringField(data, 'imageUrl', true).trim();
   const video = stringField(data, 'videoUrl', true).trim();
-  return { link: stringField(data, 'link', true), media: [...(image ? [{ kind: 'image' as const, url: image }] : []), ...(video ? [{ kind: 'video' as const, url: video }] : [])] };
+  const link = stringField(data, 'link', true).trim();
+  const existing = stringField(data, 'existingImageRef', true).trim();
+  const uploaded = stringField(data, 'uploadedImageRef', true).trim();
+  const removeExistingImage = data.get('removeExistingImage') === 'on';
+  if (uploaded && image) throw new Error('Choose an uploaded image or an image URL, not both.');
+  if (uploaded && video || image && video || link && (uploaded || image || video)) throw new Error('Choose a link, an image, or a video for this post.');
+  let imageReference = image || uploaded;
+  if (uploaded && !/^media:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(uploaded)) throw new Error('The uploaded image could not be attached. Please choose it again.');
+  if (!imageReference && !video && !link) {
+    if (!removeExistingImage && /^media:[0-9a-f-]{36}$/i.test(existing)) imageReference = existing;
+  } else if (!imageReference) {
+    imageReference = '';
+  }
+  const altText = (data.has('altText') ? stringField(data, 'altText', true) : stringField(data, 'existingAltText', true)).trim();
+  return { link, media: [...(imageReference ? [{ kind: 'image' as const, url: imageReference, ...(altText ? { altText } : {}) }] : []), ...(video ? [{ kind: 'video' as const, url: video }] : [])] };
 }
 function stringField(data: FormData, key: string, optional = false) {
   const value = data.get(key);

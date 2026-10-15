@@ -99,4 +99,14 @@ describe('replacement worker scheduling', () => {
     await drain(worker);
     expect(state.started).toEqual(['purges']);
   });
+
+  it('runs media cleanup on its own Root-configured schedule', async () => {
+    const state = dependencies({
+      readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 0 : key === 'sync.retryBaseDelayMs' ? 1000 : key === 'sync.retryMaxDelayMs' ? 60000 : key === 'sync.workerPollSeconds' ? 5 : key === 'sync.workerLeaseMinutes' ? 5 : key === 'sync.workerHeartbeatSeconds' ? 30 : key === 'storage.orphanMediaCleanupSchedule' ? '17 3 * * *' : '0 * * * *',
+    });
+    const worker = createWorker(state.deps, 'test-worker');
+    await worker.tick(new Date(2026, 0, 1, 3, 17));
+    await drain(worker);
+    expect(state.started).toEqual(['mediaCleanup']);
+  });
 });

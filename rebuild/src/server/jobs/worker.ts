@@ -4,7 +4,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { cronMatches } from './cron';
 import type { RetryBackoff } from './retry';
 
-export type JobName = 'posts' | 'analytics' | 'inbox' | 'purges';
+export type JobName = 'posts' | 'analytics' | 'inbox' | 'purges' | 'mediaCleanup';
 export type WorkerLogger = (message: string, detail?: unknown) => void;
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1_000;
@@ -14,6 +14,7 @@ const jobs: Job[] = [
   { name: 'analytics', configKey: 'sync.analytics.schedule' },
   { name: 'inbox', configKey: 'sync.inbox.schedule' },
   { name: 'purges', configKey: 'data.purgeRecoverySchedule' },
+  { name: 'mediaCleanup', configKey: 'storage.orphanMediaCleanupSchedule' },
 ];
 
 export type WorkerDependencies = {

@@ -1,31 +1,97 @@
 "use client";
 
 import { cancelScheduledPostAction, createPostAction, deletePostAction, importPostsAction, publishPostAction, schedulePostAction, submitForApprovalAction, syncPostAction, updatePostAction } from "./actions";
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components";
 import { ModalDialog } from "@/components/ModalDialog";
 import styles from "../publishing.module.css";
 import { csvDestinationLabel } from '@/lib/publishing/csv-destinations';
 
 type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean };
-type PostRow = { id: string; message: string; firstComment: string | null; link: string | null; media: Array<{kind: string; url: string}>; status: string; publishedAt: Date | null; targets: Array<{ status: string; remotePostId: string | null; target: { id: string } }> };
+type ImageRules = { allowedMimeTypes: string[]; maxUploadBytes: number; maxAltCharacters: number };
+type PostRow = { id: string; message: string; firstComment: string | null; link: string | null; media: Array<{kind: string; url: string; altText?: string}>; status: string; publishedAt: Date | null; targets: Array<{ status: string; remotePostId: string | null; target: { id: string } }> };
 
-function AttachmentFields({ post }: { post?: PostRow }) {
+function uploadImageBeforeSubmit(event: FormEvent<HTMLFormElement>) {
+  const form = event.currentTarget;
+  const input = form.querySelector<HTMLInputElement>('input[type="file"]');
+  const file = input?.files?.[0];
+  if (!input || !file) return;
+  event.preventDefault();
+  if (form.dataset.uploading === 'true') return;
+  const value = (name: string) => form.querySelector<HTMLInputElement>(`[name="${name}"]`)?.value.trim() ?? '';
+  const output = form.querySelector<HTMLElement>('[data-image-upload-status]');
+  if (value('imageUrl') || value('videoUrl') || value('link')) {
+    if (output) output.textContent = 'Choose a link, an image, or a video. Clear the other attachment fields before uploading.';
+    return;
+  }
+  form.dataset.uploading = 'true';
+  if (output) output.textContent = 'Uploading image…';
+  const body = new FormData();
+  body.append('imageFile', file);
+  const submitter = (event.nativeEvent as SubmitEvent).submitter;
+  fetch('/api/media', { method: 'POST', body })
+    .then(async response => {
+      const result = await response.json().catch(() => ({})) as { reference?: string; error?: string };
+      if (!response.ok || !result.reference) throw new Error(result.error || 'Image upload failed. Please try again.');
+      const reference = form.querySelector<HTMLInputElement>('input[name="uploadedImageRef"]');
+      if (!reference) throw new Error('The upload could not be attached to this post.');
+      reference.value = result.reference;
+      input.value = '';
+      form.dataset.uploading = 'false';
+      if (output) output.textContent = '';
+      form.requestSubmit(submitter instanceof HTMLElement ? submitter : undefined);
+    })
+    .catch(error => {
+      form.dataset.uploading = 'false';
+      if (output) output.textContent = error instanceof Error ? error.message : 'Image upload failed. Please try again.';
+    });
+}
+
+function ImageAttachment({ post, imageRules }: { post?: PostRow; imageRules: ImageRules }) {
+  const image = post?.media.find(item => item.kind === 'image');
+  const existingReference = image?.url.startsWith('media:') ? image.url : '';
+  const existingId = existingReference.slice('media:'.length);
+  const [file, setFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState('');
+  const [removeExisting, setRemoveExisting] = useState(false);
+  useEffect(() => {
+    if (!file) { setFilePreview(''); return; }
+    const url = URL.createObjectURL(file);
+    setFilePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  const preview = filePreview || (existingId ? `/api/media/${encodeURIComponent(existingId)}` : image?.url || '');
+  return <div className={styles.imageAttachment}>
+    <label htmlFor={post ? `image-file-${post.id}` : 'new-post-image'}>Image <span>(optional)</span></label>
+    <input id={post ? `image-file-${post.id}` : 'new-post-image'} type="file" accept={imageRules.allowedMimeTypes.join(',')} onChange={event => { setFile(event.currentTarget.files?.[0] ?? null); setRemoveExisting(false); const form = event.currentTarget.form; const uploadedRef = form?.querySelector<HTMLInputElement>('input[name="uploadedImageRef"]'); if (uploadedRef) uploadedRef.value = ''; }} />
+    {existingReference ? <input type="hidden" name="existingImageRef" value={existingReference} /> : null}
+    <input type="hidden" name="uploadedImageRef" value="" />
+    {existingReference ? <label className={styles.removeImage}><input type="checkbox" name="removeExistingImage" checked={removeExisting} onChange={event => setRemoveExisting(event.currentTarget.checked)} /> Remove current image</label> : null}
+    <label htmlFor={post ? `image-alt-${post.id}` : 'new-post-image-alt'}>Image description <span>(optional)</span></label>
+    <input id={post ? `image-alt-${post.id}` : 'new-post-image-alt'} name="altText" type="text" maxLength={imageRules.maxAltCharacters} placeholder="Describe the image for people using a screen reader" defaultValue={image?.altText ?? ''} />
+    {preview && (!removeExisting || file) ? <div className={styles.imagePreview}><img src={preview} alt="Selected post image preview" /><span>{file ? file.name : 'Current image'}</span></div> : null}
+    <small aria-live="polite" data-image-upload-status="true" />
+    <small>Upload one image up to {Math.ceil(imageRules.maxUploadBytes / 1048576)} MB. Destinations may have lower limits.</small>
+  </div>;
+}
+
+function AttachmentFields({ post, imageRules }: { post?: PostRow; imageRules: ImageRules }) {
   return <>
     <label>Link <span>(optional)</span><input name="link" type="url" placeholder="https://example.com" defaultValue={post?.link ?? ''} /></label>
-    <label>Image URL <span>(optional)</span><input name="imageUrl" type="url" placeholder="https://example.com/image.jpg" defaultValue={post?.media.find(item => item.kind === 'image')?.url ?? ''} /></label>
+    <ImageAttachment post={post} imageRules={imageRules} />
+    <label>Image URL <span>(optional)</span><input name="imageUrl" type="url" placeholder="https://example.com/image.jpg" defaultValue={post?.media.find(item => item.kind === 'image' && !item.url.startsWith('media:'))?.url ?? ''} /></label>
     <label>Video URL <span>(optional)</span><input name="videoUrl" type="url" placeholder="https://example.com/video.mp4" defaultValue={post?.media.find(item => item.kind === 'video')?.url ?? ''} /></label>
-    <small>Choose a link, an image, or a video using a public HTTPS URL. Provider support varies by destination.</small>
+    <small>Choose a link, one uploaded image or image URL, or a video URL. Provider support varies by destination.</small>
   </>;
 }
 
-export function PostEditorForm({ targets }: { targets: TargetChoice[] }) {
-  return <form action={createPostAction} className={styles.draftForm}>
+export function PostEditorForm({ targets, imageRules }: { targets: TargetChoice[]; imageRules: ImageRules }) {
+  return <form action={createPostAction} className={styles.draftForm} onSubmit={uploadImageBeforeSubmit}>
     <label htmlFor="new-post-message">Post text</label>
     <textarea id="new-post-message" name="message" required rows={4} placeholder="Write a post for your team…" />
     <label htmlFor="new-post-first-comment">First comment <span>(optional)</span></label>
     <textarea id="new-post-first-comment" name="firstComment" rows={2} placeholder="Add a link or follow-up as the first comment…" />
-    <AttachmentFields />
+    <AttachmentFields imageRules={imageRules} />
     <TargetPicker targets={targets} />
     <div className={styles.formFooter}><span>Saved locally until you publish it.</span><button className="ui-button ui-button--primary" type="submit">Create post</button></div>
   </form>;
@@ -41,7 +107,7 @@ export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
   </form>;
 }
 
-export function PostRowActions({ post, targets, canEdit, canPublish }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean }) {
+export function PostRowActions({ post, targets, canEdit, canPublish, imageRules }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const selected = new Set(post.targets.map(item => item.target.id));
   const hasRemote = post.targets.some(item => Boolean(item.remotePostId));
@@ -50,13 +116,13 @@ export function PostRowActions({ post, targets, canEdit, canPublish }: { post: P
   return <div className={styles.rowActions}>
     {canEdit && isDraft && post.media.length <= 1 ? <details className={styles.editDetails}>
       <summary>Edit post</summary>
-      <form action={updatePostAction} className={styles.editForm}>
+      <form action={updatePostAction} className={styles.editForm} onSubmit={uploadImageBeforeSubmit}>
         <input type="hidden" name="postId" value={post.id} />
         <label htmlFor={`message-${post.id}`}>Post text</label>
         <textarea id={`message-${post.id}`} name="message" defaultValue={post.message} required rows={4} />
         <label htmlFor={`comment-${post.id}`}>First comment <span>(optional)</span></label>
         <textarea id={`comment-${post.id}`} name="firstComment" defaultValue={post.firstComment ?? ''} rows={2} />
-        <AttachmentFields post={post} />
+        <AttachmentFields post={post} imageRules={imageRules} />
         <TargetPicker targets={targets} selected={selected} />
         <button className="ui-button ui-button--secondary ui-button--sm" type="submit">Save post</button>
       </form>

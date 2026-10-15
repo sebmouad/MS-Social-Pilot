@@ -16,6 +16,11 @@ const dependencies: WorkerDependencies = {
       const result = await resumePendingWorkspaceDataPurges();
       return `examined=${result.examined} completed=${result.completed} failed=${result.failed}`;
     }
+    if (job === 'mediaCleanup') {
+      const { cleanupOrphanImages } = await import('../src/server/media/storage');
+      const result = await cleanupOrphanImages(now);
+      return `removed=${result.removed} bytes=${result.bytes} failed=${result.errors}`;
+    }
     const { publishDuePosts, syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } = await import('../src/server/jobs/sync');
     if (job === 'posts') {
       const due = await publishDuePosts(now);
