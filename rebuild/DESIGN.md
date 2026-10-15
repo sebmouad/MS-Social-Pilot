@@ -56,7 +56,7 @@ Inter and the system sans stack carry navigation, forms, and prose. Use a restra
 
 ## Layout
 
-The desktop shell has a 256px sidebar and a main content area capped at 1440px, with a 36px content inset. The sidebar owns its vertical scroll. On narrow screens, primary modules form a bottom rail; route tabs scroll horizontally above it; filters open from an explicit top-bar control. Tables own horizontal overflow. The publishing calendar becomes an agenda below 720px. Forms and data panels keep natural document scrolling unless a component has its own bounded surface.
+The desktop shell has a 256px sidebar and a main content area capped at 1440px, with a 36px content inset. The sidebar names the current workspace above the module navigation and owns its vertical scroll. A keyboard skip link leads directly to the main content. On narrow screens, primary modules form a bottom rail with device safe-area spacing; route tabs scroll horizontally above it; filters open from an explicit top-bar control. Tables own horizontal overflow. The publishing calendar becomes an agenda below 720px. Forms and data panels keep natural document scrolling unless a component has its own bounded surface.
 
 ## Elevation & Depth
 

@@ -38,8 +38,11 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
   const moreMobileModules = navigationModules.length > 5 ? navigationModules.slice(4) : [];
   const moduleHref = (module: (typeof MODULES)[number]) => PAGES.find(page => page.module === module.id && enabledFeatures.includes(page.id))?.href ?? module.href;
   return <div className="shell">
+    <a className="shell-skip-link" href="#main-content">Skip to content</a>
     <aside className="shell-sidebar" aria-label="Main navigation">
       <a className="shell-brand" href={installationMode ? '/root/config' : '/home'} aria-label={installationMode ? 'Social Pilot, Root controls' : 'Social Pilot, home'}><Mark/><span>Social Pilot</span></a>
+      <p className="shell-workspace-label">Workspace</p>
+      <p className="shell-workspace-name" title={workspaceName}>{workspaceName}</p>
       <nav className="shell-nav shell-nav--desktop">{installationMode && <a href="/root/config" className="shell-nav__link is-active" aria-current="page"><span className="shell-nav__glyph"><ModuleIcon name="Settings"/></span><span>Root controls</span></a>}{navigationModules.map((module) => <a key={module.id} href={moduleHref(module)} className={`shell-nav__link${activeModule === module.id ? " is-active" : ""}`} aria-current={activeModule === module.id ? "page" : undefined}>
         <span className="shell-nav__glyph"><ModuleIcon name={module.title}/></span><span>{module.title}</span>
       </a>)}</nav>
@@ -55,6 +58,6 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       {sidebar && <div id="shell-filters" className={`shell-sidebar-filter${filterOpen ? " is-open" : ""}`} onSubmitCapture={() => setFilterOpen(false)} onClickCapture={event => { if ((event.target as Element).closest('a[href]')) setFilterOpen(false); }}>{sidebar}</div>}
       {rootAccess && !installationMode && <a className="shell-subnav__link shell-root-link" href="/root/config">Root controls</a>}
     </aside>
-    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions">{sidebar && <button className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => setFilterOpen(open => !open)}>{filterOpen ? "Close filters" : "Filters"}</button>}<span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main className="shell-content">{children}</main></div>
+    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions">{sidebar && <button className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => setFilterOpen(open => !open)}>{filterOpen ? "Close filters" : "Filters"}</button>}<span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main id="main-content" className="shell-content" tabIndex={-1}>{children}</main></div>
   </div>;
 }

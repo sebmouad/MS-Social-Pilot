@@ -29,6 +29,12 @@ button, input, select { font: inherit; }
 .metric-card { padding: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
 .metric-card dt { color: var(--ink-soft); font-size: 12px; }
 .metric-card dd { margin: 12px 0 0; font-size: 32px; font-weight: 750; letter-spacing: -.04em; }
+.metric-card dd { font-variant-numeric: tabular-nums; }
+.home-start { display: flex; align-items: center; justify-content: space-between; gap: 28px; border-color: var(--line-strong); box-shadow: none; }
+.home-start h2 { margin: 8px 0; font-size: clamp(19px, 2vw, 24px); }
+.home-start p:not(.eyebrow) { max-width: 620px; margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.6; }
+.home-start__action { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 16px; min-height: 42px; padding: 0 16px; border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent, white); font-size: 13px; font-weight: 700; }
+.home-start__action:hover { background: var(--accent-hover); }
 .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 9px; background: var(--surface-muted); color: var(--ink-soft); font-size: 11px; font-weight: 700; text-transform: capitalize; }
 .badge[data-status="published"] { background: var(--accent-soft); color: var(--accent); }
 .badge[data-status="failed"], .badge[data-status="partially_failed"] { background: var(--danger-soft); color: var(--danger); }
@@ -40,4 +46,5 @@ button, input, select { font: inherit; }
 .quick-links a:hover { background: var(--accent-soft); }
 .text-link { color: var(--accent); font-size: 13px; font-weight: 650; text-decoration: underline; }
 @media (max-width: 850px) { .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .page-heading { flex-direction: column; } }
+@media (max-width: 700px) { .home-start { flex-direction: column; align-items: stretch; } }
 @media (max-width: 500px) { .metric-grid { grid-template-columns: 1fr 1fr; gap: 10px; } .metric-card { padding: 15px; } .metric-card dd { font-size: 25px; } .panel { padding: 18px; } }

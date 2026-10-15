@@ -25,6 +25,10 @@ export default async function HomePage() {
       {showAds && <div className="metric-card"><dt>Linked ad accounts</dt><dd>{adAccounts}</dd></div>}
       {showPosts && <><div className="metric-card"><dt>Published posts</dt><dd>{published}</dd></div><div className="metric-card"><dt>Scheduled posts</dt><dd>{scheduled}</dd></div></>}
     </dl>
+    {showConnections && visibleTargets.length === 0 && <section className="panel home-start" aria-labelledby="home-start-title">
+      <div><p className="eyebrow">First step</p><h2 id="home-start-title">Choose the channels you want to manage</h2><p>Connect a platform, then select the channels and ad accounts to add to this workspace. Only selected sources appear in publishing and reports.</p></div>
+      <a className="home-start__action" href="/settings/connections">Connect channels <span aria-hidden="true">→</span></a>
+    </section>}
     <section className="panel"><h2>Continue your work</h2><div className="quick-links">
       {showPosts && <a href="/publishing/posts">Browse posts</a>}
       {showConnections && <a href="/settings/connections">View connections</a>}
