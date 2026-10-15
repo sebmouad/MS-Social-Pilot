@@ -23,6 +23,8 @@ vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, save
 const analytics = vi.hoisted(() => ({ load: vi.fn(), build: vi.fn() }));
 vi.mock('../src/server/analytics/data', () => ({ analyticsRange: (start?: string, end?: string) => ({ from: new Date(`${start ?? '2026-10-01'}T00:00:00`), to: new Date(`${end ?? '2026-10-15'}T23:59:59.999`) }), loadAnalytics: analytics.load }));
 vi.mock('../src/server/analytics/aggregate', () => ({ buildAnalytics: analytics.build }));
+const adsQueries = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn() }));
+vi.mock('../src/server/ads/queries', () => ({ getAdsAccounts: adsQueries.accounts, getAdsDataset: adsQueries.dataset }));
 const dataControls = vi.hoisted(() => ({ preview: vi.fn(), export: vi.fn(), remove: vi.fn() }));
 vi.mock('../src/server/data-control', () => ({ previewWorkspaceDataDeletion: dataControls.preview, exportWorkspaceData: dataControls.export, deleteWorkspaceData: dataControls.remove }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
@@ -83,9 +85,30 @@ beforeEach(() => {
   const targets = [{ id: 'page-allowed', type: 'page', name: 'Allowed' }];
   analytics.load.mockResolvedValue({ targets, selectedTargets: targets, pageRows: [], adRows: [], audienceRows: [], adAccountCount: 0, instagramRows: [], selectedInstagramAudience: [] });
   analytics.build.mockReturnValue({ audience: { total: 12, covered: 1, selected: 1, entries: [] }, metrics: [{ key: 'reach' }, { key: 'clicks' }] });
+  adsQueries.accounts.mockResolvedValue([{ id: 'account-a', name: 'Account A', currency: 'USD' }]);
+  adsQueries.dataset.mockResolvedValue({ insights: [
+    { id: 'row-1', adAccountId: 'account-a', level: 'campaign', objectId: 'campaign-a', objectName: 'Campaign A', date: new Date('2026-10-14T00:00:00.000Z'), spend: 20, impressions: 1000, clicks: 20, reach: 900, cpc: 1, cpm: 20, cpp: null, ctr: 2, frequency: 1.1, actions: [], fields: {}, adAccount: { id: 'account-a', name: 'Account A', currency: 'USD' } },
+    { id: 'row-2', adAccountId: 'account-a', level: 'ad', objectId: 'ad-a', objectName: 'Ad A', date: new Date('2026-10-14T00:00:00.000Z'), spend: 5, impressions: 500, clicks: 10, reach: 400, cpc: 0.5, cpm: 10, cpp: null, ctr: 2, frequency: 1.25, actions: [], fields: {}, adAccount: { id: 'account-a', name: 'Account A', currency: 'USD' } },
+  ] });
 });
 
 describe('MCP workspace boundaries', () => {
+  it('reads paginated Ads performance through workspace and channel scoped services', async () => {
+    const scoped = { ...viewer, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
+    const listed = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 48, method: 'tools/list' });
+    expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('get_ads_performance');
+    const response = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 49, method: 'tools/call', params: { name: 'get_ads_performance', arguments: { accountId: 'account-a', start: '2026-10-14', end: '2026-10-14', limit: 1 } } });
+    const result = (await response.json()).result.structuredContent;
+    expect(result.performance).toHaveLength(1);
+    expect(result.performance[0]).toMatchObject({ id: 'campaign-a', spend: 20, accountId: 'account-a' });
+    expect(result.nextOffset).toBe(1);
+    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', ['page-allowed']);
+    expect(adsQueries.dataset).toHaveBeenCalledWith('workspace-a', expect.objectContaining({ accountId: 'account-a' }), ['page-allowed']);
+
+    const denied = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 491, method: 'tools/call', params: { name: 'get_ads_performance', arguments: { accountId: 'other-workspace-account' } } });
+    expect((await denied.json()).result.isError).toBe(true);
+    expect(adsQueries.dataset).toHaveBeenCalledTimes(1);
+  });
   it('paginates shared analytics and rejects channels outside the viewer scope', async () => {
     const scoped = { ...viewer, permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
     const denied = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 50, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { targetIds: ['page-other'] } } });

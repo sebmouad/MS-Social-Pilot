@@ -14,6 +14,8 @@ import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion 
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
 import { campaignCreationConfirmation, createWorkspaceAdCampaign, updateWorkspaceAd } from '../ads/actions';
 import type { AdMutationRequest, FacebookCampaignObjective } from '@/platforms/types';
+import { getAdsAccounts, getAdsDataset } from '../ads/queries';
+import { summarizeInsights } from '../ads/summary';
 
 export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number; apiKeyId?: string; isInstanceOwner?: boolean };
 type JsonRpcId = string | number | null;
@@ -35,6 +37,7 @@ const tools = [
   { name: 'get_page_analytics', description: 'Read stored daily insights for one workspace Page.', inputSchema: { type: 'object', required: ['pageId'], properties: { pageId: { type: 'string' }, days: { type: 'integer', minimum: 1, maximum: 365 } }, additionalProperties: false } },
   { name: 'get_analytics_overview', description: 'Read all available analytics metrics and combined audience for selected channels. Metrics are paginated.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel.' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'list_ad_accounts', description: 'List advertising accounts in this workspace.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'get_ads_performance', description: 'Read stored campaign, ad set, and ad performance for accessible ad accounts. Results are paginated.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, accountId: { type: 'string', description: 'Accessible ad account ID.' }, level: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'create_ad_campaign', description: 'Create a paused Facebook campaign in a selected account. The confirmation must match CREATE PAUSED FACEBOOK CAMPAIGN <JSON-quoted name> IN ACCOUNT <adAccountId> WITH OBJECTIVE <objective>.', inputSchema: { type: 'object', required: ['adAccountId', 'name', 'objective', 'confirmation'], properties: { adAccountId: { type: 'string' }, name: { type: 'string' }, objective: { type: 'string', enum: ['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'update_ad', description: 'Change the status or one budget of a verified Facebook campaign, ad set, or ad. Confirmation must exactly match SET AD STATUS <objectId> TO <ACTIVE|PAUSED> or SET AD BUDGET <objectId> TO <amount> MINOR UNITS.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType', 'confirmation'], properties: { adAccountId: { type: 'string' }, objectId: { type: 'string' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, status: { type: 'string', enum: ['active', 'paused'] }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, lifetimeBudgetMinor: { type: 'integer', minimum: 1 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'preview_workspace_data_deletion', description: 'Count workspace records that a data deletion would remove. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -72,6 +75,7 @@ const toolFeatures: Record<string, string> = {
   moderate_inbox_comment: 'inbox/conversations',
   get_page_analytics: 'analytics/overview',
   get_analytics_overview: 'analytics/overview',
+  get_ads_performance: 'ads/campaigns',
   list_ad_accounts: 'ads/campaigns',
   create_ad_campaign: 'ads/campaigns',
   update_ad: 'ads/campaigns',
@@ -225,6 +229,41 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
     case 'list_ad_accounts':
       if (viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can list advertising accounts.');
       return prisma.adAccount.findMany({ where: { workspaceId: viewer.workspaceId }, orderBy: { name: 'asc' }, take: cap, select: { id: true, actId: true, name: true, enabled: true, currency: true } });
+    case 'get_ads_performance': {
+      const date = (key: 'start' | 'end') => {
+        const value = args[key];
+        if (value === undefined) return undefined;
+        if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error(`${key} must be a valid YYYY-MM-DD date.`);
+        const parsed = new Date(`${value}T00:00:00.000Z`);
+        if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) throw new Error(`${key} must be a valid YYYY-MM-DD date.`);
+        return value;
+      };
+      const start = date('start');
+      const end = date('end');
+      if (start && end && start > end) throw new Error('start must not be after end.');
+      const range = analyticsRange(start, end);
+      const maxRangeDays = Number(await runtimeConfig('analytics.maxRangeDays'));
+      if ((range.to.getTime() - range.from.getTime()) / 86_400_000 > maxRangeDays) throw new Error(`Date range exceeds the configured ${maxRangeDays}-day maximum.`);
+      const allowedTargetIds = pageIdsFor(viewer);
+      const accounts = await getAdsAccounts(viewer.workspaceId, allowedTargetIds);
+      if (args.accountId !== undefined && (typeof args.accountId !== 'string' || !accounts.some(account => account.id === args.accountId))) throw new Error('Ad account is unavailable in this workspace.');
+      const accountId = args.accountId as string | undefined;
+      const filters = { period: 'custom' as const, since: range.from, until: range.to, accountId: accountId ?? null };
+      const { insights } = await getAdsDataset(viewer.workspaceId, filters, allowedTargetIds);
+      const level = args.level;
+      if (level !== undefined && !['campaign', 'adset', 'ad'].includes(String(level))) throw new Error('level must be campaign, adset, or ad.');
+      const rows = summarizeInsights(insights, level as string | undefined).filter(row => ['campaign', 'adset', 'ad'].includes(row.level));
+      const offset = args.offset === undefined ? 0 : Number(args.offset);
+      const limit = args.limit === undefined ? Math.min(cap, 50) : Number(args.limit);
+      if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('offset and limit must be valid integers.');
+      const pageLimit = Math.min(limit, cap);
+      const performance = rows.slice(offset, offset + pageLimit).map(row => ({
+        id: row.id, name: row.name, level: row.level, accountId: row.accountId, accountName: row.accountName, currency: row.currency,
+        spend: row.spend, impressions: row.impressions, clicks: row.clicks, reach: row.reach, reachDate: row.reachDate,
+        cpc: row.cpc, cpm: row.cpm, cpp: row.cpp, ctr: row.ctr, frequency: row.frequency, actions: row.actions, dailyRowCount: row.rows,
+      }));
+      return { range, accounts: accounts.filter(account => !accountId || account.id === accountId).map(({ id, name, currency }) => ({ id, name, currency })), level: level ?? null, resultCount: rows.length, performance, nextOffset: offset + performance.length < rows.length ? offset + performance.length : null };
+    }
     case 'create_ad_campaign': {
       const adAccountId = requiredString(args, 'adAccountId');
       const nameValue = requiredString(args, 'name');
