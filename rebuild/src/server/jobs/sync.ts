@@ -22,10 +22,10 @@ function validDate(value: unknown): Date | null {
 
 /** Only read remote status; this job never calls a publishing method. */
 export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0): Promise<JobSummary> {
-  const limit = (await runtimeConfig('meta.pageSize') as number) * (await runtimeConfig('meta.maxPages') as number);
+  const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
   const rows = await prisma.postTarget.findMany({
     where: { status: 'scheduled_remote', remotePostId: { not: null }, target: { enabled: true, type: 'page', socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } } },
-    orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }], take: Math.min(limit, 10_000),
+    orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }], take: limit,
     select: { id: true, postId: true, remotePostId: true, target: { select: { workspaceId: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, tokenExpiresAt: true, invalidatedAt: true } } } } },
   });
   const engine = await configuredFacebookEngine();
@@ -60,7 +60,7 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0):
 
 /** Refresh current daily Page snapshots for enabled connections in their own workspace. */
 export async function syncPageAnalytics(now = new Date(), retryLimit = 0): Promise<JobSummary> {
-  const limit = Math.min((await runtimeConfig('meta.pageSize') as number) * (await runtimeConfig('meta.maxPages') as number), 10_000);
+  const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
   const targets = await prisma.target.findMany({
     where: { type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
     orderBy: [{ workspaceId: 'asc' }, { id: 'asc' }], take: limit,
@@ -91,7 +91,7 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0): Promi
 
 /** Refresh account-level Ads Insights for each enabled account in its own workspace. */
 export async function syncAdsAnalytics(now = new Date(), retryLimit = 0): Promise<JobSummary> {
-  const limit = Math.min((await runtimeConfig('meta.pageSize') as number) * (await runtimeConfig('meta.maxPages') as number), 10_000);
+  const limit = await runtimeConfig('sync.maxItemsPerJob') as number;
   const accounts = await prisma.adAccount.findMany({
     where: { enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
     orderBy: [{ workspaceId: 'asc' }, { id: 'asc' }], take: limit,
@@ -133,11 +133,10 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0): Promis
 
 /** Sync conversations/messages and post comments through the Facebook platform engine. */
 export async function syncInbox(now = new Date(), retryLimit = 0): Promise<JobSummary> {
-  const [readScopes, pageSize, maxPages] = await Promise.all([
-    runtimeConfig('meta.inboxReadScopes') as Promise<string[]>, runtimeConfig('meta.pageSize') as Promise<number>, runtimeConfig('meta.maxPages') as Promise<number>,
+  const [readScopes, limit] = await Promise.all([
+    runtimeConfig('meta.inboxReadScopes') as Promise<string[]>, runtimeConfig('sync.maxItemsPerJob') as Promise<number>,
   ]);
   const required = new Set(readScopes.map(scope => scope.trim()).filter(Boolean));
-  const limit = Math.min(pageSize * maxPages, 10_000);
   const targets = await prisma.target.findMany({
     where: { type: 'page', enabled: true, socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } },
     orderBy: [{ workspaceId: 'asc' }, { id: 'asc' }], take: limit,

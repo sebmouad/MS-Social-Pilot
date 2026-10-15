@@ -5,8 +5,8 @@ import { cronMatches } from './cron';
 
 export type JobName = 'posts' | 'analytics' | 'inbox';
 export type WorkerLogger = (message: string, detail?: unknown) => void;
-const LEASE_MS = 5 * 60_000;
-const HEARTBEAT_MS = 30_000;
+const MINUTE_MS = 60_000;
+const SECOND_MS = 1_000;
 type Job = { name: JobName; configKey: string };
 const jobs: Job[] = [
   { name: 'posts', configKey: 'sync.posts.schedule' },
@@ -31,7 +31,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
   const running = new Set<JobName>();
   let lastHeartbeat = 0;
 
-  async function launch(job: Job, now: Date, retryLimit: number): Promise<void> {
+  async function launch(job: Job, now: Date, retryLimit: number, leaseMs: number): Promise<void> {
     if (running.has(job.name)) return;
     const minuteStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
     const minuteEnd = new Date(minuteStart.getTime() + 60_000);
@@ -44,7 +44,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     running.add(job.name);
     const token = randomUUID();
     let acquired: boolean;
-    try { acquired = await deps.tryLease(job.name, owner, token, new Date(Date.now() + LEASE_MS)); }
+    try { acquired = await deps.tryLease(job.name, owner, token, new Date(Date.now() + leaseMs)); }
     catch (error) { running.delete(job.name); throw error; }
     if (!acquired) { running.delete(job.name); return; }
     const startedAt = new Date();
@@ -53,10 +53,10 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     let summary: string | undefined;
     let errorText: string | undefined;
     const renew = setInterval(() => {
-      void deps.renewLease(job.name, token, new Date(Date.now() + LEASE_MS)).then(renewed => {
+      void deps.renewLease(job.name, token, new Date(Date.now() + leaseMs)).then(renewed => {
         if (!renewed) deps.logger(`lease for ${job.name} is no longer owned by this worker`);
       }).catch(error => deps.logger(`lease renewal failed for ${job.name}`, error));
-    }, Math.floor(LEASE_MS / 3));
+    }, Math.floor(leaseMs / 3));
     try {
       attempts = 1;
       summary = await deps.execute(job.name, new Date(), retryLimit);
@@ -79,6 +79,9 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     const enabled = await deps.readConfig('jobs.enabled') as boolean;
     const maxConcurrent = await deps.readConfig('sync.maxConcurrentJobs') as number;
     const retryLimit = await deps.readConfig('sync.retryLimit') as number;
+    const leaseMinutes = await deps.readConfig('sync.workerLeaseMinutes') as number;
+    const heartbeatSeconds = await deps.readConfig('sync.workerHeartbeatSeconds') as number;
+    const leaseMs = Math.max(1, Math.trunc(leaseMinutes)) * MINUTE_MS;
     if (enabled) {
       let available = Math.max(0, Math.trunc(maxConcurrent) - running.size);
       for (const job of jobs) {
@@ -86,12 +89,12 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
         const expression = await deps.readConfig(job.configKey) as string;
         if (!cronMatches(expression, now)) continue;
         if (running.has(job.name)) continue;
-        void launch(job, now, Math.max(0, Math.trunc(retryLimit))).catch(error => deps.logger(`could not start ${job.name}`, error));
+        void launch(job, now, Math.max(0, Math.trunc(retryLimit)), leaseMs).catch(error => deps.logger(`could not start ${job.name}`, error));
         // Lease acquisition is async; reserve a local slot before its result.
         available--;
       }
     }
-    if (Date.now() - lastHeartbeat >= HEARTBEAT_MS) {
+    if (Date.now() - lastHeartbeat >= Math.max(1, Math.trunc(heartbeatSeconds)) * SECOND_MS) {
       lastHeartbeat = Date.now();
       await deps.writeHeartbeat(owner, enabled ? jobs.map(job => job.name) : [], now).catch(error => deps.logger('worker heartbeat failed', error));
     }

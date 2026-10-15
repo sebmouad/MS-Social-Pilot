@@ -61,6 +61,7 @@ export async function syncFacebookInbox(actor: InboxActor, targetId?: string) {
   if (targetId && !targets.length) throw new Error('This Facebook Page is unavailable in the current workspace.');
   const { permissions } = await access(actor);
   const visibleTargets = targets.filter(item => canAccessPage(permissions, item.id));
+  if (targetId && !visibleTargets.length) throw new Error('You do not have access to this Facebook Page.');
   const engine = await configuredFacebookEngine();
   const batches: Array<{ targetId: string; conversations: Awaited<ReturnType<typeof engine.listInbox>>; comments: Array<{ postTargetId: string; items: Awaited<ReturnType<typeof engine.listComments>> }> }> = [];
   for (const item of visibleTargets) {

@@ -46,15 +46,17 @@ successful build or a passing unit suite alone does not authorize the swap.
 - `rebuild/prisma/schema.prisma` is a partial mapped client view. It has no
   `rebuild/prisma/migrations/` directory and is explicitly not a database
   migration schema. Do not run `db push` or `migrate deploy` from this app.
-  There is no reviewed DDL, data migration, forward/rollback migration plan,
-  or proof that rebuild writes are safe against a production-shaped copy.
+  Two additive rebuild migrations for MCP keys and worker runs passed on the
+  isolated test database. Rebuild writes still need verification against a
+  production-shaped copy and a complete forward/rollback data plan.
 - The rebuild Prisma enums include `WorkspaceRole.viewer` and
   `WorkspaceRole.client`, plus `TargetType.telegram`, `youtube`, and `tiktok`.
   The checked-in legacy migrations add those values on 2026-10-17 and
-  2026-10-18, after the current 2026-10-15 review date. Confirm production's
-  actual enum labels and migration ledger before connecting the rebuild. The
-  rehearsal rejects a staging copy that lacks any mapped enum value. This is
-  a concrete schema compatibility gap, not a planned migration.
+  2026-10-18, after the current 2026-10-15 review date. A read-only
+  production check on 2026-10-15 found exactly the same 91 applied
+  pre-rebuild migration names as the repository. The two new additive rebuild
+  migrations remain unapplied in production. Verify enum labels on the
+  sanitized staging copy; the rehearsal rejects missing mapped values.
 - Existing application rollback swaps the previous code release back, while
   leaving the database schema as-is. That is not a database rollback plan for
   data writes or an incompatible migration. A database restore requires

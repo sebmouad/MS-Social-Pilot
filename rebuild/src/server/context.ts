@@ -7,7 +7,7 @@ import { canAccessFeature, canAccessModule } from './permissions';
 import { loadPermissions } from './permissions/loader';
 
 /** Each request starts with a validated user and a current workspace membership. */
-export async function requireViewer(access?: { module?: string; feature?: string }) {
+export async function requireViewer(access?: { module?: string; feature?: string; channelScoped?: boolean }) {
   const token = (await cookies()).get(LEGACY_SESSION_COOKIE)?.value;
   const hash = token ? hashLegacySessionToken(token) : null;
   if (!hash) redirect('/sign-in');
@@ -19,9 +19,9 @@ export async function requireViewer(access?: { module?: string; feature?: string
   if (!workspaces.length) redirect('/no-workspace');
   const selected = (await cookies()).get('sp_workspace')?.value;
   const membership = workspaces.find((item) => item.workspace.id === selected) ?? workspaces.find(item => item.role === 'owner' || item.role === 'admin') ?? workspaces[0]!;
-  // Preserve the rebuild preview's existing role gate while applying the
-  // product entitlement checks before the caller reads protected data.
-  if (membership.role !== 'owner' && membership.role !== 'admin') redirect('/access-limited');
+  // The preview remains owner/admin-only except for routes whose data layer
+  // enforces workspace and assigned-channel scope on every operation.
+  if (!access?.channelScoped && membership.role !== 'owner' && membership.role !== 'admin') redirect('/access-limited');
   const entitlements = await loadEntitlements(user.id, membership.workspace.id);
   if (!entitlements) redirect('/no-workspace');
   const permissions = await loadPermissions(user.id, membership.workspace.id);

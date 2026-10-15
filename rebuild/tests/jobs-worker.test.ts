@@ -5,7 +5,7 @@ function dependencies(overrides: Partial<WorkerDependencies> = {}) {
   const started: string[] = [];
   const runs: unknown[] = [];
   const deps: WorkerDependencies = {
-    readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 3 : key === 'sync.posts.schedule' ? '* * * * *' : key === 'sync.analytics.schedule' ? '0 * * * *' : '0 * * * *',
+    readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 3 : key === 'sync.workerLeaseMinutes' ? 5 : key === 'sync.workerHeartbeatSeconds' ? 30 : key === 'sync.posts.schedule' ? '* * * * *' : key === 'sync.analytics.schedule' ? '0 * * * *' : '0 * * * *',
     execute: async job => { started.push(job); return 'checked=1 updated=1 skipped=0 failed=0'; },
     tryLease: async () => true,
     renewLease: async () => true,
@@ -28,7 +28,7 @@ describe('replacement worker scheduling', () => {
     let resolveGate!: (value: string) => void;
     const gate = new Promise<string>(resolve => { resolveGate = resolve; });
     const state = dependencies({
-      readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 0 : '* * * * *',
+      readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 0 : key === 'sync.workerLeaseMinutes' ? 5 : key === 'sync.workerHeartbeatSeconds' ? 30 : '* * * * *',
       execute: async job => { state.started.push(job); return gate; },
     });
     const worker = createWorker(state.deps, 'test-worker');
@@ -59,5 +59,24 @@ describe('replacement worker scheduling', () => {
     await drain(worker);
     expect(state.started).toHaveLength(0);
     expect(state.runs).toHaveLength(0);
+  });
+
+  it('uses Root lease and heartbeat settings', async () => {
+    const before = Date.now();
+    const tryLease = vi.fn(async (_job: 'posts' | 'analytics' | 'inbox', _owner: string, _token: string, _until: Date) => true);
+    const writeHeartbeat = vi.fn(async () => undefined);
+    const state = dependencies({
+      readConfig: async key => key === 'jobs.enabled' ? true : key === 'sync.maxConcurrentJobs' ? 1 : key === 'sync.retryLimit' ? 0 : key === 'sync.workerLeaseMinutes' ? 2 : key === 'sync.workerHeartbeatSeconds' ? 5 : '* * * * *',
+      tryLease,
+      writeHeartbeat,
+    });
+    const worker = createWorker(state.deps, 'test-worker');
+    await worker.tick(new Date(2026, 0, 1, 12, 5));
+    await drain(worker);
+    const until = tryLease.mock.calls[0]?.[3];
+    expect(until).toBeInstanceOf(Date);
+    expect(until!.getTime()).toBeGreaterThanOrEqual(before + 2 * 60_000);
+    expect(until!.getTime()).toBeLessThan(before + 2 * 60_000 + 1000);
+    expect(writeHeartbeat).toHaveBeenCalledTimes(1);
   });
 });

@@ -95,5 +95,10 @@ export async function saveConfig(input: unknown, actorId: string) {
 async function audit(tx: Prisma.TransactionClient, actorId: string, key: string, change: string) {
   // Existing installation-wide audit table from the legacy schema. Parameterized
   // values keep the query safe; the secret itself is never included in detail.
-  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`cfg_${randomBytes(12).toString('hex')}`}, ${actorId}, 'config.changed', ${JSON.stringify({ key, change, schemaVersion: CONFIG_SCHEMA_VERSION })}::jsonb, NOW())`;
+  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`cfg_${randomBytes(12).toString('hex')}`}, ${actorId}, 'config.changed', ${JSON.stringify(configAuditDetail(key, change))}::jsonb, NOW())`;
+}
+
+/** Stable, value-free audit payload for validating Root setting changes. */
+export function configAuditDetail(key: string, change: string) {
+  return { key, change, schemaVersion: CONFIG_SCHEMA_VERSION };
 }

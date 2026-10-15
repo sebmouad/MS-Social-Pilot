@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 3;
+export const CONFIG_SCHEMA_VERSION = 4;
 
 const cron = z.string().min(9).max(100).refine((value) => {
   const fields = value.trim().split(/\s+/);
@@ -68,6 +68,9 @@ export const CONFIG_REGISTRY: Entry[] = [
   entry({ key: 'sync.inbox.schedule', group: 'Sync schedules', label: 'Inbox sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '*/2 * * * *', schema: cron, consumption: 'active' }),
   entry({ key: 'sync.maxConcurrentJobs', group: 'Sync schedules', label: 'Maximum concurrent sync jobs', kind: 'number', description: 'Upper bound for simultaneously running sync tasks.', defaultValue: 4, schema: z.number().int().min(1).max(100), consumption: 'active' }),
   entry({ key: 'sync.retryLimit', group: 'Sync schedules', label: 'Sync retry limit', kind: 'number', description: 'Maximum retry attempts before a sync task is marked failed.', defaultValue: 5, schema: z.number().int().min(0).max(50), consumption: 'active' }),
+  entry({ key: 'sync.maxItemsPerJob', group: 'Sync schedules', label: 'Maximum records per sync job', kind: 'number', description: 'Maximum local records a single sync job examines in one run.', defaultValue: 10000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
+  entry({ key: 'sync.workerLeaseMinutes', group: 'Sync schedules', label: 'Worker lease duration (minutes)', kind: 'number', description: 'How long a worker owns a distributed job lease before another worker may take it.', defaultValue: 5, schema: z.number().int().min(1).max(60), consumption: 'active' }),
+  entry({ key: 'sync.workerHeartbeatSeconds', group: 'Sync schedules', label: 'Worker heartbeat interval (seconds)', kind: 'number', description: 'How often the background worker records its health heartbeat.', defaultValue: 30, schema: z.number().int().min(5).max(300), consumption: 'active' }),
 
   entry({ key: 'api.meta.requestsPerMinute', group: 'API rate limits', label: 'Meta requests per minute', kind: 'number', description: 'Application-side request budget for Meta API calls.', defaultValue: 200, schema: z.number().int().min(1).max(100000), consumption: 'planned' }),
   entry({ key: 'api.youtube.requestsPerMinute', group: 'API rate limits', label: 'YouTube requests per minute', kind: 'number', description: 'Application-side request budget for YouTube API calls.', defaultValue: 100, schema: z.number().int().min(1).max(100000), consumption: 'planned' }),

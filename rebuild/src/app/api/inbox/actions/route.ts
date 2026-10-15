@@ -16,7 +16,7 @@ const schema = z.discriminatedUnion('action', [
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 });
   let viewer;
-  try { viewer = await requireViewer({ feature: 'inbox/conversations' }); }
+  try { viewer = await requireViewer({ feature: 'inbox/conversations', channelScoped: true }); }
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   try {
     const input = schema.parse(await request.json());

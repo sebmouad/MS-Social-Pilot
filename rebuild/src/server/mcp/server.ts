@@ -4,6 +4,8 @@ import { createLocalDraft, deleteLocalDraft, updateLocalDraft } from '../post-mu
 import { setConnectionSelections } from '../connection-mutations';
 import { randomBytes } from 'node:crypto';
 import { canAccessFeature, canAccessPage, type ScopedPermissions } from '../permissions';
+import { moderateFacebookComment, replyToFacebookInbox, setFacebookInboxResolved } from '../inbox/actions';
+import { deletePost, publishPost, syncPostStatus } from '../publishing/lifecycle';
 
 export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number; apiKeyId?: string };
 type JsonRpcId = string | number | null;
@@ -19,11 +21,17 @@ const tools = [
   { name: 'list_pages', description: 'List enabled workspace destinations and their publishing availability.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'list_posts', description: 'List workspace posts, newest first. Filter by status and scheduled date.', inputSchema: { type: 'object', properties: { status: { type: 'string', description: 'Comma-separated post statuses.' }, from: { type: 'string', description: 'ISO date or date-time lower bound for scheduledAt.' }, to: { type: 'string', description: 'ISO date or date-time upper bound for scheduledAt.' }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'list_inbox', description: 'List synced comments and conversations visible in the workspace inbox.', inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['comment', 'message'] }, state: { type: 'string', enum: ['open', 'resolved', 'all'] }, limit: { type: 'integer', minimum: 1, maximum: 100 } }, additionalProperties: false } },
+  { name: 'reply_to_inbox', description: 'Send a reply to a synced Facebook conversation or comment. This contacts Facebook. Confirmation must exactly match REPLY <message|comment> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'text', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment'] }, id: { type: 'string' }, text: { type: 'string', minLength: 1, maxLength: 2000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'set_inbox_resolved', description: 'Resolve or reopen a synced Facebook conversation or comment. Confirmation must exactly match RESOLVE <message|comment> <id> or REOPEN <message|comment> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'resolved', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment'] }, id: { type: 'string' }, resolved: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'moderate_inbox_comment', description: 'Hide or unhide a synced Facebook comment. This contacts Facebook. Confirmation must exactly match HIDE COMMENT <id> or UNHIDE COMMENT <id>.', inputSchema: { type: 'object', required: ['id', 'hidden', 'confirmation'], properties: { id: { type: 'string' }, hidden: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_page_analytics', description: 'Read stored daily insights for one workspace Page.', inputSchema: { type: 'object', required: ['pageId'], properties: { pageId: { type: 'string' }, days: { type: 'integer', minimum: 1, maximum: 365 } }, additionalProperties: false } },
   { name: 'list_ad_accounts', description: 'List advertising accounts in this workspace.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'create_draft', description: 'Create an unpublished local draft. Confirmation is required: confirmation must be exactly CREATE DRAFT.', inputSchema: { type: 'object', required: ['message', 'confirmation'], properties: { message: { type: 'string', minLength: 1, maxLength: 10000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'update_draft', description: 'Edit an unconnected local draft. Confirmation must be exactly UPDATE DRAFT followed by its ID.', inputSchema: { type: 'object', required: ['postId', 'message', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string', minLength: 1, maxLength: 10000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'delete_draft', description: 'Permanently delete an unconnected local draft. Confirmation must be exactly DELETE DRAFT followed by its ID.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'publish_post', description: 'Publish a workspace post now to its configured destinations. This contacts social platforms. Confirmation must exactly match PUBLISH POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'sync_post_status', description: 'Refresh a post status from supported social platforms. Confirmation must exactly match SYNC POST STATUS <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'delete_post', description: 'Permanently delete a workspace post and its local publishing history. Set deleteRemote to true to also request deletion of remote posts. Confirmation must exactly match DELETE POST <postId> LOCAL or DELETE POST <postId> REMOTE.', inputSchema: { type: 'object', required: ['postId', 'deleteRemote', 'confirmation'], properties: { postId: { type: 'string' }, deleteRemote: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'set_connection_selection', description: 'Enable or disable one workspace channel or advertising account. Confirmation must exactly identify the selection and action.', inputSchema: { type: 'object', required: ['kind', 'id', 'enabled', 'confirmation'], properties: { kind: { type: 'string', enum: ['target', 'adAccount'] }, id: { type: 'string' }, enabled: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
 ];
 
@@ -31,13 +39,21 @@ const toolFeatures: Record<string, string> = {
   list_pages: 'settings/connections',
   list_posts: 'publishing/posts',
   list_inbox: 'inbox/conversations',
+  reply_to_inbox: 'inbox/conversations',
+  set_inbox_resolved: 'inbox/conversations',
+  moderate_inbox_comment: 'inbox/conversations',
   get_page_analytics: 'analytics/overview',
   list_ad_accounts: 'ads/campaigns',
   create_draft: 'publishing/posts',
   update_draft: 'publishing/posts',
   delete_draft: 'publishing/posts',
+  publish_post: 'publishing/posts',
+  sync_post_status: 'publishing/posts',
+  delete_post: 'publishing/posts',
   set_connection_selection: 'settings/connections',
 };
+
+const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -50,7 +66,7 @@ function requireConfirmation(args: Record<string, unknown>, expected: string) {
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
   const feature = toolFeatures[name];
   if (feature) requireFeature(viewer.entitlements, feature);
-  if (feature && (!viewer.permissions || !canAccessFeature(viewer.permissions, feature, name.startsWith('create_') || name.startsWith('update_') || name.startsWith('delete_') || name === 'set_connection_selection' ? 'write' : 'read'))) throw new Error('You do not have permission to use this feature.');
+  if (feature && (!viewer.permissions || !canAccessFeature(viewer.permissions, feature, writeTools.has(name) ? 'write' : 'read'))) throw new Error('You do not have permission to use this feature.');
   const cap = viewer.maxResultItems ?? 100;
   switch (name) {
     case 'list_pages':
@@ -79,6 +95,34 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
         kind === 'message' ? Promise.resolve([]) : prisma.postComment.findMany({ where: commentWhere, orderBy: { createdTime: 'desc' }, take: limit, select: { id: true, message: true, fromName: true, createdTime: true, resolvedAt: true, replyCount: true, postTarget: { select: { target: { select: { id: true, type: true, name: true } }, post: { select: { id: true, message: true } } } } } }),
       ]);
       return { conversations, comments };
+    }
+    case 'reply_to_inbox': {
+      const kind = args.kind === 'message' || args.kind === 'comment' ? args.kind : null;
+      const id = typeof args.id === 'string' ? args.id : '';
+      if (!kind || !id) throw new Error('kind and id are required.');
+      requireConfirmation(args, `REPLY ${kind} ${id}`);
+      const text = typeof args.text === 'string' ? args.text.trim() : '';
+      const result = await replyToFacebookInbox(viewer, { kind, id, text });
+      await auditWrite(viewer, name, { kind, itemId: id });
+      return { ...result, kind, itemId: id };
+    }
+    case 'set_inbox_resolved': {
+      const kind = args.kind === 'message' || args.kind === 'comment' ? args.kind : null;
+      const id = typeof args.id === 'string' ? args.id : '';
+      if (!kind || !id || typeof args.resolved !== 'boolean') throw new Error('kind, id, and resolved are required.');
+      const verb = args.resolved ? 'RESOLVE' : 'REOPEN';
+      requireConfirmation(args, `${verb} ${kind} ${id}`);
+      const result = await setFacebookInboxResolved(viewer, { kind, id, resolved: args.resolved });
+      await auditWrite(viewer, name, { kind, itemId: id, resolved: args.resolved });
+      return { ...result, kind, itemId: id, resolved: args.resolved };
+    }
+    case 'moderate_inbox_comment': {
+      const id = typeof args.id === 'string' ? args.id : '';
+      if (!id || typeof args.hidden !== 'boolean') throw new Error('id and hidden are required.');
+      requireConfirmation(args, `${args.hidden ? 'HIDE' : 'UNHIDE'} COMMENT ${id}`);
+      const result = await moderateFacebookComment(viewer, { id, hidden: args.hidden });
+      await auditWrite(viewer, name, { itemId: id, hidden: args.hidden });
+      return { ...result, itemId: id, hidden: args.hidden };
     }
     case 'get_page_analytics': {
       const pageId = String(args.pageId ?? '');
@@ -120,6 +164,30 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       await auditWrite(viewer, name, { postId });
       return { id: postId, deleted: true };
     }
+    case 'publish_post': {
+      const postId = typeof args.postId === 'string' ? args.postId : '';
+      if (!postId) throw new Error('postId is required.');
+      requireConfirmation(args, `PUBLISH POST ${postId}`);
+      const result = await publishPost(viewer, postId);
+      await auditWrite(viewer, name, { postId, ...result });
+      return { postId, ...result };
+    }
+    case 'sync_post_status': {
+      const postId = typeof args.postId === 'string' ? args.postId : '';
+      if (!postId) throw new Error('postId is required.');
+      requireConfirmation(args, `SYNC POST STATUS ${postId}`);
+      const result = await syncPostStatus(viewer, postId);
+      await auditWrite(viewer, name, { postId, ...result });
+      return { postId, ...result };
+    }
+    case 'delete_post': {
+      const postId = typeof args.postId === 'string' ? args.postId : '';
+      if (!postId || typeof args.deleteRemote !== 'boolean') throw new Error('postId and deleteRemote are required.');
+      requireConfirmation(args, `DELETE POST ${postId} ${args.deleteRemote ? 'REMOTE' : 'LOCAL'}`);
+      await deletePost(viewer, postId, args.deleteRemote);
+      await auditWrite(viewer, name, { postId, remoteDeletionRequested: args.deleteRemote });
+      return { postId, deleted: true, remoteDeletionRequested: args.deleteRemote };
+    }
     case 'set_connection_selection': {
       requireFeature(viewer.entitlements, 'settings/connections');
       const kind = args.kind === 'target' || args.kind === 'adAccount' ? args.kind : null;
@@ -147,9 +215,9 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
   if (method === 'ping') return reply({});
   if (method === 'initialize') {
     const requested = String(params.protocolVersion ?? '');
-    return reply({ protocolVersion: versions.includes(requested) ? requested : versions[0], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } }, serverInfo: { name: 'ms-social-pilot', version: '0.1.0' }, instructions: `Workspace-scoped access for ${viewer.workspace.name}. Writes are limited to local drafts and channel/ad account selections. Every write requires an explicit confirmation string. Times use ${viewer.workspace.timezone}.` });
+    return reply({ protocolVersion: versions.includes(requested) ? requested : versions[0], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } }, serverInfo: { name: 'ms-social-pilot', version: '0.1.0' }, instructions: `Workspace-scoped access for ${viewer.workspace.name}. Writes can manage local posts, publish posts, sync provider status, change channel/ad account selections, or manage Facebook Inbox items. Publishing, remote post deletion, Inbox replies, and comment moderation contact social platforms. Every write requires an explicit confirmation string. Times use ${viewer.workspace.timezone}.` });
   }
-  if (method === 'tools/list') return reply({ tools: tools.filter(tool => canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, ['create_draft', 'update_draft', 'delete_draft', 'set_connection_selection'].includes(tool.name) ? 'write' : 'read')) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (tool.name !== 'list_ad_accounts' || viewer.role === 'owner' || viewer.role === 'admin')) });
+  if (method === 'tools/list') return reply({ tools: tools.filter(tool => canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (tool.name !== 'list_ad_accounts' || viewer.role === 'owner' || viewer.role === 'admin')) });
   if (method === 'tools/call') {
     const name = String(params.name ?? '');
     if (!tools.some(tool => tool.name === name)) return error(-32602, `Unknown tool: ${name}`);

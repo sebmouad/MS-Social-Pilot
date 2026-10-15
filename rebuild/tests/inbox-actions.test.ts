@@ -17,7 +17,7 @@ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitleme
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature, canAccessPage: mocks.canAccessPage }));
 
-import { moderateFacebookComment, replyToFacebookInbox } from '../src/server/inbox/actions';
+import { moderateFacebookComment, replyToFacebookInbox, syncFacebookInbox } from '../src/server/inbox/actions';
 
 const actor = { userId: 'user-1', workspaceId: 'workspace-1' };
 
@@ -54,6 +54,23 @@ describe('workspace Facebook inbox actions', () => {
     mocks.prisma.target.findFirst.mockResolvedValue({ id: 'target-1', providerId: 'page-1', accessToken: 'encrypted', socialAccount: { scopes: 'pages_messaging', tokenExpiresAt: null, invalidatedAt: null } });
     await expect(moderateFacebookComment(actor, { id: 'comment-1', hidden: true })).rejects.toThrow(/Inbox is unavailable for this connection/);
     expect(mocks.engine.moderateComment).not.toHaveBeenCalled();
+  });
+
+  it('denies a requested channel read when the page is outside the member scope', async () => {
+    mocks.prisma.target.findMany.mockResolvedValue([{ id: 'target-foreign' }]);
+    mocks.canAccessPage.mockReturnValue(false);
+    mocks.config.mockImplementation(async key => key === 'meta.pageSize' ? 25 : key === 'meta.maxPages' ? 2 : []);
+    await expect(syncFacebookInbox(actor, 'target-foreign')).rejects.toThrow(/do not have access/);
+    expect(mocks.configuredEngine).not.toHaveBeenCalled();
+  });
+
+  it('denies cross-workspace reads and writes before touching the provider', async () => {
+    mocks.prisma.conversation.findFirst.mockResolvedValue(null);
+    await expect(replyToFacebookInbox(actor, { kind: 'message', id: 'foreign-conversation', text: 'Hello' }))
+      .rejects.toThrow(/unavailable in the current workspace/);
+    expect(mocks.engine.replyToConversation).not.toHaveBeenCalled();
+    expect(mocks.prisma.conversation.findFirst.mock.calls[0][0].where)
+      .toEqual({ id: 'foreign-conversation', target: { workspaceId: actor.workspaceId } });
   });
 
   it('moderates only a comment stored under the current workspace and audits the result', async () => {

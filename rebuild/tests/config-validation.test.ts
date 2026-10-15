@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG_BY_KEY, CONFIG_REGISTRY, CONFIG_SCHEMA_VERSION, safeConfigShape } from '../src/lib/config/registry';
+import { configAuditDetail } from '../src/server/config/store';
 
 describe('configuration registry', () => {
   it('has unique keys and public metadata never contains secret values', () => {
@@ -23,7 +24,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBeGreaterThan(1);
+    expect(CONFIG_SCHEMA_VERSION).toBe(4);
     for (const prefix of ['meta.', 'youtube.', 'linkedin.', 'x.', 'sync.', 'api.', 'entitlements.', 'retention.', 'logging.', 'mcp.', 'theme.']) {
       expect(CONFIG_REGISTRY.some((item) => item.key.startsWith(prefix))).toBe(true);
     }
@@ -42,5 +43,17 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('theme.default')!.schema.safeParse('nightfall').success).toBe(true);
     expect(CONFIG_BY_KEY.get('theme.default')!.schema.safeParse('unknown').success).toBe(false);
     expect(CONFIG_BY_KEY.get('mcp.requestsPerMinute')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('sync.maxItemsPerJob')!.schema.safeParse(10000).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('sync.maxItemsPerJob')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('sync.workerLeaseMinutes')!.schema.safeParse(5).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('sync.workerLeaseMinutes')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('sync.workerHeartbeatSeconds')!.schema.safeParse(30).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('sync.workerHeartbeatSeconds')!.schema.safeParse(1).success).toBe(false);
+  });
+
+  it('audits changes with key, change type, and registry version only', () => {
+    expect(configAuditDetail('meta.appSecret', 'secret updated')).toEqual({
+      key: 'meta.appSecret', change: 'secret updated', schemaVersion: CONFIG_SCHEMA_VERSION,
+    });
   });
 });
