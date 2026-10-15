@@ -199,7 +199,7 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): Analy
       const actionValue = /(^|:)action_values(?::|$)/.test(key);
       const costRatio = /(^|:)cost_per/.test(key);
       const kind: AnalyticsKind = actionValue || (knownActions.has(key) && !costRatio) ? 'flow' : costRatio ? 'ratio' : 'stock';
-      const available = selectedAdAccounts.filter(account => (account.currency ?? '') === currency).length;
+      const available = monetary ? availableForCurrency(currency) : selectedAdAccounts.length;
       const accountRows = kind === 'flow' ? undefined : currencyObservations.map(item => ({ label: `${item.channelLabel}${currency ? ` · ${currency}` : ''} · ${dayKey(item.date)}`, value: item.value, asOf: item.date }));
       metrics.push({ key: currencyKey(key, currency, unit), label: currencyLabel(key, currency, unit), sourceLabel: 'Advertising', kind, unit, observations: kind === 'flow' ? currencyObservations : [], ...(accountRows ? { rows: accountRows, covered: new Set(currencyObservations.map(item => item.channelId)).size, totalOverride: null, displayTotal: costRatio ? 'Per-account values' : 'Stored values' } : {}), ...(kind === 'stock' ? { rollup: 'latest-per-channel' as const } : {}), available, updatedAt: latestSync(rows.filter(row => currencyObservations.some(item => item.channelId === row.adAccount.id))) });
     }

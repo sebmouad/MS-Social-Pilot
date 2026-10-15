@@ -71,6 +71,8 @@ describe('platform analytics metadata', () => {
     expect(view.metrics.find(metric => metric.key === 'ctr')?.total).toBeCloseTo(2);
     expect(result.metrics.find(metric => metric.key === 'quality_ranking')).toMatchObject({ kind: 'stock', rollup: 'latest-per-channel', observations: [], rows: [{ value: 2 }, { value: 3 }], totalOverride: null });
     expect(result.metrics.find(metric => metric.key === 'actions:link_click')?.observations.map(row => row.value)).toEqual([25, 5]);
+    expect(result.metrics.find(metric => metric.key === 'actions:link_click')).toMatchObject({ available: 3 });
+    expect(result.metrics.find(metric => metric.key === 'quality_ranking')).toMatchObject({ available: 3 });
     expect(result.metrics.find(metric => metric.key === 'action_values:purchase::USD')).toMatchObject({ kind: 'flow', unit: 'currency', label: 'Action Values Purchase · USD' });
     expect(result.metrics.find(metric => metric.key === 'action_values:purchase::EUR')).toMatchObject({ kind: 'flow', unit: 'currency' });
     expect(result.metrics.find(metric => metric.key === 'cost_per_action_type:link_click::USD')).toMatchObject({ kind: 'ratio', unit: 'currency', totalOverride: null, displayTotal: 'Per-account values' });
