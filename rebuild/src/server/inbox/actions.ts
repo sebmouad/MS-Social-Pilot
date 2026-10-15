@@ -65,16 +65,22 @@ export async function syncFacebookInbox(actor: InboxActor, targetId?: string) {
   if (targetId && !visibleTargets.length) throw new Error('You do not have access to this Facebook Page.');
   const engine = await configuredFacebookEngine();
   const batches: Array<{ targetId: string; conversations: Awaited<ReturnType<typeof engine.listInbox>>; comments: Array<{ postTargetId: string; items: Awaited<ReturnType<typeof engine.listComments>> }> }> = [];
+  const failures: unknown[] = [];
   for (const item of visibleTargets) {
-    const channel = await page(actor, item.id, false);
-    const [conversations, publishedPosts] = await Promise.all([
-      engine.listInbox(channel.token, channel.providerId),
-      prisma.postTarget.findMany({ where: { targetId: item.id, remotePostId: { not: null }, status: 'published' }, orderBy: { publishedAt: 'desc' }, take: postSyncLimit, select: { id: true, remotePostId: true } }),
-    ]);
-    const comments: Array<{ postTargetId: string; items: Awaited<ReturnType<typeof engine.listComments>> }> = [];
-    for (const post of publishedPosts) if (post.remotePostId) comments.push({ postTargetId: post.id, items: await engine.listComments(channel.token, post.remotePostId) });
-    batches.push({ targetId: item.id, conversations, comments });
+    // One channel that needs reconnecting must not block the others. Provider
+    // reads for a channel finish before anything is written for it.
+    try {
+      const channel = await page(actor, item.id, false);
+      const [conversations, publishedPosts] = await Promise.all([
+        engine.listInbox(channel.token, channel.providerId),
+        prisma.postTarget.findMany({ where: { targetId: item.id, remotePostId: { not: null }, status: 'published' }, orderBy: { publishedAt: 'desc' }, take: postSyncLimit, select: { id: true, remotePostId: true } }),
+      ]);
+      const comments: Array<{ postTargetId: string; items: Awaited<ReturnType<typeof engine.listComments>> }> = [];
+      for (const post of publishedPosts) if (post.remotePostId) comments.push({ postTargetId: post.id, items: await engine.listComments(channel.token, post.remotePostId) });
+      batches.push({ targetId: item.id, conversations, comments });
+    } catch (error) { failures.push(error); }
   }
+  if (failures.length && !batches.length) throw failures[0];
   let conversationCount = 0; let messageCount = 0; let commentCount = 0;
   await prisma.$transaction(async tx => {
   for (const batch of batches) {
@@ -106,9 +112,9 @@ export async function syncFacebookInbox(actor: InboxActor, targetId?: string) {
       }
     }
   }
-    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`inbox_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'inbox.synced', ${JSON.stringify({ workspaceId: actor.workspaceId, targetCount: visibleTargets.length, conversationCount, messageCount, commentCount })}::jsonb, NOW())`;
+    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`inbox_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'inbox.synced', ${JSON.stringify({ workspaceId: actor.workspaceId, targetCount: batches.length, failedCount: failures.length, conversationCount, messageCount, commentCount })}::jsonb, NOW())`;
   });
-  return { targetCount: visibleTargets.length, conversationCount, messageCount, commentCount };
+  return { targetCount: batches.length, failedCount: failures.length, conversationCount, messageCount, commentCount, syncedAt: new Date().toISOString() };
 }
 
 export async function replyToFacebookInbox(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; text: string }) {
@@ -130,7 +136,7 @@ export async function replyToFacebookInbox(actor: InboxActor, input: { kind: 'me
     const engine = await configuredFacebookEngine();
     const remoteId = await engine.replyToConversation(channel.token, row.remoteId, text);
     await prisma.conversationMessage.create({ data: { id: `msg_${randomBytes(12).toString('hex')}`, conversationId: row.id, remoteId, fromName: null, fromId: null, message: text, createdTime: new Date(), sentById: actor.userId } });
-    await prisma.conversation.update({ where: { id: row.id }, data: { snippet: text, updatedTime: new Date(), fetchedAt: new Date() } });
+    await prisma.conversation.update({ where: { id: row.id }, data: { snippet: text, updatedTime: new Date() } });
     await audit(actor, 'inbox.message_replied', { targetId: row.targetId, conversationId: row.id, remoteId });
     return { ok: true };
   }
@@ -140,7 +146,7 @@ export async function replyToFacebookInbox(actor: InboxActor, input: { kind: 'me
   const engine = await configuredFacebookEngine();
   const remoteId = await engine.replyToComment(channel.token, row.remoteId, text);
   await prisma.postComment.create({ data: { id: `comment_${randomBytes(12).toString('hex')}`, postTargetId: row.postTargetId, remoteId, parentRemoteId: row.remoteId, message: text, fromName: null, fromId: null, createdTime: new Date(), sentById: actor.userId } });
-  await prisma.postComment.update({ where: { id: row.id }, data: { replyCount: { increment: 1 }, fetchedAt: new Date() } });
+  await prisma.postComment.update({ where: { id: row.id }, data: { replyCount: { increment: 1 } } });
   await audit(actor, 'inbox.comment_replied', { targetId: row.postTarget.targetId, commentId: row.id, remoteId });
   return { ok: true };
 }
@@ -170,7 +176,21 @@ export async function moderateFacebookComment(actor: InboxActor, input: { id: st
   const channel = await page(actor, row.postTarget.targetId, true);
   const engine = await configuredFacebookEngine();
   await engine.moderateComment(channel.token, row.remoteId, input.hidden);
-  await prisma.postComment.update({ where: { id: row.id }, data: { isHidden: input.hidden, fetchedAt: new Date() } });
+  await prisma.postComment.update({ where: { id: row.id }, data: { isHidden: input.hidden } });
   await audit(actor, input.hidden ? 'inbox.comment_hidden' : 'inbox.comment_unhidden', { targetId: row.postTarget.targetId, commentId: row.id });
+  return { ok: true };
+}
+
+/** Delete a comment on the platform, then remove it and its stored replies locally. */
+export async function deleteFacebookComment(actor: InboxActor, input: { id: string }) {
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(input.id)) throw new Error('Invalid inbox item.');
+  const row = await prisma.postComment.findFirst({ where: { id: input.id, postTarget: { post: { workspaceId: actor.workspaceId }, target: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, postTargetId: true, postTarget: { select: { targetId: true } } } });
+  if (!row) throw new Error('This comment is unavailable in the current workspace.');
+  const channel = await page(actor, row.postTarget.targetId, true);
+  const engine = await configuredFacebookEngine();
+  await engine.deleteComment(channel.token, row.remoteId);
+  // Local removal happens only after the platform confirmed the deletion.
+  await prisma.postComment.deleteMany({ where: { postTargetId: row.postTargetId, OR: [{ id: row.id }, { parentRemoteId: row.remoteId }] } });
+  await audit(actor, 'inbox.comment_deleted', { targetId: row.postTarget.targetId, commentId: row.id });
   return { ok: true };
 }

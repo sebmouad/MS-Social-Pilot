@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
-import { moderateFacebookComment, replyToFacebookInbox, setFacebookInboxResolved, syncFacebookInbox } from '@/server/inbox/actions';
+import { deleteFacebookComment, moderateFacebookComment, replyToFacebookInbox, setFacebookInboxResolved, syncFacebookInbox } from '@/server/inbox/actions';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
@@ -11,6 +11,7 @@ const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('sync'), targetId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).optional() }).strict(),
   z.object({ action: z.literal('reply'), kind: z.enum(['message', 'comment']), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), text: z.string().max(2000) }).strict(),
   z.object({ action: z.literal('resolve'), kind: z.enum(['message', 'comment']), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), resolved: z.boolean() }).strict(),
+  z.object({ action: z.literal('delete'), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/) }).strict(),
   z.object({ action: z.literal('moderate'), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), hidden: z.boolean() }).strict(),
 ]);
 
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
     const result = await withWorkspaceOperation(viewer.workspaceId, async () => input.action === 'sync' ? await syncFacebookInbox(actor, input.targetId)
       : input.action === 'reply' ? await replyToFacebookInbox(actor, input)
       : input.action === 'resolve' ? await setFacebookInboxResolved(actor, input)
+      : input.action === 'delete' ? await deleteFacebookComment(actor, input)
       : await moderateFacebookComment(actor, input));
     return NextResponse.json({ ok: true, ...result }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
@@ -37,7 +39,7 @@ export async function POST(request: Request) {
     ];
     const match = known.find(([phrase]) => message.includes(phrase));
     return match ? NextResponse.json({ error: message }, { status: match[1], headers: { 'cache-control': 'no-store' } })
-      : NextResponse.json({ error: 'The inbox action could not be completed. Check the Facebook connection and try again.' }, { status: 502, headers: { 'cache-control': 'no-store' } });
+      : NextResponse.json({ error: 'The inbox action could not be completed. Check the channel connection and try again.' }, { status: 502, headers: { 'cache-control': 'no-store' } });
   }
 }
 
