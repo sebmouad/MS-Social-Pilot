@@ -2,13 +2,32 @@
 
 import { useState } from 'react';
 
-type Props = { adAccountId: string; objectId: string; objectType: 'campaign' | 'adset' | 'ad' };
+type Props = { adAccountId: string; objectId: string; objectType: 'campaign' | 'adset' | 'ad'; canRead: boolean; canManage: boolean };
 
-export function AdsObjectActions({ adAccountId, objectId, objectType }: Props) {
+export function AdsObjectActions({ adAccountId, objectId, objectType, canRead, canManage }: Props) {
   const [budgetMinor, setBudgetMinor] = useState('');
   const [budgetKind, setBudgetKind] = useState<'daily' | 'lifetime'>('daily');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [liveStatus, setLiveStatus] = useState('');
+
+  async function refreshStatus() {
+    setBusy(true); setMessage(''); setLiveStatus('');
+    try {
+      const response = await fetch('/api/ads/object', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ adAccountId, objectId, objectType }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        error?: string;
+        object?: { configuredStatus: string | null; effectiveStatus: string | null };
+      };
+      if (!response.ok || !payload.object) throw new Error(payload.error || 'The live ad status could not be read.');
+      setLiveStatus(`Live status: ${payload.object.configuredStatus ?? 'unknown'} · effective: ${payload.object.effectiveStatus ?? 'unknown'}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'The live ad status could not be read.');
+    } finally { setBusy(false); }
+  }
 
   async function submit(change: { status: 'active' | 'paused' } | { dailyBudgetMinor: number } | { lifetimeBudgetMinor: number }, confirmation: string) {
     setBusy(true);
@@ -44,17 +63,23 @@ export function AdsObjectActions({ adAccountId, objectId, objectType }: Props) {
   }
 
   return <div className="ads-object-actions" aria-label={`Manage ${objectType} ${objectId}`}>
-    <div className="ads-object-actions__status">
-      <button type="button" disabled={busy} onClick={() => changeStatus('paused')}>Pause</button>
-      <button type="button" disabled={busy} onClick={() => changeStatus('active')}>Resume</button>
-    </div>
-    <form className="ads-object-actions__budget" onSubmit={event => { event.preventDefault(); changeBudget(); }}>
-      <label><span className="sr-only">Budget period</span><select value={budgetKind} onChange={event => setBudgetKind(event.target.value as 'daily' | 'lifetime')} disabled={busy}>
-        <option value="daily">Daily</option><option value="lifetime">Lifetime</option>
-      </select></label>
-      <label><span className="sr-only">New budget in minor units</span><input aria-label="New budget in minor units" type="number" min="1" step="1" inputMode="numeric" placeholder="Minor units" value={budgetMinor} onChange={event => setBudgetMinor(event.target.value)} disabled={busy} /></label>
-      <button type="submit" disabled={busy}>Set budget</button>
-    </form>
+    {canRead ? <div className="ads-object-actions__status">
+      <button type="button" disabled={busy} onClick={() => void refreshStatus()}>Refresh live status</button>
+    </div> : null}
+    {canManage ? <>
+      <div className="ads-object-actions__status">
+        <button type="button" disabled={busy} onClick={() => changeStatus('paused')}>Pause</button>
+        <button type="button" disabled={busy} onClick={() => changeStatus('active')}>Resume</button>
+      </div>
+      <form className="ads-object-actions__budget" onSubmit={event => { event.preventDefault(); changeBudget(); }}>
+        <label><span className="sr-only">Budget period</span><select value={budgetKind} onChange={event => setBudgetKind(event.target.value as 'daily' | 'lifetime')} disabled={busy}>
+          <option value="daily">Daily</option><option value="lifetime">Lifetime</option>
+        </select></label>
+        <label><span className="sr-only">New budget in minor units</span><input aria-label="New budget in minor units" type="number" min="1" step="1" inputMode="numeric" placeholder="Minor units" value={budgetMinor} onChange={event => setBudgetMinor(event.target.value)} disabled={busy} /></label>
+        <button type="submit" disabled={busy}>Set budget</button>
+      </form>
+    </> : null}
+    {liveStatus ? <p role="status" className="small-note">{liveStatus}</p> : null}
     {message ? <p role="status" className="small-note">{message}</p> : null}
   </div>;
 }

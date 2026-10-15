@@ -1,7 +1,7 @@
 import type { FacebookConfig } from './config';
 import { validateFacebookConfig } from './config';
 import { graphObjectUrl } from './protocol';
-import type { AdCampaignCreateRequest, AdMutationRequest, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult } from '../types';
+import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult } from '../types';
 
 export type FacebookFetch = typeof fetch;
 
@@ -43,6 +43,7 @@ export interface FacebookEngine {
   getPageAnalytics(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<Record<string, number | null>>;
   getPageInsightObservations(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<FacebookPageInsightObservations>;
   getAdInsights(accessToken: string, accountId: string, since: Date, until: Date): Promise<Array<Record<string, unknown>>>;
+  readAdObject(input: AdObjectReadRequest): Promise<AdObjectSnapshot>;
   updateAd(input: AdMutationRequest): Promise<void>;
   createCampaign(input: AdCampaignCreateRequest): Promise<{ remoteId: string }>;
   replyToConversation(accessToken: string, conversationId: string, text: string): Promise<string>;
@@ -54,6 +55,8 @@ export interface FacebookEngine {
 type JsonObject = Record<string, unknown>;
 function object(value: unknown): JsonObject { return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {}; }
 function date(value: unknown): Date | null { if (typeof value !== 'string') return null; const d = new Date(value); return Number.isNaN(d.getTime()) ? null : d; }
+const AD_OBJECT_FIELDS = 'id,name,account_id,configured_status,effective_status';
+function normalizeAdAccountId(value: string): string { return value.replace(/^act_/, ''); }
 function graphError(payload: unknown, status: number): FacebookApiError {
   const err = object(object(payload).error);
   return new FacebookApiError(typeof err.message === 'string' ? err.message : `Facebook answered ${status}.`, status,
@@ -326,6 +329,23 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       const raw = await pages<JsonObject>(`${graphObjectUrl(config, `${encodeURIComponent(accountId)}/insights`)}?${params}`, token);
       return raw;
     },
+    async readAdObject(input) {
+      if (!/^[A-Za-z0-9_-]{1,100}$/.test(input.objectId) || !/^(act_)?[A-Za-z0-9_-]{1,100}$/.test(input.accountId)) {
+        throw new FacebookApiError('Invalid Facebook ad object or account id.', 0);
+      }
+      const raw = object(await request(encodeURIComponent(input.objectId), { token: input.credential.accessToken, params: { fields: AD_OBJECT_FIELDS } }));
+      if (typeof raw.id !== 'string' || raw.id !== input.objectId || typeof raw.account_id !== 'string' ||
+          normalizeAdAccountId(raw.account_id) !== normalizeAdAccountId(input.accountId)) {
+        throw new FacebookApiError('Facebook returned an ad object outside the selected account.', 200);
+      }
+      return {
+        id: raw.id,
+        name: typeof raw.name === 'string' ? raw.name : null,
+        accountId: raw.account_id,
+        configuredStatus: typeof raw.configured_status === 'string' ? raw.configured_status : null,
+        effectiveStatus: typeof raw.effective_status === 'string' ? raw.effective_status : null,
+      };
+    },
     async updateAd(input) {
       if (!input.status && input.dailyBudgetMinor === undefined && input.lifetimeBudgetMinor === undefined) throw new FacebookApiError('An ad update needs a status or budget change.', 0);
       if (input.dailyBudgetMinor !== undefined && input.lifetimeBudgetMinor !== undefined) throw new FacebookApiError('Choose daily or lifetime budget for one update.', 0);
@@ -403,6 +423,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
       if (!request.since || !request.until) throw new FacebookApiError('Facebook Ads Insights requires an explicit start and end date.', 0);
       return { items: await engine.getAdInsights(request.credential.accessToken, request.accountId, request.since, request.until) };
     },
+    async readAdObject(request) { return engine.readAdObject(request); },
     async updateAd(request) { await engine.updateAd(request); },
     async createCampaign(request) { return engine.createCampaign(request); },
   };

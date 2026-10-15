@@ -148,6 +148,21 @@ describe('Facebook Graph adapter', () => {
     await expect(engine.createCampaign({ credential: { accessToken: 'token' }, accountId: 'act_12', name: 'Spring launch', objective: 'OUTCOME_TRAFFIC' })).resolves.toEqual({ remoteId: 'campaign-7' });
   });
 
+  it('reads live configured and effective status and verifies the selected account', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      expect(url.pathname).toBe('/v99.0/campaign-7');
+      expect(url.searchParams.get('fields')).toBe('id,name,account_id,configured_status,effective_status');
+      return response({ id: 'campaign-7', name: 'Spring launch', account_id: '99', configured_status: 'PAUSED', effective_status: 'CAMPAIGN_PAUSED' });
+    }) as unknown as typeof fetch;
+    const engine = createFacebookEngine(config, fetcher);
+    await expect(engine.readAdObject({ credential: { accessToken: 'token' }, accountId: 'act_99', objectId: 'campaign-7', objectType: 'campaign' })).resolves.toEqual({
+      id: 'campaign-7', name: 'Spring launch', accountId: '99', configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED',
+    });
+    await expect(engine.readAdObject({ credential: { accessToken: 'token' }, accountId: 'act_98', objectId: 'campaign-7', objectType: 'campaign' })).rejects.toThrow(/outside the selected account/);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects invalid campaign names before making a provider request', async () => {
     const fetcher = vi.fn() as unknown as typeof fetch;
     const engine = createFacebookEngine(config, fetcher);

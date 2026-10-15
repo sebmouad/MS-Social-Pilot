@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   },
   config: vi.fn(),
   decrypt: vi.fn(),
-  engine: { updateAd: vi.fn(), createCampaign: vi.fn() },
+  engine: { updateAd: vi.fn(), createCampaign: vi.fn(), readAdObject: vi.fn() },
   configuredEngine: vi.fn(),
   entitlements: vi.fn(),
   permissions: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitleme
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature }));
 
-import { canManageWorkspaceAds, createWorkspaceAdCampaign, updateWorkspaceAd } from '../src/server/ads/actions';
+import { canManageWorkspaceAds, canReadWorkspaceAds, createWorkspaceAdCampaign, readWorkspaceAdObject, updateWorkspaceAd } from '../src/server/ads/actions';
 
 const actor = { userId: 'user-1', workspaceId: 'workspace-1' };
 const statusChange = {
@@ -45,15 +45,46 @@ beforeEach(() => {
     socialAccount: { id: 'social-1', accessToken: 'encrypted-token', scopes: 'ads_read,ads_management', invalidatedAt: null, tokenExpiresAt: null },
   });
   mocks.prisma.adInsight.findFirst.mockResolvedValue({ id: 'insight-1' });
-  mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : ['ads_management']);
+  mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' || key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : ['ads_management']);
   mocks.decrypt.mockReturnValue('secret-token-value');
   mocks.configuredEngine.mockResolvedValue(mocks.engine);
   mocks.engine.updateAd.mockResolvedValue(undefined);
   mocks.engine.createCampaign.mockResolvedValue({ remoteId: 'campaign-new' });
+  mocks.engine.readAdObject.mockResolvedValue({ id: 'campaign-44', name: 'Spring', accountId: '99', configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED' });
   mocks.prisma.$executeRaw.mockResolvedValue(1);
 });
 
 describe('workspace Ads actions', () => {
+  it('allows read-authorized members to inspect live status without ads_management or the spend-change switch', async () => {
+    mocks.prisma.membership.findUnique.mockResolvedValue({ role: 'viewer' });
+    mocks.config.mockImplementation(async (key: string) => key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : false);
+    mocks.prisma.adAccount.findFirst.mockResolvedValue({
+      id: 'local-account-1', actId: 'act_99',
+      socialAccount: { id: 'social-1', accessToken: 'encrypted-token', scopes: 'ads_read', invalidatedAt: null, tokenExpiresAt: null },
+    });
+    expect(await canReadWorkspaceAds(actor, 'local-account-1', ['target-a'])).toBe(true);
+    expect(mocks.prisma.adAccount.findFirst.mock.calls[0][0].where.socialAccount.is.targets.some).toEqual({ workspaceId: actor.workspaceId, id: { in: ['target-a'] } });
+    await expect(readWorkspaceAdObject(actor, { adAccountId: 'local-account-1', objectId: 'campaign-44', objectType: 'campaign' }, ['target-a'])).resolves.toMatchObject({
+      id: 'campaign-44', configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED',
+    });
+    expect(mocks.prisma.adInsight.findFirst.mock.calls[0][0].where).toEqual({ adAccountId: 'local-account-1', level: 'campaign', objectId: 'campaign-44' });
+    expect(mocks.engine.readAdObject).toHaveBeenCalledWith({ credential: { accessToken: 'secret-token-value' }, accountId: 'act_99', objectId: 'campaign-44', objectType: 'campaign' });
+  });
+
+  it('blocks live status reads for unknown objects and when required read scopes are missing', async () => {
+    mocks.prisma.adInsight.findFirst.mockResolvedValue(null);
+    await expect(readWorkspaceAdObject(actor, { adAccountId: 'local-account-1', objectId: 'campaign-44', objectType: 'campaign' })).rejects.toThrow(/cannot be verified/);
+    expect(mocks.engine.readAdObject).not.toHaveBeenCalled();
+    mocks.prisma.adInsight.findFirst.mockResolvedValue({ id: 'insight-1' });
+    mocks.config.mockImplementation(async (key: string) => key === 'platforms.facebook.enabled' ? true : key === 'meta.adsReadScopes' ? ['ads_read'] : false);
+    mocks.prisma.adAccount.findFirst.mockResolvedValue({
+      id: 'local-account-1', actId: 'act_99',
+      socialAccount: { id: 'social-1', accessToken: 'encrypted-token', scopes: 'ads_management', invalidatedAt: null, tokenExpiresAt: null },
+    });
+    await expect(readWorkspaceAdObject(actor, { adAccountId: 'local-account-1', objectId: 'campaign-44', objectType: 'campaign' })).rejects.toThrow(/performance access is unavailable/);
+    expect(mocks.engine.readAdObject).not.toHaveBeenCalled();
+  });
+
   it('shows controls only when Root enablement and the recorded management grant are present', async () => {
     expect(await canManageWorkspaceAds(actor, 'local-account-1')).toBe(true);
     mocks.config.mockImplementation(async (key: string) => key === 'ads.managementEnabled' ? false : key === 'platforms.facebook.enabled' ? true : ['ads_management']);

@@ -23,6 +23,7 @@ export type AdsActionInput = {
   confirmation: string;
 };
 export type AdsCampaignCreateInput = { adAccountId: string; name: string; objective: FacebookCampaignObjective; confirmation: string };
+export type AdsObjectReadInput = { adAccountId: string; objectId: string; objectType: AdMutationRequest['objectType'] };
 const OBJECTIVES = new Set<FacebookCampaignObjective>(['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION']);
 
 export function campaignCreationConfirmation(adAccountId: string, name: string, objective: string) {
@@ -50,6 +51,62 @@ export async function canManageWorkspaceAds(actor: AdsActionActor, adAccountId: 
   if (!account?.socialAccount || account.socialAccount.invalidatedAt || (account.socialAccount.tokenExpiresAt && account.socialAccount.tokenExpiresAt <= new Date())) return false;
   const grantedScopes = new Set(account.socialAccount.scopes.split(',').map(scope => scope.trim()).filter(Boolean));
   return requiredScopes.every(scope => grantedScopes.has(scope));
+}
+
+/** Read access is independent from spend-changing management enablement and scope. */
+export async function canReadWorkspaceAds(actor: AdsActionActor, adAccountId: string, allowedTargetIds?: readonly string[]): Promise<boolean> {
+  const [entitlements, permissions, requiredScopes, facebookEnabled] = await Promise.all([
+    loadEntitlements(actor.userId, actor.workspaceId),
+    loadPermissions(actor.userId, actor.workspaceId),
+    runtimeConfig('meta.adsReadScopes') as Promise<string[]>,
+    runtimeConfig('platforms.facebook.enabled') as Promise<boolean>,
+  ]);
+  if (facebookEnabled !== true || !entitlements || !permissions) return false;
+  if (!canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', 'read')) return false;
+  const scopes = [...new Set(requiredScopes.map(scope => scope.trim()).filter(Boolean))];
+  if (!scopes.length) return false;
+  const account = await prisma.adAccount.findFirst({
+    where: {
+      id: adAccountId, workspaceId: actor.workspaceId, enabled: true,
+      socialAccount: { is: {
+        workspaceId: actor.workspaceId, provider: 'facebook', invalidatedAt: null,
+        ...(allowedTargetIds ? { targets: { some: { workspaceId: actor.workspaceId, id: { in: [...allowedTargetIds] } } } } : {}),
+      } },
+    },
+    select: { socialAccount: { select: { scopes: true, invalidatedAt: true, tokenExpiresAt: true } } },
+  });
+  if (!account?.socialAccount || account.socialAccount.invalidatedAt || (account.socialAccount.tokenExpiresAt && account.socialAccount.tokenExpiresAt <= new Date())) return false;
+  const grantedScopes = new Set(account.socialAccount.scopes.split(',').map(scope => scope.trim()).filter(Boolean));
+  return scopes.every(scope => grantedScopes.has(scope));
+}
+
+/** Read the live state of one account-verified ad object shown in stored insights. */
+export async function readWorkspaceAdObject(actor: AdsActionActor, input: AdsObjectReadInput, allowedTargetIds?: readonly string[]) {
+  if (!OBJECT_TYPES.has(input.objectType) || !/^[A-Za-z0-9_-]{1,100}$/.test(input.objectId)) throw new Error('Invalid ad object.');
+  if (!(await canReadWorkspaceAds(actor, input.adAccountId, allowedTargetIds))) throw new Error('Ads performance access is unavailable.');
+
+  const account = await prisma.adAccount.findFirst({
+    where: {
+      id: input.adAccountId, workspaceId: actor.workspaceId, enabled: true,
+      socialAccount: { is: {
+        workspaceId: actor.workspaceId, provider: 'facebook', invalidatedAt: null,
+        ...(allowedTargetIds ? { targets: { some: { workspaceId: actor.workspaceId, id: { in: [...allowedTargetIds] } } } } : {}),
+      } },
+    },
+    select: { id: true, actId: true, socialAccount: { select: { accessToken: true, invalidatedAt: true, tokenExpiresAt: true } } },
+  });
+  if (!account?.socialAccount || account.socialAccount.invalidatedAt || (account.socialAccount.tokenExpiresAt && account.socialAccount.tokenExpiresAt <= new Date())) {
+    throw new Error('This advertising account is unavailable.');
+  }
+  const ownedObject = await prisma.adInsight.findFirst({
+    where: { adAccountId: account.id, level: input.objectType, objectId: input.objectId }, select: { id: true },
+  });
+  if (!ownedObject) throw new Error('This ad object cannot be verified for the selected account.');
+  const accessToken = decryptSecret(account.socialAccount.accessToken);
+  if (!accessToken) throw new Error('This advertising account is unavailable.');
+  const engine = await configuredFacebookEngine();
+  if (!engine.readAdObject) throw new Error('Facebook ad object reads are unavailable.');
+  return engine.readAdObject({ credential: { accessToken }, accountId: account.actId, objectId: input.objectId, objectType: input.objectType });
 }
 
 /** Mutate one previously observed Facebook object after rechecking every server-side boundary. */

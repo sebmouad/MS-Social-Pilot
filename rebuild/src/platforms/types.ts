@@ -100,6 +100,19 @@ export interface AdMutationRequest {
   dailyBudgetMinor?: number;
   lifetimeBudgetMinor?: number;
 }
+export interface AdObjectReadRequest {
+  credential: PlatformCredential;
+  accountId: string;
+  objectId: string;
+  objectType: 'campaign' | 'adset' | 'ad';
+}
+export interface AdObjectSnapshot {
+  id: string;
+  name: string | null;
+  accountId: string;
+  configuredStatus: string | null;
+  effectiveStatus: string | null;
+}
 export type FacebookCampaignObjective = 'OUTCOME_AWARENESS' | 'OUTCOME_ENGAGEMENT' | 'OUTCOME_LEADS' | 'OUTCOME_SALES' | 'OUTCOME_TRAFFIC' | 'OUTCOME_APP_PROMOTION';
 export interface AdCampaignCreateRequest {
   credential: PlatformCredential;
@@ -128,6 +141,7 @@ export interface PlatformAdapter {
   deleteInboxItem?(request: InboxActionRequest): Promise<void>;
   getAnalytics?(request: AnalyticsRequest): Promise<AnalyticsResult>;
   listAds?(request: AdsRequest): Promise<AdsResult>;
+  readAdObject?(request: AdObjectReadRequest): Promise<AdObjectSnapshot>;
   updateAd?(request: AdMutationRequest): Promise<void>;
   createCampaign?(request: AdCampaignCreateRequest): Promise<{ remoteId: string }>;
 }

@@ -3,7 +3,7 @@ import { requireViewer } from '@/server/context';
 import { AdsFiltersSidebar, dateRangeLabel } from '../ads-filters';
 import { getAdsAccounts, getAdsDataset, parseAdsFilters, type AdsSearchParams } from '@/server/ads/queries';
 import { formatMetricJson, groupSummariesByAccount, summarizeInsights } from '@/server/ads/summary';
-import { canManageWorkspaceAds } from '@/server/ads/actions';
+import { canManageWorkspaceAds, canReadWorkspaceAds } from '@/server/ads/actions';
 import { AdsObjectActions } from '../AdsObjectActions';
 import { CampaignCreateForm } from '../CampaignCreateForm';
 
@@ -24,6 +24,10 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
     accountId,
     await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, accountId),
   ] as const)));
+  const readAvailability = new Map(await Promise.all([...byAccount.keys()].map(async accountId => [
+    accountId,
+    await canReadWorkspaceAds({ userId: viewer.user.id, workspaceId }, accountId, allowedTargetIds),
+  ] as const)));
   const createAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, account.id)] as const)));
   const sidebar = <AdsFiltersSidebar accounts={accounts} filters={filters} action="/ads/campaigns" />;
   return <PageFrame module="ads" sidebar={sidebar}><div className="page-stack">
@@ -41,7 +45,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
           return <div className="ads-result-level" key={level.value}><h3>{level.label}</h3><div className="ads-performance-mobile" aria-label={`${level.label} results`}>
             {levelRows.map(row => <article className="ads-performance-card" key={row.key}>
               <header className="ads-performance-card__heading"><div><strong>{row.name}</strong><small className="ads-object-id">{row.id}</small></div><span>{row.rows} daily row{row.rows === 1 ? '' : 's'}</span></header>
-              {actionAvailability.get(accountId) ? <AdsObjectActions adAccountId={accountId} objectId={row.id} objectType={row.level as 'campaign' | 'adset' | 'ad'} /> : null}
+              {readAvailability.get(accountId) || actionAvailability.get(accountId) ? <AdsObjectActions adAccountId={accountId} objectId={row.id} objectType={row.level as 'campaign' | 'adset' | 'ad'} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null}
               <dl className="ads-performance-card__metrics">
                 <div><dt>Spend</dt><dd>{money(row.spend, row.currency)}</dd></div><div><dt>Impressions</dt><dd>{number.format(row.impressions)}</dd></div>
                 <div><dt>Latest reach</dt><dd>{number.format(row.reach)}<small>{date(row.reachDate)}</small></dd></div><div><dt>Clicks</dt><dd>{number.format(row.clicks)}</dd></div>
@@ -53,7 +57,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
             </article>)}
           </div><div className="ui-table-wrap"><table className="ui-table ads-performance-table"><thead><tr><th>{level.label.slice(0, -1)} name</th><th>Daily rows</th><th className="is-end">Spend</th><th className="is-end">Impressions</th><th className="is-end">Latest reach</th><th className="is-end">Clicks</th><th className="is-end">CPC</th><th className="is-end">CPM</th><th className="is-end">CTR</th><th className="is-end">CPP</th><th className="is-end">Freq.</th><th>Stored details</th></tr></thead>
             <tbody>{levelRows.map(row => <tr key={row.key}>
-              <td><strong>{row.name}</strong><small className="ads-object-id">{row.id}</small>{actionAvailability.get(accountId) ? <AdsObjectActions adAccountId={accountId} objectId={row.id} objectType={row.level as 'campaign' | 'adset' | 'ad'} /> : null}</td>
+              <td><strong>{row.name}</strong><small className="ads-object-id">{row.id}</small>{readAvailability.get(accountId) || actionAvailability.get(accountId) ? <AdsObjectActions adAccountId={accountId} objectId={row.id} objectType={row.level as 'campaign' | 'adset' | 'ad'} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null}</td>
               <td>{row.rows}</td><td className="is-end">{money(row.spend, row.currency)}</td><td className="is-end">{number.format(row.impressions)}</td><td className="is-end">{number.format(row.reach)}<small>{date(row.reachDate)}</small></td><td className="is-end">{number.format(row.clicks)}</td><td className="is-end">{money(row.cpc, row.currency)}</td><td className="is-end">{money(row.cpm, row.currency)}</td><td className="is-end">{row.ctr === null ? '—' : `${number.format(row.ctr)}%`}</td><td className="is-end">{money(row.cpp, row.currency)}</td><td className="is-end">{row.frequency === null ? '—' : number.format(row.frequency)}</td>
               <td><details className="ads-stored-details"><summary>{row.rows} daily row{row.rows === 1 ? '' : 's'}</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily stored metrics and fields</h4>{row.dailyMetrics.map(day => <details className="ads-day-details" key={day.date.toISOString()}><summary>{date(day.date)}</summary><p>CPC {money(day.cpc, row.currency)} · CPM {money(day.cpm, row.currency)} · CPP {money(day.cpp, row.currency)} · CTR {day.ctr === null ? '—' : `${number.format(day.ctr)}%`} · Frequency {day.frequency === null ? '—' : number.format(day.frequency)}</p><pre>Actions: {formatMetricJson(day.actions)}{`\n`}Other fields: {formatMetricJson(day.fields)}</pre></details>)}</div></details></td>
             </tr>)}</tbody></table></div></div>;
