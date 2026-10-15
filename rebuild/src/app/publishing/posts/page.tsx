@@ -7,6 +7,7 @@ import { CsvImportForm, PostEditorForm, PostRowActions } from "./PostActions";
 import { hasPlatformCapability } from "@/server/entitlements";
 import { platformFor } from '@/server/platforms/registry';
 import { runtimeConfig } from '@/server/config/store';
+import { PostStatus } from '../../../../generated/client';
 
 const NOTICE_TEXT: Record<string, string> = {
   created: "Post saved.",
@@ -26,18 +27,20 @@ const NOTICE_TEXT: Record<string, string> = {
   synced: "Remote status sync completed.",
 };
 
-export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; page?: string }> }) {
+export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; page?: string; status?: string; channel?: string }> }) {
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
-  const { notice, page: pageParam } = await searchParams;
+  const { notice, page: pageParam, status, channel } = await searchParams;
   const [allowedMimeTypes, maxUploadBytes, maxAltCharacters] = await Promise.all([
     runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'), runtimeConfig('publishing.maxImageAltCharacters'),
   ]);
   const imageRules = { allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters) };
   const allowedTargetIds = viewer.permissions.pageScope.all ? null : viewer.permissions.pageScope.ids;
   const requestedPage = pageParam && /^\d+$/.test(pageParam) ? Number(pageParam) : 1;
-  const listing = await listPostPage(viewer.workspaceId, requestedPage, 50, allowedTargetIds, viewer.user.id);
   const targetRows = await getTargets(viewer.workspaceId);
   const scopedTargetRows = allowedTargetIds === null ? targetRows : targetRows.filter(target => allowedTargetIds.includes(target.id));
+  const selectedStatus = Object.values(PostStatus).find(value => value === status);
+  const selectedChannel = channel || undefined;
+  const listing = await listPostPage(viewer.workspaceId, requestedPage, 50, allowedTargetIds, viewer.user.id, { status: selectedStatus, channelId: selectedChannel });
   const targetChoices = await Promise.all(scopedTargetRows.map(async target => {
     const provider = target.socialAccount?.provider ?? null;
     const adapter = provider && hasPlatformCapability(viewer.entitlements, provider) ? await platformFor(provider, 'publishing') : null;
@@ -48,6 +51,12 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const canManageDrafts = ["owner", "admin", "editor"].includes(viewer.membership.role);
   const canAuthorDrafts = canManageDrafts || viewer.membership.role === "contributor";
   const canPublish = targetChoices.some(target => target.canPublish);
+  const pageLink = (page: number) => {
+    const params = new URLSearchParams({ page: String(page) });
+    if (selectedStatus) params.set('status', selectedStatus);
+    if (channel) params.set('channel', channel);
+    return `/publishing/posts?${params}`;
+  };
   const columns: TableColumn<(typeof rows)[number]>[] = [
     { key: "post", label: "Post", render: post => <PostMessage message={post.message}/> },
     { key: "channels", label: "Channels", render: post => <PostTargets post={post}/> },
@@ -67,9 +76,9 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     </div> : null}
     <section className={styles.card}><DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage="No posts have been created in this workspace yet."/>
       {listing.pages > 1 ? <nav className={styles.postPagination} aria-label="Post pages">
-        {listing.page > 1 ? <a className="ui-button ui-button--secondary" href={`/publishing/posts?page=${listing.page - 1}`}>Previous page</a> : <span />}
+        {listing.page > 1 ? <a className="ui-button ui-button--secondary" href={pageLink(listing.page - 1)}>Previous page</a> : <span />}
         <span>Page {listing.page} of {listing.pages}</span>
-        {listing.page < listing.pages ? <a className="ui-button ui-button--secondary" href={`/publishing/posts?page=${listing.page + 1}`}>Next page</a> : <span />}
+        {listing.page < listing.pages ? <a className="ui-button ui-button--secondary" href={pageLink(listing.page + 1)}>Next page</a> : <span />}
       </nav> : null}
     </section>
   </>;

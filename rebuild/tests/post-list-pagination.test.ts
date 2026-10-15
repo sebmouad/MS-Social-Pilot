@@ -27,4 +27,13 @@ describe('scoped post pagination', () => {
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { workspaceId: 'workspace-2' }, skip: 0, take: 50 }));
     expect(result).toMatchObject({ total: 1, page: 1, pages: 1 });
   });
+
+  it('combines sidebar filters with channel access before pagination', async () => {
+    const count = vi.spyOn(prisma.post, 'count').mockResolvedValue(55);
+    const findMany = vi.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
+    await listPostPage('workspace-1', 2, 50, ['page-1', 'page-2'], 'author-1', { status: 'published', channelId: 'page-2' });
+    const where = expect.objectContaining({ workspaceId: 'workspace-1', status: 'published', targets: { some: { targetId: 'page-2' } }, OR: expect.any(Array) });
+    expect(count).toHaveBeenCalledWith({ where });
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where, skip: 50, take: 50 }));
+  });
 });

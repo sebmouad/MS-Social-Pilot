@@ -1,5 +1,10 @@
 .page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 25px; }
 .postPagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.postFilters { display: grid; gap: 9px; }
+.postFilters label { color: var(--ink-soft); font-size: 12px; font-weight: 650; }
+.postFilters select { width: 100%; min-height: 44px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 16px; }
+.postFilters button { min-height: 44px; margin-top: 7px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--accent); font-weight: 700; cursor: pointer; }
+.postFilters a { justify-self: center; color: var(--ink-soft); font-size: 12px; }
 .postWorkbench { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, .85fr); align-items: start; gap: 18px; }
 .postWorkbench > :only-child { grid-column: 1 / -1; }
 .importCard { position: sticky; top: 20px; }

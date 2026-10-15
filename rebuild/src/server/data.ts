@@ -1,4 +1,4 @@
-import { PrismaClient, type Prisma } from "../../generated/client";
+import { PrismaClient, type Prisma, type PostStatus } from "../../generated/client";
 
 const globalForPrisma = globalThis as typeof globalThis & {
   rebuildPrisma?: PrismaClient;
@@ -117,7 +117,7 @@ export async function listPosts(workspaceId: string, limit = 100): Promise<PostS
 }
 
 /** Paginate posts after workspace and channel scope have been enforced in the query. */
-export async function listPostPage(workspaceId: string, page: number, pageSize: number, allowedTargetIds: readonly string[] | null, authorId: string) {
+export async function listPostPage(workspaceId: string, page: number, pageSize: number, allowedTargetIds: readonly string[] | null, authorId: string, filters: { status?: PostStatus; channelId?: string } = {}) {
   const size = Math.max(1, Math.min(Math.trunc(pageSize), 100));
   const requestedPage = Number.isSafeInteger(page) && page > 0 ? page : 1;
   const where: Prisma.PostWhereInput = {
@@ -126,6 +126,8 @@ export async function listPostPage(workspaceId: string, page: number, pageSize: 
       { targets: { some: { targetId: { in: [...allowedTargetIds] } }, every: { targetId: { in: [...allowedTargetIds] } } } },
       { targets: { none: {} }, authorId },
     ] }),
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.channelId ? { targets: { some: { targetId: filters.channelId } } } : {}),
   };
   const total = await prisma.post.count({ where });
   const pages = Math.max(1, Math.ceil(total / size));

@@ -20,8 +20,9 @@ function Mark() {
   return <svg className="shell-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23.5 12.2 8l4 9 3.2-5.3L27 23.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/><circle cx="23.5" cy="8.5" r="2.5" fill="currentColor"/></svg>;
 }
 
-export function AppShell({ children, activeModule, enabledModules, enabledFeatures, rootAccess, userName, workspaceName, sidebar, installationMode = false }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; rootAccess: boolean; userName: string; workspaceName: string; sidebar?: ReactNode; installationMode?: boolean }) {
+export function AppShell({ children, activeModule, enabledModules, enabledFeatures, rootAccess, userName, workspaceName, sidebar, sidebarWhen, installationMode = false }: { children: ReactNode; activeModule: ModuleId; enabledModules: readonly ModuleId[]; enabledFeatures: readonly string[]; rootAccess: boolean; userName: string; workspaceName: string; sidebar?: ReactNode; sidebarWhen?: string; installationMode?: boolean }) {
   const pathname = usePathname();
+  const visibleSidebar = sidebar && (!sidebarWhen || pathname === sidebarWhen);
   const [filterOpen, setFilterOpen] = useState(false);
   useEffect(() => setFilterOpen(false), [pathname]);
   useEffect(() => {
@@ -54,10 +55,10 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
         {modulePages.map(page => <a key={page.id} href={page.href} className={`shell-subnav__link${pathname === page.href ? " is-active" : ""}`} aria-current={pathname === page.href ? "page" : undefined}>{page.title}</a>)}
         {rootAccess && activeModule === 'settings' && <a className="shell-subnav__link shell-root-mobile" href="/root/config">Root controls</a>}
       </nav>}
-      {sidebar && filterOpen && <button className="shell-filter-scrim" type="button" aria-label="Close filters" onClick={() => setFilterOpen(false)} />}
-      {sidebar && <div id="shell-filters" className={`shell-sidebar-filter${filterOpen ? " is-open" : ""}`} onSubmitCapture={() => setFilterOpen(false)} onClickCapture={event => { if ((event.target as Element).closest('a[href]')) setFilterOpen(false); }}>{sidebar}</div>}
+      {visibleSidebar && filterOpen && <button className="shell-filter-scrim" type="button" aria-label="Close filters" onClick={() => setFilterOpen(false)} />}
+      {visibleSidebar && <div id="shell-filters" className={`shell-sidebar-filter${filterOpen ? " is-open" : ""}`} onSubmitCapture={() => setFilterOpen(false)} onClickCapture={event => { if ((event.target as Element).closest('a[href]')) setFilterOpen(false); }}>{sidebar}</div>}
       {rootAccess && !installationMode && <a className="shell-subnav__link shell-root-link" href="/root/config">Root controls</a>}
     </aside>
-    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions">{sidebar && <button className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => setFilterOpen(open => !open)}>{filterOpen ? "Close filters" : "Filters"}</button>}<span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main id="main-content" className="shell-content" tabIndex={-1}>{children}</main></div>
+    <div className="shell-main"><header className="shell-topbar"><div className="shell-topbar__crumb"><span>{workspaceName}</span><span aria-hidden="true">/</span><strong>{installationMode ? 'Root' : MODULES.find(module => module.id === activeModule)?.title}</strong></div><div className="shell-topbar__actions">{visibleSidebar && <button className="shell-filter-toggle" type="button" aria-expanded={filterOpen} aria-controls="shell-filters" onClick={() => setFilterOpen(open => !open)}>{filterOpen ? "Close filters" : "Filters"}</button>}<span className="shell-topbar__user">{userName}</span><button className="shell-signout" type="button" onClick={async () => { const response = await fetch('/api/auth/sign-out', { method: 'POST' }); if (response.ok) window.location.assign('/sign-in'); }}>Sign out</button></div></header><main id="main-content" className="shell-content" tabIndex={-1}>{children}</main></div>
   </div>;
 }
