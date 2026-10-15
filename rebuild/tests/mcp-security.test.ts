@@ -29,10 +29,11 @@ const dataControls = vi.hoisted(() => ({ preview: vi.fn(), export: vi.fn(), remo
 vi.mock('../src/server/data-control', () => ({ previewWorkspaceDataDeletion: dataControls.preview, exportWorkspaceData: dataControls.export, deleteWorkspaceData: dataControls.remove }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
 vi.mock('../src/server/inbox/actions', () => ({ replyToFacebookInbox: inboxMutations.reply, setFacebookInboxResolved: inboxMutations.resolve, moderateFacebookComment: inboxMutations.moderate }));
-const adsMutations = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn() }));
+const adsMutations = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), read: vi.fn() }));
 vi.mock('../src/server/ads/actions', () => ({
   createWorkspaceAdCampaign: adsMutations.create,
   updateWorkspaceAd: adsMutations.update,
+  readWorkspaceAdObject: adsMutations.read,
   campaignCreationConfirmation: (adAccountId: string, name: string, objective: string) => `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(name.trim())} IN ACCOUNT ${adAccountId} WITH OBJECTIVE ${objective}`,
 }));
 const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
@@ -70,6 +71,7 @@ beforeEach(() => {
   inboxMutations.moderate.mockResolvedValue({ ok: true });
   adsMutations.create.mockResolvedValue({ campaignId: 'campaign-1' });
   adsMutations.update.mockResolvedValue(undefined);
+  adsMutations.read.mockResolvedValue({ id: 'campaign-a', configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED' });
   publishingMutations.publish.mockResolvedValue({ published: 1, failed: 0, needsReconciliation: 0 });
   publishingMutations.sync.mockResolvedValue({ synced: 1 });
   publishingMutations.remove.mockResolvedValue(undefined);
@@ -161,6 +163,24 @@ describe('MCP workspace boundaries', () => {
     const denied = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 491, method: 'tools/call', params: { name: 'get_ads_performance', arguments: { accountId: 'other-workspace-account' } } });
     expect((await denied.json()).result.isError).toBe(true);
     expect(adsQueries.dataset).toHaveBeenCalledTimes(1);
+  });
+  it('exposes live Ads status only through the scoped read permission and shared status service', async () => {
+    const scoped = { ...viewer, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
+    const listed = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 491, method: 'tools/list' });
+    expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('get_live_ad_status');
+    const response = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 492, method: 'tools/call', params: { name: 'get_live_ad_status', arguments: { adAccountId: 'account-a', objectId: 'campaign-a', objectType: 'campaign' } } });
+    expect((await response.json()).result.structuredContent).toMatchObject({ configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED' });
+    expect(adsMutations.read).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { adAccountId: 'account-a', objectId: 'campaign-a', objectType: 'campaign' }, ['page-allowed']);
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+
+    const deniedViewer = { ...scoped, permissions: { ...scoped.permissions!, features: { ...scoped.permissions!.features, 'ads/campaigns': { read: false, write: false } } } };
+    const hidden = await handleMcpMessage(deniedViewer, { jsonrpc: '2.0', id: 493, method: 'tools/list' });
+    expect((await hidden.json()).result.tools.map((tool: { name: string }) => tool.name)).not.toContain('get_live_ad_status');
+    const denied = await handleMcpMessage(deniedViewer, { jsonrpc: '2.0', id: 494, method: 'tools/call', params: { name: 'get_live_ad_status', arguments: { adAccountId: 'account-a', objectId: 'campaign-a', objectType: 'campaign' } } });
+    expect((await denied.json()).result.isError).toBe(true);
+    const malformed = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 495, method: 'tools/call', params: { name: 'get_live_ad_status', arguments: { adAccountId: 'account/a', objectId: 'campaign-a', objectType: 'campaign' } } });
+    expect((await malformed.json()).result.isError).toBe(true);
+    expect(adsMutations.read).toHaveBeenCalledTimes(1);
   });
   it('paginates shared analytics and rejects channels outside the viewer scope', async () => {
     const scoped = { ...viewer, permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };

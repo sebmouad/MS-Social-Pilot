@@ -12,7 +12,7 @@ import { buildAnalytics } from '../analytics/aggregate';
 import { CONFIG_SCHEMA_VERSION, safeConfigShape } from '@/lib/config/registry';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
-import { campaignCreationConfirmation, createWorkspaceAdCampaign, updateWorkspaceAd } from '../ads/actions';
+import { campaignCreationConfirmation, createWorkspaceAdCampaign, readWorkspaceAdObject, updateWorkspaceAd } from '../ads/actions';
 import type { AdMutationRequest, FacebookCampaignObjective } from '@/platforms/types';
 import { getAdsAccounts, getAdsDataset } from '../ads/queries';
 import { summarizeInsights } from '../ads/summary';
@@ -44,6 +44,7 @@ const tools = [
   { name: 'get_analytics_metric_details', description: 'Read a bounded page of stored date points or channel/breakdown rows for one Analytics metric. Continue with nextOffset until null.', inputSchema: { type: 'object', required: ['metricKey', 'kind'], properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel.' }, metricKey: { type: 'string', minLength: 1 }, kind: { type: 'string', enum: ['points', 'rows'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'list_ad_accounts', description: 'List advertising accounts in this workspace using bounded offset pagination.', inputSchema: { type: 'object', properties: { offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'get_ads_performance', description: 'Read stored campaign, ad set, and ad performance for accessible ad accounts. Performance rows and account summaries have independent offsets.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, accountId: { type: 'string', description: 'Accessible ad account ID.' }, level: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, accountOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
+  { name: 'get_live_ad_status', description: 'Read live configured and effective status for a campaign, ad set, or ad verified in stored insights. Requires Ads read access and an enabled connected account visible to your page scope.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, objectId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] } }, additionalProperties: false } },
   { name: 'create_ad_campaign', description: 'Create a paused Facebook campaign in a selected account. The confirmation must match CREATE PAUSED FACEBOOK CAMPAIGN <JSON-quoted name> IN ACCOUNT <adAccountId> WITH OBJECTIVE <objective>.', inputSchema: { type: 'object', required: ['adAccountId', 'name', 'objective', 'confirmation'], properties: { adAccountId: { type: 'string' }, name: { type: 'string' }, objective: { type: 'string', enum: ['OUTCOME_AWARENESS', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_SALES', 'OUTCOME_TRAFFIC', 'OUTCOME_APP_PROMOTION'] }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'update_ad', description: 'Change the status or one budget of a verified Facebook campaign, ad set, or ad. Confirmation must exactly match SET AD STATUS <objectId> TO <ACTIVE|PAUSED> or SET AD BUDGET <objectId> TO <amount> MINOR UNITS.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType', 'confirmation'], properties: { adAccountId: { type: 'string' }, objectId: { type: 'string' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, status: { type: 'string', enum: ['active', 'paused'] }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, lifetimeBudgetMinor: { type: 'integer', minimum: 1 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'preview_workspace_data_deletion', description: 'Count workspace records that a data deletion would remove. Only workspace owners and admins may use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
@@ -87,6 +88,7 @@ const toolFeatures: Record<string, string> = {
   get_analytics_overview: 'analytics/overview',
   get_analytics_metric_details: 'analytics/overview',
   get_ads_performance: 'ads/campaigns',
+  get_live_ad_status: 'ads/campaigns',
   list_ad_accounts: 'ads/campaigns',
   create_ad_campaign: 'ads/campaigns',
   update_ad: 'ads/campaigns',
@@ -352,6 +354,13 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const accountPage = visibleAccounts.slice(accountOffset, accountOffset + cap).map(({ id, name, currency }) => ({ id, name, currency }));
       return { range, accounts: accountPage, accountCount: visibleAccounts.length, nextAccountOffset: accountOffset + accountPage.length < visibleAccounts.length ? accountOffset + accountPage.length : null, level: level ?? null, resultCount: rows.length, performance, nextOffset: offset + performance.length < rows.length ? offset + performance.length : null };
     }
+    case 'get_live_ad_status': {
+      const adAccountId = requiredString(args, 'adAccountId');
+      const objectId = requiredString(args, 'objectId');
+      const objectType = requiredString(args, 'objectType') as 'campaign' | 'adset' | 'ad';
+      if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(objectId) || !['campaign', 'adset', 'ad'].includes(objectType)) throw new Error('Invalid ad object request.');
+      return readWorkspaceAdObject({ userId: viewer.userId, workspaceId: viewer.workspaceId }, { adAccountId, objectId, objectType }, pageIdsFor(viewer));
+    }
     case 'create_ad_campaign': {
       const adAccountId = requiredString(args, 'adAccountId');
       const nameValue = requiredString(args, 'name');
@@ -530,7 +539,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
       if (rootTools.has(name) && !canUseRootTool(viewer)) throw new Error('Root configuration is unavailable.');
       if (name === 'set_connection_selection' && viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can change connections.');
       const args = (params.arguments ?? {}) as Record<string, unknown>;
-      const result = writeTools.has(name) && name !== 'delete_workspace_data' && name !== 'set_root_config'
+      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && name !== 'set_root_config') || name === 'get_live_ad_status'
         ? await withWorkspaceOperation(viewer.workspaceId, () => runTool(viewer, name, args))
         : await runTool(viewer, name, args);
       return reply(textResult(result));
