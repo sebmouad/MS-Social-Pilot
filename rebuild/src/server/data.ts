@@ -167,6 +167,31 @@ export function listCalendarPosts(workspaceId: string, year: number, month: numb
   });
 }
 
+/**
+ * Read posts whose scheduled or published time falls in [from, to), with their
+ * channels and the channel provider, after workspace and channel scope are
+ * applied in the query. Callers pad the range and group by workspace-local day.
+ */
+export async function listCalendarRange(workspaceId: string, from: Date, to: Date, allowedTargetIds: readonly string[] | null, authorId: string, filters: { channelId?: string; status?: PostStatus } = {}) {
+  const scope: Prisma.PostWhereInput = allowedTargetIds === null ? {} : { OR: [
+    { targets: { some: { targetId: { in: [...allowedTargetIds] } }, every: { targetId: { in: [...allowedTargetIds] } } } },
+    { targets: { none: {} }, authorId },
+  ] };
+  return prisma.post.findMany({
+    where: { workspaceId, AND: [
+      scope,
+      { OR: [{ scheduledAt: { gte: from, lt: to } }, { publishedAt: { gte: from, lt: to } }] },
+      ...(filters.channelId ? [{ targets: { some: { targetId: filters.channelId } } }] : []),
+      ...(filters.status ? [{ status: filters.status }] : []),
+    ] },
+    orderBy: [{ scheduledAt: 'asc' }, { publishedAt: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, authorId: true,
+      targets: { select: { status: true, remotePostId: true, target: { select: { id: true, name: true, type: true, socialAccount: { select: { provider: true } } } } } },
+    },
+  });
+}
+
 /** Read the basic workspace details used by the new app shell. */
 export function workspaceSummary(workspaceId: string) {
   return prisma.workspace.findUnique({

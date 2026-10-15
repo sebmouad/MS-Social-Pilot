@@ -8,6 +8,7 @@ import { hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
 import type { PlatformAdapter, PublishMedia } from '@/platforms/types';
 import { resolveCsvDestinationIds } from '@/lib/publishing/csv-destinations';
 import { readWorkspaceImage } from '@/server/media/storage';
+import { isValidTimeZone, wallTimeToInstant } from '@/lib/calendar-dates';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
@@ -125,7 +126,9 @@ export async function submitPostForApproval(actor: PublishingActor, postId: stri
 }
 
 /** Reviewers may approve to draft or reject; clients cannot review their own posts. */
-export async function reviewPost(actor: PublishingActor, postId: string, decision: 'approve' | 'reject') {
+export async function reviewPost(actor: PublishingActor, postId: string, decision: 'approve' | 'reject', note?: string) {
+  const reviewNote = (note ?? '').trim();
+  if (reviewNote.length > 500) throw new Error('Keep the review note to 500 characters or fewer.');
   const member = await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
   if (!member || !['owner', 'admin', 'editor', 'client'].includes(member.role)) throw new Error('You do not have permission to review posts.');
   if (member.role === 'client') {
@@ -139,7 +142,7 @@ export async function reviewPost(actor: PublishingActor, postId: string, decisio
     const status = decision === 'approve' ? 'draft' : 'rejected';
     const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'pending_approval' }, data: { status, updatedAt: new Date() } });
     if (changed.count !== 1) throw new Error('This post is no longer awaiting approval.');
-    await audit(tx, actor, decision === 'approve' ? 'publishing.post_approved' : 'publishing.post_rejected', { postId: post.id });
+    await audit(tx, actor, decision === 'approve' ? 'publishing.post_approved' : 'publishing.post_rejected', { postId: post.id, ...(reviewNote ? { note: reviewNote } : {}) });
   });
 }
 
@@ -154,6 +157,32 @@ export async function schedulePost(actor: PublishingActor, postId: string, sched
     await tx.post.update({ where: { id: post.id }, data: { status: 'scheduled', scheduledAt, updatedAt: new Date() } });
     await audit(tx, actor, 'publishing.post_scheduled', { postId: post.id, scheduledAt: scheduledAt.toISOString() });
   });
+}
+
+export type RescheduleInput = { postId: string; date: string; time: string; timeZone: string };
+
+/**
+ * Move a still-local scheduled post to a new workspace-local date and time.
+ * The wall-clock time is interpreted in the workspace time zone (DST-aware) and
+ * must be in the future. Posts already handed to the platform cannot be moved.
+ */
+export async function reschedulePost(actor: PublishingActor, input: RescheduleInput) {
+  const role = await membership(actor);
+  await assertPostScope(actor, input.postId);
+  if (!isValidTimeZone(input.timeZone)) throw new Error('This workspace has no valid time zone.');
+  const resolved = wallTimeToInstant(input.date, input.time, input.timeZone);
+  if (!resolved.ok) throw new Error(resolved.reason === 'skipped' ? 'That time does not exist on that day because the clocks change. Choose another time.' : 'Choose a valid date and time.');
+  const scheduledAt = resolved.instant;
+  if (scheduledAt.getTime() <= Date.now()) throw new Error('Choose a future publishing time.');
+  await prisma.$transaction(async tx => {
+    const post = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, scheduledAt: true, targets: { select: { status: true, remotePostId: true } } } });
+    if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new Error('This post cannot be rescheduled.');
+    if (post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new Error('Only posts that are still waiting to publish can be rescheduled.');
+    const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'scheduled' }, data: { scheduledAt, updatedAt: new Date() } });
+    if (changed.count !== 1) throw new Error('Only posts that are still waiting to publish can be rescheduled.');
+    await audit(tx, actor, 'publishing.post_rescheduled', { postId: post.id, from: post.scheduledAt?.toISOString() ?? null, to: scheduledAt.toISOString() });
+  });
+  return { scheduledAt };
 }
 
 /** Cancel a locally queued post back to draft while it is still pending delivery. */

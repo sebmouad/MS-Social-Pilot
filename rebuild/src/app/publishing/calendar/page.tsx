@@ -1,55 +1,96 @@
 import { requireViewer } from "@/server/context";
-import { listCalendarPosts } from "@/server/data";
+import { getTargets, listCalendarRange } from "@/server/data";
+import { canAccessFeature } from "@/server/permissions";
 import { PageHeading } from "../publishing-ui";
-import { adjacentCalendarMonth, calendarMonth, postCalendarDate, workspaceDateKey } from "@/lib/calendar-dates";
-import styles from "../publishing.module.css";
+import { adjacentCalendarMonth, addDaysToKey, calendarMonth, isDateKey, postCalendarDate, weekStartKey, weekdayOfKey, workspaceDateKey } from "@/lib/calendar-dates";
+import { channelBadgeInfo } from "@/lib/channel-badge";
+import { CalendarBoard } from "./CalendarBoard";
+import type { BoardDay, BoardPost } from "./types";
+import styles from "./calendar.module.css";
 
-const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+type Params = { view?: string; date?: string; month?: string; channel?: string; status?: string };
+const STATUSES = ["draft", "pending_approval", "rejected", "scheduled", "publishing", "published", "partially_failed", "failed", "cancelled"] as const;
+const MANAGERS = new Set(["owner", "admin", "editor"]);
+const DAY = 24 * 60 * 60 * 1000;
 
-export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
-  const viewer = await requireViewer({ feature: 'publishing/calendar', channelScoped: true });
+const utcNoon = (key: string) => new Date(`${key}T12:00:00Z`);
+const formatUtc = (key: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" }).format(utcNoon(key));
+
+export default async function CalendarPage({ searchParams }: { searchParams: Promise<Params> }) {
+  const viewer = await requireViewer({ feature: "publishing/calendar", channelScoped: true });
   const timeZone = viewer.membership.workspace.timezone;
-  const { month: monthParam } = await searchParams;
-  const selected = calendarMonth(monthParam, new Date(), timeZone);
-  const { year } = selected;
-  const month = selected.month - 1;
+  const params = await searchParams;
+  const now = new Date();
+  const today = workspaceDateKey(now, timeZone);
+  const view = params.view === "week" ? "week" : "month";
+  const month = params.month && /^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(params.month) ? params.month : undefined;
+  const anchor = isDateKey(params.date) ? params.date : month ? (month === today.slice(0, 7) ? today : `${month}-01`) : today;
+
   const pageScope = viewer.permissions.pageScope;
-  const broadPosts = await listCalendarPosts(viewer.workspaceId, year, selected.month, pageScope.all ? null : pageScope.ids, viewer.user.id);
-  const posts = broadPosts.filter(post => {
-    const date = postCalendarDate(post);
-    return date && workspaceDateKey(date, timeZone).startsWith(selected.key);
-  });
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstWeekday = new Date(year, month, 1).getDay();
-  const cells = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
-  const postsByDay = new Map<string, typeof posts>();
+  const allowedIds = pageScope.all ? null : pageScope.ids;
+  const channels = (await getTargets(viewer.workspaceId)).filter(target => allowedIds === null || allowedIds.includes(target.id));
+  const channelId = channels.some(channel => channel.id === params.channel) ? params.channel : undefined;
+  const status = (STATUSES as readonly string[]).includes(params.status ?? "") ? params.status as (typeof STATUSES)[number] : undefined;
+
+  // The days on screen: a whole month grid (weeks start on Sunday) or one week.
+  const selected = calendarMonth(anchor.slice(0, 7), now, timeZone);
+  const firstOfMonth = `${selected.key}-01`;
+  const daysInMonth = new Date(Date.UTC(selected.year, selected.month, 0)).getUTCDate();
+  const gridStart = view === "week" ? weekStartKey(anchor) : weekStartKey(firstOfMonth);
+  const count = view === "week" ? 7 : Math.ceil((weekdayOfKey(firstOfMonth) + daysInMonth) / 7) * 7;
+  const keys = Array.from({ length: count }, (_, index) => addDaysToKey(gridStart, index));
+
+  const from = new Date(utcNoon(keys[0]!).getTime() - 2 * DAY);
+  const to = new Date(utcNoon(keys[keys.length - 1]!).getTime() + 2 * DAY);
+  const posts = await listCalendarRange(viewer.workspaceId, from, to, allowedIds, viewer.user.id, { channelId, status });
+
+  const canEditCalendar = canAccessFeature(viewer.permissions, "publishing/calendar", "write");
+  const canCreate = canAccessFeature(viewer.permissions, "publishing/posts", "write");
+  const byDay = new Map<string, BoardPost[]>();
   for (const post of posts) {
-    const date = postCalendarDate(post);
-    if (!date) continue;
-    const key = workspaceDateKey(date, timeZone);
-    postsByDay.set(key, [...(postsByDay.get(key) ?? []), post]);
+    const when = postCalendarDate(post);
+    if (!when) continue;
+    const key = workspaceDateKey(when, timeZone);
+    const channelsOfPost = [...new Map(post.targets.map(({ target }) => [target.id, { id: target.id, name: target.name, ...channelBadgeInfo(target.socialAccount?.provider) }])).values()];
+    const movable = canEditCalendar && post.status === "scheduled" && post.targets.length > 0 && post.targets.every(target => target.status === "pending" && !target.remotePostId)
+      && (MANAGERS.has(viewer.membership.role) || post.authorId === viewer.user.id);
+    byDay.set(key, [...(byDay.get(key) ?? []), { id: post.id, text: post.message.trim().slice(0, 240), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable }]);
   }
-  for (const items of postsByDay.values()) items.sort((a, b) => postCalendarDate(a)!.getTime() - postCalendarDate(b)!.getTime());
-  const monthLabel = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric", timeZone }).format(new Date(Date.UTC(year, month, 15, 12)));
-  const monthPosts = [...postsByDay.entries()].sort(([a], [b]) => a.localeCompare(b));
-  return <><PageHeading title="Calendar" description="Posts with a scheduled or published date, shown in the workspace timezone." summary={monthLabel}/><nav className={styles.calendarNavigation} aria-label="Calendar months"><a href={`/publishing/calendar?month=${adjacentCalendarMonth(year, selected.month, -1)}`}>Previous month</a><span>{monthLabel}</span><a href={`/publishing/calendar?month=${adjacentCalendarMonth(year, selected.month, 1)}`}>Next month</a></nav><div className={styles.calendar} role="grid" aria-label={`${monthLabel} publishing calendar`}>
-    {weekdays.map(day => <div key={day} className={styles.weekday} role="columnheader">{day}</div>)}
-    {Array.from({ length: cells }, (_, index) => {
-      const day = index - firstWeekday + 1;
-      const inMonth = day >= 1 && day <= daysInMonth;
-      const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dayPosts = inMonth ? postsByDay.get(key) ?? [] : [];
-      return <div key={index} className={`${styles.day}${inMonth ? "" : ` ${styles.outside}`}`} role="gridcell" aria-label={inMonth ? `${monthLabel} ${day}, ${dayPosts.length} posts` : undefined}>
-        <div className={styles.dayNumber}>{inMonth ? day : ""}</div>
-        {dayPosts.slice(0, 3).map(post => <div key={post.id} className={styles.event} data-status={post.status} title={post.message}>{post.message.trim().slice(0, 70) || "Untitled post"}</div>)}
-        {dayPosts.length > 3 ? <span className={styles.summary}>+{dayPosts.length - 3} more</span> : null}
-      </div>;
-    })}
-  </div><section className={styles.agenda} aria-label={`${monthLabel} publishing agenda`}>
-    <h2>{monthLabel} agenda</h2>
-    {monthPosts.length ? monthPosts.map(([day, items]) => <div className={styles.agendaDay} key={day}>
-      <h3><time dateTime={day}>{new Intl.DateTimeFormat(undefined, { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${day}T12:00:00Z`))}</time></h3>
-      <ul>{items.map(post => <li key={post.id}><span className={styles.agendaStatus}>{post.status.replaceAll('_', ' ')} · <time dateTime={postCalendarDate(post)!.toISOString()}>{new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', timeZone }).format(postCalendarDate(post)!)}</time></span><p>{post.message.trim() || 'Untitled post'}</p></li>)}</ul>
-    </div>) : <p className={styles.empty}>No scheduled or published posts this month.</p>}
-  </section></>;
+  const days: BoardDay[] = keys.map(key => ({
+    key,
+    label: formatUtc(key, { weekday: "short", day: "numeric" }),
+    longLabel: formatUtc(key, { weekday: "long", month: "long", day: "numeric" }),
+    inMonth: key.startsWith(selected.key),
+    isToday: key === today,
+    isPast: key < today,
+    posts: (byDay.get(key) ?? []).sort((a, b) => a.whenIso.localeCompare(b.whenIso)),
+  }));
+
+  const filterQuery = `${channelId ? `&channel=${encodeURIComponent(channelId)}` : ""}${status ? `&status=${status}` : ""}`;
+  const href = (nextView: string, date: string) => `/publishing/calendar?view=${nextView}&date=${date}${filterQuery}`;
+  const previous = view === "week" ? addDaysToKey(gridStart, -7) : `${adjacentCalendarMonth(selected.year, selected.month, -1)}-01`;
+  const next = view === "week" ? addDaysToKey(gridStart, 7) : `${adjacentCalendarMonth(selected.year, selected.month, 1)}-01`;
+  const rangeLabel = view === "month" ? formatUtc(firstOfMonth, { month: "long", year: "numeric" }) : (() => {
+    const last = keys[6]!;
+    const sameMonth = gridStart.slice(0, 7) === last.slice(0, 7);
+    return `${formatUtc(gridStart, { month: "short", day: "numeric" })} – ${formatUtc(last, sameMonth ? { day: "numeric", year: "numeric" } : { month: "short", day: "numeric", year: "numeric" })}`;
+  })();
+  const unit = view === "week" ? "week" : "month";
+
+  return <>
+    <PageHeading title="Calendar" description="Plan, check and reschedule posts in your workspace time zone." summary={rangeLabel} />
+    <div className={styles.toolbar}>
+      <nav className={styles.nav} aria-label={`Calendar ${unit}s`}>
+        <a className="ui-button ui-button--secondary ui-button--md" href={href(view, previous)}>Previous<span className="ui-visually-hidden"> {unit}</span></a>
+        <a className="ui-button ui-button--secondary ui-button--md" href={href(view, today)}>Today</a>
+        <a className="ui-button ui-button--secondary ui-button--md" href={href(view, next)}>Next<span className="ui-visually-hidden"> {unit}</span></a>
+        <h2 className={styles.range} aria-live="polite">{rangeLabel}</h2>
+      </nav>
+      <nav className={styles.switch} aria-label="Calendar view">
+        <a href={href("month", anchor)} aria-current={view === "month" ? "page" : undefined}>Month</a>
+        <a href={href("week", anchor)} aria-current={view === "week" ? "page" : undefined}>Week</a>
+      </nav>
+    </div>
+    <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} />
+  </>;
 }
