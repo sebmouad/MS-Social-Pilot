@@ -24,7 +24,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
   const allowedTargetIds = viewer.permissions.pageScope.all ? null : viewer.permissions.pageScope.ids;
   const rawPosts = await listPosts(viewer.workspaceId);
-  const extraPosts = await prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, id: { in: rawPosts.map(post => post.id) } }, select: { id: true, firstComment: true, authorId: true } });
+  const extraPosts = await prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, id: { in: rawPosts.map(post => post.id) } }, select: { id: true, firstComment: true, authorId: true, link: true, media: true } });
   const byPost = new Map(extraPosts.map(post => [post.id, post]));
   const posts = allowedTargetIds === null ? rawPosts : rawPosts.filter(post => post.targets.length
     ? post.targets.every(item => allowedTargetIds.includes(item.target.id))
@@ -36,7 +36,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     const adapter = provider && hasPlatformCapability(viewer.entitlements, provider) ? await platformFor(provider, 'publishing') : null;
     return { id: target.id, name: target.name, type: target.type, provider, canPublish: Boolean(target.canPublish && !target.socialAccount?.invalidatedAt && adapter?.publish && adapter.supportsTargetKind?.(target.type, 'publishing')) };
   }));
-  const rows = posts.map(post => ({ ...post, firstComment: byPost.get(post.id)?.firstComment ?? null, authorId: byPost.get(post.id)?.authorId ?? '' }));
+  const rows = posts.map(post => ({ ...post, firstComment: byPost.get(post.id)?.firstComment ?? null, authorId: byPost.get(post.id)?.authorId ?? '', link: byPost.get(post.id)?.link ?? null, media: (byPost.get(post.id)?.media ?? []) as Array<{ kind: string; url: string }> }));
   const { notice } = await searchParams;
   const noticeText = notice ? NOTICE_TEXT[notice] ?? (notice.startsWith('imported-') ? `${notice.slice('imported-'.length)} posts imported as drafts.` : undefined) : undefined;
   const canManageDrafts = ["owner", "admin", "editor"].includes(viewer.membership.role);

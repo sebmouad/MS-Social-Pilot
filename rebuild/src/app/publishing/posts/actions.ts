@@ -11,14 +11,14 @@ type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published'
 
 export async function createPostAction(data: FormData) {
   await run(async viewer => {
-    await createPost(actor(viewer), { message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') });
+    await createPost(actor(viewer), { message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') });
     return 'created';
   });
 }
 
 export async function updatePostAction(data: FormData) {
   await run(async viewer => {
-    await updatePost(actor(viewer), { postId: stringField(data, 'postId'), message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') });
+    await updatePost(actor(viewer), { postId: stringField(data, 'postId'), message: stringField(data, 'message'), firstComment: stringField(data, 'firstComment', true), ...attachments(data), targetIds: data.getAll('targetIds').filter((id): id is string => typeof id === 'string') });
     return 'updated';
   });
 }
@@ -98,6 +98,11 @@ async function run(operation: (viewer: Awaited<ReturnType<typeof requireViewer>>
 }
 
 function actor(viewer: Awaited<ReturnType<typeof requireViewer>>) { return { userId: viewer.user.id, workspaceId: viewer.workspaceId, ...(viewer.permissions.pageScope.all ? {} : { allowedTargetIds: viewer.permissions.pageScope.ids }) }; }
+function attachments(data: FormData) {
+  const image = stringField(data, 'imageUrl', true).trim();
+  const video = stringField(data, 'videoUrl', true).trim();
+  return { link: stringField(data, 'link', true), media: [...(image ? [{ kind: 'image' as const, url: image }] : []), ...(video ? [{ kind: 'video' as const, url: video }] : [])] };
+}
 function stringField(data: FormData, key: string, optional = false) {
   const value = data.get(key);
   if (typeof value !== 'string') {

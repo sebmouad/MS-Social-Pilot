@@ -5,18 +5,33 @@ import { decryptSecret } from '@/server/secret-crypto';
 import { platformFor } from '@/server/platforms/registry';
 import { runtimeConfig } from '@/server/config/store';
 import { hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
+import type { PublishMedia } from '@/platforms/types';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
 const MANAGERS = new Set(['owner', 'admin', 'editor']);
-type PublishingLimits = { maxText: number; maxImportRows: number; maxImportBytes: number; maxTargets: number };
+type PublishingLimits = { maxText: number; maxImportRows: number; maxImportBytes: number; maxTargets: number; maxMedia: number };
 
 async function limits(): Promise<PublishingLimits> {
-  const [maxText, maxImportRows, maxImportBytes, maxTargets] = await Promise.all([
+  const [maxText, maxImportRows, maxImportBytes, maxTargets, maxMedia] = await Promise.all([
     runtimeConfig('publishing.maxMessageCharacters'), runtimeConfig('publishing.maxImportRows'),
-    runtimeConfig('publishing.maxImportBytes'), runtimeConfig('publishing.maxTargetsPerPost'),
+    runtimeConfig('publishing.maxImportBytes'), runtimeConfig('publishing.maxTargetsPerPost'), runtimeConfig('publishing.maxRemoteMediaPerPost'),
   ]);
-  return { maxText: Number(maxText), maxImportRows: Number(maxImportRows), maxImportBytes: Number(maxImportBytes), maxTargets: Number(maxTargets) };
+  return { maxText: Number(maxText), maxImportRows: Number(maxImportRows), maxImportBytes: Number(maxImportBytes), maxTargets: Number(maxTargets), maxMedia: Number(maxMedia) };
+}
+
+type PostAttachments = { link?: string; media?: PublishMedia[] };
+export function validatePostAttachments(input: PostAttachments, maxMedia: number) {
+  const secureUrl = (value: string) => {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new Error('Attachments require a public HTTPS URL without credentials.');
+    return parsed.toString();
+  };
+  const link = input.link?.trim() ? secureUrl(input.link.trim()) : null;
+  const media = input.media ?? [];
+  if (media.length > maxMedia || media.some(item => !item || (item.kind !== 'image' && item.kind !== 'video') || typeof item.url !== 'string')) throw new Error(`Choose up to ${maxMedia} supported media URLs.`);
+  if ((link && media.length) || (media.some(item => item.kind === 'image') && media.some(item => item.kind === 'video'))) throw new Error('Choose a link, images, or a video; these formats cannot be combined in one post.');
+  return { link, media: media.map(item => ({ kind: item.kind, url: secureUrl(item.url), ...(item.altText?.trim() ? { altText: item.altText.trim() } : {}) })) };
 }
 
 async function membership(actor: PublishingActor) {
@@ -126,35 +141,37 @@ export async function cancelScheduledPost(actor: PublishingActor, postId: string
   });
 }
 
-export async function createPost(actor: PublishingActor, input: { message: string; firstComment: string; targetIds: string[] }) {
+export async function createPost(actor: PublishingActor, input: { message: string; firstComment: string; targetIds: string[] } & PostAttachments) {
   await membership(actor);
   const config = await limits();
   const text = validText(input.message, config.maxText);
   const firstComment = validFirstComment(input.firstComment, config.maxText);
+  const attachments = validatePostAttachments(input, config.maxMedia);
   const targets = await validateTargets(actor, input.targetIds, config.maxTargets);
   const now = new Date();
   const id = randomUUID();
   await prisma.$transaction(async tx => {
-    await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, status: 'draft', scheduledAt: null, publishedAt: null, createdAt: now, updatedAt: now,
+    await tx.post.create({ data: { id, workspaceId: actor.workspaceId, authorId: actor.userId, message: text, firstComment, link: attachments.link, media: attachments.media, status: 'draft', scheduledAt: null, publishedAt: null, createdAt: now, updatedAt: now,
       targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
     await audit(tx, actor, 'publishing.post_created', { postId: id, targetCount: targets.length });
   });
   return { id };
 }
 
-export async function updatePost(actor: PublishingActor, input: { postId: string; message: string; firstComment: string; targetIds: string[] }) {
+export async function updatePost(actor: PublishingActor, input: { postId: string; message: string; firstComment: string; targetIds: string[] } & PostAttachments) {
   const role = await membership(actor);
   await assertPostScope(actor, input.postId);
   const config = await limits();
   const text = validText(input.message, config.maxText);
   const firstComment = validFirstComment(input.firstComment, config.maxText);
+  const attachments = validatePostAttachments(input, config.maxMedia);
   const targets = await validateTargets(actor, input.targetIds, config.maxTargets);
   await prisma.$transaction(async tx => {
     const existing = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, publishedAt: true, targets: { select: { id: true, status: true, remotePostId: true } } } });
     if (!existing || (role.role === 'contributor' && existing.authorId !== actor.userId)) throw new Error('This post is unavailable in the current workspace.');
     if (existing.publishedAt || ['publishing', 'published', 'partially_failed', 'scheduled'].includes(existing.status) || existing.targets.some(target => target.remotePostId || target.status === 'processing' || target.status === 'published' || target.status === 'scheduled_remote')) throw new Error('This post can no longer be edited.');
     await tx.postTarget.deleteMany({ where: { postId: existing.id } });
-    await tx.post.update({ where: { id: existing.id }, data: { message: text, firstComment, updatedAt: new Date(), targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
+    await tx.post.update({ where: { id: existing.id }, data: { message: text, firstComment, link: attachments.link, media: attachments.media, updatedAt: new Date(), targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
     await audit(tx, actor, 'publishing.post_updated', { postId: existing.id, targetCount: targets.length });
   });
 }
@@ -204,11 +221,13 @@ export async function deletePost(actor: PublishingActor, postId: string, deleteR
 export async function publishPost(actor: PublishingActor, postId: string) {
   const role = await membership(actor);
   await assertPostScope(actor, postId);
-  const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, message: true, firstComment: true, status: true, scheduledAt: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
+  const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
   if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new Error('This post is unavailable in the current workspace.');
   if (!['draft', 'scheduled', 'failed', 'partially_failed'].includes(post.status)) throw new Error('This post cannot be published in its current state.');
   if (post.status === 'scheduled' && (!post.scheduledAt || post.scheduledAt > new Date())) throw new Error('This post is scheduled for a future time.');
   if (!post.targets.length) throw new Error('Select at least one destination before publishing.');
+  if (!Array.isArray(post.media)) throw new Error('Stored post media needs review before publishing.');
+  const attachments = validatePostAttachments({ link: post.link ?? undefined, media: post.media as unknown as PublishMedia[] }, Number(await runtimeConfig('publishing.maxRemoteMediaPerPost')));
   const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
   if (!entitlements) throw new Error('This workspace is unavailable.');
   let published = 0;
@@ -225,7 +244,7 @@ export async function publishPost(actor: PublishingActor, postId: string) {
     const claim = await prisma.$transaction(async tx => tx.postTarget.updateMany({ where: { id: item.id, postId: post.id, status: item.status, remotePostId: null }, data: { status: 'processing' } }));
     if (claim.count !== 1) { pending++; continue; }
     try {
-      const result = await adapter!.publish!({ credential: { accessToken: decryptSecret(item.target.accessToken!) }, target: { id: item.target.providerId, name: '', kind: item.target.type }, text: post.message, firstComment: post.firstComment });
+      const result = await adapter!.publish!({ credential: { accessToken: decryptSecret(item.target.accessToken!) }, target: { id: item.target.providerId, name: '', kind: item.target.type }, text: post.message, firstComment: post.firstComment, link: attachments.link, media: attachments.media });
       await prisma.$transaction(async tx => {
         await tx.postTarget.update({ where: { id: item.id }, data: { status: 'published', remotePostId: result.remoteId, remoteUrl: result.url, publishedAt: new Date() } });
         await audit(tx, actor, 'publishing.target_published', { postId: post.id, postTargetId: item.id });

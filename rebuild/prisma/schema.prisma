@@ -253,6 +253,8 @@ model Post {
   authorId    String
   message     String
   firstComment String?
+  link        String?
+  media       Json         @default("[]")
   status      PostStatus
   scheduledAt DateTime?
   publishedAt DateTime?
