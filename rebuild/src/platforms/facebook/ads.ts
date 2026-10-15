@@ -28,6 +28,27 @@ export function facebookAdSetConfirmation(input: { adAccountId: string; campaign
 }
 
 export const facebookAdsHost = {
+  ui: {
+    campaign: {
+      nameLabel: 'Campaign name', nameMaxLength: 100, optionLabel: 'Objective', title: 'Create paused campaign',
+      description: 'Creates a paused campaign. Complete its ad setup before activating delivery.',
+      actionLabel: 'Create paused campaign', confirmTitle: 'Create this paused campaign?', confirmDescription: 'It will not deliver until activated separately.',
+      defaultOption: 'OUTCOME_TRAFFIC', options: [
+        { value: 'OUTCOME_AWARENESS', label: 'Awareness' }, { value: 'OUTCOME_ENGAGEMENT', label: 'Engagement' },
+        { value: 'OUTCOME_LEADS', label: 'Leads' }, { value: 'OUTCOME_SALES', label: 'Sales' },
+        { value: 'OUTCOME_TRAFFIC', label: 'Traffic' }, { value: 'OUTCOME_APP_PROMOTION', label: 'App promotion' },
+      ],
+      confirmationTemplate: 'CREATE PAUSED FACEBOOK CAMPAIGN {nameJson} IN ACCOUNT {adAccountId} WITH OBJECTIVE {objective}',
+    },
+    adSet: {
+      nameLabel: 'Ad set name', nameMaxLength: 100, budgetLabel: 'Daily budget', countryLabel: 'Country code', goalLabel: 'Optimize for',
+      title: 'Create paused ad set under {campaignName}',
+      description: 'Uses impressions billing. Enter a daily amount{currency}; delivery targets one country.',
+      actionLabel: 'Create paused ad set', confirmTitle: 'Create this paused ad set?', confirmDescription: 'It will not deliver until activated separately.',
+      defaultOption: 'LINK_CLICKS', options: [{ value: 'LINK_CLICKS', label: 'Link clicks' }, { value: 'IMPRESSIONS', label: 'Impressions' }],
+      confirmationTemplate: 'CREATE PAUSED FACEBOOK AD SET {nameJson} UNDER CAMPAIGN {campaignId} IN ACCOUNT {adAccountId} WITH DAILY BUDGET {dailyBudgetMinor} MINOR UNITS TARGETING {countryCode} OPTIMIZED FOR {optimizationGoal}',
+    },
+  },
   async readScopes() { return runtimeConfig('meta.adsReadScopes') as Promise<string[]>; },
   async manageScopes() { return runtimeConfig('meta.adsManageScopes') as Promise<string[]>; },
   hasReadScopes(required: readonly string[], granted: readonly string[]) {

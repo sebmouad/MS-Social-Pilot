@@ -8,6 +8,7 @@ import { canManageWorkspaceAds, canReadWorkspaceAds } from '@/server/ads/actions
 import { AdsObjectActions } from '../AdsObjectActions';
 import { CampaignCreateForm } from '../CampaignCreateForm';
 import { AdSetCreateForm } from '../AdSetCreateForm';
+import { platformAds } from '@/server/platforms/registry';
 
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const money = (value: number | null, currency: string | null) => value === null ? '—' : `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
@@ -31,6 +32,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
     await canReadWorkspaceAds({ userId: viewer.user.id, workspaceId }, accountId, allowedTargetIds),
   ] as const)));
   const createAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, account.id)] as const)));
+  const adsUi = new Map(await Promise.all(accounts.map(async account => [account.id, account.socialAccount ? (await platformAds(account.socialAccount.provider))?.ui ?? null : null] as const)));
   const sidebar = <AdsFiltersSidebar accounts={accounts} filters={filters} action="/ads/campaigns" />;
   return <PageFrame module="ads" sidebar={accounts.length ? sidebar : undefined}><div className="page-stack">
     <header className="page-heading"><div><p className="eyebrow">Ads / Performance</p><h1>Campaign, ad set, and ad results</h1><p>{accounts.length ? `Stored daily insight records · ${dateRangeLabel(filters)}. Select an account and date range in the sidebar.` : 'Connect an advertising account to review and manage its campaigns.'}</p></div></header>
@@ -65,13 +67,13 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
               <td><details className="ads-stored-details"><summary>{row.rows} daily row{row.rows === 1 ? '' : 's'}</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily measures</h4>{row.dailyMetrics.map(day => <details className="ads-day-details" key={day.date.toISOString()}><summary>{date(day.date)}</summary><p>CPC {money(day.cpc, row.currency)} · CPM {money(day.cpm, row.currency)} · CPP {money(day.cpp, row.currency)} · CTR {day.ctr === null ? '—' : `${number.format(day.ctr)}%`} · Frequency {day.frequency === null ? '—' : number.format(day.frequency)}</p><StoredFields actions={day.actions} fields={day.fields} /></details>)}</div></details></td>
             </tr>)}</tbody></table></div></div>;
         })}
-        {viewer.permissions.pageScope.all && actionAvailability.get(accountId) && rows.some(row => row.level === 'campaign') ? <div className="ads-result-level"><h3>Create ad sets</h3><p className="small-note">Choose a campaign already verified in this account’s stored performance history.</p>
-          {rows.filter(row => row.level === 'campaign').map(row => <AdSetCreateForm key={row.id} adAccountId={accountId} campaignId={row.id} campaignName={row.name} currency={row.currency} />)}
+        {viewer.permissions.pageScope.all && actionAvailability.get(accountId) && adsUi.get(accountId)?.adSet && rows.some(row => row.level === 'campaign') ? <div className="ads-result-level"><h3>Create ad sets</h3><p className="small-note">Choose a campaign already verified in this account’s stored performance history.</p>
+          {adsUi.get(accountId)?.adSet ? rows.filter(row => row.level === 'campaign').map(row => <AdSetCreateForm key={row.id} adAccountId={accountId} campaignId={row.id} campaignName={row.name} currency={row.currency} config={adsUi.get(accountId)!.adSet!} />) : null}
         </div> : null}
       </section>;
     }) : <section className="panel"><div className="empty-state"><h2>No campaign, ad set, or ad insights stored</h2><p>When insight rows are captured for the selected ad accounts and dates, each level will appear here with its saved metrics.</p><a className="text-link" href="/ads">Return to ad accounts →</a></div></section>}
-    {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id)) ? <section className="panel"><h2>Create a campaign</h2><p className="small-note">Each campaign is created paused under one enabled ad account.</p>
-      {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id)).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} />)}
+    {accounts.filter(account => !filters.accountId || account.id === filters.accountId).some(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign) ? <section className="panel"><h2>Create a campaign</h2><p className="small-note">Each campaign is created paused under one enabled ad account.</p>
+      {accounts.filter(account => !filters.accountId || account.id === filters.accountId).filter(account => createAvailability.get(account.id) && adsUi.get(account.id)?.campaign).map(account => <CampaignCreateForm key={account.id} adAccountId={account.id} accountName={account.name} config={adsUi.get(account.id)!.campaign!} />)}
     </section> : null}
     <p className="ads-read-only-note">Review delivery and adjust eligible campaigns, ad sets, and ads. Changes require confirmation before they are sent.</p>
     </>}

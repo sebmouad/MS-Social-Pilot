@@ -10,8 +10,11 @@ import type { PlatformJobName, JobSummary } from '@/server/jobs/types';
 import type { RetryBackoff } from '@/server/jobs/retry';
 import type { InboxActor } from '@/server/inbox/actions';
 import type { AdMutationRequest, AdObjectReadRequest, PlatformCredential } from '@/platforms/types';
+import type { AdsUiSchema } from '@/platforms/ads-ui';
 
 export interface PlatformAdsHost {
+  /** Safe creation metadata; provider credentials and functions never reach the browser. */
+  ui: AdsUiSchema;
   readScopes(): Promise<string[]>;
   manageScopes(): Promise<string[]>;
   hasReadScopes(required: readonly string[], granted: readonly string[]): boolean;

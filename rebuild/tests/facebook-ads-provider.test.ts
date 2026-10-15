@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createFacebookAdSet } from '../src/platforms/facebook/adset';
+import { facebookAdsHost } from '../src/platforms/facebook/ads';
+import { fillAdsTemplate } from '../src/platforms/ads-ui';
 
 const config = {
   graphBaseUrl: 'https://graph.facebook.com', oauthBaseUrl: 'https://www.facebook.com', graphVersion: 'v99.0',
@@ -11,6 +13,26 @@ const input = { credential: { accessToken: 'secret-token' }, accountId: 'act_99'
 const response = (body: unknown, ok = true) => ({ ok, status: ok ? 200 : 400, json: async () => body }) as Response;
 
 describe('Facebook ad set creation', () => {
+  it('owns the campaign and ad set form options, copy, and exact-confirmation formats', () => {
+    expect(facebookAdsHost.ui.campaign?.options.map(option => option.value)).toContain('OUTCOME_TRAFFIC');
+    expect(facebookAdsHost.ui.campaign?.confirmationTemplate).toContain('FACEBOOK CAMPAIGN');
+    expect(facebookAdsHost.ui.adSet?.options.map(option => option.value)).toEqual(['LINK_CLICKS', 'IMPRESSIONS']);
+    expect(facebookAdsHost.ui.campaign?.description).toContain('paused campaign');
+    expect(facebookAdsHost.ui.adSet?.confirmationTemplate).toContain('FACEBOOK AD SET');
+  });
+
+  it('keeps the browser templates and server confirmations identical for names with quotes and braces', () => {
+    const name = 'Audience "A" {campaignId}';
+    expect(fillAdsTemplate(facebookAdsHost.ui.campaign.confirmationTemplate, {
+      nameJson: JSON.stringify(name), adAccountId: 'account-1', objective: 'OUTCOME_TRAFFIC',
+    })).toBe(facebookAdsHost.campaignConfirmation('account-1', name, 'OUTCOME_TRAFFIC'));
+    const values = { name, adAccountId: 'account-1', campaignId: 'campaign-2', dailyBudgetMinor: 2500, countryCode: 'MA', optimizationGoal: 'LINK_CLICKS' };
+    expect(fillAdsTemplate(facebookAdsHost.ui.adSet.confirmationTemplate, {
+      ...values, nameJson: JSON.stringify(name), dailyBudgetMinor: String(values.dailyBudgetMinor),
+    })).toBe(facebookAdsHost.adSetConfirmation(values));
+    expect(() => fillAdsTemplate('{missing}', {})).toThrow('Missing Ads template value');
+  });
+
   it('creates a paused ad set with explicit campaign, budget, delivery goal, and country targeting', async () => {
     const fetcher = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
       if (String(url).endsWith('/campaign-4?fields=id%2Caccount_id&access_token=secret-token')) {
