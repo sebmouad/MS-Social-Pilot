@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
 import { moderateFacebookComment, replyToFacebookInbox, setFacebookInboxResolved, syncFacebookInbox } from '@/server/inbox/actions';
-import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
+import { withWorkspaceOperation } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,13 +20,12 @@ export async function POST(request: Request) {
   try { viewer = await requireViewer({ feature: 'inbox/conversations', channelScoped: true }); }
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   try {
-    await assertWorkspaceNotPurging(viewer.workspaceId);
     const input = schema.parse(await request.json());
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
-    const result = input.action === 'sync' ? await syncFacebookInbox(actor, input.targetId)
+    const result = await withWorkspaceOperation(viewer.workspaceId, async () => input.action === 'sync' ? await syncFacebookInbox(actor, input.targetId)
       : input.action === 'reply' ? await replyToFacebookInbox(actor, input)
       : input.action === 'resolve' ? await setFacebookInboxResolved(actor, input)
-      : await moderateFacebookComment(actor, input);
+      : await moderateFacebookComment(actor, input));
     return NextResponse.json({ ok: true, ...result }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     if (error instanceof z.ZodError || error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid inbox action.' }, { status: 400 });

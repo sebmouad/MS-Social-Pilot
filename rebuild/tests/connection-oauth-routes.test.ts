@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { createFacebookOAuthState, FACEBOOK_OAUTH_STATE_COOKIE } from '../src/server/connection-oauth-state';
-vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: vi.fn() }));
+vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: vi.fn(), withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
 
 const mocks = vi.hoisted(() => ({
   requireViewer: vi.fn(),

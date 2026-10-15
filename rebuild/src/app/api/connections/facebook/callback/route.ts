@@ -6,7 +6,7 @@ import { persistFacebookDiscovery, recordFacebookConnectionFailure } from '@/ser
 import { FacebookApiError } from '@/platforms/facebook/publishing';
 import { platformFor } from '@/server/platforms/registry';
 import { FACEBOOK_CONNECTION_CALLBACK_PATH } from '@/platforms/facebook/protocol';
-import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
+import { withWorkspaceOperation } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,25 +27,26 @@ export async function GET(request: NextRequest) {
 
   let stage = 'configuration';
   try {
-    await assertWorkspaceNotPurging(viewer.workspaceId);
-    const [oauth, engine] = await Promise.all([configuredFacebookOAuth(), configuredFacebookEngine()]);
-    const expectedRedirect = new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, request.url).toString();
-    if (new URL(oauth.redirectUri).toString() !== expectedRedirect) return finish(request, 'connect_failed');
+    return await withWorkspaceOperation(viewer.workspaceId, async () => {
+      const [oauth, engine] = await Promise.all([configuredFacebookOAuth(), configuredFacebookEngine()]);
+      const expectedRedirect = new URL(FACEBOOK_CONNECTION_CALLBACK_PATH, request.url).toString();
+      if (new URL(oauth.redirectUri).toString() !== expectedRedirect) return finish(request, 'connect_failed');
 
-    stage = 'exchange';
-    const shortLived = await engine.exchangeCode({ appId: oauth.appId, appSecret: oauth.appSecret, redirectUri: oauth.redirectUri, code });
-    const longLived = await engine.exchangeForLongLivedToken({ accessToken: shortLived.accessToken, appId: oauth.appId, appSecret: oauth.appSecret });
-    stage = 'discovery';
-    const [user, pages, adAccounts] = await Promise.all([
-      engine.getCurrentUser(longLived.accessToken),
-      engine.discoverPages(longLived.accessToken),
-      engine.discoverAdAccounts(longLived.accessToken),
-    ]);
-    const result = await persistFacebookDiscovery({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, {
-      user, accessToken: longLived.accessToken, expiresAt: longLived.expiresAt,
-      scopes: pending.scopes, pages, adAccounts,
+      stage = 'exchange';
+      const shortLived = await engine.exchangeCode({ appId: oauth.appId, appSecret: oauth.appSecret, redirectUri: oauth.redirectUri, code });
+      const longLived = await engine.exchangeForLongLivedToken({ accessToken: shortLived.accessToken, appId: oauth.appId, appSecret: oauth.appSecret });
+      stage = 'discovery';
+      const [user, pages, adAccounts] = await Promise.all([
+        engine.getCurrentUser(longLived.accessToken),
+        engine.discoverPages(longLived.accessToken),
+        engine.discoverAdAccounts(longLived.accessToken),
+      ]);
+      const result = await persistFacebookDiscovery({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, {
+        user, accessToken: longLived.accessToken, expiresAt: longLived.expiresAt,
+        scopes: pending.scopes, pages, adAccounts,
+      });
+      return finish(request, result.skippedPages || result.skippedAdAccounts ? 'connected_partial' : 'connected', true);
     });
-    return finish(request, result.skippedPages || result.skippedAdAccounts ? 'connected_partial' : 'connected', true);
   } catch (error) {
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
     await recordFacebookConnectionFailure(actor, stage, error instanceof FacebookApiError ? 'provider_error' : 'internal_error');

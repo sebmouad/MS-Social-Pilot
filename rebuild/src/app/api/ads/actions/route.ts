@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
 import { updateWorkspaceAd } from '@/server/ads/actions';
-import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
+import { withWorkspaceOperation } from '@/server/data-control/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,9 +23,8 @@ export async function POST(request: Request) {
   try { viewer = await requireViewer({ feature: 'ads/campaigns' }); }
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   try {
-    await assertWorkspaceNotPurging(viewer.workspaceId);
     const input = schema.parse(await request.json());
-    await updateWorkspaceAd({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input);
+    await withWorkspaceOperation(viewer.workspaceId, () => updateWorkspaceAd({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input));
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     return actionError(error);

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireViewer } from '@/server/context';
 import { canAccessFeature } from '@/server/permissions';
+import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { cancelScheduledPost, createPost, deletePost, importPostsCsv, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '@/server/publishing/lifecycle';
 
 const PATH = '/publishing/posts';
@@ -87,7 +88,7 @@ async function run(operation: (viewer: Awaited<ReturnType<typeof requireViewer>>
   try {
     const viewer = await requireViewer({ feature, channelScoped: true, write: true });
     if (!canAccessFeature(viewer.permissions, feature, 'write')) throw new Error(feature.endsWith('approvals') ? 'You cannot review posts.' : 'You cannot manage posts.');
-    notice = await operation(viewer);
+    notice = await withWorkspaceOperation(viewer.workspaceId, () => operation(viewer));
     revalidatePath(PATH);
     revalidatePath('/publishing/queue');
     revalidatePath('/publishing/approvals');

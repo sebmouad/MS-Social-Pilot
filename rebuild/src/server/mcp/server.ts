@@ -9,7 +9,7 @@ import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, s
 import { readConfig, saveConfig } from '../config/store';
 import { CONFIG_SCHEMA_VERSION, safeConfigShape } from '@/lib/config/registry';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
-import { assertWorkspaceNotPurging } from '../data-control/guard';
+import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
 
 export type McpViewer = { userId: string; workspaceId: string; role: string; workspace: { id: string; name: string; timezone: string }; entitlements: Entitlements; permissions?: ScopedPermissions; maxResultItems?: number; apiKeyId?: string; isInstanceOwner?: boolean };
 type JsonRpcId = string | number | null;
@@ -338,7 +338,11 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     try {
       if (rootTools.has(name) && !canUseRootTool(viewer)) throw new Error('Root configuration is unavailable.');
       if (name === 'set_connection_selection' && viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can change connections.');
-      return reply(textResult(await runTool(viewer, name, (params.arguments ?? {}) as Record<string, unknown>)));
+      const args = (params.arguments ?? {}) as Record<string, unknown>;
+      const result = writeTools.has(name) && name !== 'delete_workspace_data' && name !== 'set_root_config'
+        ? await withWorkspaceOperation(viewer.workspaceId, () => runTool(viewer, name, args))
+        : await runTool(viewer, name, args);
+      return reply(textResult(result));
     }
     catch (e) { return reply({ ...textResult({ error: e instanceof Error ? e.message : 'Tool failed.' }), isError: true }); }
   }

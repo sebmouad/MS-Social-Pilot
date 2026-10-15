@@ -9,7 +9,7 @@ import { publishPost } from '@/server/publishing/lifecycle';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { loadEntitlements, canUseFeature } from '@/server/entitlements';
-import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
+import { assertWorkspaceNotPurging, withWorkspaceOperation } from '@/server/data-control/guard';
 
 export type JobSummary = { examined: number; updated: number; skipped: number; failed: number };
 const DAY_MS = 86_400_000;
@@ -45,7 +45,7 @@ export async function publishDuePosts(now = new Date()): Promise<JobSummary> {
         continue;
       }
       const actor = { userId: row.authorId, workspaceId: row.workspaceId, ...(permissions.pageScope.all ? {} : { allowedTargetIds: permissions.pageScope.ids }) };
-      const outcome = await publishPost(actor, row.id);
+      const outcome = await withWorkspaceOperation(row.workspaceId, () => publishPost(actor, row.id));
       result.updated += outcome.published;
       result.failed += outcome.failed;
       if (outcome.needsReconciliation) result.skipped++;

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const purgeGuard = vi.hoisted(() => vi.fn());
-vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: purgeGuard }));
+vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: purgeGuard, withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
 
 const db = vi.hoisted(() => ({
   target: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
