@@ -17,6 +17,7 @@ These files govern the rebuild. Do not silently replace them with legacy docs, a
 ## Work rules
 
 - Work in reviewable batches. The user requested independent lower-cost agents, commits to `main`, and continued implementation until the full objective is verified.
+- Before every session ends, commit and push all completed, verified work to GitHub (`origin/main`). Verify the remote branch contains the intended commits. Never force-push or silently discard concurrent changes. If publishing is blocked, report the exact reason and remaining local commits instead of claiming GitHub is current. Unfinished work must be identified explicitly; do not label unverified code release-ready merely to publish it.
 - Give every delegated agent the contract path, owned files, dependencies, and verification expectations. Prevent concurrent edits to the same files.
 - Re-check the current tree before relying on old reports. Distinguish required behavior, implemented source, automated evidence, browser evidence, live provider evidence, and production evidence.
 - Update the architecture status and affected UX/operation documents in the same batch when behavior or ownership changes. Change the target contract only to reflect an explicit user architecture decision, with its reason recorded.

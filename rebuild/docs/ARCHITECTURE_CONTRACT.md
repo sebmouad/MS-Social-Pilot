@@ -135,6 +135,8 @@ The user authorized settings changes, deployment, real data/API tests, and ident
 
 Work in reviewable batches using independent lower-cost agents where useful. Commit working batches to `main`; update evidence and remaining limitations. Each delegated task receives this contract and explicit file ownership.
 
+User update, 2026-10-16: **Always publish completed work to GitHub before the session ends.** Push verified commits to `origin/main` and verify remote state. Do not force-push or misrepresent unfinished work as complete. Report any push blocker and unpushed commits explicitly. GitHub publication is separate from production cutover; it does not bypass the release gates below.
+
 Release requires all of the following, not just a successful build:
 
 1. Legacy capability inventory and all explicit rebuild requirements implemented and reviewed.
