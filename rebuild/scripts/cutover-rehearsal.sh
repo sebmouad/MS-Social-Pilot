@@ -86,12 +86,19 @@ END $$;
 SQL
 
 count_rows() {
-  local db_url="$1" table result
-  for table in users workspaces memberships social_accounts targets ad_accounts posts post_targets conversations conversation_messages page_insights ad_insights mcp_api_keys; do
-    result="$(psql "$db_url" -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM \"$table\"")"
-    printf '%s=%s ' "$table" "$result"
-  done
-  printf '\n'
+  local database_url="$1"
+  # Emit one sorted table=count record per public base table. Only aggregate
+  # counts leave PostgreSQL; table identifiers are quoted via format().
+  psql "$database_url" -At -v ON_ERROR_STOP=1 <<'SQL'
+SELECT format('%I=%s', c.relname, (xpath('/row/n/text()', query_to_xml(
+  format('SELECT count(*) AS n FROM %I.%I', n.nspname, c.relname),
+  false, true, ''
+)))[1]::text)
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public' AND c.relkind = 'r'
+ORDER BY c.relname;
+SQL
 }
 before="$(count_rows "$source_url")"
 echo "staging row counts: $before"

@@ -1,9 +1,19 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const script = 'scripts/cutover-rehearsal.sh';
 
 describe('cutover rehearsal safety gates', () => {
+  it('compares counts for every public base table and detects table-set drift', () => {
+    const source = readFileSync(script, 'utf8');
+    expect(source).toContain("WHERE n.nspname = 'public' AND c.relkind = 'r'");
+    expect(source).toContain("ORDER BY c.relname");
+    expect(source).toContain('backup/restore row counts changed');
+    expect(source).not.toMatch(/for table in users workspaces/);
+    expect(source).not.toMatch(/SELECT \* FROM/);
+  });
+
   it('fails closed for a non-loopback PostgreSQL URL before invoking database tools', () => {
     let output = '';
     try {
