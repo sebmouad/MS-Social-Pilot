@@ -37,3 +37,5 @@ This registry does not configure `DATABASE_URL`, `ENCRYPTION_KEY`, session authe
 Registry version 28 restores the shared `ads.managementEnabled` policy used by Ads services and connection scope selection. It is a validated Root boolean, defaults off, and is audited through the normal configuration write service. Enabling it does not grant roles, account access or provider permissions. A source-read regression check now rejects unregistered literal runtime setting reads.
 
 Registry version 29 adds `connections.statusLabels`, the active customer-facing labels for connected, expired and revoked sources. Root may change these bounded labels without altering connection health, permissions or module availability. The server and selection dialog use the same health classification; expiry prevents new selection while stored history remains readable.
+
+Registry version 30 removes the unused `x.oauthScopes` placeholder because X is not an installed module. Its stored historical values are not deleted. Facebook OAuth labels now describe Facebook scopes only; later providers supply their own module settings.

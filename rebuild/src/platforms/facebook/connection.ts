@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { FACEBOOK_CONNECTION_CALLBACK_PATH } from '@/platforms/facebook/protocol';
 import { FacebookApiError } from '@/platforms/facebook/publishing';
-import { createFacebookOAuthState, FACEBOOK_OAUTH_STATE_COOKIE, openFacebookOAuthState } from '@/server/connection-oauth-state';
-import { persistFacebookDiscovery, recordFacebookConnectionFailure } from './facebook-discovery';
+import { createFacebookOAuthState, FACEBOOK_OAUTH_STATE_COOKIE, openFacebookOAuthState } from '@/platforms/facebook/oauth-state';
+import { persistFacebookDiscovery, recordFacebookConnectionFailure } from './discovery';
 import { runtimeConfig } from '@/server/config/store';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '@/server/data-control/guard';
-import { configuredFacebookEngine, configuredFacebookOAuth } from './facebook';
-import type { ConnectionViewer } from './index';
+import { configuredFacebookEngine, configuredFacebookOAuth } from './runtime';
+import type { ConnectionViewer } from '@/server/platforms/host';
 
 /**
  * Facebook's connection flow: start the Meta authorization and finish it on the

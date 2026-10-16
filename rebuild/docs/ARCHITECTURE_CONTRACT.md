@@ -23,7 +23,7 @@ Product modules must work with any installed platform exposing the required capa
 
 **Everything specific to Facebook belongs to the Facebook module.** The same rule applies independently to each later platform.
 
-Target physical home: `rebuild/src/platforms/<provider>/**`, including provider-owned server and client slices as needed. Existing `src/server/platforms/facebook*` files are transitional wiring/debt to consolidate; their existence is not permission to scatter new provider logic.
+Target physical home: `rebuild/src/platforms/<provider>/**`, including provider-owned server and client slices as needed. Provider-owned runtime construction, OAuth state, discovery persistence and server-host assembly belong there too. Shared `src/server/platforms/` holds neutral host contracts, installed registration and dispatch; it must not compose provider workflows.
 
 ```text
 rebuild/src/

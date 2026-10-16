@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ runtimeConfig: vi.fn(), adapter: vi.fn(), oauth: vi.fn() }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.runtimeConfig, runtimeSecret: vi.fn() }));
-vi.mock('../src/server/platforms/facebook', () => ({
+vi.mock('../src/platforms/facebook/runtime', () => ({
   configuredFacebookAdapter: mocks.adapter,
   configuredFacebookOAuth: mocks.oauth,
   configuredFacebookEngine: vi.fn(),

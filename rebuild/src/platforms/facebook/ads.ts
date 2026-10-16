@@ -1,5 +1,6 @@
-import type { AdMutationRequest, AdObjectReadRequest, FacebookCampaignObjective } from '@/platforms/types';
-import { configuredFacebookEngine } from '@/server/platforms/facebook';
+import type { FacebookCampaignObjective } from './protocol';
+import type { AdMutationRequest, AdObjectReadRequest } from '@/platforms/types';
+import { configuredFacebookEngine } from '@/platforms/facebook/runtime';
 import { configuredCreateFacebookAdSet, type AdSetOptimizationGoal } from '@/platforms/facebook/adset';
 import { runtimeConfig } from '@/server/config/store';
 

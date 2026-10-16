@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
-import { configuredFacebookEngine } from '@/server/platforms/facebook';
+import { configuredFacebookEngine } from '@/platforms/facebook/runtime';
 import { runtimeConfig } from '@/server/config/store';
 import { Prisma } from '../../../generated/client';
 import { withRetries } from '@/server/jobs/retry';

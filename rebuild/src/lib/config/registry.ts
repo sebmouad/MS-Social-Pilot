@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 29;
+export const CONFIG_SCHEMA_VERSION = 30;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -38,7 +38,6 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'analytics.maxRangeDays', group: 'Analytics metrics', label: 'Maximum MCP analytics range (days)', kind: 'number', description: 'Largest date range accepted by MCP analytics overview requests.', defaultValue: 366, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
   entry({ key: 'analytics.reportExportRows', group: 'Analytics metrics', label: 'Report CSV row limit', kind: 'number', description: 'Maximum data rows included in a report CSV download; truncated exports are marked.', defaultValue: 5000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
   entry({ key: 'analytics.reportMaxChannels', group: 'Analytics metrics', label: 'Maximum report channels', kind: 'number', description: 'Maximum selected channels accepted in one report CSV URL.', defaultValue: 500, schema: z.number().int().min(1).max(5000), consumption: 'active' }),
-  entry({ key: 'x.oauthScopes', group: 'API scopes', label: 'X OAuth scopes', kind: 'json', description: 'JSON array of OAuth scopes requested for X access.', defaultValue: ['tweet.read', 'users.read', 'tweet.write', 'offline.access'], schema: stringList, consumption: 'planned' }),
 
   entry({ key: 'jobs.enabled', group: 'Sync schedules', label: 'Background jobs enabled', kind: 'boolean', description: 'Master availability switch for background work.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
   entry({ key: 'sync.posts.schedule', group: 'Sync schedules', label: 'Post and publishing sync schedule', kind: 'text', description: 'Five-field cron schedule in the server timezone.', defaultValue: '*/5 * * * *', schema: cron, consumption: 'active' }),

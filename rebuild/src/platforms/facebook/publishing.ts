@@ -1,13 +1,14 @@
 import type { FacebookConfig } from './config';
 import { validateFacebookConfig } from './config';
-import { graphObjectUrl } from './protocol';
+import { PlatformApiError } from '../errors';
+import { graphObjectUrl, isFacebookRetryable } from './protocol';
 import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult } from '../types';
 
 export type FacebookFetch = typeof fetch;
 
-export class FacebookApiError extends Error {
+export class FacebookApiError extends PlatformApiError {
   constructor(message: string, readonly status: number, readonly code?: number, readonly subcode?: number) {
-    super(message);
+    super(message, isFacebookRetryable(status, code));
     this.name = 'FacebookApiError';
   }
 }

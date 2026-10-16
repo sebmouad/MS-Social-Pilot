@@ -14,7 +14,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
   return [];
 } }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
-vi.mock('../src/server/platforms/facebook', () => ({ configuredFacebookEngine: async () => ({
+vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({
   getPageInsightObservations: state.observations, getAdInsights: state.adInsights,
   getStatus: state.remoteStatus,
   listInbox: vi.fn(), listComments: vi.fn(),

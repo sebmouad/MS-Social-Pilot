@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { configuredFacebookEngine } from '@/server/platforms/facebook';
+import { configuredFacebookEngine } from '@/platforms/facebook/runtime';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
 import { loadEntitlements, canUseFeature } from '@/server/entitlements';

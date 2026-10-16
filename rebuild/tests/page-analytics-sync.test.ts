@@ -3,7 +3,7 @@ vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: 
 
 const state = vi.hoisted(() => ({ targets: vi.fn(), upsert: vi.fn(), observations: vi.fn(), settingRead: vi.fn(), settingWrite: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: { target: { findMany: state.targets }, pageInsight: { upsert: state.upsert }, appSetting: { findUnique: state.settingRead, upsert: state.settingWrite } } }));
-vi.mock('../src/server/platforms/facebook', () => ({ configuredFacebookEngine: async () => ({ getPageInsightObservations: state.observations }), configuredFacebookAdapter: vi.fn() }));
+vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({ getPageInsightObservations: state.observations }), configuredFacebookAdapter: vi.fn() }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
 let facebookEnabled = true;
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => key === 'platforms.facebook.enabled' ? facebookEnabled : 100 }));

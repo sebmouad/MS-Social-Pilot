@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { createFacebookOAuthState, FACEBOOK_OAUTH_STATE_COOKIE } from '../src/server/connection-oauth-state';
+import { createFacebookOAuthState, FACEBOOK_OAUTH_STATE_COOKIE } from '../src/platforms/facebook/oauth-state';
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: vi.fn(), withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
 
 const mocks = vi.hoisted(() => ({
@@ -18,12 +18,12 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../src/server/context', () => ({ requireViewer: mocks.requireViewer }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: mocks.runtimeConfig }));
-vi.mock('../src/server/platforms/facebook', () => ({
+vi.mock('../src/platforms/facebook/runtime', () => ({
   configuredFacebookEngine: mocks.configuredFacebookEngine,
   configuredFacebookOAuth: mocks.configuredFacebookOAuth,
   configuredFacebookAdapter: mocks.configuredFacebookAdapter,
 }));
-vi.mock('../src/server/platforms/facebook-discovery', () => ({ persistFacebookDiscovery: mocks.persistFacebookDiscovery, recordFacebookConnectionFailure: mocks.recordFacebookConnectionFailure }));
+vi.mock('../src/platforms/facebook/discovery', () => ({ persistFacebookDiscovery: mocks.persistFacebookDiscovery, recordFacebookConnectionFailure: mocks.recordFacebookConnectionFailure }));
 
 import { GET as callbackRoute } from '../src/app/api/connections/[platform]/callback/route';
 import { POST as startRoute } from '../src/app/api/connections/[platform]/start/route';

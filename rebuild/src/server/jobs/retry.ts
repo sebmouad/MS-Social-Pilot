@@ -1,9 +1,7 @@
-import { FacebookApiError } from '@/platforms/facebook/publishing';
+import { PlatformApiError } from '@/platforms/errors';
 
 export function isRetryableSyncError(error: unknown): boolean {
-  if (error instanceof FacebookApiError) {
-    return error.status === 0 || error.status === 429 || error.status >= 500 || [4, 17, 32, 613].includes(error.code ?? -1);
-  }
+  if (error instanceof PlatformApiError) return error.retryable;
   return error instanceof TypeError || (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name));
 }
 

@@ -113,12 +113,11 @@ export interface AdObjectSnapshot {
   configuredStatus: string | null;
   effectiveStatus: string | null;
 }
-export type FacebookCampaignObjective = 'OUTCOME_AWARENESS' | 'OUTCOME_ENGAGEMENT' | 'OUTCOME_LEADS' | 'OUTCOME_SALES' | 'OUTCOME_TRAFFIC' | 'OUTCOME_APP_PROMOTION';
 export interface AdCampaignCreateRequest {
   credential: PlatformCredential;
   accountId: string;
   name: string;
-  objective: FacebookCampaignObjective;
+  objective: string;
 }
 
 /** Optional members are intentionally absent when the provider slice does not implement them. */

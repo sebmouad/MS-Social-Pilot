@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 const factory = vi.hoisted(() => vi.fn());
 const setting = vi.hoisted(() => vi.fn().mockResolvedValue(true));
-vi.mock('@/server/platforms/facebook', () => ({ configuredFacebookAdapter: factory }));
+vi.mock('@/platforms/facebook/runtime', () => ({ configuredFacebookAdapter: factory }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: setting }));
 
 describe('platform capability dispatch', () => {

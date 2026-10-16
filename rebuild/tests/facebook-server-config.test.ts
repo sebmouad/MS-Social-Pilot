@@ -6,7 +6,7 @@ vi.mock('../src/server/config/store', () => ({
   runtimeSecret: async (key: string) => key === 'meta.appSecret' ? 'secret' : '',
 }));
 
-import { configuredFacebookOAuth } from '../src/server/platforms/facebook';
+import { configuredFacebookOAuth } from '../src/platforms/facebook/runtime';
 
 describe('Facebook OAuth scope configuration', () => {
   it('does not unconditionally add ads-management permission to connection scopes', async () => {

@@ -6,7 +6,7 @@ import { enabledEntry, type PlatformModule } from '../module';
  * The Facebook platform module: Facebook Pages and Meta ad accounts.
  *
  * Engine: `./publishing.ts` (provider operations) · server wiring:
- * `src/server/platforms/facebook.ts` · settings: below (stored keys keep their
+ * `./runtime.ts` and `./host.ts` · settings: below (stored keys keep their
  * historical `meta.*` names so existing values carry over).
  */
 export const facebookModule = {
@@ -37,7 +37,7 @@ export const FACEBOOK_CONFIG = [
   entry({ key: 'meta.appSecret', group: 'Facebook · API credentials', label: 'Meta app secret', kind: 'secret', description: 'Encrypted at rest. The saved value is never returned by the configuration API.', defaultValue: '', schema: z.string().max(2048), consumption: 'active' }),
   entry({ key: 'meta.oauthRedirectUri', group: 'Facebook · API credentials', label: 'Meta OAuth callback URL', kind: 'text', description: 'HTTPS callback URL registered with the Meta application.', defaultValue: '', schema: z.union([z.literal(''), url]), consumption: 'active' }),
   entry({ key: 'meta.oauthStateMinutes', group: 'Facebook · API credentials', label: 'Meta connection challenge lifetime', kind: 'number', description: 'Minutes allowed between opening Meta authorization and returning to the callback.', defaultValue: 10, schema: z.number().int().min(1).max(60), consumption: 'active' }),
-  entry({ key: 'meta.oauthScopes', group: 'Facebook · API scopes', label: 'Meta Page and Instagram scopes', kind: 'json', description: 'JSON array of Page and Instagram scopes requested during Meta authorization. Keep aligned with app review approval.', defaultValue: ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'read_insights'], schema: stringList, consumption: 'active' }),
+  entry({ key: 'meta.oauthScopes', group: 'Facebook · API scopes', label: 'Facebook OAuth scopes', kind: 'json', description: 'JSON array of Facebook Page scopes requested during authorization. Keep aligned with app review approval.', defaultValue: ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'read_insights'], schema: stringList, consumption: 'active' }),
   entry({ key: 'meta.inboxReadScopes', group: 'Facebook · API scopes · inbox', label: 'Meta inbox read scopes', kind: 'json', description: 'JSON array of Meta scopes required to read Page conversations and comments.', defaultValue: ['pages_messaging', 'pages_read_engagement'], schema: stringList, consumption: 'configured' }),
   entry({ key: 'meta.postReadScopes', group: 'Facebook · API scopes · publishing', label: 'Meta post status read scopes', kind: 'json', description: 'JSON array of Meta scopes required to refresh the status of Page posts.', defaultValue: ['pages_read_engagement'], schema: stringList.min(1), consumption: 'active' }),
   entry({ key: 'meta.inboxWriteScopes', group: 'Facebook · API scopes · inbox', label: 'Meta inbox write scopes', kind: 'json', description: 'JSON array of Meta scopes required to reply to Page conversations and moderate comments.', defaultValue: ['pages_messaging', 'pages_manage_engagement'], schema: stringList, consumption: 'configured' }),

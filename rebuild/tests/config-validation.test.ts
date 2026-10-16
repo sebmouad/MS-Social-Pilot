@@ -27,7 +27,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(29);
+    expect(CONFIG_SCHEMA_VERSION).toBe(30);
     expect(CONFIG_BY_KEY.get('connections.statusLabels')!.schema.safeParse({ connected: 'Connected', expired: 'Reconnect needed', revoked: 'Reconnect needed' }).success).toBe(true);
     expect(CONFIG_BY_KEY.get('connections.statusLabels')!.schema.safeParse({ connected: ' ', expired: 'Expired' }).success).toBe(false);
     expect(CONFIG_BY_KEY.get('publishing.maxImageAltCharacters')!.schema.safeParse(500).success).toBe(true);
@@ -113,6 +113,10 @@ describe('configuration registry', () => {
       return !definition || (match[1] === 'Secret') !== (definition.kind === 'secret') ? [`${file}: ${match[2]}`] : [];
     }));
     expect(missing).toEqual([]);
+  });
+
+  it('omits configuration placeholders for uninstalled providers', () => {
+    expect(CONFIG_BY_KEY.has('x.oauthScopes')).toBe(false);
   });
 
   it('audits changes with key, change type, and registry version only', () => {

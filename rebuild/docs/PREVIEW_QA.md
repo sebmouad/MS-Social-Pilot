@@ -54,3 +54,15 @@ Chrome checks against fake preview connections verified:
 Component regressions cover disabled-control fallback, recovery, opener restoration, selector updates without reopening, pending close/Escape protection and failed Inbox deletion context. Native modal behavior is checked in Chrome because JSDOM requires a small modal API shim. This batch did not create or remove remote content and does not establish success-path provider deletion coverage.
 
 Dialog follow-up verification: **388 tests in 86 files**, including both PostgreSQL probes, TypeScript checking and production compilation passed.
+
+## Facebook server-module consolidation
+
+Facebook runtime construction, OAuth state/cookie handling, connection flow and discovery persistence now live under `src/platforms/facebook/`, along with a provider-owned `host.ts` assembling its operations and jobs. The installed server list imports that host; neutral contracts live in `src/server/platforms/host.ts`. Shared adapter contracts no longer declare Facebook campaign objectives. Shared retries consume a generic adapter hint while Facebook retains its own transport/rate-limit classification.
+
+Source boundary regressions reject reintroducing the old provider-specific server files, provider imports in shared retry code, provider enums in shared contracts and inline provider workflow assembly in the installed list. Regression coverage includes generic retry hints plus the existing Facebook HTTP/Graph classifications, OAuth state/session/workspace binding, discovery and enabled-capability dispatch.
+
+After the move, local Connections and Root Platforms rendered, authenticated MCP Analytics still returned audience 2,020 and 22 metrics, and the Root config endpoint returned schema version 30 without the unused uninstalled-provider scope placeholder. These are synthetic fixture smoke checks. No provider credentials, connection records, database schema or production service were changed by the consolidation. Remaining shared Inbox reply policy and legacy-shaped MCP/error mappings are recorded in the architecture gaps.
+
+The actual local Root API module switch was also exercised and restored: with Facebook disabled, authenticated MCP returned zero selected channels, zero ad accounts and zero metric groups; restoring the prior enabled value returned four channels, audience 2,020 and 22 metrics. Only the synthetic preview instance was affected; value-free configuration audit entries record the two setting changes.
+
+Consolidation verification: **406 tests in 87 files**, both PostgreSQL probes, TypeScript checking and production compilation passed. A limited scan of 74 generated browser chunks found none of the checked module-runtime/credential-helper markers; this is supporting boundary evidence, not a complete security audit.
