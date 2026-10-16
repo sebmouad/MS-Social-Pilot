@@ -1,3 +1,5 @@
+// Actual publishing destination lock interaction is covered by the PostgreSQL concurrency suite.
+vi.mock('@/modules/publishing/server/guard', () => ({ lockPublishingTargets: async () => {}, assertPublishingTargetsSettled: async () => {} }));
 import { describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({

@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireViewer } from "@/server/context";
 import { canAccessFeature } from "@/server/permissions";
-import { withWorkspaceOperation } from "@/server/data-control/guard";
 import { reviewPost } from "@/server/publishing/lifecycle";
 
 const PATH = "/publishing/approvals";
@@ -20,7 +19,7 @@ export async function reviewWithNoteAction(data: FormData) {
     const note = data.get("note");
     if (typeof postId !== "string" || (decision !== "approve" && decision !== "reject")) throw new Error("Choose an approval decision.");
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId, ...(viewer.permissions.pageScope.all ? {} : { allowedTargetIds: viewer.permissions.pageScope.ids }) };
-    await withWorkspaceOperation(viewer.workspaceId, () => reviewPost(actor, postId, decision, typeof note === "string" ? note : undefined));
+    await reviewPost(actor, postId, decision, typeof note === "string" ? note : undefined);
     notice = decision === "approve" ? "approved" : "rejected";
     revalidatePath(PATH);
     revalidatePath("/publishing/posts");

@@ -1,3 +1,4 @@
+import { assertPublishingTargetsSettled, lockPublishingTargets } from '@/modules/publishing/server/guard';
 import { assertInboxDeletionsSettled, lockInboxChannel } from '@/modules/inbox/server/comment-guard';
 import { OperationError } from '@/lib/operation-error';
 import { prisma } from "./data";
@@ -75,6 +76,8 @@ export async function setConnectionSelections(actor: ConnectionMutationActor, it
         if (item.enabled) {
           await requireSelectableSource(tx, actor.workspaceId, target.socialAccountId);
         } else {
+          await lockPublishingTargets(tx, actor.workspaceId, [target.id]);
+          await assertPublishingTargetsSettled(tx, actor.workspaceId, [target.id]);
           await lockInboxChannel(tx, actor.workspaceId, target.id);
           await assertInboxDeletionsSettled(tx, actor.workspaceId, [target.id]);
         }
@@ -113,6 +116,8 @@ export async function disconnectSocialAccount(actor: ConnectionMutationActor, so
     const account = await tx.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
     if (!account) throw new OperationError('unavailable', 'This source is unavailable in the current workspace.');
     const targetIds = account.targets.map(item => item.id);
+    await lockPublishingTargets(tx, actor.workspaceId, targetIds);
+    await assertPublishingTargetsSettled(tx, actor.workspaceId, targetIds);
     for (const targetId of [...targetIds].sort()) await lockInboxChannel(tx, actor.workspaceId, targetId);
     await assertInboxDeletionsSettled(tx, actor.workspaceId, targetIds);
     const adAccountIds = account.adAccounts.map(item => item.id);

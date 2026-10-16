@@ -33,6 +33,8 @@ equivalent workflow; **unverified** means code exists without adequate evidence.
 | P1 | Page profiles/groups/labels, media/watermark, custom fields, AI agents, history and owner export screens under `src/app/(app)/settings` | Partial: image library and data export exist; the other controls are absent. | Working feature screens and shared services, migrated data, permission and visual checks. |
 | P2 | Asynchronous owner ZIP export with job status and expiry in `src/app/(app)/settings/export` | Partial: rebuild has synchronous export and workspace deletion. | Large-data async export, durable status, expiry/cleanup and completeness reporting. |
 
+Publishing safety update, 2026-10-16: all lifecycle/local-draft service writes now recheck current authority inside a single workspace operation guard with post/destination locks, bounded atomic writes/audits and adapter cancellation. Stale scheduled candidates are skipped. Inline edit/delete recover entered values and choices after failure; successful browser save/delete and scoped live localhost MCP were verified. This remains **partial**: uncertain publish claims have no auditable resolution action, remote deletion has no durable receipt journal, and first-comment failure can lose a successful post receipt. Those are release blockers. Selected-resource reads still need correction for retained posts on unselected channels. See PUBLISHING_OPERATIONS.md; no full Publishing or production-readiness claim follows from this batch.
+
 The route-based inventory is a first pass; inspect each legacy API and worker
 before claiming the crosswalk exhaustive. Each provider must be modular, but retaining legacy
 capability does not require preserving a legacy route or visual design.

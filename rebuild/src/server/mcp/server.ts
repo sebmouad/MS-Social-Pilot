@@ -126,6 +126,7 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
+const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'create_post', 'update_post', 'delete_post', 'publish_post', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post']);
 const writeTools = new Set(['manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
@@ -624,7 +625,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       if (params.arguments !== undefined && (!params.arguments || typeof params.arguments !== 'object' || Array.isArray(params.arguments))) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
       const args = (params.arguments ?? {}) as Record<string, unknown>;
       // Data deletion and local Inbox workflow own their service-level lock.
-      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !['set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion'].includes(name) && !rootTools.has(name)) || name === 'get_live_ad_status'
+      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !serviceGuardedPublishingTools.has(name) && !['set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion'].includes(name) && !rootTools.has(name)) || name === 'get_live_ad_status'
         ? await withWorkspaceOperation(viewer.workspaceId, () => runTool(viewer, name, args))
         : await runTool(viewer, name, args);
       return reply(textResult(result));

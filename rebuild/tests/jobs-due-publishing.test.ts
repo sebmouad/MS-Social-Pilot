@@ -11,13 +11,14 @@ vi.mock('@/server/permissions', () => ({ canAccessFeature: (value: { allowed: bo
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: state.entitlements, canUseFeature: (value: { allowed: boolean }) => value.allowed }));
 vi.mock('@/server/publishing/lifecycle', () => ({ publishPost: state.publish }));
 
+import { OperationError } from '../src/lib/operation-error';
 import { publishDuePosts } from '@/server/jobs/sync';
 
 describe('due post publishing job', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     state.config.mockResolvedValue(50);
-    state.findMany.mockResolvedValue([{ id: 'post-1', authorId: 'author-1', workspaceId: 'workspace-1' }]);
+    state.findMany.mockResolvedValue([{ id: 'post-1', authorId: 'author-1', workspaceId: 'workspace-1', scheduledAt: new Date('2026-10-15T11:00:00Z') }]);
     state.permissions.mockResolvedValue({ allowed: true, pageScope: { all: false, ids: ['page-1'] } });
     state.entitlements.mockResolvedValue({ allowed: true });
     state.publish.mockResolvedValue({ published: 1, failed: 0, needsReconciliation: 0 });
@@ -27,7 +28,17 @@ describe('due post publishing job', () => {
     const now = new Date('2026-10-15T12:00:00.000Z');
     expect(await publishDuePosts(now)).toEqual({ examined: 1, updated: 1, skipped: 0, failed: 0 });
     expect(state.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ status: 'scheduled', scheduledAt: { lte: now } }) }));
-    expect(state.publish).toHaveBeenCalledWith({ userId: 'author-1', workspaceId: 'workspace-1', allowedTargetIds: ['page-1'] }, 'post-1');
+    expect(state.publish).toHaveBeenCalledWith({ userId: 'author-1', workspaceId: 'workspace-1', allowedTargetIds: ['page-1'] }, 'post-1', new Date('2026-10-15T11:00:00Z'));
+  });
+
+  it('counts stale or cancelled schedule candidates as skipped', async () => {
+    state.publish.mockResolvedValue({ published: 0, failed: 0, needsReconciliation: 0, skipped: true });
+    expect(await publishDuePosts()).toEqual({ examined: 1, updated: 0, skipped: 1, failed: 0 });
+  });
+
+  it('skips a candidate claimed or removed after the job scan', async () => {
+    state.publish.mockRejectedValue(new OperationError('conflict', 'Another action is running for this post.'));
+    expect(await publishDuePosts()).toEqual({ examined: 1, updated: 0, skipped: 1, failed: 0 });
   });
 
   it('does not publish after the author loses write access', async () => {

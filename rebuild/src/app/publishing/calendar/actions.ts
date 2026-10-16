@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { requireViewer } from "@/server/context";
 import { canAccessFeature } from "@/server/permissions";
-import { withWorkspaceOperation } from "@/server/data-control/guard";
 import { reschedulePost } from "@/server/publishing/lifecycle";
 import { formatWhen, rescheduleFailureMessage } from "@/lib/reschedule";
 
@@ -16,7 +15,7 @@ export async function reschedulePostAction(input: { postId: string; date: string
     const viewer = await requireViewer({ feature: "publishing/calendar", channelScoped: true, write: true });
     if (!canAccessFeature(viewer.permissions, "publishing/calendar", "write")) throw new Error("You cannot reschedule posts.");
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId, ...(viewer.permissions.pageScope.all ? {} : { allowedTargetIds: viewer.permissions.pageScope.ids }) };
-    const { scheduledAt } = await withWorkspaceOperation(viewer.workspaceId, () => reschedulePost(actor, { postId: input.postId, date: input.date, time: input.time, timeZone: viewer.membership.workspace.timezone }));
+    const { scheduledAt } = await reschedulePost(actor, { postId: input.postId, date: input.date, time: input.time, timeZone: viewer.membership.workspace.timezone });
     revalidatePath("/publishing/calendar");
     revalidatePath("/publishing/queue");
     revalidatePath("/publishing/posts");

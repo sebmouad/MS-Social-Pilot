@@ -5,7 +5,7 @@ import { THEMES } from '@/lib/themes';
 import { configurationOwner } from './ownership';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 39;
+export const CONFIG_SCHEMA_VERSION = 40;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -62,6 +62,12 @@ export const CONFIG_REGISTRY = [
 
   entry({ key: 'ads.managementEnabled', group: 'Ads controls', label: 'Ads management enabled', kind: 'boolean', description: 'Allow authorized workspace owners and admins to use supported advertising management operations. Platform grants, account scope and confirmations are still required.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
 
+  entry({ key: 'publishing.operationTimeoutMs', group: 'Publishing', label: 'Publishing action deadline (ms)', kind: 'number', description: 'Whole-action cancellation budget across provider requests and local processing.', defaultValue: 60000, schema: z.number().int().min(1000).max(300000), consumption: 'active' }),
+  entry({ key: 'publishing.operationMaxWaitMs', group: 'Publishing', label: 'Publishing guard connection wait (ms)', kind: 'number', description: 'Pool-acquisition bound for the publishing action guard.', defaultValue: 2000, schema: z.number().int().min(1).max(30000), consumption: 'active' }),
+  entry({ key: 'publishing.transactionTimeoutMs', group: 'Publishing', label: 'Publishing local transaction timeout (ms)', kind: 'number', description: 'Maximum duration of an atomic local post change and its audit.', defaultValue: 15000, schema: z.number().int().min(1000).max(60000), consumption: 'active' }),
+  entry({ key: 'publishing.transactionMaxWaitMs', group: 'Publishing', label: 'Publishing local transaction wait (ms)', kind: 'number', description: 'Pool-acquisition bound for local post transactions.', defaultValue: 5000, schema: z.number().int().min(1).max(30000), consumption: 'active' }),
+  entry({ key: 'publishing.maxTargetsPerOperation', group: 'Publishing', label: 'Publishing resources per operation', kind: 'number', description: 'Maximum distinct destination locks across edits, CSV batches and connection changes.', defaultValue: 5000, schema: z.number().int().min(1).max(50000), consumption: 'active' }),
+  entry({ key: 'publishing.identifierMaxCharacters', group: 'Publishing', label: 'Publishing identifier length', kind: 'number', description: 'Maximum post and destination identifier length accepted at the operation boundary.', defaultValue: 200, schema: z.number().int().min(1).max(2000), consumption: 'active' }),
   entry({ key: 'analytics.defaultRangeDays', group: 'Analytics metrics', label: 'Default analytics window (days)', kind: 'number', description: 'Default inclusive UTC calendar window; capped by the maximum range.', defaultValue: 30, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
   entry({ key: 'analytics.metricPageSize', group: 'Analytics metrics', label: 'Metrics per page', kind: 'number', description: 'Number of metric summaries shown on one Analytics page.', defaultValue: 12, schema: z.number().int().min(1).max(100), consumption: 'active' }),
   entry({ key: 'analytics.detailPageSize', group: 'Analytics metrics', label: 'Metric detail rows per page', kind: 'number', description: 'Number of dated values or resource/category rows on one detail page.', defaultValue: 50, schema: z.number().int().min(1).max(1000), consumption: 'active' }),

@@ -67,9 +67,17 @@ function graphError(payload: unknown, status: number): FacebookApiError {
 }
 
 /** Create a bounded Graph client. Tokens are sent in form/query parameters and never logged. */
-export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: FacebookFetch = fetch): FacebookEngine {
+export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: FacebookFetch = fetch, operationSignal?: AbortSignal): FacebookEngine {
   const config = validateFacebookConfig(rawConfig);
+  const assertOperationActive = () => {
+    if (operationSignal?.aborted) throw new FacebookApiError('Facebook operation was cancelled.', 0);
+  };
+  const requestSignal = () => AbortSignal.any([
+    ...(operationSignal ? [operationSignal] : []),
+    AbortSignal.timeout(config.requestTimeoutMs),
+  ]);
   async function request<T = unknown>(path: string, options: { method?: string; token: string; params?: Record<string, string | number | undefined>; body?: Record<string, string | undefined>; file?: { bytes: Uint8Array; mimeType: string; fileName: string } } ): Promise<T> {
+    assertOperationActive();
     const url = graphObjectUrl(config, path);
     if (options.method !== 'POST') {
       url.searchParams.set('access_token', options.token);
@@ -84,12 +92,19 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     }
     const body = options.method === 'POST' ? form ?? new URLSearchParams({ access_token: options.token, ...(options.body ?? {}) }) : undefined;
     const headers = body instanceof URLSearchParams ? { 'content-type': 'application/x-www-form-urlencoded' } : undefined;
+    const signal = requestSignal();
     let response: Response;
     try {
       response = await fetchImpl(url, { method: options.method ?? 'GET', headers,
-        body, redirect: 'error', signal: AbortSignal.timeout(config.requestTimeoutMs) });
-    } catch (error) { throw new FacebookApiError(error instanceof Error ? error.message : 'Facebook request failed.', 0); }
+        body, redirect: 'error', signal });
+    } catch (error) {
+      if (operationSignal?.aborted) throw new FacebookApiError('Facebook operation was cancelled.', 0);
+      if (signal.aborted) throw new FacebookApiError('Facebook request timed out.', 0);
+      throw new FacebookApiError(error instanceof Error ? error.message : 'Facebook request failed.', 0);
+    }
+    assertOperationActive();
     const payload: unknown = await response.json().catch(() => null);
+    assertOperationActive();
     if (!response.ok || object(payload).error) throw graphError(payload, response.status);
     return payload as T;
   }
@@ -97,10 +112,16 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
   async function pages<T>(first: string, token: string): Promise<T[]> {
     const results: T[] = []; let next: string | undefined = first; const seen = new Set<string>();
     for (let page = 0; page < config.maxPages && next; page++) {
-      const response = await fetchImpl(next, { redirect: 'error', signal: AbortSignal.timeout(config.requestTimeoutMs) }).catch((error: unknown) => {
+      assertOperationActive();
+      const signal = requestSignal();
+      const response = await fetchImpl(next, { redirect: 'error', signal }).catch((error: unknown) => {
+        if (operationSignal?.aborted) throw new FacebookApiError('Facebook operation was cancelled.', 0);
+        if (signal.aborted) throw new FacebookApiError('Facebook request timed out.', 0);
         throw new FacebookApiError(error instanceof Error ? error.message : 'Facebook request failed.', 0);
       });
+      assertOperationActive();
       const payload: unknown = await response.json().catch(() => null);
+      assertOperationActive();
       if (!response.ok || object(payload).error) throw graphError(payload, response.status);
       const data = object(payload).data;
       if (!Array.isArray(data)) throw new FacebookApiError('Facebook returned an invalid paginated response.', response.status);
@@ -381,20 +402,27 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
 
 /** Backward-compatible thin publisher used by the current neutral contract. */
 export function createFacebookPublisher(config: FacebookConfig, fetchImpl: FacebookFetch = fetch) {
-  const engine = createFacebookEngine(config, fetchImpl);
   return async (request: PublishRequest): Promise<PublishResult> => {
     if (request.target.kind !== 'page') throw new FacebookApiError('Facebook publishing currently supports Page targets only.', 0);
+    const engine = createFacebookEngine(config, fetchImpl, request.signal);
     const result = await engine.publish({ targetId: request.target.id, accessToken: request.credential.accessToken, text: request.text, link: request.link, media: request.media, firstComment: request.firstComment });
     return result;
   };
 }
 
-export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch): PlatformAdapter {
+export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { postReadScopes: readonly string[] }): PlatformAdapter {
   const engine = createFacebookEngine(config, fetchImpl);
+  const requiredPostReadScopes = policy?.postReadScopes.map(scope => scope.trim()).filter(Boolean) ?? [];
   return {
     id: 'facebook',
     localImageUpload: { maxBytes: config.maxImageUploadBytes, mimeTypes: config.allowedImageMimeTypes },
     capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
+    canUseCredential(credential, capability) {
+      if (capability !== 'remoteStatus') return true;
+      if (!requiredPostReadScopes.length || !credential.grantedScopes) return false;
+      const granted = new Set(credential.grantedScopes.map(scope => scope.trim()));
+      return requiredPostReadScopes.every(scope => granted.has(scope));
+    },
     supportsTargetKind: (kind, capability) => kind === 'page' && ['publishing', 'inbox', 'analytics'].includes(capability),
     getAuthorizationUrl: input => engine.getAuthorizationUrl(input),
     async exchangeCode(input) { return engine.exchangeCode(input); },
@@ -403,8 +431,8 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
       return { targets: pages.map(p => ({ id: p.id, name: p.name, kind: 'page' })), adAccounts: accounts.map(a => ({ id: a.id, name: a.name, currency: a.currency, status: a.status === null ? null : String(a.status) })) };
     },
     publish: createFacebookPublisher(config, fetchImpl),
-    async getRemoteStatus(request) { return engine.getStatus(request.credential.accessToken, request.remoteId); },
-    async deleteRemote(request) { await engine.deletePost(request.credential.accessToken, request.remoteId); },
+    async getRemoteStatus(request) { return createFacebookEngine(config, fetchImpl, request.signal).getStatus(request.credential.accessToken, request.remoteId); },
+    async deleteRemote(request) { await createFacebookEngine(config, fetchImpl, request.signal).deletePost(request.credential.accessToken, request.remoteId); },
     async listInbox(request) {
       const conversations = await engine.listInbox(request.credential.accessToken, request.targetId);
       return conversations.flatMap(conversation => conversation.messages.map(message => ({

@@ -26,6 +26,7 @@ const NOTICE_TEXT: Record<string, string> = {
   cancelled: "Scheduled post returned to drafts.",
   "publish-review": "Some destinations still need review. Their claimed publishing records were kept to prevent duplicate posts.",
   synced: "Remote status sync completed.",
+  "failed-sync": "No new delivery status was confirmed. Check the post on its platform, then try syncing again.",
 };
 
 export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; page?: string; status?: string; channel?: string; view?: string }> }) {

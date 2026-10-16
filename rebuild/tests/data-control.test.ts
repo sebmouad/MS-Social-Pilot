@@ -37,7 +37,7 @@ function makePurgeClient(role: string = 'owner') {
     adAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'a1' }]) },
     instagramAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'ig1' }]) },
     post: { findMany: vi.fn().mockResolvedValue([{ id: 'p1' }]) },
-    postTarget: { findMany: vi.fn().mockResolvedValue([{ id: 'pt1', postId: 'p1' }]) },
+    postTarget: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([{ id: 'pt1', postId: 'p1' }]) },
     conversation: { findMany: vi.fn().mockResolvedValue([{ id: 'c1' }]) },
     postComment: { count: vi.fn().mockResolvedValue(2) },
     conversationMessage: { count: vi.fn().mockResolvedValue(3) },
@@ -158,6 +158,15 @@ describe('workspace data controls', () => {
     const { deleteWorkspaceData } = await import('../src/server/data-control');
     await expect(deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'delete')).rejects.toThrow(/Type DELETE/);
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not erase unresolved publishing claims', async () => {
+    const { tx } = makePurgeClient();
+    tx.postTarget.findFirst.mockResolvedValue({ id: 'processing-target' } as never);
+    const { deleteWorkspaceData } = await import('../src/server/data-control');
+    await expect(deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'DELETE')).rejects.toMatchObject({ code: 'conflict' });
+    expect(tx.workspaceDataPurge.create).not.toHaveBeenCalled();
+    expect(tx.$executeRawUnsafe).not.toHaveBeenCalled();
   });
 
   it('does not queue erasure while remote comment deletion needs recovery', async () => {

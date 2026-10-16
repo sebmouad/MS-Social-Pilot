@@ -1,3 +1,9 @@
+vi.mock('@/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
+// Operation-lock/authority behavior is exercised by publishing-guard and PostgreSQL suites.
+vi.mock('@/modules/publishing/server/guard', () => ({
+  withPublishingTransaction: (_signal: AbortSignal, work: (tx: unknown) => Promise<unknown>) => db.$transaction(work),
+  withPublishingOperation: (actor: unknown, _options: unknown, work: (context: unknown) => Promise<unknown>) => work({ actor, signal: new AbortController().signal, lockTargets: async () => {} }),
+}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
@@ -6,7 +12,7 @@ const db = vi.hoisted(() => ({
   post: { findFirst: vi.fn(), update: vi.fn() },
   $transaction: vi.fn(),
 }));
-const provider = vi.hoisted(() => ({ getRemoteStatus: vi.fn() }));
+const provider = vi.hoisted(() => ({ getRemoteStatus: vi.fn(), canUseCredential: vi.fn(() => false) }));
 vi.mock('@/server/data', () => ({ prisma: db }));
 vi.mock('@/server/platforms/registry', () => ({ platformFor: vi.fn(async () => provider) }));
 vi.mock('@/server/entitlements', () => ({ loadEntitlements: vi.fn(async () => ({})), hasPlatformCapability: vi.fn(() => true) }));

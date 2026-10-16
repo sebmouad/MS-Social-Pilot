@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireViewer } from '@/server/context';
 import { canAccessFeature } from '@/server/permissions';
-import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { cancelScheduledPost, createPost, deletePost, importPostsCsv, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '@/server/publishing/lifecycle';
+import { OperationError, operationFailure } from '@/lib/operation-error';
 import { wallTimeToInstant } from '@/lib/calendar-dates';
 
 const PATH = '/publishing/posts';
@@ -27,6 +27,41 @@ export type ComposerValues = {
 };
 export type ComposerActionState = { status: 'idle' | 'error'; message?: string; saveUnconfirmed?: boolean; values: Partial<ComposerValues> };
 
+export type PostEditActionState = { status: 'idle' | 'error'; message?: string; values: Partial<ComposerValues> };
+export type PostDeleteActionState = { status: 'idle' | 'error'; message?: string; deleteRemote: boolean };
+
+export async function updatePostWithRecoveryAction(previous: PostEditActionState, data: FormData): Promise<PostEditActionState> {
+  const values = composerValues(data);
+  try {
+    const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
+    if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new OperationError('forbidden', 'You cannot manage posts.');
+    await updatePost(actor(viewer), { postId: stringField(data, 'postId'), message: values.message, firstComment: values.firstComment, targetIds: values.targetIds, ...attachments(data) });
+    refreshPublishing();
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { status: 'error', message: operationFailure(error, 'The save result could not be confirmed. Your changes are retained; check Posts before trying again.').error, values };
+  }
+  redirect(`${PATH}?notice=updated`);
+}
+
+export async function deletePostWithRecoveryAction(previous: PostDeleteActionState, data: FormData): Promise<PostDeleteActionState> {
+  const deleteRemote = data.get('deleteRemote') === 'on';
+  try {
+    const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
+    if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new OperationError('forbidden', 'You cannot manage posts.');
+    await deletePost(actor(viewer), stringField(data, 'postId'), deleteRemote);
+    refreshPublishing();
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { status: 'error', message: operationFailure(error, 'The deletion result could not be confirmed. Check Posts and the selected platforms before trying again.').error, deleteRemote };
+  }
+  redirect(`${PATH}?notice=deleted`);
+}
+
+function refreshPublishing() {
+  for (const path of [PATH, '/publishing/calendar', '/publishing/queue', '/publishing/approvals']) revalidatePath(path);
+}
+
 /** Stateful creation path for the dedicated composer. The legacy redirecting action remains available to existing callers. */
 export async function createPostWithRecoveryAction(previous: ComposerActionState, data: FormData): Promise<ComposerActionState> {
   const values = composerValues(data);
@@ -39,13 +74,13 @@ export async function createPostWithRecoveryAction(previous: ComposerActionState
       if (!result.ok) throw new Error('schedule');
       return result.instant;
     })() : undefined;
-    await withWorkspaceOperation(viewer.workspaceId, () => createPost(actor(viewer), {
+    await createPost(actor(viewer), {
       message: values.message,
       firstComment: values.firstComment,
       ...attachments(data),
       targetIds: values.targetIds,
       scheduledAt,
-    }));
+    });
     revalidatePath(PATH);
     revalidatePath('/publishing/queue');
     revalidatePath('/publishing/approvals');
@@ -96,8 +131,8 @@ export async function publishPostAction(data: FormData) {
 
 export async function syncPostAction(data: FormData) {
   await run(async viewer => {
-    await syncPostStatus(actor(viewer), stringField(data, 'postId'));
-    return 'synced';
+    const result = await syncPostStatus(actor(viewer), stringField(data, 'postId'));
+    return result.synced > 0 ? 'synced' : 'failed-sync';
   });
 }
 
@@ -143,7 +178,7 @@ async function run(operation: (viewer: Awaited<ReturnType<typeof requireViewer>>
   try {
     const viewer = await requireViewer({ feature, channelScoped: true, write: true });
     if (!canAccessFeature(viewer.permissions, feature, 'write')) throw new Error(feature.endsWith('approvals') ? 'You cannot review posts.' : 'You cannot manage posts.');
-    notice = await withWorkspaceOperation(viewer.workspaceId, () => operation(viewer));
+    notice = await operation(viewer);
     revalidatePath(PATH);
     revalidatePath('/publishing/queue');
     revalidatePath('/publishing/approvals');

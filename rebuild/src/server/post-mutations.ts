@@ -1,8 +1,8 @@
+import { withPublishingOperation, withPublishingTransaction } from '@/modules/publishing/server/guard';
 import { randomUUID } from "node:crypto";
 import { OperationError } from "@/lib/operation-error";
 import { prisma } from "./data";
 
-const EDITOR_ROLES = new Set(["owner", "admin", "editor"]);
 const AUTHOR_ROLES = new Set(["owner", "admin", "editor", "contributor"]);
 
 export type PostMutationActor = { userId: string; workspaceId: string };
@@ -12,44 +12,57 @@ export type PostMutationActor = { userId: string; workspaceId: string };
  * schedule delivery, or call a social provider.
  */
 export async function createLocalDraft(actor: PostMutationActor, message: string) {
-  const membership = await getCurrentMembership(actor);
-  if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to create drafts.");
+  return withPublishingOperation(actor, {}, async ({ actor, signal }) => {
+    signal.throwIfAborted();
+    const membership = await getCurrentMembership(actor);
+    if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to create drafts.");
 
-  const now = new Date();
-  return prisma.post.create({
-    data: {
-      id: randomUUID(),
-      workspaceId: actor.workspaceId,
-      authorId: actor.userId,
-      message,
-      status: "draft",
-      scheduledAt: null,
-      publishedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    },
-    select: { id: true },
+    const now = new Date();
+    return withPublishingTransaction(signal, async tx => {
+      const created = await tx.post.create({
+        data: {
+          id: randomUUID(),
+          workspaceId: actor.workspaceId,
+          authorId: actor.userId,
+          message,
+          status: "draft",
+          scheduledAt: null,
+          publishedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+        select: { id: true },
+      });
+      await auditDraft(tx, actor, 'publishing.post_created', created.id);
+      return created;
+    });
   });
 }
 
 /** Edit only an unconnected, unpublished draft in the actor's current workspace. */
 export async function updateLocalDraft(actor: PostMutationActor, postId: string, message: string) {
-  const membership = await getCurrentMembership(actor);
-  if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to edit drafts.");
+  return withPublishingOperation(actor, { postId }, async ({ actor, signal }) => {
+    signal.throwIfAborted();
+    const membership = await getCurrentMembership(actor);
+    if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to edit drafts.");
 
-  const ownsPost = membership.role === "contributor";
-  const result = await prisma.post.updateMany({
-    where: {
-      id: postId,
-      workspaceId: actor.workspaceId,
-      status: "draft",
-      publishedAt: null,
-      ...(ownsPost ? { authorId: actor.userId } : {}),
-      targets: { none: {} },
-    },
-    data: { message, updatedAt: new Date() },
+    const ownsPost = membership.role === "contributor";
+    await withPublishingTransaction(signal, async tx => {
+      const result = await tx.post.updateMany({
+        where: {
+          id: postId,
+          workspaceId: actor.workspaceId,
+          status: "draft",
+          publishedAt: null,
+          ...(ownsPost ? { authorId: actor.userId } : {}),
+          targets: { none: {} },
+        },
+        data: { message, updatedAt: new Date() },
+      });
+      if (result.count !== 1) throw new OperationError('conflict', "This draft is unavailable or can no longer be edited.");
+      await auditDraft(tx, actor, 'publishing.post_updated', postId);
+    });
   });
-  if (result.count !== 1) throw new OperationError('conflict', "This draft is unavailable or can no longer be edited.");
 }
 
 /**
@@ -57,21 +70,27 @@ export async function updateLocalDraft(actor: PostMutationActor, postId: string,
  * The UI must ask for confirmation; this operation never contacts providers.
  */
 export async function deleteLocalDraft(actor: PostMutationActor, postId: string) {
-  const membership = await getCurrentMembership(actor);
-  if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to delete drafts.");
+  return withPublishingOperation(actor, { postId }, async ({ actor, signal }) => {
+    signal.throwIfAborted();
+    const membership = await getCurrentMembership(actor);
+    if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to delete drafts.");
 
-  const ownsPost = membership.role === "contributor";
-  const result = await prisma.post.deleteMany({
-    where: {
-      id: postId,
-      workspaceId: actor.workspaceId,
-      status: "draft",
-      publishedAt: null,
-      ...(ownsPost ? { authorId: actor.userId } : {}),
-      targets: { none: {} },
-    },
+    const ownsPost = membership.role === "contributor";
+    await withPublishingTransaction(signal, async tx => {
+      const result = await tx.post.deleteMany({
+        where: {
+          id: postId,
+          workspaceId: actor.workspaceId,
+          status: "draft",
+          publishedAt: null,
+          ...(ownsPost ? { authorId: actor.userId } : {}),
+          targets: { none: {} },
+        },
+      });
+      if (result.count !== 1) throw new OperationError('conflict', "This draft is unavailable or can no longer be deleted.");
+      await auditDraft(tx, actor, 'publishing.post_deleted', postId);
+    });
   });
-  if (result.count !== 1) throw new OperationError('conflict', "This draft is unavailable or can no longer be deleted.");
 }
 
 async function getCurrentMembership(actor: PostMutationActor) {
@@ -81,4 +100,8 @@ async function getCurrentMembership(actor: PostMutationActor) {
   });
   if (!membership) throw new OperationError('unauthorized', "You are no longer a member of this workspace.");
   return membership;
+}
+
+async function auditDraft(tx: import('../../generated/client').Prisma.TransactionClient, actor: PostMutationActor, action: string, postId: string) {
+  await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${randomUUID()}, ${actor.userId}, ${action}, ${JSON.stringify({ workspaceId: actor.workspaceId, postId, localDraft: true })}::jsonb, NOW())`;
 }

@@ -1,7 +1,9 @@
+vi.mock('@/modules/publishing/server/guard', () => ({ withPublishingTransaction: (_signal: AbortSignal, work: (tx: unknown) => Promise<unknown>) => db.$transaction(work), withPublishingOperation: (actor: unknown, _options: unknown, work: (context: unknown) => Promise<unknown>) => work({ actor, signal: new AbortController().signal }) }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
   membership: { findUnique: vi.fn() },
+  $transaction: vi.fn(), $executeRaw: vi.fn(),
   post: { create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
 }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
@@ -12,6 +14,7 @@ const actor = { userId: 'u1', workspaceId: 'w1' };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  db.$transaction.mockImplementation(async (work: (tx: typeof db) => Promise<unknown>) => work(db));
   db.membership.findUnique.mockResolvedValue({ role: 'owner' });
   db.post.create.mockResolvedValue({ id: 'new-id' });
   db.post.updateMany.mockResolvedValue({ count: 1 });

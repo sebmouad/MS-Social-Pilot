@@ -44,8 +44,8 @@ There is no released billing or legal-copy contract for the rebuild. Do not inve
 | Connect source | Disable repeat start while OAuth begins | Show discovered channels and ad accounts with checkboxes | Keep workspace page and a retry path; do not expose credentials |
 | Change selection | Keep current choices visible; disable duplicate save | Persist selected local state and refresh the connection table | Keep the selection dialog open with entered choices |
 | Disconnect source | Ask retain or delete, show related-data preview for delete | Confirm scope and update the table | Keep dialog and choice; never claim provider revocation |
-| Create/edit post | Preserve composer values and target choices; block duplicate upload/submission | Return to a refreshed post list with status | Dedicated creation retains service/network failure values; unconfirmed save directs the user to inspect Posts before retry. Inline editing still needs equivalent recovery. |
-| Delete published post | Separate local removal from optional remote deletion | Show actual local and remote outcomes | Preserve reconciliation state for uncertain remote outcome |
+| Create/edit post | Preserve composer values and target choices; block duplicate upload/submission | Return to a refreshed post list with status | Dedicated creation and inline editing retain service/network failure values; unconfirmed save directs the user to inspect Posts before retry. |
+| Delete published post | Separate local removal from optional remote deletion; disable repeats | Show actual local and remote outcomes | Dialog, remote choice and focused error remain after refusal; durable remote-deletion reconciliation is still missing |
 | Export workspace | Show coverage and generate a no-store archive | Download ZIP with manifest | Fail visibly if files/records are missing or unsafe |
 | Delete workspace data | Exact confirmation after row preview | Show resumable progress and completion | Preserve purge state and retry cleanup without repeating DB deletion |
 

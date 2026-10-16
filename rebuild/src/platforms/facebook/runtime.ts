@@ -28,7 +28,10 @@ export async function configuredFacebookEngine(options?: { signal?: AbortSignal 
   const transport: typeof fetch = signal ? (input, init) => fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal }) : fetch;
   return createFacebookEngine(await configuredFacebookConfig(), transport);
 }
-export async function configuredFacebookAdapter() { return createFacebookAdapter(await configuredFacebookConfig()); }
+export async function configuredFacebookAdapter() {
+  const [config, postReadScopes] = await Promise.all([configuredFacebookConfig(), configured<string[]>('meta.postReadScopes')]);
+  return createFacebookAdapter(config, fetch, { postReadScopes });
+}
 
 export async function configuredFacebookOAuth() {
   const [appId, appSecret, redirectUri, scopes, inboxReadScopes, inboxWriteScopes] = await Promise.all([

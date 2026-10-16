@@ -1,3 +1,9 @@
+vi.mock('@/server/config/store', () => ({ runtimeConfig: async () => 15000 }));
+// Operation-lock/authority behavior is exercised by publishing-guard and PostgreSQL suites.
+vi.mock('@/modules/publishing/server/guard', () => ({
+  withPublishingTransaction: (_signal: AbortSignal, work: (tx: unknown) => Promise<unknown>) => db.$transaction(work),
+  withPublishingOperation: (actor: unknown, _options: unknown, work: (context: unknown) => Promise<unknown>) => work({ actor, signal: new AbortController().signal, lockTargets: async () => {} }),
+}));
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({

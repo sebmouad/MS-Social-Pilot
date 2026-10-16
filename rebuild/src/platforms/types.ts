@@ -14,6 +14,7 @@ export interface CapabilityDeclaration {
 
 export interface PlatformCredential {
   accessToken: string;
+  grantedScopes?: readonly string[];
 }
 
 export interface OAuthStartRequest {
@@ -63,11 +64,12 @@ export interface PublishRequest {
   link?: string | null;
   media?: PublishMedia[];
   firstComment?: string | null;
+  signal?: AbortSignal;
 }
 export interface PublishResult { remoteId: string; url: string | null }
-export interface RemoteStatusRequest { credential: PlatformCredential; remoteId: string }
+export interface RemoteStatusRequest { credential: PlatformCredential; remoteId: string; signal?: AbortSignal }
 export interface RemoteStatus { state: 'published' | 'scheduled' | 'unknown'; publishedAt?: Date | null }
-export interface RemoteDeleteRequest { credential: PlatformCredential; remoteId: string }
+export interface RemoteDeleteRequest { credential: PlatformCredential; remoteId: string; signal?: AbortSignal }
 export interface InboxRequest { credential: PlatformCredential; targetId: string }
 export interface InboxCommentsRequest extends InboxRequest { remotePostId: string }
 export interface InboxItem {
@@ -126,6 +128,7 @@ export interface PlatformAdapter {
   readonly capabilities: CapabilityDeclaration;
   /** Adapter limits for ephemeral server-supplied image bytes during publish. */
   readonly localImageUpload?: { maxBytes: number; mimeTypes: readonly string[] };
+  canUseCredential?(credential: PlatformCredential, capability: 'publishing' | 'remoteStatus' | 'remoteDelete'): boolean;
   supportsTargetKind?(kind: string, capability: 'publishing' | 'inbox' | 'analytics'): boolean;
   getAuthorizationUrl?(request: OAuthStartRequest): string;
   exchangeCode?(request: OAuthExchangeRequest): Promise<OAuthToken>;
