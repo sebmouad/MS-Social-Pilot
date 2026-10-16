@@ -66,7 +66,7 @@
 .dialogNote { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
 
 .reply { display: grid; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
-.reply textarea { width: 100%; min-height: 84px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.5; resize: vertical; }
+.reply textarea { width: 100%; min-height: 84px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.5; }
 .reply textarea:disabled { background: var(--surface-muted); cursor: not-allowed; }
 .reply textarea[aria-invalid="true"] { border-color: var(--danger); }
 .ruleOpen, .ruleClosed { margin: 0; padding: 9px 12px; border-radius: var(--radius-sm); font-size: 13px; line-height: 1.45; }

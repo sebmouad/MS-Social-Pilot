@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react';
 import { ModalDialog } from '@/components/ModalDialog';
+import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { budgetFractionDigits, formatBudgetMinor, parseBudgetAmount } from './budget';
 
 type Change = { status: 'active' | 'paused' } | { dailyBudgetMinor: number } | { lifetimeBudgetMinor: number };
@@ -16,6 +17,7 @@ export function AdsObjectActions({ adAccountId, objectId, objectType, currency, 
   const [liveStatus, setLiveStatus] = useState('');
   const [pending, setPending] = useState<PendingChange | null>(null);
   const dialogId = useId();
+  const validation = useFormValidation();
 
   async function refreshStatus() {
     setBusy(true); setMessage(''); setLiveStatus('');
@@ -57,12 +59,14 @@ export function AdsObjectActions({ adAccountId, objectId, objectType, currency, 
     setPending({ change: { status }, confirmation, description: `${status === 'paused' ? 'Pause' : 'Resume'} delivery for this ${objectType}.` });
   }
 
-  function changeBudget() {
+  function changeBudget(form: HTMLFormElement) {
+    if (busy) return;
     const amount = parseBudgetAmount(budgetAmount, currency);
-    if (amount === null) {
-      setMessage(`Enter a valid amount${currency ? ` in ${currency}` : ''} with up to ${budgetFractionDigits(currency)} decimal places.`);
-      return;
-    }
+    const customErrors = amount === null
+      ? { budgetAmount: `Enter a valid amount${currency ? ` in ${currency}` : ''} with up to ${budgetFractionDigits(currency)} decimal places.` }
+      : undefined;
+    if (!validation.validate(form, customErrors)) return;
+    if (amount === null) return;
     const confirmation = `SET AD BUDGET ${objectId} TO ${amount} MINOR UNITS`;
     setPending({
       change: budgetKind === 'daily' ? { dailyBudgetMinor: amount } : { lifetimeBudgetMinor: amount },
@@ -80,11 +84,11 @@ export function AdsObjectActions({ adAccountId, objectId, objectType, currency, 
         <button type="button" disabled={busy} onClick={() => changeStatus('paused')}>Pause</button>
         <button type="button" disabled={busy} onClick={() => changeStatus('active')}>Resume</button>
       </div>
-      <form method="post" className="ads-object-actions__budget" onSubmit={event => { event.preventDefault(); changeBudget(); }}>
+      <form method="post" noValidate className="ads-object-actions__budget" onSubmit={event => { event.preventDefault(); changeBudget(event.currentTarget); }}>
         <label><span className="sr-only">Budget period</span><select value={budgetKind} onChange={event => setBudgetKind(event.target.value as 'daily' | 'lifetime')} disabled={busy}>
           <option value="daily">Daily</option><option value="lifetime">Lifetime</option>
         </select></label>
-        <label><span className="sr-only">New {budgetKind} budget{currency ? ` in ${currency}` : ''}</span><input aria-label={`New ${budgetKind} budget${currency ? ` in ${currency}` : ''}`} type="number" min={10 ** -budgetFractionDigits(currency)} step={10 ** -budgetFractionDigits(currency)} inputMode="decimal" placeholder={currency ?? 'Amount'} value={budgetAmount} onChange={event => setBudgetAmount(event.target.value)} disabled={busy} /></label>
+        <label><span className="sr-only">New {budgetKind} budget{currency ? ` in ${currency}` : ''}</span><input name="budgetAmount" aria-label={`New ${budgetKind} budget${currency ? ` in ${currency}` : ''}`} type="number" min={10 ** -budgetFractionDigits(currency)} step={10 ** -budgetFractionDigits(currency)} inputMode="decimal" placeholder={currency ?? 'Amount'} value={budgetAmount} onChange={event => setBudgetAmount(event.target.value)} required disabled={busy} {...validation.fieldProps('budgetAmount')} /><FieldError {...validation.errorProps('budgetAmount')} /></label>
         <button type="submit" disabled={busy}>Set budget</button>
       </form>
     </> : null}

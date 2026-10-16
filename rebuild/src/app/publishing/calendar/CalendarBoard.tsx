@@ -1,5 +1,6 @@
 "use client";
 
+import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { useRef, useState, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button, ChannelBadge, Dialog, StatusChip } from "@/components";
@@ -129,6 +130,7 @@ export function CalendarBoard({ view, days, timeZone, nowIso, canCreate, filterQ
 }
 
 function MoveDialog({ move, timeZone, nowMs, onChange, onConfirm }: { move: Move | null; timeZone: string; nowMs: number; onChange: (next: Move | null) => void; onConfirm: () => void }) {
+  const validation = useFormValidation();
   if (!move) return null;
   const close = () => { if (!move.busy) onChange(null); };
   const validShape = /^\d{4}-\d{2}-\d{2}$/.test(move.date) && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(move.time);
@@ -146,10 +148,10 @@ function MoveDialog({ move, timeZone, nowMs, onChange, onConfirm }: { move: Move
         <button type="button" className="ui-button ui-button--secondary ui-button--md" disabled={Boolean(option.unavailable)} onClick={() => onChange({ ...move, step: "confirm", date: option.date, time: option.time, error: "" })}>{option.label}</button>
         {option.unavailable && <span className={styles.muted}>{option.unavailable === "past" ? "Already passed" : "Clocks change"}</span>}
       </li>)}</ul>
-      <form className={styles.pickForm} onSubmit={event => { event.preventDefault(); onChange({ ...move, step: "confirm", error: "" }); }}>
+      <form noValidate method="post" className={styles.pickForm} onSubmit={event => { event.preventDefault(); if (!validation.validate(event.currentTarget)) return; onChange({ ...move, step: "confirm", error: "" }); }}>
         <fieldset><legend>Pick a date and time</legend>
-          <label>Date<input type="date" required value={move.date} onChange={event => onChange({ ...move, date: event.target.value })} /></label>
-          <label>Time<input type="time" required value={move.time} onChange={event => onChange({ ...move, time: event.target.value })} /></label>
+          <label>Date<input {...validation.fieldProps('date')} name="date" type="date" required value={move.date} onChange={event => onChange({ ...move, date: event.target.value })} /><FieldError {...validation.errorProps('date')} /></label>
+          <label>Time<input {...validation.fieldProps('time')} name="time" type="time" required value={move.time} onChange={event => onChange({ ...move, time: event.target.value })} /><FieldError {...validation.errorProps('time')} /></label>
         </fieldset>
         <Button type="submit" variant="primary">Review move</Button>
       </form>

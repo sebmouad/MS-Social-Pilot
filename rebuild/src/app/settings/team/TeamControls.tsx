@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FieldError, useFormValidation } from '@/components/FormValidation';
 import styles from '../settings.module.css';
 
 type Member = { id: string; userId: string; name: string; email: string; role: string; targetIds: string[]; allPages: boolean };
@@ -15,6 +16,7 @@ export function TeamControls({ members, targets, actorId, actorRole }: { members
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const validation = useFormValidation();
 
   async function mutate(method: 'POST' | 'PATCH' | 'DELETE', body: Record<string, unknown>) {
     setBusy(true); setNotice('');
@@ -32,10 +34,10 @@ export function TeamControls({ members, targets, actorId, actorRole }: { members
   }
 
   return <div className={styles['team-management']}>
-    <form method="post" className={styles['team-add-form']} onSubmit={event => { event.preventDefault(); void mutate('POST', { email, role, targetIds: allPages ? [] : selected, allPages }); }}>
+    <form method="post" noValidate className={styles['team-add-form']} onSubmit={event => { event.preventDefault(); if (!validation.validate(event.currentTarget)) return; void mutate('POST', { email, role, targetIds: allPages ? [] : selected, allPages }); }}>
       <h3>Add an existing account</h3><p>They must already have an active account. New account invitations are unavailable until email invitations are configured.</p>
-      <div className={styles['team-add-fields']}><label>Email address<input type="email" value={email} onChange={event => setEmail(event.currentTarget.value)} required maxLength={320} /></label><label>Role<select value={role} onChange={event => setRole(event.currentTarget.value)}>{actorRole === 'owner' && <option value="owner">owner</option>}{roles.map(item => <option key={item} value={item}>{item}</option>)}</select></label></div>
-      <label className={styles['team-all-channels']}><input type="checkbox" checked={allPages} onChange={event => setAllPages(event.currentTarget.checked)} /> Access to all channels</label>
+      <div className={styles['team-add-fields']}><label>Email address<input name="email" type="email" value={email} onChange={event => { setEmail(event.currentTarget.value); validation.clear('email'); }} required maxLength={320} {...validation.fieldProps('email')} /><FieldError {...validation.errorProps('email')} /></label><label>Role<select name="role" value={role} onChange={event => setRole(event.currentTarget.value)}>{actorRole === 'owner' && <option value="owner">owner</option>}{roles.map(item => <option key={item} value={item}>{item}</option>)}</select></label></div>
+      <label className={styles['team-all-channels']}><input type="checkbox" name="allPages" checked={allPages} onChange={event => setAllPages(event.currentTarget.checked)} /> Access to all channels</label>
       {!allPages && <div className={styles['team-channel-list']}>{targets.map(target => <label key={target.id}><input type="checkbox" checked={selected.includes(target.id)} onChange={event => setSelected(event.currentTarget.checked ? [...selected, target.id] : selected.filter(id => id !== target.id))} /> {target.name}</label>)}</div>}
       <button disabled={busy}>{busy ? 'Saving…' : 'Add member'}</button>
     </form>

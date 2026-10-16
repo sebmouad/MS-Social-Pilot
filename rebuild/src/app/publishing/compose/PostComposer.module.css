@@ -2,7 +2,7 @@
 .form { display: grid; gap: 10px; min-width: 0; }
 .form > label, .attachmentField > label, .scheduleFields > label { color: var(--ink-soft); font-size: 12px; font-weight: 700; }
 .form textarea, .form input:not([type="radio"]):not([type="checkbox"]):not([type="file"]):not([type="hidden"]) { width: 100%; min-width: 0; min-height: 42px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--ink); background: var(--surface); font: inherit; font-size: 13px; }
-.form textarea { min-height: 126px; line-height: 1.55; resize: vertical; }
+.form textarea { min-height: 126px; line-height: 1.55; }
 .form textarea:focus, .form input:focus-visible, .sidebarControls input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .fieldMeta { justify-self: end; margin-top: -6px; color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
 .form label span, .attachments legend span { font-weight: 400; }

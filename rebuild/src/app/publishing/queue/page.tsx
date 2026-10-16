@@ -35,7 +35,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
           const due = post.scheduledAt !== null && post.scheduledAt <= now;
           const mayCancel = canCancelQueuedPost({ canWritePosts: viewer.permissions.features["publishing/posts"].write, role: viewer.membership.role, userId: viewer.user.id, authorId: post.authorId });
           const actions = <div className={workflow.actions}>
-            {mayCancel ? <><form action={cancelScheduledPostAction}><input type="hidden" name="postId" value={post.id} /><CancelScheduleButton /></form><p className={workflow.help}>Returns the post to drafts.</p></>
+            {mayCancel ? <><form noValidate action={cancelScheduledPostAction}><input type="hidden" name="postId" value={post.id} /><CancelScheduleButton /></form><p className={workflow.help}>Returns the post to drafts.</p></>
               : <p className={workflow.help}>{viewer.permissions.features["publishing/posts"].write ? "Only the author or a workspace manager can cancel this item." : "You can view this post but cannot change it."}</p>}
             {due ? <p className={workflow.help} role="status">Due; publishes on the next run.</p> : null}
           </div>;

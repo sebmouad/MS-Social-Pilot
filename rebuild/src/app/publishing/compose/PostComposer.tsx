@@ -1,4 +1,5 @@
 'use client';
+import { AutoTextarea } from '@/components/AutoTextarea';
 
 import { useActionState, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
@@ -160,10 +161,10 @@ export function PostComposer({ targets, imageRules, schedule, authorName, create
       {state.status === 'error' && <p className={styles.error} role="alert">{state.message} Your post details are still here.{state.saveUnconfirmed ? <> <a href="/publishing/posts" target="_blank" rel="noopener noreferrer">Check Posts in a new tab</a>.</> : ' You can retry.'}</p>}
       {uploadMessage && <p className={styles.uploadNotice} role="status">{uploadMessage}</p>}
       <label htmlFor="composer-message">Post text</label>
-      <textarea id="composer-message" name="message" value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={7} placeholder="Write a post for your team…" aria-describedby="composer-message-count" />
+      <AutoTextarea id="composer-message" name="message" value={message} onChange={event => setMessage(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={7} placeholder="Write a post for your team…" aria-describedby="composer-message-count" />
       <div className={styles.fieldMeta} id="composer-message-count">{message.length.toLocaleString()} / {imageRules.maxMessageCharacters.toLocaleString()}</div>
       <label htmlFor="composer-first-comment">First comment <span>(optional)</span></label>
-      <textarea id="composer-first-comment" name="firstComment" value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder="Add a link or follow-up as the first comment…" />
+      <AutoTextarea id="composer-first-comment" name="firstComment" value={firstComment} onChange={event => setFirstComment(event.currentTarget.value)} maxLength={imageRules.maxMessageCharacters} rows={3} placeholder="Add a link or follow-up as the first comment…" />
 
       <fieldset className={styles.attachments}>
         <legend>Attachment <span>(optional, choose one)</span></legend>

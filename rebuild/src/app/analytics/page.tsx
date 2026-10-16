@@ -75,7 +75,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   exportParams.set('adFilter', '1');
   data?.selectedAdIds.forEach(id => exportParams.append('adAccount', id));
   const canExport = selected.length > 0 && canUseFeature(entitlements, 'analytics/reports') && canAccessFeature(permissions, 'analytics/reports');
-  const sidebar = <form action="/analytics" method="get" className="analytics-sidebar-filter">
+  const sidebar = <form noValidate action="/analytics" method="get" className="analytics-sidebar-filter">
     <p className="analytics-filter-heading">Filters</p>
     <p className="shell-subnav__label">Date range</p>
     <label className="analytics-date-filter">From<input type="date" name="start" defaultValue={inputDate(range.from)} /></label>

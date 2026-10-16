@@ -17,14 +17,14 @@ export function parsePostView(value: string | null | undefined): PostView {
 export function PostFilters({ channels, currentMonth }: { channels: Array<{ id: string; name: string }>; currentMonth: string }) {
   const pathname = usePathname();
   const params = useSearchParams();
-  if (pathname === '/publishing/calendar') return <form action="/publishing/calendar" method="get" className={styles.postFilters} key={params.toString()}>
+  if (pathname === '/publishing/calendar') return <form noValidate action="/publishing/calendar" method="get" className={styles.postFilters} key={params.toString()}>
     <p className="shell-subnav__label">Calendar</p>
     <label htmlFor="calendar-month-filter">Month</label>
     <input id="calendar-month-filter" type="month" name="month" defaultValue={params.get('month') ?? currentMonth} />
     <button type="submit">Show Month</button>
     <a href="/publishing/calendar">Current Month</a>
   </form>;
-  return <form action="/publishing/posts" method="get" className={styles.postFilters} key={params.toString()}>
+  return <form noValidate action="/publishing/posts" method="get" className={styles.postFilters} key={params.toString()}>
     <p className="shell-subnav__label">Post Filters</p>
     <label htmlFor="post-view-filter">View</label>
     <select id="post-view-filter" name="view" defaultValue={parsePostView(params.get('view'))}>

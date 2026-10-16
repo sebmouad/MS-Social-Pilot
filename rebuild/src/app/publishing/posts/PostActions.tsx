@@ -1,4 +1,5 @@
 "use client";
+import { AutoTextarea } from '@/components/AutoTextarea';
 
 import { cancelScheduledPostAction, createPostAction, deletePostAction, importPostsAction, publishPostAction, schedulePostAction, submitForApprovalAction, syncPostAction, updatePostAction } from "./actions";
 import { useEffect, useState, type FormEvent } from "react";
@@ -6,6 +7,7 @@ import { Button } from "@/components";
 import { ModalDialog } from "@/components/ModalDialog";
 import styles from "../publishing.module.css";
 import { csvDestinationLabel } from '@/lib/publishing/csv-destinations';
+import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { validateFields } from '@/lib/ui/form-validation';
 
 type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean };
@@ -118,12 +120,12 @@ function AttachmentFields({ post, imageRules, errors = {} }: { post?: PostRow; i
 
 export function PostEditorForm({ targets, imageRules, schedule }: { targets: TargetChoice[]; imageRules: ImageRules; schedule?: { date: string; time: string; timeZone: string } }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
-  return <form action={createPostAction} noValidate className={styles.draftForm} onSubmit={event => submitPost(event, setErrors)}>
+  return <form noValidate action={createPostAction} className={styles.draftForm} onSubmit={event => submitPost(event, setErrors)}>
     <label htmlFor="new-post-message">Post text</label>
-    <textarea id="new-post-message" name="message" required rows={4} placeholder="Write a post for your team…" aria-invalid={Boolean(errors.message)} aria-describedby={errors.message ? 'new-post-message-error' : undefined} />
+    <AutoTextarea id="new-post-message" name="message" required rows={4} placeholder="Write a post for your team…" aria-invalid={Boolean(errors.message)} aria-describedby={errors.message ? 'new-post-message-error' : undefined} />
     {errors.message && <p id="new-post-message-error" className={styles.formError}>{errors.message}</p>}
     <label htmlFor="new-post-first-comment">First comment <span>(optional)</span></label>
-    <textarea id="new-post-first-comment" name="firstComment" rows={2} placeholder="Add a link or follow-up as the first comment…" />
+    <AutoTextarea id="new-post-first-comment" name="firstComment" rows={2} placeholder="Add a link or follow-up as the first comment…" />
     <AttachmentFields imageRules={imageRules} errors={errors} />
     <TargetPicker targets={targets} />
     {schedule && <fieldset className={styles.targetPicker}><legend>Publishing time</legend><p>Times use {schedule.timeZone.replaceAll('_', ' ')}.</p><label>Date<input type="date" name="scheduleDate" defaultValue={schedule.date} required /></label><label>Time<input type="time" name="scheduleTime" defaultValue={schedule.time} required /></label></fieldset>}
@@ -133,7 +135,7 @@ export function PostEditorForm({ targets, imageRules, schedule }: { targets: Tar
 
 export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
   const [error, setError] = useState('');
-  return <form action={importPostsAction} noValidate className={styles.draftForm} onSubmit={event => {
+  return <form noValidate action={importPostsAction} className={styles.draftForm} onSubmit={event => {
     const input = event.currentTarget.elements.namedItem('csv');
     if (!(input instanceof HTMLInputElement) || !input.files?.[0]?.size) {
       event.preventDefault(); setError('Choose a non-empty CSV file to import.'); input instanceof HTMLInputElement && input.focus();
@@ -158,33 +160,33 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules 
   return <div className={styles.rowActions}>
     {canEdit && isDraft && post.media.length <= 1 ? <details className={styles.editDetails}>
       <summary>Edit post</summary>
-      <form action={updatePostAction} noValidate className={styles.editForm} onSubmit={event => submitPost(event, setEditErrors)}>
+      <form noValidate action={updatePostAction} className={styles.editForm} onSubmit={event => submitPost(event, setEditErrors)}>
         <input type="hidden" name="postId" value={post.id} />
         <label htmlFor={`message-${post.id}`}>Post text</label>
-        <textarea id={`message-${post.id}`} name="message" defaultValue={post.message} required rows={4} aria-invalid={Boolean(editErrors.message)} aria-describedby={editErrors.message ? `message-error-${post.id}` : undefined} />
+        <AutoTextarea id={`message-${post.id}`} name="message" defaultValue={post.message} required rows={4} aria-invalid={Boolean(editErrors.message)} aria-describedby={editErrors.message ? `message-error-${post.id}` : undefined} />
         {editErrors.message && <p id={`message-error-${post.id}`} className={styles.formError}>{editErrors.message}</p>}
         <label htmlFor={`comment-${post.id}`}>First comment <span>(optional)</span></label>
-        <textarea id={`comment-${post.id}`} name="firstComment" defaultValue={post.firstComment ?? ''} rows={2} />
+        <AutoTextarea id={`comment-${post.id}`} name="firstComment" defaultValue={post.firstComment ?? ''} rows={2} />
         <AttachmentFields post={post} imageRules={imageRules} errors={editErrors} />
         <TargetPicker targets={targets} selected={selected} />
         <button className="ui-button ui-button--secondary ui-button--sm" type="submit">Save post</button>
       </form>
     </details> : null}
     {canEdit && isDraft && post.media.length > 1 ? <span className={styles.noActions}>Posts with multiple media attachments need the full media editor before changes can be made.</span> : null}
-    {canPublish && isDraft && post.targets.length ? <form action={publishPostAction}>
+    {canPublish && isDraft && post.targets.length ? <form noValidate action={publishPostAction}>
       <input type="hidden" name="postId" value={post.id} />
       <button className="ui-button ui-button--primary ui-button--sm" type="submit">Publish now</button>
     </form> : null}
     {canEdit && isDraft && post.targets.length ? <>
-      <form action={submitForApprovalAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Submit for approval</button></form>
+      <form noValidate action={submitForApprovalAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Submit for approval</button></form>
       <ScheduleForm postId={post.id}/>
     </> : null}
-    {canEdit && isQueued ? <form action={cancelScheduledPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Cancel schedule</button></form> : null}
-    {hasRemote ? <form action={syncPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Sync status</button></form> : null}
+    {canEdit && isQueued ? <form noValidate action={cancelScheduledPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Cancel schedule</button></form> : null}
+    {hasRemote ? <form noValidate action={syncPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Sync status</button></form> : null}
     {post.targets.some(item => item.status === 'processing' && !item.remotePostId) ? <span className={styles.noActions}>A publish result needs review on the destination before retrying.</span> : null}
     <Button variant="danger" size="sm" type="button" onClick={() => setDeleteOpen(true)}>Delete locally</Button>
     {deleteOpen && <ModalDialog className="ui-dialog" labelledBy={`delete-title-${post.id}`} onDismiss={() => setDeleteOpen(false)}>
-      <form action={deletePostAction}>
+      <form noValidate action={deletePostAction}>
         <input type="hidden" name="postId" value={post.id} />
         <div className="ui-dialog__header"><div><h2 id={`delete-title-${post.id}`}>Delete this post locally?</h2><p>This permanently removes the post and its local publishing history.</p></div></div>
         <div className="ui-dialog__body">
@@ -198,8 +200,10 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules 
 }
 
 function ScheduleForm({ postId }: { postId: string }) {
-  return <form action={schedulePostAction} className={styles.scheduleForm} onSubmit={event => {
+  const validation = useFormValidation();
+  return <form noValidate action={schedulePostAction} className={styles.scheduleForm} onSubmit={event => {
     const form = event.currentTarget;
+    if (!validation.validate(form)) { event.preventDefault(); return; }
     const input = form.elements.namedItem('localScheduledAt');
     const hidden = form.elements.namedItem('scheduledAt');
     if (input instanceof HTMLInputElement && hidden instanceof HTMLInputElement && input.value) {
@@ -208,8 +212,8 @@ function ScheduleForm({ postId }: { postId: string }) {
     }
   }}>
     <input type="hidden" name="postId" value={postId}/>
-    <label>Schedule (your local time) <input type="datetime-local" name="localScheduledAt" required/></label>
-    <input type="hidden" name="scheduledAt"/>
+    <label>Schedule (your local time) <input {...validation.fieldProps('localScheduledAt')} type="datetime-local" name="localScheduledAt" required/></label>
+    <FieldError {...validation.errorProps('localScheduledAt')} /><input type="hidden" name="scheduledAt"/>
     <button className="ui-button ui-button--secondary ui-button--sm" type="submit">Add to queue</button>
   </form>;
 }

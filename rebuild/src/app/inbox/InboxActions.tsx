@@ -1,8 +1,10 @@
 'use client';
+import { AutoTextarea } from '@/components/AutoTextarea';
 
 import { useId, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Dialog } from '@/components';
+import { FieldError, useFormValidation } from '@/components/FormValidation';
 import styles from './inbox.module.css';
 
 type Kind = 'message' | 'comment';
@@ -86,6 +88,7 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
 
 /** Reply composer with a character count and the platform's reply rule in plain words. */
 export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000 }: { id: string; kind: Kind; allowed: boolean; headline: string; detail?: string; maxLength?: number }) {
+  const validation = useFormValidation();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -100,6 +103,7 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (empty || busy || !allowed) return;
+    if (!validation.validate(event.currentTarget)) return;
     setBusy(true); setError(''); setSent('');
     const outcome = await send({ action: 'reply', id, kind, text });
     setBusy(false);
@@ -108,11 +112,12 @@ export function ReplyBox({ id, kind, allowed, headline, detail, maxLength = 2000
     router.refresh();
   }
 
-  return <form method="post" className={styles.reply} onSubmit={event => void submit(event)}>
+  return <form method="post" noValidate className={styles.reply} onSubmit={event => void submit(event)}>
     <p id={ruleId} className={allowed ? styles.ruleOpen : styles.ruleClosed}><span aria-hidden="true">{allowed ? '●' : '■'}</span> <strong>{headline}</strong>{detail ? <span className={styles.ruleDetail}> {detail}</span> : null}</p>
     <label htmlFor={fieldId} className="ui-visually-hidden">Reply</label>
-    <textarea id={fieldId} name="reply" rows={3} maxLength={maxLength} value={text} disabled={!allowed || busy} aria-describedby={`${ruleId} ${countId}`} aria-invalid={Boolean(error) || undefined}
+    <AutoTextarea id={fieldId} name="reply" rows={3} maxLength={maxLength} value={text} disabled={!allowed || busy} aria-describedby={[ruleId, countId, validation.fieldProps('reply')['aria-describedby']].filter(Boolean).join(' ')} aria-invalid={Boolean(error) || Boolean(validation.errors.reply) || undefined}
       placeholder={allowed ? (kind === 'message' ? 'Write a reply…' : 'Write a public reply…') : 'Replies are not possible right now.'} onChange={event => { setText(event.target.value); setSent(''); }} />
+    <FieldError {...validation.errorProps('reply')} />
     <div className={styles.replyFoot}>
       <span id={countId} className={remaining < 100 ? styles.countLow : styles.count}>{text.length.toLocaleString('en-US')} / {maxLength.toLocaleString('en-US')} characters{remaining < 100 ? ` · ${remaining} left` : ''}</span>
       <Button type="submit" variant="primary" disabled={!allowed || busy || empty} aria-busy={busy}>{busy ? 'Sending…' : 'Send reply'}</Button>

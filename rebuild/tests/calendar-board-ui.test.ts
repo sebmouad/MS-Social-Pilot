@@ -51,6 +51,18 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); sidebar.remove(); });
 
 describe('calendar post preview and navigation', () => {
+  it('keeps invalid picked times in the move dialog with associated field errors', async () => {
+    await render();
+    const moveButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.startsWith('Move'))!;
+    await act(async () => moveButton.click());
+    const dialog = document.querySelector<HTMLDialogElement>('dialog[aria-labelledby]')!;
+    const date = dialog.querySelector<HTMLInputElement>('[name=date]')!;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(date, ''); date.dispatchEvent(new Event('input', { bubbles: true })); });
+    await act(async () => [...dialog.querySelectorAll('button')].find(button => button.textContent === 'Review move')!.click());
+    expect(document.activeElement).toBe(date); expect(date.getAttribute('aria-invalid')).toBe('true');
+    expect(document.getElementById(date.getAttribute('aria-describedby')!)?.textContent).toBeTruthy();
+    expect(dialog.textContent).toContain('Pick a date and time'); expect(reschedulePostAction).not.toHaveBeenCalled();
+  });
   it('rejects drag targets in elapsed slots while keeping later slots available', async () => {
     await render({ slotEndedByHour: { ...days[0]!.slotEndedByHour, '06:00': true } });
     const transfer = { effectAllowed: '', dropEffect: '', setData: vi.fn() };

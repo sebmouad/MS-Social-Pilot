@@ -5,7 +5,7 @@ type AdsAccountOption = { id: string; name: string };
 export function AdsFiltersSidebar({ accounts, filters, action = "/ads" }: { accounts: AdsAccountOption[]; filters: AdsFilters; action?: string }) {
   const value = (date: Date) => date.toISOString().slice(0, 10);
   const untilInclusive = new Date(filters.until.getTime() - 24 * 60 * 60 * 1000);
-  return <form action={action} method="get" className="ads-sidebar-filter">
+  return <form noValidate action={action} method="get" className="ads-sidebar-filter">
     <p className="ads-filter-heading">Filters</p>
     <label><span>Date range</span><select name="period" defaultValue={filters.period}>
       <option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="90d">Last 90 days</option><option value="custom">Custom dates</option>

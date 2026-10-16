@@ -10,7 +10,7 @@ export function RootUserFilters({ values, page, searchMaxCharacters }: { values:
   const status = page?.status ?? (typeof values.status === 'string' && ROOT_USER_STATUS_OPTIONS.some(option => option.value === values.status) ? values.status as NonNullable<RootUsersSearch['status']> : 'all');
   return <SidebarDock><section aria-label="User directory filters" className="root-user-filters">
     <p className="shell-subnav__label">Directory filters</p>
-    <form action="/root/users" method="get">
+    <form noValidate action="/root/users" method="get">
       <label className="ui-field">Name or email<input className="ui-input" type="search" name="q" defaultValue={search} maxLength={page?.searchMaxCharacters ?? searchMaxCharacters ?? undefined} placeholder="Search users" /></label>
       <label className="ui-field">Account status<select className="ui-input" name="status" defaultValue={status}>{ROOT_USER_STATUS_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
       <Button type="submit" variant="primary">Apply filters</Button>

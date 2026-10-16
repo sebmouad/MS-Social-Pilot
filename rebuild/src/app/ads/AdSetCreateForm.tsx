@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { ModalDialog } from '@/components/ModalDialog';
+import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { budgetFractionDigits, formatBudgetMinor, parseBudgetAmount } from './budget';
 import { fillAdsTemplate as fill, type AdsUiSchema } from '@/platforms/ads-ui';
 
@@ -17,15 +18,20 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
   const [dialogError, setDialogError] = useState('');
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [pendingRequest, setPendingRequest] = useState<{ name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string; confirmation: string } | null>(null);
+  const validation = useFormValidation();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     const cleanName = name.trim();
     const minorBudget = parseBudgetAmount(budget, currency);
     const country = countryCode.trim().toUpperCase();
-    if (!cleanName || cleanName.length > config.nameMaxLength) { setMessage(`Enter an ad set name from 1 to ${config.nameMaxLength} characters.`); return; }
-    if (minorBudget === null) { setMessage(`Enter a valid daily budget${currency ? ` in ${currency}` : ''} with up to ${budgetFractionDigits(currency)} decimal places.`); return; }
-    if (!/^[A-Z]{2}$/.test(country)) { setMessage('Enter a two-letter country code, such as MA.'); return; }
+    const customErrors: Record<string, string> = {};
+    if (!cleanName || cleanName.length > config.nameMaxLength) customErrors.name = `Enter an ad set name from 1 to ${config.nameMaxLength} characters.`;
+    if (minorBudget === null) customErrors.budget = `Enter a valid daily budget${currency ? ` in ${currency}` : ''} with up to ${budgetFractionDigits(currency)} decimal places.`;
+    if (!/^[A-Z]{2}$/.test(country)) customErrors.countryCode = 'Enter a two-letter country code, such as MA.';
+    if (!validation.validate(event.currentTarget, customErrors)) { setMessage('Correct the highlighted fields to continue.'); return; }
+    if (minorBudget === null) return;
     const confirmation = fill(config.confirmationTemplate, { nameJson: JSON.stringify(cleanName), campaignId, adAccountId, dailyBudgetMinor: String(minorBudget), countryCode: country, optimizationGoal });
     setDialogError('');
     setPendingRequest({ name: cleanName, dailyBudgetMinor: minorBudget, countryCode: country, optimizationGoal, confirmation });
@@ -48,13 +54,13 @@ export function AdSetCreateForm({ adAccountId, campaignId, campaignName, currenc
     finally { setBusy(false); }
   }
 
-  return <form method="post" className="ads-campaign-create" onSubmit={handleSubmit} aria-label={`Create ad set under ${campaignName}`}>
+  return <form method="post" noValidate className="ads-campaign-create" onSubmit={handleSubmit} aria-label={`Create ad set under ${campaignName}`}>
     <h4>{fill(config.title, { campaignName })}</h4>
     <p className="small-note">{fill(config.description, { currency: currency ? ` in ${currency}` : '' })}</p>
     <div className="ads-campaign-create__fields">
-      <label>{config.nameLabel}<input value={name} onChange={event => setName(event.target.value)} maxLength={config.nameMaxLength} required disabled={busy} /></label>
-      <label>{config.budgetLabel}{currency ? ` (${currency})` : ''}<input type="number" min={10 ** -budgetFractionDigits(currency)} step={10 ** -budgetFractionDigits(currency)} value={budget} onChange={event => setBudget(event.target.value)} inputMode="decimal" required disabled={busy} /></label>
-      <label>{config.countryLabel}<input value={countryCode} onChange={event => setCountryCode(event.target.value.toUpperCase())} maxLength={2} placeholder="MA" required disabled={busy} /></label>
+      <label>{config.nameLabel}<input name="name" value={name} onChange={event => setName(event.target.value)} maxLength={config.nameMaxLength} required disabled={busy} {...validation.fieldProps('name')} /><FieldError {...validation.errorProps('name')} /></label>
+      <label>{config.budgetLabel}{currency ? ` (${currency})` : ''}<input name="budget" type="number" min={10 ** -budgetFractionDigits(currency)} step={10 ** -budgetFractionDigits(currency)} value={budget} onChange={event => setBudget(event.target.value)} inputMode="decimal" required disabled={busy} {...validation.fieldProps('budget')} /><FieldError {...validation.errorProps('budget')} /></label>
+      <label>{config.countryLabel}<input name="countryCode" value={countryCode} onChange={event => setCountryCode(event.target.value.toUpperCase())} maxLength={2} pattern="[A-Za-z]{2}" placeholder="MA" required disabled={busy} {...validation.fieldProps('countryCode')} /><FieldError {...validation.errorProps('countryCode')} /></label>
       <label>{config.goalLabel}<select value={optimizationGoal} onChange={event => setOptimizationGoal(event.target.value)} disabled={busy}>{config.options.map(({value, label}) => <option key={value} value={value}>{label}</option>)}</select></label>
       <button type="submit" disabled={busy}>{busy ? 'Creating…' : config.actionLabel}</button>
     </div>

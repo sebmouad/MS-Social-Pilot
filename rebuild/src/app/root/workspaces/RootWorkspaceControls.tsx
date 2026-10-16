@@ -3,8 +3,10 @@
 import { useState, type FormEvent } from 'react';
 import { ModalDialog } from '@/components/ModalDialog';
 import { Button } from '@/components/Button';
+import { FieldError, useFormValidation } from '@/components/FormValidation';
 
 export function CreateRootWorkspace({ defaultTimezone, maxName }: { defaultTimezone: string; maxName: number }) {
+  const validation = useFormValidation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [timezone, setTimezone] = useState(defaultTimezone);
@@ -15,7 +17,14 @@ export function CreateRootWorkspace({ defaultTimezone, maxName }: { defaultTimez
   const cleanName = name.trim();
   const cleanEmail = email.trim().toLowerCase();
   const phrase = `CREATE ${cleanName} FOR ${cleanEmail}`;
-  function prepare(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setError(''); setConfirmation(''); setOpen(true); }
+  function prepare(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const errors: Record<string, string> = {};
+    if (!cleanName) errors.name = 'Enter a workspace name.';
+    try { new Intl.DateTimeFormat('en', { timeZone: timezone.trim() }); } catch { errors.timezone = 'Enter a valid timezone, such as Africa/Casablanca.'; }
+    if (!validation.validate(event.currentTarget, errors)) return;
+    setError(''); setConfirmation(''); setOpen(true);
+  }
   async function create() {
     setBusy(true); setError('');
     try {
@@ -25,7 +34,11 @@ export function CreateRootWorkspace({ defaultTimezone, maxName }: { defaultTimez
       window.location.reload();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Workspace could not be created.'); setBusy(false); }
   }
-  return <><form method="post" className="root-directory__create" onSubmit={prepare}><label className="ui-field">Workspace name<input className="ui-input" value={name} onChange={event => setName(event.target.value)} maxLength={maxName} required /></label><label className="ui-field">Owner email<input className="ui-input" type="email" value={email} onChange={event => setEmail(event.target.value)} required /></label><label className="ui-field">Timezone<input className="ui-input" value={timezone} onChange={event => setTimezone(event.target.value)} required /></label><Button type="submit" variant="primary">Create workspace</Button></form>
+  return <><form method="post" noValidate className="root-directory__create" onSubmit={prepare}>
+    <label className="ui-field">Workspace name<input {...validation.fieldProps('name')} name="name" className="ui-input" value={name} onChange={event => setName(event.target.value)} maxLength={maxName} required /><FieldError {...validation.errorProps('name')} /></label>
+    <label className="ui-field">Owner email<input {...validation.fieldProps('email')} name="email" className="ui-input" type="email" value={email} onChange={event => setEmail(event.target.value)} required /><FieldError {...validation.errorProps('email')} /></label>
+    <label className="ui-field">Timezone<input {...validation.fieldProps('timezone')} name="timezone" className="ui-input" value={timezone} onChange={event => setTimezone(event.target.value)} required /><FieldError {...validation.errorProps('timezone')} /></label>
+    <Button type="submit" variant="primary">Create workspace</Button></form>
     {open && <ModalDialog className="ui-dialog" labelledBy="root-create-workspace" onDismiss={() => { if (!busy) setOpen(false); }} busy={busy}>
       <div className="ui-dialog__header"><h2 id="root-create-workspace">Create workspace?</h2></div>
       <div className="ui-dialog__body"><p><strong>{cleanName}</strong> · {timezone} · owner {cleanEmail}</p><p>The owner will gain access immediately.</p><label className="ui-field"><span>Type <strong>{phrase}</strong> to confirm</span><input className="ui-input" value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" /></label>{error && <p className="ui-error" role="alert">{error}</p>}</div>

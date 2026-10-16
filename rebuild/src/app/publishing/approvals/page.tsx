@@ -1,3 +1,4 @@
+import { AutoTextarea } from '@/components/AutoTextarea';
 import { PostPreview } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
 import { listPostPage } from "@/server/data";
@@ -32,10 +33,10 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
     {listing.total === 0 ? <EmptyState title="No posts are waiting for approval">When a teammate submits a draft for review, it appears here so you can approve or reject it.</EmptyState> : <>
       <ul className={workflow.items} aria-label={`Posts awaiting approval, page ${listing.page} of ${listing.pages}`}>{listing.posts.map(post => {
         const actions = canReview ? <div className={workflow.actions}>
-          <form className={workflow.form} action={reviewWithNoteAction}>
+          <form noValidate className={workflow.form} action={reviewWithNoteAction}>
             <input type="hidden" name="postId" value={post.id} />
             <label htmlFor={`note-${post.id}`}>Review note (optional)</label>
-            <textarea id={`note-${post.id}`} name="note" maxLength={500} rows={2} aria-describedby={`note-help-${post.id}`} placeholder="Why you approved or rejected it" />
+            <AutoTextarea id={`note-${post.id}`} name="note" maxLength={500} rows={2} aria-describedby={`note-help-${post.id}`} placeholder="Why you approved or rejected it" />
             <ReviewButtons />
             <p className={workflow.help} id={`note-help-${post.id}`}>Approving returns the post to drafts. Your note is saved with the decision.</p>
           </form>

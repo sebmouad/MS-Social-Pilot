@@ -37,7 +37,7 @@ export function RootDiagnosticsClient({ initial }: { initial: Snapshot }) {
   }
   const latest = receipt ?? initial.history.find(item => item.result)?.result ?? null;
   return <section className="root-jobs" aria-label={`${initial.label} diagnostics`} aria-busy={busy}>
-    <form id={formId} onSubmit={event => { event.preventDefault(); void run(); }} />
+    <form id={formId} method="post" noValidate onSubmit={event => { event.preventDefault(); void run(); }} />
     <SidebarDock><section className="root-diagnostics__tools" aria-label="Diagnostic controls"><h2>Diagnostics</h2>
       {initial.scope.startsWith('platform:') && <label className="ui-field">Test connection<select className="ui-input" value={connectionId} disabled={busy} onChange={event => { setConnectionId(event.target.value); setReceipt(null); }}>
         <option value="">Configuration only</option>{initial.connections.map(connection => <option key={connection.id} value={connection.id}>{connection.name} · {connection.workspaceId}</option>)}
