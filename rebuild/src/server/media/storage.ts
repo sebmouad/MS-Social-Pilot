@@ -6,6 +6,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { canonicalMediaRoot, validateWorkspaceId } from '@/server/data-control/storage';
 import { prisma } from '@/server/data';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
+import { MediaStorageUnavailable, MediaValidationError } from './errors';
 
 export type MediaActor = { userId: string; workspaceId: string };
 export type WorkspaceImage = { id: string; mimeType: string; fileName: string };
@@ -46,8 +47,10 @@ async function ensureRealDirectory(dir: string, parent: string, create: boolean)
 async function workspaceImageDirectory(workspaceId: string, create: boolean): Promise<string> {
   validateWorkspaceId(workspaceId);
   const configuredRoot = await runtimeConfig('storage.mediaRoot') as string;
-  if (!configuredRoot) throw new Error('Set the media storage root in Root before uploading images.');
-  const root = await canonicalMediaRoot(configuredRoot);
+  if (!configuredRoot) throw new MediaStorageUnavailable();
+  let root: string;
+  try { root = await canonicalMediaRoot(configuredRoot); }
+  catch { throw new MediaStorageUnavailable(); }
   const workspaceDir = path.join(root, workspaceId);
   await ensureRealDirectory(workspaceDir, root, create);
   const imageDir = path.join(workspaceDir, 'images');
@@ -58,11 +61,12 @@ async function workspaceImageDirectory(workspaceId: string, create: boolean): Pr
 export async function uploadWorkspaceImage(actor: MediaActor, file: File): Promise<WorkspaceImage> {
   const maxBytes = await runtimeConfig('publishing.maxImageUploadBytes') as number;
   const allowed = await runtimeConfig('publishing.allowedImageMimeTypes') as string[];
-  if (!(file instanceof File) || file.size < 1 || file.size > maxBytes) throw new Error('Image exceeds the configured upload size limit.');
+  if (!(file instanceof File)) throw new MediaValidationError('invalid_file');
+  if (file.size < 1 || file.size > maxBytes) throw new MediaValidationError('too_large');
   const mimeType = file.type.toLowerCase();
-  if (!allowed.includes(mimeType) || !allowedSignatures[mimeType]) throw new Error('Image type is not allowed by Root configuration.');
+  if (!allowed.includes(mimeType) || !allowedSignatures[mimeType]) throw new MediaValidationError('invalid_type');
   const bytes = Buffer.from(await file.arrayBuffer());
-  if (!bytes.length || bytes.length > maxBytes || !allowedSignatures[mimeType]!(bytes)) throw new Error('Image content does not match an allowed image type.');
+  if (!bytes.length || bytes.length > maxBytes || !allowedSignatures[mimeType]!(bytes)) throw new MediaValidationError('invalid_content');
   const id = randomUUID();
   const dir = await workspaceImageDirectory(actor.workspaceId, true);
   const filePath = path.join(dir, id);
@@ -121,14 +125,14 @@ function detectedImageMime(bytes: Buffer): string | undefined {
 /** Return a bounded, tenant-scoped page of stored image metadata without reading image bytes. */
 export async function listWorkspaceImages(workspaceId: string, options: { limit: number; cursor?: string }): Promise<{ items: WorkspaceImageListing[]; nextCursor: string | null }> {
   const { limit, cursor } = options;
-  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error('Invalid media listing limit.');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new MediaValidationError('invalid_listing_limit');
   let after: { mtimeMs: number; id: string } | undefined;
   if (cursor) {
     try {
       const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { mtimeMs?: unknown; id?: unknown };
       if (typeof parsed.mtimeMs !== 'number' || !Number.isFinite(parsed.mtimeMs) || typeof parsed.id !== 'string' || !IMAGE_ID.test(parsed.id)) throw new Error();
       after = { mtimeMs: parsed.mtimeMs, id: parsed.id };
-    } catch { throw new Error('Invalid media cursor.'); }
+    } catch { throw new MediaValidationError('invalid_cursor'); }
   }
   const dir = await workspaceImageDirectory(workspaceId, false).catch(error => {
     if (typeof error === 'object' && error && 'code' in error && error.code === 'ENOENT') return null;

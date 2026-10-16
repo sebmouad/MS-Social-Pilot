@@ -47,6 +47,7 @@ vi.mock('../src/server/media/storage', () => ({ listWorkspaceImages: media.list,
 import { handleMcpMessage, type McpViewer } from '../src/server/mcp/server';
 import { resolvePermissions } from '../src/server/permissions';
 import { OperationError } from '../src/lib/operation-error';
+import { MediaStorageUnavailable, MediaValidationError } from '../src/server/media/errors';
 
 const viewer: McpViewer = {
   userId: 'user-a', workspaceId: 'workspace-a', role: 'owner',
@@ -119,6 +120,30 @@ describe('MCP workspace boundaries', () => {
     const result = (await response.json()).result;
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toEqual({ code: 'reconnect_required', error: 'Reconnect this advertising connection and allow advertising changes.' });
+  });
+  it('redacts unexpected storage exceptions from all workspace image tools', async () => {
+    const cases: Array<[() => void, string, Record<string, unknown>]> = [
+      [() => media.list.mockRejectedValueOnce(new Error('EACCES /srv/private/root/media/images')), 'list_workspace_images', { limit: 10 }],
+      [() => media.get.mockRejectedValueOnce(new Error('ENOENT /srv/private/root/media/image-a')), 'get_workspace_image', { imageId: 'image-a' }],
+      [() => media.remove.mockRejectedValueOnce(new Error('EIO /srv/private/root/media/image-a')), 'delete_workspace_image', { imageId: 'image-a', confirmation: 'DELETE WORKSPACE IMAGE image-a' }],
+      [() => media.upload.mockRejectedValueOnce(new Error('EACCES /srv/private/root/media/images')), 'upload_workspace_image', { fileName: 'new.png', mimeType: 'image/png', base64: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).toString('base64'), confirmation: 'UPLOAD WORKSPACE IMAGE new.png' }],
+    ];
+    for (const [reject, name, args] of cases) {
+      reject();
+      const result = (await (await call(name, args)).json()).result;
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toEqual({ code: 'upstream_failure', error: 'The image operation could not be completed. Please try again.' });
+      expect(JSON.stringify(result)).not.toMatch(/EACCES|ENOENT|EIO|private\/root/);
+    }
+  });
+  it('maps typed media storage and validation failures to safe MCP codes', async () => {
+    media.list.mockRejectedValueOnce(new MediaStorageUnavailable());
+    const unavailable = (await (await call('list_workspace_images', { limit: 10 })).json()).result;
+    expect(unavailable.structuredContent).toEqual({ code: 'unavailable', error: 'Image storage is temporarily unavailable. Try again later.' });
+
+    media.get.mockRejectedValueOnce(new MediaValidationError('invalid_cursor'));
+    const invalid = (await (await call('get_workspace_image', { imageId: 'image-a' })).json()).result;
+    expect(invalid.structuredContent).toEqual({ code: 'invalid_request', error: 'Invalid media cursor.' });
   });
   it('rejects string budgets instead of coercing a different input shape than HTTP accepts', async () => {
     const response = await call('update_ad', { adAccountId: 'account-a', objectId: 'campaign-a', objectType: 'campaign', dailyBudgetMinor: '500', confirmation: 'SET AD BUDGET campaign-a TO 500 MINOR UNITS' });

@@ -9,6 +9,7 @@ const db = vi.hoisted(() => ({ post: { findMany: vi.fn(async (): Promise<Array<{
 vi.mock('../src/server/data', () => ({ prisma: db }));
 
 import { listWorkspaceImages, readWorkspaceImage, selectOrphanImageIds, uploadWorkspaceImage } from '../src/server/media/storage';
+import { MediaStorageUnavailable, MediaValidationError } from '../src/server/media/errors';
 
 let tempRoot = '';
 afterEach(async () => { if (tempRoot) await rm(tempRoot, { recursive: true, force: true }); tempRoot = ''; config.maxBytes = 1024; });
@@ -69,11 +70,17 @@ describe('workspace image storage', () => {
     tempRoot = await mkdtemp(path.join(os.tmpdir(), 'media-store-test-'));
     config.root = path.join(tempRoot, 'root');
     await mkdir(config.root);
-    await expect(uploadWorkspaceImage({ userId: 'u1', workspaceId: 'w1' }, new File(['not jpeg'], 'x.jpg', { type: 'image/jpeg' }))).rejects.toThrow(/content/);
+    await expect(uploadWorkspaceImage({ userId: 'u1', workspaceId: 'w1' }, new File(['not jpeg'], 'x.jpg', { type: 'image/jpeg' }))).rejects.toBeInstanceOf(MediaValidationError);
     config.maxBytes = 2;
-    await expect(uploadWorkspaceImage({ userId: 'u1', workspaceId: 'w1' }, new File(['abc'], 'x.jpg', { type: 'image/jpeg' }))).rejects.toThrow(/size limit/);
+    await expect(uploadWorkspaceImage({ userId: 'u1', workspaceId: 'w1' }, new File(['abc'], 'x.jpg', { type: 'image/jpeg' }))).rejects.toBeInstanceOf(MediaValidationError);
     config.maxBytes = 1024;
     await symlink(tempRoot, path.join(config.root, 'workspace-a'));
     await expect(uploadWorkspaceImage({ userId: 'u1', workspaceId: 'workspace-a' }, new File([Buffer.from([0xff, 0xd8, 0xff])], 'x.jpg', { type: 'image/jpeg' }))).rejects.toThrow(/unsafe media directory/);
+  });
+
+  it('types a missing configured media root as storage unavailable', async () => {
+    tempRoot = await mkdtemp(path.join(os.tmpdir(), 'media-store-test-'));
+    config.root = path.join(tempRoot, 'missing-root');
+    await expect(listWorkspaceImages('workspace-a', { limit: 10 })).rejects.toBeInstanceOf(MediaStorageUnavailable);
   });
 });

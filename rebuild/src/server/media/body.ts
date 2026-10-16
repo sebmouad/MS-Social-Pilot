@@ -1,13 +1,14 @@
-/** Bound the complete multipart envelope before parsing it into memory. */
-export class MediaBodyTooLarge extends Error {}
+import { MediaBodyTooLarge, MediaValidationError } from './errors';
+
+export { MediaBodyTooLarge } from './errors';
 
 export async function readBoundedImageForm(request: Request, maxBytes: number): Promise<FormData> {
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new Error('Invalid media request limit.');
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new MediaValidationError('invalid_limit');
   const declared = Number(request.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > maxBytes) throw new MediaBodyTooLarge('Image request exceeds the configured size limit.');
+  if (Number.isFinite(declared) && declared > maxBytes) throw new MediaBodyTooLarge();
   const contentType = request.headers.get('content-type');
-  if (!contentType?.toLowerCase().startsWith('multipart/form-data;')) throw new Error('Upload an image using a multipart form.');
-  if (!request.body) throw new Error('Image request is empty.');
+  if (!contentType?.toLowerCase().startsWith('multipart/form-data;')) throw new MediaValidationError('invalid_form');
+  if (!request.body) throw new MediaValidationError('empty_body');
   const chunks: Uint8Array[] = [];
   const reader = request.body.getReader();
   let total = 0;
@@ -18,7 +19,7 @@ export async function readBoundedImageForm(request: Request, maxBytes: number): 
       total += value.byteLength;
       if (total > maxBytes) {
         await reader.cancel();
-        throw new MediaBodyTooLarge('Image request exceeds the configured size limit.');
+        throw new MediaBodyTooLarge();
       }
       chunks.push(value);
     }
@@ -26,5 +27,9 @@ export async function readBoundedImageForm(request: Request, maxBytes: number): 
   const bytes = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  return new Request(request.url, { method: 'POST', headers: { 'content-type': contentType }, body: bytes }).formData();
+  try {
+    return await new Request(request.url, { method: 'POST', headers: { 'content-type': contentType }, body: bytes }).formData();
+  } catch {
+    throw new MediaValidationError('invalid_form');
+  }
 }

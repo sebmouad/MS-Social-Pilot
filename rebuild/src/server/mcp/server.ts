@@ -1,5 +1,6 @@
 import { inboxTargetWhere } from '../inbox/providers';
 import { withAdsErrorBoundary } from '../ads/errors';
+import { withMediaErrorBoundary } from '../media/mcp-errors';
 import { OperationError } from '@/lib/operation-error';
 import { selectedResourceConnectionWhere } from '../platforms/resource-visibility';
 import { prisma } from '../data';
@@ -184,9 +185,9 @@ async function loadScopedAnalytics(viewer: McpViewer, args: Record<string, unkno
 }
 
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
-  return toolFeatures[name] === 'ads/campaigns'
-    ? withAdsErrorBoundary(() => executeTool(viewer, name, args))
-    : executeTool(viewer, name, args);
+  if (toolFeatures[name] === 'ads/campaigns') return withAdsErrorBoundary(() => executeTool(viewer, name, args));
+  if (['list_workspace_images', 'get_workspace_image', 'delete_workspace_image', 'upload_workspace_image'].includes(name)) return withMediaErrorBoundary(() => executeTool(viewer, name, args));
+  return executeTool(viewer, name, args);
 }
 
 async function executeTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
@@ -212,8 +213,8 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const imageId = requiredString(args, 'imageId');
       requireConfirmation(args, `DELETE WORKSPACE IMAGE ${imageId}`);
       const outcome = await deleteUnusedWorkspaceImage(viewer.workspaceId, imageId);
-      if (outcome === 'in_use') throw new Error('This image is attached to a post and cannot be deleted.');
-      if (outcome === 'missing') throw new Error('Image not found in this workspace.');
+      if (outcome === 'in_use') throw new OperationError('conflict', 'This image is attached to a post and cannot be deleted.');
+      if (outcome === 'missing') throw new OperationError('not_found', 'Image not found in this workspace.');
       await auditWrite(viewer, name, { imageId });
       return { imageId, deleted: true };
     }
@@ -221,13 +222,13 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const fileName = requiredString(args, 'fileName');
       const mimeType = requiredString(args, 'mimeType');
       const encoded = requiredString(args, 'base64');
-      if (fileName.length > 180) throw new Error('fileName must contain at most 180 characters.');
+      if (fileName.length > 180) throw new OperationError('invalid_request', 'fileName must contain at most 180 characters.');
       requireConfirmation(args, `UPLOAD WORKSPACE IMAGE ${fileName}`);
       const maxBytes = Number(await runtimeConfig('publishing.maxImageUploadBytes'));
-      if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || encoded.length > Math.ceil(maxBytes / 3) * 4) throw new Error('Image exceeds the configured upload size limit.');
-      if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) throw new Error('base64 must contain standard padded base64 data.');
+      if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || encoded.length > Math.ceil(maxBytes / 3) * 4) throw new OperationError('invalid_request', 'This image exceeds the upload size limit.');
+      if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) throw new OperationError('invalid_request', 'Image data must use standard padded base64.');
       const bytes = Buffer.from(encoded, 'base64');
-      if (!bytes.length || bytes.length > maxBytes || bytes.toString('base64') !== encoded) throw new Error('Image exceeds the configured upload size limit or has invalid base64 data.');
+      if (!bytes.length || bytes.length > maxBytes || bytes.toString('base64') !== encoded) throw new OperationError('invalid_request', 'Image data is empty, invalid, or exceeds the upload size limit.');
       const image = await uploadWorkspaceImage({ userId: viewer.userId, workspaceId: viewer.workspaceId }, new File([bytes], fileName, { type: mimeType }));
       await auditWrite(viewer, name, { imageId: image.id, mimeType: image.mimeType, size: bytes.length });
       return { ...image, size: bytes.length, reference: `media:${image.id}`, url: `/api/media/${image.id}` };
