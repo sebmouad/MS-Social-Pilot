@@ -6,7 +6,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { Prisma } from '../../../generated/client';
 import { withRetries } from '@/server/jobs/retry';
 import type { RetryBackoff } from '@/server/jobs/retry';
-import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
+import { withWorkspaceOperation } from '@/server/data-control/guard';
 import type { JobSummary } from '@/server/jobs/types';
 
 const DAY_MS = 86_400_000;
@@ -51,23 +51,24 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
     const grantedScopes = new Set((account.scopes ?? '').split(',').map(scope => scope.trim()).filter(Boolean));
     if (!requiredScopes.size || [...requiredScopes].some(scope => !grantedScopes.has(scope))) { result.skipped++; continue; }
     try {
-      await assertWorkspaceNotPurging(row.target.workspaceId);
-      const status = await withRetries(() => engine.getStatus(decryptSecret(encrypted), row.remotePostId!), retryLimit, retryBackoff);
-      if (status.state !== 'published') { result.skipped++; continue; }
-      const changed = await prisma.postTarget.updateMany({
-        where: { id: row.id, postId: row.postId, status: 'scheduled_remote', remotePostId: row.remotePostId },
-        data: { status: 'published', ...(status.publishedAt ? { publishedAt: status.publishedAt } : { publishedAt: now }) },
+      await withWorkspaceOperation(row.target.workspaceId, async () => {
+        const status = await withRetries(() => engine.getStatus(decryptSecret(encrypted), row.remotePostId!), retryLimit, retryBackoff);
+        if (status.state !== 'published') { result.skipped++; return; }
+        const changed = await prisma.postTarget.updateMany({
+          where: { id: row.id, postId: row.postId, status: 'scheduled_remote', remotePostId: row.remotePostId },
+          data: { status: 'published', ...(status.publishedAt ? { publishedAt: status.publishedAt } : { publishedAt: now }) },
+        });
+        if (!changed.count) return;
+        result.updated++;
+        const counts = await prisma.postTarget.groupBy({ by: ['status'], where: { postId: row.postId }, _count: true });
+        const total = counts.reduce((sum, item) => sum + item._count, 0);
+        const published = counts.find(item => item.status === 'published')?._count ?? 0;
+        const remote = counts.find(item => item.status === 'scheduled_remote')?._count ?? 0;
+        const failed = counts.find(item => item.status === 'failed')?._count ?? 0;
+        const processing = counts.find(item => item.status === 'processing')?._count ?? 0;
+        const nextStatus = processing ? (published + remote > 0 ? 'partially_failed' : 'publishing') : (published + remote === total ? (remote ? 'scheduled' : 'published') : published ? 'partially_failed' : failed ? 'failed' : undefined);
+        if (nextStatus) await prisma.post.updateMany({ where: { id: row.postId }, data: { status: nextStatus, ...(published && !remote ? { publishedAt: now } : {}), updatedAt: now } });
       });
-      if (!changed.count) continue;
-      result.updated++;
-      const counts = await prisma.postTarget.groupBy({ by: ['status'], where: { postId: row.postId }, _count: true });
-      const total = counts.reduce((sum, item) => sum + item._count, 0);
-      const published = counts.find(item => item.status === 'published')?._count ?? 0;
-      const remote = counts.find(item => item.status === 'scheduled_remote')?._count ?? 0;
-      const failed = counts.find(item => item.status === 'failed')?._count ?? 0;
-      const processing = counts.find(item => item.status === 'processing')?._count ?? 0;
-      const nextStatus = processing ? (published + remote > 0 ? 'partially_failed' : 'publishing') : (published + remote === total ? (remote ? 'scheduled' : 'published') : published ? 'partially_failed' : failed ? 'failed' : undefined);
-      if (nextStatus) await prisma.post.updateMany({ where: { id: row.postId }, data: { status: nextStatus, ...(published && !remote ? { publishedAt: now } : {}), updatedAt: now } });
     } catch {
       result.failed++;
     }
@@ -94,17 +95,18 @@ export async function syncPageAnalytics(now = new Date(), retryLimit = 0, retryB
     const encrypted = target.accessToken ?? account?.accessToken;
     if (!account || account.workspaceId !== target.workspaceId || account.invalidatedAt || (account.tokenExpiresAt && account.tokenExpiresAt <= now) || !encrypted) { result.skipped++; continue; }
     try {
-      await assertWorkspaceNotPurging(target.workspaceId);
-      const observations = await withRetries(() => engine.getPageInsightObservations(decryptSecret(encrypted), target.providerId, since, now), retryLimit, retryBackoff);
-      if (observations.failedMetrics?.length) result.failed++;
-      for (const { metric, period, endTime, value, numeric } of observations) {
-        await prisma.pageInsight.upsert({
-          where: { targetId_metric_period_endTime: { targetId: target.id, metric, period, endTime } },
-          create: { id: `rebuild_${randomUUID()}`, targetId: target.id, metric, period, endTime, value: value === null ? Prisma.JsonNull : value as Prisma.InputJsonValue, numeric, fetchedAt: now },
-          update: { value: value === null ? Prisma.JsonNull : value as Prisma.InputJsonValue, numeric, fetchedAt: now },
-        });
-        result.updated++;
-      }
+      await withWorkspaceOperation(target.workspaceId, async () => {
+        const observations = await withRetries(() => engine.getPageInsightObservations(decryptSecret(encrypted), target.providerId, since, now), retryLimit, retryBackoff);
+        if (observations.failedMetrics?.length) result.failed++;
+        for (const { metric, period, endTime, value, numeric } of observations) {
+          await prisma.pageInsight.upsert({
+            where: { targetId_metric_period_endTime: { targetId: target.id, metric, period, endTime } },
+            create: { id: `rebuild_${randomUUID()}`, targetId: target.id, metric, period, endTime, value: value === null ? Prisma.JsonNull : value as Prisma.InputJsonValue, numeric, fetchedAt: now },
+            update: { value: value === null ? Prisma.JsonNull : value as Prisma.InputJsonValue, numeric, fetchedAt: now },
+          });
+          result.updated++;
+        }
+      });
     } catch { result.failed++; }
   }
   return result;
@@ -130,26 +132,27 @@ export async function syncAdsAnalytics(now = new Date(), retryLimit = 0, retryBa
     const granted = new Set((connection?.scopes ?? '').split(',').map(scope => scope.trim()).filter(Boolean));
     if (!connection || connection.workspaceId !== account.workspaceId || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= now) || !connection.accessToken || !requiredScopes.size || [...requiredScopes].some(scope => !granted.has(scope))) { result.skipped++; continue; }
     try {
-      await assertWorkspaceNotPurging(account.workspaceId);
-      const rows = await withRetries(() => engine.getAdInsights(decryptSecret(connection.accessToken!), account.actId, since, until), retryLimit, retryBackoff);
-      for (const row of rows) {
-        const date = validDate(row.date_start);
-        if (!date) continue;
-        const objectId = typeof row.account_id === 'string' ? row.account_id : account.actId;
-        const objectName = typeof row.account_name === 'string' ? row.account_name : account.name;
-        const spend = finite(row.spend) ?? 0;
-        const impressions = Math.max(0, Math.trunc(finite(row.impressions) ?? 0));
-        const clicks = Math.max(0, Math.trunc(finite(row.clicks) ?? 0));
-        const reach = Math.max(0, Math.trunc(finite(row.reach) ?? 0));
-        const cpc = finite(row.cpc); const cpm = finite(row.cpm); const cpp = finite(row.cpp); const ctr = finite(row.ctr); const frequency = finite(row.frequency);
-        await prisma.adInsight.upsert({
-          where: { adAccountId_level_objectId_date: { adAccountId: account.id, level: 'account', objectId, date } },
-          create: { id: `rebuild_${randomUUID()}`, adAccountId: account.id, level: 'account', objectId, objectName, date, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
-          update: { objectName, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
-        });
-        result.updated++;
-      }
-      await prisma.adAccount.updateMany({ where: { id: account.id, workspaceId: account.workspaceId, enabled: true }, data: { lastSyncedAt: now } });
+      await withWorkspaceOperation(account.workspaceId, async () => {
+        const rows = await withRetries(() => engine.getAdInsights(decryptSecret(connection.accessToken!), account.actId, since, until), retryLimit, retryBackoff);
+        for (const row of rows) {
+          const date = validDate(row.date_start);
+          if (!date) continue;
+          const objectId = typeof row.account_id === 'string' ? row.account_id : account.actId;
+          const objectName = typeof row.account_name === 'string' ? row.account_name : account.name;
+          const spend = finite(row.spend) ?? 0;
+          const impressions = Math.max(0, Math.trunc(finite(row.impressions) ?? 0));
+          const clicks = Math.max(0, Math.trunc(finite(row.clicks) ?? 0));
+          const reach = Math.max(0, Math.trunc(finite(row.reach) ?? 0));
+          const cpc = finite(row.cpc); const cpm = finite(row.cpm); const cpp = finite(row.cpp); const ctr = finite(row.ctr); const frequency = finite(row.frequency);
+          await prisma.adInsight.upsert({
+            where: { adAccountId_level_objectId_date: { adAccountId: account.id, level: 'account', objectId, date } },
+            create: { id: `rebuild_${randomUUID()}`, adAccountId: account.id, level: 'account', objectId, objectName, date, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
+            update: { objectName, spend, impressions, clicks, reach, cpc, cpm, cpp, ctr, frequency, actions: row.actions === undefined ? undefined : row.actions as Prisma.InputJsonValue, fields: row as unknown as Prisma.InputJsonValue, fetchedAt: now },
+          });
+          result.updated++;
+        }
+        await prisma.adAccount.updateMany({ where: { id: account.id, workspaceId: account.workspaceId, enabled: true }, data: { lastSyncedAt: now } });
+      });
     } catch { result.failed++; }
   }
   return result;
@@ -176,38 +179,39 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
     const granted = new Set((account?.scopes ?? '').split(',').map(scope => scope.trim()).filter(Boolean));
     if (!account || account.workspaceId !== target.workspaceId || account.invalidatedAt || (account.tokenExpiresAt && account.tokenExpiresAt <= now) || !encrypted || !required.size || [...required].some(scope => !granted.has(scope))) { result.skipped++; continue; }
     try {
-      await assertWorkspaceNotPurging(target.workspaceId);
-      const token = decryptSecret(encrypted);
-      const conversations = await withRetries(() => engine.listInbox(token, target.providerId), retryLimit, retryBackoff);
-      const posts = await prisma.postTarget.findMany({ where: { targetId: target.id, status: 'published', remotePostId: { not: null } }, orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }], take: limit, select: { id: true, remotePostId: true } });
-      const commentBatches: Array<{ postTargetId: string; comments: Awaited<ReturnType<typeof engine.listComments>> }> = [];
-      for (const post of posts) if (post.remotePostId) commentBatches.push({ postTargetId: post.id, comments: await withRetries(() => engine.listComments(token, post.remotePostId!), retryLimit, retryBackoff) });
-      await prisma.$transaction(async tx => {
-        for (const conversation of conversations) {
-          const stored = await tx.conversation.upsert({
-            where: { targetId_remoteId: { targetId: target.id, remoteId: conversation.id } },
-            create: { id: `rebuild_${randomUUID()}`, targetId: target.id, remoteId: conversation.id, snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: now },
-            update: { snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: now },
-            select: { id: true },
-          });
-          for (const message of conversation.messages) {
-            await tx.conversationMessage.upsert({
-              where: { conversationId_remoteId: { conversationId: stored.id, remoteId: message.id } },
-              create: { id: `rebuild_${randomUUID()}`, conversationId: stored.id, remoteId: message.id, fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
-              update: { fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
+      await withWorkspaceOperation(target.workspaceId, async () => {
+        const token = decryptSecret(encrypted);
+        const conversations = await withRetries(() => engine.listInbox(token, target.providerId), retryLimit, retryBackoff);
+        const posts = await prisma.postTarget.findMany({ where: { targetId: target.id, status: 'published', remotePostId: { not: null } }, orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }], take: limit, select: { id: true, remotePostId: true } });
+        const commentBatches: Array<{ postTargetId: string; comments: Awaited<ReturnType<typeof engine.listComments>> }> = [];
+        for (const post of posts) if (post.remotePostId) commentBatches.push({ postTargetId: post.id, comments: await withRetries(() => engine.listComments(token, post.remotePostId!), retryLimit, retryBackoff) });
+        await prisma.$transaction(async tx => {
+          for (const conversation of conversations) {
+            const stored = await tx.conversation.upsert({
+              where: { targetId_remoteId: { targetId: target.id, remoteId: conversation.id } },
+              create: { id: `rebuild_${randomUUID()}`, targetId: target.id, remoteId: conversation.id, snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: now },
+              update: { snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: now },
+              select: { id: true },
+            });
+            for (const message of conversation.messages) {
+              await tx.conversationMessage.upsert({
+                where: { conversationId_remoteId: { conversationId: stored.id, remoteId: message.id } },
+                create: { id: `rebuild_${randomUUID()}`, conversationId: stored.id, remoteId: message.id, fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
+                update: { fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
+              });
+              result.updated++;
+            }
+            result.updated++;
+          }
+          for (const batch of commentBatches) for (const comment of batch.comments) {
+            await tx.postComment.upsert({
+              where: { postTargetId_remoteId: { postTargetId: batch.postTargetId, remoteId: comment.id } },
+              create: { id: `rebuild_${randomUUID()}`, postTargetId: batch.postTargetId, remoteId: comment.id, parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, createdTime: comment.createdAt, fetchedAt: now },
+              update: { parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, fetchedAt: now },
             });
             result.updated++;
           }
-          result.updated++;
-        }
-        for (const batch of commentBatches) for (const comment of batch.comments) {
-          await tx.postComment.upsert({
-            where: { postTargetId_remoteId: { postTargetId: batch.postTargetId, remoteId: comment.id } },
-            create: { id: `rebuild_${randomUUID()}`, postTargetId: batch.postTargetId, remoteId: comment.id, parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, createdTime: comment.createdAt, fetchedAt: now },
-            update: { parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, fetchedAt: now },
-          });
-          result.updated++;
-        }
+        });
       });
     } catch { result.failed++; }
   }

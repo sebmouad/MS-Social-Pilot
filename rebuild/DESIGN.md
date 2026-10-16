@@ -91,3 +91,5 @@ The line icons in `src/components/AppShell.tsx` use a consistent light stroke an
 - Do verify each theme on desktop and phone widths before releasing shared style changes.
 - Don't use a light-only surface or raw color in a screen-local style.
 - Don't imply that a partial archive, metric, or provider capability is complete.
+
+Root directory forms use `.ui-field` and `.ui-input` primitives: stacked labels, a 44px input target, semantic surface/line/text colors, invalid borders and disabled state. These primitives currently cover Root directory search, creation and confirmations; other route-specific fields remain to be consolidated. Root dialog actions use the shared `Button` variants. Avoid directory-specific CSS that overrides those variants or restores native unthemed controls.

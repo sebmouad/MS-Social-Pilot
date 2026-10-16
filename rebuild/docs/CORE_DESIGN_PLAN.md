@@ -27,6 +27,14 @@ Queue and approvals use the same complete post preview within a readable 720px m
 
 Synthetic campaign images are opt-in repeatable fixtures with guarded local storage. Browser draft-upload and offline-retry checks persisted first comments, were read through authenticated MCP and were cleaned up. HTTP/MCP media errors expose safe typed messages rather than internal paths or Root instructions. This is functional local evidence, not remote publishing or completed UI/API/MCP parity.
 
+## Root access and directory batch
+
+Users and Workspaces search now live in the contextual sidebar. Counts distinguish matches from installation totals, stale page requests clamp to available pages, and empty-state copy stays outside the horizontal table region. Root directory forms and confirmation dialogs use shared theme fields and buttons. Workspace access shows Active/Suspended, with exact resource/action confirmation for suspension or restoration, duplicate-submit protection and retained error input. The private shared service rechecks installation-owner identity, serializes access changes against workspace operations, retains records and audits state changes atomically. UI and authenticated Root MCP use that service; workspace API keys cannot access it.
+
+The shared workspace lock rejects new side effects after suspension. Background provider status, channel/Ads analytics and Inbox sync now hold the same lock across provider requests, retries and storage. Existing operations finish before suspension commits. Customer entitlements hide suspended workspace features; installation owners may inspect retained data and restore access, while ordinary workspace operations still fail closed. Access-limited UI offers workspace switching and sign-out without internal setup instructions.
+
+Root workspace deletion, plans, backups, the complete legacy operator inventory and full MCP parity remain separate work. This batch adds no database schema migration or new configuration key; its lock timeouts use existing validated Root settings.
+
 ## Remaining boundaries
 
 The legacy app is a reference, not a source of shared provider-specific business rules. Existing production remains running. Local previews use synthetic data. Design coverage, implemented actions, automated checks, browser evidence and live-provider evidence must remain distinct. This plan does not declare the design, adapter, MCP parity or cutover complete.

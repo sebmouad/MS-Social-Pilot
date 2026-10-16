@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { rootDirectoryQuery } from '../src/server/root/directory';
+import { describe, expect, it, vi } from 'vitest';
+const state = vi.hoisted(() => ({ count: vi.fn(), find: vi.fn(), access: vi.fn() }));
+vi.mock('../src/server/data', () => ({ prisma: { user: { count: state.count, findMany: state.find }, workspace: { count: state.count, findMany: state.find }, $queryRaw: state.access } }));
+import { listRootUsers, listRootWorkspaces, rootDirectoryQuery } from '../src/server/root/directory';
 
 describe('Root directory pagination', () => {
   it('normalizes search and keeps page within safe bounds', () => {
@@ -9,5 +11,19 @@ describe('Root directory pagination', () => {
 
   it('rejects unsafe page sizes', () => {
     expect(() => rootDirectoryQuery({}, 0)).toThrow(/page size/);
+  });
+
+  it('bounds stale user directory pages to the actual matching count', async () => {
+    state.count.mockResolvedValue(27); state.find.mockResolvedValue([]);
+    const result = await listRootUsers({ q: 'Studio', page: '999999' }, 25);
+    expect(result).toMatchObject({ query: 'Studio', page: 2, skip: 25, total: 27 });
+    expect(state.find).toHaveBeenLastCalledWith(expect.objectContaining({ skip: 25, take: 25 }));
+  });
+
+  it('keeps empty workspace searches on page one without an unbounded access query', async () => {
+    state.count.mockResolvedValue(0); state.find.mockResolvedValue([]); state.access.mockClear();
+    const result = await listRootWorkspaces({ q: 'Missing', page: '999999' }, 25);
+    expect(result).toMatchObject({ page: 1, skip: 0, total: 0, workspaces: [] });
+    expect(state.access).not.toHaveBeenCalled();
   });
 });

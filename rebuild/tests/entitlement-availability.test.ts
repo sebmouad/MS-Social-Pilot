@@ -8,6 +8,12 @@ const source = {
 };
 
 describe('Root installation availability', () => {
+  it('denies all customer modules in a suspended workspace while permitting private owner inspection', () => {
+    const suspended = { ...source, workspace: { ...source.workspace, suspendedAt: new Date() } };
+    expect(Object.values(resolveEntitlements(suspended).modules).every(enabled => !enabled)).toBe(true);
+    expect(Object.values(resolveEntitlements(suspended).features).every(enabled => !enabled)).toBe(true);
+    expect(resolveEntitlements({ ...suspended, isInstanceOwner: true }).modules.publishing).toBe(true);
+  });
   it('keeps unset controls available and denies a disabled feature', () => {
     const access = resolveEntitlements({ ...source, installationAvailability: { 'entitlements.features.analytics/overview': false, 'entitlements.features.analytics/reports': false } });
     expect(access.features['analytics/overview']).toBe(false);

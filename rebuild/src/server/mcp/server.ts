@@ -1,7 +1,9 @@
 import { inboxTargetWhere } from '../inbox/providers';
 import { withAdsErrorBoundary } from '../ads/errors';
 import { withMediaErrorBoundary } from '../media/mcp-errors';
-import { OperationError } from '@/lib/operation-error';
+import { OperationError, operationFailure } from '@/lib/operation-error';
+import { setRootWorkspaceAccess } from '../root/workspace-access';
+import { listRootWorkspaces } from '../root/directory';
 import { selectedResourceConnectionWhere } from '../platforms/resource-visibility';
 import { prisma } from '../data';
 import { enabledSocialAccountWhere } from '../platforms/registry';
@@ -73,9 +75,11 @@ const tools = [
   { name: 'cancel_scheduled_post', description: 'Return a queued post to drafts before delivery. Confirmation must exactly match CANCEL SCHEDULE <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'set_connection_selection', description: 'Enable or disable one workspace channel or advertising account. Confirmation must exactly identify the selection and action.', inputSchema: { type: 'object', required: ['kind', 'id', 'enabled', 'confirmation'], properties: { kind: { type: 'string', enum: ['target', 'adAccount'] }, id: { type: 'string' }, enabled: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_root_config', description: 'Read installation configuration definitions and safe values. Only available to the signed-in instance owner; secrets are masked.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'list_root_workspaces', description: 'Private installation-owner workspace directory, including access state and record counts. Workspace API keys cannot use this tool.', inputSchema: { type: 'object', properties: { q: { type: 'string' }, page: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
+  { name: 'set_root_workspace_access', description: 'Suspend or restore workspace member access and new app operations. Only signed-in installation owners. Confirmation must exactly match SUSPEND WORKSPACE <workspaceId> or RESTORE WORKSPACE <workspaceId>. Data is retained; existing provider content is not deleted.', inputSchema: { type: 'object', required: ['workspaceId', 'suspended', 'confirmation'], properties: { workspaceId: { type: 'string' }, suspended: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'set_root_config', description: 'Validate and save an installation setting. Only available to the signed-in instance owner. Confirmation must exactly match SET ROOT CONFIG <key> or CLEAR ROOT SECRET <key>.', inputSchema: { type: 'object', required: ['key', 'confirmation'], properties: { key: { type: 'string' }, value: {}, clear: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
 ];
-const rootTools = new Set(['get_root_config', 'set_root_config']);
+const rootTools = new Set(['get_root_config', 'set_root_config', 'list_root_workspaces', 'set_root_workspace_access']);
 const canUseRootTool = (viewer: McpViewer) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
 const dataTools = new Set(['preview_workspace_data_deletion', 'export_workspace_data', 'delete_workspace_data']);
 const adsManagerTools = new Set(['list_ad_accounts', 'get_ad_creation_options', 'create_ad_campaign', 'create_ad_set', 'update_ad']);
@@ -121,7 +125,7 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image']);
+const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -185,19 +189,23 @@ async function loadScopedAnalytics(viewer: McpViewer, args: Record<string, unkno
 }
 
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
+  if (name === 'list_root_workspaces' || name === 'set_root_workspace_access') {
+    try { return await executeTool(viewer, name, args); }
+    catch (error) { const failure = operationFailure(error, 'The workspace operation could not be confirmed. Refresh the directory and try again.'); throw new OperationError(failure.code, failure.error); }
+  }
   if (toolFeatures[name] === 'ads/campaigns') return withAdsErrorBoundary(() => executeTool(viewer, name, args));
   if (['list_workspace_images', 'get_workspace_image', 'delete_workspace_image', 'upload_workspace_image'].includes(name)) return withMediaErrorBoundary(() => executeTool(viewer, name, args));
   return executeTool(viewer, name, args);
 }
 
 async function executeTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
-  if (rootTools.has(name) && !canUseRootTool(viewer)) throw new Error('Root configuration is unavailable.');
+  if (rootTools.has(name) && !canUseRootTool(viewer)) throw new OperationError('forbidden', 'Installation-owner access is required.');
   if (dataTools.has(name) && !canManageData(viewer)) throw new Error('Only workspace owners and admins can manage workspace data.');
   if (adsManagerTools.has(name) && !canManageData(viewer)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage ads.');
   const feature = toolFeatures[name];
   if (feature && !canUseFeature(viewer.entitlements, feature)) throw new OperationError('forbidden', 'This feature is unavailable.');
   if (feature && (!viewer.permissions || !canAccessFeature(viewer.permissions, feature, writeTools.has(name) ? 'write' : 'read'))) throw new OperationError('forbidden', 'You do not have permission to use this feature.');
-  if (writeTools.has(name) && name !== 'delete_workspace_data' && name !== 'set_root_config') {
+  if (writeTools.has(name) && name !== 'delete_workspace_data' && !rootTools.has(name)) {
     await assertWorkspaceNotPurging(viewer.workspaceId);
   }
   const cap = viewer.maxResultItems ?? 100;
@@ -235,6 +243,15 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
     }
     case 'get_root_config':
       return { schemaVersion: CONFIG_SCHEMA_VERSION, definitions: safeConfigShape(), values: await readConfig() };
+    case 'list_root_workspaces': {
+      if (Object.keys(args).some(key => !['q', 'page'].includes(key)) || args.q !== undefined && typeof args.q !== 'string' || args.page !== undefined && (typeof args.page !== 'number' || !Number.isSafeInteger(args.page) || args.page < 1)) throw new OperationError('invalid_request', 'Choose a valid workspace query and page.');
+      const pageSize = Math.min(cap, Number(await runtimeConfig('root.directoryPageSize')));
+      return listRootWorkspaces({ q: args.q as string | undefined, page: args.page === undefined ? undefined : String(args.page) }, pageSize);
+    }
+    case 'set_root_workspace_access': {
+      if (Object.keys(args).some(key => !['workspaceId', 'suspended', 'confirmation'].includes(key)) || typeof args.workspaceId !== 'string' || !args.workspaceId.trim() || typeof args.suspended !== 'boolean' || typeof args.confirmation !== 'string' || !args.confirmation.length) throw new OperationError('invalid_request', 'Invalid workspace access change.');
+      return setRootWorkspaceAccess(viewer.userId, args.workspaceId, args.suspended, args.confirmation);
+    }
     case 'set_root_config': {
       const key = requiredString(args, 'key');
       const clear = args.clear === true;
@@ -620,10 +637,10 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     const name = String(params.name ?? '');
     if (!tools.some(tool => tool.name === name)) return error(-32602, `Unknown tool: ${name}`);
     try {
-      if (rootTools.has(name) && !canUseRootTool(viewer)) throw new Error('Root configuration is unavailable.');
+      if (rootTools.has(name) && !canUseRootTool(viewer)) throw new OperationError('forbidden', 'Installation-owner access is required.');
       if (name === 'set_connection_selection' && viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can change connections.');
       const args = (params.arguments ?? {}) as Record<string, unknown>;
-      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && name !== 'set_root_config') || name === 'get_live_ad_status'
+      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !rootTools.has(name)) || name === 'get_live_ad_status'
         ? await withWorkspaceOperation(viewer.workspaceId, () => runTool(viewer, name, args))
         : await runTool(viewer, name, args);
       return reply(textResult(result));
@@ -639,7 +656,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
     { uri: 'msp://analytics/overview', name: 'Analytics overview', description: 'Selected-channel audience totals and available stored metrics for the default date range.', mimeType: 'application/json' },
     { uri: 'msp://ads/performance', name: 'Ads performance', description: 'Stored campaign, ad set, and ad performance for the default date range.', mimeType: 'application/json' },
     { uri: 'msp://data/deletion-preview', name: 'Data deletion preview', description: 'Current workspace record counts before deletion.', mimeType: 'application/json' },
-    ...(canUseRootTool(viewer) ? [{ uri: 'msp://root/config', name: 'Root configuration', description: 'Installation setting definitions and safe values.', mimeType: 'application/json' }] : []),
+    ...(canUseRootTool(viewer) ? [{ uri: 'msp://root/config', name: 'Root configuration', description: 'Installation setting definitions and safe values.', mimeType: 'application/json' }, { uri: 'msp://root/workspaces', name: 'Installation workspaces', description: 'Private bounded workspace directory and access state.', mimeType: 'application/json' }] : []),
   ].filter(resource => {
     const feature = resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : resource.uri === 'msp://ads/performance' ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
     return (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
@@ -658,6 +675,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
       else if (uri === 'msp://ads/performance') contents = await runTool(viewer, 'get_ads_performance', {});
       else if (uri === 'msp://data/deletion-preview') contents = await runTool(viewer, 'preview_workspace_data_deletion', {});
       else if (uri === 'msp://root/config') contents = await runTool(viewer, 'get_root_config', {});
+      else if (uri === 'msp://root/workspaces') contents = await runTool(viewer, 'list_root_workspaces', {});
       else return error(-32602, `Unknown resource: ${uri}`);
       return reply({ contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(contents, null, 2) }] });
     } catch (failure) {

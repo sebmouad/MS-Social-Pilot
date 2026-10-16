@@ -8,8 +8,7 @@
 .root-directory__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 22px; }
 .root-directory__head h1 { margin: 3px 0; font-size: clamp(27px, 3vw, 38px); letter-spacing: -.04em; }
 .root-directory__head p { color: var(--ink-soft); }
-.root-directory__search { display: flex; gap: 8px; }
-.root-directory__search input { min-height: 40px; padding: 8px 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); }
+.root-directory__search { display: grid; gap: 10px; }
 .root-directory__table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .root-directory table { border-collapse: collapse; width: 100%; font-size: 13px; }
 .root-directory th,.root-directory td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
@@ -17,11 +16,9 @@
 .root-directory tbody tr:last-child td { border-bottom: 0; }
 .root-directory__pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 15px; }
 .root-directory__pager a { color: var(--accent); }
-.root-directory__search label { display: grid; gap: 4px; color: var(--ink-soft); font-size: 12px; }
-.root-directory td button,.root-directory__search button { min-height: 36px; padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--ink); cursor: pointer; }
 .root-directory__self { color: var(--ink-faint); }
 .root-directory__actions { display: flex; gap: 6px; flex-wrap: wrap; min-width: 280px; }
 .root-directory__create { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; padding: 16px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
-.root-directory__create label { display: grid; gap: 4px; color: var(--ink-soft); font-size: 12px; }
-.root-directory__create input { min-height: 40px; padding: 8px 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); }
-.root-directory__create button { min-height: 40px; padding: 8px 13px; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: white; cursor: pointer; }
+.root-directory__create .ui-field { flex: 1 1 180px; }
+.root-directory__create .ui-button { flex: 0 0 auto; }
+.root-directory__workspace-actions { display: flex; gap: 6px; flex-wrap: wrap; min-width: 160px; }

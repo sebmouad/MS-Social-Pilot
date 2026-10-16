@@ -10,6 +10,7 @@ type ActivityRow = {
 };
 
 const ACTIVITY_METADATA: Record<string, { label: string; format?: 'boolean' }> = {
+  suspended: { label: 'workspace suspended', format: 'boolean' },
   postCount: { label: 'posts' }, targetCount: { label: 'destinations' },
   published: { label: 'published' }, failed: { label: 'failed' },
   needsReconciliation: { label: 'needs reconciliation' },

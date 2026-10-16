@@ -11,6 +11,16 @@ beforeEach(() => {
 });
 
 describe('workspace purge write guard', () => {
+  it('refuses new operations in a suspended workspace before running side effects', async () => {
+    const operation = vi.fn();
+    state.transaction.mockImplementation(async (run: (client: unknown) => Promise<unknown>) => run({
+      $queryRaw: async () => [{ id: 'workspace-1', suspendedAt: new Date() }],
+      workspaceDataPurge: { findUnique: vi.fn() },
+    }));
+    await expect(withWorkspaceOperation('workspace-1', operation)).rejects.toMatchObject({ code: 'forbidden', message: 'This workspace is suspended.' });
+    expect(operation).not.toHaveBeenCalled();
+  });
+
   it.each(['requested', 'db_deleted'])('denies workspace actions during %s', async status => {
     state.findUnique.mockResolvedValue({ status });
     await expect(assertWorkspaceNotPurging('workspace-1')).rejects.toThrow('Workspace data deletion is in progress.');

@@ -6,7 +6,7 @@ const state = vi.hoisted(() => ({
   observations: vi.fn(), adInsights: vi.fn(), remoteStatus: vi.fn(), targetUpdate: vi.fn(), targetGroup: vi.fn(), postUpdate: vi.fn(), transaction: vi.fn(),
 }));
 
-vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: vi.fn() }));
+vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_workspaceId: string, operation: () => Promise<unknown>) => operation() }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => {
   if (key === 'platforms.facebook.enabled') return true;
   if (key === 'sync.maxItemsPerJob') return 1;

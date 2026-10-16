@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: vi.fn() }));
+vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_workspaceId: string, operation: () => Promise<unknown>) => operation() }));
 
 const state = vi.hoisted(() => ({ targets: vi.fn(), upsert: vi.fn(), observations: vi.fn(), settingRead: vi.fn(), settingWrite: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: { target: { findMany: state.targets }, pageInsight: { upsert: state.upsert }, appSetting: { findUnique: state.settingRead, upsert: state.settingWrite } } }));

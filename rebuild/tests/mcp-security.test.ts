@@ -20,6 +20,9 @@ const mutations = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), remove: 
 vi.mock('../src/server/post-mutations', () => ({ createLocalDraft: mutations.create, updateLocalDraft: mutations.update, deleteLocalDraft: mutations.remove }));
 vi.mock('../src/server/connection-mutations', () => ({ setConnectionSelections: mutations.select }));
 const rootConfig = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn() }));
+const rootWorkspaces = vi.hoisted(() => ({ list: vi.fn(), change: vi.fn() }));
+vi.mock('../src/server/root/directory', () => ({ listRootWorkspaces: rootWorkspaces.list }));
+vi.mock('../src/server/root/workspace-access', () => ({ setRootWorkspaceAccess: rootWorkspaces.change }));
 vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save, runtimeConfig: vi.fn().mockResolvedValue(366) }));
 const analytics = vi.hoisted(() => ({ load: vi.fn(), build: vi.fn() }));
 vi.mock('../src/server/analytics/data', () => ({ analyticsRange: (start?: string, end?: string) => ({ from: new Date(`${start ?? '2026-10-01'}T00:00:00`), to: new Date(`${end ?? '2026-10-15'}T23:59:59.999`) }), loadAnalytics: analytics.load }));
@@ -93,6 +96,8 @@ beforeEach(() => {
   media.upload.mockResolvedValue({ id: 'image-b', mimeType: 'image/png', fileName: 'new.png' });
   rootConfig.read.mockResolvedValue([{ key: 'meta.appSecret', value: '', isSet: true, source: 'database' }]);
   rootConfig.save.mockResolvedValue(undefined);
+  rootWorkspaces.list.mockResolvedValue({ workspaces: [{ id: 'workspace-b', suspendedAt: null }], total: 1 });
+  rootWorkspaces.change.mockResolvedValue({ changed: true, suspended: true });
   dataControls.preview.mockResolvedValue({ posts: 2 });
   dataControls.export.mockResolvedValue({ format: 'ms-social-pilot-workspace-export', workspace: { id: 'workspace-a' } });
   dataControls.remove.mockResolvedValue({ posts: 2 });
@@ -107,6 +112,45 @@ beforeEach(() => {
 });
 
 describe('MCP workspace boundaries', () => {
+  it('keeps Root workspace tools and resources private to signed-in installation owners', async () => {
+    for (const actor of [viewer, { ...viewer, isInstanceOwner: true, apiKeyId: 'key-1' }]) {
+      const invoke = (method: string, params = {}) => handleMcpMessage(actor, { jsonrpc: '2.0', id: 1, method, params });
+      const listing = await (await invoke('tools/list')).json();
+      expect(listing.result.tools.map((tool: { name: string }) => tool.name)).not.toContain('set_root_workspace_access');
+      const resources = await (await invoke('resources/list')).json();
+      expect(resources.result.resources.map((resource: { uri: string }) => resource.uri)).not.toContain('msp://root/workspaces');
+      const forced = await (await invoke('tools/call', { name: 'set_root_workspace_access', arguments: { workspaceId: 'workspace-b', suspended: true, confirmation: 'SUSPEND WORKSPACE workspace-b' } })).json();
+      expect(forced.result.structuredContent.code).toBe('forbidden');
+      expect((await (await invoke('resources/read', { uri: 'msp://root/workspaces' })).json()).error).toBeDefined();
+    }
+    expect(rootWorkspaces.list).not.toHaveBeenCalled();
+    expect(rootWorkspaces.change).not.toHaveBeenCalled();
+  });
+
+  it('routes Root workspace operations through shared services with bounded reads and strict input types', async () => {
+    const invoke = (name: string, args: Record<string, unknown>) => handleMcpMessage({ ...viewer, isInstanceOwner: true }, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
+    await invoke('list_root_workspaces', { q: 'Studio', page: 2 });
+    expect(rootWorkspaces.list).toHaveBeenCalledWith({ q: 'Studio', page: '2' }, 100);
+    const invalid = await (await invoke('set_root_workspace_access', { workspaceId: 'workspace-b', suspended: 'true', confirmation: 'yes' })).json();
+    expect(invalid.result.structuredContent.code).toBe('invalid_request');
+    expect(rootWorkspaces.change).not.toHaveBeenCalled();
+    await invoke('set_root_workspace_access', { workspaceId: 'workspace-b', suspended: true, confirmation: 'SUSPEND WORKSPACE workspace-b' });
+    expect(rootWorkspaces.change).toHaveBeenCalledWith('user-a', 'workspace-b', true, 'SUSPEND WORKSPACE workspace-b');
+    expect(purgeGuard).not.toHaveBeenCalled();
+  });
+
+  it('redacts unexpected Root directory and access failures while preserving public operation errors', async () => {
+    const invoke = (name: string, args: Record<string, unknown>) => handleMcpMessage({ ...viewer, isInstanceOwner: true }, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
+    rootWorkspaces.list.mockRejectedValueOnce(new Error('postgres://private-password@database'));
+    const failure = await (await invoke('list_root_workspaces', {})).json();
+    expect(failure.result.structuredContent.code).toBe('upstream_failure');
+    expect(JSON.stringify(failure)).not.toContain('private-password');
+    rootWorkspaces.change.mockRejectedValueOnce(new OperationError('conflict', 'Workspace data deletion is in progress.'));
+    const conflict = await (await invoke('set_root_workspace_access', { workspaceId: 'workspace-b', suspended: true, confirmation: 'SUSPEND WORKSPACE workspace-b' })).json();
+    expect(conflict.result.structuredContent).toEqual({ code: 'conflict', error: 'Workspace data deletion is in progress.' });
+    const resource = await (await handleMcpMessage({ ...viewer, isInstanceOwner: true }, { jsonrpc: '2.0', id: 1, method: 'resources/read', params: { uri: 'msp://root/workspaces' } })).json();
+    expect(JSON.parse(resource.result.contents[0].text).workspaces[0].id).toBe('workspace-b');
+  });
   it('does not expose provider exception details from live Ads reads', async () => {
     adsMutations.read.mockRejectedValueOnce(new Error('Provider unavailable: access_token=private-example'));
     const response = await call('get_live_ad_status', { adAccountId: 'account-a', objectId: 'campaign-a', objectType: 'campaign' });

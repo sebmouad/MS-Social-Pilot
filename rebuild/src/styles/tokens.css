@@ -163,6 +163,11 @@ h1, h2, h3 { text-wrap: balance; scroll-margin-top: 88px; }
 .ui-filterbar__fields { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .ui-filter { display: grid; gap: 6px; color: var(--ink-soft); font-size: 11px; font-weight: 650; }
 .ui-filter select { min-width: 140px; height: 38px; padding: 0 32px 0 11px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink); font-size: 12px; }
+.ui-field { display: grid; min-width: 0; gap: 8px; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+.ui-field > span { overflow-wrap: anywhere; }
+.ui-input { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
+.ui-input:disabled { opacity: .65; cursor: not-allowed; }
+.ui-input[aria-invalid=true] { border-color: var(--danger); }
 .ui-dialog { width: min(520px, calc(100% - 32px)); max-height: min(85vh, 740px); padding: 0; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-panel); }
 .ui-dialog::backdrop { background: var(--scrim); backdrop-filter: blur(2px); }
 .ui-dialog__header, .ui-dialog__actions { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 20px 24px; }

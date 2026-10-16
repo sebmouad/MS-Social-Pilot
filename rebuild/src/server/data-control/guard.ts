@@ -23,8 +23,9 @@ export async function withWorkspaceOperation<T>(workspaceId: string, operation: 
     runtimeConfig('data.workspaceOperationLockWaitMs'),
   ]);
   return prisma.$transaction(async tx => {
-    const rows = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM workspaces WHERE id = ${workspaceId} FOR SHARE`;
+    const rows = await tx.$queryRaw<Array<{ id: string; suspendedAt: Date | null }>>`SELECT id, "suspendedAt" FROM workspaces WHERE id = ${workspaceId} FOR SHARE`;
     if (!rows.length) throw new OperationError('unavailable', 'This workspace is unavailable.');
+    if (rows[0]!.suspendedAt) throw new OperationError('forbidden', 'This workspace is suspended.');
     const purge = await tx.workspaceDataPurge.findUnique({ where: { workspaceId }, select: { status: true } });
     if (purge && purge.status !== 'completed') throw new OperationError('conflict', 'Workspace data deletion is in progress.');
     return operation();
