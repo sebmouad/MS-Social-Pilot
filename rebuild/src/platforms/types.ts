@@ -63,10 +63,15 @@ export interface PublishRequest {
   text: string;
   link?: string | null;
   media?: PublishMedia[];
-  firstComment?: string | null;
   signal?: AbortSignal;
 }
 export interface PublishResult { remoteId: string; url: string | null }
+export interface FirstCommentRequest {
+  credential: PlatformCredential;
+  remotePostId: string;
+  text: string;
+  signal?: AbortSignal;
+}
 export interface RemoteStatusRequest { credential: PlatformCredential; remoteId: string; signal?: AbortSignal }
 export interface RemoteStatus { state: 'published' | 'scheduled' | 'unknown'; publishedAt?: Date | null }
 export interface RemoteDeleteRequest { credential: PlatformCredential; remoteId: string; signal?: AbortSignal }
@@ -128,12 +133,14 @@ export interface PlatformAdapter {
   readonly capabilities: CapabilityDeclaration;
   /** Adapter limits for ephemeral server-supplied image bytes during publish. */
   readonly localImageUpload?: { maxBytes: number; mimeTypes: readonly string[] };
-  canUseCredential?(credential: PlatformCredential, capability: 'publishing' | 'remoteStatus' | 'remoteDelete'): boolean;
+  canUseCredential?(credential: PlatformCredential, capability: 'publishing' | 'remoteStatus' | 'remoteDelete' | 'firstComment'): boolean;
   supportsTargetKind?(kind: string, capability: 'publishing' | 'inbox' | 'analytics'): boolean;
   getAuthorizationUrl?(request: OAuthStartRequest): string;
   exchangeCode?(request: OAuthExchangeRequest): Promise<OAuthToken>;
   discover?(request: DiscoveryRequest): Promise<DiscoveryResult>;
   publish?(request: PublishRequest): Promise<PublishResult>;
+  publishFirstComment?(request: FirstCommentRequest): Promise<{ remoteId: string }>;
+  classifyPublishingFailure?(error: unknown): 'rejected' | 'uncertain';
   getRemoteStatus?(request: RemoteStatusRequest): Promise<RemoteStatus>;
   deleteRemote?(request: RemoteDeleteRequest): Promise<void>;
   listInbox?(request: InboxRequest): Promise<InboxItem[]>;

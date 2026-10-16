@@ -13,6 +13,8 @@ import { randomBytes } from 'node:crypto';
 import { canAccessFeature, canAccessPage } from '../permissions';
 import { moderateInboxComment, replyToInbox, setInboxResolved } from '../inbox/actions';
 import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '../publishing/lifecycle';
+import { recordFirstCommentOutcome, sendFirstComment } from '@/modules/publishing/server/first-comment';
+import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
 import { runtimeConfig } from '../config/store';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
 import { analyticsRange } from '../analytics/data';
@@ -69,6 +71,8 @@ const tools = [
   { name: 'update_draft', description: 'Edit an unconnected local draft. Confirmation must be exactly UPDATE DRAFT followed by its ID.', inputSchema: { type: 'object', required: ['postId', 'message', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string', minLength: 1, maxLength: 10000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'delete_draft', description: 'Permanently delete an unconnected local draft. Confirmation must be exactly DELETE DRAFT followed by its ID.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'publish_post', description: 'Publish a workspace post now to its configured destinations. This contacts social platforms. Confirmation must exactly match PUBLISH POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'send_first_comment', description: 'Send the saved first comment once to a confirmed remote post. This contacts the platform. If the result is uncertain, inspect list_posts and do not repeat until the outcome has been manually checked. Confirmation must exactly match SEND FIRST COMMENT <postTargetId>.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'record_first_comment_outcome', description: 'Record an outcome verified manually on the platform. This tool does not contact or verify the platform. NOT SENT permits a separate later send request; SENT requires the platform comment ID. A late request may still appear. Confirmation must exactly match RECORD FIRST COMMENT <postTargetId> SENT or RECORD FIRST COMMENT <postTargetId> NOT SENT.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'outcome', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, outcome: { type: 'string', enum: ['sent', 'not_sent'] }, remoteId: { type: 'string', minLength: 1 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'sync_post_status', description: 'Refresh a post status from supported social platforms. Confirmation must exactly match SYNC POST STATUS <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'delete_post', description: 'Permanently delete a workspace post and its local publishing history. Set deleteRemote to true to also request deletion of remote posts. Confirmation must exactly match DELETE POST <postId> LOCAL or DELETE POST <postId> REMOTE.', inputSchema: { type: 'object', required: ['postId', 'deleteRemote', 'confirmation'], properties: { postId: { type: 'string' }, deleteRemote: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'create_post', description: 'Create a local post draft with selected destinations and optional first comment, link, or media URL. Confirmation must exactly match CREATE POST.', inputSchema: { type: 'object', required: ['message', 'targetIds', 'confirmation'], properties: { message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -115,6 +119,8 @@ const toolFeatures: Record<string, string> = {
   update_draft: 'publishing/posts',
   delete_draft: 'publishing/posts',
   publish_post: 'publishing/posts',
+  send_first_comment: 'publishing/posts',
+  record_first_comment_outcome: 'publishing/posts',
   sync_post_status: 'publishing/posts',
   delete_post: 'publishing/posts',
   create_post: 'publishing/posts',
@@ -126,8 +132,8 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'create_post', 'update_post', 'delete_post', 'publish_post', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post']);
-const writeTools = new Set(['manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
+const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post']);
+const writeTools = new Set(['manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -268,7 +274,12 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       if ((from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime()))) throw new OperationError('invalid_request', 'from and to must be valid ISO dates.');
       const limit = Math.max(1, Math.min(cap, Math.trunc(Number(args.limit) || cap)));
       const pageIds = pageIdsFor(viewer);
-      return prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, ...(pageIds ? { OR: [{ targets: { some: {}, none: { targetId: { notIn: pageIds } } } }, { authorId: viewer.userId, targets: { none: {} } }] } : {}), ...(status.length ? { status: { in: status as never[] } } : {}), ...(from || to ? { scheduledAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}) }, orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }], take: limit, select: { id: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, targets: { where: pageIds ? { targetId: { in: pageIds } } : {}, select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, type: true, name: true } } } } } });
+      const posts = await prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, ...(pageIds ? { OR: [{ targets: { some: {}, none: { targetId: { notIn: pageIds } } } }, { authorId: viewer.userId, targets: { none: {} } }] } : {}), ...(status.length ? { status: { in: status as never[] } } : {}), ...(from || to ? { scheduledAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}) }, orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }], take: limit, select: { id: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, targets: { where: pageIds ? { targetId: { in: pageIds } } : {}, select: { id: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true, target: { select: { id: true, type: true, name: true } } } } } });
+      return posts.map(post => ({ ...post, targets: post.targets.map(row => {
+        const state = firstCommentState(post.firstComment, row);
+        return { id: row.id, status: row.status, remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, target: row.target,
+          firstComment: { state, label: FIRST_COMMENT_LABELS[state], ...(row.firstCommentAt ? { attemptedAt: row.firstCommentAt } : {}), ...(row.firstCommentId ? { remoteCommentId: row.firstCommentId } : {}), errorPresent: Boolean(row.firstCommentError) } };
+      }) }));
     }
     case 'list_inbox': {
       const { channels, ...result } = await readInboxList({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer), maxItems: cap });
@@ -518,6 +529,28 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       requireConfirmation(args, `PUBLISH POST ${postId}`);
       const result = await publishPost(viewer, postId);
       return auditedReceipt(viewer, name, { postId, ...result }, { postId, ...result });
+    }
+    case 'send_first_comment': {
+      const postId = requiredString(args, 'postId');
+      const postTargetId = requiredString(args, 'postTargetId');
+      if (Object.keys(args).some(key => !['postId', 'postTargetId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Choose one post destination.');
+      requireConfirmation(args, `SEND FIRST COMMENT ${postTargetId}`);
+      const result = await sendFirstComment(viewer, { postId, postTargetId });
+      return auditedReceipt(viewer, name, { postId, postTargetId, state: result.state }, result);
+    }
+    case 'record_first_comment_outcome': {
+      const postId = requiredString(args, 'postId');
+      const postTargetId = requiredString(args, 'postTargetId');
+      const outcome = args.outcome;
+      if (outcome !== 'sent' && outcome !== 'not_sent') throw new OperationError('invalid_request', 'outcome must be sent or not_sent.');
+      if (Object.keys(args).some(key => !['postId', 'postTargetId', 'outcome', 'remoteId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Choose one verified comment outcome.');
+      const remoteId = typeof args.remoteId === 'string' ? args.remoteId.trim() : '';
+      if (outcome === 'sent' && !remoteId) throw new OperationError('invalid_request', 'remoteId is required when outcome is sent.');
+      if (outcome === 'not_sent' && remoteId) throw new OperationError('invalid_request', 'Do not include remoteId when outcome is not_sent.');
+      const confirmation = `RECORD FIRST COMMENT ${postTargetId} ${outcome === 'sent' ? 'SENT' : 'NOT SENT'}`;
+      requireConfirmation(args, confirmation);
+      const result = await recordFirstCommentOutcome(viewer, { postId, postTargetId, outcome, ...(remoteId ? { remoteId } : {}), confirmation });
+      return auditedReceipt(viewer, name, { postId, postTargetId, outcome, state: result.state }, result);
     }
     case 'sync_post_status': {
       const postId = typeof args.postId === 'string' ? args.postId : '';

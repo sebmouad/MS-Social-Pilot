@@ -1,6 +1,12 @@
 import { PrismaClient, type Prisma, type PostStatus } from "../../generated/client";
 import { selectedResourceConnectionWhere } from './platforms/resource-visibility';
 import { enabledSocialAccountWhere } from './platforms/registry';
+import { FIRST_COMMENT_REJECTED } from '@/modules/publishing/first-comment-state';
+
+/** Legacy error strings can contain provider details; never serialize them to clients. */
+function safeCommentErrors<T extends { targets: Array<{ firstCommentError: string | null }> }>(posts: T[]): T[] {
+  return posts.map(post => ({ ...post, targets: post.targets.map(row => ({ ...row, firstCommentError: row.firstCommentError === FIRST_COMMENT_REJECTED ? FIRST_COMMENT_REJECTED : row.firstCommentError ? 'review_required' : null })) }));
+}
 
 const globalForPrisma = globalThis as typeof globalThis & {
   rebuildPrisma?: PrismaClient;
@@ -144,10 +150,10 @@ export async function listPostPage(workspaceId: string, page: number, pageSize: 
     select: {
       id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true,
       firstComment: true, authorId: true, link: true, media: true,
-      targets: { select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, type: true, name: true, pictureUrl: true } } } },
+      targets: { select: { id: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true, target: { select: { id: true, type: true, name: true, pictureUrl: true } } } },
     },
   });
-  return { posts, total, page: currentPage, pages };
+  return { posts: safeCommentErrors(posts), total, page: currentPage, pages };
 }
 
 /** Read a calendar month without truncating it to the newest workspace posts. */
@@ -178,7 +184,7 @@ export async function listCalendarRange(workspaceId: string, from: Date, to: Dat
     { targets: { some: { targetId: { in: [...allowedTargetIds] } }, every: { targetId: { in: [...allowedTargetIds] } } } },
     { targets: { none: {} }, authorId },
   ] };
-  return prisma.post.findMany({
+  const posts = await prisma.post.findMany({
     where: { workspaceId, AND: [
       scope,
       { OR: [{ scheduledAt: { gte: from, lt: to } }, { publishedAt: { gte: from, lt: to } }] },
@@ -189,9 +195,10 @@ export async function listCalendarRange(workspaceId: string, from: Date, to: Dat
     select: {
       id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, authorId: true,
       firstComment: true, link: true, media: true,
-      targets: { select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, name: true, type: true, pictureUrl: true, socialAccount: { select: { provider: true } } } } } },
+      targets: { select: { id: true, status: true, remotePostId: true, remoteUrl: true, firstCommentId: true, firstCommentAt: true, firstCommentError: true, target: { select: { id: true, name: true, type: true, pictureUrl: true, socialAccount: { select: { provider: true } } } } } },
     },
   });
+  return safeCommentErrors(posts);
 }
 
 /** Read the basic workspace details used by the new app shell. */

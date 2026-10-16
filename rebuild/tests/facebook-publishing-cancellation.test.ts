@@ -33,23 +33,44 @@ describe('Facebook publishing cancellation', () => {
     }) as unknown as typeof fetch;
     const publish = createFacebookPublisher(config, fetcher);
 
-    await expect(publish({ ...publishRequest(controller.signal), firstComment: 'Follow-up', media: [
+    await expect(publish({ ...publishRequest(controller.signal), media: [
       { kind: 'image', url: 'https://cdn.test/a.jpg', localFile: jpeg('a.jpg') },
       { kind: 'image', url: 'https://cdn.test/b.jpg', localFile: jpeg('b.jpg') },
     ] })).rejects.toBeInstanceOf(FacebookApiError);
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it('does not dispatch a first-comment request after the post response is cancelled', async () => {
+  it('returns the post result without dispatching a first-comment request', async () => {
     const controller = new AbortController();
-    const fetcher = vi.fn(async () => {
-      controller.abort();
-      return response({ id: 'post-1' });
-    }) as unknown as typeof fetch;
-    const publish = createFacebookPublisher(config, fetcher);
+    const fetcher = vi.fn(async () => response({ id: 'post-1' })) as unknown as typeof fetch;
+    const adapter = createFacebookAdapter(config, fetcher);
 
-    await expect(publish({ ...publishRequest(controller.signal), firstComment: 'Follow-up' })).rejects.toBeInstanceOf(FacebookApiError);
+    await expect(adapter.publish!({ ...publishRequest(controller.signal) })).resolves.toMatchObject({ remoteId: 'post-1' });
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches a first comment separately and requires a nonempty remote comment id', async () => {
+    const fetcher = vi.fn(async () => response({ id: 'comment-1' })) as unknown as typeof fetch;
+    const adapter = createFacebookAdapter(config, fetcher);
+
+    await expect(adapter.publishFirstComment!({ credential: { accessToken: 'page-token' }, remotePostId: 'post-1', text: 'Follow-up' }))
+      .resolves.toEqual({ remoteId: 'comment-1' });
+    expect(String((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0])).toContain('/post-1/comments');
+
+    const invalidAdapter = createFacebookAdapter(config, vi.fn(async () => response({ id: '  ' })) as unknown as typeof fetch);
+    await expect(invalidAdapter.publishFirstComment!({ credential: { accessToken: 'page-token' }, remotePostId: 'post-1', text: 'Follow-up' }))
+      .rejects.toBeInstanceOf(FacebookApiError);
+  });
+
+  it('does not dispatch first-comment work when its signal is already cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const fetcher = vi.fn();
+    const adapter = createFacebookAdapter(config, fetcher as unknown as typeof fetch);
+
+    await expect(adapter.publishFirstComment!({ credential: { accessToken: 'page-token' }, remotePostId: 'post-1', text: 'Follow-up', signal: controller.signal }))
+      .rejects.toBeInstanceOf(FacebookApiError);
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it('passes a combined abortable signal to an in-flight Graph request', async () => {

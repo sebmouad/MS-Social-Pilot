@@ -1,14 +1,14 @@
 import type { FacebookConfig } from './config';
 import { validateFacebookConfig } from './config';
 import { PlatformApiError } from '../errors';
-import { graphObjectUrl, isFacebookRetryable } from './protocol';
-import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult } from '../types';
+import { graphObjectUrl, isFacebookDefiniteRejection, isFacebookRetryable } from './protocol';
+import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult } from '../types';
 
 export type FacebookFetch = typeof fetch;
 
 export class FacebookApiError extends PlatformApiError {
-  constructor(message: string, readonly status: number, readonly code?: number, readonly subcode?: number) {
-    super(message, isFacebookRetryable(status, code));
+  constructor(message: string, readonly status: number, readonly code?: number, readonly subcode?: number, readonly transient = false) {
+    super(message, isFacebookRetryable(status, code, transient));
     this.name = 'FacebookApiError';
   }
 }
@@ -22,7 +22,7 @@ export interface FacebookAdAccount { id: string; name: string; currency: string 
 export type FacebookMedia = { kind: 'image' | 'video'; url: string; altText?: string; localFile?: { bytes: Uint8Array; mimeType: string; fileName: string } };
 export interface FacebookPublishInput {
   targetId: string; accessToken: string; text?: string; link?: string | null;
-  media?: readonly FacebookMedia[]; firstComment?: string | null;
+  media?: readonly FacebookMedia[];
 }
 export interface FacebookPublished { remoteId: string; url: string | null }
 export interface FacebookPageInsightObservation { metric: string; period: string; endTime: Date; value: unknown; numeric: number | null }
@@ -63,7 +63,8 @@ function normalizeAdAccountId(value: string): string { return value.replace(/^ac
 function graphError(payload: unknown, status: number): FacebookApiError {
   const err = object(object(payload).error);
   return new FacebookApiError(typeof err.message === 'string' ? err.message : `Facebook answered ${status}.`, status,
-    typeof err.code === 'number' ? err.code : undefined, typeof err.error_subcode === 'number' ? err.error_subcode : undefined);
+    typeof err.code === 'number' ? err.code : undefined, typeof err.error_subcode === 'number' ? err.error_subcode : undefined,
+    err.is_transient === true);
 }
 
 /** Create a bounded Graph client. Tokens are sent in form/query parameters and never logged. */
@@ -257,7 +258,6 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       }
       const id = payload.id;
       if (typeof id !== 'string' || !id) throw new FacebookApiError('Facebook did not return a post id.', 200);
-      if (input.firstComment?.trim()) await request(`${encodeURIComponent(id)}/comments`, { method: 'POST', token: input.accessToken, body: { message: input.firstComment.trim() } });
       return { remoteId: id, url: null };
     },
     async getStatus(token, remoteId) {
@@ -405,23 +405,47 @@ export function createFacebookPublisher(config: FacebookConfig, fetchImpl: Faceb
   return async (request: PublishRequest): Promise<PublishResult> => {
     if (request.target.kind !== 'page') throw new FacebookApiError('Facebook publishing currently supports Page targets only.', 0);
     const engine = createFacebookEngine(config, fetchImpl, request.signal);
-    const result = await engine.publish({ targetId: request.target.id, accessToken: request.credential.accessToken, text: request.text, link: request.link, media: request.media, firstComment: request.firstComment });
+    const result = await engine.publish({ targetId: request.target.id, accessToken: request.credential.accessToken, text: request.text, link: request.link, media: request.media });
     return result;
   };
 }
 
-export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { postReadScopes: readonly string[] }): PlatformAdapter {
+function createFacebookFirstCommentPublisher(config: FacebookConfig, fetchImpl: FacebookFetch) {
+  return async (request: FirstCommentRequest): Promise<{ remoteId: string }> => {
+    if (request.signal?.aborted) throw new FacebookApiError('Facebook operation was cancelled.', 0);
+    const text = request.text.trim();
+    if (!request.remotePostId.trim() || !text) throw new FacebookApiError('A Facebook first comment needs a post id and text.', 0);
+    const remoteId = await createFacebookEngine(config, fetchImpl, request.signal)
+      .replyToComment(request.credential.accessToken, request.remotePostId, text);
+    if (typeof remoteId !== 'string' || !remoteId.trim()) throw new FacebookApiError('Facebook did not return a first-comment id.', 200);
+    return { remoteId };
+  };
+}
+
+export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { postReadScopes: readonly string[]; firstCommentScopes?: readonly string[] }): PlatformAdapter {
   const engine = createFacebookEngine(config, fetchImpl);
   const requiredPostReadScopes = policy?.postReadScopes.map(scope => scope.trim()).filter(Boolean) ?? [];
+  const requiredFirstCommentScopes = policy?.firstCommentScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
   return {
     id: 'facebook',
     localImageUpload: { maxBytes: config.maxImageUploadBytes, mimeTypes: config.allowedImageMimeTypes },
     capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
     canUseCredential(credential, capability) {
-      if (capability !== 'remoteStatus') return true;
-      if (!requiredPostReadScopes.length || !credential.grantedScopes) return false;
-      const granted = new Set(credential.grantedScopes.map(scope => scope.trim()));
-      return requiredPostReadScopes.every(scope => granted.has(scope));
+      if (capability === 'remoteStatus') {
+        if (!requiredPostReadScopes.length || !credential.grantedScopes) return false;
+        const granted = new Set(credential.grantedScopes.map(scope => scope.trim()));
+        return requiredPostReadScopes.every(scope => granted.has(scope));
+      }
+      if (capability === 'firstComment') {
+        if (!requiredFirstCommentScopes.length || !credential.grantedScopes) return false;
+        const granted = new Set(credential.grantedScopes.map(scope => scope.trim()));
+        return requiredFirstCommentScopes.every(scope => granted.has(scope));
+      }
+      return true;
+    },
+    classifyPublishingFailure(error) {
+      if (!(error instanceof FacebookApiError)) return 'uncertain';
+      return isFacebookDefiniteRejection(error.status, error.code, error.transient) ? 'rejected' : 'uncertain';
     },
     supportsTargetKind: (kind, capability) => kind === 'page' && ['publishing', 'inbox', 'analytics'].includes(capability),
     getAuthorizationUrl: input => engine.getAuthorizationUrl(input),
@@ -431,6 +455,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
       return { targets: pages.map(p => ({ id: p.id, name: p.name, kind: 'page' })), adAccounts: accounts.map(a => ({ id: a.id, name: a.name, currency: a.currency, status: a.status === null ? null : String(a.status) })) };
     },
     publish: createFacebookPublisher(config, fetchImpl),
+    publishFirstComment: createFacebookFirstCommentPublisher(config, fetchImpl),
     async getRemoteStatus(request) { return createFacebookEngine(config, fetchImpl, request.signal).getStatus(request.credential.accessToken, request.remoteId); },
     async deleteRemote(request) { await createFacebookEngine(config, fetchImpl, request.signal).deletePost(request.credential.accessToken, request.remoteId); },
     async listInbox(request) {

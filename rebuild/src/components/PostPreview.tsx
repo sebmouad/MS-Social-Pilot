@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { StatusChip } from '@/components/StatusChip';
 import styles from './PostPreview.module.css';
+import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
 
 export type PostPreviewPost = {
   id: string;
@@ -16,9 +17,13 @@ export type PostPreviewPost = {
   /** Server-formatted workspace time for previews rendered inside client components. */
   displayTime?: string;
   targets: Array<{
+    id?: string;
     status: string;
     remotePostId: string | null;
     remoteUrl: string | null;
+    firstCommentId?: string | null;
+    firstCommentAt?: Date | string | null;
+    firstCommentError?: string | null;
     target: { id: string; type: string; name: string; pictureUrl: string | null };
   }>;
 };
@@ -92,13 +97,16 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
     </header>
 
     {post.targets.length > 0 ? <ul className={styles.destinations} aria-label="Destinations">
-      {post.targets.map(({ status, remoteUrl, target }) => {
+      {post.targets.map(row => {
+        const { status, remoteUrl, target } = row;
         const picture = webUrl(target.pictureUrl);
         const destinationUrl = webUrl(remoteUrl);
+        const commentState = firstCommentState(post.firstComment, row);
         return <li className={styles.destination} key={target.id}>
           {picture ? <img className={styles.channelAvatar} src={picture} alt="" loading="lazy" /> : <span className={styles.channelFallback} aria-hidden="true">{initials(target.name)}</span>}
           <span className={styles.channelName}>{target.name}</span>
           <StatusChip status={status} compact />
+          {commentState !== 'not_requested' ? <span className={styles.noDestinations}>{FIRST_COMMENT_LABELS[commentState]}</span> : null}
           {destinationUrl ? <a href={destinationUrl} target="_blank" rel="noopener noreferrer">View post</a> : null}
         </li>;
       })}

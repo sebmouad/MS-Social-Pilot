@@ -77,15 +77,13 @@ describe('Facebook Graph adapter', () => {
     expect(token.expiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 5_184_000_000 + 100);
   });
 
-  it('publishes link posts then a first comment with the same Page token', async () => {
-    const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => init?.method === 'POST'
-      ? response({ id: new URLSearchParams(String(init.body)).has('message') && String(init.body).includes('first') ? 'comment-1' : 'p1_2' })
-      : response({})) as unknown as typeof fetch;
+  it('publishes only the post and returns its id before any comment dispatch', async () => {
+    const fetcher = vi.fn(async () => response({ id: 'p1_2' })) as unknown as typeof fetch;
     const engine = createFacebookEngine(config, fetcher);
-    const result = await engine.publish({ targetId: 'p1', accessToken: 'page-token', text: 'Hello', link: 'https://example.test', firstComment: 'first' });
+    const result = await engine.publish({ targetId: 'p1', accessToken: 'page-token', text: 'Hello', link: 'https://example.test' });
     expect(result.remoteId).toBe('p1_2');
-    expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(String((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[1][0])).toContain('/p1_2/comments');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0])).toContain('/p1/feed');
   });
 
   it('uploads image URLs before creating an attached multi-photo post', async () => {

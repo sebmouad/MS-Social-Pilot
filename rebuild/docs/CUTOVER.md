@@ -35,6 +35,12 @@ production transition is therefore intentionally blocked. The scripts in
 deploy and rollback commands refuse to make changes until a separately reviewed
 cutover runbook and host configuration are supplied.
 
+The 2026-10-16 first-comment batch maps three existing nullable legacy delivery
+columns (`firstCommentId`, `firstCommentAt`, `firstCommentError`). Its verifier
+inventory now explicitly checks them. Local catalog metadata and actual
+PostgreSQL receipt/attempt writes passed without DDL; this is not a new
+migration or a claim of the complete production-shaped cutover rehearsal.
+
 ## Phases and gates
 
 1. **Build a release candidate.** From the repository root run

@@ -47,7 +47,7 @@ Chrome uses disposable synthetic examples. Phone edit/delete refusals retain val
 
 1. `processing` without a remote ID has no durable operator/customer reconciliation action. The new cleanup refusal preserves evidence but can leave the post, source or workspace deletion blocked until such recovery exists. Do not clear it by retrying publication or editing database rows in production.
 2. Successful remote deletion followed by failed local receipt/audit persistence has no durable deletion journal or provider-confirmed recovery. A later provider not-found response is not automatically proof of this operation's success.
-3. Successful publication followed by failed first comment can lose the remote post ID. Persist the post receipt independently and recover first-comment outcomes without republishing content.
+3. The subsequent first-comment batch now commits post receipts before separate comment dispatch, retains uncertain comment claims, and provides explicit sending/manual outcome recording through UI/MCP. See FIRST_COMMENT_DELIVERY.md. A failed post-receipt transaction still needs the publication reconciliation workflow in item 1; delayed comments and automatic provider verification remain open.
 4. Facebook formats/grants, multi-photo orphan cleanup, native scheduling, full legacy workflows, all-state UX and real provider create/status/delete checks remain required. The Posts list also still exposes a synthetic retained post on an unselected channel; selected-resource read/retained-history policy needs correction and tests.
 
 No schema, migration, production traffic, worker ownership or deployment was changed by this batch. Keep legacy production running until the complete release gates pass.

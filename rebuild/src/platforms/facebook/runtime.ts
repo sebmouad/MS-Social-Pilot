@@ -29,19 +29,22 @@ export async function configuredFacebookEngine(options?: { signal?: AbortSignal 
   return createFacebookEngine(await configuredFacebookConfig(), transport);
 }
 export async function configuredFacebookAdapter() {
-  const [config, postReadScopes] = await Promise.all([configuredFacebookConfig(), configured<string[]>('meta.postReadScopes')]);
-  return createFacebookAdapter(config, fetch, { postReadScopes });
+  const [config, postReadScopes, firstCommentScopes] = await Promise.all([
+    configuredFacebookConfig(), configured<string[]>('meta.postReadScopes'), configured<string[]>('meta.firstCommentScopes'),
+  ]);
+  return createFacebookAdapter(config, fetch, { postReadScopes, firstCommentScopes });
 }
 
 export async function configuredFacebookOAuth() {
-  const [appId, appSecret, redirectUri, scopes, inboxReadScopes, inboxWriteScopes] = await Promise.all([
+  const [appId, appSecret, redirectUri, scopes, inboxReadScopes, inboxWriteScopes, firstCommentScopes] = await Promise.all([
     configured<string>('meta.appId'),
     runtimeSecret('meta.appSecret'),
     configured<string>('meta.oauthRedirectUri'),
     configured<string[]>('meta.oauthScopes'),
     configured<string[]>('meta.inboxReadScopes'),
     configured<string[]>('meta.inboxWriteScopes'),
+    configured<string[]>('meta.firstCommentScopes'),
   ]);
   if (!appId || !appSecret || !redirectUri || !scopes.length) throw new Error('Meta connection is not configured.');
-  return { appId, appSecret, redirectUri, scopes: [...new Set([...scopes, ...inboxReadScopes, ...inboxWriteScopes])] };
+  return { appId, appSecret, redirectUri, scopes: [...new Set([...scopes, ...inboxReadScopes, ...inboxWriteScopes, ...firstCommentScopes])] };
 }

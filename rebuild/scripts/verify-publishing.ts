@@ -50,6 +50,24 @@ async function main() {
     await client.$executeRaw`INSERT INTO member_page_access ("membershipId", "targetId") VALUES (${membershipId}, ${channelId})`;
     const updated = await rpc('update_post', update);
     check(!updated.data.result?.isError && (await client.post.findUnique({ where: { id: postId } }))?.firstComment === update.firstComment && await auditCount('publishing.post_updated') === 1, 'Confirmed update must preserve first comments and audit once.');
+    const delivery = await client.postTarget.findFirstOrThrow({ where: { postId }, select: { id: true } });
+    await client.postTarget.update({ where: { id: delivery.id }, data: { status: 'published', remotePostId: 'preview_probe_remote_post', firstCommentAt: new Date(), firstCommentError: 'synthetic-private-provider-detail' } });
+    const outcome = { postId, postTargetId: delivery.id, outcome: 'sent', remoteId: 'preview_probe_remote_comment', confirmation: `RECORD FIRST COMMENT ${delivery.id} SENT` };
+    check((await rpc('record_first_comment_outcome', outcome, readBearer)).data.result?.structuredContent?.code === 'forbidden', 'Read-only keys cannot record comment outcomes.');
+    await client.$executeRaw`DELETE FROM member_page_access WHERE "membershipId" = ${membershipId}`;
+    check((await rpc('record_first_comment_outcome', outcome)).data.result?.structuredContent?.code === 'forbidden', 'Current channel grants also protect comment reconciliation.');
+    await client.$executeRaw`INSERT INTO member_page_access ("membershipId", "targetId") VALUES (${membershipId}, ${channelId})`;
+    check((await rpc('record_first_comment_outcome', { ...outcome, confirmation: 'wrong' })).data.result?.structuredContent?.code === 'invalid_request', 'Comment outcome needs its exact confirmation.');
+    const listed = await rpc('list_posts', {});
+    check(JSON.stringify(listed.data).includes('needs_review') && !JSON.stringify(listed.data).includes('synthetic-private-provider-detail'), 'MCP exposes safe comment state without legacy provider error strings.');
+    const recorded = await rpc('record_first_comment_outcome', outcome);
+    check(recorded.data.result?.structuredContent?.state === 'sent' && await auditCount('publishing.first_comment_outcome_recorded') === 1 && (await client.postTarget.findUnique({ where: { id: delivery.id } }))?.firstCommentId === outcome.remoteId, 'Manual comment receipt and audit must commit together.');
+    check((await rpc('send_first_comment', { postId, postTargetId: delivery.id, confirmation: `SEND FIRST COMMENT ${delivery.id}` })).data.result?.structuredContent?.state === 'sent' && await auditCount('publishing.first_comment_started') === 0, 'A confirmed comment must not be dispatched again.');
+    await client.postTarget.update({ where: { id: delivery.id }, data: { firstCommentId: null, firstCommentAt: new Date(), firstCommentError: 'synthetic uncertain outcome' } });
+    const absent = await rpc('record_first_comment_outcome', { postId, postTargetId: delivery.id, outcome: 'not_sent', confirmation: `RECORD FIRST COMMENT ${delivery.id} NOT SENT` });
+    const cleared = await client.postTarget.findUnique({ where: { id: delivery.id } });
+    check(absent.data.result?.structuredContent?.state === 'ready' && !cleared?.firstCommentAt && !cleared?.firstCommentError && await auditCount('publishing.first_comment_outcome_recorded') === 2, 'Manual absence permits a separate later send without dispatching now.');
+    await client.postTarget.update({ where: { id: delivery.id }, data: { status: 'pending', remotePostId: null } });
     await client.$executeRaw`UPDATE memberships SET "disabledModules" = ARRAY['publishing/posts']::TEXT[] WHERE id = ${membershipId}`;
     check((await rpc('update_post', update)).data.result?.structuredContent?.code === 'forbidden', 'Current module/feature permissions must apply immediately.');
     await client.$executeRaw`UPDATE memberships SET "disabledModules" = ARRAY[]::TEXT[] WHERE id = ${membershipId}`;
@@ -61,7 +79,7 @@ async function main() {
     check(!deleted.data.result?.isError && await client.post.count({ where: { id: postId } }) === 0 && await auditCount('publishing.post_deleted') === 1, 'Local deletion must finish once with its domain audit.');
     const root = await rpc('get_root_config', {});
     check(root.data.result?.structuredContent?.code === 'forbidden', 'Workspace bearer must not gain Root access.');
-    console.log(JSON.stringify({ scopedCreateAndFirstComment: true, readOnlyDenied: true, currentGrantRevocation: true, scopedUpdateAndAudit: true, featureRevocation: true, processingDeletionDenied: true, confirmedLocalDeletion: true, rootIsolation: true, noStore: true }));
+    console.log(JSON.stringify({ scopedCreateAndFirstComment: true, readOnlyDenied: true, currentGrantRevocation: true, scopedUpdateAndAudit: true, firstCommentScopedReconciliation: true, safeFirstCommentReads: true, firstCommentExactConfirmation: true, confirmedCommentNoRepeat: true, manualAbsenceNoDispatch: true, featureRevocation: true, processingDeletionDenied: true, confirmedLocalDeletion: true, rootIsolation: true, noStore: true }));
   } finally {
     try {
       if (previousRoles) await roles(previousRoles);

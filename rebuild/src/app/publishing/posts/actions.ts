@@ -7,9 +7,12 @@ import { canAccessFeature } from '@/server/permissions';
 import { cancelScheduledPost, createPost, deletePost, importPostsCsv, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '@/server/publishing/lifecycle';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { wallTimeToInstant } from '@/lib/calendar-dates';
+import { recordFirstCommentOutcome, sendFirstComment } from '@/modules/publishing/server/first-comment';
 
 const PATH = '/publishing/posts';
 type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published' | 'publish-review' | 'synced' | 'failed';
+
+export type FirstCommentActionState = { status: 'idle' | 'error' | 'success'; message?: string; postId: string; postTargetId: string; state?: 'sent' | 'needs_review' | 'ready'; outcome?: 'sent' | 'not_sent'; remoteId?: string };
 
 export type ComposerValues = {
   intent: string;
@@ -125,8 +128,57 @@ export async function deletePostAction(data: FormData) {
 export async function publishPostAction(data: FormData) {
   await run(async viewer => {
     const result = await publishPost(actor(viewer), stringField(data, 'postId'));
-    return result.needsReconciliation || result.failed ? 'publish-review' : 'published';
+    return result.needsReconciliation || result.failed || result.firstCommentsNeedingReview || result.firstCommentsNotSent ? 'publish-review' : 'published';
   });
+}
+
+/** Send only the saved first comment for a confirmed remote post. */
+export async function sendFirstCommentAction(previous: FirstCommentActionState, data: FormData): Promise<FirstCommentActionState> {
+  const postId = stringField(data, 'postId');
+  const postTargetId = stringField(data, 'postTargetId');
+  try {
+    if (stringField(data, 'confirmation') !== `SEND FIRST COMMENT ${postTargetId}`) throw new OperationError('invalid_request', 'Confirm sending this first comment.');
+    if (data.get('acknowledged') !== 'on') throw new OperationError('invalid_request', 'Acknowledge the possible delayed result before sending.');
+    const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
+    if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new OperationError('forbidden', 'You cannot manage posts.');
+    const result = await sendFirstComment(actor(viewer), { postId, postTargetId });
+    refreshPublishing();
+    if (!result || result.ok !== true || result.postId !== postId || result.postTargetId !== postTargetId || !['sent', 'needs_review', 'ready'].includes(result.state)) {
+      return { status: 'error', postId, postTargetId, state: 'needs_review', message: 'The send result could not be confirmed. Check the platform and current post before another action.' };
+    }
+    if (result.state !== 'sent') return { status: 'error', postId, postTargetId, state: result.state, message: result.state === 'needs_review' ? 'The comment result is uncertain. Check the platform before recording an outcome or sending again.' : 'The platform refused this request. The saved comment is ready for a separate send request.' };
+    return { status: 'success', postId, postTargetId, state: 'sent', message: 'The first comment was recorded as sent.' };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { status: 'error', postId, postTargetId, message: operationFailure(error, 'The comment result could not be confirmed. Check its current state before taking another action.').error };
+  }
+}
+
+/** Record a manual platform check; this does not query or verify the provider. */
+export async function recordFirstCommentOutcomeAction(previous: FirstCommentActionState, data: FormData): Promise<FirstCommentActionState> {
+  const postId = stringField(data, 'postId');
+  const postTargetId = stringField(data, 'postTargetId');
+  const outcome = stringField(data, 'outcome');
+  const remoteId = stringField(data, 'remoteId', true).trim();
+  try {
+    if (outcome !== 'sent' && outcome !== 'not_sent') throw new OperationError('invalid_request', 'Choose the result you verified on the platform.');
+    const confirmation = `RECORD FIRST COMMENT ${postTargetId} ${outcome === 'sent' ? 'SENT' : 'NOT SENT'}`;
+    if (stringField(data, 'confirmation') !== confirmation) throw new OperationError('invalid_request', 'Confirm the verified comment result.');
+    if (data.get('acknowledged') !== 'on') throw new OperationError('invalid_request', 'Acknowledge the external verification and possible late result.');
+    if (outcome === 'sent' && !remoteId) throw new OperationError('invalid_request', 'Enter the platform comment ID you verified.');
+    const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
+    if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new OperationError('forbidden', 'You cannot manage posts.');
+    const result = await recordFirstCommentOutcome(actor(viewer), { postId, postTargetId, outcome, ...(remoteId ? { remoteId } : {}), confirmation });
+    refreshPublishing();
+    const expectedState = outcome === 'sent' ? 'sent' : 'ready';
+    if (!result || result.ok !== true || result.postId !== postId || result.postTargetId !== postTargetId || result.state !== expectedState) {
+      return { status: 'error', postId, postTargetId, state: 'needs_review', outcome, remoteId, message: 'The outcome could not be confirmed. Check the current post before repeating or taking another action.' };
+    }
+    return { status: 'success', postId, postTargetId, state: expectedState, outcome, remoteId, message: outcome === 'sent' ? 'The externally verified comment ID was recorded.' : 'The result was recorded as not sent. You can now make a separate send request.' };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { status: 'error', postId, postTargetId, outcome: outcome === 'sent' || outcome === 'not_sent' ? outcome : undefined, remoteId, message: operationFailure(error, 'The result could not be recorded. Check the current state before trying again.').error };
+  }
 }
 
 export async function syncPostAction(data: FormData) {

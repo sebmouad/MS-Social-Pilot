@@ -4,6 +4,14 @@ import { listPostPage, prisma } from '../src/server/data';
 describe('scoped post pagination', () => {
   afterEach(() => vi.restoreAllMocks());
 
+  it('does not expose legacy provider error strings in client post data', async () => {
+    vi.spyOn(prisma.post, 'count').mockResolvedValue(1);
+    vi.spyOn(prisma.post, 'findMany').mockResolvedValue([{ targets: [{ firstCommentError: 'private-provider-detail', firstCommentAt: new Date() }] }] as never);
+    const result = await listPostPage('workspace-1', 1, 50, null, 'author-1');
+    expect(JSON.stringify(result)).not.toContain('private-provider-detail');
+    expect(result.posts[0]?.targets[0]?.firstCommentError).toBe('review_required');
+  });
+
   it('filters channel access before counting and paging, while retaining the author’s unassigned drafts', async () => {
     const count = vi.spyOn(prisma.post, 'count').mockResolvedValue(101);
     const findMany = vi.spyOn(prisma.post, 'findMany').mockResolvedValue([]);

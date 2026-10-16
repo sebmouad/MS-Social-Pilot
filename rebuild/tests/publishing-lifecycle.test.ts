@@ -13,6 +13,7 @@ const db = vi.hoisted(() => ({
   $transaction: vi.fn(),
   $executeRaw: vi.fn(),
 }));
+const capabilities = vi.hoisted(() => ({ firstComment: true }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => ({
   'publishing.maxMessageCharacters': 10000, 'publishing.maxImportRows': 100,
@@ -20,7 +21,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
   'publishing.maxRemoteMediaPerPost': 4, 'publishing.maxImageAltCharacters': 500,
 })[key] }));
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: async () => ({}), hasPlatformCapability: () => true }));
-vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: vi.fn(), supportsTargetKind: () => true }) }));
+vi.mock('../src/server/platforms/registry', () => ({ platformFor: async () => ({ publish: vi.fn(), ...(capabilities.firstComment ? { publishFirstComment: vi.fn() } : {}), supportsTargetKind: () => true }) }));
 
 import { cancelScheduledPost, createPost, reviewPost, schedulePost, submitPostForApproval } from '../src/server/publishing/lifecycle';
 
@@ -28,6 +29,7 @@ const actor = { userId: 'u1', workspaceId: 'w1' };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  capabilities.firstComment = true;
   db.membership.findUnique.mockResolvedValue({ role: 'editor' });
   db.postTarget.findMany.mockResolvedValue([]);
   db.post.findFirst.mockResolvedValue({ id: 'p1', authorId: 'u1', status: 'draft', targets: [{ status: 'pending' }] });
@@ -40,6 +42,12 @@ beforeEach(() => {
 });
 
 describe('publishing lifecycle transitions', () => {
+  it('rejects a first comment when a chosen adapter does not implement it', async () => {
+    capabilities.firstComment = false;
+    await expect(createPost(actor, { message: 'Update', firstComment: 'Details', targetIds: ['target-1'] })).rejects.toThrow(/cannot add a first comment/);
+    expect(db.post.create).not.toHaveBeenCalled();
+  });
+
   it('creates a scheduled post atomically and rejects a schedule without destinations', async () => {
     const scheduledAt = new Date(Date.now() + 3_600_000);
     await createPost(actor, { message: 'Planned update', firstComment: 'More details', targetIds: ['target-1'], scheduledAt });

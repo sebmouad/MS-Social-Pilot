@@ -30,6 +30,13 @@ describe('PostPreview', () => {
     } finally { formatter.mockRestore(); }
   });
 
+  it('shows a safe first-comment state beside each destination without exposing stored errors', () => {
+    const uncertain = { ...post, targets: [{ ...post.targets[0]!, id: 'post-target-a', firstCommentAt: new Date(), firstCommentError: 'private provider error detail' }] };
+    const markup = renderToStaticMarkup(createElement(PostPreview, { post: uncertain, authorName: 'Amina', timeZone: 'UTC' }));
+    expect(markup).toContain('First comment needs review');
+    expect(markup).not.toContain('private provider error detail');
+  });
+
   it('renders private media through the authorized local media route and rejects unsafe URLs', () => {
     const markup = renderToStaticMarkup(createElement(PostPreview, {
       post: { ...post, link: 'javascript:alert(1)', media: [...post.media, { kind: 'video', url: 'javascript:alert(2)' }], targets: [{ ...post.targets[0], remoteUrl: 'javascript:alert(3)' }] },

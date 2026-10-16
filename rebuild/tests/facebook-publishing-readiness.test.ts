@@ -5,10 +5,11 @@ import type { FacebookConfig } from '../src/platforms/facebook/config';
 const runtime = vi.hoisted(() => ({ values: new Map<string, unknown>() }));
 vi.mock('../src/server/config/store', () => ({
   runtimeConfig: async (key: string) => runtime.values.get(key),
-  runtimeSecret: async () => '',
+  runtimeSecret: async () => 'synthetic-app-secret',
 }));
 
-import { configuredFacebookAdapter } from '../src/platforms/facebook/runtime';
+import { configuredFacebookAdapter, configuredFacebookOAuth } from '../src/platforms/facebook/runtime';
+import { FACEBOOK_CONFIG } from '../src/platforms/facebook/module';
 
 const config: FacebookConfig = {
   graphBaseUrl: 'https://graph.facebook.test', oauthBaseUrl: 'https://www.facebook.test', graphVersion: 'v99.0', requestTimeoutMs: 2_000,
@@ -32,6 +33,22 @@ describe('Facebook publishing credential readiness', () => {
     expect(adapter.canUseCredential!(granted(['pages_read_engagement']), 'remoteStatus')).toBe(false);
     expect(adapter.canUseCredential!(granted(['pages_read_engagement']), 'publishing')).toBe(true);
     expect(adapter.canUseCredential!(granted(['pages_read_engagement']), 'remoteDelete')).toBe(true);
+    expect(adapter.canUseCredential!(granted(['pages_manage_engagement']), 'firstComment')).toBe(false);
+  });
+
+  it('requires every dedicated first-comment scope and fails closed without recorded grants', () => {
+    const adapter = createFacebookAdapter(config, fetch, { postReadScopes: ['pages_read_engagement'], firstCommentScopes: ['pages_manage_engagement'] });
+
+    expect(adapter.canUseCredential!(granted(['pages_manage_engagement']), 'firstComment')).toBe(true);
+    expect(adapter.canUseCredential!(granted(['pages_read_engagement']), 'firstComment')).toBe(false);
+    expect(adapter.canUseCredential!({ accessToken: 'page-token' }, 'firstComment')).toBe(false);
+  });
+
+  it('registers a validated, active Root setting for first-comment scopes', () => {
+    const setting = FACEBOOK_CONFIG.find(item => item.key === 'meta.firstCommentScopes');
+    expect(setting).toMatchObject({ defaultValue: ['pages_manage_engagement'], consumption: 'active', group: 'Facebook · API scopes · publishing' });
+    expect(setting?.schema.safeParse(['pages_manage_engagement']).success).toBe(true);
+    expect(setting?.schema.safeParse([]).success).toBe(false);
   });
 
   it('injects Root configured status-read permissions into the runtime adapter', async () => {
@@ -41,11 +58,23 @@ describe('Facebook publishing credential readiness', () => {
       ['meta.pageInsightMetrics', config.pageInsightMetrics], ['meta.adInsightFields', config.adInsightFields],
       ['meta.maxImageUploadBytes', config.maxImageUploadBytes], ['meta.allowedImageMimeTypes', config.allowedImageMimeTypes],
       ['meta.postReadScopes', ['pages_read_engagement', 'pages_manage_posts']],
+      ['meta.firstCommentScopes', ['pages_manage_engagement']],
     ]);
 
     const adapter = await configuredFacebookAdapter();
 
     expect(adapter.canUseCredential!(granted(['pages_read_engagement', 'pages_manage_posts']), 'remoteStatus')).toBe(true);
     expect(adapter.canUseCredential!(granted(['pages_read_engagement']), 'remoteStatus')).toBe(false);
+    expect(adapter.canUseCredential!(granted(['pages_manage_engagement']), 'firstComment')).toBe(true);
+    expect(adapter.canUseCredential!(granted(['pages_read_engagement']), 'firstComment')).toBe(false);
+  });
+
+  it('includes the configured first-comment permission in OAuth scopes', async () => {
+    runtime.values = new Map<string, unknown>([
+      ['meta.appId', 'synthetic-app-id'], ['meta.oauthRedirectUri', 'https://app.test/callback'], ['meta.oauthScopes', ['pages_show_list']],
+      ['meta.inboxReadScopes', []], ['meta.inboxWriteScopes', []], ['meta.firstCommentScopes', ['pages_manage_engagement']],
+    ]);
+    const oauth = await configuredFacebookOAuth();
+    expect(oauth.scopes).toEqual(['pages_show_list', 'pages_manage_engagement']);
   });
 });

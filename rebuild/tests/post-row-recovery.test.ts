@@ -6,15 +6,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   edit: vi.fn(async (_previous: unknown, _data: FormData) => ({ status: 'error', message: 'The post could not be saved. Try again.', values: {} })),
   remove: vi.fn(async (_previous: unknown, _data: FormData) => ({ status: 'error', message: 'The post could not be deleted. Try again.', deleteRemote: true })),
+  sendComment: vi.fn(async (_previous: unknown, _data: FormData) => ({ status: 'error', postId: 'post-1', postTargetId: 'post-target-a', message: 'Check its status.' })),
+  recordComment: vi.fn(async (_previous: unknown, _data: FormData) => ({ status: 'error', postId: 'post-1', postTargetId: 'post-target-a', message: 'Check its status.' })),
 }));
 
 vi.mock('../src/app/publishing/posts/actions', async importOriginal => ({
   ...await importOriginal<typeof import('../src/app/publishing/posts/actions')>(),
   updatePostWithRecoveryAction: mocks.edit,
   deletePostWithRecoveryAction: mocks.remove,
+  sendFirstCommentAction: mocks.sendComment,
+  recordFirstCommentOutcomeAction: mocks.recordComment,
 }));
 
-import { PostRowActions, runDeletePostWithRecovery, runUpdatePostWithRecovery } from '../src/app/publishing/posts/PostActions';
+import { PostRowActions, runDeletePostWithRecovery, runRecordFirstCommentWithRecovery, runSendFirstCommentWithRecovery, runUpdatePostWithRecovery } from '../src/app/publishing/posts/PostActions';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
@@ -23,12 +27,14 @@ const rules = { allowedMimeTypes: ['image/png'], maxUploadBytes: 5000, maxAltCha
 const post = {
   id: 'post-1', message: 'Saved text', firstComment: 'Saved comment', link: null,
   media: [{ kind: 'image', url: 'media:123e4567-e89b-42d3-a456-426614174000', altText: 'Saved description' }],
-  status: 'draft', publishedAt: null, targets: [{ status: 'draft', remotePostId: 'remote-1', target: { id: 'target-a' } }],
+  status: 'draft', publishedAt: null, targets: [{ id: 'post-target-draft', status: 'draft', remotePostId: 'remote-1', target: { id: 'target-a' } }],
 };
 
 async function render() {
   await act(async () => root.render(createElement(PostRowActions, { post, targets, canEdit: true, canPublish: true, imageRules: rules })));
 }
+const publishedWithReadyComment = { ...post, status: 'published', publishedAt: new Date(), targets: [{ id: 'post-target-a', status: 'published', remotePostId: 'remote-1', remoteUrl: null, target: { id: 'target-a', name: 'Studio channel' } }] };
+const publishedWithUnknownComment = { ...publishedWithReadyComment, targets: [{ ...publishedWithReadyComment.targets[0]!, firstCommentAt: new Date(), firstCommentError: 'must never be shown to customers' }] };
 
 async function setValue(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
   await act(async () => {
@@ -53,8 +59,108 @@ describe('post row recovery', () => {
     const redirect = Object.assign(new Error('redirect'), { digest: 'NEXT_REDIRECT;replace;/publishing/posts?notice=updated;303;' });
     mocks.edit.mockRejectedValueOnce(redirect);
     mocks.remove.mockRejectedValueOnce(redirect);
+    mocks.sendComment.mockRejectedValueOnce(redirect);
+    mocks.recordComment.mockRejectedValueOnce(redirect);
     await expect(runUpdatePostWithRecovery({ status: 'idle', values: {} }, new FormData())).rejects.toBe(redirect);
     await expect(runDeletePostWithRecovery({ status: 'idle', deleteRemote: false }, new FormData())).rejects.toBe(redirect);
+    await expect(runSendFirstCommentWithRecovery({ status: 'idle', postId: 'post-1', postTargetId: 'post-target-a' }, new FormData())).rejects.toBe(redirect);
+    await expect(runRecordFirstCommentWithRecovery({ status: 'idle', postId: 'post-1', postTargetId: 'post-target-a' }, new FormData())).rejects.toBe(redirect);
+  });
+
+  it('retains first-comment recovery context after transport failures', async () => {
+    mocks.sendComment.mockRejectedValueOnce(new TypeError('network failure'));
+    mocks.recordComment.mockRejectedValueOnce(new TypeError('network failure'));
+    const sendData = new FormData(); sendData.set('postId', 'post-1'); sendData.set('postTargetId', 'post-target-a');
+    const recordData = new FormData(); recordData.set('postId', 'post-1'); recordData.set('postTargetId', 'post-target-a'); recordData.set('outcome', 'sent'); recordData.set('remoteId', 'comment-42');
+    expect(await runSendFirstCommentWithRecovery({ status: 'idle', postId: 'post-1', postTargetId: 'post-target-a' }, sendData)).toMatchObject({ status: 'error', postId: 'post-1', postTargetId: 'post-target-a', message: expect.stringMatching(/unconfirmed/i) });
+    expect(await runRecordFirstCommentWithRecovery({ status: 'idle', postId: 'post-1', postTargetId: 'post-target-a' }, recordData)).toMatchObject({ status: 'error', outcome: 'sent', remoteId: 'comment-42', message: expect.stringMatching(/unconfirmed/i) });
+  });
+
+  it('requires acknowledgement before sending and retains the dialog after an uncertain result', async () => {
+    mocks.sendComment.mockImplementationOnce(async (_previous, data) => ({ status: 'error', postId: 'post-1', postTargetId: 'post-target-a', message: 'The result could not be confirmed. Check its current state.' }));
+    await act(async () => root.render(createElement(PostRowActions, { post: publishedWithReadyComment, targets, canEdit: true, canPublish: true, imageRules: rules })));
+    const send = Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Send first comment')!;
+    expect(send).toBeTruthy();
+    await act(async () => send.click());
+    const dialog = container.querySelector('dialog')!;
+    const submit = Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Send once')!;
+    expect(submit.disabled).toBe(true);
+    await act(async () => dialog.querySelector<HTMLInputElement>('input[name="acknowledged"]')!.click());
+    await act(async () => submit.click());
+    const submitted = mocks.sendComment.mock.calls[0]![1] as FormData;
+    expect(submitted.get('confirmation')).toBe('SEND FIRST COMMENT post-target-a');
+    expect(submitted.get('acknowledged')).toBe('on');
+    expect(container.querySelector('dialog')).toBeTruthy();
+    expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/check its current state/i);
+  });
+
+  it('keeps uncertain comments blocked until a manually verified outcome is acknowledged', async () => {
+    await act(async () => root.render(createElement(PostRowActions, { post: publishedWithUnknownComment, targets, canEdit: true, canPublish: true, imageRules: rules })));
+    expect(container.textContent).not.toContain('must never be shown to customers');
+    const review = Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Record comment outcome')!;
+    await act(async () => review.click());
+    const dialog = container.querySelector('dialog')!;
+    const submit = Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Record result')!;
+    expect(submit.disabled).toBe(true);
+    await act(async () => dialog.querySelector<HTMLInputElement>('input[name="acknowledged"]')!.click());
+    await act(async () => submit.click());
+    const submitted = mocks.recordComment.mock.calls[0]![1] as FormData;
+    expect(submitted.get('outcome')).toBe('not_sent');
+    expect(submitted.get('confirmation')).toBe('RECORD FIRST COMMENT post-target-a NOT SENT');
+    expect(submitted.get('acknowledged')).toBe('on');
+    expect(container.querySelector('dialog')).toBeTruthy();
+  });
+
+  it('keeps the latest uncertain receipt after cancelling and resets a reopened recovery dialog', async () => {
+    mocks.recordComment.mockImplementationOnce(async () => ({ status: 'success', postId: 'post-1', postTargetId: 'post-target-a', state: 'ready', message: 'Outcome recorded.' }));
+    mocks.sendComment.mockImplementationOnce(async () => ({ status: 'error', postId: 'post-1', postTargetId: 'post-target-a', state: 'needs_review', message: 'The send result is unconfirmed.' }));
+    await act(async () => root.render(createElement(PostRowActions, { post: publishedWithUnknownComment, targets, canEdit: true, canPublish: true, imageRules: rules })));
+
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Record comment outcome')!.click());
+    let dialog = container.querySelector('dialog')!;
+    await act(async () => dialog.querySelector<HTMLInputElement>('input[name="acknowledged"]')!.click());
+    await act(async () => Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Record result')!.click());
+    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Send first comment')).toBe(true);
+    expect(document.activeElement).toBe(container.querySelector('[data-first-comment-control]'));
+
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Send first comment')!.click());
+    dialog = container.querySelector('dialog')!;
+    await act(async () => dialog.querySelector<HTMLInputElement>('input[name="acknowledged"]')!.click());
+    await act(async () => Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Send once')!.click());
+    expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/unconfirmed/i);
+    await act(async () => container.querySelector<HTMLButtonElement>('[data-first-comment-cancel]')!.click());
+    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Send first comment')).toBe(false);
+    expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === 'Record comment outcome')).toBe(true);
+
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Record comment outcome')!.click());
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('requires the platform comment ID before recording a sent outcome', async () => {
+    await act(async () => root.render(createElement(PostRowActions, { post: publishedWithUnknownComment, targets, canEdit: true, canPublish: true, imageRules: rules })));
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Record comment outcome')!.click());
+    const dialog = container.querySelector('dialog')!;
+    await act(async () => dialog.querySelector<HTMLInputElement>('input[type="radio"][name="outcomeChoice"][value="sent"]')!.click());
+    await act(async () => dialog.querySelector<HTMLInputElement>('input[name="acknowledged"]')!.click());
+    const submit = Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Record result')!;
+    expect(submit.disabled).toBe(true);
+    const idField = dialog.querySelector<HTMLInputElement>('input[name="remoteId"]')!;
+    await setValue(idField, 'remote-comment-42');
+    expect(submit.disabled).toBe(false);
+    await act(async () => submit.click());
+    const submitted = mocks.recordComment.mock.calls[0]![1] as FormData;
+    expect(submitted.get('outcome')).toBe('sent');
+    expect(submitted.get('remoteId')).toBe('remote-comment-42');
+    expect(submitted.get('confirmation')).toBe('RECORD FIRST COMMENT post-target-a SENT');
+    expect(dialog.querySelector<HTMLInputElement>('input[name="acknowledged"]')?.checked).toBe(true);
+    expect(dialog.querySelector<HTMLInputElement>('input[name="outcomeChoice"][value="sent"]')?.checked).toBe(true);
+    expect(idField.value).toBe('remote-comment-42');
+    // A server refresh can update delivery evidence while a recoverable dialog remains open.
+    const refreshed = { ...publishedWithUnknownComment, targets: [{ ...publishedWithUnknownComment.targets[0]!, firstCommentError: 'refreshed-review-required' }] };
+    await act(async () => root.render(createElement(PostRowActions, { post: refreshed, targets, canEdit: true, canPublish: true, imageRules: rules })));
+    expect(container.querySelector('dialog')).toBe(dialog);
+    expect(idField.value).toBe('remote-comment-42');
+    expect(dialog.querySelector<HTMLInputElement>('input[name="acknowledged"]')?.checked).toBe(true);
   });
 
   it('retains the submitted edit and remote-deletion choice after a transport rejection', async () => {

@@ -14,6 +14,7 @@ describe('Facebook OAuth scope configuration', () => {
       ['meta.appId', 'app-id'], ['meta.oauthRedirectUri', 'https://social.test/callback'],
       ['meta.oauthScopes', ['pages_show_list']], ['meta.inboxReadScopes', ['pages_messaging']],
       ['meta.inboxWriteScopes', ['pages_manage_engagement']], ['meta.adsManageScopes', ['ads_management']],
+      ['meta.firstCommentScopes', ['pages_manage_engagement']],
     ]);
     await expect(configuredFacebookOAuth()).resolves.toMatchObject({
       scopes: ['pages_show_list', 'pages_messaging', 'pages_manage_engagement'],

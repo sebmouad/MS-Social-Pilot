@@ -367,6 +367,9 @@ model PostTarget {
   status       PostTargetStatus
   remotePostId String?
   remoteUrl    String?
+  firstCommentId String?
+  firstCommentAt DateTime?
+  firstCommentError String?
   publishedAt  DateTime?
   updatedAt    DateTime         @updatedAt
   post         Post             @relation(fields: [postId], references: [id])

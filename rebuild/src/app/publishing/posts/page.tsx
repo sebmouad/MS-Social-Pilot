@@ -24,7 +24,7 @@ const NOTICE_TEXT: Record<string, string> = {
   submitted: "Post submitted for approval.",
   scheduled: "Post added to the queue.",
   cancelled: "Scheduled post returned to drafts.",
-  "publish-review": "Some destinations still need review. Their claimed publishing records were kept to prevent duplicate posts.",
+  "publish-review": "Some destinations or first comments need attention. Review their individual delivery states before another action.",
   synced: "Remote status sync completed.",
   "failed-sync": "No new delivery status was confirmed. Check the post on its platform, then try syncing again.",
 };

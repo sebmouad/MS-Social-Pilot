@@ -11,6 +11,7 @@ import { readWorkspaceImage } from '@/server/media/storage';
 import { isValidTimeZone, wallTimeToInstant } from '@/lib/calendar-dates';
 import { withPublishingOperation, withPublishingTransaction as publishingTransaction } from '@/modules/publishing/server/guard';
 import { OperationError } from '@/lib/operation-error';
+import { attemptFirstCommentInOperation } from '@/modules/publishing/server/first-comment';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
@@ -85,7 +86,7 @@ function validFirstComment(value: string, maxText: number) {
   return text || null;
 }
 
-async function validateTargets(actor: PublishingActor, ids: string[], maxTargets: number, media: PublishMedia[] = []) {
+async function validateTargets(actor: PublishingActor, ids: string[], maxTargets: number, media: PublishMedia[] = [], firstCommentRequested = false) {
   if (ids.length > maxTargets || new Set(ids).size !== ids.length) throw new OperationError('invalid_request', `Choose up to ${maxTargets} distinct destinations.`);
   if (actor.allowedTargetIds && ids.some(id => !actor.allowedTargetIds!.includes(id))) throw new OperationError('forbidden', 'One or more destinations are outside your channel access.');
   if (!ids.length) return [];
@@ -102,6 +103,7 @@ async function validateTargets(actor: PublishingActor, ids: string[], maxTargets
     if (!provider || !hasPlatformCapability(entitlements, provider) || !adapter?.publish || !adapter.supportsTargetKind?.(target.type, 'publishing') || target.socialAccount?.invalidatedAt || !target.accessToken) {
       throw new OperationError('unavailable', 'One or more destinations are unavailable or cannot publish.');
     }
+    if (firstCommentRequested && !adapter.publishFirstComment) throw new OperationError('invalid_request', 'A selected destination cannot add a first comment. Clear the comment or choose another destination.');
     assertLocalImageLimits(adapter, media);
   }
   return targets;
@@ -220,7 +222,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
     const firstComment = validFirstComment(input.firstComment, config.maxText);
     const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
     const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
-    const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia);
+    const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment));
     if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new OperationError('invalid_request', 'Choose a future publishing time and at least one destination.');
     const now = new Date();
     const id = randomUUID();
@@ -243,7 +245,7 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
     const firstComment = validFirstComment(input.firstComment, config.maxText);
     const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
     const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
-    const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia);
+    const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia, Boolean(firstComment));
     await publishingTransaction(signal, async tx => {
       const existing = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, publishedAt: true, targets: { select: { id: true, status: true, remotePostId: true } } } });
       if (!existing || (role.role === 'contributor' && existing.authorId !== actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
@@ -306,7 +308,7 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
     const role = await membership(actor);
     await assertPostScope(actor, postId);
     const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
-    if (expectedScheduledAt !== undefined && (!post || post.status !== 'scheduled' || !post.scheduledAt || post.scheduledAt.getTime() !== expectedScheduledAt.getTime())) return { published: 0, failed: 0, needsReconciliation: 0, skipped: true };
+    if (expectedScheduledAt !== undefined && (!post || post.status !== 'scheduled' || !post.scheduledAt || post.scheduledAt.getTime() !== expectedScheduledAt.getTime())) return { published: 0, failed: 0, needsReconciliation: 0, firstCommentsNeedingReview: 0, firstCommentsNotSent: 0, skipped: true };
     if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
     if (!['draft', 'scheduled', 'failed', 'partially_failed'].includes(post.status)) throw new OperationError('conflict', 'This post cannot be published in its current state.');
     if (post.status === 'scheduled' && (!post.scheduledAt || post.scheduledAt > new Date())) throw new OperationError('conflict', 'This post is scheduled for a future time.');
@@ -327,36 +329,57 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
     let published = 0;
     let failed = 0;
     let pending = 0;
+    let firstCommentsNeedingReview = 0;
+    let firstCommentsNotSent = 0;
     for (const item of post.targets) {
       if (item.status === 'published' || item.remotePostId) { published++; continue; }
       if (item.status === 'processing') { pending++; continue; }
       if (!['pending', 'failed'].includes(item.status)) { failed++; continue; }
       const provider = item.target.socialAccount?.provider;
       const adapter = provider ? await platformFor(provider, 'publishing') : null;
-      const eligible = Boolean(provider && hasPlatformCapability(entitlements, provider) && adapter?.publish && adapter.supportsTargetKind?.(item.target.type, 'publishing') && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount?.invalidatedAt);
+      const eligible = Boolean(provider && hasPlatformCapability(entitlements, provider) && adapter?.publish && (!post.firstComment?.trim() || adapter.publishFirstComment) && adapter.supportsTargetKind?.(item.target.type, 'publishing') && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount?.invalidatedAt);
       if (!eligible) { failed++; await markTarget(actor, item.id, 'failed', signal); continue; }
       const claim = await publishingTransaction(signal, async tx => tx.postTarget.updateMany({ where: { id: item.id, postId: post.id, status: item.status, remotePostId: null }, data: { status: 'processing' } }));
       if (claim.count !== 1) { pending++; continue; }
+      let result: import('@/platforms/types').PublishResult;
       try {
         signal.throwIfAborted();
-        const result = await adapter!.publish!({ credential: { accessToken: decryptSecret(item.target.accessToken!) }, target: { id: item.target.providerId, name: '', kind: item.target.type }, text: post.message, firstComment: post.firstComment, link: attachments.link, media: publishMedia, signal });
+        result = await adapter!.publish!({ credential: { accessToken: decryptSecret(item.target.accessToken!) }, target: { id: item.target.providerId, name: '', kind: item.target.type }, text: post.message, link: attachments.link, media: publishMedia, signal });
+      } catch (error) {
+        if (adapter!.classifyPublishingFailure?.(error) === 'rejected') { await markTarget(actor, item.id, 'failed', signal); failed++; }
+        else pending++;
+        continue;
+      }
+      try {
+        const maxId = await runtimeConfig('publishing.identifierMaxCharacters');
+        if (!result || typeof result.remoteId !== 'string' || !result.remoteId.trim() || result.remoteId !== result.remoteId.trim() || result.remoteId.length > maxId || /[\u0000-\u001f\u007f]/.test(result.remoteId)) throw new Error('Unconfirmed publish receipt.');
         await publishingTransaction(signal, async tx => {
           await tx.postTarget.update({ where: { id: item.id }, data: { status: 'published', remotePostId: result.remoteId, remoteUrl: result.url, publishedAt: new Date() } });
           await audit(tx, actor, 'publishing.target_published', { postId: post.id, postTargetId: item.id });
         });
-        published++;
-      } catch (error) {
-        // A timeout or malformed response can happen after a provider accepted the post. Keep the claim locked for manual reconciliation.
-        if (isDefiniteProviderRejection(error, Boolean(post.firstComment?.trim()))) { await markTarget(actor, item.id, 'failed', signal); failed++; }
-        else pending++;
+      } catch {
+        // The provider receipt was not durably recorded. Never dispatch the comment or create another post.
+        pending++;
+        continue;
+      }
+      published++;
+      if (post.firstComment?.trim()) {
+        try {
+          const comment = await attemptFirstCommentInOperation({ actor, role: role.role, signal }, { postId: post.id, postTargetId: item.id });
+          if (comment.state === 'needs_review') firstCommentsNeedingReview++;
+          else if (comment.state === 'ready') firstCommentsNotSent++;
+        } catch {
+          // Publication is already committed; comment readiness/failure must never turn it into a failed create.
+          firstCommentsNeedingReview++;
+        }
       }
     }
     const status = pending ? (published ? 'partially_failed' : 'publishing') : failed ? (published ? 'partially_failed' : 'failed') : 'published';
     await publishingTransaction(signal, async tx => {
       await tx.post.update({ where: { id: post.id }, data: { status, publishedAt: published && !pending && !failed ? new Date() : undefined, updatedAt: new Date() } });
-      await audit(tx, actor, 'publishing.publish_finished', { postId: post.id, published, failed, needsReconciliation: pending });
+      await audit(tx, actor, 'publishing.publish_finished', { postId: post.id, published, failed, needsReconciliation: pending, firstCommentsNeedingReview, firstCommentsNotSent });
     });
-    return { published, failed, needsReconciliation: pending, skipped: false };
+    return { published, failed, needsReconciliation: pending, firstCommentsNeedingReview, firstCommentsNotSent, skipped: false };
   });
 }
 
@@ -418,7 +441,7 @@ export async function importPostsCsv(actor: PublishingActor, csv: string) {
       return { message: validText(row[0]!, config.maxText), firstComment: validFirstComment(row[1]!, config.maxText), targetIds: resolveCsvDestinationIds(row[2]!, choices, index + 2) };
     });
     await lockTargets([...new Set(inputs.flatMap(input => input.targetIds))]);
-    for (const input of inputs) await validateTargets(actor, input.targetIds, config.maxTargets);
+    for (const input of inputs) await validateTargets(actor, input.targetIds, config.maxTargets, [], Boolean(input.firstComment));
     const targetCount = new Set(inputs.flatMap(row => row.targetIds)).size;
     const now = new Date();
     const ids = inputs.map(() => randomUUID());
@@ -458,15 +481,9 @@ export function parsePublishingCsv(source: string): string[][] {
 
 async function markTarget(actor: PublishingActor, id: string, status: 'failed', signal: AbortSignal) {
   await publishingTransaction(signal, async tx => {
-    await tx.postTarget.updateMany({ where: { id, post: { workspaceId: actor.workspaceId }, status: 'processing' }, data: { status } });
+    await tx.postTarget.updateMany({ where: { id, post: { workspaceId: actor.workspaceId }, status: { in: ['pending', 'failed', 'processing'] }, remotePostId: null }, data: { status } });
     await audit(tx, actor, 'publishing.target_failed', { postTargetId: id });
   });
-}
-
-function isDefiniteProviderRejection(error: unknown, firstCommentIncluded: boolean) {
-  // When a first comment is requested, any Graph error could be the comment call
-  // after the post itself was accepted, so keep the claim for manual review.
-  return !firstCommentIncluded && typeof error === 'object' && error !== null && 'status' in error && typeof error.status === 'number' && error.status >= 400;
 }
 
 async function audit(tx: Prisma.TransactionClient, actor: PublishingActor, action: string, detail: Record<string, unknown>) {

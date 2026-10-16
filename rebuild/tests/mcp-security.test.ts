@@ -51,6 +51,8 @@ vi.mock('../src/server/ads/actions', () => ({
 }));
 const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
 vi.mock('../src/server/publishing/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
+const firstCommentMutations = vi.hoisted(() => ({ send: vi.fn(), record: vi.fn() }));
+vi.mock('../src/modules/publishing/server/first-comment', () => ({ sendFirstComment: firstCommentMutations.send, recordFirstCommentOutcome: firstCommentMutations.record }));
 const media = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), remove: vi.fn(), upload: vi.fn() }));
 vi.mock('../src/server/media/storage', () => ({ listWorkspaceImages: media.list, getWorkspaceImageMetadata: media.get, deleteUnusedWorkspaceImage: media.remove, uploadWorkspaceImage: media.upload }));
 
@@ -119,6 +121,8 @@ beforeEach(() => {
   publishingMutations.review.mockResolvedValue(undefined);
   publishingMutations.schedule.mockResolvedValue(undefined);
   publishingMutations.cancel.mockResolvedValue(undefined);
+  firstCommentMutations.send.mockResolvedValue({ ok: true, postId: 'post-a', postTargetId: 'post-target-a', state: 'sent' });
+  firstCommentMutations.record.mockResolvedValue({ ok: true, postId: 'post-a', postTargetId: 'post-target-a', state: 'ready' });
   media.list.mockResolvedValue({ items: [{ id: 'image-a', mimeType: 'image/png', size: 123, createdAt: '2026-10-14T00:00:00.000Z', inUse: false }], nextCursor: null });
   media.get.mockResolvedValue({ id: 'image-a', mimeType: 'image/png', size: 123, createdAt: '2026-10-14T00:00:00.000Z', inUse: false });
   media.remove.mockResolvedValue('deleted');
@@ -867,6 +871,34 @@ describe('MCP workspace boundaries', () => {
     expect((await remoteDelete.json()).result.structuredContent).toMatchObject({ postId: 'post-a', deleted: true, remoteDeletionRequested: true });
     expect(publishingMutations.remove).toHaveBeenCalledWith(viewer, 'post-a', true);
     expect(db.$executeRaw).toHaveBeenCalled();
+  });
+
+  it('exposes scoped first-comment send and manual outcome tools with exact confirmations', async () => {
+    const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
+    const names = (await listed.json()).result.tools.map((tool: { name: string }) => tool.name);
+    expect(names).toContain('send_first_comment');
+    expect(names).toContain('record_first_comment_outcome');
+
+    const denied = await call('send_first_comment', { postId: 'post-a', postTargetId: 'post-target-a', confirmation: 'SEND FIRST COMMENT wrong' });
+    expect((await denied.json()).result.isError).toBe(true);
+    expect(firstCommentMutations.send).not.toHaveBeenCalled();
+
+    const sent = await call('send_first_comment', { postId: 'post-a', postTargetId: 'post-target-a', confirmation: 'SEND FIRST COMMENT post-target-a' });
+    expect((await sent.json()).result.structuredContent).toMatchObject({ ok: true, state: 'sent', mcpAuditRecorded: true });
+    expect(firstCommentMutations.send).toHaveBeenCalledWith(viewer, { postId: 'post-a', postTargetId: 'post-target-a' });
+
+    const notSent = await call('record_first_comment_outcome', { postId: 'post-a', postTargetId: 'post-target-a', outcome: 'not_sent', confirmation: 'RECORD FIRST COMMENT post-target-a NOT SENT' });
+    expect((await notSent.json()).result.structuredContent).toMatchObject({ ok: true, state: 'ready' });
+    expect(firstCommentMutations.record).toHaveBeenCalledWith(viewer, { postId: 'post-a', postTargetId: 'post-target-a', outcome: 'not_sent', confirmation: 'RECORD FIRST COMMENT post-target-a NOT SENT' });
+    expect(workspaceGuard).not.toHaveBeenCalled();
+  });
+
+  it('normalizes first-comment state in list_posts and never returns stored error text', async () => {
+    db.post.findMany.mockResolvedValueOnce([{ id: 'post-a', message: 'Saved post', firstComment: 'Details below', status: 'published', targets: [{ id: 'post-target-a', status: 'published', remotePostId: 'remote-post-a', remoteUrl: null, firstCommentId: null, firstCommentAt: new Date('2026-10-16T12:00:00.000Z'), firstCommentError: 'private provider error', target: { id: 'target-a', type: 'page', name: 'Studio' } }] }]);
+    const response = await call('list_posts');
+    const post = (await response.json()).result.structuredContent.items[0];
+    expect(post.targets[0]).toMatchObject({ id: 'post-target-a', firstComment: { state: 'needs_review', label: 'First comment needs review', errorPresent: true } });
+    expect(JSON.stringify(post)).not.toContain('private provider error');
   });
 
   it('confirms configured post creation and scheduling, with workspace actor passed to lifecycle', async () => {
