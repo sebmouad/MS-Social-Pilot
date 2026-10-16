@@ -8,6 +8,7 @@ import { cancelScheduledPost, createPost, deletePost, importPostsCsv, publishPos
 import { OperationError, operationFailure } from '@/lib/operation-error';
 import { wallTimeToInstant } from '@/lib/calendar-dates';
 import { recordFirstCommentOutcome, sendFirstComment } from '@/modules/publishing/server/first-comment';
+import { finishPostDeletion, getPostDeletion, recordPostDeletionOutcome, type PostDeletionReceipt } from '@/modules/publishing/server/deletion';
 
 const PATH = '/publishing/posts';
 type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published' | 'publish-review' | 'synced' | 'failed';
@@ -31,7 +32,7 @@ export type ComposerValues = {
 export type ComposerActionState = { status: 'idle' | 'error'; message?: string; saveUnconfirmed?: boolean; values: Partial<ComposerValues> };
 
 export type PostEditActionState = { status: 'idle' | 'error'; message?: string; values: Partial<ComposerValues> };
-export type PostDeleteActionState = { status: 'idle' | 'error'; message?: string; deleteRemote: boolean };
+export type PostDeleteActionState = { status: 'idle' | 'error'; message?: string; deleteRemote: boolean; receipt?: PostDeletionReceipt; operationId?: string };
 
 export async function updatePostWithRecoveryAction(previous: PostEditActionState, data: FormData): Promise<PostEditActionState> {
   const values = composerValues(data);
@@ -48,17 +49,49 @@ export async function updatePostWithRecoveryAction(previous: PostEditActionState
 }
 
 export async function deletePostWithRecoveryAction(previous: PostDeleteActionState, data: FormData): Promise<PostDeleteActionState> {
+  const postId = stringField(data, 'postId', true);
+  const intent = stringField(data, 'intent', true);
   const deleteRemote = data.get('deleteRemote') === 'on';
   try {
-    const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
-    if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new OperationError('forbidden', 'You cannot manage posts.');
-    await deletePost(actor(viewer), stringField(data, 'postId'), deleteRemote);
-    refreshPublishing();
+    if (!postId) throw new OperationError('invalid_request', 'postId is required.');
+    const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: intent !== 'status' });
+    if (!canAccessFeature(viewer.permissions, 'publishing/posts', intent === 'status' ? 'read' : 'write')) throw new OperationError('forbidden', 'You cannot manage posts.');
+    let receipt: PostDeletionReceipt;
+    if (intent === 'start') {
+      if (stringField(data, 'confirmation') !== `DELETE POST ${postId} ${deleteRemote ? 'REMOTE' : 'LOCAL'}`) throw new OperationError('invalid_request', 'Confirm the requested post deletion.');
+      receipt = await deletePost(actor(viewer), postId, deleteRemote);
+    } else if (intent === 'status') {
+      receipt = await getPostDeletion(actor(viewer), { postId });
+    } else if (intent === 'finish') {
+      if (stringField(data, 'confirmation') !== `FINISH POST DELETION ${postId}`) throw new OperationError('invalid_request', 'Confirm local removal after remote deletion.');
+      receipt = await finishPostDeletion(actor(viewer), { postId, confirmation: `FINISH POST DELETION ${postId}` });
+    } else if (intent === 'record') {
+      const operationId = stringField(data, 'operationId');
+      const outcome = stringField(data, 'outcome');
+      if (outcome !== 'deleted' && outcome !== 'not_deleted') throw new OperationError('invalid_request', 'Choose the verified platform outcome.');
+      const confirmation = `RECORD POST DELETION ${operationId} ${outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}`;
+      if (stringField(data, 'confirmation') !== confirmation || data.get('verifiedOnPlatform') !== 'on') throw new OperationError('invalid_request', 'Confirm the externally checked platform outcome.');
+      receipt = await recordPostDeletionOutcome(actor(viewer), { postId, operationId, outcome, confirmation, verifiedOnPlatform: true });
+    } else throw new OperationError('invalid_request', 'Choose a post deletion recovery action.');
+    if (!receipt || receipt.ok !== true || receipt.postId !== postId || !Array.isArray(receipt.operations) || typeof receipt.localConfirmed !== 'boolean') throw new OperationError('conflict', 'The deletion outcome could not be confirmed. Check its current status.');
+    if (receipt.localConfirmed) {
+      refreshPublishing();
+      redirect(`${PATH}?notice=deleted`);
+    }
+    return { status: intent === 'start' ? 'error' : 'idle', message: deletionReceiptMessage(receipt), deleteRemote, receipt, operationId: typeof data.get('operationId') === 'string' ? String(data.get('operationId')) : undefined };
   } catch (error) {
     if (isRedirect(error)) throw error;
-    return { status: 'error', message: operationFailure(error, 'The deletion result could not be confirmed. Check Posts and the selected platforms before trying again.').error, deleteRemote };
+    return { status: 'error', message: operationFailure(error, 'The deletion result could not be confirmed. Check its current status before trying again.').error, deleteRemote, ...(previous.receipt ? { receipt: previous.receipt } : {}), operationId: typeof data.get('operationId') === 'string' ? String(data.get('operationId')) : undefined };
   }
-  redirect(`${PATH}?notice=deleted`);
+}
+
+function deletionReceiptMessage(receipt: PostDeletionReceipt): string {
+  if (receipt.state === 'none') return 'No active deletion request is recorded. Choose the deletion request you want to start.';
+  if (receipt.state === 'local_pending') return 'Remote deletion is confirmed. Finish local removal when all destination confirmations are saved.';
+  if (receipt.state === 'needs_review') return 'A destination deletion result needs review. Check the platform before recording an outcome or trying a new request.';
+  if (receipt.state === 'completed') return 'The post was removed locally.';
+  if (receipt.operations.some(operation => operation.state === 'rejected')) return 'A destination refused the deletion request. Check its platform state before making a separate new request.';
+  return 'The deletion is still in progress. Check its status before taking another action.';
 }
 
 function refreshPublishing() {
@@ -120,7 +153,9 @@ export async function updatePostAction(data: FormData) {
 export async function deletePostAction(data: FormData) {
   await run(async viewer => {
     const remote = data.get('deleteRemote') === 'on';
-    await deletePost(actor(viewer), stringField(data, 'postId'), remote);
+    const postId = stringField(data, 'postId');
+    const receipt = await deletePost(actor(viewer), postId, remote);
+    if (!receipt || receipt.ok !== true || receipt.postId !== postId || receipt.localConfirmed !== true) throw new OperationError('conflict', 'The post was not confirmed removed locally. Check deletion status before taking another action.');
     return 'deleted';
   });
 }

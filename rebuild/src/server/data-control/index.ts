@@ -287,6 +287,8 @@ async function finishWorkspaceDataPurge(actor: DataControlActor, timeout: number
     await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${actor.workspaceId} FOR UPDATE`;
     const job = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId } });
     if (!job) throw new Error('Workspace data purge state is missing.');
+    await assertPublishingTargetsSettled(tx, actor.workspaceId);
+    await assertInboxDeletionsSettled(tx, actor.workspaceId);
     if (job.status === 'db_deleted' || job.status === 'completed') return savedCounts(job.counts);
     if (job.status !== 'requested') throw new Error('Workspace data purge state is invalid.');
     const counts: Record<string, number> = {

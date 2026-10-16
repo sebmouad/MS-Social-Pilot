@@ -221,13 +221,34 @@ describe('post row recovery', () => {
     const dialog = container.querySelector('dialog')!;
     const remoteChoice = container.querySelector<HTMLInputElement>('input[name="deleteRemote"]')!;
     await act(async () => remoteChoice.click());
-    await act(async () => dialog.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());
+    await act(async () => Array.from(dialog.querySelectorAll('button')).find(button => button.textContent === 'Delete post')!.click());
 
     expect(mocks.remove).toHaveBeenCalledTimes(1);
     expect(dialog.open).toBe(true);
     expect(remoteChoice.checked).toBe(true);
     expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/could not be deleted/i);
     expect(document.activeElement instanceof HTMLElement && document.activeElement.hasAttribute('data-dialog-error')).toBe(true);
+  });
+
+  it('keeps remote deletion blocked after ambiguity and sends explicit external outcome confirmation', async () => {
+    mocks.remove.mockImplementationOnce(async (_previous, data) => ({ status: 'error', deleteRemote: data.get('deleteRemote') === 'on', message: 'Deletion needs review.', receipt: { ok: true, postId: 'post-1', localConfirmed: false, remoteDeletionRequested: true, state: 'needs_review', operations: [{ operationId: 'op-a', targetId: 'target-a', targetName: 'Studio channel', state: 'uncertain', remoteConfirmed: false, localConfirmed: false }] } }));
+    await act(async () => root.render(createElement(PostRowActions, { post: publishedWithReadyComment, targets, canEdit: true, canPublish: true, imageRules: rules })));
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Delete locally'))!.click());
+    await act(async () => container.querySelector<HTMLInputElement>('input[name="deleteRemote"]')!.click());
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Delete post')!.click());
+    expect(container.querySelector<HTMLInputElement>('input[name="deleteRemote"]')!.checked).toBe(true);
+    expect(Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Delete post')!.disabled).toBe(true);
+    expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/needs review/i);
+
+    await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]:not([name="deleteRemote"])')!.click());
+    await act(async () => Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Record deleted')!.click());
+    const submitted = mocks.remove.mock.calls[1]![1] as FormData;
+    expect(submitted.get('intent')).toBe('record');
+    expect(submitted.get('operationId')).toBe('op-a');
+    expect(submitted.get('outcome')).toBe('deleted');
+    expect(submitted.get('verifiedOnPlatform')).toBe('on');
+    expect(submitted.get('confirmation')).toBe('RECORD POST DELETION op-a DELETED');
+    expect(submitted.get('deleteRemote')).toBe('on');
   });
 
   it('cancel closes the delete dialog and restores focus to its opener', async () => {

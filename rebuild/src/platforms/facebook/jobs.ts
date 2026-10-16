@@ -8,7 +8,10 @@ import { withRetries } from '@/server/jobs/retry';
 import type { RetryBackoff } from '@/server/jobs/retry';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { withInboxChannelOperation, inboxCommentSuppressed, orderInboxCommentBatch } from '@/modules/inbox/server/comment-guard';
+import { lockPublishingTargets } from '@/modules/publishing/server/guard';
+import { assertNoPostDeletionForRemoteIdentity } from '@/modules/publishing/server/post-deletion-guard';
 import type { JobSummary } from '@/server/jobs/types';
+import { OperationError } from '@/lib/operation-error';
 
 const DAY_MS = 86_400_000;
 type FairRow = { id: string };
@@ -40,7 +43,7 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
   const rows = await prisma.postTarget.findMany({
     where: { status: 'scheduled_remote', remotePostId: { not: null }, target: { enabled: true, type: 'page', socialAccount: { is: { provider: 'facebook', invalidatedAt: null } } } },
     orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }], take: limit,
-    select: { id: true, postId: true, remotePostId: true, target: { select: { workspaceId: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } } },
+    select: { id: true, postId: true, remotePostId: true, target: { select: { id: true, workspaceId: true, providerId: true, accessToken: true, socialAccount: { select: { workspaceId: true, accessToken: true, scopes: true, tokenExpiresAt: true, invalidatedAt: true } } } } },
   });
   const result: JobSummary = { examined: rows.length, updated: 0, skipped: 0, failed: 0 };
   if (!rows.length) return result;
@@ -53,25 +56,33 @@ export async function syncScheduledPostStatus(now = new Date(), retryLimit = 0, 
     if (!requiredScopes.size || [...requiredScopes].some(scope => !grantedScopes.has(scope))) { result.skipped++; continue; }
     try {
       await withWorkspaceOperation(row.target.workspaceId, async () => {
-        const status = await withRetries(() => engine.getStatus(decryptSecret(encrypted), row.remotePostId!), retryLimit, retryBackoff);
-        if (status.state !== 'published') { result.skipped++; return; }
-        const changed = await prisma.postTarget.updateMany({
-          where: { id: row.id, postId: row.postId, status: 'scheduled_remote', remotePostId: row.remotePostId },
-          data: { status: 'published', ...(status.publishedAt ? { publishedAt: status.publishedAt } : { publishedAt: now }) },
+        await prisma.$transaction(async tx => {
+          const postKey = JSON.stringify(['publishing-post', row.target.workspaceId, row.postId]);
+          const postLock = await tx.$queryRaw<Array<{ acquired: boolean }>>`SELECT pg_try_advisory_xact_lock(hashtextextended(${postKey}, 0)) AS acquired`;
+          if (postLock[0]?.acquired !== true) { result.skipped++; return; }
+          await lockPublishingTargets(tx, row.target.workspaceId, [row.target.id]);
+          await assertNoPostDeletionForRemoteIdentity(tx, row.target.workspaceId, row.target.id, row.remotePostId!);
+          const status = await withRetries(() => engine.getStatus(decryptSecret(encrypted), row.remotePostId!), retryLimit, retryBackoff);
+          if (status.state !== 'published') { result.skipped++; return; }
+          const changed = await tx.postTarget.updateMany({
+            where: { id: row.id, postId: row.postId, targetId: row.target.id, status: 'scheduled_remote', remotePostId: row.remotePostId },
+            data: { status: 'published', ...(status.publishedAt ? { publishedAt: status.publishedAt } : { publishedAt: now }) },
+          });
+          if (!changed.count) return;
+          const counts = await tx.postTarget.groupBy({ by: ['status'], where: { postId: row.postId }, _count: true });
+          const total = counts.reduce((sum, item) => sum + item._count, 0);
+          const published = counts.find(item => item.status === 'published')?._count ?? 0;
+          const remote = counts.find(item => item.status === 'scheduled_remote')?._count ?? 0;
+          const failed = counts.find(item => item.status === 'failed')?._count ?? 0;
+          const processing = counts.find(item => item.status === 'processing')?._count ?? 0;
+          const nextStatus = processing ? (published + remote > 0 ? 'partially_failed' : 'publishing') : (published + remote === total ? (remote ? 'scheduled' : 'published') : published ? 'partially_failed' : failed ? 'failed' : undefined);
+          if (nextStatus) await tx.post.updateMany({ where: { id: row.postId }, data: { status: nextStatus, ...(published && !remote ? { publishedAt: now } : {}), updatedAt: now } });
+          result.updated++;
         });
-        if (!changed.count) return;
-        result.updated++;
-        const counts = await prisma.postTarget.groupBy({ by: ['status'], where: { postId: row.postId }, _count: true });
-        const total = counts.reduce((sum, item) => sum + item._count, 0);
-        const published = counts.find(item => item.status === 'published')?._count ?? 0;
-        const remote = counts.find(item => item.status === 'scheduled_remote')?._count ?? 0;
-        const failed = counts.find(item => item.status === 'failed')?._count ?? 0;
-        const processing = counts.find(item => item.status === 'processing')?._count ?? 0;
-        const nextStatus = processing ? (published + remote > 0 ? 'partially_failed' : 'publishing') : (published + remote === total ? (remote ? 'scheduled' : 'published') : published ? 'partially_failed' : failed ? 'failed' : undefined);
-        if (nextStatus) await prisma.post.updateMany({ where: { id: row.postId }, data: { status: nextStatus, ...(published && !remote ? { publishedAt: now } : {}), updatedAt: now } });
       });
-    } catch {
-      result.failed++;
+    } catch (error) {
+      if (error instanceof OperationError && error.code === 'conflict') result.skipped++;
+      else result.failed++;
     }
   }
   return result;

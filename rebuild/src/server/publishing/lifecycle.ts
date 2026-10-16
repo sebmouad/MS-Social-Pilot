@@ -257,50 +257,8 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
   });
 }
 
-/** Local deletion is always explicit. Requested remote deletion runs first through each destination adapter. */
-export async function deletePost(actor: PublishingActor, postId: string, deleteRemote: boolean) {
-  return withPublishingOperation(actor, { postId, includeInbox: true }, async ({ actor, signal, lockTargets }) => {
-    const role = await membership(actor);
-    await assertPostScope(actor, postId);
-    if (deleteRemote && !MANAGERS.has(role.role)) throw new OperationError('forbidden', 'Only workspace owners, admins, and editors can delete remote posts.');
-    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, providerId: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
-    if (!post || (role.role === 'contributor' && post.authorId !== actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
-    if (post.targets.some(row => row.status === 'processing')) throw new OperationError('conflict', 'A publishing result needs review before this post can be removed. Check the post status first.');
-    const remoteRows = post.targets.filter(row => row.remotePostId);
-    const entitlements = deleteRemote ? await loadEntitlements(actor.userId, actor.workspaceId) : null;
-    if (deleteRemote) for (const row of remoteRows) {
-      const provider = row.target.socialAccount?.provider;
-      const adapter = provider ? await platformFor(provider, 'remoteDelete') : null;
-      if (!provider || !entitlements || !hasPlatformCapability(entitlements, provider) || !adapter?.deleteRemote) throw new OperationError('unavailable', 'Remote deletion is not supported for every destination. No remote deletion was attempted.');
-    }
-    if (deleteRemote && remoteRows.length) {
-      for (const row of remoteRows) {
-        const provider = row.target.socialAccount?.provider;
-        const adapter = provider ? await platformFor(provider, 'remoteDelete') : null;
-        if (!adapter?.deleteRemote || !row.target.accessToken || row.target.socialAccount?.invalidatedAt) throw new OperationError('reconnect_required', 'Reconnect this source before remote deletion. The local post is preserved.');
-        try {
-          signal.throwIfAborted();
-          await adapter.deleteRemote({ credential: { accessToken: decryptSecret(row.target.accessToken) }, remoteId: row.remotePostId!, signal });
-          await publishingTransaction(signal, async tx => {
-            await tx.postTarget.updateMany({ where: { id: row.id, postId: post.id, remotePostId: row.remotePostId }, data: { status: 'cancelled', remotePostId: null, remoteUrl: null } });
-            await audit(tx, actor, 'publishing.remote_post_deleted', { postId: post.id, postTargetId: row.id });
-          });
-        } catch {
-          await publishingTransaction(signal, tx => audit(tx, actor, 'publishing.remote_delete_failed', { postId: post.id, postTargetId: row.id }));
-          throw new OperationError('upstream_failure', 'The platform could not confirm remote deletion. The local post and publishing history are preserved.');
-        }
-      }
-    }
-    await publishingTransaction(signal, async tx => {
-      const current = await tx.post.findFirst({ where: { id: post.id, workspaceId: actor.workspaceId }, select: { id: true } });
-      if (!current) throw new OperationError('not_found', 'This post was already deleted.');
-      await tx.postComment.deleteMany({ where: { postTarget: { postId: post.id } } });
-      await tx.postTarget.deleteMany({ where: { postId: post.id } });
-      await tx.post.delete({ where: { id: post.id } });
-      await audit(tx, actor, 'publishing.post_deleted', { postId: post.id, remoteDeletionRequested: deleteRemote, remoteDeletedCount: deleteRemote ? remoteRows.length : 0 });
-    });
-  });
-}
+/** Shared durable deletion service owns dispatch, receipts and local recovery. */
+export { deletePostDurably as deletePost } from '@/modules/publishing/server/deletion';
 
 /** Claim each destination before the provider call. `processing` remains as a manual-reconciliation marker on ambiguous failures. */
 export async function publishPost(actor: PublishingActor, postId: string, expectedScheduledAt?: Date) {

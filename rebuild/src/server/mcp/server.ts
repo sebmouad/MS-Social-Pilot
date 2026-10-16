@@ -14,6 +14,7 @@ import { canAccessFeature, canAccessPage } from '../permissions';
 import { moderateInboxComment, replyToInbox, setInboxResolved } from '../inbox/actions';
 import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '../publishing/lifecycle';
 import { recordFirstCommentOutcome, sendFirstComment } from '@/modules/publishing/server/first-comment';
+import { finishPostDeletion, getPostDeletion, recordPostDeletionOutcome } from '@/modules/publishing/server/deletion';
 import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
 import { runtimeConfig } from '../config/store';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
@@ -74,7 +75,10 @@ const tools = [
   { name: 'send_first_comment', description: 'Send the saved first comment once to a confirmed remote post. This contacts the platform. If the result is uncertain, inspect list_posts and do not repeat until the outcome has been manually checked. Confirmation must exactly match SEND FIRST COMMENT <postTargetId>.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'record_first_comment_outcome', description: 'Record an outcome verified manually on the platform. This tool does not contact or verify the platform. NOT SENT permits a separate later send request; SENT requires the platform comment ID. A late request may still appear. Confirmation must exactly match RECORD FIRST COMMENT <postTargetId> SENT or RECORD FIRST COMMENT <postTargetId> NOT SENT.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'outcome', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, outcome: { type: 'string', enum: ['sent', 'not_sent'] }, remoteId: { type: 'string', minLength: 1 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'sync_post_status', description: 'Refresh a post status from supported social platforms. Confirmation must exactly match SYNC POST STATUS <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
-  { name: 'delete_post', description: 'Permanently delete a workspace post and its local publishing history. Set deleteRemote to true to also request deletion of remote posts. Confirmation must exactly match DELETE POST <postId> LOCAL or DELETE POST <postId> REMOTE.', inputSchema: { type: 'object', required: ['postId', 'deleteRemote', 'confirmation'], properties: { postId: { type: 'string' }, deleteRemote: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'delete_post', description: 'Start one post deletion request. Set deleteRemote to true to request remote deletion too. Inspect the returned per-destination receipt; uncertain results must be checked or manually attested before any separate retry. Confirmation must exactly match DELETE POST <postId> LOCAL or DELETE POST <postId> REMOTE.', inputSchema: { type: 'object', required: ['postId', 'deleteRemote', 'confirmation'], properties: { postId: { type: 'string' }, deleteRemote: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'get_post_deletion_status', description: 'Read the current durable deletion receipt for a post, including after local removal.', inputSchema: { type: 'object', required: ['postId'], properties: { postId: { type: 'string' } }, additionalProperties: false } },
+  { name: 'finish_post_deletion', description: 'Remove the local post only after every required remote deletion confirmation is persisted. Confirmation must exactly match FINISH POST DELETION <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'record_post_deletion_outcome', description: 'Record an outcome manually verified on the platform. This does not contact or verify the platform; a late request may still take effect. Confirmation must exactly match RECORD POST DELETION <operationId> DELETED or RECORD POST DELETION <operationId> NOT DELETED.', inputSchema: { type: 'object', required: ['postId', 'operationId', 'outcome', 'verifiedOnPlatform', 'confirmation'], properties: { postId: { type: 'string' }, operationId: { type: 'string' }, outcome: { type: 'string', enum: ['deleted', 'not_deleted'] }, verifiedOnPlatform: { type: 'boolean', const: true }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'create_post', description: 'Create a local post draft with selected destinations and optional first comment, link, or media URL. Confirmation must exactly match CREATE POST.', inputSchema: { type: 'object', required: ['message', 'targetIds', 'confirmation'], properties: { message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'update_post', description: 'Edit an unpublished post and its selected destinations. Confirmation must exactly match UPDATE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'message', 'targetIds', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'submit_post_for_approval', description: 'Submit a draft for review. Confirmation must exactly match SUBMIT POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -123,6 +127,9 @@ const toolFeatures: Record<string, string> = {
   record_first_comment_outcome: 'publishing/posts',
   sync_post_status: 'publishing/posts',
   delete_post: 'publishing/posts',
+  get_post_deletion_status: 'publishing/posts',
+  finish_post_deletion: 'publishing/posts',
+  record_post_deletion_outcome: 'publishing/posts',
   create_post: 'publishing/posts',
   update_post: 'publishing/posts',
   submit_post_for_approval: 'publishing/posts',
@@ -132,8 +139,8 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post']);
-const writeTools = new Set(['manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
+const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome']);
+const writeTools = new Set(['manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -563,8 +570,31 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const postId = typeof args.postId === 'string' ? args.postId : '';
       if (!postId || typeof args.deleteRemote !== 'boolean') throw new OperationError('invalid_request', 'postId and deleteRemote are required.');
       requireConfirmation(args, `DELETE POST ${postId} ${args.deleteRemote ? 'REMOTE' : 'LOCAL'}`);
-      await deletePost(viewer, postId, args.deleteRemote);
-      return auditedReceipt(viewer, name, { postId, remoteDeletionRequested: args.deleteRemote }, { postId, deleted: true, remoteDeletionRequested: args.deleteRemote });
+      const result = await deletePost(viewer, postId, args.deleteRemote);
+      return auditedReceipt(viewer, name, { postId, remoteDeletionRequested: args.deleteRemote, state: result.state }, result);
+    }
+    case 'get_post_deletion_status': {
+      const postId = requiredString(args, 'postId');
+      if (Object.keys(args).some(key => key !== 'postId')) throw new OperationError('invalid_request', 'postId is the only accepted field.');
+      return getPostDeletion(viewer, { postId });
+    }
+    case 'finish_post_deletion': {
+      const postId = requiredString(args, 'postId');
+      if (Object.keys(args).some(key => !['postId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'postId and confirmation are the only accepted fields.');
+      requireConfirmation(args, `FINISH POST DELETION ${postId}`);
+      const result = await finishPostDeletion(viewer, { postId, confirmation: `FINISH POST DELETION ${postId}` });
+      return auditedReceipt(viewer, name, { postId, state: result.state }, result);
+    }
+    case 'record_post_deletion_outcome': {
+      const postId = requiredString(args, 'postId');
+      const operationId = requiredString(args, 'operationId');
+      const outcome = args.outcome;
+      if (outcome !== 'deleted' && outcome !== 'not_deleted') throw new OperationError('invalid_request', 'outcome must be deleted or not_deleted.');
+      if (args.verifiedOnPlatform !== true) throw new OperationError('invalid_request', 'verifiedOnPlatform must be true after an external platform check.');
+      if (Object.keys(args).some(key => !['postId', 'operationId', 'outcome', 'verifiedOnPlatform', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Only the post, operation and verified outcome are accepted.');
+      requireConfirmation(args, `RECORD POST DELETION ${operationId} ${outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}`);
+      const result = await recordPostDeletionOutcome(viewer, { postId, operationId, outcome, confirmation: `RECORD POST DELETION ${operationId} ${outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}`, verifiedOnPlatform: true });
+      return auditedReceipt(viewer, name, { postId, operationId, outcome, state: result.state }, result);
     }
     case 'create_post': {
       requireConfirmation(args, 'CREATE POST');

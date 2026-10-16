@@ -12,7 +12,7 @@ The product serves teams publishing to selected social channels, managing respon
 |---|---|
 | Module and route availability | `src/modules/*/manifest.ts`, `src/server/entitlements` |
 | Member and channel permissions | `src/server/permissions`, `src/server/context.ts` |
-| Post lifecycle and remote deletion | `src/server/publishing` |
+| Post lifecycle and remote deletion | `src/modules/publishing/server/deletion.ts`, `src/server/publishing/lifecycle.ts`, platform adapter contracts |
 | Connection selection and disconnection | `src/server/connections` |
 | Workspace export and erasure | `src/server/data-control`, `src/app/settings/data/IMPLEMENTATION.md` |
 | Facebook capabilities | `src/platforms/facebook`, `docs/PLATFORMS.md` |
@@ -45,11 +45,13 @@ There is no released billing or legal-copy contract for the rebuild. Do not inve
 | Change selection | Keep current choices visible; disable duplicate save | Persist selected local state and refresh the connection table | Keep the selection dialog open with entered choices |
 | Disconnect source | Ask retain or delete, show related-data preview for delete | Confirm scope and update the table | Keep dialog and choice; never claim provider revocation |
 | Create/edit post | Preserve composer values and target choices; block duplicate upload/submission | Return to a refreshed post list with status | Dedicated creation and inline editing retain service/network failure values; unconfirmed save directs the user to inspect Posts before retry. |
-| Delete published post | Separate local removal from optional remote deletion; disable repeats | Show actual local and remote outcomes | Dialog, remote choice and focused error remain after refusal; durable remote-deletion reconciliation is still missing |
+| Delete published post | Separate local removal from optional remote deletion; disable repeats | Show per-destination receipt and local-finalization state | Durable status and externally verified recovery retain identity and confirmation; uncertain provider outcomes are never automatically retried or claimed verified |
 | Export workspace | Show coverage and generate a no-store archive | Download ZIP with manifest | Fail visibly if files/records are missing or unsafe |
 | Delete workspace data | Exact confirmation after row preview | Show resumable progress and completion | Preserve purge state and retry cleanup without repeating DB deletion |
 
 The server sources above govern permission, idempotency, and deletion semantics. Rows describe UI consequences, not new business policy.
+
+Remote post deletion commits one content-free intent per remote identity before dispatch. Provider exceptions remain uncertain, and partial success remains visible by destination. The customer can inspect status, record an outcome only after externally checking the platform, and finish local removal only after persisted confirmation for every required destination. Private Root provides bounded history and separately labeled human attestation. The app does not automatically verify an uncertain request; late provider effects remain possible. Alias records remain until workspace erasure. See [POST_DELETION_RECOVERY.md](docs/POST_DELETION_RECOVERY.md).
 
 ## Navigation, data, and feedback
 

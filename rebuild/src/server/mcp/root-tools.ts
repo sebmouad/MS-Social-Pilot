@@ -1,4 +1,5 @@
 import { listRootInboxDeletions, confirmRootInboxDeletion } from '../root/inbox-deletions';
+import { listRootPostDeletions, recordRootPostDeletionOutcome } from '../root/post-deletions';
 import { z } from 'zod';
 import { listRootDiagnostics, runRootDiagnostics } from '../root/diagnostics';
 import { loadRootOperations } from '../root/operations';
@@ -17,6 +18,8 @@ import type { RootMcpActor } from './types';
 export const rootToolDefinitions = [
   { name: 'list_root_inbox_deletions', description: 'Private bounded Inbox deletion recovery history. Includes remote object identity for operator verification, never credentials or comment content. Workspace keys cannot use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'confirm_root_inbox_deletion', description: 'Record an operator attestation only after separately verifying actual remote deletion. This is not an automatic provider check; it never contacts the platform or removes local rows. Require verifiedOnPlatform:true and exact CONFIRM REMOTE DELETION <operationId>. Workspace keys cannot use this tool.', inputSchema: { type: 'object', required: ['operationId', 'verifiedOnPlatform', 'confirmation'], properties: { operationId: { type: 'string' }, verifiedOnPlatform: { const: true, type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'list_root_post_deletions', description: 'Private bounded recent Publishing post deletion history. Shows remote and local post identities to installation owners only; excludes post content, credentials and provider errors.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'record_root_post_deletion_outcome', description: 'Record a human-verified platform outcome for an uncertain remote post deletion. Never contacts the provider or performs local cleanup. A delayed request may still take effect after NOT DELETED; verify again before any new attempt. Require verifiedOnPlatform:true and exact ROOT RECORD POST DELETION <operationId> DELETED or NOT DELETED. Workspace keys cannot use this tool.', inputSchema: { type: 'object', required: ['operationId', 'outcome', 'verifiedOnPlatform', 'confirmation'], properties: { operationId: { type: 'string' }, outcome: { type: 'string', enum: ['deleted', 'not_deleted'] }, verifiedOnPlatform: { const: true, type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_root_operations', description: 'Private rebuild-only worker heartbeat and bounded job history. Optional product module ID. Stored raw summaries, provider errors and worker hostnames are excluded. Workspace keys cannot use this tool.', inputSchema: { type: 'object', properties: { moduleId: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_root_diagnostics', description: 'Private diagnostic history and bounded recent connection choices. Scope is shared, product:<installed module id>, or platform:<installed provider id>. No credentials or raw transport errors.', inputSchema: { type: 'object', properties: { scope: { type: 'string' } }, additionalProperties: false } },
   { name: 'run_root_diagnostics', description: 'Run private predefined module checks and read-only provider connectivity tests. Confirmation must exactly match RUN DIAGNOSTICS <scope>. Scope-wide cooldown and durable start audit apply across interfaces. Optional connectionId belongs to the selected platform. No publishing, ads or message changes. Inspect check statuses and auditRecorded; a pass verifies only its stated check.', inputSchema: { type: 'object', required: ['scope', 'confirmation'], properties: { scope: { type: 'string' }, connectionId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -33,6 +36,7 @@ export const rootTools = new Set(rootToolDefinitions.map(tool => tool.name));
 export const canUseRootTool = (viewer: RootMcpActor) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
 const resourceDefinitions = [
   { uri: 'msp://root/inbox-deletions', name: 'Inbox deletion recovery', description: 'Private bounded operator deletion history and remote identity; credentials excluded.', tool: 'list_root_inbox_deletions' },
+  { uri: 'msp://root/post-deletions', name: 'Publishing post deletion recovery', description: 'Private bounded operator deletion history and remote identity; post content and credentials excluded.', tool: 'list_root_post_deletions' },
   { uri: 'msp://root/operations', name: 'Replacement operations', description: 'Private replacement-only worker health; no raw errors.', tool: 'get_root_operations' },
   { uri: 'msp://root/diagnostics', name: 'Shared diagnostics', description: 'Private shared diagnostic history and configuration.', tool: 'get_root_diagnostics' },
   { uri: 'msp://root/users', name: 'Installation users', description: 'Private bounded user directory, access and verification status; credentials excluded.', tool: 'list_root_users' },
@@ -57,6 +61,10 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
         if (Object.keys(args).length) throw new OperationError('invalid_request', 'This read does not accept filters.');
         return await listRootInboxDeletions(viewer.userId, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
       case 'confirm_root_inbox_deletion': return await confirmRootInboxDeletion(viewer.userId, args);
+      case 'list_root_post_deletions':
+        if (Object.keys(args).length) throw new OperationError('invalid_request', 'This read does not accept filters.');
+        return await listRootPostDeletions(viewer.userId, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
+      case 'record_root_post_deletion_outcome': return await recordRootPostDeletionOutcome(viewer.userId, args);
       case 'get_root_operations': {
         const parsed = z.object({ moduleId: z.string().optional() }).strict().safeParse(args);
         if (!parsed.success) throw new OperationError('invalid_request', 'Choose a valid product module.');

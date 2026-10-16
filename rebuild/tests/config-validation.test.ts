@@ -27,7 +27,13 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(41);
+    expect(CONFIG_SCHEMA_VERSION).toBe(42);
+    expect(CONFIG_BY_KEY.get('publishing.deletionHistoryLimit')!.defaultValue).toBe(20);
+    expect(CONFIG_BY_KEY.get('publishing.deletionHistoryLimit')!.schema.safeParse(100).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('publishing.deletionHistoryLimit')!.schema.safeParse(101).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('publishing.deletionMaxAliases')!.defaultValue).toBe(1000);
+    expect(CONFIG_BY_KEY.get('publishing.deletionMaxAliases')!.schema.safeParse(10000).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('publishing.deletionMaxAliases')!.schema.safeParse(10001).success).toBe(false);
     for (const [key, value] of [['root.userSearchMaxCharacters', 200], ['root.accountOperationTimeoutMs', 15000], ['root.accountOperationLockWaitMs', 5000]] as const) {
       expect(CONFIG_BY_KEY.get(key)!.defaultValue).toBe(value);
       expect(CONFIG_BY_KEY.get(key)!.consumption).toBe('active');

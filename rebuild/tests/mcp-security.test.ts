@@ -53,6 +53,8 @@ const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(),
 vi.mock('../src/server/publishing/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
 const firstCommentMutations = vi.hoisted(() => ({ send: vi.fn(), record: vi.fn() }));
 vi.mock('../src/modules/publishing/server/first-comment', () => ({ sendFirstComment: firstCommentMutations.send, recordFirstCommentOutcome: firstCommentMutations.record }));
+const postDeletions = vi.hoisted(() => ({ get: vi.fn(), finish: vi.fn(), record: vi.fn() }));
+vi.mock('../src/modules/publishing/server/deletion', () => ({ getPostDeletion: postDeletions.get, finishPostDeletion: postDeletions.finish, recordPostDeletionOutcome: postDeletions.record }));
 const media = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), remove: vi.fn(), upload: vi.fn() }));
 vi.mock('../src/server/media/storage', () => ({ listWorkspaceImages: media.list, getWorkspaceImageMetadata: media.get, deleteUnusedWorkspaceImage: media.remove, uploadWorkspaceImage: media.upload }));
 
@@ -114,7 +116,7 @@ beforeEach(() => {
   adsMutations.read.mockResolvedValue({ id: 'campaign-a', configuredStatus: 'PAUSED', effectiveStatus: 'CAMPAIGN_PAUSED' });
   publishingMutations.publish.mockResolvedValue({ published: 1, failed: 0, needsReconciliation: 0 });
   publishingMutations.sync.mockResolvedValue({ synced: 1 });
-  publishingMutations.remove.mockResolvedValue(undefined);
+  publishingMutations.remove.mockResolvedValue({ ok: true, postId: 'post-a', localConfirmed: true, remoteDeletionRequested: false, state: 'completed', operations: [] });
   publishingMutations.create.mockResolvedValue({ id: 'new-post' });
   publishingMutations.update.mockResolvedValue(undefined);
   publishingMutations.submit.mockResolvedValue(undefined);
@@ -123,6 +125,9 @@ beforeEach(() => {
   publishingMutations.cancel.mockResolvedValue(undefined);
   firstCommentMutations.send.mockResolvedValue({ ok: true, postId: 'post-a', postTargetId: 'post-target-a', state: 'sent' });
   firstCommentMutations.record.mockResolvedValue({ ok: true, postId: 'post-a', postTargetId: 'post-target-a', state: 'ready' });
+  postDeletions.get.mockResolvedValue({ ok: true, postId: 'post-a', localConfirmed: false, remoteDeletionRequested: true, state: 'needs_review', operations: [] });
+  postDeletions.finish.mockResolvedValue({ ok: true, postId: 'post-a', localConfirmed: true, remoteDeletionRequested: true, state: 'completed', operations: [] });
+  postDeletions.record.mockResolvedValue({ ok: true, postId: 'post-a', localConfirmed: false, remoteDeletionRequested: true, state: 'local_pending', operations: [] });
   media.list.mockResolvedValue({ items: [{ id: 'image-a', mimeType: 'image/png', size: 123, createdAt: '2026-10-14T00:00:00.000Z', inUse: false }], nextCursor: null });
   media.get.mockResolvedValue({ id: 'image-a', mimeType: 'image/png', size: 123, createdAt: '2026-10-14T00:00:00.000Z', inUse: false });
   media.remove.mockResolvedValue('deleted');
@@ -209,7 +214,7 @@ describe('MCP workspace boundaries', () => {
     ['create_draft', { message: 'Hello', confirmation: 'CREATE DRAFT' }, () => mutations.create, { id: 'new-post', status: 'draft' }],
     ['reply_to_inbox', { kind: 'message', id: 'conversation-a', text: 'Hello', confirmation: 'REPLY message conversation-a' }, () => inboxMutations.reply, { ok: true, itemId: 'conversation-a' }],
     ['publish_post', { postId: 'post-a', confirmation: 'PUBLISH POST post-a' }, () => publishingMutations.publish, { postId: 'post-a', published: 1 }],
-    ['delete_post', { postId: 'post-a', deleteRemote: false, confirmation: 'DELETE POST post-a LOCAL' }, () => publishingMutations.remove, { postId: 'post-a', deleted: true }],
+    ['delete_post', { postId: 'post-a', deleteRemote: false, confirmation: 'DELETE POST post-a LOCAL' }, () => publishingMutations.remove, { ok: true, postId: 'post-a', localConfirmed: true, remoteDeletionRequested: false, state: 'completed', operations: [] }],
     ['upload_workspace_image', { fileName: 'new.png', mimeType: 'image/png', base64: 'AQID', confirmation: 'UPLOAD WORKSPACE IMAGE new.png' }, () => media.upload, { id: 'image-b' }],
     ['set_connection_selection', { kind: 'target', id: 'target-a', enabled: true, confirmation: 'SET CONNECTION target target-a ENABLED' }, () => mutations.select, { id: 'target-a', enabled: true }],
     ['update_ad', { adAccountId: 'account-a', objectId: 'ad-a', objectType: 'ad', status: 'paused', confirmation: 'SET AD STATUS ad-a TO PAUSED' }, () => adsMutations.update, { objectId: 'ad-a', updated: true }],
@@ -867,10 +872,34 @@ describe('MCP workspace boundaries', () => {
     expect((await badDelete.json()).result.isError).toBe(true);
     expect(publishingMutations.remove).not.toHaveBeenCalled();
 
+    publishingMutations.remove.mockResolvedValueOnce({ ok: true, postId: 'post-a', localConfirmed: false, remoteDeletionRequested: true, state: 'needs_review', operations: [{ operationId: 'operation-1', targetId: 'target-a', targetName: 'Studio', state: 'uncertain', remoteConfirmed: false, localConfirmed: false }] });
     const remoteDelete = await call('delete_post', { postId: 'post-a', deleteRemote: true, confirmation: 'DELETE POST post-a REMOTE' });
-    expect((await remoteDelete.json()).result.structuredContent).toMatchObject({ postId: 'post-a', deleted: true, remoteDeletionRequested: true });
+    expect((await remoteDelete.json()).result.structuredContent).toMatchObject({ postId: 'post-a', ok: true, localConfirmed: false, remoteDeletionRequested: true, state: 'needs_review', operations: [{ state: 'uncertain' }] });
     expect(publishingMutations.remove).toHaveBeenCalledWith(viewer, 'post-a', true);
     expect(db.$executeRaw).toHaveBeenCalled();
+  });
+
+  it('exposes durable post deletion status and recovery with explicit external confirmation', async () => {
+    const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
+    const names = (await listed.json()).result.tools.map((tool: { name: string }) => tool.name);
+    expect(names).toContain('get_post_deletion_status');
+    expect(names).toContain('finish_post_deletion');
+    expect(names).toContain('record_post_deletion_outcome');
+
+    const status = await call('get_post_deletion_status', { postId: 'post-a' });
+    expect((await status.json()).result.structuredContent).toMatchObject({ postId: 'post-a', state: 'needs_review' });
+    expect(postDeletions.get).toHaveBeenCalledWith(viewer, { postId: 'post-a' });
+
+    const bad = await call('record_post_deletion_outcome', { postId: 'post-a', operationId: 'operation-1', outcome: 'deleted', verifiedOnPlatform: true, confirmation: 'RECORD POST DELETION operation-1 NOT DELETED' });
+    expect((await bad.json()).result.isError).toBe(true);
+    expect(postDeletions.record).not.toHaveBeenCalled();
+    const recorded = await call('record_post_deletion_outcome', { postId: 'post-a', operationId: 'operation-1', outcome: 'deleted', verifiedOnPlatform: true, confirmation: 'RECORD POST DELETION operation-1 DELETED' });
+    expect((await recorded.json()).result.structuredContent).toMatchObject({ state: 'local_pending', localConfirmed: false });
+    expect(postDeletions.record).toHaveBeenCalledWith(viewer, { postId: 'post-a', operationId: 'operation-1', outcome: 'deleted', confirmation: 'RECORD POST DELETION operation-1 DELETED', verifiedOnPlatform: true });
+
+    const finished = await call('finish_post_deletion', { postId: 'post-a', confirmation: 'FINISH POST DELETION post-a' });
+    expect((await finished.json()).result.structuredContent).toMatchObject({ state: 'completed', localConfirmed: true });
+    expect(postDeletions.finish).toHaveBeenCalledWith(viewer, { postId: 'post-a', confirmation: 'FINISH POST DELETION post-a' });
   });
 
   it('exposes scoped first-comment send and manual outcome tools with exact confirmations', async () => {

@@ -17,13 +17,23 @@ it('retains edit values and shows only the safe domain error', async () => {
 });
 it('retains the remote-deletion choice without exposing unexpected errors', async () => {
   state.remove.mockRejectedValue(new Error('secret DSN'));
-  const data = values(); data.set('deleteRemote', 'on');
+  const data = values(); data.set('deleteRemote', 'on'); data.set('intent', 'start'); data.set('confirmation', 'DELETE POST p REMOTE');
   const result = await deletePostWithRecoveryAction({ status: 'idle', deleteRemote: false }, data);
   expect(result.status).toBe('error'); expect(result.deleteRemote).toBe(true); expect(result.message).toContain('could not be confirmed'); expect(result.message).not.toContain('secret');
 });
 it('redirects only after a confirmed delete and refreshes publishing views', async () => {
-  state.remove.mockResolvedValue(undefined);
-  await expect(deletePostWithRecoveryAction({ status: 'idle', deleteRemote: false }, values())).rejects.toMatchObject({ digest: expect.stringContaining('notice=deleted') });
+  state.remove.mockResolvedValue({ ok: true, postId: 'p', localConfirmed: true, state: 'completed', operations: [] });
+  const data = values(); data.set('intent', 'start'); data.set('confirmation', 'DELETE POST p LOCAL');
+  await expect(deletePostWithRecoveryAction({ status: 'idle', deleteRemote: false }, data)).rejects.toMatchObject({ digest: expect.stringContaining('notice=deleted') });
   expect(state.remove).toHaveBeenCalledWith({ userId: 'u', workspaceId: 'w', allowedTargetIds: ['a'] }, 'p', false);
   expect(state.refresh).toHaveBeenCalledWith('/publishing/posts');
+});
+
+it('does not report deletion for a missing receipt or malformed request', async () => {
+  state.remove.mockResolvedValue(undefined);
+  const data = values(); data.set('intent', 'start'); data.set('confirmation', 'DELETE POST p LOCAL');
+  expect(await deletePostWithRecoveryAction({ status: 'idle', deleteRemote: false }, data)).toMatchObject({ status: 'error' });
+  expect(state.refresh).not.toHaveBeenCalled();
+  data.delete('intent');
+  expect(await deletePostWithRecoveryAction({ status: 'idle', deleteRemote: false }, data)).toMatchObject({ status: 'error' });
 });

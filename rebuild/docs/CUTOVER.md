@@ -59,15 +59,16 @@ migration or a claim of the complete production-shaped cutover rehearsal.
    at production as a substitute for staging evidence.
 3. **Decide the schema path.** `rebuild/prisma/schema.prisma` is a partial
    compatibility view, not a migration schema. It has no rebuild migration
-   directory. The worker expects its lease and run tables, and MCP uses a key
-   table; their additive migrations exist in the root migration directory and
-   have passed only on an isolated local database.
+  directory. The worker expects its lease and run tables, MCP uses a key
+  table, and deletion recovery uses journal tables; their additive migrations
+  exist in the root migration directory and have passed only on an isolated
+  local database.
    No `prisma db push` or `migrate deploy` is permitted from the rebuild against
    production. For the local rehearsal, use a sanitized, pre-migration custom
    format dump and a loopback-only PostgreSQL admin URL. Set
    `CUTOVER_DUMP_SANITIZED=YES` only after a separate sanitization review, and
-   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions`.
-   `rebuild/scripts/cutover-rehearsal.sh` pins those three SQL files by SHA-256,
+   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions`.
+   `rebuild/scripts/cutover-rehearsal.sh` pins those four SQL files by SHA-256,
    restores the dump into local scratch databases, refuses migration objects
    or success records already present, applies only those files, checks the
    explicitly enumerated mapped columns and enum labels, reports aggregate
@@ -125,7 +126,7 @@ migration or a claim of the complete production-shaped cutover rehearsal.
   operational options, MCP parity, and live provider integration tests.
 - Production currently has no rebuild web or worker systemd unit and no
   verified proxy switch from 3100 to 3200.
-- The rebuild schema is not a migration schema. Its three checksum-pinned
+- The rebuild schema is not a migration schema. Its four checksum-pinned
   additive migrations still need application and data-impact review against a
   sanitized production-shaped copy and a restore-aware plan.
 - There is no sanitized production-shaped staging evidence covering the full
@@ -139,8 +140,23 @@ exit without SSH, service, proxy, database, or filesystem changes.
 
 ## Inbox deletion journal addition — 2026-10-16
 
-The third reviewed additive migration, `20261016190000_rebuild_inbox_deletions`, adds only the durable Inbox deletion journal and its constraints/indexes. The cutover script now pins all three checksums, checks all three migration-history entries and enumerates the new mapped columns. The original two-migration schema-only rehearsal above remains historical evidence; it does not prove the new three-migration rehearsal.
+The third reviewed additive migration, `20261016190000_rebuild_inbox_deletions`, adds only the durable Inbox deletion journal and its constraints/indexes. At that point, the cutover script pinned three checksums and checked their migration-history entries and mapped columns. The original two-migration schema-only rehearsal above remains historical evidence; it does not prove the then-current three-migration rehearsal. The later fourth migration is described below.
 
 Before applying the new table to the isolated synthetic preview, a private custom-format backup was restored into a scratch database and users/workspaces/posts/audit/comments/conversations counts matched (1/1/6/37/3/2). The scratch database was removed; the backup remains private at `/private/tmp/socialpilot-preview-before-inbox-deletion-20261016T182951Z.dump`. The table was applied only to the preview, without db push or production changes. The complete three-migration rehearsal against a sanitized pre-migration production-shaped baseline, exact cutover backup/media recovery and proxy/service rollback remain required.
 
-The final journal schema also retains local alias IDs and suppressed descendant remote IDs. Its current checksum-pinned SQL was applied from scratch to a private pre-journal restore, then independently backed up/restored with matching counts across 96 public tables; both scratch databases were removed. The isolated preview’s array-column amendment was separately preceded by another restore-verified backup. These are local journal-migration checks; they do not substitute for the full approved three-file rehearsal on a sanitized production-shaped baseline or production proxy/service/media rollback.
+The final Inbox journal schema also retains local alias IDs and suppressed descendant remote IDs. Its current checksum-pinned SQL was applied from scratch to a private pre-journal restore, then independently backed up/restored with matching counts across 96 public tables; both scratch databases were removed. The isolated preview’s array-column amendment was separately preceded by another restore-verified backup. These are local journal-migration checks; they do not substitute for the full approved four-file rehearsal on a sanitized production-shaped baseline or production proxy/service/media rollback.
+
+## Publishing post-deletion journal addition — 2026-10-16
+
+The fourth pinned additive migration, `20261016220000_rebuild_post_deletions`, adds the content-free remote post deletion journal. Its SHA-256 is now `80e406ae33000a349d07f9e428563d20083bc36c65956a969a5e7ccc77c32f07`; the state/timestamp CHECK is explicitly NULL-safe. Before the isolated synthetic preview received this migration, the private backup `/private/tmp/socialpilot-preview-before-post-deletion-20261016T210904Z.dump` (244200 bytes) was restored; the exact source-table counts matched, and the migration restore matched the 97-table inventory. The revised DDL has not been applied to the preview; the parent will back up and restore it before applying the correction. Production was not changed.
+
+The cutover allowlist, checksum pin, migration-history guard, and mapped-column inventory now contain four migrations. This backup/restore evidence and preview application do not prove a full four-file rehearsal against a sanitized, production-shaped pre-migration baseline. Exact production cutover backup/media recovery, application workflows, and proxy/service rollback remain required. See [POST_DELETION_RECOVERY.md](POST_DELETION_RECOVERY.md) for service semantics and remaining gaps.
+
+The final post-deletion SQL above was reapplied from the pre-journal private
+backup, then independently backed up/restored with matching exact counts for
+97 tables. Its NULL-safe CHECK amendment on the preview was separately preceded
+by a restore-verified 97-table backup at
+`/private/tmp/socialpilot-preview-before-post-deletion-constraint-20261016T231821Z.dump`
+(249411 bytes). These checks establish the local additive migration and
+constraint repair only; they do not close the full four-file production-shaped
+migration, media or proxy/service rollback gates.

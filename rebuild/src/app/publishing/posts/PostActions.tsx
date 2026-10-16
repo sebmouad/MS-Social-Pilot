@@ -184,7 +184,7 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules 
       {post.targets.map(target => <FirstCommentControl key={target.id} postId={post.id} postComment={post.firstComment!} target={target} />)}
     </section> : null}
     <Button variant="danger" size="sm" type="button" disabled={rowPending} onClick={() => setDeleteOpen(true)}>Delete locally</Button>
-    {deleteOpen && <PostDeleteDialog postId={post.id} hasRemote={hasRemote} onDismiss={() => setDeleteOpen(false)} onPendingChange={setDeletePending} />}
+    {deleteOpen && <PostDeleteDialog postId={post.id} postMessage={post.message} hasRemote={hasRemote} onDismiss={() => setDeleteOpen(false)} onPendingChange={setDeletePending} />}
   </div>;
 }
 
@@ -337,23 +337,77 @@ function PostEditForm({ post, targets, selected, imageRules, disabled, onPending
   </form>;
 }
 
-function PostDeleteDialog({ postId, hasRemote, onDismiss, onPendingChange }: { postId: string; hasRemote: boolean; onDismiss: () => void; onPendingChange: (pending: boolean) => void }) {
+function PostDeleteDialog({ postId, postMessage, hasRemote, onDismiss, onPendingChange }: { postId: string; postMessage: string; hasRemote: boolean; onDismiss: () => void; onPendingChange: (pending: boolean) => void }) {
   const [actionState, formAction, pending] = useActionState(runDeletePostWithRecovery, { status: 'idle', deleteRemote: false } satisfies PostDeleteActionState);
   const [deleteRemote, setDeleteRemote] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const lastReceipt = useRef(actionState.receipt);
   useEffect(() => { onPendingChange(pending); }, [onPendingChange, pending]);
+  useEffect(() => {
+    if (lastReceipt.current !== actionState.receipt) {
+      lastReceipt.current = actionState.receipt;
+      setAcknowledged(false);
+    }
+  }, [actionState.receipt]);
   const initialFocus = actionState.status === 'error' ? '[data-dialog-error]' : '[data-dialog-cancel]';
   return <ModalDialog className="ui-dialog" labelledBy={`delete-title-${postId}`} onDismiss={onDismiss} busy={pending} initialFocus={initialFocus}>
-    <form noValidate action={formAction} onSubmit={() => onPendingChange(true)}>
+    <form ref={formRef} noValidate onSubmit={event => event.preventDefault()}>
       <input type="hidden" name="postId" value={postId} />
       <div className="ui-dialog__header"><div><h2 id={`delete-title-${postId}`}>Delete this post locally?</h2><p>This permanently removes the post and its local publishing history.</p></div></div>
       <div className="ui-dialog__body">
-        <p>{hasRemote ? 'Remote posts will remain on their platforms unless you also select remote deletion.' : 'No remote post is recorded for this item.'}</p>
-        {hasRemote ? <label className={styles.confirmCheck}><input type="checkbox" name="deleteRemote" checked={deleteRemote} disabled={pending} onChange={event => setDeleteRemote(event.currentTarget.checked)} /> Also delete recorded remote posts. This cannot be undone.</label> : null}
+        <p><strong>Post text</strong></p>
+        <p className={styles.help} style={{ overflowWrap: 'anywhere', display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 3, overflow: 'hidden' }}>{postMessage}</p>
+        <p>{hasRemote ? 'Choose whether to request deletion of recorded remote posts. Unconfirmed outcomes stay available here for review.' : 'No remote post is recorded for this item; only the local post and its history will be removed.'}</p>
+        {hasRemote ? <label className={styles.confirmCheck}><input type="checkbox" name="deleteRemote" checked={deleteRemote} disabled={pending} onChange={event => setDeleteRemote(event.currentTarget.checked)} /> Also request deletion of recorded remote posts.</label> : null}
+        {actionState.receipt ? <section aria-label="Deletion status">
+          <p role={actionState.status === 'error' ? 'alert' : 'status'}><strong>Deletion status:</strong> {actionState.receipt.state.replaceAll('_', ' ')}. {actionState.message}</p>
+          {actionState.receipt.operations.map(operation => <div className={styles.firstCommentRow} key={operation.operationId}>
+            <span>{operation.targetName ?? 'Destination'}: {deletionOperationLabel(operation.state, operation.remoteConfirmed)}</span>
+            {['started', 'uncertain'].includes(operation.state) ? <>
+              <Button type="button" size="sm" disabled={pending || !acknowledged} onClick={() => submit('record', { operationId: operation.operationId, outcome: 'deleted' })}>Record deleted</Button>
+              <Button type="button" size="sm" disabled={pending || !acknowledged} onClick={() => submit('record', { operationId: operation.operationId, outcome: 'not_deleted' })}>Record not deleted</Button>
+            </> : null}
+          </div>)}
+        </section> : null}
+        {actionState.receipt?.operations.some(operation => operation.state === 'started' || operation.state === 'uncertain') ? <div>
+          <p>The original request may still complete later. For each destination, check the platform yourself before recording an outcome.</p>
+          <label className={styles.confirmCheck}><input type="checkbox" checked={acknowledged} disabled={pending} onChange={event => setAcknowledged(event.currentTarget.checked)} /> I checked the platform outside this app and understand a late deletion result may still appear.</label>
+        </div> : null}
         {actionState.status === 'error' && <p className="ui-error" role="alert" data-dialog-error tabIndex={-1}>{actionState.message ?? 'We could not confirm whether this post was deleted. Check its current status before trying again.'}</p>}
       </div>
-      <div className="ui-dialog__actions"><Button type="button" data-dialog-cancel disabled={pending} onClick={onDismiss}>Cancel</Button><Button variant="danger" type="submit" disabled={pending}>Delete locally</Button></div>
+      <div className="ui-dialog__actions"><Button type="button" data-dialog-cancel disabled={pending} onClick={onDismiss}>Close</Button><Button type="button" disabled={pending} onClick={() => submit('status')}>Check deletion status</Button>{actionState.receipt?.state === 'local_pending' ? <Button variant="danger" type="button" disabled={pending} onClick={() => submit('finish')}>Finish local removal</Button> : <Button variant="danger" type="button" disabled={pending || actionState.receipt?.operations.some(operation => operation.state === 'started' || operation.state === 'uncertain')} onClick={() => submit('start')}>{actionState.receipt?.operations.some(operation => operation.state === 'rejected') ? 'New deletion request' : 'Delete post'}</Button>}</div>
     </form>
   </ModalDialog>;
+
+  function submit(intent: 'start' | 'status' | 'finish' | 'record', extras: Record<string, string> = {}) {
+    const form = formRef.current;
+    if (!form || pending) return;
+    const data = new FormData(form);
+    data.set('intent', intent);
+    if (intent === 'start') data.set('confirmation', `DELETE POST ${postId} ${deleteRemote ? 'REMOTE' : 'LOCAL'}`);
+    if (intent === 'finish') data.set('confirmation', `FINISH POST DELETION ${postId}`);
+    if (intent === 'record') {
+      if (!acknowledged) return;
+      data.set('verifiedOnPlatform', 'on');
+      data.set('confirmation', `RECORD POST DELETION ${extras.operationId} ${extras.outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}`);
+    }
+    for (const [name, value] of Object.entries(extras)) data.set(name, value);
+    if (intent === 'record' || intent === 'status') setAcknowledged(false);
+    startTransition(() => formAction(data));
+  }
+}
+
+function deletionOperationLabel(state: string, remoteConfirmed: boolean): string {
+  if (remoteConfirmed) return 'Remote deletion confirmed';
+  switch (state) {
+    case 'started': return 'Request started';
+    case 'uncertain': return 'Outcome unconfirmed';
+    case 'remote_confirmed': return 'Remote deletion confirmed';
+    case 'completed': return 'Local cleanup completed';
+    case 'rejected': return 'Not deleted';
+    default: return 'Needs review';
+  }
 }
 
 export async function runUpdatePostWithRecovery(previous: PostEditActionState, data: FormData): Promise<PostEditActionState> {
@@ -366,10 +420,15 @@ export async function runUpdatePostWithRecovery(previous: PostEditActionState, d
 
 export async function runDeletePostWithRecovery(previous: PostDeleteActionState, data: FormData): Promise<PostDeleteActionState> {
   const deleteRemote = data.get('deleteRemote') === 'on';
-  try { return await deletePostWithRecoveryAction(previous, data); }
+  try {
+    const result = await deletePostWithRecoveryAction(previous, data);
+    if (result.status === 'error' && !result.receipt && previous.receipt) return { ...result, deleteRemote, receipt: previous.receipt };
+    return result;
+  }
   catch (error) {
     if (isActionRedirect(error)) throw error;
-    return { status: 'error', message: 'We could not confirm whether this post was deleted. Check its current status before trying again.', deleteRemote };
+    const operationId = data.get('operationId');
+    return { status: 'error', message: 'The deletion result is unconfirmed. Check deletion status before trying again.', deleteRemote, ...(previous.receipt ? { receipt: previous.receipt } : {}), ...(typeof operationId === 'string' ? { operationId } : {}) };
   }
 }
 

@@ -30,9 +30,9 @@ describe('installation-only MCP context', () => {
     const initialized = await (await invoke('initialize')).json();
     expect(initialized.result.instructions).toContain('Private installation access');
     const names = (await (await invoke('tools/list')).json()).result.tools.map((tool: { name: string }) => tool.name);
-    expect(names.sort()).toEqual(['confirm_root_inbox_deletion', 'get_root_config', 'get_root_diagnostics', 'get_root_operations', 'list_root_activity', 'list_root_inbox_deletions', 'list_root_users', 'list_root_workspaces', 'manage_root_user', 'run_root_diagnostics', 'set_root_config', 'set_root_workspace_access']);
+    expect(names.sort()).toEqual(['confirm_root_inbox_deletion', 'get_root_config', 'get_root_diagnostics', 'get_root_operations', 'list_root_activity', 'list_root_inbox_deletions', 'list_root_post_deletions', 'list_root_users', 'list_root_workspaces', 'manage_root_user', 'record_root_post_deletion_outcome', 'run_root_diagnostics', 'set_root_config', 'set_root_workspace_access']);
     const resources = (await (await invoke('resources/list')).json()).result.resources.map((resource: { uri: string }) => resource.uri);
-    expect(resources.sort()).toEqual(['msp://root/activity', 'msp://root/config', 'msp://root/diagnostics', 'msp://root/inbox-deletions', 'msp://root/operations', 'msp://root/users', 'msp://root/workspaces']);
+    expect(resources.sort()).toEqual(['msp://root/activity', 'msp://root/config', 'msp://root/diagnostics', 'msp://root/inbox-deletions', 'msp://root/operations', 'msp://root/post-deletions', 'msp://root/users', 'msp://root/workspaces']);
   });
   it('rejects forced workspace calls before write locks or data/provider queries', async () => {
     for (const name of ['list_posts', 'create_draft', 'delete_workspace_data', 'get_live_ad_status']) {

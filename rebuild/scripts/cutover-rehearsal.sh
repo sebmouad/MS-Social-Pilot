@@ -11,7 +11,7 @@ fail() { echo "cutover rehearsal: $*" >&2; exit 1; }
 : "${CUTOVER_DUMP_SANITIZED:?Set CUTOVER_DUMP_SANITIZED=YES only after confirming the dump is sanitized}"
 : "${CUTOVER_APPROVED_MIGRATION_SET:?Set CUTOVER_APPROVED_MIGRATION_SET to the reviewed migration set}"
 [ "$CUTOVER_DUMP_SANITIZED" = YES ] || fail "CUTOVER_DUMP_SANITIZED must be YES"
-approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions'
+approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions'
 [ "$CUTOVER_APPROVED_MIGRATION_SET" = "$approved_migrations" ] || fail "migration set must exactly match the reviewed staging allowlist"
 [ -f "$CUTOVER_STAGING_DUMP" ] || fail "staging dump does not exist"
 
@@ -32,6 +32,7 @@ verify_migration() {
 verify_migration 20261015120000_mcp_api_keys 988d873c33229b439818d079d72c8bc49ffec93cbfe081ee4061ef93d2b2b3f4
 verify_migration 20261023100000_rebuild_worker_jobs 5fb7962a2c720f8a3f30480c4c5afa6f0d48c92a8f2ee58047fb96ccf04a7205
 verify_migration 20261016190000_rebuild_inbox_deletions 457327ad55d02af41eefe00f56021923abe5e13cf7ca668a96c064fa714acc57
+verify_migration 20261016220000_rebuild_post_deletions 80e406ae33000a349d07f9e428563d20083bc36c65956a969a5e7ccc77c32f07
 
 # Only loopback TCP or the standard local PostgreSQL socket and database
 # /postgres are accepted. A copied production DATABASE_URL must fail closed.
@@ -73,13 +74,14 @@ BEGIN
   IF to_regclass('public.mcp_api_keys') IS NOT NULL
      OR to_regclass('public.rebuild_job_leases') IS NOT NULL
      OR to_regclass('public.rebuild_sync_runs') IS NOT NULL
-     OR to_regclass('public.rebuild_inbox_deletions') IS NOT NULL THEN
+     OR to_regclass('public.rebuild_inbox_deletions') IS NOT NULL
+     OR to_regclass('public.rebuild_post_deletions') IS NOT NULL THEN
     RAISE EXCEPTION 'staging dump already contains reviewed migration objects; use a pre-migration sanitized baseline';
   END IF;
   IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
-    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
+    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
       INTO already_applied
-      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions';
+      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions';
     IF already_applied THEN
       RAISE EXCEPTION 'staging dump migration history already contains an allowlisted migration';
     END IF;
@@ -89,6 +91,7 @@ SQL
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261015120000_mcp_api_keys/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261023100000_rebuild_worker_jobs/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261016190000_rebuild_inbox_deletions/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261016220000_rebuild_post_deletions/migration.sql"
 echo "reviewed additive migrations applied to local scratch database"
 
 # Required tables/columns are taken from rebuild/prisma/schema.prisma. This
@@ -120,6 +123,7 @@ BEGIN
     ,ARRAY['rebuild_job_leases','name'], ARRAY['rebuild_job_leases','owner'], ARRAY['rebuild_job_leases','token'], ARRAY['rebuild_job_leases','leaseExpiresAt'], ARRAY['rebuild_job_leases','updatedAt']
     ,ARRAY['rebuild_sync_runs','id'], ARRAY['rebuild_sync_runs','job'], ARRAY['rebuild_sync_runs','owner'], ARRAY['rebuild_sync_runs','startedAt'], ARRAY['rebuild_sync_runs','finishedAt'], ARRAY['rebuild_sync_runs','outcome'], ARRAY['rebuild_sync_runs','attempts'], ARRAY['rebuild_sync_runs','summary'], ARRAY['rebuild_sync_runs','error']
     ,ARRAY['rebuild_inbox_deletions','id'], ARRAY['rebuild_inbox_deletions','workspaceId'], ARRAY['rebuild_inbox_deletions','targetId'], ARRAY['rebuild_inbox_deletions','provider'], ARRAY['rebuild_inbox_deletions','remoteId'], ARRAY['rebuild_inbox_deletions','localItemId'], ARRAY['rebuild_inbox_deletions','localAliases'], ARRAY['rebuild_inbox_deletions','suppressedRemoteIds'], ARRAY['rebuild_inbox_deletions','actorId'], ARRAY['rebuild_inbox_deletions','state'], ARRAY['rebuild_inbox_deletions','reason'], ARRAY['rebuild_inbox_deletions','createdAt'], ARRAY['rebuild_inbox_deletions','updatedAt'], ARRAY['rebuild_inbox_deletions','remoteConfirmedAt'], ARRAY['rebuild_inbox_deletions','completedAt']
+    ,ARRAY['rebuild_post_deletions','id'], ARRAY['rebuild_post_deletions','workspaceId'], ARRAY['rebuild_post_deletions','targetId'], ARRAY['rebuild_post_deletions','provider'], ARRAY['rebuild_post_deletions','remoteId'], ARRAY['rebuild_post_deletions','actorId'], ARRAY['rebuild_post_deletions','localPostIds'], ARRAY['rebuild_post_deletions','localPostTargetIds'], ARRAY['rebuild_post_deletions','state'], ARRAY['rebuild_post_deletions','reason'], ARRAY['rebuild_post_deletions','createdAt'], ARRAY['rebuild_post_deletions','updatedAt'], ARRAY['rebuild_post_deletions','remoteConfirmedAt'], ARRAY['rebuild_post_deletions','completedAt']
   ] LOOP
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.columns

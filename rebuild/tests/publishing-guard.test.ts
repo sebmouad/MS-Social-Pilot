@@ -24,8 +24,8 @@ const operationTx = { $queryRaw: state.query, postTarget: { findFirst: state.pos
 beforeEach(() => {
   vi.clearAllMocks();
   state.transaction.mockImplementation(async (work: (tx: typeof operationTx) => Promise<unknown>) => work(operationTx));
-  state.query.mockResolvedValue([{ acquired: true }]);
-  state.post.mockResolvedValue({ targets: [{ targetId: 'channel-a' }] });
+  state.query.mockImplementation((strings: TemplateStringsArray) => String(strings[0]).includes('rebuild_post_deletions') ? [] : [{ acquired: true }]);
+  state.post.mockResolvedValue({ id: 'post-1', targets: [{ id: 'post-target-1', targetId: 'channel-a' }] });
   state.postTarget.mockResolvedValue(null);
   state.target.mockImplementation(async (query: { where: { id?: { in?: string[] } } }) => (query.where.id?.in ?? []).map(id => ({ id })));
   state.user.mockResolvedValue({ disabledAt: null });
@@ -54,8 +54,8 @@ describe('Publishing guarded operations', () => {
     await expect(withPublishingOperation(actor, { postId: 'post-1', targetIds: ['channel-b'] }, work)).resolves.toBe('done');
     expect(state.workspaceOperation).toHaveBeenCalledTimes(1);
     expect(state.transaction).toHaveBeenCalledWith(expect.any(Function), { timeout: 102000, maxWait: 2000 });
-    expect(state.post).toHaveBeenCalledWith({ where: { id: 'post-1', workspaceId: 'workspace' }, select: { targets: { select: { targetId: true } } } });
-    expect(state.query).toHaveBeenCalledTimes(4);
+    expect(state.post).toHaveBeenCalledWith({ where: { id: 'post-1', workspaceId: 'workspace' }, select: { id: true, targets: { select: { id: true, targetId: true } } } });
+    expect(state.query).toHaveBeenCalledTimes(5);
     expect(state.permissions).toHaveBeenCalledTimes(2);
   });
 
@@ -80,7 +80,7 @@ describe('Publishing guarded operations', () => {
     const work = vi.fn();
     await expect(withPublishingOperation(actor, { postId: 'post-1' }, work)).rejects.toMatchObject({ code: 'forbidden' });
     expect(work).not.toHaveBeenCalled();
-    expect(state.query).toHaveBeenCalledTimes(1); // post lock only; no destination lock is acquired
+    expect(state.query).toHaveBeenCalledTimes(2); // post lock and alias check; no destination lock is acquired
   });
 
   it('rejects an invalid transaction budget before acquiring the workspace operation lock', async () => {
@@ -161,5 +161,27 @@ describe('Publishing guarded operations', () => {
     state.postTarget.mockClear();
     await assertPublishingTargetsSettled(operationTx as never, 'workspace', []);
     expect(state.postTarget).not.toHaveBeenCalled();
+  });
+
+  it('blocks a post mutation while a deletion journal matches its aliases', async () => {
+    state.query.mockImplementation((strings: TemplateStringsArray) => String(strings[0]).includes('rebuild_post_deletions') ? [{ id: 'deletion-1' }] : [{ acquired: true }]);
+    const work = vi.fn();
+    await expect(withPublishingOperation(actor, { postId: 'post-1' }, work)).rejects.toMatchObject({ code: 'conflict' });
+    expect(work).not.toHaveBeenCalled();
+  });
+
+  it('allows missing-post status recovery only with both explicit recovery options and scoped journal aliases', async () => {
+    state.post.mockResolvedValue(null);
+    state.query.mockImplementation((strings: TemplateStringsArray) => String(strings[0]).includes('SELECT DISTINCT "targetId"') ? [{ targetId: 'channel-a' }] : [{ acquired: true }]);
+    const work = vi.fn(async () => 'status');
+    await expect(withPublishingOperation(actor, { postId: 'post-1', allowDeletionRecovery: true, allowMissingPost: true }, work)).resolves.toBe('status');
+    expect(work).toHaveBeenCalledTimes(1);
+    state.post.mockResolvedValue(null);
+    await expect(withPublishingOperation(actor, { postId: 'post-1', allowDeletionRecovery: true }, vi.fn())).rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it('blocks cleanup while a remote deletion remains unresolved', async () => {
+    state.query.mockImplementation((strings: TemplateStringsArray) => String(strings[0]).includes('rebuild_post_deletions') ? [{ id: 'deletion-1' }] : []);
+    await expect(assertPublishingTargetsSettled(operationTx as never, 'workspace', ['channel-a'])).rejects.toMatchObject({ code: 'conflict' });
   });
 });

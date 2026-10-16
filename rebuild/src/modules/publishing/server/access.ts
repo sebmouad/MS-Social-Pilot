@@ -10,6 +10,7 @@ import type { PublishingActor, PublishingAuthorization, PublishingFeature } from
 export async function authorizePublishing(
   actor: PublishingActor,
   feature: PublishingFeature = 'publishing/posts',
+  access: 'read' | 'write' = 'write',
 ): Promise<PublishingAuthorization> {
   const user = await prisma.user.findUnique({ where: { id: actor.userId }, select: { disabledAt: true } });
   if (!user || user.disabledAt) throw new OperationError('unauthorized', 'Sign in with an active account to manage posts.');
@@ -19,7 +20,7 @@ export async function authorizePublishing(
     loadPermissions(actor.userId, actor.workspaceId),
     prisma.membership.findFirst({ where: { userId: actor.userId, workspaceId: actor.workspaceId }, select: { role: true } }),
   ]);
-  if (!membership || !entitlements || !permissions || !canUseFeature(entitlements, feature) || !canAccessFeature(permissions, feature, 'write')) {
+  if (!membership || !entitlements || !permissions || !canUseFeature(entitlements, feature) || !canAccessFeature(permissions, feature, access)) {
     throw new OperationError('forbidden', 'Publishing access is unavailable in this workspace.');
   }
   await assertWorkspaceNotPurging(actor.workspaceId);

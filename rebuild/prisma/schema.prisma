@@ -148,6 +148,7 @@ model Workspace {
   dataPurge      WorkspaceDataPurge?
 
   inboxDeletions RebuildInboxDeletion[]
+  postDeletions  RebuildPostDeletion[]
 
   @@map("workspaces")
 }
@@ -543,4 +544,27 @@ model RebuildInboxDeletion {
   @@unique([workspaceId, provider, targetId, remoteId])
   @@index([workspaceId, targetId, updatedAt])
   @@map("rebuild_inbox_deletions")
+}
+
+/// Durable, content-free recovery journal and tombstones for remote post deletion.
+model RebuildPostDeletion {
+  id                 String    @id
+  workspaceId        String
+  targetId           String
+  provider           String
+  remoteId           String
+  actorId            String
+  localPostIds       String[]  @default([])
+  localPostTargetIds String[]  @default([])
+  state              String
+  reason             String?
+  createdAt          DateTime  @default(now()) @db.Timestamp(3)
+  updatedAt          DateTime  @default(now()) @updatedAt @db.Timestamp(3)
+  remoteConfirmedAt  DateTime? @db.Timestamp(3)
+  completedAt        DateTime? @db.Timestamp(3)
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, targetId, updatedAt])
+  @@index([localPostIds], type: Gin)
+  @@map("rebuild_post_deletions")
 }

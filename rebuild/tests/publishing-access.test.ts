@@ -47,6 +47,13 @@ describe('Publishing authorization', () => {
     expect(state.purge).toHaveBeenCalledWith('workspace');
   });
 
+  it('supports read authorization while keeping write as the default', async () => {
+    await authorizePublishing(actor, 'publishing/posts', 'read');
+    expect(state.permission).toHaveBeenLastCalledWith(expect.anything(), 'publishing/posts', 'read');
+    await authorizePublishing(actor);
+    expect(state.permission).toHaveBeenLastCalledWith(expect.anything(), 'publishing/posts', 'write');
+  });
+
   it('rejects missing feature access and an active workspace purge', async () => {
     state.feature.mockReturnValue(false);
     await expect(authorizePublishing(actor)).rejects.toMatchObject({ code: 'forbidden' });

@@ -336,3 +336,71 @@ Actual Chrome checks at **1440×1000 desktop** and **390×844 phone** verified t
 Temporary Grove/Coast/Clay/Nightfall DOM themes were measured across animation frames at both widths: expected semantic surface/ink tokens and no horizontal page overflow. Representative Clay desktop and Nightfall phone screenshots were visually inspected; themes were restored to the saved Clay value without changing appearance settings. This is representative visual plus four-theme token/layout evidence, not exhaustive screenshots/accessibility audits for every state. Fresh console checks contained no errors/warnings. Browser does not prove complete provider API coverage.
 
 Remaining Analytics boundaries are explicit in ANALYTICS_READS.md: account-level stored Ads inputs only; no live provider verification, production-volume load proof, complete historical breakdown archive, post/object exploration, pins, report scheduling/templates, independent ad-resource grants or production cutover. Invalid-filter errors currently recover through sidebar retry/reset rather than full inline field correction. Full rebuild/legacy parity remains active; production is still legacy.
+
+## Durable post deletion batch — 2026-10-16
+
+The synthetic preview now has the additive `rebuild_post_deletions` journal.
+Final migration SHA-256:
+`80e406ae33000a349d07f9e428563d20083bc36c65956a969a5e7ccc77c32f07`.
+The pre-journal private custom-format backup restored with matching exact
+counts for 96 tables; the final SQL applied from that backup and independently
+restored with matching counts across 97 tables. Before the preview constraint
+amendment, another private backup restored with matching counts across 97
+tables (`socialpilot-preview-before-post-deletion-constraint-20261016T231821Z.dump`,
+249411 bytes). SQL state predicates now require a true result: NULL reason
+values cannot bypass required uncertain/confirmed/rejected reasons. No
+production schema, worker or provider data was changed.
+
+Actual localhost MCP/HTTP probe `scripts/verify-post-deletion.ts` passed:
+read-only empty/status reads, expired-source preflight before intent/dispatch,
+uncertain request reuse, exact confirmations, read-key write refusal,
+workspace-key refusal at private Root, Root HTTP shared history, human
+attestation without local removal, provider-free finalization, retained alias
+content with cancelled remote references, readable post-removal receipts,
+idempotent finalization and domain audits. This uses disposable synthetic
+records and performs no real provider deletion. Fixtures, keys, sessions and
+sources were removed; synthetic audit evidence remains.
+
+Actual Chrome checks used a fresh sign-in to the synthetic preview. On a
+390×844 phone with reduced motion, customer recovery preserved the selected
+remote option and known operation after an offline status failure, focused its
+error and kept the dialog open. Manual DELETED advanced to local-pending;
+explicit Finish local removal alone produced the deletion redirect. PostgreSQL
+then showed completed remote/local receipts and no requested local post.
+The customer dialog showed the affected post excerpt, one status control,
+human-readable operation states and a single final cleanup action. Clay and
+Nightfall were visually inspected; the dialog stayed 358px wide with no
+horizontal overflow. Other theme/state combinations remain unverified here.
+
+Private Publishing Root recovery was exercised at 1440×1000 and 390×844.
+Cancel received initial focus; Escape returned focus to Review. Offline
+submission retained the chosen result, exact phrase and verification checkbox
+and focused the error. Successful recording closed the dialog and the actual
+journal became remote-confirmed, with no completed local receipt. The success
+notice now receives focus (component regression tested). Synthetic browser
+journals were removed. This is manual workflow evidence, not a claim that a
+human checked a real platform.
+
+Automated evidence: the final integrated suite passed 1064 tests in 180 files,
+including 39 actual PostgreSQL checks in 15 files. The 12 deletion-service cases
+include committed intent visibility, concurrent request exclusion, a separate
+attempt after NOT DELETED, complete preflight before any dispatch and atomic
+local audit rollback. Typecheck and isolated production build passed. PostgreSQL
+coverage includes real journal constraints and writes; provider calls in those
+tests are controlled mocks.
+
+The premium static audit reports two existing scanner false positives:
+`Button.tsx` forwards action/type props to its native button, and
+`AutoTextarea.tsx` explicitly applies `resize: 'none'`. Its scan does not
+understand those shared implementations. The audit artifact is private at
+`/private/tmp/socialpilot-post-deletion-premium-audit.json`; it is not reported
+as a clean strict audit. Shared primitive/component/browser checks supply the
+separate behavior evidence.
+
+Remaining release gaps include remote publication receipt loss before local
+commit, automatic provider verification, complete Facebook formats/grants,
+actual live-provider tests, selected-resource reads (retained posts on
+unselected channels still appear), deletion redirect list/filter restoration
+and focus after the removed customer action, complete Root/MCP/legacy parity,
+production-shaped migration/authorization and cutover/media/rollback checks.
+Production remains legacy.

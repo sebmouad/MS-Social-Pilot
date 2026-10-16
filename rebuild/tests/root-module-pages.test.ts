@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), form: vi.fn() }));
 vi.mock('../src/server/root/RootDiagnostics', () => ({ RootDiagnostics: async () => null }));
+vi.mock('../src/server/root/RootInboxDeletions', () => ({ RootInboxDeletions: async () => createElement('section', null, 'Inbox deletion recovery') }));
+vi.mock('../src/server/root/RootPostDeletions', () => ({ RootPostDeletions: async () => createElement('section', null, 'Post deletion recovery') }));
 vi.mock('../src/server/jobs/RootJobHealth', () => ({ RootJobHealth: async () => null }));
 vi.mock('../src/server/config/access', () => ({ requireRootPage: state.access }));
 vi.mock('../src/server/config/store', () => ({ readConfig: state.read }));
@@ -62,5 +64,13 @@ describe('Root module screens', () => {
     await expect(PlatformPage({ params: Promise.resolve({ id: 'uninstalled' }) })).rejects.toThrow('Not found');
     const html = renderToStaticMarkup(await ModulesPage());
     for (const module of moduleManifests) expect(html).toContain(`/root/modules/${module.id}`);
+  });
+  it('attaches private post deletion recovery only to the Publishing Root module', async () => {
+    const publishingPage = await ProductPage({ params: Promise.resolve({ id: 'publishing' }) });
+    const inboxPage = await ProductPage({ params: Promise.resolve({ id: 'inbox' }) });
+    const publishing = renderToStaticMarkup(publishingPage.props.children);
+    const inbox = renderToStaticMarkup(inboxPage.props.children);
+    expect(publishing).toContain('Post deletion recovery');
+    expect(inbox).not.toContain('Post deletion recovery');
   });
 });

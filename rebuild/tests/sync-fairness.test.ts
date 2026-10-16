@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({
   targets: vi.fn(), accounts: vi.fn(), settings: new Map<string, string>(),
   settingRead: vi.fn(), settingWrite: vi.fn(), postTargets: vi.fn(), accountUpdate: vi.fn(),
-  observations: vi.fn(), adInsights: vi.fn(), remoteStatus: vi.fn(), targetUpdate: vi.fn(), targetGroup: vi.fn(), postUpdate: vi.fn(), transaction: vi.fn(), inboxList: vi.fn(), postComments: vi.fn(), suppressed: vi.fn(), orderBatch: vi.fn(), suppressedOrder: [] as string[],
+  observations: vi.fn(), adInsights: vi.fn(), remoteStatus: vi.fn(), targetUpdate: vi.fn(), targetGroup: vi.fn(), postUpdate: vi.fn(), transaction: vi.fn(), operationQuery: vi.fn(), inboxList: vi.fn(), postComments: vi.fn(), suppressed: vi.fn(), orderBatch: vi.fn(), suppressedOrder: [] as string[],
 }));
 
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_workspaceId: string, operation: () => Promise<unknown>) => operation() }));
@@ -17,6 +17,8 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string
   if (key === 'sync.maxItemsPerJob') return 1;
   if (key === 'meta.postReadScopes') return ['pages_read_engagement'];
   if (key === 'meta.inboxReadScopes') return ['pages_messaging'];
+  if (key === 'publishing.maxTargetsPerOperation') return 100;
+  if (key === 'publishing.identifierMaxCharacters') return 200;
   return [];
 } }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
@@ -61,7 +63,12 @@ beforeEach(() => {
   });
   state.targets.mockImplementation((query: { where: { AND: Array<Record<string, unknown>> }; take: number }) => applyQuery(targets, query));
   state.accounts.mockImplementation((query: { where: { AND: Array<Record<string, unknown>> }; take: number }) => applyQuery(accounts, query));
-  state.postTargets.mockResolvedValue([]); state.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<void>) => callback({ postComment: { upsert: vi.fn().mockResolvedValue({}) } }));
+  state.postTargets.mockResolvedValue([]); state.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<void>) => callback({
+    $queryRaw: state.operationQuery,
+    postComment: { upsert: vi.fn().mockResolvedValue({}) },
+    postTarget: { updateMany: state.targetUpdate, groupBy: state.targetGroup }, post: { updateMany: state.postUpdate },
+  }));
+  state.operationQuery.mockImplementation((strings: TemplateStringsArray) => String(strings[0]).includes('rebuild_post_deletions') ? [] : [{ acquired: true }]);
   state.remoteStatus.mockResolvedValue({ state: 'published', publishedAt: new Date('2026-10-15T00:00:00Z') });
   state.targetUpdate.mockResolvedValue({ count: 1 });
   state.targetGroup.mockResolvedValue([{ status: 'published', _count: 1 }]);
@@ -141,6 +148,7 @@ describe('fair sync batches', () => {
 
   it('skips scheduled post status refresh when the Page connection lacks the configured read grant', async () => {
     state.postTargets.mockResolvedValue([{ id: 'pt1', postId: 'post1', remotePostId: 'remote1', target: {
+      id: 'target1',
       workspaceId: 'w', providerId: 'page1', accessToken: 'page-token',
       socialAccount: { workspaceId: 'w', accessToken: 'user-token', scopes: 'pages_show_list', tokenExpiresAt: null, invalidatedAt: null },
     } }]);
@@ -151,6 +159,7 @@ describe('fair sync batches', () => {
 
   it('refreshes scheduled post status after confirming the connection has the configured read grant', async () => {
     state.postTargets.mockResolvedValue([{ id: 'pt1', postId: 'post1', remotePostId: 'remote1', target: {
+      id: 'target1',
       workspaceId: 'w', providerId: 'page1', accessToken: 'page-token',
       socialAccount: { workspaceId: 'w', accessToken: 'user-token', scopes: 'pages_show_list,pages_read_engagement', tokenExpiresAt: null, invalidatedAt: null },
     } }]);
@@ -158,5 +167,18 @@ describe('fair sync batches', () => {
     expect(await syncScheduledPostStatus(new Date('2026-10-15T12:00:00Z'))).toEqual({ examined: 1, updated: 1, skipped: 0, failed: 0 });
     expect(state.remoteStatus).toHaveBeenCalledWith('page-token', 'remote1');
     expect(state.targetUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'published' }) }));
+    expect(state.operationQuery).toHaveBeenCalled();
+  });
+
+  it('does not resuscitate a remote post with any non-rejected deletion receipt', async () => {
+    state.postTargets.mockResolvedValue([{ id: 'pt1', postId: 'post1', remotePostId: 'remote1', target: {
+      id: 'target1', workspaceId: 'w', providerId: 'page1', accessToken: 'page-token',
+      socialAccount: { workspaceId: 'w', accessToken: 'user-token', scopes: 'pages_read_engagement', tokenExpiresAt: null, invalidatedAt: null },
+    } }]);
+    state.operationQuery.mockImplementation((strings: TemplateStringsArray) => String(strings[0]).includes('state <> \'rejected\'') ? [{ id: 'deletion-1' }] : [{ acquired: true }]);
+    const { syncScheduledPostStatus } = await import('../src/platforms/facebook/jobs');
+    expect(await syncScheduledPostStatus()).toEqual({ examined: 1, updated: 0, skipped: 1, failed: 0 });
+    expect(state.remoteStatus).not.toHaveBeenCalled();
+    expect(state.targetUpdate).not.toHaveBeenCalled();
   });
 });

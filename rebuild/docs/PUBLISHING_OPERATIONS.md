@@ -1,6 +1,6 @@
 # Publishing operation boundaries
 
-Status: verified local safety batch, **not complete Publishing or production readiness**. Updated 2026-10-16. The architecture contract and legacy capability gate still apply.
+Status: local Publishing safety and durable remote-deletion recovery are implemented, **not complete Publishing or production readiness**. Updated 2026-10-16. The architecture contract and legacy capability gate still apply.
 
 ## Ownership and authority
 
@@ -8,7 +8,7 @@ Status: verified local safety batch, **not complete Publishing or production rea
 
 All Publishing lifecycle operations and the three unconnected-draft services use this guard. UI actions, the scheduled worker and the named MCP transport bypass list delegate lock ownership to those services; they must not acquire a second workspace operation lock. MCP still performs bearer scope, feature-write, schema and exact-confirmation checks. Local draft creation/edit/deletion now commits its domain audit with the write.
 
-Connection deselection/disconnection uses the same destination locks, then the existing Inbox channel locks. It refuses any stored `processing` publishing result, including after a process restart. Workspace erasure refuses the same unresolved evidence. Local post removal also locks its channels against Inbox operations and refuses unresolved Inbox deletion journals. This is intentionally conservative at channel scope: an unresolved deletion on another post in the same channel can block removal. None of these checks confirms remote absence or permits operators to discard uncertain evidence.
+Connection deselection/disconnection uses the same destination locks, then the existing Inbox channel locks. It refuses any stored `processing` publishing result, including after a process restart. Workspace erasure refuses unresolved publishing, Inbox, or remote-post-deletion evidence before local data removal. Local post removal also locks its channels against Inbox operations and refuses unresolved Inbox deletion journals. This is intentionally conservative at channel scope: an unresolved deletion on another post in the same channel can block removal. None of these checks confirms remote absence or permits operators to discard uncertain evidence.
 
 ## Scheduling and cancellation
 
@@ -37,7 +37,7 @@ Other row mutations, action availability for inconsistent stored states, complet
 
 ## Evidence
 
-The isolated preview suite passed **994 tests in 171 files**, including **16 PostgreSQL tests in 12 integration files**. Typecheck and an isolated production build passed. Three new real-database Publishing tests use independent clients: a held provider response excludes cancel/edit/local delete/source deletion; stale cancelled work performs no provider dispatch; unresolved Inbox deletion prevents local history removal. Their provider and authorization dependencies are mocked; they prove actual database locking, not Facebook or full authorization.
+The earlier isolated preview suite passed **994 tests in 171 files**, including **16 PostgreSQL tests in 12 integration files**, before the durable post-deletion batch. Typecheck and an isolated production build passed for that earlier snapshot. Three real-database Publishing tests at that stage used independent clients: a held provider response excludes cancel/edit/local delete/source deletion; stale cancelled work performs no provider dispatch; unresolved Inbox deletion prevents local history removal. Their provider and authorization dependencies are mocked; they prove actual database locking, not Facebook or full authorization. Do not use this prior count as final evidence for the post-deletion batch; current verification remains a separate pending result.
 
 The guarded localhost MCP/HTTP probe exercises scoped creation with first comment, read-only refusal, current grant revocation, current feature revocation, update/audit, unresolved-processing deletion refusal, confirmed local deletion, Root isolation and no-store behavior. It removes its temporary actor, keys, sessions, content and domain audits and restores the original effective MCP role policy. Root policy-change audits remain. No provider is called.
 
@@ -46,8 +46,16 @@ Chrome uses disposable synthetic examples. Phone edit/delete refusals retain val
 ## Release blockers and next work
 
 1. `processing` without a remote ID has no durable operator/customer reconciliation action. The new cleanup refusal preserves evidence but can leave the post, source or workspace deletion blocked until such recovery exists. Do not clear it by retrying publication or editing database rows in production.
-2. Successful remote deletion followed by failed local receipt/audit persistence has no durable deletion journal or provider-confirmed recovery. A later provider not-found response is not automatically proof of this operation's success.
+2. Remote post deletion now has durable intent, receipt, aliases, status and explicit operator recovery; provider exceptions stay uncertain, with no automatic provider verification or retry. Live provider deletion and attestation workflows still need production-shaped verification.
 3. The subsequent first-comment batch now commits post receipts before separate comment dispatch, retains uncertain comment claims, and provides explicit sending/manual outcome recording through UI/MCP. See FIRST_COMMENT_DELIVERY.md. A failed post-receipt transaction still needs the publication reconciliation workflow in item 1; delayed comments and automatic provider verification remain open.
 4. Facebook formats/grants, multi-photo orphan cleanup, native scheduling, full legacy workflows, all-state UX and real provider create/status/delete checks remain required. The Posts list also still exposes a synthetic retained post on an unselected channel; selected-resource read/retained-history policy needs correction and tests.
 
-No schema, migration, production traffic, worker ownership or deployment was changed by this batch. Keep legacy production running until the complete release gates pass.
+The post-deletion batch added one checksum-pinned additive migration, applied only to the isolated preview after restore verification. It did not change production traffic, worker ownership or deployment. Keep legacy production running until the complete release gates pass.
+
+## Durable remote post deletion — 2026-10-16
+
+`modules/publishing/server/deletion.ts` owns the durable deletion workflow. It writes content-free per-identity intent before contacting the adapter, leaves every provider/transport exception uncertain, persists each confirmed outcome before local finalization, and keeps a partial result when a later destination fails. Uncertain attempts are not automatically resent. No automatic provider verification is implemented. Workspace members use the shared UI/MCP service for status, explicit deletion, externally checked outcome recording, and local finalization; private Root UI/HTTP/MCP exposes bounded history and explicit human attestation. Attestation records an operator's external check; it is not an API verification, and a late provider effect can still occur.
+
+Local post and destination aliases retain status after cleanup and let finalization clear duplicate references to one remote identity. Non-rejected rows, including completed ones, remain tombstones until workspace erasure and prevent duplicate dispatch or status-sync resurrection. The journal contains remote IDs and local aliases, not post content or credentials. Registry 42 manages consumed Root history (20 by default, 1–100) and alias bounds (1000 by default, 1–10000). Workspace erasure and relevant connection cleanup refuse unresolved evidence.
+
+The migration is the fourth checksum-pinned additive migration in the cutover verifier. Before its preview-only application, a 244200-byte private backup was restored and checked against its exact 96 source tables; the migration restore matched the 97-table inventory. The backup remains at `/private/tmp/socialpilot-preview-before-post-deletion-20261016T210904Z.dump`. This does not establish a production-shaped four-file rehearsal. The current integrated test counts and build evidence are pending; consult [POST_DELETION_RECOVERY.md](POST_DELETION_RECOVERY.md) and [CUTOVER.md](CUTOVER.md) for evidence boundaries.

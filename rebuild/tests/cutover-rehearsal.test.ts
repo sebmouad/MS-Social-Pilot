@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const script = 'scripts/cutover-rehearsal.sh';
-const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions';
+const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions';
 
 describe('cutover rehearsal safety gates', () => {
   it('compares counts for every public base table and detects table-set drift', () => {
@@ -70,13 +70,15 @@ describe('cutover rehearsal safety gates', () => {
     const root = readFileSync('../prisma/migrations/20261015120000_mcp_api_keys/migration.sql', 'utf8');
     const worker = readFileSync('../prisma/migrations/20261023100000_rebuild_worker_jobs/migration.sql', 'utf8');
     const inbox = readFileSync('../prisma/migrations/20261016190000_rebuild_inbox_deletions/migration.sql', 'utf8');
+    const postDeletion = readFileSync('../prisma/migrations/20261016220000_rebuild_post_deletions/migration.sql', 'utf8');
     const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 
     expect(source).toContain(hash(root));
     expect(source).toContain(hash(worker));
     expect(source).toContain(hash(inbox));
-    expect(source).toContain('migration_name IN ($1, $2, $3)');
-    expect(source).toContain("USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions'");
+    expect(source).toContain(hash(postDeletion));
+    expect(source).toContain('migration_name IN ($1, $2, $3, $4)');
+    expect(source).toContain("USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions'");
     expect(source).toContain('CUTOVER_APPROVED_MIGRATION_SET');
     expect(source.indexOf('migration.sql"')) .toBeLessThan(source.indexOf('Required tables/columns are taken'));
     expect(source).toContain('staging dump already contains reviewed migration objects');
@@ -86,6 +88,15 @@ describe('cutover rehearsal safety gates', () => {
     expect(source).toContain("ARRAY['rebuild_inbox_deletions','completedAt']");
     expect(source).toContain("ARRAY['rebuild_inbox_deletions','localAliases']");
     expect(source).toContain("ARRAY['rebuild_inbox_deletions','suppressedRemoteIds']");
+    expect(source).toContain("ARRAY['rebuild_post_deletions','localPostIds']");
+    expect(source).toContain("ARRAY['rebuild_post_deletions','localPostTargetIds']");
+    expect(source).toContain('20261016220000_rebuild_post_deletions');
+    expect(source).toContain('80e406ae33000a349d07f9e428563d20083bc36c65956a969a5e7ccc77c32f07');
+    expect(source).toContain('988d873c33229b439818d079d72c8bc49ffec93cbfe081ee4061ef93d2b2b3f4');
+    expect(source).toContain('5fb7962a2c720f8a3f30480c4c5afa6f0d48c92a8f2ee58047fb96ccf04a7205');
+    expect(source).toContain('457327ad55d02af41eefe00f56021923abe5e13cf7ca668a96c064fa714acc57');
+    expect(source).toContain("to_regclass('public.rebuild_post_deletions')");
+    expect(source).toContain('migration_dir/20261016220000_rebuild_post_deletions/migration.sql');
   });
 
   it('maps the content-free deletion journal and guards its SQL constraints', () => {

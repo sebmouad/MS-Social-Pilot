@@ -5,6 +5,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { authorizePublishing } from './access';
+import { assertNoPendingPostDeletionForAliases, assertPostDeletionTargetsSettled, loadPostDeletionTargetIds } from './post-deletion-guard';
 import type { PublishingActor, PublishingFeature } from './types';
 
 type PublishingOperationContext = {
@@ -13,7 +14,7 @@ type PublishingOperationContext = {
   signal: AbortSignal;
   lockTargets(ids: readonly string[]): Promise<void>;
 };
-type PublishingOperationOptions = { postId?: string; targetIds?: readonly string[]; feature?: PublishingFeature; includeInbox?: boolean };
+type PublishingOperationOptions = { postId?: string; targetIds?: readonly string[]; feature?: PublishingFeature; includeInbox?: boolean; access?: 'read' | 'write'; allowDeletionRecovery?: boolean; allowMissingPost?: boolean };
 
 function validateIds(ids: readonly string[], maxTargets: number, maxIdCharacters: number): string[] {
   if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string' || !id || id.length > maxIdCharacters || /[\u0000-\u001f\u007f]/.test(id))) {
@@ -61,6 +62,7 @@ export async function assertPublishingTargetsSettled(
     select: { id: true },
   });
   if (pending) throw new OperationError('conflict', 'A publishing result needs review before this data or connection can be removed. Check the post status first.');
+  await assertPostDeletionTargetsSettled(tx, workspaceId, targetIds);
 }
 
 /** Holds the workspace operation boundary and fail-fast post/destination locks for one publishing action. */
@@ -95,7 +97,7 @@ export async function withPublishingOperation<T>(
     try {
       const assertActive = () => controller.signal.throwIfAborted();
       assertActive();
-      const initial = await authorizePublishing(actor, options.feature);
+      const initial = await authorizePublishing(actor, options.feature, options.access);
       assertActive();
       let postTargetIds: string[] = [];
       if (options.postId) {
@@ -105,11 +107,21 @@ export async function withPublishingOperation<T>(
         if (postLock[0]?.acquired !== true) throw new OperationError('conflict', 'Another action is running for this post. Check its outcome before continuing.');
         const post = await prisma.post.findFirst({
           where: { id: options.postId, workspaceId: actor.workspaceId },
-          select: { targets: { select: { targetId: true } } },
+          select: { id: true, targets: { select: { id: true, targetId: true } } },
         });
         assertActive();
-        if (!post) throw new OperationError('not_found', 'This post is unavailable.');
-        postTargetIds = post.targets.map(target => target.targetId);
+        if (!post) {
+          if (!options.allowDeletionRecovery || !options.allowMissingPost) throw new OperationError('not_found', 'This post is unavailable.');
+          postTargetIds = await loadPostDeletionTargetIds(tx, actor.workspaceId, options.postId);
+          assertActive();
+          if (!postTargetIds.length) throw new OperationError('not_found', 'This post is unavailable.');
+        } else {
+          postTargetIds = post.targets.map(target => target.targetId);
+          if (!options.allowDeletionRecovery) {
+            await assertNoPendingPostDeletionForAliases(tx, actor.workspaceId, [post.id], post.targets.map(target => target.id));
+            assertActive();
+          }
+        }
       }
 
       const requestedIds = [...new Set([...postTargetIds, ...targetIds])];
@@ -132,7 +144,7 @@ export async function withPublishingOperation<T>(
         assertActive();
       }
 
-      const current = await authorizePublishing(actor, options.feature);
+      const current = await authorizePublishing(actor, options.feature, options.access);
       assertActive();
       if (requestedIds.some(id => current.actor.allowedTargetIds !== undefined && !current.actor.allowedTargetIds.includes(id))) {
         throw new OperationError('forbidden', 'You do not have access to one or more selected destinations.');
