@@ -1,5 +1,5 @@
 import { prisma } from "@/server/data";
-import { enabledSocialAccountWhere } from "@/server/platforms/registry";
+import { selectedResourceConnectionWhere } from '@/server/platforms/resource-visibility';
 
 export type AdsPeriod = "7d" | "30d" | "90d" | "custom";
 
@@ -71,11 +71,10 @@ export async function getAdsAccountWhere(workspaceId: string, allowedTargetIds?:
     where: { workspaceId, id: { in: [...allowedTargetIds] } },
     select: { socialAccountId: true },
   })).map(target => target.socialAccountId).filter((id): id is string => Boolean(id));
-  const enabledProviderWhere = await enabledSocialAccountWhere();
   return {
     workspaceId,
     enabled: true,
-    socialAccount: { is: { workspaceId, invalidatedAt: null, ...enabledProviderWhere } },
+    socialAccount: { is: await selectedResourceConnectionWhere(workspaceId) },
     ...(socialAccountIds !== undefined ? { socialAccountId: { in: socialAccountIds } } : {}),
   };
 }

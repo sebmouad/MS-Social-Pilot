@@ -21,8 +21,6 @@ Scope: a fresh loopback PostgreSQL database populated only by `scripts/seed-prev
 
 ## Remaining findings and scope limits
 
-- Home counts include invalidated-source channels/accounts that Analytics and Ads exclude. Align inventory semantics and test shared visibility rules.
-- Connections labels an expired source “Connected”; stored data may remain readable, but reconnection status needs an expiry-aware label.
 - The localhost versus 127.0.0.1 origin mismatch needs explicit canonical-origin/proxy coverage before release.
 - After the failed campaign request, focus was observed on the document body while the native modal remained open. Review pending/error focus recovery and restoration across dialogs.
 - Customer copy still includes storage/provider type jargon and raw status codes in some places. Design/copy polish remains incomplete.
@@ -31,3 +29,13 @@ Scope: a fresh loopback PostgreSQL database populated only by `scripts/seed-prev
 ## Automated verification
 
 The integrated batch passed **369 tests in 80 files**, with `REBUILD_PREVIEW_DATABASE_URL` set so both PostgreSQL probes ran, **TypeScript checking**, and **production compilation**. A skipped database probe must never be described as passing. The fixture seeder was executed repeatedly, and its production, remote-host, non-preview-name and host-override refusal paths were checked. It never reads the legacy application `.env`.
+
+## Connection health and inventory follow-up
+
+Home now uses the selected channel loader and the same ad-account predicate as Ads/MCP. In the synthetic browser it displays four channels and three accounts, excluding unselected and revoked sources. MCP `list_pages` returns the same four channel names. Tenant and enabled-platform filters are shared through `selectedResourceConnectionWhere`; expired credentials do not erase retained history.
+
+Connections shows expired and revoked social/ad accounts as **Reconnect needed**. Its status labels come from the Root-managed `connections.statusLabels` registry entry (version 29), with bounded non-empty values. The shared selection service rejects attempts to enable expired/revoked sources or resources from a disabled module; disabling a stale resource remains allowed. The dialog permits undoing an unsaved deselection and omits unchanged items from the request.
+
+Browser checks verified unchecking and restoring an expired channel before saving, with both actions still available. An actual local API request to enable the expired channel returned **409** and the reconnect message. The equivalent MCP ad-account request returned a tool error with the same message. These refusal checks did not change fixture selections. The phone Connections screen fit a 390px viewport without page overflow. The selection dialog was visually inspected in Nightfall at 390 × 844, and the connections table in Grove on phone and desktop. Regression tests cover expiry boundaries, disabled modules, stale-resource removal, selection undo/no-op writes, Home counts, post scope and MCP query bounds.
+
+Follow-up verification: **383 tests in 84 files**, including both PostgreSQL probes, TypeScript checking and production compilation passed. No live provider or production deployment evidence is implied.

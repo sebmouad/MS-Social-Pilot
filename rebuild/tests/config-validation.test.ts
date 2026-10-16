@@ -27,7 +27,9 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(28);
+    expect(CONFIG_SCHEMA_VERSION).toBe(29);
+    expect(CONFIG_BY_KEY.get('connections.statusLabels')!.schema.safeParse({ connected: 'Connected', expired: 'Reconnect needed', revoked: 'Reconnect needed' }).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('connections.statusLabels')!.schema.safeParse({ connected: ' ', expired: 'Expired' }).success).toBe(false);
     expect(CONFIG_BY_KEY.get('publishing.maxImageAltCharacters')!.schema.safeParse(500).success).toBe(true);
     expect(CONFIG_BY_KEY.get('publishing.maxImageUploadRequestOverheadBytes')!.schema.safeParse(65536).success).toBe(true);
     expect(CONFIG_BY_KEY.get('publishing.maxImageUploadBytes')!.schema.parse(26214400)).toBe(26214400);

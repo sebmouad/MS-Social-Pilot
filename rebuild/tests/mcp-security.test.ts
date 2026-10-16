@@ -407,7 +407,7 @@ describe('MCP workspace boundaries', () => {
     db.post.findMany.mockResolvedValue([]);
     await call('list_pages');
     await call('list_posts', { limit: 900 });
-    expect(db.target.findMany.mock.calls[0][0].where).toEqual({ workspaceId: 'workspace-a', enabled: true, socialAccount: { is: { provider: { in: ['facebook'] } } } });
+    expect(db.target.findMany.mock.calls[0][0].where).toEqual({ workspaceId: 'workspace-a', enabled: true, socialAccount: { is: { workspaceId: 'workspace-a', invalidatedAt: null, provider: { in: ['facebook'] } } } });
     expect(db.post.findMany.mock.calls[0][0]).toMatchObject({ where: { workspaceId: 'workspace-a' }, take: 100 });
   });
 

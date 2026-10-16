@@ -1,4 +1,6 @@
 import { prisma } from "./data";
+import { connectionState } from '@/lib/connection-status';
+import { isPlatformEnabled } from '@/server/platforms/registry';
 import { randomBytes } from "node:crypto";
 
 const MANAGER_ROLES = new Set(["owner", "admin"]);
@@ -49,6 +51,15 @@ function linkedInstagramAccounts(tx: typeof prisma | import('../../generated/cli
   return tx.instagramAccount.findMany({ where: { workspaceId, OR: [{ socialAccountId }, ...(targetIds.length ? [{ socialAccountId: null, targetId: { in: targetIds } }] : [])] }, select: { id: true } });
 }
 
+async function requireSelectableSource(tx: import('../../generated/client').Prisma.TransactionClient, workspaceId: string, socialAccountId: string | null) {
+  const source = socialAccountId ? await tx.socialAccount.findFirst({
+    where: { id: socialAccountId, workspaceId },
+    select: { id: true, provider: true, invalidatedAt: true, tokenExpiresAt: true },
+  }) : null;
+  if (!source || connectionState(source) !== 'connected') throw new Error('Reconnect this source before selecting it.');
+  if (!await isPlatformEnabled(source.provider)) throw new Error('This connection is unavailable in the current workspace.');
+}
+
 /** Apply a confirmed set of channel and ad account choices atomically. */
 export async function setConnectionSelections(actor: ConnectionMutationActor, items: ConnectionSelection[]) {
   const membership = await currentMembership(actor);
@@ -60,7 +71,7 @@ export async function setConnectionSelections(actor: ConnectionMutationActor, it
         const target = await tx.target.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, type: true, providerId: true, socialAccountId: true } });
         if (!target) throw new Error('This channel is unavailable in the current workspace.');
         if (item.enabled) {
-          if (!target.socialAccountId || !await tx.socialAccount.findFirst({ where: { id: target.socialAccountId, workspaceId: actor.workspaceId, invalidatedAt: null }, select: { id: true } })) throw new Error('Reconnect this source before selecting it.');
+          await requireSelectableSource(tx, actor.workspaceId, target.socialAccountId);
         }
         await tx.target.updateMany({ where: { id: target.id, workspaceId: actor.workspaceId }, data: { enabled: item.enabled } });
         if (target.type === 'instagram') await tx.instagramAccount.updateMany({ where: { workspaceId: actor.workspaceId, igUserId: target.providerId }, data: { enabled: item.enabled } });
@@ -68,7 +79,7 @@ export async function setConnectionSelections(actor: ConnectionMutationActor, it
         const account = await tx.adAccount.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, socialAccountId: true } });
         if (!account) throw new Error('This advertising account is unavailable in the current workspace.');
         if (item.enabled) {
-          if (!account.socialAccountId || !await tx.socialAccount.findFirst({ where: { id: account.socialAccountId, workspaceId: actor.workspaceId, invalidatedAt: null }, select: { id: true } })) throw new Error('Reconnect this source before selecting it.');
+          await requireSelectableSource(tx, actor.workspaceId, account.socialAccountId);
         }
         await tx.adAccount.updateMany({ where: { id: account.id, workspaceId: actor.workspaceId }, data: { enabled: item.enabled } });
       }

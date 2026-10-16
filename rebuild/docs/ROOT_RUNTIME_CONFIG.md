@@ -35,3 +35,5 @@ Module and feature availability is generated from manifests and enforced by `src
 This registry does not configure `DATABASE_URL`, `ENCRYPTION_KEY`, session authentication, or process-level logging sinks. Runtime settings must not be presented as active until the corresponding consumer reads and validates the persisted setting.
 
 Registry version 28 restores the shared `ads.managementEnabled` policy used by Ads services and connection scope selection. It is a validated Root boolean, defaults off, and is audited through the normal configuration write service. Enabling it does not grant roles, account access or provider permissions. A source-read regression check now rejects unregistered literal runtime setting reads.
+
+Registry version 29 adds `connections.statusLabels`, the active customer-facing labels for connected, expired and revoked sources. Root may change these bounded labels without altering connection health, permissions or module availability. The server and selection dialog use the same health classification; expiry prevents new selection while stored history remains readable.

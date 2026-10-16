@@ -3,7 +3,7 @@ import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 28;
+export const CONFIG_SCHEMA_VERSION = 29;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -30,6 +30,8 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'root.directoryPageSize', group: 'Root', label: 'Root directory page size', kind: 'number', description: 'Users and workspaces shown per page in the private Root directory.', defaultValue: 25, schema: z.number().int().min(1).max(200), consumption: 'active' }),
   entry({ key: 'root.defaultWorkspaceTimezone', group: 'Root', label: 'New workspace timezone', kind: 'text', description: 'IANA timezone assigned when Root creates a workspace.', defaultValue: 'UTC', schema: z.string().min(1).max(100).refine(value => { try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; } }, 'Use an IANA timezone.'), consumption: 'active' }),
   entry({ key: 'root.workspaceNameMaxCharacters', group: 'Root', label: 'Workspace name character limit', kind: 'number', description: 'Maximum characters Root accepts for newly created or renamed workspaces.', defaultValue: 100, schema: z.number().int().min(1).max(500), consumption: 'active' }),
+
+  entry({ key: 'connections.statusLabels', group: 'Connections', label: 'Connection status labels', kind: 'json', description: 'Customer-facing labels for connected, expired and revoked sources. Health and permission checks are independent of these labels.', defaultValue: { connected: 'Connected', expired: 'Reconnect needed', revoked: 'Reconnect needed' }, schema: z.object({ connected: z.string().trim().min(1).max(80), expired: z.string().trim().min(1).max(80), revoked: z.string().trim().min(1).max(80) }).strict(), consumption: 'active' }),
 
   entry({ key: 'ads.managementEnabled', group: 'Ads controls', label: 'Ads management enabled', kind: 'boolean', description: 'Allow authorized workspace owners and admins to use supported advertising management operations. Platform grants, account scope and confirmations are still required.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
 

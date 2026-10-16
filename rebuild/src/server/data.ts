@@ -1,4 +1,5 @@
 import { PrismaClient, type Prisma, type PostStatus } from "../../generated/client";
+import { selectedResourceConnectionWhere } from './platforms/resource-visibility';
 import { enabledSocialAccountWhere } from './platforms/registry';
 
 const globalForPrisma = globalThis as typeof globalThis & {
@@ -72,9 +73,9 @@ export async function listWorkspaces(userId: string): Promise<WorkspaceSummary[]
 }
 
 /** Return connected destinations for a workspace without exposing access tokens. */
-export async function getTargets(workspaceId: string) {
+export async function getTargets(workspaceId: string, allowedTargetIds?: readonly string[]) {
   return prisma.target.findMany({
-    where: { workspaceId, enabled: true, socialAccount: { is: await enabledSocialAccountWhere() } },
+    where: { workspaceId, enabled: true, socialAccount: { is: await selectedResourceConnectionWhere(workspaceId) }, ...(allowedTargetIds === undefined ? {} : { id: { in: [...allowedTargetIds] } }) },
     orderBy: [{ type: "asc" }, { name: "asc" }],
     select: {
       id: true,
@@ -210,6 +211,7 @@ export async function listConnections(workspaceId: string) {
       name: true,
       pictureUrl: true,
       invalidatedAt: true,
+      tokenExpiresAt: true,
       createdAt: true,
       targets: { select: { id: true, type: true, name: true, enabled: true } },
       adAccounts: { select: { id: true, actId: true, name: true, enabled: true } },

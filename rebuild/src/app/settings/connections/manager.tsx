@@ -3,15 +3,16 @@
 import { useEffect, useState } from 'react';
 import { ModalDialog } from '@/components/ModalDialog';
 import styles from '../settings.module.css';
+import { connectionState, type ConnectionStatusLabels } from '@/lib/connection-status';
 import { summarizeDisconnectCounts } from './preview';
 
 type Channel = { id: string; name: string; type: string; enabled: boolean };
 type AdAccount = { id: string; name: string; actId: string; enabled: boolean };
-type Source = { id: string; name: string; provider: string; invalidatedAt: Date | null; targets: Channel[]; adAccounts: AdAccount[] };
+type Source = { id: string; name: string; provider: string; invalidatedAt: Date | null; tokenExpiresAt: Date | null; targets: Channel[]; adAccounts: AdAccount[] };
 
 type Connectable = { id: string; name: string; mark: { text: string; color: string } };
 
-export function ConnectionManager({ sources, canManage, platforms, initiallyOpen = false, initialSourceId, initialAction }: { sources: Source[]; canManage: boolean; platforms: Connectable[]; initiallyOpen?: boolean; initialSourceId?: string; initialAction?: 'manage' | 'disconnect' }) {
+export function ConnectionManager({ statusLabels, sources, canManage, platforms, initiallyOpen = false, initialSourceId, initialAction }: { statusLabels: ConnectionStatusLabels; sources: Source[]; canManage: boolean; platforms: Connectable[]; initiallyOpen?: boolean; initialSourceId?: string; initialAction?: 'manage' | 'disconnect' }) {
   const initialSource = sources.find(source => source.id === initialSourceId);
   const [open, setOpen] = useState(initiallyOpen || Boolean(initialSource && initialAction === 'manage'));
   const [busy, setBusy] = useState(false);
@@ -51,7 +52,7 @@ export function ConnectionManager({ sources, canManage, platforms, initiallyOpen
       const items = Object.entries(selected).map(([key, enabled]) => {
         const [kind, id] = key.split(':');
         return { kind, id, enabled };
-      });
+      }).filter(item => sources.some(source => (item.kind === 'target' ? source.targets : source.adAccounts).some(resource => resource.id === item.id && resource.enabled !== item.enabled)));
       const response = await fetch('/api/connections', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items }) });
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
@@ -92,9 +93,9 @@ export function ConnectionManager({ sources, canManage, platforms, initiallyOpen
     {open && <ModalDialog className={styles['connection-dialog']} labelledBy="connection-dialog-title" onDismiss={() => setOpen(false)} busy={busy} initialFocus={initialSource && initialAction === 'manage' ? '[data-connection-source-focus]' : '[data-dialog-cancel]'}>
       <header><div><p className={styles['settings-eyebrow']}>Workspace connections</p><h2 id="connection-dialog-title">Choose channels and ad accounts</h2><p>Turn discovered channels and advertising accounts on or off for this workspace.</p></div><button type="button" aria-label="Close" onClick={() => setOpen(false)}>×</button></header>
       {sources.length ? sources.map(source => <fieldset id={`connection-source-${source.id}`} className={`${styles['connection-source']}${initialSourceId === source.id ? ` ${styles['connection-source--selected']}` : ''}`} data-connection-source-focus={initialSourceId === source.id ? '' : undefined} tabIndex={initialSourceId === source.id ? -1 : undefined} key={source.id}><legend>{source.name} <span>{source.provider.replace(/[_-]/g, ' ')}</span></legend>
-        {source.invalidatedAt && <p className={styles['settings-note']}>This source needs to be reconnected before selections can be enabled.</p>}
-        {source.targets.map(item => <label key={item.id}><input type="checkbox" checked={selected[`target:${item.id}`] ?? item.enabled} disabled={Boolean(source.invalidatedAt) || busy} onChange={event => toggle('target', item.id, event.currentTarget.checked)} /><span>{item.name || item.type}<small>Channel · {item.type}</small></span></label>)}
-        {source.adAccounts.map(item => <label key={item.id}><input type="checkbox" checked={selected[`adAccount:${item.id}`] ?? item.enabled} disabled={Boolean(source.invalidatedAt) || busy} onChange={event => toggle('adAccount', item.id, event.currentTarget.checked)} /><span>{item.name}<small>Ad account · {item.actId}</small></span></label>)}
+        {connectionState(source) !== 'connected' && <p className={styles['settings-note']}>{statusLabels[connectionState(source)]}. Reconnect this source to add channels or ad accounts. You can still remove selected items.</p>}
+        {source.targets.map(item => <label key={item.id}><input type="checkbox" checked={selected[`target:${item.id}`] ?? item.enabled} disabled={busy || (connectionState(source) !== 'connected' && !item.enabled)} onChange={event => toggle('target', item.id, event.currentTarget.checked)} /><span>{item.name || item.type}<small>Channel · {item.type}</small></span></label>)}
+        {source.adAccounts.map(item => <label key={item.id}><input type="checkbox" checked={selected[`adAccount:${item.id}`] ?? item.enabled} disabled={busy || (connectionState(source) !== 'connected' && !item.enabled)} onChange={event => toggle('adAccount', item.id, event.currentTarget.checked)} /><span>{item.name}<small>Ad account · {item.actId}</small></span></label>)}
         {!source.targets.length && !source.adAccounts.length && <p className={styles['settings-note']}>No channels or ad accounts have been discovered for this source.</p>}
         <button type="button" className={styles['connection-danger-link']} onClick={() => { setOpen(false); setDisconnect(source); setDisconnectMode('retain'); setDeleteConfirmation(''); }}>Disconnect locally…</button>
       </fieldset>) : <p>No discovered sources are available.</p>}

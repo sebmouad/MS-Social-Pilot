@@ -1,3 +1,4 @@
+import { selectedResourceConnectionWhere } from '../platforms/resource-visibility';
 import { prisma } from '../data';
 import { enabledSocialAccountWhere } from '../platforms/registry';
 import { canUseFeature, requireFeature, type Entitlements } from '../entitlements';
@@ -234,7 +235,7 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
     }
     case 'list_pages':
       const pageIds = pageIdsFor(viewer);
-      return prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: await enabledSocialAccountWhere() }, ...(pageIds ? { id: { in: pageIds } } : {}) }, orderBy: [{ type: 'asc' }, { name: 'asc' }], take: cap, select: { id: true, type: true, providerId: true, name: true, pictureUrl: true, canPublish: true } });
+      return prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: await selectedResourceConnectionWhere(viewer.workspaceId) }, ...(pageIds ? { id: { in: pageIds } } : {}) }, orderBy: [{ type: 'asc' }, { name: 'asc' }], take: cap, select: { id: true, type: true, providerId: true, name: true, pictureUrl: true, canPublish: true } });
     case 'list_posts': {
       const status = typeof args.status === 'string' ? args.status.split(',').map(s => s.trim()).filter(Boolean) : [];
       const allowedStatuses = new Set(['draft', 'pending_approval', 'rejected', 'scheduled', 'publishing', 'published', 'partially_failed', 'failed', 'cancelled']);
