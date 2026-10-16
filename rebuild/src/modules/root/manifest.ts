@@ -1,18 +1,26 @@
-/** Private installation tools. This is intentionally not registered as a customer module. */
+import { moduleManifests } from '@/modules';
+import { PLATFORM_MODULES } from '@/platforms';
+
+/** Root administers modules; it is intentionally not a customer module. */
 export const rootManifest = {
   id: 'root',
   title: 'Root',
   sections: [
-    { title: 'Control center', pages: [
+    { title: 'Shared controls', pages: [
       { title: 'Overview', href: '/root' },
-      { title: 'Operations', href: '/root/operations' },
-      { title: 'Activity', href: '/root/activity' },
-    ] },
-    { title: 'Installation', pages: [
       { title: 'Users', href: '/root/users' },
       { title: 'Workspaces', href: '/root/workspaces' },
-      { title: 'Platforms', href: '/root/platforms' },
-      { title: 'Runtime configuration', href: '/root/config' },
+      { title: 'Operations', href: '/root/operations' },
+      { title: 'Activity', href: '/root/activity' },
+      { title: 'Shared configuration', href: '/root/config' },
+    ] },
+    { title: 'Product modules', pages: [
+      { title: 'All product modules', href: '/root/modules' },
+      ...moduleManifests.map(module => ({ title: module.title, href: `/root/modules/${module.id}` })),
+    ] },
+    { title: 'Platform modules', pages: [
+      { title: 'All platform modules', href: '/root/platforms' },
+      ...PLATFORM_MODULES.map(module => ({ title: module.name, href: `/root/platforms/${module.id}` })),
     ] },
   ],
 } as const;

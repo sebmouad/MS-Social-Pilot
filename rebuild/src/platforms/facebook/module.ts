@@ -21,7 +21,7 @@ export const facebookModule = {
   settingsGroup: 'Facebook',
 } as const satisfies PlatformModule;
 
-export const FACEBOOK_CONFIG = [
+const facebookConfigEntries = [
   entry({ ...enabledEntry('facebook', 'Facebook', true), schema: z.boolean() }),
   entry({ key: 'meta.graphBaseUrl', group: 'Facebook · API endpoints', label: 'Meta Graph API base URL', kind: 'text', description: 'HTTPS origin and optional path used by Meta Graph requests.', defaultValue: 'https://graph.facebook.com', schema: url, consumption: 'active' }),
   entry({ key: 'meta.oauthBaseUrl', group: 'Facebook · API endpoints', label: 'Meta OAuth dialog base URL', kind: 'text', description: 'HTTPS origin used to display the Meta authorization dialog.', defaultValue: 'https://www.facebook.com', schema: url, consumption: 'active' }),
@@ -46,3 +46,6 @@ export const FACEBOOK_CONFIG = [
   entry({ key: 'meta.adsManageScopes', group: 'Facebook · API scopes · ads', label: 'Meta ads management scopes', kind: 'json', description: 'JSON array of ads management scopes. These can enable spend-affecting actions and require an approved app and implemented controls.', defaultValue: ['ads_management'], schema: stringList, consumption: 'active' }),
   entry({ key: 'api.meta.requestsPerMinute', group: 'Facebook · API rate limits', label: 'Meta requests per minute', kind: 'number', description: 'Application-side request budget for Meta API calls.', defaultValue: 200, schema: z.number().int().min(1).max(100000), consumption: 'planned' }),
 ] as const;
+
+/** Every setting remains owned by this adapter, including legacy key namespaces. */
+export const FACEBOOK_CONFIG = facebookConfigEntries.map(setting => ({ ...setting, owner: { kind: 'platform' as const, id: facebookModule.id } }));

@@ -2,6 +2,8 @@ import type { ModuleManifest } from '../types';
 
 export const publishingManifest = {
   id: 'publishing',
+  rootSettingsPrefixes: ['publishing.'],
+  rootSettingKeys: ['sync.posts.schedule', 'storage.orphanMediaRetentionDays', 'storage.orphanMediaBatchLimit', 'storage.mediaLibraryBatchLimit', 'storage.orphanMediaCleanupSchedule'],
   title: 'Publishing',
   mobileTitle: 'Publish',
   href: '/publishing/posts',

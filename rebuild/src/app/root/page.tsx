@@ -27,7 +27,7 @@ export default async function RootOverviewPage() {
           {data.failedPosts > 0 && <li><strong>{data.failedPosts}</strong> posts are failed or partially failed. Review <a href="/root/activity">recent recorded activity</a>.</li>}
         </ul>
         {data.workspaces > 0 && data.sources > 0 && data.failedPosts === 0 && <p className="root-control__clear">No installation attention items are indicated by the available stored counts.</p>}
-        <div className="root-control__links"><a href="/root/operations">Background job health</a><a href="/root/activity">Recent activity</a><a href="/root/config">Runtime configuration</a></div>
+        <div className="root-control__links"><a href="/root/operations">Background job health</a><a href="/root/activity">Recent activity</a><a href="/root/modules">Product modules</a><a href="/root/platforms">Platform modules</a><a href="/root/config">Shared configuration</a></div>
       </section>
     </>}
     <RootMcpConnection />

@@ -8,18 +8,19 @@ type Definition = ReturnType<typeof safeConfigShape>[number];
 type Values = Array<{ key: string; value: unknown; isSet: boolean; source: string }>;
 type Catalog = typeof AVAILABILITY_CATALOG;
 
-export function RootConfigForm({ definitions, initialValues, availability }: { definitions: Definition[]; initialValues: Values; availability: Catalog }) {
+export function RootConfigForm({ definitions, initialValues, availability, groupPrefix }: { definitions: Definition[]; initialValues: Values; availability: Catalog; groupPrefix?: string }) {
   const [values, setValues] = useState(initialValues);
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [pending, setPending] = useState<Record<string, 'save' | 'clear'>>({});
   const inFlight = useRef(new Set<string>());
-  const sections = Array.from(new Set(definitions.map((item) => item.group.split(' · ')[0])));
+  const categoryFor = (item: Definition) => (groupPrefix && item.group.startsWith(`${groupPrefix} · `) ? item.group.slice(groupPrefix.length + 3) : item.group).split(' · ')[0];
+  const sections = Array.from(new Set(definitions.map(categoryFor)));
   const [section, setSection] = useState(sections[0] ?? '');
   const [search, setSearch] = useState('');
   const visible = definitions.filter((item) => {
     if (search.trim()) return `${item.label} ${item.key} ${item.description} ${item.group}`.toLowerCase().includes(search.trim().toLowerCase());
-    return item.group.split(' · ')[0] === section;
+    return categoryFor(item) === section;
   });
 
   async function write(key: string, operation: 'save' | 'clear', value: unknown) {
@@ -73,7 +74,7 @@ export function RootConfigForm({ definitions, initialValues, availability }: { d
         <div className="root-config__group">{definition.group} · <code>{definition.key}</code></div>
         <h2>{definition.label}</h2>
         <p>{definition.description}</p>
-        {definition.kind === 'boolean' ? <label><input type="checkbox" disabled={isPending} aria-busy={isPending || undefined} checked={Boolean(current?.value)} onChange={(event) => void write(definition.key, 'save', event.target.checked)} /> Enabled</label> : <div className="root-config__controls">
+        {definition.kind === 'boolean' ? <label><input type="checkbox" aria-label={definition.label} disabled={isPending} aria-busy={isPending || undefined} checked={Boolean(current?.value)} onChange={(event) => void write(definition.key, 'save', event.target.checked)} /> Enabled</label> : <div className="root-config__controls">
           {definition.kind === 'select' ? <select aria-label={definition.label} disabled={isPending} aria-busy={isPending || undefined} value={String(current?.value ?? definition.defaultValue)} onChange={(event) => void write(definition.key, 'save', event.target.value)}>
             {(definition.options ?? []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select> : definition.kind === 'json' ? <textarea aria-label={definition.label} disabled={isPending} aria-busy={isPending || undefined} rows={4} value={inputs[definition.key] ?? JSON.stringify(current?.value ?? definition.defaultValue, null, 2)} onChange={(event) => setInputs((old) => ({ ...old, [definition.key]: event.target.value }))} /> : <input aria-label={definition.label} disabled={isPending} aria-busy={isPending || undefined} type={definition.kind === 'secret' ? 'password' : definition.kind === 'number' ? 'number' : 'text'} autoComplete="off" placeholder={definition.kind === 'secret' ? (current?.isSet ? 'Saved value hidden' : 'Enter secret') : undefined} value={inputs[definition.key] ?? (definition.kind === 'secret' ? '' : String(current?.value ?? definition.defaultValue))} onChange={(event) => setInputs((old) => ({ ...old, [definition.key]: event.target.value }))} />}

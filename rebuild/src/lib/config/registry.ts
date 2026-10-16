@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
+import { configurationOwner } from './ownership';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 33;
+export const CONFIG_SCHEMA_VERSION = 34;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -113,6 +114,6 @@ export const AVAILABILITY_CATALOG = {
 
 export function safeConfigShape() {
   return (CONFIG_REGISTRY as readonly Entry[]).map(({ key, group, label, kind, description, defaultValue, consumption, options: choices }) => ({
-    key, group, label, kind, description, defaultValue, consumption, options: choices,
+    key, group, label, kind, description, defaultValue, consumption, options: choices, owner: configurationOwner(key),
   }));
 }

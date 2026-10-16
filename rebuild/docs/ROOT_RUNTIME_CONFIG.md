@@ -54,3 +54,6 @@ Workspace bearer keys and explicit workspace sessions resolve entitlements with 
 
 
 Registry version 33 adds active `root.userSearchMaxCharacters` (default 200; 1–2000), `root.accountOperationTimeoutMs` (default 15000; 1000–300000) and `root.accountOperationLockWaitMs` (default 5000; 1000–300000). They bound private user reads and account action transactions; the latter is Prisma's transaction acquisition wait, not a provider timeout. These controls do not grant Root authority or bypass confirmation/last-owner protections.
+
+
+Registry version 34 adds safe definition ownership metadata (`shared`, `product` or `platform` with stable module ID). This does not change stored key/value formats or move encrypted records. Adapter-owned configuration takes precedence over product prefixes. Product ownership comes from module declarations and generated module/feature availability. Root Shared configuration, product module screens and platform module screens partition this registry by owner; changes still use the same validation and audited persistence service. Root is the managing interface, not the parent source folder.

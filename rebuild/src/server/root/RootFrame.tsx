@@ -9,10 +9,10 @@ import '../../app/root/config/root-config.css';
 export async function RootFrame({ active, children }: { active: string; children: ReactNode }) {
   const actor = await requireRootPage();
   const sidebar = <nav className="root-directory-nav" aria-label="Root sections">
-    {rootManifest.sections.map(section => <section key={section.title} aria-label={section.title}>
-      <p className="shell-subnav__label">{section.title}</p>
+    {rootManifest.sections.map(section => <details key={section.title} open={section.pages.some(page => active === page.href)}>
+      <summary>{section.title}</summary>
       {section.pages.map(page => <a key={page.href} href={page.href} aria-current={active === page.href ? 'page' : undefined} className={active === page.href ? 'is-active' : undefined}>{page.title}</a>)}
-    </section>)}
+    </details>)}
   </nav>;
   return <AppShell activeModule="settings" enabledModules={[]} enabledFeatures={[]} rootAccess installationMode userName={actor.name} workspaceName="Installation" sidebar={sidebar}>
     <div className="root-directory">{children}</div>

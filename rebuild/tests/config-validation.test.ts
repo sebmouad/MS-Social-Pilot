@@ -27,7 +27,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(33);
+    expect(CONFIG_SCHEMA_VERSION).toBe(34);
     for (const [key, value] of [['root.userSearchMaxCharacters', 200], ['root.accountOperationTimeoutMs', 15000], ['root.accountOperationLockWaitMs', 5000]] as const) {
       expect(CONFIG_BY_KEY.get(key)!.defaultValue).toBe(value);
       expect(CONFIG_BY_KEY.get(key)!.consumption).toBe('active');

@@ -57,3 +57,6 @@ An unexpected write error means the outcome could not be confirmed. Check the ap
 The guarded local script `scripts/verify-installation-mcp.ts` exercises actual password/TOTP login, pending-session denial, a zero-membership owner, private discovery, config audit, owner-created workspace-key isolation, disposable workspace suspension/restoration, UI recovery, demotion/disable denial and cleanup. Set `REBUILD_PREVIEW_ORIGIN` explicitly and use the isolated seeded loopback `_preview` database; the script rejects remote/production-shaped targets and prints no credentials.
 
 See `PREVIEW_QA.md` for actual checks. Remaining work includes the rest of Root and customer capability parity, durable remote-write reconciliation and audit coverage, wider client interoperability, provider verification and the migration/rollback/cutover gates. Production still runs the legacy application.
+
+
+`get_root_config` schema version 34 includes safe setting ownership metadata. Clients can group controls into shared infrastructure, product modules and platform modules using `definition.owner`; do not infer provider ownership from legacy key prefixes. The same validated `set_root_config` action applies from every module screen. This exposes configuration ownership, not a new provider engine or complete module-health/operation parity.

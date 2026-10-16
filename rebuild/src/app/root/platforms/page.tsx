@@ -17,7 +17,7 @@ export default async function RootPlatformsPage() {
   await requireRootPage();
   const statuses = await platformStatuses();
   return <RootFrame active="/root/platforms">
-    <div className="root-directory__head"><div><p className="root-config__eyebrow">Root · Installation</p><h1>Platforms</h1>
+    <div className="root-directory__head"><div><p className="root-config__eyebrow">Root · Platform modules</p><h1>Platform modules</h1>
       <p>Each social platform is a module. Switch a module on to offer it to workspaces; switch it off to hide it everywhere. Connected data stays stored either way.</p></div></div>
     <ul className="root-platforms">{statuses.map(({ module, enabled, ready }) => {
       const supported = (Object.keys(CAPABILITY_LABELS) as (keyof CapabilityDeclaration)[]).filter(key => module.capabilities[key] === 'supported');
@@ -28,12 +28,12 @@ export default async function RootPlatformsPage() {
           <h2>{module.name}</h2>
           <p>{module.description}</p>
           <p className="root-platform__state" data-tone={state.tone}>{state.label}</p>
-          {enabled && !ready && <p className="root-platform__hint">Fill in the {module.name} app credentials in <a href="/root/config">Runtime configuration</a> ({module.settingsGroup} groups) so customers can connect.</p>}
+          {enabled && !ready && <p className="root-platform__hint">Fill in the {module.name} app credentials in <a href={`/root/platforms/${module.id}`}>{module.name} settings</a> ({module.settingsGroup} groups) so customers can connect.</p>}
           <ul className="root-platform__capabilities" aria-label={`${module.name} capabilities`}>{supported.map(key => <li key={key}>{CAPABILITY_LABELS[key]}</li>)}</ul>
         </div>
         <div className="root-platform__actions">
           <PlatformSwitch settingKey={module.enabledKey} name={module.name} enabled={enabled} />
-          <a href="/root/config">Settings</a>
+          <a href={`/root/platforms/${module.id}`}>Manage {module.name}</a>
         </div>
       </li>;
     })}</ul>

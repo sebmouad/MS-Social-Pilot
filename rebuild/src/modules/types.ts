@@ -9,6 +9,9 @@ export interface ModulePageManifest {
 
 /** Source of truth for one independently available customer module. */
 export interface ModuleManifest {
+  /** Core setting namespaces owned by this product module; platform ownership takes precedence. */
+  readonly rootSettingsPrefixes: readonly string[];
+  readonly rootSettingKeys: readonly string[];
   readonly id: string;
   readonly title: string;
   readonly mobileTitle?: string;

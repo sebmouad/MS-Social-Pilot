@@ -34,3 +34,6 @@
   .root-control__panel, .root-control__notice { padding: var(--space-4); }
   .root-activity__heading { align-items: flex-start; flex-direction: column; gap: 4px; }
 }
+.root-control__module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px; }
+.root-control__module-grid > .root-control__panel { margin-bottom: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.root-control__module-grid .ui-button { margin-top: auto; }

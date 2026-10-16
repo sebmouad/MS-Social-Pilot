@@ -2,6 +2,8 @@ import type { ModuleManifest } from '../types';
 
 export const analyticsManifest = {
   id: 'analytics',
+  rootSettingsPrefixes: ['analytics.'],
+  rootSettingKeys: ['sync.analytics.schedule', 'retention.analyticsDays'],
   title: 'Analytics',
   href: '/analytics',
   pages: [

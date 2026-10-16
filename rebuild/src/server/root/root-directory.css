@@ -1,7 +1,10 @@
 .root-directory { max-width: 1440px; margin: 0 auto; }
 .root-directory .root-config__eyebrow { margin: 0 0 7px; color: var(--accent); font-size: 12px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
 .root-directory-nav { display: grid; gap: 18px; padding: 18px 12px; }
-.root-directory-nav section { display: grid; gap: 4px; }
+.root-directory-nav details { min-width: 0; }
+.root-directory-nav summary { padding: 9px 12px; cursor: pointer; color: var(--ink-soft); font-size: 12px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.root-directory-nav summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+.root-directory-nav details[open] summary { margin-bottom: 5px; }
 .root-directory-nav .shell-subnav__label { margin: 0 12px 5px; }
 .root-directory-nav a { display: block; padding: 10px 12px; border-radius: var(--radius-sm); color: var(--ink-soft); text-decoration: none; }
 .root-directory-nav a:hover,.root-directory-nav a.is-active { background: var(--surface-muted); color: var(--accent); }

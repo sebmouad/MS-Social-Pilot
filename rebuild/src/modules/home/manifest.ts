@@ -2,6 +2,8 @@ import type { ModuleManifest } from '../types';
 
 export const homeManifest = {
   id: 'home',
+  rootSettingsPrefixes: ['home.'],
+  rootSettingKeys: [],
   title: 'Home',
   href: '/home',
   pages: [

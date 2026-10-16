@@ -31,6 +31,17 @@ async function fill(input: HTMLInputElement, value: string) {
 }
 
 describe('Root configuration form writes', () => {
+  it('uses the module category names without repeating the platform group prefix', async () => {
+    const scoped = safeConfigShape().filter(setting => setting.key === 'meta.appId' || setting.key === 'platforms.facebook.enabled');
+    await act(async () => root.render(createElement(RootConfigForm, { definitions: scoped, initialValues: [], availability: { modules: [], features: [] }, groupPrefix: 'Facebook' })));
+    const categories = container.querySelector('[aria-label="Configuration categories"]')!;
+    expect(categories.textContent).toContain('Engine');
+    expect(categories.textContent).toContain('API credentials');
+    expect(categories.textContent).not.toContain('Facebook');
+    const credentials = [...categories.querySelectorAll('button')].find(button => button.textContent === 'API credentials')!;
+    await act(async () => credentials.click());
+    expect(container.querySelector('input[aria-label="Meta app ID"]')).not.toBeNull();
+  });
   it('preserves a draft on network failure and allows retry', async () => {
     const fetch = vi.fn()
       .mockRejectedValueOnce(new Error('offline'))

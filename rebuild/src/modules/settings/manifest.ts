@@ -2,6 +2,8 @@ import type { ModuleManifest } from '../types';
 
 export const settingsManifest = {
   id: 'settings',
+  rootSettingsPrefixes: ['settings.', 'connections.', 'mcp.keys.'],
+  rootSettingKeys: ['data.purgeRecoverySchedule', 'data.deleteTransactionTimeoutMs', 'data.maxArchiveBytes'],
   title: 'Settings',
   href: '/settings/connections',
   pages: [
