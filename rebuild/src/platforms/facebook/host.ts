@@ -1,3 +1,4 @@
+import { facebookDiagnostics } from './diagnostics';
 import type { PlatformHost } from '@/server/platforms/host';
 import { configuredFacebookAdapter, configuredFacebookOAuth } from './runtime';
 import { finishFacebookConnection, startFacebookConnection } from './connection';
@@ -9,6 +10,7 @@ import { syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus
 /** Facebook-owned assembly; shared registration knows only the host contract. */
 export const facebookHost = {
   adapter: configuredFacebookAdapter,
+  diagnostics: facebookDiagnostics,
   ads: facebookAdsHost,
   analytics: facebookAnalyticsHost,
   inbox: { replyPolicy: facebookReplyPolicy, canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, resolve: setFacebookInboxResolved, moderate: moderateFacebookComment, deleteComment: deleteFacebookComment },

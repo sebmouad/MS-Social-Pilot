@@ -2,6 +2,7 @@ import type { ModuleManifest } from '../types';
 
 export const adsManifest = {
   id: 'ads',
+  jobs: [],
   rootSettingsPrefixes: ['ads.'],
   rootSettingKeys: [],
   title: 'Ads',

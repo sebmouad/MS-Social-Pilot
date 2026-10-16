@@ -1,21 +1,16 @@
+import { moduleManifests } from '@/modules';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
 import { cronMatches } from './cron';
 import type { RetryBackoff } from './retry';
 
-export type JobName = 'posts' | 'analytics' | 'inbox' | 'purges' | 'mediaCleanup';
+export type JobName = (typeof moduleManifests)[number]['jobs'][number]['name'];
 export type WorkerLogger = (message: string, detail?: unknown) => void;
 const MINUTE_MS = 60_000;
 const SECOND_MS = 1_000;
 type Job = { name: JobName; configKey: string };
-const jobs: Job[] = [
-  { name: 'posts', configKey: 'sync.posts.schedule' },
-  { name: 'analytics', configKey: 'sync.analytics.schedule' },
-  { name: 'inbox', configKey: 'sync.inbox.schedule' },
-  { name: 'purges', configKey: 'data.purgeRecoverySchedule' },
-  { name: 'mediaCleanup', configKey: 'storage.orphanMediaCleanupSchedule' },
-];
+const jobs: Job[] = moduleManifests.flatMap(module => [...module.jobs]);
 
 export type WorkerDependencies = {
   readConfig: (key: string) => Promise<unknown>;
@@ -81,6 +76,10 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
 
   async function tick(now = new Date()): Promise<void> {
     const enabled = await deps.readConfig('jobs.enabled') as boolean;
+    const order = await deps.readConfig('jobs.order') as string[];
+    if (!Array.isArray(order) || order.some(name => typeof name !== 'string')) throw new Error('Background job priority order is invalid.');
+    const priority = (job: Job) => { const index = order.indexOf(job.name); return index < 0 ? order.length : index; };
+    const orderedJobs = [...jobs].sort((a, b) => priority(a) - priority(b));
     const maxConcurrent = await deps.readConfig('sync.maxConcurrentJobs') as number;
     const retryLimit = await deps.readConfig('sync.retryLimit') as number;
     const retryBaseDelayMs = await deps.readConfig('sync.retryBaseDelayMs') as number;
@@ -93,7 +92,7 @@ export function createWorker(deps: WorkerDependencies, owner: string) {
     const leaseMs = Math.max(1, Math.trunc(leaseMinutes)) * MINUTE_MS;
     if (enabled) {
       let available = Math.max(0, Math.trunc(maxConcurrent) - running.size);
-      for (const job of jobs) {
+      for (const job of orderedJobs) {
         if (!available) break;
         const expression = await deps.readConfig(job.configKey) as string;
         if (!cronMatches(expression, now)) continue;

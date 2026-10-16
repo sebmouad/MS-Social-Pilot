@@ -1,10 +1,11 @@
 import { hostname } from 'node:os';
+import { REBUILD_WORKER_PREFIX } from '../src/server/jobs/identity';
 import { prisma } from '../src/server/data';
 import { runtimeConfig } from '../src/server/config/store';
 import { createWorker, type JobName, type WorkerDependencies } from '../src/server/jobs/worker';
 import type { RetryBackoff } from '../src/server/jobs/retry';
 
-const owner = `rebuild-${hostname()}-${process.pid}`;
+const owner = `${REBUILD_WORKER_PREFIX}${hostname()}-${process.pid}`;
 let stopping = false;
 const log = (message: string, detail?: unknown) => console.log(`${new Date().toISOString()} [${owner}] ${message}`, detail ?? '');
 

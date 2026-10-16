@@ -86,3 +86,14 @@
 .root-jobs table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .root-jobs th, .root-jobs td { padding: 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .root-jobs td:last-child { min-width: 240px; overflow-wrap: anywhere; }
+
+.root-diagnostics__tools { display: grid; gap: var(--space-3); padding-block: var(--space-4); border-top: 1px solid var(--line); }
+.root-diagnostics__tools h2 { margin: 0; font-size: 14px; }
+.root-diagnostics__tools p { margin: 0; color: var(--ink-soft); font-size: 12px; overflow-wrap: anywhere; }
+.root-diagnostics__tools select { width: 100%; min-width: 0; }
+.root-diagnostics__feedback:empty { display: none; }
+.root-diagnostics__feedback p[role=alert] { color: var(--danger); }
+.root-diagnostics__history { padding-left: var(--space-5); }
+.root-diagnostics__history li { margin-block: var(--space-3); overflow-wrap: anywhere; }
+.root-diagnostics__history small { display: block; color: var(--ink-soft); }
+.root-jobs caption { text-align: left; padding-block: var(--space-2); }

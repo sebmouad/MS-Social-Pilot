@@ -123,6 +123,8 @@ Do not scatter operational literals, provider settings or business rules in appl
 
 Provider protocol invariants remain isolated and documented in their adapters. Bootstrap dependencies needed before configuration can load (database access, encryption trust material, process startup) need an explicit documented bootstrap contract and secure operator management; do not expose encryption keys in ordinary Root forms or pretend such dependencies disappear.
 
+User addition, 2026-10-16: Root must also provide relevant diagnostics and tests, including API connectivity. Shared infrastructure checks belong under Shared controls; product and platform checks belong with their owning modules. Use safe actionable results, clear pass/fail/skipped status, timing, authorization and audit history. A connectivity pass must not imply every platform operation is verified.
+
 Changes must validate, audit and apply without source edits when the provider permits it. Provider approval/protocol constraints cannot be bypassed by a Root switch. New executable adapter code is installed through the release process.
 
 ## 9. Authentication, authorization and MCP parity

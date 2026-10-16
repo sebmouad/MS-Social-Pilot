@@ -60,3 +60,12 @@ See `PREVIEW_QA.md` for actual checks. Remaining work includes the rest of Root 
 
 
 `get_root_config` schema version 34 includes safe setting ownership metadata. Clients can group controls into shared infrastructure, product modules and platform modules using `definition.owner`; do not infer provider ownership from legacy key prefixes. The same validated `set_root_config` action applies from every module screen. This exposes configuration ownership, not a new provider engine or complete module-health/operation parity.
+
+Private installation diagnostics/operations now add three tools and two resources (ten private tools, six resources total):
+
+- `get_root_operations({moduleId?})`: bounded replacement-only telemetry, optionally filtered to one installed product. No raw worker summaries/errors/hostnames.
+- `get_root_diagnostics({scope?})`: bounded safe run history and recent connection choices; defaults to `shared`. Other scopes are `product:<installed id>` and `platform:<installed id>`.
+- `run_root_diagnostics({scope, connectionId?, confirmation})`: exact `RUN DIAGNOSTICS <scope>` confirmation. Calls the same service as the UI/HTTP; connection IDs must belong to that installed platform. Root-only read probes create start/completion audits, obey scope-wide cooldown/recovery and a total suite deadline. Inspect individual statuses and `auditRecorded`; a returned audit warning does not erase completed check outcomes. Discovery probes do not add resources or mutate providers.
+- `msp://root/operations` and `msp://root/diagnostics`: private shared snapshots; module-specific reads use tools.
+
+HTTP `GET/POST /api/root/diagnostics` and `GET /api/root/operations` expose the same services to verified Root sessions with no-store responses. POST requires same origin. Workspace keys and ordinary members cannot invoke these capabilities. A successful connectivity check is narrower than full provider-operation authorization or delivery proof. Installation bearer/OAuth support and full application parity remain separate gaps.

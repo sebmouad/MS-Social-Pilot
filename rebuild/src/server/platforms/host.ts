@@ -47,6 +47,7 @@ export interface PlatformInboxHost {
 }
 
 export interface PlatformHost {
+  diagnostics?: import('@/server/diagnostics/types').PlatformDiagnostics;
   inbox?: PlatformInboxHost;
   ads?: PlatformAdsHost;
   analytics?: PlatformAnalyticsHost;

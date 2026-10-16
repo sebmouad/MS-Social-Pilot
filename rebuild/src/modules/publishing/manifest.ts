@@ -2,6 +2,7 @@ import type { ModuleManifest } from '../types';
 
 export const publishingManifest = {
   id: 'publishing',
+  jobs: [{ name: 'posts', label: 'Post delivery and status', configKey: 'sync.posts.schedule' }, { name: 'mediaCleanup', label: 'Orphan image cleanup', configKey: 'storage.orphanMediaCleanupSchedule' }],
   rootSettingsPrefixes: ['publishing.'],
   rootSettingKeys: ['sync.posts.schedule', 'storage.orphanMediaRetentionDays', 'storage.orphanMediaBatchLimit', 'storage.mediaLibraryBatchLimit', 'storage.orphanMediaCleanupSchedule'],
   title: 'Publishing',

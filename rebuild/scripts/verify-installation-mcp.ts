@@ -57,12 +57,27 @@ async function main() {
     check(initialized.result.instructions.includes('Private installation access'), 'Membership-free owner must receive automatic private context.');
     const listed = await rpc('installation', 'tools/list');
     const names = (await listed.json()).result.tools.map((tool: { name: string }) => tool.name);
-    check(listed.headers.get('cache-control') === 'no-store' && names.length === 7 && names.every((name: string) => /root/.test(name)), 'Installation discovery must be private and Root-only.');
+    check(listed.headers.get('cache-control') === 'no-store' && names.length === 10 && names.every((name: string) => /root/.test(name)), 'Installation discovery must be private and Root-only.');
     check((await rpc('workspace', 'tools/list')).status === 401, 'Explicit workspace scope must require real membership.');
     const denied = await (await rpc('installation', 'tools/call', { name: 'list_posts', arguments: {} })).json();
     check(denied.result.structuredContent.code === 'forbidden', 'Private context must refuse customer data.');
     const resources = await (await rpc('installation', 'resources/list')).json();
-    check(resources.result.resources.length === 4 && resources.result.resources.every((resource: { uri: string }) => resource.uri.startsWith('msp://root/')), 'Installation resources must be Root-only.');
+    check(resources.result.resources.length === 6 && resources.result.resources.every((resource: { uri: string }) => resource.uri.startsWith('msp://root/')), 'Installation resources must be Root-only.');
+    const operations = await (await rpc('installation', 'tools/call', { name: 'get_root_operations', arguments: { moduleId: 'inbox' } })).json();
+    check(!operations.result.isError && operations.result.structuredContent.jobs.every((job: { moduleId: string }) => job.moduleId === 'inbox'), 'Private operations must respect product ownership.');
+    check(!/"error"|"summary"|"owner"|"workerId"/.test(JSON.stringify(operations.result.structuredContent)), 'Operational telemetry must exclude raw errors, summaries and worker hostnames.');
+    const scope = 'product:home';
+    const invalidDiagnostic = await (await rpc('installation', 'tools/call', { name: 'run_root_diagnostics', arguments: { scope, confirmation: 'wrong' } })).json();
+    check(invalidDiagnostic.result.structuredContent.code === 'invalid_request', 'Diagnostic exact confirmation must be enforced.');
+    const diagnostic = await (await rpc('installation', 'tools/call', { name: 'run_root_diagnostics', arguments: { scope, confirmation: `RUN DIAGNOSTICS ${scope}` } })).json();
+    const receipt = diagnostic.result.structuredContent;
+    check(!diagnostic.result.isError && receipt.auditRecorded && receipt.checks.some((item: { status: string }) => item.status === 'pass'), 'MCP diagnostic must return checked results and recorded audit.');
+    const diagnosticHttp = await fetch(new URL(`/api/root/diagnostics?scope=${encodeURIComponent(scope)}`, origin), { headers: { cookie } });
+    check(diagnosticHttp.ok && (await diagnosticHttp.json()).history.some((item: { id: string }) => item.id === receipt.id), 'HTTP must expose the same MCP diagnostic receipt.');
+    const repeated = await (await rpc('installation', 'tools/call', { name: 'run_root_diagnostics', arguments: { scope, confirmation: `RUN DIAGNOSTICS ${scope}` } })).json();
+    check(repeated.result.structuredContent.code === 'conflict', 'Cross-interface diagnostic cooldown must be enforced.');
+    const diagnosticResource = await (await rpc('installation', 'resources/read', { uri: 'msp://root/diagnostics' })).json();
+    check(diagnosticResource.result.contents.length === 1, 'Private diagnostic resource must read without membership.');
     const config = await (await rpc('installation', 'tools/call', { name: 'get_root_config', arguments: {} })).json();
     const value = config.result.structuredContent.values.find((item: { key: string }) => item.key === configKey).value;
     const secretKeys = new Set(config.result.structuredContent.definitions.filter((item: { kind: string }) => item.kind === 'secret').map((item: { key: string }) => item.key));
@@ -124,7 +139,7 @@ async function main() {
     check((await rpc('installation', 'tools/list')).status === 401, 'Demoted owner must lose private context immediately.');
     await client.user.update({ where: { id }, data: { isInstanceOwner: true, disabledAt: new Date() } });
     check((await rpc('installation', 'tools/list')).status === 401, 'Disabled owner must lose private context immediately.');
-    console.log(JSON.stringify({ passwordAndTotp: true, pendingDenied: true, memberships: 0, rootTools: names.length, privateResources: 4, workspaceCallsDenied: true, configDomainAudit: true, bearerScopeEnforced: true, ownerCreatedKeySuspensionDenied: true, restoredKeyRead: true, ownerUiRecovery: true, demotionAndDisableDenied: true, userDirectorySafe: true, userControlsAndAudits: true, nonRootAndKeyUserDenial: true }));
+    console.log(JSON.stringify({ passwordAndTotp: true, pendingDenied: true, memberships: 0, rootTools: names.length, privateResources: 6, diagnosticsHttpMcpAndAudit: true, diagnosticsCooldown: true, operationsScopedAndSafe: true, workspaceCallsDenied: true, configDomainAudit: true, bearerScopeEnforced: true, ownerCreatedKeySuspensionDenied: true, restoredKeyRead: true, ownerUiRecovery: true, demotionAndDisableDenied: true, userDirectorySafe: true, userControlsAndAudits: true, nonRootAndKeyUserDenial: true }));
   } finally {
     try {
       await client.$transaction(async tx => {

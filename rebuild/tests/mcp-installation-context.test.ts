@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ actor: vi.fn(), read: vi.fn(), save: vi.fn(), workspaces: vi.fn(), activity: vi.fn(), access: vi.fn(), lock: vi.fn(), post: vi.fn(), execute: vi.fn() }));
+const state = vi.hoisted(() => ({ actor: vi.fn(), read: vi.fn(), save: vi.fn(), workspaces: vi.fn(), activity: vi.fn(), access: vi.fn(), lock: vi.fn(), post: vi.fn(), execute: vi.fn(), diagnostics: vi.fn(), diagnosticRun: vi.fn(), operations: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: state.actor }, post: { findMany: state.post }, $executeRaw: state.execute } }));
 vi.mock('../src/server/config/store', () => ({ readConfig: state.read, saveConfig: state.save, runtimeConfig: async () => 100 }));
+vi.mock('../src/server/root/diagnostics', () => ({ listRootDiagnostics: state.diagnostics, runRootDiagnostics: state.diagnosticRun }));
+vi.mock('../src/server/root/operations', () => ({ loadRootOperations: state.operations }));
 vi.mock('../src/server/root/directory', () => ({ listRootWorkspaces: state.workspaces }));
 vi.mock('../src/server/root/activity', () => ({ listRootActivity: state.activity }));
 vi.mock('../src/server/root/workspace-access', () => ({ setRootWorkspaceAccess: state.access }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: state.lock, assertWorkspaceNotPurging: vi.fn() }));
+import { runRootTool } from '../src/server/mcp/root-tools';
 import { handleMcpMessage, type McpInstallationViewer } from '../src/server/mcp/server';
 
 const installation: McpInstallationViewer = { scope: 'installation', userId: 'root', isInstanceOwner: true, maxResultItems: 10 };
@@ -26,9 +29,9 @@ describe('installation-only MCP context', () => {
     const initialized = await (await invoke('initialize')).json();
     expect(initialized.result.instructions).toContain('Private installation access');
     const names = (await (await invoke('tools/list')).json()).result.tools.map((tool: { name: string }) => tool.name);
-    expect(names.sort()).toEqual(['get_root_config', 'list_root_activity', 'list_root_users', 'list_root_workspaces', 'manage_root_user', 'set_root_config', 'set_root_workspace_access']);
+    expect(names.sort()).toEqual(['get_root_config', 'get_root_diagnostics', 'get_root_operations', 'list_root_activity', 'list_root_users', 'list_root_workspaces', 'manage_root_user', 'run_root_diagnostics', 'set_root_config', 'set_root_workspace_access']);
     const resources = (await (await invoke('resources/list')).json()).result.resources.map((resource: { uri: string }) => resource.uri);
-    expect(resources.sort()).toEqual(['msp://root/activity', 'msp://root/config', 'msp://root/users', 'msp://root/workspaces']);
+    expect(resources.sort()).toEqual(['msp://root/activity', 'msp://root/config', 'msp://root/diagnostics', 'msp://root/operations', 'msp://root/users', 'msp://root/workspaces']);
   });
   it('rejects forced workspace calls before write locks or data/provider queries', async () => {
     for (const name of ['list_posts', 'create_draft', 'delete_workspace_data', 'get_live_ad_status']) {
@@ -58,8 +61,20 @@ describe('installation-only MCP context', () => {
   });
   it.each([null, { isInstanceOwner: false, disabledAt: null }, { isInstanceOwner: true, disabledAt: new Date() }])('rechecks current owner authority before Root data or mutations', async actor => {
     state.actor.mockResolvedValue(actor);
-    for (const name of ['get_root_config', 'set_root_config', 'list_root_workspaces', 'list_root_activity', 'set_root_workspace_access', 'list_root_users', 'manage_root_user']) expect((await (await call(name)).json()).result.structuredContent.code).toBe('forbidden');
+    for (const name of ['get_root_diagnostics', 'run_root_diagnostics', 'get_root_operations', 'get_root_config', 'set_root_config', 'list_root_workspaces', 'list_root_activity', 'set_root_workspace_access', 'list_root_users', 'manage_root_user']) expect((await (await call(name)).json()).result.structuredContent.code).toBe('forbidden');
     expect(state.read).not.toHaveBeenCalled(); expect(state.save).not.toHaveBeenCalled(); expect(state.activity).not.toHaveBeenCalled(); expect(state.workspaces).not.toHaveBeenCalled(); expect(state.access).not.toHaveBeenCalled();
+  });
+  it('routes private diagnostics and worker reads to shared services with caps and exact run arguments', async () => {
+    state.operations.mockResolvedValue({ runs: [] }); state.diagnostics.mockResolvedValue({ history: [] }); state.diagnosticRun.mockResolvedValue({ auditRecorded: false, warning: 'Keep receipt.' });
+    await call('get_root_operations', { moduleId: 'inbox' }); expect(state.operations).toHaveBeenCalledWith('root', 'inbox', 10);
+    await call('get_root_diagnostics', { scope: 'platform:facebook' }); expect(state.diagnostics).toHaveBeenCalledWith('root', 'platform:facebook', 10);
+    const args = { scope: 'platform:facebook', connectionId: 'connection', confirmation: 'RUN DIAGNOSTICS platform:facebook' };
+    const result = await (await call('run_root_diagnostics', args)).json(); expect(state.diagnosticRun).toHaveBeenCalledWith('root', args); expect(result.result.structuredContent.auditRecorded).toBe(false);
+    await invoke('resources/read', { uri: 'msp://root/diagnostics' }); expect(state.diagnostics).toHaveBeenCalledWith('root', 'shared', 10);
+  });
+  it('refuses owner-created workspace keys for every new diagnostic capability before services', async () => {
+    for (const name of ['get_root_operations', 'get_root_diagnostics', 'run_root_diagnostics']) await expect(runRootTool({ userId: 'root', isInstanceOwner: true, apiKeyId: 'workspace-key' }, name, {})).rejects.toMatchObject({ code: 'forbidden' });
+    expect(state.actor).not.toHaveBeenCalled(); expect(state.operations).not.toHaveBeenCalled(); expect(state.diagnostics).not.toHaveBeenCalled(); expect(state.diagnosticRun).not.toHaveBeenCalled();
   });
   it('validates config types/keys/confirmation, retains the atomic domain audit and masks unexpected failures', async () => {
     for (const input of [

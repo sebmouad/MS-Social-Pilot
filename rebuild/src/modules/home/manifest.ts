@@ -2,6 +2,7 @@ import type { ModuleManifest } from '../types';
 
 export const homeManifest = {
   id: 'home',
+  jobs: [],
   rootSettingsPrefixes: ['home.'],
   rootSettingKeys: [],
   title: 'Home',

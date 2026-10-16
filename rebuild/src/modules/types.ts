@@ -12,6 +12,8 @@ export interface ModuleManifest {
   /** Core setting namespaces owned by this product module; platform ownership takes precedence. */
   readonly rootSettingsPrefixes: readonly string[];
   readonly rootSettingKeys: readonly string[];
+  /** Background work owned by this module, shared by worker and Root diagnostics. */
+  readonly jobs: readonly { name: string; label: string; configKey: string }[];
   readonly id: string;
   readonly title: string;
   readonly mobileTitle?: string;

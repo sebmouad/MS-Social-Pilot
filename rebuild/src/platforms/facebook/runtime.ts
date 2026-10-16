@@ -23,7 +23,11 @@ async function configuredFacebookConfig(): Promise<FacebookConfig> {
   return { graphBaseUrl, oauthBaseUrl, graphVersion, requestTimeoutMs, maxPages, pageSize, pageInsightMetrics, adInsightFields, maxImageUploadBytes, allowedImageMimeTypes };
 }
 
-export async function configuredFacebookEngine() { return createFacebookEngine(await configuredFacebookConfig()); }
+export async function configuredFacebookEngine(options?: { signal?: AbortSignal }) {
+  const signal = options?.signal;
+  const transport: typeof fetch = signal ? (input, init) => fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal }) : fetch;
+  return createFacebookEngine(await configuredFacebookConfig(), transport);
+}
 export async function configuredFacebookAdapter() { return createFacebookAdapter(await configuredFacebookConfig()); }
 
 export async function configuredFacebookOAuth() {

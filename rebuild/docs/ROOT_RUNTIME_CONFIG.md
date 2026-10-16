@@ -57,3 +57,18 @@ Registry version 33 adds active `root.userSearchMaxCharacters` (default 200; 1�
 
 
 Registry version 34 adds safe definition ownership metadata (`shared`, `product` or `platform` with stable module ID). This does not change stored key/value formats or move encrypted records. Adapter-owned configuration takes precedence over product prefixes. Product ownership comes from module declarations and generated module/feature availability. Root Shared configuration, product module screens and platform module screens partition this registry by owner; changes still use the same validation and audited persistence service. Root is the managing interface, not the parent source folder.
+
+Registry version 35 adds active Shared controls:
+
+- `diagnostics.enabled` (true): private diagnostic runs; does not enable customer features or start a worker.
+- `diagnostics.minimumIntervalSeconds` (30, 1–86400): scope-wide start cooldown.
+- `diagnostics.incompleteRunStaleSeconds` (600, 10–86400): minimum incomplete-run recovery age. Effective recovery is at least the original total deadline plus two database timeouts; a start persists that floor, and later shorter settings cannot shorten it.
+- `diagnostics.runTimeoutMs` (60000, 1000–300000): total preparation/check deadline. Provider transport receives combined suite/request cancellation; remaining checks are skipped on expiry. Completion auditing may use another database timeout.
+- `diagnostics.databaseTimeoutMs` (5000, 1000–30000): statement/transaction wait bounds for database probes and start/completion audits. Ordinary configuration/history reads retain their existing database-client behavior.
+- `diagnostics.historyLimit` (10, 1–100): recent starts/results and connection choices per scope; MCP caps can reduce it.
+- `root.operationsRecentLimit` (25, 1–200): replacement job attempts per health view.
+- `root.workerStaleSeconds` (180, 10–86400): replacement-heartbeat freshness threshold.
+- `jobs.order` (original posts/analytics/inbox/purges/media-cleanup priority): unique installed job names in dispatch order; unlisted installed jobs follow in manifest order. This preserves previous priority after consolidating declarations.
+- `root.operationalTimezone` (UTC): validated IANA timezone for diagnostics and worker telemetry presentation; API timestamps stay UTC. Other Root date surfaces are not yet converted.
+
+Configuration validation checks only the current owner’s registry entries and decryptability of saved secrets. It names an invalid registered key without its value. Missing optional configuration is not treated as remote readiness. Adapter diagnostics remain owned by that adapter; Facebook uses its existing endpoint, version, timeout, scope and pagination settings. No diagnostic URL overrides are accepted. Fixed audit action names, persisted worker identity prefix, advisory-lock namespace and confirmation shape are internal protocols, not independently editable transport targets.

@@ -2,6 +2,7 @@ import type { ModuleManifest } from '../types';
 
 export const settingsManifest = {
   id: 'settings',
+  jobs: [{ name: 'purges', label: 'Data deletion recovery', configKey: 'data.purgeRecoverySchedule' }],
   rootSettingsPrefixes: ['settings.', 'connections.', 'mcp.keys.'],
   rootSettingKeys: ['data.purgeRecoverySchedule', 'data.deleteTransactionTimeoutMs', 'data.maxArchiveBytes'],
   title: 'Settings',

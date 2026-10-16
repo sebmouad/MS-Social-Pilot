@@ -2,6 +2,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), form: vi.fn() }));
+vi.mock('../src/server/root/RootDiagnostics', () => ({ RootDiagnostics: async () => null }));
+vi.mock('../src/server/jobs/RootJobHealth', () => ({ RootJobHealth: async () => null }));
 vi.mock('../src/server/config/access', () => ({ requireRootPage: state.access }));
 vi.mock('../src/server/config/store', () => ({ readConfig: state.read }));
 vi.mock('../src/server/root/RootFrame', () => ({ RootFrame: 'main' }));
