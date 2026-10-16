@@ -6,6 +6,7 @@ export type MetricView = {
   sourceLabel: string;
   resourceKind: 'channel' | 'ad-account';
   aggregationLabel: string;
+  aggregationNote?: string;
   unit: AnalyticsMetricInput['unit'];
   kind: AnalyticsKind;
   total: number | null;
@@ -14,12 +15,13 @@ export type MetricView = {
   updatedAt?: Date | null;
   coverage: number;
   available: number;
+  coveredResourceIds?: string[];
   points: Array<{ date: string; label: string; value: number }>;
   rows: Array<{ label: string; value: number; asOf: Date | null }>;
 };
 
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
-const formatDay = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const formatDay = (value: string) => new Date(`${value}T12:00:00.000Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 function metricView(input: AnalyticsMetricInput): MetricView {
   const byDay = new Map<string, number>();
@@ -32,6 +34,8 @@ function metricView(input: AnalyticsMetricInput): MetricView {
     byChannel.set(observation.channelId, channel);
   }
   const points = [...byDay].sort(([a], [b]) => a.localeCompare(b)).map(([date, value]) => ({ date, label: formatDay(date), value }));
+  const observedResourceIds = [...new Set(input.observations.map(observation => observation.channelId).filter(id => id !== 'total'))].sort();
+  const coveredResourceIds = input.coveredResourceIds ?? (observedResourceIds.length ? observedResourceIds : undefined);
   const generatedRows = [...byChannel.values()].map(channel => {
     channel.values.sort((a, b) => a.date.getTime() - b.date.getTime());
     const value = input.kind === 'stock' || input.rollup === 'latest-per-channel'
@@ -53,9 +57,10 @@ function metricView(input: AnalyticsMetricInput): MetricView {
     label: input.label,
     sourceLabel: input.sourceLabel,
     resourceKind: input.resourceKind ?? 'channel',
-    aggregationLabel: input.kind === 'breakdown' ? 'Latest category values'
+    aggregationLabel: input.aggregationLabel ?? (input.kind === 'breakdown' ? 'Latest category values'
       : input.kind === 'stock' || input.rollup === 'latest-per-channel' ? 'Latest value per resource'
-        : input.kind === 'ratio' ? 'Calculated for the selected period' : 'Total over the selected period',
+        : input.kind === 'ratio' ? 'Calculated for the selected period' : 'Total over the selected period'),
+    aggregationNote: input.aggregationNote,
     unit: input.unit,
     kind: input.kind,
     total: input.totalOverride !== undefined ? input.totalOverride : input.kind === 'breakdown' ? null : input.kind === 'stock' || input.rollup === 'latest-per-channel'
@@ -66,6 +71,7 @@ function metricView(input: AnalyticsMetricInput): MetricView {
     updatedAt: input.updatedAt,
     coverage: input.covered ?? (input.kind === 'breakdown' ? rows.length : byChannel.size),
     available: input.available,
+    ...(coveredResourceIds ? { coveredResourceIds: [...coveredResourceIds] } : {}),
     points,
     rows: rows.slice().sort((a, b) => b.value - a.value),
   };

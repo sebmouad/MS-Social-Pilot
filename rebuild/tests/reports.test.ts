@@ -32,3 +32,22 @@ describe('reports overview and CSV', () => {
     expect(capped.truncated).toBe(false);
   });
 });
+
+it('exports complete metric detail and comparison provenance independently of visible pagination', async () => {
+  const { analyticsSnapshotCsv } = await import('../src/server/analytics/reports');
+  const snapshot = {
+    period: { start: '2026-10-01', end: '2026-10-02', comparison: { start: '2026-09-29', end: '2026-09-30', mode: 'previous' } },
+    audience: { entries: [], total: 0, covered: 0, selected: 0 },
+    allMetrics: [{ key: 'module:metric', label: '=Unsafe', sourceLabel: 'Source', unit: 'count', kind: 'flow', total: 12, coverage: 1, available: 1, aggregationLabel: 'Total over the selected period', latestAt: null, points: [{ date: '2026-10-01', value: 5 }, { date: '2026-10-02', value: 7 }], rows: [{ label: 'Channel', value: 12, asOf: null }] }],
+    comparisons: { 'module:metric': { previous: 8, delta: 4, percent: 50, status: 'comparable' } },
+  } as unknown as Parameters<typeof analyticsSnapshotCsv>[0];
+  const result = analyticsSnapshotCsv(snapshot, 100);
+  expect(result.truncated).toBe(false);
+  expect(result.csv).toContain('comparison_status');
+  expect(result.csv).toContain('2026-09-29');
+  expect(result.csv).toContain("'=Unsafe");
+  expect(result.csv).toContain('"comparable","8","4","50"');
+  expect(result.csv).toContain('2026-10-02');
+  const capped = analyticsSnapshotCsv(snapshot, 1);
+  expect(capped.rowCount).toBe(1); expect(capped.truncated).toBe(true);
+});

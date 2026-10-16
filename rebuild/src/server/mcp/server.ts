@@ -14,8 +14,8 @@ import { canAccessFeature, canAccessPage } from '../permissions';
 import { moderateInboxComment, replyToInbox, setInboxResolved } from '../inbox/actions';
 import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, schedulePost, submitPostForApproval, syncPostStatus, updatePost } from '../publishing/lifecycle';
 import { runtimeConfig } from '../config/store';
-import { analyticsRange, loadAnalytics } from '../analytics/data';
-import { buildAnalytics } from '../analytics/aggregate';
+import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
+import { analyticsRange } from '../analytics/data';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
 import { campaignCreationConfirmation, canManageWorkspaceAds, createWorkspaceAdCampaign, createWorkspaceAdSet, readWorkspaceAdObject, updateWorkspaceAd } from '../ads/actions';
@@ -53,9 +53,8 @@ const tools = [
   { name: 'finish_inbox_deletion', description: 'Complete only local cleanup after stored remote confirmation. Never contacts the platform. Confirmation: FINISH DELETION <operationId>.', inputSchema: { type: 'object', required: ['operationId', 'confirmation'], properties: { operationId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'set_inbox_resolved', description: 'Resolve or reopen a synced conversation or comment. Confirmation must exactly match RESOLVE <message|comment> <id> or REOPEN <message|comment> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'resolved', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment'] }, id: { type: 'string' }, resolved: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'moderate_inbox_comment', description: 'Hide or unhide a synced comment through its connected platform. This contacts the remote platform. Confirmation must exactly match HIDE COMMENT <id> or UNHIDE COMMENT <id>.', inputSchema: { type: 'object', required: ['id', 'hidden', 'confirmation'], properties: { id: { type: 'string' }, hidden: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
-  { name: 'get_page_analytics', description: 'Read stored daily insights for one workspace Page.', inputSchema: { type: 'object', required: ['pageId'], properties: { pageId: { type: 'string' }, days: { type: 'integer', minimum: 1, maximum: 365 } }, additionalProperties: false } },
-  { name: 'get_analytics_overview', description: 'Read available metrics and combined audience for selected channels. Metrics, audience entries, and selected channels have independent offsets; each response is bounded.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel.' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, audienceOffset: { type: 'integer', minimum: 0 }, targetOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
-  { name: 'get_analytics_metric_details', description: 'Read a bounded page of stored date points or channel/breakdown rows for one Analytics metric. Continue with nextOffset until null.', inputSchema: { type: 'object', required: ['metricKey', 'kind'], properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel.' }, metricKey: { type: 'string', minLength: 1 }, kind: { type: 'string', enum: ['points', 'rows'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
+  { name: 'get_analytics_overview', description: 'Read available metrics and combined audience for selected channels and ad accounts. Metrics, audience entries, and selected channels have independent offsets; each response is bounded.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, compare: { type: 'string', enum: ['none', 'previous', 'year'] }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel. An empty array selects no channels.' }, adAccountIds: { type: 'array', items: { type: 'string' }, description: 'Selected ad account IDs; omit to use every accessible account. An empty array selects no ad accounts.' }, search: { type: 'string' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, audienceOffset: { type: 'integer', minimum: 0 }, targetOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
+  { name: 'get_analytics_metric_details', description: 'Read a bounded page of stored date points or channel/breakdown rows for one Analytics metric. Continue with nextOffset until null.', inputSchema: { type: 'object', required: ['metricKey', 'kind'], properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, compare: { type: 'string', enum: ['none', 'previous', 'year'] }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel. An empty array selects no channels.' }, adAccountIds: { type: 'array', items: { type: 'string' }, description: 'Selected ad account IDs; omit to use every accessible account. An empty array selects no ad accounts.' }, search: { type: 'string' }, metricKey: { type: 'string', minLength: 1 }, kind: { type: 'string', enum: ['points', 'rows'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'list_ad_accounts', description: 'List advertising accounts in this workspace using bounded offset pagination.', inputSchema: { type: 'object', properties: { offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'get_ad_creation_options', description: 'Read safe Ads creation choices and exact confirmation formats for one enabled, connected advertising account. Only workspace owners and admins can use this tool.', inputSchema: { type: 'object', required: ['adAccountId'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' } }, additionalProperties: false } },
   { name: 'get_ads_performance', description: 'Read stored campaign, ad set, and ad performance for accessible ad accounts. Performance rows and account summaries have independent offsets.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, accountId: { type: 'string', description: 'Accessible ad account ID.' }, level: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, accountOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
@@ -100,7 +99,6 @@ const toolFeatures: Record<string, string> = {
   delete_inbox_comment: 'inbox/conversations',
   finish_inbox_deletion: 'inbox/conversations',
   moderate_inbox_comment: 'inbox/conversations',
-  get_page_analytics: 'analytics/overview',
   get_analytics_overview: 'analytics/overview',
   get_analytics_metric_details: 'analytics/overview',
   get_ads_performance: 'ads/campaigns',
@@ -179,28 +177,34 @@ function requiredString(args: Record<string, unknown>, key: string) {
   return value.trim();
 }
 
-async function loadScopedAnalytics(viewer: McpViewer, args: Record<string, unknown>) {
-  const date = (key: 'start' | 'end') => {
-    const value = args[key];
+async function readMcpAnalyticsSnapshot(viewer: McpViewer, args: Record<string, unknown>, metricKey?: string) {
+  const cap = viewer.maxResultItems ?? 100;
+  const selectedIds = (value: unknown, label: string): unknown => {
     if (value === undefined) return undefined;
-    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(new Date(`${value}T00:00:00.000Z`).getTime()) || new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) !== value) throw new OperationError('invalid_request', `${key} must be a valid YYYY-MM-DD date.`);
+    if (Array.isArray(value) && value.length > cap) throw new OperationError('invalid_request', `${label} cannot exceed the configured result limit of ${cap}.`);
     return value;
   };
-  const start = date('start');
-  const end = date('end');
-  if (start && end && start > end) throw new OperationError('invalid_request', 'start must not be after end.');
-  const range = analyticsRange(start, end);
-  const maxRangeDays = Number(await runtimeConfig('analytics.maxRangeDays'));
-  if ((range.to.getTime() - range.from.getTime()) / 86_400_000 > maxRangeDays) throw new OperationError('invalid_request', `Date range exceeds the configured ${maxRangeDays}-day maximum.`);
-  const allowedTargetIds = pageIdsFor(viewer);
-  const available = await loadAnalytics(viewer.workspaceId, [], range, allowedTargetIds);
-  const availableIds = new Set(available.targets.map(target => target.id));
-  const cap = viewer.maxResultItems ?? 100;
-  if (args.targetIds !== undefined && (!Array.isArray(args.targetIds) || args.targetIds.length > cap || args.targetIds.some(id => typeof id !== 'string' || !availableIds.has(id)))) throw new OperationError('invalid_request', 'One or more selected channels are unavailable or exceed the configured result limit.');
-  const selectedIds = args.targetIds === undefined ? available.targets.map(target => target.id) : [...new Set(args.targetIds as string[])];
-  const data = await loadAnalytics(viewer.workspaceId, selectedIds, range, allowedTargetIds);
-  const overview = buildAnalytics(data.metrics, data.audienceEntries, data.audienceSelected);
-  return { range, data, overview };
+  const targetIds = selectedIds(args.targetIds, 'targetIds');
+  const adAccountIds = selectedIds(args.adAccountIds, 'adAccountIds');
+  const input: Record<string, unknown> = {};
+  for (const key of ['start', 'end', 'compare', 'search'] as const) if (args[key] !== undefined) input[key] = args[key];
+  if (targetIds !== undefined) { input.filter = '1'; input.channel = targetIds; }
+  if (adAccountIds !== undefined) { input.adFilter = '1'; input.adAccount = adAccountIds; }
+  if (metricKey !== undefined) input.metric = metricKey;
+  return readAnalyticsSnapshot(viewer, input, { allowedChannelIds: pageIdsFor(viewer) });
+}
+
+function analyticsPageArgs(args: Record<string, unknown>, cap: number, fallback: number) {
+  const integer = (key: string, minimum: number, maximum?: number) => {
+    const value = args[key] === undefined ? (key === 'limit' ? fallback : 0) : args[key];
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < minimum || (maximum !== undefined && value > maximum)) throw new OperationError('invalid_request', `${key} must be a valid integer.`);
+    return value;
+  };
+  const offset = integer('offset', 0);
+  const audienceOffset = integer('audienceOffset', 0);
+  const targetOffset = integer('targetOffset', 0);
+  const limit = integer('limit', 1, 200);
+  return { offset, audienceOffset, targetOffset, limit: Math.min(limit, cap) };
 }
 
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
@@ -313,49 +317,39 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const result = await moderateInboxComment(viewer, { id, hidden: args.hidden });
       return auditedReceipt(viewer, name, { itemId: id, hidden: args.hidden }, { ...result, itemId: id, hidden: args.hidden });
     }
-    case 'get_page_analytics': {
-      const pageId = String(args.pageId ?? '');
-      const pageIds = pageIdsFor(viewer);
-      const page = await prisma.target.findFirst({ where: { id: pageId, workspaceId: viewer.workspaceId, type: 'page', ...(pageIds ? { id: { in: pageIds } } : {}) }, select: { id: true, name: true } });
-      if (!page) throw new OperationError('not_found', 'Page not found in this workspace.');
-      const days = Math.max(1, Math.min(365, Math.trunc(Number(args.days) || 30)));
-      const rows = await prisma.pageInsight.findMany({ where: { targetId: pageId, period: 'day', endTime: { gte: new Date(Date.now() - days * 86_400_000) } }, orderBy: { endTime: 'desc' }, take: cap, select: { metric: true, period: true, endTime: true, numeric: true, value: true } });
-      return { page, days, insights: rows };
-    }
     case 'get_analytics_overview': {
-      const { range, data, overview } = await loadScopedAnalytics(viewer, args);
-      const offset = args.offset === undefined ? 0 : Number(args.offset);
-      const audienceOffset = args.audienceOffset === undefined ? 0 : Number(args.audienceOffset);
-      const targetOffset = args.targetOffset === undefined ? 0 : Number(args.targetOffset);
-      const limit = args.limit === undefined ? Math.min(cap, 50) : Number(args.limit);
-      if (![offset, audienceOffset, targetOffset].every(value => Number.isInteger(value) && value >= 0) || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new OperationError('invalid_request', 'offsets and limit must be valid integers.');
-      const pageLimit = Math.min(limit, cap);
-      const metrics = overview.metrics.slice(offset, offset + pageLimit);
+      const { offset, audienceOffset, targetOffset, limit: pageLimit } = analyticsPageArgs(args, cap, Math.min(cap, 50));
+      const snapshot = await readMcpAnalyticsSnapshot(viewer, args);
+      const filteredMetrics = snapshot.allMetrics;
+      const metrics = filteredMetrics.slice(offset, offset + pageLimit);
       const boundedMetrics = metrics.map(metric => ({
         ...metric,
+        comparison: snapshot.comparisons[metric.key] ?? null,
         points: metric.points.slice(0, cap),
         rows: metric.rows.slice(0, cap),
         pointsTruncated: metric.points.length > cap,
         rowsTruncated: metric.rows.length > cap,
       }));
-      const audienceEntries = overview.audience.entries.slice(audienceOffset, audienceOffset + pageLimit);
-      const selectedTargets = data.selectedTargets.slice(targetOffset, targetOffset + pageLimit).map(target => ({ id: target.id, type: target.type, name: target.name }));
-      return { range, selectedTargets, selectedTargetCount: data.selectedTargets.length, nextTargetOffset: targetOffset + selectedTargets.length < data.selectedTargets.length ? targetOffset + selectedTargets.length : null, audience: { ...overview.audience, entries: audienceEntries, entryCount: overview.audience.entries.length, entriesTruncated: audienceOffset + audienceEntries.length < overview.audience.entries.length, nextOffset: audienceOffset + audienceEntries.length < overview.audience.entries.length ? audienceOffset + audienceEntries.length : null }, adAccountCount: data.adAccountCount, metricCount: overview.metrics.length, metrics: boundedMetrics, nextOffset: offset + metrics.length < overview.metrics.length ? offset + metrics.length : null };
+      const audienceEntries = snapshot.audience.entries.slice(audienceOffset, audienceOffset + pageLimit);
+      const selectedIds = new Set(snapshot.selected.channelIds);
+      const selectedTargets = snapshot.options.channels.filter(target => selectedIds.has(target.id)).slice(targetOffset, targetOffset + pageLimit).map(target => ({ id: target.id, type: target.type, name: target.name }));
+      const range = snapshot.period.range;
+      return { period: snapshot.period, range, selectedTargets, selectedTargetCount: snapshot.selected.channelIds.length, nextTargetOffset: targetOffset + selectedTargets.length < snapshot.selected.channelIds.length ? targetOffset + selectedTargets.length : null, audience: { ...snapshot.audience, entries: audienceEntries, entryCount: snapshot.audience.entries.length, entriesTruncated: audienceOffset + audienceEntries.length < snapshot.audience.entries.length, nextOffset: audienceOffset + audienceEntries.length < snapshot.audience.entries.length ? audienceOffset + audienceEntries.length : null }, adAccountCount: snapshot.selected.adAccountIds.length, publishing: snapshot.publishing, metricCount: filteredMetrics.length, metrics: boundedMetrics, nextOffset: offset + metrics.length < filteredMetrics.length ? offset + metrics.length : null };
     }
     case 'get_analytics_metric_details': {
       const metricKey = requiredString(args, 'metricKey');
       const kind = args.kind;
       if (kind !== 'points' && kind !== 'rows') throw new OperationError('invalid_request', 'kind must be points or rows.');
-      const { range, overview } = await loadScopedAnalytics(viewer, args);
-      const metric = overview.metrics.find(candidate => candidate.key === metricKey);
+      const offset = args.offset === undefined ? 0 : args.offset;
+      const limit = args.limit === undefined ? Math.min(cap, 50) : args.limit;
+      if (typeof offset !== 'number' || !Number.isSafeInteger(offset) || offset < 0 || typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 1 || limit > 200) throw new OperationError('invalid_request', 'offset and limit must be valid integers.');
+      const snapshot = await readMcpAnalyticsSnapshot(viewer, args, metricKey);
+      const metric = snapshot.allMetrics.find(candidate => candidate.key === metricKey);
       if (!metric) throw new OperationError('not_found', 'Metric is unavailable for this selection and date range.');
-      const offset = args.offset === undefined ? 0 : Number(args.offset);
-      const limit = args.limit === undefined ? Math.min(cap, 50) : Number(args.limit);
-      if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new OperationError('invalid_request', 'offset and limit must be valid integers.');
       const pageLimit = Math.min(limit, cap);
       const details = metric[kind];
       const items = details.slice(offset, offset + pageLimit);
-      return { range, metric: { key: metric.key, label: metric.label, sourceLabel: metric.sourceLabel, unit: metric.unit, kind: metric.kind }, detailKind: kind, totalCount: details.length, offset, items, nextOffset: offset + items.length < details.length ? offset + items.length : null };
+      return { period: snapshot.period, range: snapshot.period.range, metric: { key: metric.key, label: metric.label, sourceLabel: metric.sourceLabel, unit: metric.unit, kind: metric.kind, aggregationLabel: metric.aggregationLabel, aggregationNote: metric.aggregationNote, coverage: metric.coverage, available: metric.available }, comparison: snapshot.comparisons[metric.key] ?? null, detailKind: kind, totalCount: details.length, offset, items, nextOffset: offset + items.length < details.length ? offset + items.length : null };
     }
     case 'list_ad_accounts': {
       if (viewer.role !== 'owner' && viewer.role !== 'admin') throw new OperationError('forbidden', 'Only workspace owners and admins can list advertising accounts.');

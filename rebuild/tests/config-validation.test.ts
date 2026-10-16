@@ -27,7 +27,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(38);
+    expect(CONFIG_SCHEMA_VERSION).toBe(39);
     for (const [key, value] of [['root.userSearchMaxCharacters', 200], ['root.accountOperationTimeoutMs', 15000], ['root.accountOperationLockWaitMs', 5000]] as const) {
       expect(CONFIG_BY_KEY.get(key)!.defaultValue).toBe(value);
       expect(CONFIG_BY_KEY.get(key)!.consumption).toBe('active');
@@ -57,6 +57,11 @@ describe('configuration registry', () => {
     expect(CONFIG_BY_KEY.get('inbox.messengerReplyWindowHours')!.schema.safeParse(24).success).toBe(true);
     expect(CONFIG_BY_KEY.get('inbox.messengerReplyWindowHours')!.schema.safeParse(25).success).toBe(false);
     expect(CONFIG_BY_KEY.get('inbox.messengerReplyWindowHours')!.consumption).toBe('active');
+    for (const [key, value] of [['analytics.defaultRangeDays', 30], ['analytics.metricPageSize', 12], ['analytics.detailPageSize', 50], ['analytics.chartPoints', 28], ['analytics.searchMaxLength', 200]] as const) {
+      expect(CONFIG_BY_KEY.get(key)?.defaultValue).toBe(value);
+      expect(CONFIG_BY_KEY.get(key)?.consumption).toBe('active');
+      expect(CONFIG_BY_KEY.get(key)?.schema.safeParse(0).success).toBe(false);
+    }
     expect(CONFIG_BY_KEY.get('analytics.maxRangeDays')!.schema.safeParse(366).success).toBe(true);
     expect(CONFIG_BY_KEY.get('analytics.maxRangeDays')!.schema.safeParse(0).success).toBe(false);
     expect(CONFIG_BY_KEY.get('auth.passkeyChallengeMinutes')!.schema.safeParse(5).success).toBe(true);

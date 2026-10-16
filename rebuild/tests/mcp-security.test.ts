@@ -28,9 +28,8 @@ vi.mock('../src/server/root/activity', () => ({ listRootActivity: rootActivity.l
 vi.mock('../src/server/root/directory', () => ({ listRootWorkspaces: rootWorkspaces.list }));
 vi.mock('../src/server/root/workspace-access', () => ({ setRootWorkspaceAccess: rootWorkspaces.change }));
 vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save, runtimeConfig: vi.fn(async (key: string) => key === 'mcp.maxResultItems' ? 100 : key === 'root.directoryPageSize' ? 25 : 366) }));
-const analytics = vi.hoisted(() => ({ load: vi.fn(), build: vi.fn() }));
-vi.mock('../src/server/analytics/data', () => ({ analyticsRange: (start?: string, end?: string) => ({ from: new Date(`${start ?? '2026-10-01'}T00:00:00`), to: new Date(`${end ?? '2026-10-15'}T23:59:59.999`) }), loadAnalytics: analytics.load }));
-vi.mock('../src/server/analytics/aggregate', () => ({ buildAnalytics: analytics.build }));
+const analytics = vi.hoisted(() => ({ snapshot: vi.fn() }));
+vi.mock('../src/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: analytics.snapshot }));
 const adsQueries = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn() }));
 vi.mock('../src/server/ads/queries', () => ({ getAdsAccounts: adsQueries.accounts, getAdsDataset: adsQueries.dataset, getAdsAccountWhere: async (workspaceId: string, allowedTargetIds?: string[]) => ({ workspaceId, enabled: true, socialAccount: { is: { workspaceId, invalidatedAt: null, provider: { in: ['facebook'] } } }, ...(allowedTargetIds === undefined ? {} : { socialAccountId: { in: ['social-a'] } }) }) }));
 const dataControls = vi.hoisted(() => ({ preview: vi.fn(), export: vi.fn(), remove: vi.fn() }));
@@ -59,6 +58,20 @@ import { handleMcpMessage, type McpViewer } from '../src/server/mcp/server';
 import { resolvePermissions } from '../src/server/permissions';
 import { OperationError } from '../src/lib/operation-error';
 import { MediaStorageUnavailable, MediaValidationError } from '../src/server/media/errors';
+
+const snapshot = (overrides: Record<string, unknown> = {}) => {
+  const channel = { id: 'page-allowed', name: 'Allowed', type: 'page' };
+  const reach = { key: 'reach', label: 'Reach', sourceLabel: 'Page performance', resourceKind: 'channel', aggregationLabel: 'Total over the selected period', unit: 'count', kind: 'flow', total: 12, latestAt: null, coverage: 1, available: 1, coveredResourceIds: ['page-allowed'], points: [], rows: [] };
+  return {
+    period: { start: '2026-10-01', end: '2026-10-15', range: { from: new Date('2026-10-01T00:00:00.000Z'), to: new Date('2026-10-15T23:59:59.999Z') }, comparison: null },
+    options: { channels: [channel], adAccounts: [], metrics: [{ key: 'reach', label: 'Reach', sourceLabel: 'Page performance' }] },
+    selected: { channelIds: ['page-allowed'], adAccountIds: [] },
+    audience: { total: 12, covered: 1, selected: 1, entries: [] },
+    publishing: { published: 0, scheduled: 0, failed: 0 },
+    comparisons: {}, query: '', chartPoints: 30, allMetrics: [reach],
+    ...overrides,
+  };
+};
 
 const viewer: McpViewer = {
   scope: 'workspace',
@@ -119,8 +132,10 @@ beforeEach(() => {
   dataControls.export.mockResolvedValue({ format: 'ms-social-pilot-workspace-export', workspace: { id: 'workspace-a' } });
   dataControls.remove.mockResolvedValue({ posts: 2 });
   const targets = [{ id: 'page-allowed', type: 'page', name: 'Allowed' }];
-  analytics.load.mockResolvedValue({ targets, selectedTargets: targets, pageRows: [], adRows: [], audienceRows: [], adAccountCount: 0, instagramRows: [], selectedInstagramAudience: [] });
-  analytics.build.mockReturnValue({ audience: { total: 12, covered: 1, selected: 1, entries: [] }, metrics: [{ key: 'reach', points: [], rows: [] }, { key: 'clicks', points: [], rows: [] }] });
+  analytics.snapshot.mockResolvedValue(snapshot({ options: { channels: targets, adAccounts: [], metrics: [] }, allMetrics: [
+    { ...snapshot().allMetrics[0], key: 'reach', points: [], rows: [] },
+    { ...snapshot().allMetrics[0], key: 'clicks', points: [], rows: [] },
+  ] }));
   adsQueries.accounts.mockResolvedValue([{ id: 'account-a', name: 'Account A', currency: 'USD' }]);
   adsQueries.dataset.mockResolvedValue({ insights: [
     { id: 'row-1', adAccountId: 'account-a', level: 'campaign', objectId: 'campaign-a', objectName: 'Campaign A', date: new Date('2026-10-14T00:00:00.000Z'), spend: 20, impressions: 1000, clicks: 20, reach: 900, cpc: 1, cpm: 20, cpp: null, ctr: 2, frequency: 1.1, actions: [], fields: {}, adAccount: { id: 'account-a', name: 'Account A', currency: 'USD' } },
@@ -133,7 +148,7 @@ describe('MCP workspace boundaries', () => {
     ['list_pages', () => db.target.findMany],
     ['list_posts', () => db.post.findMany],
     ['list_inbox', () => inboxReads.list],
-    ['get_analytics_overview', () => analytics.load],
+    ['get_analytics_overview', () => analytics.snapshot],
     ['preview_workspace_data_deletion', () => dataControls.preview],
     ['export_workspace_data', () => dataControls.export],
   ] as const)('masks unexpected %s read failures with a stable public code', async (name, mock) => {
@@ -165,14 +180,16 @@ describe('MCP workspace boundaries', () => {
     const failedBody = await failed.json();
     expect(failedBody.error.data.code).toBe('upstream_failure');
     expect(JSON.stringify(failedBody)).not.toContain('private-password');
-    analytics.load.mockRejectedValueOnce(new OperationError('unavailable', 'Analytics is temporarily unavailable.'));
+    analytics.snapshot.mockRejectedValueOnce(new OperationError('unavailable', 'Analytics is temporarily unavailable.'));
     const unavailable = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'resources/read', params: { uri: 'msp://analytics/overview' } });
     expect((await unavailable.json()).error).toMatchObject({ message: 'Analytics is temporarily unavailable.', data: { code: 'unavailable' } });
   });
-  it.each(['2026-02-31', '2026-13-01', 'not-a-date'])('rejects invalid analytics date %s before querying', async start => {
+  it.each(['2026-02-31', '2026-13-01', 'not-a-date'])('passes analytics date %s to shared validation', async start => {
+    analytics.snapshot.mockRejectedValueOnce(new OperationError('invalid_request', 'Choose a valid analytics date range.'));
     const result = (await (await call('get_analytics_overview', { start })).json()).result;
     expect(result.structuredContent.code).toBe('invalid_request');
-    expect(analytics.load).not.toHaveBeenCalled();
+    expect(analytics.snapshot).toHaveBeenCalledWith(viewer, { start }, { allowedChannelIds: undefined });
+    expect(db.pageInsight.findMany).not.toHaveBeenCalled();
   });
   it.each([{ id: {} }, { id: [] }, { id: true }, { params: [] }, { params: null }])('rejects invalid protocol fields before tool dispatch: %j', async fields => {
     const response = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_posts' }, ...fields });
@@ -414,22 +431,43 @@ describe('MCP workspace boundaries', () => {
     expect((await malformed.json()).result.isError).toBe(true);
     expect(adsMutations.read).toHaveBeenCalledTimes(1);
   });
-  it('paginates shared analytics and rejects channels outside the viewer scope', async () => {
+  it('passes selected channels and current page scope to the shared Analytics read service', async () => {
     const scoped = { ...viewer, permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
-    const denied = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 50, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { targetIds: ['page-other'] } } });
-    expect((await denied.json()).result.isError).toBe(true);
-    expect(analytics.load).toHaveBeenCalledTimes(1);
-    expect(analytics.load).toHaveBeenCalledWith('workspace-a', [], expect.any(Object), ['page-allowed']);
-    analytics.load.mockClear();
     const response = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 51, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { targetIds: ['page-allowed'], limit: 1 } } });
     const result = (await response.json()).result.structuredContent;
     expect(result.audience.total).toBe(12);
     expect(result.metrics.map((metric: { key: string }) => metric.key)).toEqual(['reach']);
-    expect(result.nextOffset).toBe(1);
-    expect(analytics.load).toHaveBeenLastCalledWith('workspace-a', ['page-allowed'], expect.any(Object), ['page-allowed']);
+    expect(analytics.snapshot).toHaveBeenCalledWith(scoped, { filter: '1', channel: ['page-allowed'] }, { allowedChannelIds: ['page-allowed'] });
+  });
+  it('maps explicit empty selections, ad account filters, search, and comparison into shared reads', async () => {
+    const comparable = { previous: 8, delta: 4, percent: 50, status: 'comparable' };
+    const base = snapshot({ period: { ...snapshot().period, comparison: { mode: 'year', start: '2025-10-01', end: '2025-10-15', range: { from: new Date('2025-10-01T00:00:00.000Z'), to: new Date('2025-10-15T23:59:59.999Z') } } }, comparisons: { reach: comparable } });
+    analytics.snapshot.mockResolvedValue(base);
+    const overview = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 52, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { targetIds: [], adAccountIds: [], compare: 'year', search: 'reach' } } });
+    const overviewResult = (await overview.json()).result.structuredContent;
+    expect(overviewResult.metrics[0].comparison).toEqual(comparable);
+    expect(analytics.snapshot).toHaveBeenLastCalledWith(viewer, { compare: 'year', filter: '1', channel: [], adFilter: '1', adAccount: [], search: 'reach' }, { allowedChannelIds: undefined });
+
+    await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 53, method: 'tools/call', params: { name: 'get_analytics_metric_details', arguments: { metricKey: 'reach', kind: 'points', adAccountIds: ['ad-a'], compare: 'previous', search: 'reach' } } });
+    expect(analytics.snapshot).toHaveBeenLastCalledWith(viewer, { compare: 'previous', adFilter: '1', adAccount: ['ad-a'], search: 'reach', metric: 'reach' }, { allowedChannelIds: undefined });
+  });
+  it.each([
+    { offset: -1 }, { limit: 201 }, { targetIds: ['a', 'b'] }, { adAccountIds: ['a', 'b'] },
+  ])('validates MCP-specific page bounds and selection caps before shared reads: %j', async args => {
+    const limited = { ...viewer, maxResultItems: 1 };
+    const response = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 54, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: args } });
+    expect((await response.json()).result.structuredContent.code).toBe('invalid_request');
+    expect(analytics.snapshot).not.toHaveBeenCalled();
+  });
+  it('passes analytics search and comparison values through to shared validation', async () => {
+    const args = { compare: 'invalid-mode', search: 'x'.repeat(500), targetIds: [], adAccountIds: [] };
+    analytics.snapshot.mockRejectedValueOnce(new OperationError('invalid_request', 'Choose valid analytics filters.'));
+    const result = (await (await call('get_analytics_overview', args)).json()).result;
+    expect(result.structuredContent.code).toBe('invalid_request');
+    expect(analytics.snapshot).toHaveBeenCalledWith(viewer, { compare: args.compare, search: args.search, filter: '1', channel: [], adFilter: '1', adAccount: [] }, { allowedChannelIds: undefined });
+    expect(db.pageInsight.findMany).not.toHaveBeenCalled();
   });
   it('publishes scoped Analytics and Ads resources using the same read tools', async () => {
-    analytics.load.mockResolvedValue({ targets: [{ id: 'page-allowed', type: 'page', name: 'Allowed' }], selectedTargets: [{ id: 'page-allowed', type: 'page', name: 'Allowed' }], pageRows: [], adRows: [], audienceRows: [], adAccountCount: 0, instagramRows: [], selectedInstagramAudience: [] });
     const resources = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 52, method: 'resources/list' });
     const uris = (await resources.json()).result.resources.map((resource: { uri: string }) => resource.uri);
     expect(uris).toContain('msp://analytics/overview');
@@ -437,7 +475,7 @@ describe('MCP workspace boundaries', () => {
 
     const analyticsResource = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 53, method: 'resources/read', params: { uri: 'msp://analytics/overview' } });
     expect((await analyticsResource.json()).result.contents[0].text).toContain('"audience"');
-    expect(analytics.load).toHaveBeenCalledWith('workspace-a', ['page-allowed'], expect.any(Object), undefined);
+    expect(analytics.snapshot).toHaveBeenCalledWith(viewer, {}, { allowedChannelIds: undefined });
 
     const adsResource = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 54, method: 'resources/read', params: { uri: 'msp://ads/performance' } });
     expect((await adsResource.json()).result.contents[0].text).toContain('"performance"');
@@ -445,7 +483,8 @@ describe('MCP workspace boundaries', () => {
   });
   it('caps nested Analytics result rows and reports truncation', async () => {
     const limited = { ...viewer, maxResultItems: 1 };
-    analytics.build.mockReturnValue({ audience: { total: 30, covered: 2, selected: 2, entries: [{ id: 'page-a' }, { id: 'page-b' }] }, metrics: [{ key: 'reach', points: [{ date: '2026-10-14' }, { date: '2026-10-15' }], rows: [{ label: 'A' }, { label: 'B' }] }] });
+    const base = snapshot({ audience: { total: 30, covered: 2, selected: 2, entries: [{ id: 'page-a' }, { id: 'page-b' }] }, allMetrics: [{ ...snapshot().allMetrics[0], points: [{ date: '2026-10-14' }, { date: '2026-10-15' }], rows: [{ label: 'A' }, { label: 'B' }] }] });
+    analytics.snapshot.mockResolvedValueOnce(base);
     const response = await handleMcpMessage(limited, { jsonrpc: '2.0', id: 55, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { limit: 1 } } });
     const result = (await response.json()).result.structuredContent;
     expect(result.audience).toMatchObject({ total: 30, entries: [{ id: 'page-a' }], entriesTruncated: true });
@@ -454,8 +493,7 @@ describe('MCP workspace boundaries', () => {
   it('paginates audience entries and selected targets beyond the Root result cap', async () => {
     const limited = { ...viewer, maxResultItems: 1 };
     const targets = [{ id: 'page-a', type: 'page', name: 'Page A' }, { id: 'page-b', type: 'page', name: 'Page B' }];
-    analytics.load.mockResolvedValue({ targets, selectedTargets: targets, pageRows: [], adRows: [], audienceRows: [], adAccountCount: 0, instagramRows: [], selectedInstagramAudience: [] });
-    analytics.build.mockReturnValue({ audience: { total: 30, covered: 2, selected: 2, entries: [{ id: 'page-a', value: 10 }, { id: 'page-b', value: 20 }] }, metrics: [] });
+    analytics.snapshot.mockResolvedValue(snapshot({ options: { channels: targets, adAccounts: [], metrics: [] }, selected: { channelIds: ['page-a', 'page-b'], adAccountIds: [] }, audience: { total: 30, covered: 2, selected: 2, entries: [{ id: 'page-a', value: 10 }, { id: 'page-b', value: 20 }] }, allMetrics: [] }));
     const first = (await (await handleMcpMessage(limited, { jsonrpc: '2.0', id: 57, method: 'tools/call', params: { name: 'get_analytics_overview', arguments: { limit: 1 } } })).json()).result.structuredContent;
     expect(first.audience.entries).toEqual([{ id: 'page-a', value: 10 }]);
     expect(first.audience.nextOffset).toBe(1);
@@ -495,19 +533,21 @@ describe('MCP workspace boundaries', () => {
   });
   it('paginates every point and row for an authorized Analytics metric', async () => {
     const limited = { ...viewer, maxResultItems: 1, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
-    analytics.build.mockReturnValue({ audience: { total: 12, covered: 1, selected: 1, entries: [] }, metrics: [{ key: 'reach::day', label: 'Reach', source: 'page', unit: 'count', kind: 'flow', points: [{ date: '2026-10-14', value: 4 }, { date: '2026-10-15', value: 5 }], rows: [{ label: 'Page A', value: 4 }, { label: 'Page B', value: 5 }] }] });
+    analytics.snapshot.mockResolvedValue(snapshot({ allMetrics: [{ ...snapshot().allMetrics[0], key: 'reach::day', label: 'Reach', aggregationLabel: 'Latest value per resource', aggregationNote: 'People may overlap', points: [{ date: '2026-10-14', value: 4 }, { date: '2026-10-15', value: 5 }], rows: [{ label: 'Page A', value: 4 }, { label: 'Page B', value: 5 }] }] }));
     const callMetric = (kind: 'points' | 'rows', offset: number) => handleMcpMessage(limited, { jsonrpc: '2.0', id: 56 + offset, method: 'tools/call', params: { name: 'get_analytics_metric_details', arguments: { metricKey: 'reach::day', kind, offset, limit: 1, targetIds: ['page-allowed'], start: '2026-10-14', end: '2026-10-15' } } });
 
     for (const kind of ['points', 'rows'] as const) {
       const first = (await (await callMetric(kind, 0)).json()).result.structuredContent;
       expect(first.items).toHaveLength(1);
+      expect(first.metric.aggregationNote).toBe('People may overlap');
+      expect(first.metric.aggregationLabel).toBe('Latest value per resource');
       expect(first.nextOffset).toBe(1);
       const second = (await (await callMetric(kind, 1)).json()).result.structuredContent;
       expect(second.items).toHaveLength(1);
       expect(second.nextOffset).toBeNull();
       expect(second.totalCount).toBe(2);
     }
-    expect(analytics.load).toHaveBeenCalledWith('workspace-a', ['page-allowed'], expect.any(Object), ['page-allowed']);
+    expect(analytics.snapshot).toHaveBeenCalledWith(limited, expect.objectContaining({ filter: '1', channel: ['page-allowed'], metric: 'reach::day' }), { allowedChannelIds: ['page-allowed'] });
   });
   it('applies ads write scope, manager role, and exact confirmations before shared ads services', async () => {
     const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 60, method: 'tools/list' });
@@ -639,20 +679,14 @@ describe('MCP workspace boundaries', () => {
     expect(db.post.findMany.mock.calls[0][0]).toMatchObject({ where: { workspaceId: 'workspace-a' }, take: 100 });
   });
 
-  it('checks page ownership before reading analytics and constrains insight lookup to the requested page', async () => {
-    db.target.findFirst.mockResolvedValue(null);
-    const response = await call('get_page_analytics', { pageId: 'other-workspace-page' });
-    const payload = await response.json();
-    expect(payload.result.isError).toBe(true);
-    expect(db.target.findFirst).toHaveBeenCalledWith({
-      where: { id: 'other-workspace-page', workspaceId: 'workspace-a', type: 'page' }, select: { id: true, name: true },
-    });
+  it('does not advertise or dispatch the removed legacy page analytics tool', async () => {
+    const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 3, method: 'tools/list' });
+    const names = (await listed.json()).result.tools.map((tool: { name: string }) => tool.name);
+    expect(names).not.toContain('get_page_analytics');
+    const response = await call('get_page_analytics', { pageId: 'page-a' });
+    expect((await response.json()).error).toMatchObject({ code: -32602, message: 'Unknown tool: get_page_analytics' });
+    expect(db.target.findFirst).not.toHaveBeenCalled();
     expect(db.pageInsight.findMany).not.toHaveBeenCalled();
-
-    db.target.findFirst.mockResolvedValue({ id: 'page-a', name: 'Page A' });
-    db.pageInsight.findMany.mockResolvedValue([]);
-    await call('get_page_analytics', { pageId: 'page-a', days: 5 });
-    expect(db.pageInsight.findMany.mock.calls[0][0].where.targetId).toBe('page-a');
   });
 
   it('applies feature grants and page scope to MCP discovery and reads', async () => {

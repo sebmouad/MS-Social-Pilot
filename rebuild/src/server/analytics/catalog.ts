@@ -15,9 +15,14 @@ export type AnalyticsMetricInput = {
   sourceLabel: string;
   /** Cross-platform resource domain, independent of translated provenance labels. */
   resourceKind?: 'channel' | 'ad-account';
+  /** Exact resource IDs represented by this metric when the module can provide them. */
+  coveredResourceIds?: string[];
   kind: AnalyticsKind;
   unit: AnalyticsUnit;
   observations: AnalyticsObservation[];
+  /** Provider-owned explanation of limitations in aggregation. */
+  aggregationNote?: string;
+  aggregationLabel?: string;
   /** How a module says observations combine across a stored window. */
   rollup?: 'sum' | 'latest-per-channel';
   /** Ratios can use a separately weighted overall series while retaining account rows. */

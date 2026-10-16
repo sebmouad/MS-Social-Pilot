@@ -24,9 +24,9 @@ function facebookLabel(key: string): string {
 }
 
 export function facebookPageMetricKind(key: string): AnalyticsKind {
-  if (['page_follows', 'page_fans', 'page_fans_online_per_day'].includes(key)) return 'stock';
+  if (['page_follows', 'page_fans', 'page_fans_online_per_day', 'page_daily_follows_unique', 'page_daily_unfollows_unique', 'page_total_media_view_unique', 'page_impressions_unique'].includes(key)) return 'stock';
   if (/country|city|locale|gender_age|source/.test(key)) return 'breakdown';
-  return 'flow';
+  return ['page_daily_follows', 'page_impressions', 'page_media_view', 'page_post_engagements', 'page_views_total', 'page_video_views'].includes(key) ? 'flow' : 'stock';
 }
 
 export function facebookAdMetricUnit(key: string, _currency?: string | null): AnalyticsMetricInput['unit'] {
@@ -41,27 +41,28 @@ type AdRow = { date: Date; spend: number; impressions: number; clicks: number; r
 type FacebookTarget = AnalyticsTarget & { socialAccountId: string | null };
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const dayKey = (date: Date) => date.toISOString().slice(0, 10);
+const overlappingPeopleNote = 'Counts may overlap across resources. Sums are not deduplicated people or total reach for the whole period.';
 
-function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: PageRow[]): { metrics: AnalyticsMetricInput[]; audience: AnalyticsAudienceEntry[] } {
+function pageInputs(rows: PageRow[], selected: FacebookTarget[], audienceRows: PageRow[], audienceAsOf?: Date): { metrics: AnalyticsMetricInput[]; audience: AnalyticsAudienceEntry[] } {
   const groups = new Map<string, PageRow[]>();
   for (const row of rows) { const key = `${row.metric}::${row.period ?? 'day'}`; const group = groups.get(key) ?? []; group.push(row); groups.set(key, group); }
   const metrics: AnalyticsMetricInput[] = [];
   for (const [key, group] of groups) {
     const first = group[0]!; const kind = facebookPageMetricKind(first.metric); const period = first.period ?? 'day';
     const numeric = group.flatMap(row => { const value = row.numeric ?? safeNumber(row.value); return value === null ? [] : [{ date: row.endTime, channelId: row.target.id, channelLabel: row.target.name, value }]; });
+    const coveredResourceIds = [...new Set(numeric.map(row => row.channelId))].sort();
     const updatedAt = new Date(Math.max(...group.map(row => row.fetchedAt.getTime())));
-    if (numeric.length) metrics.push({ key, label: `${facebookLabel(first.metric)}${period !== 'day' ? ` · ${period}` : ''}`, sourceLabel: 'Page performance', kind, unit: 'count', observations: numeric, rollup: kind === 'flow' && period !== 'day' ? 'latest-per-channel' : 'sum', available: selected.length, updatedAt });
-    else {
-      const newest = new Map<string, PageRow>();
-      for (const row of group) { if (!Object.keys(object(row.value)).length) continue; const old = newest.get(row.target.id); if (!old || old.endTime < row.endTime) newest.set(row.target.id, row); }
-      const values = new Map<string, number>();
-      for (const row of newest.values()) for (const [label, raw] of Object.entries(object(row.value))) { const value = safeNumber(raw); if (value !== null) values.set(label, (values.get(label) ?? 0) + value); }
-      const latest = [...newest.values()];
-      if (values.size) metrics.push({ key, label: `${facebookLabel(first.metric)}${period !== 'day' ? ` · ${period}` : ''}`, sourceLabel: 'Page performance', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), available: selected.length, covered: newest.size, latestAt: latest.length ? new Date(Math.max(...latest.map(row => row.endTime.getTime()))) : null, updatedAt: latest.length ? new Date(Math.max(...latest.map(row => row.fetchedAt.getTime()))) : null });
-    }
+    const baseLabel = `${facebookLabel(first.metric)}${period !== 'day' ? ` · ${period}` : ''}`;
+    if (numeric.length) metrics.push({ key, label: kind === 'stock' ? `${baseLabel} · Latest per channel` : baseLabel, sourceLabel: 'Page performance', kind, unit: 'count', observations: numeric, ...(/unique|reach/.test(first.metric) ? { aggregationNote: overlappingPeopleNote } : {}), coveredResourceIds, ...(kind === 'stock' || period !== 'day' ? { rollup: 'latest-per-channel' as const } : {}), available: selected.length, updatedAt });
+    const newest = new Map<string, PageRow>();
+    for (const row of group) { if (!Object.keys(object(row.value)).length) continue; const old = newest.get(row.target.id); if (!old || old.endTime < row.endTime || (old.endTime.getTime() === row.endTime.getTime() && row.fetchedAt > old.fetchedAt)) newest.set(row.target.id, row); }
+    const values = new Map<string, number>();
+    for (const row of newest.values()) for (const [label, raw] of Object.entries(object(row.value))) { const value = safeNumber(raw); if (value !== null) values.set(label, (values.get(label) ?? 0) + value); }
+    const latest = [...newest.values()];
+    if (values.size) metrics.push({ key: numeric.length ? `${key}::breakdown` : key, label: `${baseLabel} · Categories`, sourceLabel: 'Page performance', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...newest.keys()].sort(), available: selected.length, covered: newest.size, latestAt: latest.length ? new Date(Math.max(...latest.map(row => row.endTime.getTime()))) : null, updatedAt: latest.length ? new Date(Math.max(...latest.map(row => row.fetchedAt.getTime()))) : null });
   }
   const newest = new Map<string, PageRow>();
-  for (const row of audienceRows) { const old = newest.get(row.target.id); if (!old || row.endTime > old.endTime || (row.endTime.getTime() === old.endTime.getTime() && row.metric === 'page_follows' && old.metric !== 'page_follows') || (row.endTime.getTime() === old.endTime.getTime() && row.metric === old.metric && row.fetchedAt > old.fetchedAt)) newest.set(row.target.id, row); }
+  for (const row of audienceRows) { if (audienceAsOf && row.endTime > audienceAsOf) continue; const old = newest.get(row.target.id); if (!old || row.endTime > old.endTime || (row.endTime.getTime() === old.endTime.getTime() && row.metric === 'page_follows' && old.metric !== 'page_follows') || (row.endTime.getTime() === old.endTime.getTime() && row.metric === old.metric && row.fetchedAt > old.fetchedAt)) newest.set(row.target.id, row); }
   const audience = [...newest.values()].flatMap(row => row.numeric === null ? [] : [{ id: row.target.id, name: row.target.name, metric: row.metric, metricLabel: row.metric === 'page_fans' ? 'Page likes' : 'Followers', sourceLabel: 'Page performance', value: row.numeric, asOf: row.endTime, fetchedAt: row.fetchedAt }]);
   return { metrics, audience };
 }
@@ -85,14 +86,14 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): Analy
   // Delivery counts can be combined across ad accounts; monetary spend is split into currency series.
   for (const key of ['impressions', 'clicks', 'reach'] as const) {
     const observations = rows.map(row => ({ date: row.date, channelId: row.adAccount.id, channelLabel: row.adAccount.name, value: row[key] }));
-    if (observations.length) metrics.push({ key, label: facebookMetricLabel(key)!, sourceLabel: 'Advertising', kind: key === 'reach' ? 'stock' : 'flow', unit: 'count', observations, available: selectedAdAccounts.length, updatedAt: latestSync(rows) });
+    if (observations.length) metrics.push({ key, label: key === 'reach' ? 'Reach · Latest per ad account' : facebookMetricLabel(key)!, sourceLabel: 'Advertising', kind: key === 'reach' ? 'stock' : 'flow', unit: 'count', observations, ...(key === 'reach' ? { aggregationNote: overlappingPeopleNote } : {}), coveredResourceIds: [...new Set(observations.map(row => row.channelId))].sort(), available: selectedAdAccounts.length, updatedAt: latestSync(rows) });
   }
   for (const [currency, currencyRows] of byCurrency) {
     const available = availableForCurrency(currency);
     if (!currencyRows.length) continue;
     const unit = 'currency';
     const observations = currencyRows.map(row => ({ date: row.date, channelId: row.adAccount.id, channelLabel: row.adAccount.name, value: row.spend }));
-    metrics.push({ key: currencyKey('spend', currency, unit), label: currencyLabel('spend', currency, unit), sourceLabel: 'Advertising', kind: 'flow', unit, observations, available, updatedAt: latestSync(currencyRows) });
+    metrics.push({ key: currencyKey('spend', currency, unit), label: currencyLabel('spend', currency, unit), sourceLabel: 'Advertising', kind: 'flow', unit, observations, coveredResourceIds: [...new Set(observations.map(row => row.channelId))].sort(), available, updatedAt: latestSync(currencyRows) });
   }
 
   const byDay = (source: AdRow[]) => {
@@ -117,18 +118,21 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): Analy
       const daily = [...byDay(currencyRows)].flatMap(([day, group]) => { const value = ratio(key, group); return value === null ? [] : [{ date: new Date(`${day}T00:00:00Z`), value }]; });
       const accounts = new Map<string, AdRow[]>();
       for (const row of currencyRows) { const group = accounts.get(row.adAccount.id) ?? []; group.push(row); accounts.set(row.adAccount.id, group); }
-      const details = [...accounts.values()].flatMap(group => {
+      const detailsByAccount = [...accounts.entries()].flatMap(([id, group]) => {
         const latest = group.reduce((a, b) => a.date > b.date ? a : b).date;
         const eligible = ['cpp', 'frequency'].includes(key) ? group.filter(row => dayKey(row.date) === dayKey(latest)) : group;
         const value = ratio(key, eligible);
-        return value === null ? [] : [{ label: `${group[0]!.adAccount.name}${currency ? ` · ${currency}` : ''}`, value, asOf: latest }];
+        return value === null ? [] : [{ id, label: `${group[0]!.adAccount.name}${currency ? ` · ${currency}` : ''}`, value, asOf: latest }];
       });
+      const details = detailsByAccount.map(({ id: _id, ...detail }) => detail);
       const totalRows = ['cpp', 'frequency'].includes(key) && daily.length ? currencyRows.filter(row => dayKey(row.date) === dayKey(daily.at(-1)!.date)) : currencyRows;
       const total = ratio(key, totalRows);
       const totalObservations = total === null || !daily.length ? [] : [{ date: daily.at(-1)!.date, value: total }];
       if (!currencyRows.length) continue;
       const unit = facebookAdMetricUnit(key, currency || null);
-      metrics.push({ key: currencyKey(key, currency, unit), label: currencyLabel(key, currency, unit), sourceLabel: 'Advertising', kind: 'ratio', unit, observations: daily.map(item => ({ ...item, channelId: 'total', channelLabel: 'Selected ad accounts' })), totalObservations, rows: details, available, covered: details.length, updatedAt: latestSync(currencyRows) });
+      const latestDayOnly = ['cpp', 'frequency'].includes(key);
+      const coveredResourceIds = latestDayOnly ? [...new Set(totalRows.filter(row => row.reach > 0).map(row => row.adAccount.id))].sort() : detailsByAccount.map(item => item.id).sort();
+      metrics.push({ key: currencyKey(key, currency, unit), label: currencyLabel(key, currency, unit), ...(latestDayOnly ? { aggregationLabel: 'Calculated for the latest stored day', aggregationNote: 'Calculated using summed account reach for the latest stored day. People may overlap across accounts; this is not a deduplicated rate for the whole period.' } : {}), sourceLabel: 'Advertising', kind: 'ratio', unit, observations: daily.map(item => ({ ...item, channelId: 'total', channelLabel: 'Selected ad accounts' })), totalObservations, rows: details, coveredResourceIds, available, covered: coveredResourceIds.length, updatedAt: latestSync(currencyRows) });
     }
   }
 
@@ -173,8 +177,11 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): Analy
     const record = object(raw);
     if (Object.keys(record).length) {
       if (typeof record.action_type === 'string') add(`${key}:${record.action_type}`, row, record.value, sourcePriority, true);
-      else if (Object.values(record).some(value => safeNumber(value) !== null)) addBreakdown(key, row, Object.entries(record), sourcePriority);
-      else for (const [field, value] of Object.entries(record)) readField(`${key}:${field}`, row, value, sourcePriority, knownAction);
+      else {
+        const scalarValues = Object.entries(record).filter(([, value]) => safeNumber(value) !== null);
+        if (scalarValues.length) addBreakdown(key, row, scalarValues, sourcePriority);
+        for (const [field, value] of Object.entries(record)) if (safeNumber(value) === null) readField(`${key}:${field}`, row, value, sourcePriority, knownAction);
+      }
       return;
     }
     add(key, row, raw, sourcePriority, knownAction);
@@ -201,21 +208,21 @@ function adInputs(rows: AdRow[], selectedAdAccounts: SelectedAdAccount[]): Analy
       const kind: AnalyticsKind = actionValue || (knownActions.has(key) && !costRatio) ? 'flow' : costRatio ? 'ratio' : 'stock';
       const available = monetary ? availableForCurrency(currency) : selectedAdAccounts.length;
       const accountRows = kind === 'flow' ? undefined : currencyObservations.map(item => ({ label: `${item.channelLabel}${currency ? ` · ${currency}` : ''} · ${dayKey(item.date)}`, value: item.value, asOf: item.date }));
-      metrics.push({ key: currencyKey(key, currency, unit), label: currencyLabel(key, currency, unit), sourceLabel: 'Advertising', kind, unit, observations: kind === 'flow' ? currencyObservations : [], ...(accountRows ? { rows: accountRows, covered: new Set(currencyObservations.map(item => item.channelId)).size, totalOverride: null, displayTotal: costRatio ? 'Per-account values' : 'Stored values' } : {}), ...(kind === 'stock' ? { rollup: 'latest-per-channel' as const } : {}), available, updatedAt: latestSync(rows.filter(row => currencyObservations.some(item => item.channelId === row.adAccount.id))) });
+      metrics.push({ key: currencyKey(key, currency, unit), label: kind === 'stock' ? `${currencyLabel(key, currency, unit)} · Latest per ad account` : currencyLabel(key, currency, unit), sourceLabel: 'Advertising', kind, unit, observations: currencyObservations, ...(accountRows ? { rows: accountRows, covered: new Set(currencyObservations.map(item => item.channelId)).size, totalOverride: null, displayTotal: costRatio ? 'Per-account values' : 'Stored values' } : {}), ...(kind === 'stock' ? { rollup: 'latest-per-channel' as const } : {}), coveredResourceIds: [...new Set(currencyObservations.map(item => item.channelId))].sort(), available, updatedAt: latestSync(rows.filter(row => currencyObservations.some(item => item.channelId === row.adAccount.id))) });
     }
   }
   for (const [key, accounts] of breakdowns) {
     const values = new Map<string, number>();
     for (const account of accounts.values()) for (const [label, value] of account.values) values.set(label, (values.get(label) ?? 0) + value);
     const latest = [...accounts.values()];
-    if (values.size) metrics.push({ key, label: facebookLabel(key), sourceLabel: 'Advertising', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), available: selectedAdAccounts.length, covered: accounts.size, latestAt: new Date(Math.max(...latest.map(item => item.date.getTime()))), updatedAt: new Date(Math.max(...latest.map(item => item.fetchedAt.getTime()))) });
+    if (values.size) metrics.push({ key: extras.has(key) ? `${key}::breakdown` : key, label: `${facebookLabel(key)} · Categories`, sourceLabel: 'Advertising', kind: 'breakdown', unit: 'count', observations: [], rows: [...values].map(([label, value]) => ({ label, value, asOf: null })), coveredResourceIds: [...accounts.keys()].sort(), available: selectedAdAccounts.length, covered: accounts.size, latestAt: new Date(Math.max(...latest.map(item => item.date.getTime()))), updatedAt: new Date(Math.max(...latest.map(item => item.fetchedAt.getTime()))) });
   }
   return metrics.map(metric => ({ ...metric, resourceKind: 'ad-account' }));
 }
 
 /** Pure mapper kept at the Facebook boundary so stored-row semantics can be tested without storage. */
-export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienceRows: PageRow[]; adRows: AdRow[]; selectedTargets: FacebookTarget[]; selectedAdAccounts: SelectedAdAccount[] }) {
-  const page = pageInputs(input.pageRows, input.selectedTargets, input.audienceRows);
+export function normalizeFacebookAnalytics(input: { pageRows: PageRow[]; audienceRows: PageRow[]; adRows: AdRow[]; selectedTargets: FacebookTarget[]; selectedAdAccounts: SelectedAdAccount[]; audienceAsOf?: Date }) {
+  const page = pageInputs(input.pageRows, input.selectedTargets, input.audienceRows, input.audienceAsOf);
   return { metrics: [...page.metrics, ...adInputs(input.adRows, input.selectedAdAccounts)], audienceEntries: page.audience, audienceSelected: input.selectedTargets.length };
 }
 
@@ -230,16 +237,20 @@ export const facebookAnalyticsHost = {
     const visible = targets.filter(target => allowed === undefined || allowed.includes(target.id));
     const selectedTargets = visible.filter(target => request.selectedTargetIds.includes(target.id));
     const targetIds = selectedTargets.map(target => target.id);
-    const socialAccountIds = [...new Set(selectedTargets.map(target => target.socialAccountId).filter((id): id is string => Boolean(id)))];
-    const adAccounts = socialAccountIds.length ? await prisma.adAccount.findMany({ where: { workspaceId: request.workspaceId, socialAccountId: { in: socialAccountIds }, enabled: true, socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, orderBy: { name: 'asc' }, select: { id: true, name: true, currency: true } }) : [];
+    const socialAccountIds = [...new Set(visible.map(target => target.socialAccountId).filter((id): id is string => Boolean(id)))];
+    const adAccounts = request.allowedTargetIds === undefined
+      ? await prisma.adAccount.findMany({ where: { workspaceId: request.workspaceId, enabled: true, socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, orderBy: { name: 'asc' }, select: { id: true, name: true, currency: true } })
+      : socialAccountIds.length
+        ? await prisma.adAccount.findMany({ where: { workspaceId: request.workspaceId, socialAccountId: { in: socialAccountIds }, enabled: true, socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, orderBy: { name: 'asc' }, select: { id: true, name: true, currency: true } })
+        : [];
     const selectedAdAccountIds = request.selectedAdAccountIds === undefined ? adAccounts.map(item => item.id) : adAccounts.filter(item => request.selectedAdAccountIds!.includes(item.id)).map(item => item.id);
     const [pageRows, audienceRows, adRows] = await Promise.all([
       prisma.pageInsight.findMany({ where: { targetId: { in: targetIds }, target: { workspaceId: request.workspaceId, type: 'page', socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, endTime: { gte: request.range.from, lte: request.range.to } }, orderBy: [{ endTime: 'asc' }, { metric: 'asc' }], select: { metric: true, period: true, endTime: true, numeric: true, value: true, fetchedAt: true, target: { select: { id: true, name: true } } } }),
-      prisma.pageInsight.findMany({ where: { targetId: { in: targetIds }, target: { workspaceId: request.workspaceId, type: 'page', socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, metric: { in: ['page_follows', 'page_fans'] }, numeric: { not: null } }, orderBy: [{ endTime: 'desc' }, { fetchedAt: 'desc' }], select: { metric: true, period: true, endTime: true, numeric: true, value: true, fetchedAt: true, target: { select: { id: true, name: true } } } }),
-      selectedAdAccountIds.length ? prisma.adInsight.findMany({ where: { adAccount: { workspaceId: request.workspaceId, id: { in: selectedAdAccountIds }, socialAccountId: { in: socialAccountIds }, enabled: true, socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, level: 'account', date: { gte: request.range.from, lte: request.range.to } }, orderBy: [{ date: 'asc' }], select: { date: true, spend: true, impressions: true, clicks: true, reach: true, cpc: true, cpm: true, cpp: true, ctr: true, frequency: true, actions: true, fields: true, fetchedAt: true, adAccount: { select: { id: true, name: true, currency: true } } } }) : Promise.resolve([]),
+      prisma.pageInsight.findMany({ where: { targetId: { in: targetIds }, target: { workspaceId: request.workspaceId, type: 'page', socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, metric: { in: ['page_follows', 'page_fans'] }, numeric: { not: null }, endTime: { lte: request.range.to } }, orderBy: [{ endTime: 'desc' }, { fetchedAt: 'desc' }], select: { metric: true, period: true, endTime: true, numeric: true, value: true, fetchedAt: true, target: { select: { id: true, name: true } } } }),
+      selectedAdAccountIds.length ? prisma.adInsight.findMany({ where: { adAccount: { workspaceId: request.workspaceId, id: { in: selectedAdAccountIds }, ...(allowed === undefined ? {} : { socialAccountId: { in: socialAccountIds } }), enabled: true, socialAccount: { is: { workspaceId: request.workspaceId, provider: 'facebook', invalidatedAt: null } } }, level: 'account', date: { gte: request.range.from, lte: request.range.to } }, orderBy: [{ date: 'asc' }], select: { date: true, spend: true, impressions: true, clicks: true, reach: true, cpc: true, cpm: true, cpp: true, ctr: true, frequency: true, actions: true, fields: true, fetchedAt: true, adAccount: { select: { id: true, name: true, currency: true } } } }) : Promise.resolve([]),
     ]);
     const selectedAdAccounts = adAccounts.filter(account => selectedAdAccountIds.includes(account.id));
-    const normalized = normalizeFacebookAnalytics({ pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts });
+    const normalized = normalizeFacebookAnalytics({ pageRows: pageRows as PageRow[], selectedTargets, audienceRows: audienceRows as PageRow[], adRows: adRows as AdRow[], selectedAdAccounts, audienceAsOf: request.range.to });
     return { targets: visible.map(({ socialAccountId: _socialAccountId, ...target }) => target), selectedTargets: selectedTargets.map(({ socialAccountId: _socialAccountId, ...target }) => target), adAccounts, selectedAdAccountIds, ...normalized };
   },
 };

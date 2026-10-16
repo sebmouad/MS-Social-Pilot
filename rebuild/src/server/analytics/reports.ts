@@ -28,3 +28,22 @@ export function reportOverviewCsv(view: ReturnType<typeof buildReportOverview>, 
   const truncated = rows.length - 1 > cap;
   return { csv: [rows[0]!.map(csvCell).join(','), ...body, ...(truncated ? [csvCell('truncated') + ',' + csvCell('true')] : [])].join('\r\n') + '\r\n', rowCount: body.length, truncated };
 }
+
+/** Exports the full filtered snapshot, regardless of the visible metric/detail page. */
+export function analyticsSnapshotCsv(snapshot: Awaited<ReturnType<typeof import('@/modules/analytics/server/read').readAnalyticsSnapshot>>, limit: number) {
+  const header = ['record_type', 'metric_key', 'metric', 'source', 'resource', 'date', 'value', 'unit', 'coverage', 'available', 'aggregation', 'period_start', 'period_end', 'comparison_start', 'comparison_end', 'comparison_status', 'previous', 'delta', 'percent_change'];
+  const rows: unknown[][] = [];
+  const period = snapshot.period;
+  const dates = [period.start, period.end, period.comparison?.start, period.comparison?.end];
+  for (const entry of snapshot.audience.entries) rows.push(['audience', entry.metric, entry.metricLabel, entry.sourceLabel, entry.name, entry.asOf, entry.value, 'people', snapshot.audience.covered, snapshot.audience.selected, 'Latest value per channel at period end', ...dates]);
+  for (const metric of snapshot.allMetrics) {
+    const comparison = snapshot.comparisons[metric.key];
+    rows.push(['summary', metric.key, metric.label, metric.sourceLabel, '', metric.latestAt, metric.displayTotal ?? metric.total, metric.unit, metric.coverage, metric.available, [metric.aggregationLabel, metric.aggregationNote].filter(Boolean).join('. '), ...dates, comparison?.status, comparison?.previous, comparison?.delta, comparison?.percent]);
+    for (const point of metric.points) rows.push(['point', metric.key, metric.label, metric.sourceLabel, '', point.date, point.value, metric.unit, metric.coverage, metric.available, [metric.aggregationLabel, metric.aggregationNote].filter(Boolean).join('. '), ...dates]);
+    for (const row of metric.rows) rows.push(['resource_or_category', metric.key, metric.label, metric.sourceLabel, row.label, row.asOf, row.value, metric.unit, metric.coverage, metric.available, [metric.aggregationLabel, metric.aggregationNote].filter(Boolean).join('. '), ...dates]);
+  }
+  const cap = Math.max(0, Math.floor(limit));
+  const selected = rows.slice(0, cap);
+  const truncated = rows.length > cap;
+  return { csv: [header, ...selected, ...(truncated ? [['truncated', 'true']] : [])].map(row => row.map(csvCell).join(',')).join('\r\n') + '\r\n', rowCount: selected.length, truncated };
+}

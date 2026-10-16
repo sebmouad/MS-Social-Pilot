@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildAnalytics } from '../src/server/analytics/aggregate';
 import type { AnalyticsMetricInput } from '../src/server/analytics/catalog';
 
@@ -49,6 +49,33 @@ describe('provider-neutral analytics aggregation', () => {
     ], [], 0);
     expect(result.metrics.find(metric => metric.key === 'ctr')).toMatchObject({ total: 2.5, rows: [{ value: 4 }, { value: 1 }] });
     expect(result.metrics.find(metric => metric.key === 'spend')).toMatchObject({ total: null, displayTotal: 'Multiple currencies' });
+  });
+
+  it('preserves provider covered resource IDs and infers ordinary IDs without synthetic ratio totals', () => {
+    const result = buildAnalytics([
+      input({ key: 'accounts-ratio', kind: 'ratio', observations: [
+        { date: date('2026-10-01'), channelId: 'total', channelLabel: 'Selected accounts', value: 2 },
+      ], coveredResourceIds: ['account-a', 'account-b'] }),
+      input({ key: 'generic', observations: [
+        { date: date('2026-10-01'), channelId: 'b', channelLabel: 'B', value: 2 },
+        { date: date('2026-10-01'), channelId: 'a', channelLabel: 'A', value: 3 },
+      ] }),
+    ], [], 0);
+    expect(result.metrics.find(metric => metric.key === 'accounts-ratio')?.coveredResourceIds).toEqual(['account-a', 'account-b']);
+    expect(result.metrics.find(metric => metric.key === 'generic')?.coveredResourceIds).toEqual(['a', 'b']);
+  });
+
+  it('formats chart day labels in UTC', () => {
+    const formatter = vi.spyOn(Date.prototype, 'toLocaleDateString');
+    try {
+      const result = buildAnalytics([input({ observations: [
+        { date: date('2026-10-01'), channelId: 'a', channelLabel: 'A', value: 1 },
+      ] })], [], 0);
+      expect(result.metrics[0]?.points[0]?.label).toBe('Oct 1');
+      expect(formatter).toHaveBeenCalledWith(undefined, expect.objectContaining({ timeZone: 'UTC' }));
+    } finally {
+      formatter.mockRestore();
+    }
   });
 
   it('adds normalized audience snapshots and reports selected-channel coverage', () => {

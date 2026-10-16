@@ -5,7 +5,7 @@ import { THEMES } from '@/lib/themes';
 import { configurationOwner } from './ownership';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 38;
+export const CONFIG_SCHEMA_VERSION = 39;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -62,9 +62,14 @@ export const CONFIG_REGISTRY = [
 
   entry({ key: 'ads.managementEnabled', group: 'Ads controls', label: 'Ads management enabled', kind: 'boolean', description: 'Allow authorized workspace owners and admins to use supported advertising management operations. Platform grants, account scope and confirmations are still required.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),
 
-  entry({ key: 'analytics.maxRangeDays', group: 'Analytics metrics', label: 'Maximum MCP analytics range (days)', kind: 'number', description: 'Largest date range accepted by MCP analytics overview requests.', defaultValue: 366, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
+  entry({ key: 'analytics.defaultRangeDays', group: 'Analytics metrics', label: 'Default analytics window (days)', kind: 'number', description: 'Default inclusive UTC calendar window; capped by the maximum range.', defaultValue: 30, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
+  entry({ key: 'analytics.metricPageSize', group: 'Analytics metrics', label: 'Metrics per page', kind: 'number', description: 'Number of metric summaries shown on one Analytics page.', defaultValue: 12, schema: z.number().int().min(1).max(100), consumption: 'active' }),
+  entry({ key: 'analytics.detailPageSize', group: 'Analytics metrics', label: 'Metric detail rows per page', kind: 'number', description: 'Number of dated values or resource/category rows on one detail page.', defaultValue: 50, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'analytics.chartPoints', group: 'Analytics metrics', label: 'Chart preview points', kind: 'number', description: 'Latest dated points shown in metric previews; full series remains available through detail pagination.', defaultValue: 28, schema: z.number().int().min(1).max(3660), consumption: 'active' }),
+  entry({ key: 'analytics.searchMaxLength', group: 'Analytics metrics', label: 'Metric search length', kind: 'number', description: 'Maximum characters accepted by Analytics metric search.', defaultValue: 200, schema: z.number().int().min(1).max(2000), consumption: 'active' }),
+  entry({ key: 'analytics.maxRangeDays', group: 'Analytics metrics', label: 'Maximum analytics range (days)', kind: 'number', description: 'Largest UTC calendar range accepted by Analytics, CSV and MCP reads.', defaultValue: 366, schema: z.number().int().min(1).max(3650), consumption: 'active' }),
   entry({ key: 'analytics.reportExportRows', group: 'Analytics metrics', label: 'Report CSV row limit', kind: 'number', description: 'Maximum data rows included in a report CSV download; truncated exports are marked.', defaultValue: 5000, schema: z.number().int().min(1).max(100000), consumption: 'active' }),
-  entry({ key: 'analytics.reportMaxChannels', group: 'Analytics metrics', label: 'Maximum report channels', kind: 'number', description: 'Maximum selected channels accepted in one report CSV URL.', defaultValue: 500, schema: z.number().int().min(1).max(5000), consumption: 'active' }),
+  entry({ key: 'analytics.reportMaxChannels', group: 'Analytics metrics', label: 'Maximum Analytics resources per selection', kind: 'number', description: 'Maximum selected channels or ad accounts accepted in one Analytics read.', defaultValue: 500, schema: z.number().int().min(1).max(5000), consumption: 'active' }),
 
   entry({ key: 'jobs.order', group: 'Sync schedules', label: 'Background job priority order', kind: 'json', description: 'Names of installed jobs in dispatch order. Unlisted installed jobs follow in manifest order. Existing leases and concurrency limits still apply.', defaultValue: ['posts', 'analytics', 'inbox', 'purges', 'mediaCleanup'], schema: z.array(z.string().refine(name => moduleManifests.some(module => module.jobs.some(job => job.name === name)), 'Choose an installed job name.')).max(moduleManifests.reduce((count, module) => count + module.jobs.length, 0)).refine(names => new Set(names).size === names.length, 'List each job only once.'), consumption: 'active' }),
   entry({ key: 'jobs.enabled', group: 'Sync schedules', label: 'Background jobs enabled', kind: 'boolean', description: 'Master availability switch for background work.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
