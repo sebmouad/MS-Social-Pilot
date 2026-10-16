@@ -1,68 +1,101 @@
 import { ChannelBadge } from '@/components';
+import { OperationError, operationFailure } from '@/lib/operation-error';
+import { channelBadgeInfo } from '@/lib/channel-badge';
+import { inboxHref, inboxListInput, type InboxLocation, type InboxSearchParams } from '@/modules/inbox/query';
+import type { InboxFilters, InboxListPage, InboxThreadPage, OpenThread } from '@/modules/inbox/server/types';
+import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
-import { prisma } from '@/server/data';
 import { canManageInbox } from '@/server/inbox/actions';
 import { inboxReplyPolicy } from '@/server/inbox/policy';
-import { inboxCapabilities, inboxTargetWhere } from '@/server/inbox/providers';
-import { inboxLastSynced, listInboxItems, loadThread, type InboxFilters } from '@/server/inbox/overview';
+import { inboxCapabilities } from '@/server/inbox/providers';
 import { formatInboxTime } from '@/server/inbox/threads';
-import { channelBadgeInfo } from '@/lib/channel-badge';
 import { InboxSyncBar, ReplyBox, ThreadToolbar } from './InboxActions';
 import { InboxTag } from './InboxTags';
 import styles from './inbox.module.css';
 
-type SearchParams = { channel?: string; type?: string; status?: string; hidden?: string; thread?: string };
-const valid = <T extends string>(value: string | undefined, choices: readonly T[], fallback: T): T => value && (choices as readonly string[]).includes(value) ? value as T : fallback;
+const DEFAULT_FILTERS: InboxFilters = { channelId: null, kind: 'all', state: 'open', hidden: 'visible', q: '' };
+const singleValue = (value: string | string[] | undefined) => typeof value === 'string' ? value : undefined;
 
-export default async function InboxPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const viewer = await requireViewer({ feature: 'inbox/conversations' });
-  const timeZone = viewer.membership.workspace.timezone;
-  const params = await searchParams;
-  const kind = valid(params.type, ['all', 'message', 'comment'] as const, 'all');
-  const status = valid(params.status, ['open', 'resolved', 'all'] as const, 'open');
-  const hidden = valid(params.hidden, ['visible', 'all'] as const, 'visible');
+function cursorError(field: string) {
+  return new OperationError('invalid_request', `Choose one ${field} value, or reset to the latest Inbox items.`);
+}
 
-  const channels = await prisma.target.findMany({
-    where: await inboxTargetWhere(viewer.workspaceId, viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids),
-    orderBy: { name: 'asc' }, select: { id: true, name: true },
-  });
-  const visibleChannels = channels;
-  const selectedChannel = visibleChannels.some(channel => channel.id === params.channel) ? params.channel! : 'all';
-  const channelIds = selectedChannel === 'all' ? visibleChannels.map(channel => channel.id) : [selectedChannel];
-  const allVisibleIds = visibleChannels.map(channel => channel.id);
-  const filters: InboxFilters = { channelIds, kind, status, hidden };
-
-  const [{ items, truncated }, lastSynced, thread] = await Promise.all([
-    listInboxItems(viewer.workspaceId, filters),
-    inboxLastSynced(viewer.workspaceId, allVisibleIds),
-    params.thread ? loadThread(viewer.workspaceId, allVisibleIds, params.thread) : Promise.resolve(null),
-  ]);
-
-  const query = (extra: Record<string, string> = {}) => {
-    const search = new URLSearchParams();
-    if (selectedChannel !== 'all') search.set('channel', selectedChannel);
-    if (kind !== 'all') search.set('type', kind);
-    if (status !== 'open') search.set('status', status);
-    if (hidden !== 'visible') search.set('hidden', hidden);
-    for (const [key, value] of Object.entries(extra)) search.set(key, value);
-    const text = search.toString();
-    return text ? `/inbox?${text}` : '/inbox';
+function locationFrom(page: InboxListPage | null, params: InboxSearchParams): InboxLocation {
+  const filters = page?.filters ?? DEFAULT_FILTERS;
+  const channel = filters.channelId ?? 'all';
+  return {
+    ...(channel !== 'all' ? { channel } : {}),
+    ...(filters.kind !== 'all' ? { type: filters.kind } : {}),
+    ...(filters.state !== 'open' ? { status: filters.state } : {}),
+    ...(filters.hidden !== 'visible' ? { hidden: filters.hidden } : {}),
+    ...(filters.q ? { q: filters.q } : {}),
+    ...(page ? { limit: String(page.limit) } : typeof params.limit === 'string' ? { limit: params.limit } : {}),
   };
-  const filtered = selectedChannel !== 'all' || kind !== 'all' || status !== 'open' || hidden !== 'visible';
+}
 
-  // The open thread: what the person may do with it, and the platform's reply rule.
+function pageRangeLabel(shown: number, total: number) {
+  if (total === 0) return '0 stored items';
+  return `${shown} ${shown === 1 ? 'item' : 'items'} shown · ${total} stored matches`;
+}
+
+export default async function InboxPage({ searchParams }: { searchParams: Promise<InboxSearchParams> }) {
+  const viewer = await requireViewer({ feature: 'inbox/conversations', channelScoped: true });
+  const params = await searchParams;
+  const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
+  const constraints = viewer.permissions.pageScope.all ? undefined : { allowedChannelIds: viewer.permissions.pageScope.ids };
+
+  const listOutcome = await (async () => {
+    try { return { page: await readInboxList(actor, inboxListInput(params), constraints), error: null }; }
+    catch (error) { return { page: null, error: operationFailure(error, 'The Inbox could not be loaded. Try again or reset the filters.') }; }
+  })();
+  const listPage = listOutcome.page;
+  const baseLocation = locationFrom(listPage, params);
+  const requestedThread = singleValue(params.thread);
+  const requestedHistoryCursor = singleValue(params.historyCursor);
+  let threadOutcome: { page: InboxThreadPage | null; error: { error: string; code: string; status: number } | null } = { page: null, error: null };
+  if (params.thread !== undefined && !requestedThread) {
+    threadOutcome = { page: null, error: operationFailure(cursorError('conversation'), 'The selected conversation could not be opened.') };
+  } else if (params.historyCursor !== undefined && !requestedThread) {
+    threadOutcome = { page: null, error: operationFailure(cursorError('history cursor'), 'Choose a conversation before opening its history.') };
+  } else if (params.historyCursor !== undefined && !requestedHistoryCursor) {
+    threadOutcome = { page: null, error: operationFailure(cursorError('history cursor'), 'The conversation history could not be loaded.') };
+  } else if (requestedThread) {
+    try {
+      threadOutcome = { page: await readInboxThread(actor, { key: requestedThread, ...(requestedHistoryCursor ? { cursor: requestedHistoryCursor } : {}) }, constraints), error: null };
+    } catch (error) {
+      threadOutcome = { page: null, error: operationFailure(error, 'This conversation could not be opened. Return to the Inbox list and try again.') };
+    }
+  }
+
+  const threadPage = threadOutcome.page;
+  const thread: OpenThread | null = threadPage?.thread ?? null;
+  const timeZone = listPage?.timeZone ?? viewer.membership.workspace.timezone;
+  const filters = listPage?.filters ?? DEFAULT_FILTERS;
+  const channel = filters.channelId ?? 'all';
+  const clearThreadHref = inboxHref({ ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}) });
+  const resetHref = inboxHref(threadOutcome.page && requestedThread ? { thread: requestedThread } : {});
+  const listPagingLocation = {
+    ...baseLocation,
+    ...(threadPage && requestedThread ? { thread: requestedThread } : {}),
+    ...(threadPage && requestedHistoryCursor ? { historyCursor: requestedHistoryCursor } : {}),
+  };
+
   let threadView = null;
   if (thread) {
     const [canWrite, capabilities, rule] = await Promise.all([
-      canManageInbox({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, thread.target.id),
+      canManageInbox(actor, thread.target.id),
       thread.target.provider ? inboxCapabilities(thread.target.provider) : Promise.resolve({ reply: false, hide: false, remove: false }),
       inboxReplyPolicy(thread.target.provider, { kind: thread.kind, channelRemoteId: thread.target.providerId, lastInbound: thread.lastInbound, timeZone }),
     ]);
     const badge = channelBadgeInfo(thread.target.provider);
     const first = thread.entries.find(entry => !entry.fromChannel);
+    const history = threadPage!.history;
+    const historyName = thread.kind === 'comment' ? 'replies' : 'messages';
+    const openingItemPresent = Boolean(listPage?.items.some(item => item.key === `${thread.kind}:${thread.id}`));
     threadView = <section className={styles.threadPane} aria-label={thread.kind === 'message' ? 'Open conversation' : 'Open comment'}>
-      <a className={styles.back} href={query()}>← All conversations</a>
+      <a className={styles.back} href={clearThreadHref}>← All conversations</a>
+      {!openingItemPresent && listPage ? <p className={styles.contextNote}>This conversation is outside the current list page. It stays open while you browse.</p> : null}
       <header className={styles.threadHead}>
         <h2>{thread.kind === 'message' ? `Conversation with ${first?.author ?? 'a visitor'}` : `Comment by ${thread.entries[0]?.author ?? 'a visitor'}`}</h2>
         <div className={styles.threadTags}>
@@ -73,67 +106,101 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         </div>
       </header>
       {thread.postText ? <p className={styles.postContext}><strong>On your post</strong>{thread.postText.length > 280 ? `${thread.postText.slice(0, 280)}…` : thread.postText}</p> : null}
+      <p className={styles.contextNote}>This is activity already synced to the app. Earlier messages or replies on the platform may not have been fetched yet.</p>
+      <div className={styles.historyHead}>
+        <h3>{thread.kind === 'comment' ? 'Comment history' : 'Conversation history'}</h3>
+        <span>{history.shown} of {history.total} stored {historyName} shown</span>
+      </div>
+      {history.cursor && history.shown === 0 ? <p className={styles.contextNote}>No stored history at this position. Choose Latest in the sidebar to return to recent messages or replies.</p> : null}
       <ol className={styles.entries} aria-label="History">
         {thread.entries.map(entry => <li key={entry.id} className={styles.entry} data-from={entry.fromChannel ? 'channel' : 'person'}>
           <div className={styles.entryHead}><strong>{entry.author}</strong>{entry.sentBy ? <span>sent by {entry.sentBy}</span> : null}<time dateTime={entry.time.toISOString()}>{formatInboxTime(entry.time, timeZone, true)}</time></div>
           <p>{entry.text || 'No text in this message.'}</p>
         </li>)}
       </ol>
-      {canWrite ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canWrite} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={query()} /> : null}
+      {canWrite ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canWrite} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} /> : null}
       {canWrite && capabilities.reply ? <ReplyBox key={thread.id} id={thread.id} kind={thread.kind} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} />
         : <p className={styles.readOnly}>{canWrite ? 'Replies are not available for this channel.' : 'You can read this conversation, but replying and moderation are unavailable right now. Your role may be read-only, or the channel may need to be reconnected in Connections.'}</p>}
     </section>;
   }
 
-  const sidebar = visibleChannels.length ? <aside className={styles.filters} aria-label="Inbox filters">
+  const visibleChannels = listPage?.channels ?? [];
+  const selectedChannel = channel === 'all' ? 'all' : channel;
+  const filtered = Boolean(filters.channelId || filters.kind !== 'all' || filters.state !== 'open' || filters.hidden !== 'visible' || filters.q);
+  const syncTarget = selectedChannel === 'all' ? undefined : selectedChannel;
+
+  const sidebar = <aside className={styles.filters} aria-label="Inbox filters and navigation">
     <p className={styles.filterHeading}>Filters</p>
-    <form method="get" action="/inbox">
-      <label>Channel<select name="channel" defaultValue={selectedChannel}><option value="all">All channels</option>{visibleChannels.map(channel => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></label>
-      <label>Type<select name="type" defaultValue={kind}><option value="all">All types</option><option value="message">Messages</option><option value="comment">Comments</option></select></label>
-      <label>Status<select name="status" defaultValue={status}><option value="open">Open</option><option value="resolved">Resolved</option><option value="all">All</option></select></label>
-      <label>Hidden comments<select name="hidden" defaultValue={hidden}><option value="visible">Hide them</option><option value="all">Show them</option></select></label>
+    <form method="get" action={inboxHref()} noValidate>
+      {requestedThread ? <input type="hidden" name="thread" value={requestedThread} /> : null}
+      <label>Search messages and people<input className={styles.searchInput} type="search" name="q" maxLength={listPage?.limits.searchMaxCharacters} defaultValue={filters.q} placeholder="Name or message text" /></label>
+      <label>Channel<select name="channel" defaultValue={selectedChannel}><option value="all">All channels</option>{visibleChannels.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label>Type<select name="type" defaultValue={filters.kind}><option value="all">All types</option><option value="message">Messages</option><option value="comment">Comments</option></select></label>
+      <label>Status<select name="status" defaultValue={filters.state}><option value="open">Open</option><option value="resolved">Resolved</option><option value="all">All</option></select></label>
+      <label>Hidden comments<select name="hidden" defaultValue={filters.hidden}><option value="visible">Hide them</option><option value="all">Show them</option></select></label>
+      <label>Items per page<input type="number" name="limit" min={1} max={listPage?.limits.listPageSize} defaultValue={listPage?.limit} disabled={!listPage} /></label>
       <button className="ui-button ui-button--primary ui-button--md" type="submit">Apply filters</button>
       <a href="/inbox">Reset filters</a>
     </form>
-  </aside> : undefined;
+    {listPage ? <div className={styles.navigationGroup}>
+      <p className={styles.filterHeading}>Conversations</p>
+      <nav className={styles.pagination} aria-label="Inbox list pages">
+        {listPage.olderCursor ? <a href={inboxHref({ ...listPagingLocation, cursor: listPage.olderCursor })}>Older</a> : <span aria-disabled="true">Older</span>}
+        {listPage.cursor ? <a href={inboxHref({ ...listPagingLocation, cursor: undefined })}>Latest</a> : <span aria-disabled="true">Latest</span>}
+        {listPage.newerCursor ? <a href={inboxHref({ ...listPagingLocation, cursor: listPage.newerCursor })}>Newer</a> : <span aria-disabled="true">Newer</span>}
+      </nav>
+    </div> : null}
+    {threadPage ? <div className={styles.navigationGroup}>
+      <p className={styles.filterHeading}>{thread?.kind === 'comment' ? 'Reply history' : 'Message history'}</p>
+      <nav className={styles.pagination} aria-label="Conversation history pages">
+        {threadPage.history.olderCursor ? <a href={inboxHref({ ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}), thread: `${thread!.kind}:${thread!.id}`, historyCursor: threadPage.history.olderCursor })}>Earlier</a> : <span aria-disabled="true">Earlier</span>}
+        {threadPage.history.cursor ? <a href={inboxHref({ ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}), thread: `${thread!.kind}:${thread!.id}` })}>Latest</a> : <span aria-disabled="true">Latest</span>}
+        {threadPage.history.newerCursor ? <a href={inboxHref({ ...baseLocation, ...(listPage?.cursor ? { cursor: listPage.cursor } : {}), thread: `${thread!.kind}:${thread!.id}`, historyCursor: threadPage.history.newerCursor })}>Newer</a> : <span aria-disabled="true">Newer</span>}
+      </nav>
+    </div> : null}
+  </aside>;
 
-  return <PageFrame module="inbox" sidebar={sidebar}><div className={styles.page}>
+  const listError = listOutcome.error;
+  const lastSynced = listPage?.lastSynced ?? null;
+  const noChannels = listPage !== null && visibleChannels.length === 0;
+
+  return <PageFrame module="inbox" scopedAccess sidebar={sidebar}><div className={styles.page}>
     <header className={styles.head}>
       <div><p className="eyebrow">Inbox</p><h1>Conversations</h1><p>Messages and comments from the channels you can access.</p></div>
-      {visibleChannels.length > 0 && <InboxSyncBar targetId={selectedChannel === 'all' ? undefined : selectedChannel} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true) : null} timeZone={timeZone} />}
+      {visibleChannels.length > 0 && <InboxSyncBar targetId={syncTarget} lastSynced={lastSynced ? formatInboxTime(lastSynced, timeZone, true) : null} timeZone={timeZone} />}
     </header>
-    {!visibleChannels.length ? <section className="panel"><div className={styles.empty}>
+    {listError ? <div role="alert" className={styles.alert}><p>{listError.error}</p><a href={resetHref}>Reset filters and return to the latest Inbox items</a></div> : null}
+    {threadOutcome.error ? <div role="alert" className={styles.alert}><p>{threadOutcome.error.error}</p><a href={clearThreadHref}>Return to the Inbox list</a></div> : null}
+    {noChannels ? <section className="panel"><div className={styles.empty}>
       <h2>No channels with an inbox yet</h2>
       <p>Messages sent to your channels and comments on your published posts show up here once a channel that supports them is connected and selected.</p>
       <a className="text-link" href="/settings/connections">Go to Connections</a>
-    </div></section> : <div className={styles.split} data-open={thread ? 'true' : 'false'}>
+    </div></section> : listPage ? <div className={styles.split} data-open={thread ? 'true' : 'false'}>
       <section className={styles.listPane} aria-label="Conversations and comments">
-        <div className={styles.listHead}><h2>{status === 'resolved' ? 'Resolved' : status === 'all' ? 'All activity' : 'Open'}</h2><span>{items.length} {items.length === 1 ? 'item' : 'items'}</span></div>
-        {items.length ? <>
-          <ul className={styles.list}>{items.map(item => {
-            const badge = channelBadgeInfo(item.target.provider);
-            const selected = thread !== null && thread.kind === item.kind && thread.id === item.id;
-            return <li key={item.key}><a className={styles.item} href={query({ thread: item.key })} aria-current={selected ? 'true' : undefined} data-attention={item.needsReply || item.unread > 0 || undefined}>
-              <div className={styles.itemTop}><span className={styles.author}>{item.author}</span><time dateTime={item.time.toISOString()}>{formatInboxTime(item.time, timeZone)}</time></div>
-              <p className={styles.preview}>{item.preview.length > 180 ? `${item.preview.slice(0, 180)}…` : item.preview}</p>
-              <div className={styles.itemMeta}>
-                <ChannelBadge name={item.target.name} platformName={badge.platformName} mark={badge.mark} compact />
-                <InboxTag icon={item.kind === 'message' ? 'message' : 'comment'}>{item.kind === 'message' ? 'Message' : 'Comment'}</InboxTag>
-                {item.unread > 0 ? <InboxTag icon="unread" tone="warn">{item.unread} unread</InboxTag> : null}
-                {item.needsReply ? <InboxTag icon="needsReply" tone="warn">Needs reply</InboxTag> : null}
-                {item.resolved ? <InboxTag icon="resolved" tone="ok">Resolved</InboxTag> : null}
-                {item.hidden ? <InboxTag icon="hidden">Hidden</InboxTag> : null}
-              </div>
-            </a></li>;
-          })}</ul>
-          {truncated && <p className={styles.listNote}>Showing the newest items. Narrow the filters to see older ones.</p>}
-        </> : <div className={styles.empty}>
-          {filtered ? <><h2>Nothing matches these filters</h2><p>Try another channel, type or status.</p><a className="text-link" href="/inbox">Reset filters</a></>
+        <div className={styles.listHead}><h2>{filters.state === 'resolved' ? 'Resolved' : filters.state === 'all' ? 'All activity' : 'Open'}</h2><span>{pageRangeLabel(listPage.items.length, listPage.total)}</span></div>
+        {listPage.items.length ? <ul className={styles.list}>{listPage.items.map(item => {
+          const badge = channelBadgeInfo(item.target.provider);
+          const selected = thread !== null && thread.kind === item.kind && thread.id === item.id;
+          return <li key={item.key}><a className={styles.item} href={inboxHref({ ...baseLocation, ...(listPage.cursor ? { cursor: listPage.cursor } : {}), thread: item.key })} aria-current={selected ? 'true' : undefined} data-attention={item.needsReply || item.unread > 0 || undefined}>
+            <div className={styles.itemTop}><span className={styles.author}>{item.author}</span><time dateTime={item.time.toISOString()}>{formatInboxTime(item.time, timeZone)}</time></div>
+            <p className={styles.preview}>{item.preview.length > 180 ? `${item.preview.slice(0, 180)}…` : item.preview}</p>
+            <div className={styles.itemMeta}>
+              <ChannelBadge name={item.target.name} platformName={badge.platformName} mark={badge.mark} compact />
+              <InboxTag icon={item.kind === 'message' ? 'message' : 'comment'}>{item.kind === 'message' ? 'Message' : 'Comment'}</InboxTag>
+              {item.unread > 0 ? <InboxTag icon="unread" tone="warn">{item.unread} unread</InboxTag> : null}
+              {item.needsReply ? <InboxTag icon="needsReply" tone="warn">Needs reply</InboxTag> : null}
+              {item.resolved ? <InboxTag icon="resolved" tone="ok">Resolved</InboxTag> : null}
+              {item.hidden ? <InboxTag icon="hidden">Hidden</InboxTag> : null}
+            </div>
+          </a></li>;
+        })}</ul> : <div className={styles.empty}>
+          {listPage.total > 0 && listPage.cursor ? <><h2>No items on this page</h2><p>The Inbox changed while you were browsing. Return to the latest items or choose another page.</p><a className="text-link" href={inboxHref({ ...listPagingLocation, cursor: undefined })}>Show the latest items</a></>
+            : filtered ? <><h2>Nothing matches these filters</h2><p>Try another channel, type, status or search.</p><a className="text-link" href="/inbox">Reset filters</a></>
             : lastSynced ? <><h2>No open conversations</h2><p>New messages and comments appear here after a sync. Resolved conversations are under Status.</p><a className="text-link" href="/inbox?status=resolved">Show resolved</a></>
             : <><h2>Your inbox is empty</h2><p>Messages people send to your channels and comments on your published posts appear here after the first sync. Use Sync now to check for them.</p></>}
         </div>}
       </section>
       {threadView ?? <section className={`${styles.threadPane} ${styles.empty} ${styles.pick}`} aria-label="Open conversation"><h2>Select a conversation</h2><p>Choose a message or comment on the left to read its history and reply.</p></section>}
-    </div>}
+    </div> : null}
   </div></PageFrame>;
 }

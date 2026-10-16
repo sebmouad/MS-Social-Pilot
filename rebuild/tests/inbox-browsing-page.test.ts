@@ -1,0 +1,41 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+const state = vi.hoisted(() => ({ viewer: vi.fn(), list: vi.fn(), thread: vi.fn(), manage: vi.fn() }));
+vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
+vi.mock('../src/modules/inbox/server/read', () => ({ readInboxList: state.list, readInboxThread: state.thread }));
+vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ sidebar, children, scopedAccess }: { sidebar: import('react').ReactNode; children: import('react').ReactNode; scopedAccess?: boolean }) => createElement('main', { 'data-scoped-access': scopedAccess }, createElement('aside', null, sidebar), children) }));
+vi.mock('../src/server/inbox/actions', () => ({ canManageInbox: state.manage }));
+vi.mock('../src/server/inbox/providers', () => ({ inboxCapabilities: async () => ({ reply: false, hide: false, remove: false }) }));
+vi.mock('../src/server/inbox/policy', () => ({ inboxReplyPolicy: async () => ({ allowed: false, headline: 'Read only' }) }));
+vi.mock('../src/app/inbox/InboxActions', () => ({ InboxSyncBar: () => null, ReplyBox: () => null, ThreadToolbar: () => null }));
+import InboxPage from '../src/app/inbox/page';
+import { OperationError } from '../src/lib/operation-error';
+const listPage = { items: [], total: 8, limit: 2, cursor: 'list-position', olderCursor: 'list-older', newerCursor: 'list-newer', filters: { channelId: 'channel', kind: 'message', state: 'all', hidden: 'all', q: 'literal' }, channels: [{ id: 'channel', name: 'Example' }], lastSynced: null, timeZone: 'UTC', limits: { listPageSize: 25, threadPageSize: 50, searchMaxCharacters: 200, cursorMaxCharacters: 4096 } };
+const threadPage = { thread: { kind: 'message', id: 'conversation', target: { id: 'channel', name: 'Example', providerId: 'remote', provider: 'facebook' }, resolved: false, hidden: false, postText: null, entries: [{ id: 'entry', author: 'Visitor', text: 'Stored history', time: new Date('2026-10-16T00:00:00Z'), fromChannel: false, sentBy: null }], lastInbound: null }, history: { total: 305, shown: 1, limit: 50, cursor: 'history-position', olderCursor: 'history-older', newerCursor: 'history-newer' } };
+beforeEach(() => {
+  vi.clearAllMocks(); state.viewer.mockResolvedValue({ user: { id: 'reader' }, workspaceId: 'workspace', permissions: { pageScope: { all: false, ids: ['channel'] } }, membership: { workspace: { timezone: 'UTC' } } }); state.list.mockResolvedValue(listPage); state.thread.mockResolvedValue(threadPage); state.manage.mockResolvedValue(false);
+});
+const render = async (params = { thread: 'message:conversation', cursor: 'list-position', historyCursor: 'history-position' }) => renderToStaticMarkup(await InboxPage({ searchParams: Promise.resolve(params) }));
+describe('Inbox paging and recoverable route context', () => {
+  it('keeps both page positions while navigating and places controls in the existing sidebar', async () => {
+    const html = await render();
+    expect(state.viewer).toHaveBeenCalledWith({ feature: 'inbox/conversations', channelScoped: true });
+    expect(html).toContain('data-scoped-access="true"');
+    expect(state.thread).toHaveBeenCalledWith({ userId: 'reader', workspaceId: 'workspace' }, { key: 'message:conversation', cursor: 'history-position' }, { allowedChannelIds: ['channel'] });
+    expect(html).toContain('name="thread" value="message:conversation"'); expect(html).toContain('1 of 305 stored messages shown');
+    expect(html).toContain('outside the current list page'); const limitField = html.match(/<input\b[^>]*name="limit"[^>]*>/)?.[0]; expect(limitField).toContain('min="1"'); expect(limitField).toContain('max="25"');
+    const links = [...html.matchAll(/href="([^"]+)"/g)].map(match => new URL(match[1].replaceAll('&amp;', '&'), 'http://preview.test'));
+    expect(links.some(url => url.searchParams.get('cursor') === 'list-older' && url.searchParams.get('historyCursor') === 'history-position')).toBe(true);
+    expect(links.some(url => url.searchParams.get('historyCursor') === 'history-older' && url.searchParams.get('cursor') === 'list-position')).toBe(true);
+  });
+  it('keeps a valid selected thread in reset recovery after invalid list cursor and masks unknown errors', async () => {
+    state.list.mockRejectedValueOnce(new OperationError('invalid_request', 'Reset this Inbox cursor.'));
+    const html = await render(); expect(html).toContain('Reset this Inbox cursor.'); expect(html).toContain('href="/inbox?thread=message%3Aconversation"');
+    state.thread.mockRejectedValueOnce(new Error('postgres://private-password')); const failed = await render(); expect(failed).not.toContain('private-password'); expect(failed).toContain('could not be opened');
+  });
+  it('distinguishes a changed empty page from an empty inbox and provides Latest recovery', async () => {
+    state.thread.mockRejectedValueOnce(new OperationError('not_found', 'Conversation unavailable.'));
+    const html = await render(); expect(html).toContain('No items on this page'); expect(html).toContain('Inbox changed'); expect(html).toContain('Conversation unavailable.');
+  });
+});

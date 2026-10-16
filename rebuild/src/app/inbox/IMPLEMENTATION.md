@@ -4,9 +4,9 @@ The Inbox stores channel conversations plus comments attached to locally stored 
 
 ## Screen
 
-Two panes. The left list merges the newest 50 conversations and 50 top-level comments of the chosen channels, newest first. Each row shows author, time in the workspace time zone, a preview, the channel badge and text-plus-shape tags: Message or Comment, `N unread` (conversations; the count comes from the platform), **Needs reply** and Resolved or Hidden. The right pane shows the selected thread (`?thread=message:<id>` or `?thread=comment:<id>`): the full stored history (up to 300 entries), who wrote each entry and, for replies sent from this app, which teammate sent it. For a comment it also quotes the post it is under. On phones the list and the thread are separate screens with a back link.
+Two panes. The left list merges all stored conversations and top-level comments of the authorized selected channels, newest first, through one bounded keyset query. Root controls page sizes; Older/Newer/Latest links in the contextual sidebar reach the remaining items. Each row shows author, time in the workspace time zone, a preview, the channel badge and text-plus-shape tags: Message or Comment, `N unread` (conversations; the count comes from the platform), **Needs reply** and Resolved or Hidden. The right pane shows the selected thread (`?thread=message:<id>` or `?thread=comment:<id>`): the newest stored history with Earlier/Newer/Latest continuation, without the former 300-entry truncation, who wrote each entry and, for replies sent from this app, which teammate sent it. For a comment it also quotes the post it is under. On phones the list and the thread are separate screens with a back link.
 
-Filters live in the sidebar and in the URL: channel, type (messages/comments), status (open/resolved/all) and whether hidden comments are listed. Empty states distinguish no channel, nothing synced yet, no open items, and no match for the filters.
+Filters live in the sidebar and URL: channel, type (messages/comments), status (open/resolved/all), hidden comments, literal message/person search and page size. List and history positions are separate URL cursors; paging preserves the selected thread even outside the current list page. Filter changes reset positions. Invalid or changed positions have Latest recovery. Counts explicitly describe stored activity, not complete provider history. Empty states distinguish no channel, nothing synced yet, no open items, and no match for the filters.
 
 **Needs reply** means: open, and for a conversation the newest stored message is not from the channel; for a comment, visible and nobody on the channel side (this app or the channel's own account) has replied under it (`src/server/inbox/threads.ts`). It reflects only what is stored.
 
@@ -32,6 +32,16 @@ Audit details contain workspace and object identifiers but no message content or
 
 ## Known gaps
 
-Visitor replies nested under a comment are not synced (the sync reads top-level comments), so only replies sent here appear under a comment. Lists show the newest 50 per type without paging. Assignment, notes, saved replies and an MCP delete tool do not exist. Delete and the other operations have only mocked provider tests; no live platform calls were made.
+Visitor replies nested under a comment are not synced (the sync reads top-level comments), so only replies sent here appear under a comment. Assignment, notes, saved replies and an MCP delete tool do not exist. Delete and the other operations have only mocked provider tests; no live platform calls were made.
 
 Run the isolated checks from `app/rebuild` with `npm test` and `npm run typecheck`. Mocked provider tests do not send live messages or moderation operations.
+
+## Shared read services — 2026-10-16
+
+`src/modules/inbox/server/read.ts` owns list and thread authorization, filtering and bounded persistence reads. UI, HTTP `GET /api/inbox`, HTTP `GET /api/inbox/threads/[key]`, MCP `list_inbox` and `get_inbox_thread` use these services. Every call reloads active identity, membership/feature grants, selected usable Inbox channels and workspace state; bearer resource scope is intersected with current grants. The page shell explicitly permits this scoped read path for non-admin members. Expired credentials retain stored history; revoked/unselected channels do not.
+
+Stable `(time, kind, id)` cursors bind normalized filters, workspace, current channel set and thread identity where relevant. They carry no authority and are validated again after current authorization. SQL values are bound and literal search escapes wildcard characters. Histories load newest entries chronologically; original comments remain visible on every reply page. Reply-window eligibility uses the latest stored inbound message independently of the shown history window. Local reply/workflow timestamps do not claim provider synchronization.
+
+Registry version 36 supplies `inbox.listPageSize`, `inbox.threadPageSize`, `inbox.searchMaxCharacters` and `inbox.cursorMaxCharacters`; MCP result bounds can reduce page sizes further. The old duplicate overview/list read paths have been removed. `msp://inbox` returns a configured first page; use returned cursors with tools to continue. No DDL or provider writes were introduced.
+
+Evidence and limitations are recorded in `docs/PREVIEW_QA.md`. Stored browsing is paginated; nested visitor-reply sync, assignment/notes/saved replies, durable remote-write reconciliation and MCP comment deletion remain unfinished.

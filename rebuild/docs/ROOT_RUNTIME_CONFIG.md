@@ -72,3 +72,7 @@ Registry version 35 adds active Shared controls:
 - `root.operationalTimezone` (UTC): validated IANA timezone for diagnostics and worker telemetry presentation; API timestamps stay UTC. Other Root date surfaces are not yet converted.
 
 Configuration validation checks only the current owner’s registry entries and decryptability of saved secrets. It names an invalid registered key without its value. Missing optional configuration is not treated as remote readiness. Adapter diagnostics remain owned by that adapter; Facebook uses its existing endpoint, version, timeout, scope and pagination settings. No diagnostic URL overrides are accepted. Fixed audit action names, persisted worker identity prefix, advisory-lock namespace and confirmation shape are internal protocols, not independently editable transport targets.
+
+## Inbox browsing bounds — registry 36
+
+The Inbox product owns `inbox.listPageSize` (default 25, 1–200), `inbox.threadPageSize` (50, 1–200), `inbox.searchMaxCharacters` (200, 1–2000) and `inbox.cursorMaxCharacters` (4096, 512–65536). The shared list/thread service validates input and caps caller requests with these settings; MCP also applies its result cap. Sidebar count/search controls consume the same bounds. Cursor version, canonical encoding, ID grammar and timestamp precision are isolated read-protocol invariants, not provider policy. These settings do not change provider fetch coverage or sync schedules.

@@ -1,6 +1,7 @@
 import { PrismaClient, type PostStatus, type PostTargetStatus } from '../generated/client';
 import { hashLegacyPassword } from '../src/server/auth';
 import { encryptSecret } from '../src/server/secret-crypto';
+import { preparePreviewInbox } from './preview-inbox';
 import { preparePreviewMedia, PREVIEW_IMAGES } from './preview-media';
 
 const FIXTURE = 'preview_';
@@ -234,6 +235,8 @@ async function main() {
     create: { id: comment.remoteId, postTargetId: publishedPostTargetId, ...comment, likeCount: 2, replyCount: comment.parentRemoteId ? 0 : 1, createdTime: new Date(now.getTime() - 15 * 60_000), fetchedAt: stamp, firstSeenAt: stamp },
     update: { ...comment, fetchedAt: stamp },
   });
+
+  await preparePreviewInbox(prisma, { workspaceId, targetId: targets.studio, userId, now });
 
   console.log(`Seeded synthetic preview fixtures in ${workspaceId}. QA email: ${email}.`);
   console.log('Use the configured PREVIEW_QA_PASSWORD to sign in. No provider credentials are valid.');

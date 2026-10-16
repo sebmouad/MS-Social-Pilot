@@ -1,4 +1,4 @@
-import { inboxTargetWhere } from '../inbox/providers';
+import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
 import { withAdsErrorBoundary } from '../ads/errors';
 import { withMediaErrorBoundary } from '../media/mcp-errors';
 import { OperationError, operationFailure, type OperationErrorCode } from '@/lib/operation-error';
@@ -44,7 +44,8 @@ const tools = [
   { name: 'upload_workspace_image', description: 'Store a workspace image from standard base64 data. Root image MIME and byte limits apply. Confirmation must exactly match UPLOAD WORKSPACE IMAGE <fileName>.', inputSchema: { type: 'object', required: ['fileName', 'mimeType', 'base64', 'confirmation'], properties: { fileName: { type: 'string', minLength: 1, maxLength: 180 }, mimeType: { type: 'string' }, base64: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'list_pages', description: 'List enabled workspace destinations and their publishing availability.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'list_posts', description: 'List workspace posts, newest first. Filter by status and scheduled date.', inputSchema: { type: 'object', properties: { status: { type: 'string', description: 'Comma-separated post statuses.' }, from: { type: 'string', description: 'ISO date or date-time lower bound for scheduledAt.' }, to: { type: 'string', description: 'ISO date or date-time upper bound for scheduledAt.' }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
-  { name: 'list_inbox', description: 'List synced comments and conversations visible in the workspace inbox.', inputSchema: { type: 'object', properties: { kind: { type: 'string', enum: ['comment', 'message'] }, state: { type: 'string', enum: ['open', 'resolved', 'all'] }, limit: { type: 'integer', minimum: 1, maximum: 100 } }, additionalProperties: false } },
+  { name: 'list_inbox', description: 'Read the same merged, scoped Inbox activity as the app. Top-level comments and conversations have shared literal text/person search, channel/status/hidden filters and Older/Newer cursors. Root page and MCP result limits apply. Cursors reset when selection or filters change; activity can move when new messages arrive.', inputSchema: { type: 'object', properties: { channelId: { type: 'string' }, kind: { type: 'string', enum: ['all', 'comment', 'message'] }, state: { type: 'string', enum: ['open', 'resolved', 'all'] }, hidden: { type: 'string', enum: ['visible', 'all'] }, q: { type: 'string' }, cursor: { type: 'string' }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
+  { name: 'get_inbox_thread', description: 'Read one authorized stored Inbox thread by message:<id> or comment:<id>. Defaults to newest stored messages/replies displayed chronologically; follow history Older/Newer cursors. Original comment remains visible on every reply page. History does not imply all provider history was fetched.', inputSchema: { type: 'object', required: ['key'], properties: { key: { type: 'string' }, cursor: { type: 'string' }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'reply_to_inbox', description: 'Send a reply to a synced conversation or comment through its connected platform. This contacts the remote platform. Confirmation must exactly match REPLY <message|comment> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'text', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment'] }, id: { type: 'string' }, text: { type: 'string', minLength: 1, maxLength: 2000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'set_inbox_resolved', description: 'Resolve or reopen a synced conversation or comment. Confirmation must exactly match RESOLVE <message|comment> <id> or REOPEN <message|comment> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'resolved', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment'] }, id: { type: 'string' }, resolved: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'moderate_inbox_comment', description: 'Hide or unhide a synced comment through its connected platform. This contacts the remote platform. Confirmation must exactly match HIDE COMMENT <id> or UNHIDE COMMENT <id>.', inputSchema: { type: 'object', required: ['id', 'hidden', 'confirmation'], properties: { id: { type: 'string' }, hidden: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -88,6 +89,7 @@ const toolFeatures: Record<string, string> = {
   list_pages: 'settings/connections',
   list_posts: 'publishing/posts',
   list_inbox: 'inbox/conversations',
+  get_inbox_thread: 'inbox/conversations',
   reply_to_inbox: 'inbox/conversations',
   set_inbox_resolved: 'inbox/conversations',
   moderate_inbox_comment: 'inbox/conversations',
@@ -257,19 +259,10 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       return prisma.post.findMany({ where: { workspaceId: viewer.workspaceId, ...(pageIds ? { OR: [{ targets: { some: {}, none: { targetId: { notIn: pageIds } } } }, { authorId: viewer.userId, targets: { none: {} } }] } : {}), ...(status.length ? { status: { in: status as never[] } } : {}), ...(from || to ? { scheduledAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}) }, orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }], take: limit, select: { id: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, targets: { where: pageIds ? { targetId: { in: pageIds } } : {}, select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, type: true, name: true } } } } } });
     }
     case 'list_inbox': {
-      const kind = args.kind === 'comment' || args.kind === 'message' ? args.kind : undefined;
-      const state = args.state === 'resolved' || args.state === 'all' ? args.state : 'open';
-      const limit = Math.max(1, Math.min(cap, Math.trunc(Number(args.limit) || Math.min(50, cap))));
-      const pageIds = pageIdsFor(viewer);
-      const targetWhere = await inboxTargetWhere(viewer.workspaceId, pageIds);
-      const conversationWhere = { target: targetWhere, ...(state === 'all' ? {} : { resolvedAt: state === 'resolved' ? { not: null } : null }) };
-      const commentWhere = { isHidden: false, postTarget: { post: { workspaceId: viewer.workspaceId }, target: targetWhere }, ...(state === 'all' ? {} : { resolvedAt: state === 'resolved' ? { not: null } : null }) };
-      const [conversations, comments] = await Promise.all([
-        kind === 'comment' ? Promise.resolve([]) : prisma.conversation.findMany({ where: conversationWhere, orderBy: { updatedTime: 'desc' }, take: limit, select: { id: true, snippet: true, unreadCount: true, updatedTime: true, resolvedAt: true, target: { select: { id: true, type: true, name: true } }, messages: { orderBy: { createdTime: 'desc' }, take: 5, select: { id: true, fromName: true, message: true, createdTime: true } } } }),
-        kind === 'message' ? Promise.resolve([]) : prisma.postComment.findMany({ where: commentWhere, orderBy: { createdTime: 'desc' }, take: limit, select: { id: true, message: true, fromName: true, createdTime: true, resolvedAt: true, replyCount: true, postTarget: { select: { target: { select: { id: true, type: true, name: true } }, post: { select: { id: true, message: true } } } } } }),
-      ]);
-      return { conversations, comments };
+      const { channels, ...result } = await readInboxList({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer), maxItems: cap });
+      return { ...result, channelCount: channels.length };
     }
+    case 'get_inbox_thread': return readInboxThread({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer), maxItems: cap });
     case 'reply_to_inbox': {
       const kind = args.kind === 'message' || args.kind === 'comment' ? args.kind : null;
       const id = typeof args.id === 'string' ? args.id : '';
@@ -660,7 +653,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       else if (uri === 'msp://targets') contents = await runTool(viewer, 'list_pages', {});
       else if (uri === 'msp://posts') contents = await runTool(viewer, 'list_posts', { limit: 100 });
       else if (uri === 'msp://media/images') contents = await runTool(viewer, 'list_workspace_images', { limit: 100 });
-      else if (uri === 'msp://inbox') contents = await runTool(viewer, 'list_inbox', { limit: 50 });
+      else if (uri === 'msp://inbox') contents = await runTool(viewer, 'list_inbox', {});
       else if (uri === 'msp://analytics/overview') contents = await runTool(viewer, 'get_analytics_overview', {});
       else if (uri === 'msp://ads/performance') contents = await runTool(viewer, 'get_ads_performance', {});
       else if (uri === 'msp://data/deletion-preview') contents = await runTool(viewer, 'preview_workspace_data_deletion', {});

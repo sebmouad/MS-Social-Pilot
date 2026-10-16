@@ -57,7 +57,7 @@ No visual controls, theme tokens, route structure, schema or Root configuration 
 
 The legacy app is a reference, not a source of shared provider-specific business rules. Existing production remains running. Local previews use synthetic data. Design coverage, implemented actions, automated checks, browser evidence and live-provider evidence must remain distinct. This plan does not declare the design, adapter, MCP parity or cutover complete.
 
-The paused Inbox pagination/MCP deletion expansion is not shipped. The reviewed Graph comment-delete confirmation fix is retained as a safety correction; durable deletion reconciliation is still required before claiming safe complete deletion parity.
+Inbox pagination is now implemented through shared scoped UI/HTTP/MCP read services; MCP deletion remains unshipped. The reviewed Graph comment-delete confirmation fix is retained as a safety correction; durable deletion reconciliation is still required before claiming safe complete deletion parity.
 
 
 ## Root user workflow batch

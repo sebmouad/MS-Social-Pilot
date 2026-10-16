@@ -34,6 +34,8 @@ const adsQueries = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn() }));
 vi.mock('../src/server/ads/queries', () => ({ getAdsAccounts: adsQueries.accounts, getAdsDataset: adsQueries.dataset, getAdsAccountWhere: async (workspaceId: string, allowedTargetIds?: string[]) => ({ workspaceId, enabled: true, socialAccount: { is: { workspaceId, invalidatedAt: null, provider: { in: ['facebook'] } } }, ...(allowedTargetIds === undefined ? {} : { socialAccountId: { in: ['social-a'] } }) }) }));
 const dataControls = vi.hoisted(() => ({ preview: vi.fn(), export: vi.fn(), remove: vi.fn() }));
 vi.mock('../src/server/data-control', () => ({ previewWorkspaceDataDeletion: dataControls.preview, exportWorkspaceData: dataControls.export, deleteWorkspaceData: dataControls.remove }));
+const inboxReads = vi.hoisted(() => ({ list: vi.fn(), thread: vi.fn() }));
+vi.mock('../src/modules/inbox/server/read', () => ({ readInboxList: inboxReads.list, readInboxThread: inboxReads.thread }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
 vi.mock('../src/server/inbox/actions', () => ({ replyToInbox: inboxMutations.reply, setInboxResolved: inboxMutations.resolve, moderateInboxComment: inboxMutations.moderate }));
 const adsMutations = vi.hoisted(() => ({ create: vi.fn(), createAdSet: vi.fn(), update: vi.fn(), read: vi.fn() }));
@@ -79,6 +81,8 @@ beforeEach(() => {
   mutations.update.mockResolvedValue(undefined);
   mutations.remove.mockResolvedValue(undefined);
   mutations.select.mockResolvedValue(undefined);
+  inboxReads.list.mockResolvedValue({ channels: [], items: [], total: 0, olderCursor: null, newerCursor: null });
+  inboxReads.thread.mockResolvedValue({ thread: { id: 'conv-a' }, history: {} });
   inboxMutations.reply.mockResolvedValue({ ok: true });
   inboxMutations.resolve.mockResolvedValue({ ok: true });
   inboxMutations.moderate.mockResolvedValue({ ok: true });
@@ -121,7 +125,7 @@ describe('MCP workspace boundaries', () => {
   it.each([
     ['list_pages', () => db.target.findMany],
     ['list_posts', () => db.post.findMany],
-    ['list_inbox', () => db.conversation.findMany],
+    ['list_inbox', () => inboxReads.list],
     ['get_analytics_overview', () => analytics.load],
     ['preview_workspace_data_deletion', () => dataControls.preview],
     ['export_workspace_data', () => dataControls.export],
@@ -666,15 +670,13 @@ describe('MCP workspace boundaries', () => {
     expect(db.post.findMany).not.toHaveBeenCalled();
   });
 
-  it('uses workspace filters for both inbox sources and excludes hidden comments', async () => {
-    db.conversation.findMany.mockResolvedValue([]);
-    db.postComment.findMany.mockResolvedValue([]);
-    await call('list_inbox');
-    expect(db.conversation.findMany.mock.calls[0][0].where.target).toMatchObject({ workspaceId: 'workspace-a', enabled: true, socialAccount: { is: { workspaceId: 'workspace-a', invalidatedAt: null, provider: { in: ['facebook'] } } } });
-    expect(db.postComment.findMany.mock.calls[0][0].where).toMatchObject({
-      isHidden: false,
-      postTarget: { post: { workspaceId: 'workspace-a' }, target: { workspaceId: 'workspace-a', enabled: true, socialAccount: { is: { workspaceId: 'workspace-a', invalidatedAt: null, provider: { in: ['facebook'] } } } } },
-    });
+  it('uses the same scoped Inbox services as UI and HTTP with a bounded projection', async () => {
+    const result = await (await call('list_inbox', { hidden: 'all', q: 'literal_%' })).json();
+    expect(inboxReads.list).toHaveBeenCalledWith({ userId: viewer.userId, workspaceId: viewer.workspaceId }, { hidden: 'all', q: 'literal_%' }, { allowedChannelIds: undefined, maxItems: 100 });
+    expect(result.result.structuredContent).toMatchObject({ items: [], total: 0, channelCount: 0 });
+    expect(result.result.structuredContent).not.toHaveProperty('channels');
+    await call('get_inbox_thread', { key: 'message:conv-a' });
+    expect(inboxReads.thread).toHaveBeenCalledWith({ userId: viewer.userId, workspaceId: viewer.workspaceId }, { key: 'message:conv-a' }, { allowedChannelIds: undefined, maxItems: 100 });
   });
 
   it('requires explicit draft confirmations and audits successful writes', async () => {

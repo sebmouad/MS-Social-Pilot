@@ -5,7 +5,7 @@ import { PrismaClient } from '../generated/client';
 const databaseUrl = process.env.REBUILD_PREVIEW_DATABASE_URL;
 const database = vi.hoisted(() => ({ prisma: null as unknown as PrismaClient }));
 vi.mock('../src/server/data', () => ({ get prisma() { return database.prisma; } }));
-import { inboxLastSynced } from '../src/server/inbox/overview';
+import { inboxLastSynced } from '../src/modules/inbox/server/read';
 
 describe.skipIf(!databaseUrl)('Inbox sync timestamps against PostgreSQL', () => {
   let client: PrismaClient;
