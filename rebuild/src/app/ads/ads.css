@@ -25,7 +25,7 @@
 .ads-filter-reset { justify-self: center; color: var(--ink-faint); font-size: 11px; }
 .ads-account-list { display: grid; gap: 12px; margin-top: 18px; }
 .ads-account-card { min-width: 0; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
-.ads-account-card__heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.ads-account-card__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .ads-account-card__heading h3 { margin: 8px 0 3px; font-size: 15px; }
 .ads-account-card__heading p { margin: 0; }
 .ads-account-card__sync { color: var(--ink-faint); font-size: 11px; white-space: nowrap; }
@@ -99,7 +99,7 @@
 }
 .ads-campaign-create { margin: 1rem 0; padding: 1rem; border: 1px solid var(--border, #d7ded9); border-radius: .75rem; background: var(--surface-soft, #f7f9f7); }
 .ads-campaign-create h3 { margin: 0 0 .35rem; }
-.ads-campaign-create__fields { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; margin-top: .75rem; }
+.ads-campaign-create__fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; margin-top: .75rem; }
 .ads-campaign-create__fields label { display: grid; gap: .3rem; min-width: 12rem; }
 .ads-campaign-create__fields input, .ads-campaign-create__fields select { min-height: 2.5rem; padding: .4rem .55rem; }
 .ads-campaign-create__fields button { min-height: 2.5rem; }

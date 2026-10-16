@@ -3,7 +3,7 @@
 .root-directory-nav { display: grid; gap: 4px; padding: 18px 12px; }
 .root-directory-nav a { display: block; padding: 10px 12px; border-radius: var(--radius-sm); color: var(--ink-soft); text-decoration: none; }
 .root-directory-nav a:hover,.root-directory-nav a.is-active { background: var(--surface-muted); color: var(--accent); }
-.root-directory__head { display: flex; align-items: end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 22px; }
+.root-directory__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 22px; }
 .root-directory__head h1 { margin: 3px 0; font-size: clamp(27px, 3vw, 38px); letter-spacing: -.04em; }
 .root-directory__head p { color: var(--ink-soft); }
 .root-directory__search { display: flex; gap: 8px; }
@@ -19,7 +19,7 @@
 .root-directory td button,.root-directory__search button { min-height: 36px; padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-muted); color: var(--ink); cursor: pointer; }
 .root-directory__self { color: var(--ink-faint); }
 .root-directory__actions { display: flex; gap: 6px; flex-wrap: wrap; min-width: 280px; }
-.root-directory__create { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; padding: 16px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.root-directory__create { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; padding: 16px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
 .root-directory__create label { display: grid; gap: 4px; color: var(--ink-soft); font-size: 12px; }
 .root-directory__create input { min-height: 40px; padding: 8px 11px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); }
 .root-directory__create button { min-height: 40px; padding: 8px 13px; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: white; cursor: pointer; }
