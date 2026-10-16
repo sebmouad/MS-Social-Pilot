@@ -14,7 +14,9 @@ Filters live in the sidebar and in the URL: channel, type (messages/comments), s
 
 ## Reply rule
 
-For a message thread the reply box states the rule in words: "Replies are possible until <time> (workspace zone)" with the platform window length, "The reply window closed <time>", or that there is no message from the person to reply to. The window comes from the newest stored message from the other side and the Root-configured window (`inbox.messengerReplyWindowHours`, at most 24 hours); the server checks it again before contacting the platform. Comment replies have no window and are public under the comment. The box shows a character count against the 2,000 limit and is disabled, with the reason, when a reply is not possible.
+The shared view asks the selected platform host for reply eligibility and plain-language metadata. For Facebook message threads, the reply box states "Replies are possible until <time> (workspace zone)" with the window length, "The reply window closed <time>", or that there is no message from the person to reply to. The Facebook module owns the Messenger window and its Root configuration read (`inbox.messengerReplyWindowHours`, at most 24 hours); the mutation checks it again before contacting the platform. Facebook comment replies have no window and are public under the comment. Other modules supply their own rules through the same contract. The box shows a character count against the 2,000 limit and is disabled, with the reason, when a reply is not possible.
+
+UI and MCP Inbox reads use the same channel predicate: selected, in the current workspace, within the member's channel grant, backed by a non-revoked connection in that workspace, and provided by an enabled Inbox-capable module. Expired credentials retain accessible stored history; write operations still require a usable connection.
 
 ## Actions and checks
 

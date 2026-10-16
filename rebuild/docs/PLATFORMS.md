@@ -36,7 +36,7 @@ The shared worker dispatches provider jobs through
 the selected resource provider and dispatch through an enabled capability host.
 Facebook Inbox actions, Ads operations/validation/scopes, and metric metadata
 live inside the Facebook module. Provider-driven Ads UI and normalized analytics
-are implemented behind host contracts; browser/live verification, Inbox reply-policy isolation, granular operation coverage and final data migration remain on
+are implemented behind host contracts; browser/live verification, granular operation coverage and final data migration remain on
 the architecture gap list. Another
 module must not claim capabilities merely by adding a manifest.
 

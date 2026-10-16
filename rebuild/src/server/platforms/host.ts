@@ -4,6 +4,8 @@ import type { PlatformJobName, JobSummary } from '@/server/jobs/types';
 import type { RetryBackoff } from '@/server/jobs/retry';
 import type { InboxActor } from '@/server/inbox/actions';
 import type { AnalyticsProviderData, AnalyticsProviderRequest } from '@/server/analytics/catalog';
+import type { InboxReplyPolicyRequest } from '@/server/inbox/policy';
+import type { ReplyRule } from '@/server/inbox/threads';
 import type { AdsUiSchema } from '@/platforms/ads-ui';
 
 export interface PlatformAnalyticsHost {
@@ -35,6 +37,7 @@ export interface ConnectionViewer {
 
 /** Server wiring of one installed platform module. */
 export interface PlatformInboxHost {
+  replyPolicy(input: InboxReplyPolicyRequest): Promise<ReplyRule>;
   canManage(actor: InboxActor, targetId: string): Promise<boolean>;
   sync(actor: InboxActor, targetId?: string): Promise<{ targetCount: number; failedCount: number; conversationCount: number; messageCount: number; commentCount: number; syncedAt: string }>;
   reply(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; text: string }): Promise<{ ok: boolean }>;

@@ -1,15 +1,12 @@
 import { ChannelBadge } from '@/components';
 import { PageFrame } from '@/server/PageFrame';
-import { enabledSocialAccountWhere } from '@/server/platforms/registry';
 import { requireViewer } from '@/server/context';
 import { prisma } from '@/server/data';
-import { canAccessPage } from '@/server/permissions';
 import { canManageInbox } from '@/server/inbox/actions';
-import { runtimeConfig } from '@/server/config/store';
-import { messengerReplyWindow } from '@/server/inbox/reply-window';
-import { inboxProviders, inboxCapabilities, inboxChannelKinds } from '@/server/inbox/providers';
+import { inboxReplyPolicy } from '@/server/inbox/policy';
+import { inboxCapabilities, inboxTargetWhere } from '@/server/inbox/providers';
 import { inboxLastSynced, listInboxItems, loadThread, type InboxFilters } from '@/server/inbox/overview';
-import { formatInboxTime, replyRule } from '@/server/inbox/threads';
+import { formatInboxTime } from '@/server/inbox/threads';
 import { channelBadgeInfo } from '@/lib/channel-badge';
 import { InboxSyncBar, ReplyBox, ThreadToolbar } from './InboxActions';
 import { InboxTag } from './InboxTags';
@@ -27,20 +24,19 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const hidden = valid(params.hidden, ['visible', 'all'] as const, 'visible');
 
   const channels = await prisma.target.findMany({
-    where: { workspaceId: viewer.workspaceId, type: { in: await inboxChannelKinds() }, enabled: true, socialAccount: { is: { provider: { in: await inboxProviders() }, invalidatedAt: null, AND: [await enabledSocialAccountWhere()] } } },
+    where: await inboxTargetWhere(viewer.workspaceId, viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids),
     orderBy: { name: 'asc' }, select: { id: true, name: true },
   });
-  const visibleChannels = channels.filter(channel => canAccessPage(viewer.permissions, channel.id));
+  const visibleChannels = channels;
   const selectedChannel = visibleChannels.some(channel => channel.id === params.channel) ? params.channel! : 'all';
   const channelIds = selectedChannel === 'all' ? visibleChannels.map(channel => channel.id) : [selectedChannel];
   const allVisibleIds = visibleChannels.map(channel => channel.id);
   const filters: InboxFilters = { channelIds, kind, status, hidden };
 
-  const [{ items, truncated }, lastSynced, thread, replyWindowHours] = await Promise.all([
+  const [{ items, truncated }, lastSynced, thread] = await Promise.all([
     listInboxItems(viewer.workspaceId, filters),
     inboxLastSynced(viewer.workspaceId, allVisibleIds),
     params.thread ? loadThread(viewer.workspaceId, allVisibleIds, params.thread) : Promise.resolve(null),
-    runtimeConfig('inbox.messengerReplyWindowHours') as Promise<number>,
   ]);
 
   const query = (extra: Record<string, string> = {}) => {
@@ -58,14 +54,12 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   // The open thread: what the person may do with it, and the platform's reply rule.
   let threadView = null;
   if (thread) {
-    const [canWrite, capabilities] = await Promise.all([
+    const [canWrite, capabilities, rule] = await Promise.all([
       canManageInbox({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, thread.target.id),
       thread.target.provider ? inboxCapabilities(thread.target.provider) : Promise.resolve({ reply: false, hide: false, remove: false }),
+      inboxReplyPolicy(thread.target.provider, { kind: thread.kind, channelRemoteId: thread.target.providerId, lastInbound: thread.lastInbound, timeZone }),
     ]);
     const badge = channelBadgeInfo(thread.target.provider);
-    const rule = thread.kind === 'message'
-      ? replyRule({ kind: 'message', window: messengerReplyWindow({ messages: thread.lastInbound ? [thread.lastInbound] : [], pageId: thread.target.providerId, windowHours: replyWindowHours }), windowHours: replyWindowHours, timeZone })
-      : replyRule({ kind: 'comment' });
     const first = thread.entries.find(entry => !entry.fromChannel);
     threadView = <section className={styles.threadPane} aria-label={thread.kind === 'message' ? 'Open conversation' : 'Open comment'}>
       <a className={styles.back} href={query()}>← All conversations</a>

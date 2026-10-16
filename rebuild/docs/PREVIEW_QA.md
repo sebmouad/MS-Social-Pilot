@@ -61,8 +61,16 @@ Facebook runtime construction, OAuth state/cookie handling, connection flow and 
 
 Source boundary regressions reject reintroducing the old provider-specific server files, provider imports in shared retry code, provider enums in shared contracts and inline provider workflow assembly in the installed list. Regression coverage includes generic retry hints plus the existing Facebook HTTP/Graph classifications, OAuth state/session/workspace binding, discovery and enabled-capability dispatch.
 
-After the move, local Connections and Root Platforms rendered, authenticated MCP Analytics still returned audience 2,020 and 22 metrics, and the Root config endpoint returned schema version 30 without the unused uninstalled-provider scope placeholder. These are synthetic fixture smoke checks. No provider credentials, connection records, database schema or production service were changed by the consolidation. Remaining shared Inbox reply policy and legacy-shaped MCP/error mappings are recorded in the architecture gaps.
+After the move, local Connections and Root Platforms rendered, authenticated MCP Analytics still returned audience 2,020 and 22 metrics, and the Root config endpoint returned schema version 30 without the unused uninstalled-provider scope placeholder. These are synthetic fixture smoke checks. No provider credentials, connection records, database schema or production service were changed by the consolidation. Remaining legacy-shaped MCP/error mappings are recorded in the architecture gaps.
 
 The actual local Root API module switch was also exercised and restored: with Facebook disabled, authenticated MCP returned zero selected channels, zero ad accounts and zero metric groups; restoring the prior enabled value returned four channels, audience 2,020 and 22 metrics. Only the synthetic preview instance was affected; value-free configuration audit entries record the two setting changes.
+
+## Inbox policy and MCP visibility
+
+An additional local Root switch check exposed a gap: MCP `list_inbox` still returned one conversation and two visible comments while Facebook was disabled. UI and MCP now share the selected/authorized channel predicate, including parent-workspace ownership, non-revoked connections and enabled Inbox modules. Repeating the actual browser-session MCP call returned **0 conversations / 0 comments** while disabled, then **1 / 2** after restoring the original Root value. The original setting was restored in a `finally` block; fixture records were retained.
+
+Facebook owns Messenger reply-window calculation, its configuration read and safe reply metadata. The neutral Inbox view dispatches through the module host. Chrome showed the synthetic message history and its 24-hour deadline in the workspace time zone. Module dispatch and missing/disabled-provider refusal have regression coverage. This fixture check does not prove a remote reply, remote deletion or full MCP Inbox parity.
+
+The combined suite passed 415 tests across 88 files, including both rollback-only PostgreSQL probes against the dedicated preview database. TypeScript checking, the production build and `git diff --check` passed.
 
 Consolidation verification: **406 tests in 87 files**, both PostgreSQL probes, TypeScript checking and production compilation passed. A limited scan of 74 generated browser chunks found none of the checked module-runtime/credential-helper markers; this is supporting boundary evidence, not a complete security audit.

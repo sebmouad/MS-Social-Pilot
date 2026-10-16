@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { messengerReplyWindow } from '../src/server/inbox/reply-window';
+import { messengerReplyWindow } from '../src/platforms/facebook/reply-window';
 
 const now = new Date('2026-10-15T12:00:00.000Z');
 

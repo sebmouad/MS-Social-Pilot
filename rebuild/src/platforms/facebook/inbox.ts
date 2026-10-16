@@ -6,7 +6,14 @@ import { loadEntitlements, canUseFeature } from '@/server/entitlements';
 import { canAccessFeature, canAccessPage } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { runtimeConfig } from '@/server/config/store';
-import { messengerReplyWindow } from '@/server/inbox/reply-window';
+import { messengerReplyWindow } from './reply-window';
+
+import type { InboxReplyPolicyRequest } from '@/server/inbox/policy';
+import { facebookReplyRule } from './reply-policy';
+
+export async function facebookReplyPolicy(input: InboxReplyPolicyRequest) {
+  return facebookReplyRule(input, await runtimeConfig('inbox.messengerReplyWindowHours') as number);
+}
 
 const FEATURE = 'inbox/conversations';
 export type InboxActor = { userId: string; workspaceId: string };

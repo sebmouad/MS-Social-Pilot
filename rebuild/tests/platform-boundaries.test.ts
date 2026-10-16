@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 // These completed boundaries must stay reusable when a new provider is installed.
 // Other legacy-shaped boundaries remain documented work; this test does not certify them.
 const sharedFiles = [
+  'src/app/inbox/page.tsx', 'src/server/inbox/threads.ts', 'src/server/inbox/providers.ts',
   'src/server/analytics/catalog.ts', 'src/server/analytics/data.ts',
   'src/server/analytics/aggregate.ts', 'src/server/analytics/reports.ts',
   'src/server/platforms/host.ts', 'src/server/ads/actions.ts', 'src/server/jobs/retry.ts', 'src/app/analytics/page.tsx',
@@ -47,6 +48,13 @@ describe('completed platform boundaries', () => {
     visit(source);
     expect(registrations).toHaveLength(1);
     expect(registrations[0]!.properties.every(property => ts.isPropertyAssignment(property) && ts.isIdentifier(property.initializer))).toBe(true);
+  });
+
+  it('keeps Messenger reply-window policy out of shared Inbox code', () => {
+    for (const file of ['src/app/inbox/page.tsx', 'src/server/inbox/threads.ts']) {
+      expect(readFileSync(resolve(file), 'utf8')).not.toMatch(/messengerReplyWindow|MessengerReplyWindow|inbox\.messengerReplyWindowHours/);
+    }
+    expect(existsSync(resolve('src/server/inbox/reply-window.ts'))).toBe(false);
   });
 
 });

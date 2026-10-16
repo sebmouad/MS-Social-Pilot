@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { commentNeedsReply, conversationNeedsReply, formatInboxTime, isFromChannel, replyRule } from '../src/server/inbox/threads';
-import { messengerReplyWindow } from '../src/server/inbox/reply-window';
+import { commentNeedsReply, conversationNeedsReply, formatInboxTime, isFromChannel } from '../src/server/inbox/threads';
+import { replyRule } from '../src/platforms/facebook/reply-policy';
+import { messengerReplyWindow } from '../src/platforms/facebook/reply-window';
 
 const visitor = { fromId: 'visitor-1', sentById: null };
 const sentHere = { fromId: null, sentById: 'user-1' };
