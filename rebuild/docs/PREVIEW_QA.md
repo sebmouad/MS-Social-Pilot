@@ -22,7 +22,6 @@ Scope: a fresh loopback PostgreSQL database populated only by `scripts/seed-prev
 ## Remaining findings and scope limits
 
 - The localhost versus 127.0.0.1 origin mismatch needs explicit canonical-origin/proxy coverage before release.
-- After the failed campaign request, focus was observed on the document body while the native modal remained open. Review pending/error focus recovery and restoration across dialogs.
 - Customer copy still includes storage/provider type jargon and raw status codes in some places. Design/copy polish remains incomplete.
 - No real remote publishing, remote deletion, inbox reply, ad delivery/change, backup restore, production-shaped migration or cutover was exercised by this synthetic batch. The full architecture and release requirements remain open.
 
@@ -39,3 +38,19 @@ Connections shows expired and revoked social/ad accounts as **Reconnect needed**
 Browser checks verified unchecking and restoring an expired channel before saving, with both actions still available. An actual local API request to enable the expired channel returned **409** and the reconnect message. The equivalent MCP ad-account request returned a tool error with the same message. These refusal checks did not change fixture selections. The phone Connections screen fit a 390px viewport without page overflow. The selection dialog was visually inspected in Nightfall at 390 × 844, and the connections table in Grove on phone and desktop. Regression tests cover expiry boundaries, disabled modules, stale-resource removal, selection undo/no-op writes, Home counts, post scope and MCP query bounds.
 
 Follow-up verification: **383 tests in 84 files**, including both PostgreSQL probes, TypeScript checking and production compilation passed. No live provider or production deployment evidence is implied.
+
+## Shared dialog recovery follow-up
+
+The shared native dialog now exposes its busy state, keeps focus inside when its active control becomes disabled, and recovers to a usable safe action after failure. Updating the preferred focus selector no longer closes/reopens the modal or replaces its original return-focus target. The styled Dialog wrapper forwards busy state and disables its close button; Inbox deletion, calendar moves and connection selection consume that behavior.
+
+Inbox comment deletion now retains its confirmation and displays a failure inside it. Previously the failure closed the dialog while leaving its error behind the modal context. A confirmed success still closes/navigates. No service or provider authorization rules changed.
+
+Chrome checks against fake preview connections verified:
+
+- A failed campaign creation kept its name/error/dialog and focused Cancel. Escape closed it and returned focus to the Create paused campaign opener.
+- A failed synthetic comment deletion kept the error and focus in the open dialog. Escape returned focus to Delete comment; the example comment remained stored.
+- The Inbox error dialog fit at 390 × 844 in Nightfall. Native Shift+Tab wrapped from Close to Delete comment, and Tab wrapped back to Close; focus stayed in the dialog. Desktop recovery was checked in Grove.
+
+Component regressions cover disabled-control fallback, recovery, opener restoration, selector updates without reopening, pending close/Escape protection and failed Inbox deletion context. Native modal behavior is checked in Chrome because JSDOM requires a small modal API shim. This batch did not create or remove remote content and does not establish success-path provider deletion coverage.
+
+Dialog follow-up verification: **388 tests in 86 files**, including both PostgreSQL probes, TypeScript checking and production compilation passed.

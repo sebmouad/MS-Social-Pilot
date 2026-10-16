@@ -75,10 +75,11 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
       {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => setConfirming(true)}>Delete comment</Button>}
     </div>
     <div role="status" aria-live="polite" className={styles.toolbarStatus}>{done}</div>
-    {error && <p role="alert" className={styles.error}>{error}</p>}
-    <Dialog open={confirming} title="Delete this comment?" description={`This removes the comment, and any replies under it, from ${platformName} and from your inbox. This cannot be undone.`} onClose={() => { if (busy !== 'delete') { setConfirming(false); } }}
-      actions={<><Button variant="secondary" data-dialog-cancel disabled={busy === 'delete'} onClick={() => setConfirming(false)}>Keep comment</Button><Button variant="danger" disabled={busy === 'delete'} onClick={() => void run('delete', { action: 'delete', id }, 'Comment deleted.').then(success => { if (!success) setConfirming(false); })}>{busy === 'delete' ? 'Deleting…' : 'Delete comment'}</Button></>}>
+    {error && !confirming && <p role="alert" className={styles.error}>{error}</p>}
+    <Dialog open={confirming} busy={busy === 'delete'} title="Delete this comment?" description={`This removes the comment, and any replies under it, from ${platformName} and from your inbox. This cannot be undone.`} onClose={() => { if (busy !== 'delete') { setConfirming(false); } }}
+      actions={<><Button variant="secondary" data-dialog-cancel disabled={busy === 'delete'} onClick={() => setConfirming(false)}>Keep comment</Button><Button variant="danger" disabled={busy === 'delete'} onClick={() => void run('delete', { action: 'delete', id }, 'Comment deleted.').then(success => { if (success) setConfirming(false); })}>{busy === 'delete' ? 'Deleting…' : 'Delete comment'}</Button></>}>
       <p className={styles.dialogNote}>Hiding the comment instead keeps it in your inbox and can be undone.</p>
+      {error && <p role="alert" className={styles.error}>{error}</p>}
     </Dialog>
   </div>;
 }

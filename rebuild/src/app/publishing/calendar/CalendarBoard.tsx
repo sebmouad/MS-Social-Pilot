@@ -127,7 +127,7 @@ function MoveDialog({ move, timeZone, nowMs, onChange, onConfirm }: { move: Move
 
   if (move.step === "choose") {
     const options = moveCandidates(move.post.whenIso, timeZone, nowMs);
-    return <Dialog open title="Move scheduled post" description={`Currently scheduled for ${current}.`} onClose={close}
+    return <Dialog open busy={move.busy} title="Move scheduled post" description={`Currently scheduled for ${current}.`} onClose={close}
       actions={<Button variant="secondary" onClick={close}>Cancel</Button>}>
       <p className={styles.dialogPost}>{move.post.text.slice(0, 160) || "No text included"}</p>
       <ul className={styles.moveOptions}>{options.map(option => <li key={option.id}>
@@ -144,7 +144,7 @@ function MoveDialog({ move, timeZone, nowMs, onChange, onConfirm }: { move: Move
     </Dialog>;
   }
 
-  return <Dialog open title="Confirm new time" description="The post stays scheduled and publishes at the new time." onClose={close}
+  return <Dialog open busy={move.busy} title="Confirm new time" description="The post stays scheduled and publishes at the new time." onClose={close}
     actions={<><Button variant="quiet" disabled={move.busy} onClick={() => onChange({ ...move, step: "choose", error: "" })}>Choose another time</Button><Button variant="primary" disabled={move.busy || Boolean(problem)} onClick={onConfirm}>{move.busy ? "Moving…" : "Move post"}</Button></>}>
     <p className={styles.dialogPost}>{move.post.text.slice(0, 160) || "No text included"}</p>
     <dl className={styles.times}><div><dt>Now</dt><dd>{current}</dd></div><div><dt>New time</dt><dd>{preview ?? "Not a valid time"}</dd></div></dl>
