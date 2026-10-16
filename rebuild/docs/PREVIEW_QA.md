@@ -83,4 +83,12 @@ Separate regressions caught combined status-and-budget changes accepted by the s
 
 Final local HTTP/MCP checks returned `invalid_request` for a string budget; MCP also refused a combined status/budget update before any provider request. The production build passed in an isolated temporary source copy so the user's running preview was not interrupted. Existing Autoprefixer CSS start/end compatibility warnings remain. `git diff --check` passed.
 
+## Core design checkpoint
+
+The user's 2026-10-16 priority is core design before additional Facebook coverage. Navigation, Posts view, Root organization and visual-direction approval forms are pending; [CORE_DESIGN_PLAN.md](CORE_DESIGN_PLAN.md) records the requested legacy-inspired direction and proposed batches. The new shell and post layouts are not implemented by this checkpoint.
+
+Lower-cost agents completed two reviewed foundation fixes: flex alignment keywords now use compatible `flex-start`/`flex-end` values without replacing grid alignment; and the Facebook engine requires explicit `success: true` before confirming comment deletion. Regression tests cover false, missing/malformed, and successful confirmation. Durable deletion reconciliation and new MCP deletion remain open.
+
+A workspace-selection endpoint is ready for the proposed sidebar picker. It verifies same origin, a fully authenticated enabled-user session and current membership before setting the HttpOnly selection cookie. The synthetic browser check refused a non-member workspace with **404** and accepted the current workspace with **200**, without navigation. The combined suite passed **452 tests**, with two opt-in database probes skipped; TypeScript and the isolated production build passed. The build emitted no Autoprefixer start/end warnings after the reviewed CSS changes. This is not complete core-design or live-provider evidence.
+
 Consolidation verification: **406 tests in 87 files**, both PostgreSQL probes, TypeScript checking and production compilation passed. A limited scan of 74 generated browser chunks found none of the checked module-runtime/credential-helper markers; this is supporting boundary evidence, not a complete security audit.
