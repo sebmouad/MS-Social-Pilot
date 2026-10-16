@@ -1,6 +1,7 @@
 import { PrismaClient, type PostStatus, type PostTargetStatus } from '../generated/client';
 import { hashLegacyPassword } from '../src/server/auth';
 import { encryptSecret } from '../src/server/secret-crypto';
+import { preparePreviewMedia, PREVIEW_IMAGES } from './preview-media';
 
 const FIXTURE = 'preview_';
 const CONFIRMATION = 'SEED_LOCAL_REBUILD_PREVIEW';
@@ -87,9 +88,30 @@ async function setPreviewConfig() {
 
 async function main() {
   await assertFixtureDatabaseIsEmpty();
+  if (process.argv.includes('--media-only')) {
+    if (!process.env.PREVIEW_MEDIA_ROOT) throw new Error('PREVIEW_MEDIA_ROOT is required for --media-only.');
+    if (!await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { id: true } })) throw new Error('Seed the preview workspace before adding images.');
+    const media = await preparePreviewMedia(process.env.PREVIEW_MEDIA_ROOT, workspaceId);
+    const current = await prisma.appSetting.findUnique({ where: { key: 'storage.mediaRoot' }, select: { value: true } });
+    if (current?.value && current.value !== media.root) throw new Error('Preview already has another media root; refusing to replace its configuration.');
+    const assignments = [
+      ['post_draft', 'market'], ['post_scheduled', 'market'], ['post_published', 'market'], ['post_approval', 'studio'],
+    ] as const;
+    await prisma.$transaction(async tx => {
+      await tx.appSetting.upsert({ where: { key: 'storage.mediaRoot' }, create: { key: 'storage.mediaRoot', value: media.root, encrypted: false, updatedAt: stamp }, update: { value: media.root, encrypted: false, updatedAt: stamp } });
+      for (const [post, image] of assignments) await tx.post.updateMany({
+        where: { id: `${FIXTURE}${post}`, workspaceId, authorId: userId, media: { equals: [] } },
+        data: { media: [{ kind: 'image', url: media[image], altText: PREVIEW_IMAGES[image].altText }] },
+      });
+    });
+    console.log('Added synthetic image examples to empty fixture attachments only. Existing post text, states and attachments were retained.');
+    return;
+  }
+  const images = process.env.PREVIEW_MEDIA_ROOT ? await preparePreviewMedia(process.env.PREVIEW_MEDIA_ROOT, workspaceId) : null;
   const fakeCredential = encryptSecret('FAKE_PREVIEW_CREDENTIAL_NOT_VALID');
   const fakeChannelCredential = encryptSecret('FAKE_PREVIEW_CHANNEL_TOKEN_NOT_VALID');
   await setPreviewConfig();
+  if (images) await prisma.appSetting.upsert({ where: { key: 'storage.mediaRoot' }, create: { key: 'storage.mediaRoot', value: images.root, encrypted: false, updatedAt: stamp }, update: { value: images.root, encrypted: false, updatedAt: stamp } });
   const passwordHash = hashLegacyPassword(password!);
   await prisma.user.upsert({ where: { id: userId }, create: { id: userId, email: email!, name: 'Preview QA', passwordHash, isInstanceOwner: true, createdAt: stamp, updatedAt: stamp }, update: { email: email!, name: 'Preview QA', passwordHash, isInstanceOwner: true, disabledAt: null, updatedAt: stamp } });
   await prisma.$executeRaw`UPDATE users SET "emailVerifiedAt" = ${stamp} WHERE id = ${userId}`;
@@ -144,7 +166,9 @@ async function main() {
   ];
   for (const post of postRows) {
     const firstComment = post.id === `${FIXTURE}post_draft` ? 'Preview: full offer details will appear in this first comment.' : null;
-    await prisma.post.upsert({ where: { id: post.id }, create: { id: post.id, workspaceId, authorId: userId, message: post.message, firstComment, link: null, media: [], status: post.status, scheduledAt: post.scheduledAt, publishedAt: post.publishedAt, createdAt: stamp, updatedAt: stamp }, update: { message: post.message, firstComment, status: post.status, scheduledAt: post.scheduledAt, publishedAt: post.publishedAt, updatedAt: stamp } });
+    const imageKey = post.id === `${FIXTURE}post_approval` ? 'studio' : 'market';
+    const exampleMedia = images && post.id !== `${FIXTURE}post_failed` && post.id !== `${FIXTURE}post_unselected` ? [{ kind: 'image', url: images[imageKey], altText: PREVIEW_IMAGES[imageKey].altText }] : [];
+    await prisma.post.upsert({ where: { id: post.id }, create: { id: post.id, workspaceId, authorId: userId, message: post.message, firstComment, link: null, media: exampleMedia, status: post.status, scheduledAt: post.scheduledAt, publishedAt: post.publishedAt, createdAt: stamp, updatedAt: stamp }, update: { message: post.message, firstComment, ...(images ? { media: exampleMedia } : {}), status: post.status, scheduledAt: post.scheduledAt, publishedAt: post.publishedAt, updatedAt: stamp } });
     for (const [targetId, status] of post.destinations) {
       const remotePostId = status === 'published' || status === 'scheduled_remote' ? `${FIXTURE}remote_${post.id}_${targetId}` : null;
       const id = `${post.id}_${targetId}`;

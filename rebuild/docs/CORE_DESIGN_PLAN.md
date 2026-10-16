@@ -17,7 +17,15 @@ The user approved all four design forms on 2026-10-16: two-sidebar navigation; *
 
 Implemented the two-sidebar shell, shared contextual tools dock, permission-aware quick creation, workspace switcher and recoverable sign-out. Posts now has the approved Table default plus Feed and Cards, collapsed actions/import, first comments and destination outcomes. Root has grouped private navigation, stored-count overview, Operations and a bounded redacted Activity view; config search/categories use the contextual sidebar. Registry version 31 manages the recent-activity limit. Root config saves prevent duplicate writes, preserve failed drafts and show retry feedback.
 
-Local Chrome checks cover Table/Feed/Cards, combined view/status filters, first comment visibility, Root configuration search placement, Root routes, drawer focus/Tab/Escape, and phone/desktop overflow. Four-theme contrast and component regressions pass. These checks do not complete design QA for every route, high-volume lists, every permission variant, or live providers. Next core batches still need composer/queue/calendar preview consistency, remaining shared forms/tables/states, detailed module route polish and the legacy Root control inventory.
+Local Chrome checks cover Table/Feed/Cards, combined view/status filters, first comment visibility, Root configuration search placement, Root routes, drawer focus/Tab/Escape, and phone/desktop overflow. Four-theme contrast and component regressions pass. These checks do not complete design QA for every route, high-volume lists, every permission variant, or live providers. The publishing workflow batch below now covers composer/queue/calendar preview consistency. Remaining core batches still need shared form/table/state consistency across other modules, detailed route and permission-variant polish and the legacy Root control inventory.
+
+## Publishing workflow batch
+
+The dedicated composer now pairs a live neutral preview with text/first-comment/attachment editing; destination and schedule pickers, Save and Schedule use the contextual sidebar. Draft saves do not require timing or destinations. Stateful service and transport failures preserve entered values; an unconfirmed save asks the user to check Posts before retrying. Image upload has an exact-once submission handoff, and mobile sidebar submissions reveal the editor rather than leaving feedback inert behind the drawer.
+
+Queue and approvals use the same complete post preview within a readable 720px measure, retaining ordering, time zones, permissions, approval notes and pending controls. Calendar uses that preview in an accessible dialog; Previous/Today/Next now share the sidebar with its existing filters. Server-supplied clock labels, wall times, move options and slot-ended state keep the client aligned when browser/server timezone databases disagree. Final move validity stays with the shared service.
+
+Synthetic campaign images are opt-in repeatable fixtures with guarded local storage. Browser draft-upload and offline-retry checks persisted first comments, were read through authenticated MCP and were cleaned up. HTTP/MCP media errors expose safe typed messages rather than internal paths or Root instructions. This is functional local evidence, not remote publishing or completed UI/API/MCP parity.
 
 ## Remaining boundaries
 

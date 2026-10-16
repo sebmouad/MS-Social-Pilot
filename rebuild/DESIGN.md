@@ -66,6 +66,8 @@ Publishing should lead with content rather than an always-expanded composer and 
 
 The user approved Table as the default, with Feed and Cards available. Keep row actions collapsed under Manage post and CSV import as a secondary disclosure. First comments and per-destination outcomes appear in previews; safe media references resolve through the authorized media API. Missing author profile data must use an honest fallback rather than an invented identity.
 
+The dedicated composer pairs content editing with a neutral live preview. Use one attachment choice at a time; local object URLs stay in the trusted file preview and do not weaken the saved-preview URL validator. Destination and timing controls are docked in the contextual sidebar, with Save/Schedule first for discoverability. Validation and transport feedback appears at the top of the editor. A drawer submission reveals that feedback and focuses the work area. Queue and approvals reuse the same full preview at a readable measure; calendar cards open it in the shared dialog. Client-rendered previews receive server-formatted workspace timestamps so runtime timezone differences cannot silently change the displayed time.
+
 ## Elevation & Depth
 
 Use borders and surface tone for most separation. The panel shadow in `tokens.css` is reserved for raised panels; dialogs receive stronger elevation over a scrim. Avoid stacked shadows on every table row or chip. Error, loading, and confirmation surfaces must preserve enough geometry that controls do not jump while work completes.

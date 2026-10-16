@@ -1,11 +1,6 @@
-.toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-.toolbarEnd { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.nav { display: flex; align-items: center; gap: 8px; }
 .range { margin: 0; min-width: 11ch; font-size: 17px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.switch { display: inline-grid; grid-auto-flow: column; gap: 2px; padding: 3px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); }
-.switch a { display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px; border-radius: 6px; color: var(--ink-soft); font-size: 13px; font-weight: 650; }
-.switch a:hover { background: var(--surface-muted); color: var(--ink); }
-.switch a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 750; box-shadow: inset 0 0 0 1px var(--accent); }
+.sidebarNav { display: grid; gap: 8px; min-width: 0; }
+.sidebarNav a { justify-content: center; width: 100%; }
 
 .board { display: grid; gap: 12px; min-width: 0; }
 .live { min-height: 0; }
@@ -45,6 +40,8 @@
 .postChannels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .moveButton { justify-self: start; min-height: 28px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font-size: 11px; font-weight: 650; cursor: pointer; }
 .moveButton:hover { background: var(--surface-muted); }
+.viewButton { justify-self: start; min-height: 28px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--accent); font-size: 11px; font-weight: 650; cursor: pointer; }
+.viewButton:hover { background: var(--accent-soft); }
 
 .week { display: grid; min-width: 0; }
 .corner { position: sticky; top: 0; z-index: 1; background: var(--surface-raised); border-bottom: 1px solid var(--line); }

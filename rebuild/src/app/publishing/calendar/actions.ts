@@ -5,9 +5,9 @@ import { requireViewer } from "@/server/context";
 import { canAccessFeature } from "@/server/permissions";
 import { withWorkspaceOperation } from "@/server/data-control/guard";
 import { reschedulePost } from "@/server/publishing/lifecycle";
-import { rescheduleFailureMessage } from "@/lib/reschedule";
+import { formatWhen, rescheduleFailureMessage } from "@/lib/reschedule";
 
-export type RescheduleResult = { ok: true; scheduledAt: string } | { ok: false; error: string };
+export type RescheduleResult = { ok: true; scheduledAt: string; displayTime?: string } | { ok: false; error: string };
 
 /** Move a scheduled post. The server re-checks scope, ownership, state, time zone and the past. */
 export async function reschedulePostAction(input: { postId: string; date: string; time: string }): Promise<RescheduleResult> {
@@ -20,7 +20,7 @@ export async function reschedulePostAction(input: { postId: string; date: string
     revalidatePath("/publishing/calendar");
     revalidatePath("/publishing/queue");
     revalidatePath("/publishing/posts");
-    return { ok: true, scheduledAt: scheduledAt.toISOString() };
+    return { ok: true, scheduledAt: scheduledAt.toISOString(), displayTime: formatWhen(scheduledAt, viewer.membership.workspace.timezone) };
   } catch (error) {
     if (typeof error === "object" && error !== null && "digest" in error && typeof error.digest === "string" && error.digest.startsWith("NEXT_REDIRECT")) throw error;
     return { ok: false, error: rescheduleFailureMessage(error) };

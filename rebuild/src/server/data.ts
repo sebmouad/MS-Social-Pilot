@@ -85,7 +85,7 @@ export async function getTargets(workspaceId: string, allowedTargetIds?: readonl
       pictureUrl: true,
       canPublish: true,
       socialAccount: {
-        select: { id: true, provider: true, name: true, pictureUrl: true, invalidatedAt: true },
+        select: { id: true, provider: true, name: true, pictureUrl: true, invalidatedAt: true, tokenExpiresAt: true },
       },
     },
   });
@@ -188,7 +188,8 @@ export async function listCalendarRange(workspaceId: string, from: Date, to: Dat
     orderBy: [{ scheduledAt: 'asc' }, { publishedAt: 'asc' }, { id: 'asc' }],
     select: {
       id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true, authorId: true,
-      targets: { select: { status: true, remotePostId: true, target: { select: { id: true, name: true, type: true, socialAccount: { select: { provider: true } } } } } },
+      firstComment: true, link: true, media: true,
+      targets: { select: { status: true, remotePostId: true, remoteUrl: true, target: { select: { id: true, name: true, type: true, pictureUrl: true, socialAccount: { select: { provider: true } } } } } },
     },
   });
 }

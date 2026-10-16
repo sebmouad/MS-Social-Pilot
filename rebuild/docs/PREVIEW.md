@@ -31,7 +31,21 @@ The script refuses `NODE_ENV=production`, non-loopback hosts, non-PostgreSQL pro
 
 The fixture-local `app_settings` rows turn two-step enforcement off for this isolated QA account, enable the Ads management preview controls, and enable the Facebook module for local UI coverage. The fake Ads scopes are `ads_read` and `ads_management`; fake inbox scopes cover read and reply controls. The Graph endpoint is `https://provider-preview.invalid` and the OAuth endpoint is `https://oauth-preview.invalid`. These changes occur only in the fresh dedicated preview database. No provider credential is valid, and the seed script itself makes no provider calls.
 
-The fixture creates an instance-owner QA user and workspace; selected, unselected, expired, and invalidated channels and ad accounts; published, scheduled, draft, approval-pending, failed, and unselected-channel posts, including a draft first comment; open Inbox conversations/messages and visible, replied, hidden comments; selected-channel audience and daily metrics with one intentionally missing audience; unknown demographic breakdown data; and account, campaign, ad-set and ad-level insights in USD and EUR, including unfamiliar action and breakdown fields. All fixture entity IDs use the `preview_` prefix. Re-run with the same QA email/password to update the fixture records.
+The fixture creates an instance-owner QA user and workspace; selected, unselected, expired, and invalidated channels and ad accounts; published, scheduled, draft, approval-pending, failed, and unselected-channel posts, including a draft first comment; open Inbox conversations/messages and visible, replied, hidden comments; selected-channel audience and daily metrics with one intentionally missing audience; unknown demographic breakdown data; and account, campaign, ad-set and ad-level insights in USD and EUR, including unfamiliar action and breakdown fields. Fixture database entity IDs use the `preview_` prefix. The two optional image files use reserved UUIDs because the media API accepts UUID references. Re-run with the same QA email/password to update the fixture records.
+
+## Optional image examples
+
+The bundled `scripts/fixtures/` artwork is synthetic and visibly marked **not a real offer**. SVG source and generated PNGs are kept together; preparing or viewing the fixture makes no external image request. Supply `PREVIEW_MEDIA_ROOT` as an absolute path to an existing, dedicated empty directory to include the two campaign images in full seeding. The path is persisted only in the preview database's existing `storage.mediaRoot` setting.
+
+To add these images to an already-running fixture without resetting its text, statuses, conversation actions or existing attachments:
+
+```sh
+mkdir -p /absolute/path/to/dedicated-preview-media
+PREVIEW_MEDIA_ROOT=/absolute/path/to/dedicated-preview-media \
+node --env-file=/absolute/path/to/private-preview.env --import tsx scripts/seed-preview.ts --media-only
+```
+
+The private environment still needs the original loopback database, encryption key, confirmation and QA identity variables. This mode requires the existing preview workspace and refuses to replace another saved storage root. It updates only empty media arrays on the four known authored fixture posts. The storage helper marks an initially empty directory, validates marker bytes on reuse, refuses symlink workspace directories and refuses to overwrite a different file at a reserved image ID. Images are served through `/api/media/<id>` with the normal authenticated workspace checks. The example files intentionally remain for visual review; independently created verification posts/images are cleaned up.
 
 ## Start and verify
 
@@ -52,6 +66,6 @@ REBUILD_PREVIEW_DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:55432/soc
 npm run typecheck
 ```
 
-Without this variable, database integration probes are explicitly skipped. These probes use rollback transactions and unique `preview_` IDs. Stop the development server before `npm run build`; both commands write `.next`. Restart the preview afterward. Do not start a publishing worker against this fixture.
+Without this variable, database integration probes are explicitly skipped. These probes use rollback transactions and unique `preview_` IDs. Do not run `npm run build` in the same checkout while its preview is running: both write `.next`. Current verification builds an isolated temporary source copy, with dependencies linked from the existing installation, so the user preview stays available. Alternatively, stop the preview deliberately before building. Do not start a publishing worker against this fixture.
 
 See [PREVIEW_QA.md](PREVIEW_QA.md) for observed results and remaining issues. Example-data validation is not live-provider, full MCP-parity, migration or production-cutover evidence.

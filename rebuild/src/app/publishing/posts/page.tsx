@@ -1,13 +1,12 @@
 import { DataTable, StatusChip, type TableColumn } from "@/components";
 import { PostPreview, type PostPreviewPost } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
-import { getTargets, listPostPage } from "@/server/data";
+import { listPostPage } from "@/server/data";
+import { publishingDestinationChoices } from '@/server/publishing/destinations';
 import { PageHeading, PostMessage, PostTargets, formatDate } from "../publishing-ui";
 import styles from "../publishing.module.css";
 import previewStyles from '@/components/PostPreview.module.css';
 import { CsvImportForm, PostRowActions } from "./PostActions";
-import { hasPlatformCapability } from "@/server/entitlements";
-import { platformFor } from '@/server/platforms/registry';
 import { runtimeConfig } from '@/server/config/store';
 import { PostStatus } from '../../../../generated/client';
 
@@ -39,16 +38,10 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const imageRules = { allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters) };
   const allowedTargetIds = viewer.permissions.pageScope.all ? null : viewer.permissions.pageScope.ids;
   const requestedPage = pageParam && /^\d+$/.test(pageParam) ? Number(pageParam) : 1;
-  const targetRows = await getTargets(viewer.workspaceId);
-  const scopedTargetRows = allowedTargetIds === null ? targetRows : targetRows.filter(target => allowedTargetIds.includes(target.id));
   const selectedStatus = Object.values(PostStatus).find(value => value === status);
   const selectedChannel = channel || undefined;
   const listing = await listPostPage(viewer.workspaceId, requestedPage, 50, allowedTargetIds, viewer.user.id, { status: selectedStatus, channelId: selectedChannel });
-  const targetChoices = await Promise.all(scopedTargetRows.map(async target => {
-    const provider = target.socialAccount?.provider ?? null;
-    const adapter = provider && hasPlatformCapability(viewer.entitlements, provider) ? await platformFor(provider, 'publishing') : null;
-    return { id: target.id, name: target.name, type: target.type, provider, canPublish: Boolean(target.canPublish && !target.socialAccount?.invalidatedAt && adapter?.publish && adapter.supportsTargetKind?.(target.type, 'publishing')) };
-  }));
+  const targetChoices = await publishingDestinationChoices(viewer);
   const rows = listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }> }));
   const noticeText = notice ? NOTICE_TEXT[notice] ?? (notice.startsWith('imported-') ? `${notice.slice('imported-'.length)} posts imported as drafts.` : undefined) : undefined;
   const canManageDrafts = ["owner", "admin", "editor"].includes(viewer.membership.role);

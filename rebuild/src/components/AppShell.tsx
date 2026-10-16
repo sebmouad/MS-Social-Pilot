@@ -93,7 +93,14 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
       window.location.assign('/sign-in');
     } catch { setAccountError('Could not sign out. Try again.'); setSigningOut(false); }
   }
-  return <SidebarDockContext.Provider value={sidebarHost}><div className="shell">
+  return <SidebarDockContext.Provider value={sidebarHost}><div className="shell" onSubmitCapture={event => {
+    // A drawer button may submit an associated editor form outside the drawer.
+    // Reveal its progress and validation feedback instead of leaving it inert.
+    if (filterOpen && event.target instanceof HTMLFormElement && event.target.closest('.shell-main')) {
+      setFilterOpen(false);
+      requestAnimationFrame(() => document.getElementById('main-content')?.focus());
+    }
+  }}>
     <a className="shell-skip-link" href="#main-content">Skip to content</a>
     <aside className="shell-sidebar shell-module-rail" aria-label="Modules" inert={filterOpen || undefined}>
       <a className="shell-brand" href={installationMode ? '/root' : '/home'} aria-label={installationMode ? 'Social Pilot, Root controls' : 'Social Pilot, home'}><Mark/></a>

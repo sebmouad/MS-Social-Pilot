@@ -11,6 +11,51 @@ import { wallTimeToInstant } from '@/lib/calendar-dates';
 const PATH = '/publishing/posts';
 type ActionNotice = 'created' | 'updated' | 'deleted' | 'imported' | 'published' | 'publish-review' | 'synced' | 'failed';
 
+export type ComposerValues = {
+  intent: string;
+  attachmentKind: string;
+  message: string;
+  firstComment: string;
+  link: string;
+  imageUrl: string;
+  videoUrl: string;
+  uploadedImageRef: string;
+  altText: string;
+  targetIds: string[];
+  scheduleDate: string;
+  scheduleTime: string;
+};
+export type ComposerActionState = { status: 'idle' | 'error'; message?: string; saveUnconfirmed?: boolean; values: Partial<ComposerValues> };
+
+/** Stateful creation path for the dedicated composer. The legacy redirecting action remains available to existing callers. */
+export async function createPostWithRecoveryAction(previous: ComposerActionState, data: FormData): Promise<ComposerActionState> {
+  const values = composerValues(data);
+  try {
+    const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true, write: true });
+    if (!canAccessFeature(viewer.permissions, 'publishing/posts', 'write')) throw new Error('permission');
+    if (values.intent !== 'draft' && values.intent !== 'schedule') throw new Error('intent');
+    const scheduledAt = values.intent === 'schedule' ? (() => {
+      const result = wallTimeToInstant(values.scheduleDate, values.scheduleTime, viewer.membership.workspace.timezone);
+      if (!result.ok) throw new Error('schedule');
+      return result.instant;
+    })() : undefined;
+    await withWorkspaceOperation(viewer.workspaceId, () => createPost(actor(viewer), {
+      message: values.message,
+      firstComment: values.firstComment,
+      ...attachments(data),
+      targetIds: values.targetIds,
+      scheduledAt,
+    }));
+    revalidatePath(PATH);
+    revalidatePath('/publishing/queue');
+    revalidatePath('/publishing/approvals');
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { status: 'error', message: composerError(error), values };
+  }
+  redirect(`${PATH}?notice=${values.intent === 'schedule' ? 'scheduled' : 'created'}`);
+}
+
 export async function createPostAction(data: FormData) {
   await run(async viewer => {
     const postActor = actor(viewer);
@@ -146,4 +191,26 @@ function failureNotice(error: unknown) {
   if (/permission|cannot manage posts|outside your channel access|cannot review posts/i.test(message)) return 'failed-access';
   if (/current state|can no longer|cannot be (edited|scheduled|submitted|published)|no longer awaiting/i.test(message)) return 'failed-state';
   return 'failed';
+}
+
+function composerValues(data: FormData): ComposerValues {
+  const values = (key: string) => { const value = data.get(key); return typeof value === 'string' ? value : ''; };
+  return {
+    intent: values('intent'), attachmentKind: values('attachmentKind'), message: values('message'), firstComment: values('firstComment'),
+    link: values('link'), imageUrl: values('imageUrl'), videoUrl: values('videoUrl'), uploadedImageRef: values('uploadedImageRef'),
+    altText: values('altText'), targetIds: data.getAll('targetIds').filter((item): item is string => typeof item === 'string'),
+    scheduleDate: values('scheduleDate'), scheduleTime: values('scheduleTime'),
+  };
+}
+
+function composerError(error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  if (/permission|cannot manage posts|outside your channel access/i.test(message)) return 'You do not have permission to create posts for one or more selected destinations.';
+  if (/Post text must|Write the post text/i.test(message)) return 'Write post text within the allowed character limit before saving.';
+  if (/First comment must/i.test(message)) return 'Shorten the first comment to fit the allowed character limit.';
+  if (/target|destination/i.test(message)) return 'Check your selected destinations and try again.';
+  if (/attachment|image|media|HTTPS URL/i.test(message)) return 'Check the attachment and its description, then try again.';
+  if (/schedule|publishing time|future/i.test(message)) return 'Choose a valid future time in your workspace time zone and select at least one destination.';
+  if (message === 'intent') return 'Choose whether to save a draft or schedule the post.';
+  return 'We could not save this post. Your details are still here; please try again.';
 }

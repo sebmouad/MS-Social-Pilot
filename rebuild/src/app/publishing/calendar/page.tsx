@@ -2,8 +2,10 @@ import { requireViewer } from "@/server/context";
 import { getTargets, listCalendarRange } from "@/server/data";
 import { canAccessFeature } from "@/server/permissions";
 import { PageHeading } from "../publishing-ui";
-import { adjacentCalendarMonth, addDaysToKey, calendarMonth, isDateKey, postCalendarDate, weekStartKey, weekdayOfKey, workspaceDateKey } from "@/lib/calendar-dates";
+import { adjacentCalendarMonth, addDaysToKey, calendarMonth, instantToWall, isDateKey, postCalendarDate, wallTimeToInstant, weekStartKey, weekdayOfKey, workspaceDateKey } from "@/lib/calendar-dates";
 import { channelBadgeInfo } from "@/lib/channel-badge";
+import { formatPostPreviewTime } from "@/components/PostPreview";
+import { moveCandidates } from "@/lib/reschedule";
 import { CalendarBoard } from "./CalendarBoard";
 import { runtimeConfig } from '@/server/config/store';
 import type { BoardDay, BoardPost } from "./types";
@@ -52,11 +54,24 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   for (const post of posts) {
     const when = postCalendarDate(post);
     if (!when) continue;
+    const wallTime = instantToWall(when, timeZone);
     const key = workspaceDateKey(when, timeZone);
     const channelsOfPost = [...new Map(post.targets.map(({ target }) => [target.id, { id: target.id, name: target.name, ...channelBadgeInfo(target.socialAccount?.provider) }])).values()];
     const movable = canEditCalendar && post.status === "scheduled" && post.targets.length > 0 && post.targets.every(target => target.status === "pending" && !target.remotePostId)
       && (MANAGERS.has(viewer.membership.role) || post.authorId === viewer.user.id);
-    byDay.set(key, [...(byDay.get(key) ?? []), { id: post.id, text: post.message.trim().slice(0, 240), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable }]);
+    byDay.set(key, [...(byDay.get(key) ?? []), {
+      id: post.id, text: post.message.trim().slice(0, 240), status: post.status, whenIso: when.toISOString(), channels: channelsOfPost, movable,
+      authorName: post.authorId === viewer.user.id ? viewer.user.name : "Workspace member",
+      clockLabel: formatPostPreviewTime(when, timeZone),
+      wallTime,
+      moveOptions: movable ? moveCandidates(when.toISOString(), timeZone, now.getTime()) : undefined,
+      preview: {
+        id: post.id, authorId: post.authorId, message: post.message, firstComment: post.firstComment, link: post.link, media: post.media,
+        status: post.status, scheduledAt: post.scheduledAt, publishedAt: post.publishedAt, createdAt: post.createdAt,
+        displayTime: formatPostPreviewTime(post.publishedAt ?? post.scheduledAt ?? post.createdAt, timeZone),
+        targets: post.targets.map(({ status, remotePostId, remoteUrl, target }) => ({ status, remotePostId, remoteUrl, target })),
+      },
+    }]);
   }
   const days: BoardDay[] = keys.map(key => ({
     key,
@@ -65,6 +80,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     inMonth: key.startsWith(selected.key),
     isToday: key === today,
     isPast: key < today,
+    slotEndedByHour: view === "week" ? Object.fromEntries(Array.from({ length: 24 }, (_, hour) => {
+      const time = `${String(hour).padStart(2, "0")}:00`;
+      const slot = wallTimeToInstant(key, time, timeZone);
+      return [time, slot.ok ? slot.instant.getTime() + 60 * 60 * 1000 <= now.getTime() : key < today];
+    })) : undefined,
     posts: (byDay.get(key) ?? []).sort((a, b) => a.whenIso.localeCompare(b.whenIso)),
   }));
 
@@ -81,21 +101,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return <>
     <PageHeading title="Calendar" description="Plan, check and reschedule posts in your workspace time zone." />
-    <div className={styles.toolbar}>
-      <nav className={styles.nav} aria-label={`Calendar ${unit}s`}>
-        <a className="ui-button ui-button--secondary ui-button--md" href={href(view, previous)}>Previous<span className="ui-visually-hidden"> {unit}</span></a>
-        <a className="ui-button ui-button--secondary ui-button--md" href={href(view, today)}>Today</a>
-        <a className="ui-button ui-button--secondary ui-button--md" href={href(view, next)}>Next<span className="ui-visually-hidden"> {unit}</span></a>
-        <h2 className={styles.range} aria-live="polite">{rangeLabel}</h2>
-      </nav>
-      <div className={styles.toolbarEnd}>
-      {canCreate && <a className="ui-button ui-button--primary ui-button--md" href="/publishing/compose">New post</a>}
-      <nav className={styles.switch} aria-label="Calendar view">
-        <a href={href("month", anchor)} aria-current={view === "month" ? "page" : undefined}>Month</a>
-        <a href={href("week", anchor)} aria-current={view === "week" ? "page" : undefined}>Week</a>
-      </nav>
-      </div>
-    </div>
-    <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime} />
+    <h2 className={styles.range} aria-live="polite">{rangeLabel}</h2>
+    <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime}
+      navigation={{ previous: href(view, previous), today: href(view, today), next: href(view, next), unit }} />
   </>;
 }

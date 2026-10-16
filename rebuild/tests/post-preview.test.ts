@@ -20,6 +20,16 @@ const post = {
 };
 
 describe('PostPreview', () => {
+  it('uses the supplied workspace time without recalculating it in another runtime', () => {
+    const formatter = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(() => { throw new Error('Different browser timezone data'); });
+    try {
+      const markup = renderToStaticMarkup(createElement(PostPreview, { post: { ...post, displayTime: 'Oct 15, 2026, 1:00 PM' }, authorName: 'Amina', timeZone: 'Africa/Casablanca' }));
+      expect(markup).toContain('Published Oct 15, 2026, 1:00 PM');
+      expect(markup).toContain('dateTime="2026-10-15T12:00:00.000Z"');
+      expect(formatter).not.toHaveBeenCalled();
+    } finally { formatter.mockRestore(); }
+  });
+
   it('renders private media through the authorized local media route and rejects unsafe URLs', () => {
     const markup = renderToStaticMarkup(createElement(PostPreview, {
       post: { ...post, link: 'javascript:alert(1)', media: [...post.media, { kind: 'video', url: 'javascript:alert(2)' }], targets: [{ ...post.targets[0], remoteUrl: 'javascript:alert(3)' }] },

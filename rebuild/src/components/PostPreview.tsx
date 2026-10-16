@@ -13,6 +13,8 @@ export type PostPreviewPost = {
   scheduledAt: Date | null;
   publishedAt: Date | null;
   createdAt: Date;
+  /** Server-formatted workspace time for previews rendered inside client components. */
+  displayTime?: string;
   targets: Array<{
     status: string;
     remotePostId: string | null;
@@ -65,8 +67,8 @@ function initials(value: string) {
   return value.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || '?';
 }
 
-function formatPostTime(date: Date, timeZone: string) {
-  return new Intl.DateTimeFormat(undefined, { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(date);
+export function formatPostPreviewTime(date: Date, timeZone: string) {
+  return new Intl.DateTimeFormat('en-US', { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
 export function PostPreview({ post, authorName, timeZone, variant = 'feed', actions }: Props) {
@@ -84,7 +86,7 @@ export function PostPreview({ post, authorName, timeZone, variant = 'feed', acti
       <span className={styles.authorAvatar} aria-hidden="true">{initials(authorName)}</span>
       <div className={styles.headerText}>
         <strong>{authorName}</strong>
-        <time dateTime={time.toISOString()}>{timeLabel} {formatPostTime(time, timeZone)}</time>
+        <time dateTime={time.toISOString()}>{timeLabel} {post.displayTime ?? formatPostPreviewTime(time, timeZone)}</time>
       </div>
       <StatusChip status={post.status} />
     </header>

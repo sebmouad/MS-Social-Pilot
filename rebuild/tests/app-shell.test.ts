@@ -26,6 +26,19 @@ async function render(enabledFeatures = ['publishing/posts', 'publishing/calenda
   })));
 }
 describe('two-sidebar app shell', () => {
+  it('reveals the editor when a drawer action submits its associated main-content form', async () => {
+    await render(undefined, { children: createElement('form', { id: 'route-form', onSubmit: event => event.preventDefault() },
+      createElement('input', { 'aria-label': 'Post text' }),
+      createElement(SidebarDock, { children: createElement('button', { type: 'submit', form: 'route-form' }, 'Save draft') }),
+    ) });
+    await act(async () => container.querySelector<HTMLButtonElement>('.shell-filter-toggle')!.click());
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    const submit = container.querySelector<HTMLButtonElement>('button[form="route-form"]')!;
+    await act(async () => submit.click());
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(container.querySelector('main'));
+  });
+
   it('provides a mobile exit from private Root to the customer app', async () => {
     await render([], { installationMode: true, rootAccess: true });
     expect(container.querySelector('.shell-nav--mobile a[href="/home"]')).not.toBeNull();
