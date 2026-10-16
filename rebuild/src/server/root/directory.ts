@@ -8,20 +8,6 @@ export function rootDirectoryQuery(input: { q?: string; page?: string }, pageSiz
   return { query, page, skip: (page - 1) * pageSize, take: pageSize };
 }
 
-export async function listRootUsers(input: { q?: string; page?: string }, pageSize: number) {
-  let selection = rootDirectoryQuery(input, pageSize);
-  const where = selection.query ? { OR: [
-    { name: { contains: selection.query, mode: 'insensitive' as const } },
-    { email: { contains: selection.query, mode: 'insensitive' as const } },
-  ] } : {};
-  const total = await prisma.user.count({ where });
-  selection = rootDirectoryQuery({ ...input, page: String(Math.min(selection.page, Math.max(1, Math.ceil(total / pageSize)))) }, pageSize);
-  const users = await prisma.user.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: selection.skip, take: selection.take,
-      select: { id: true, name: true, email: true, isInstanceOwner: true, disabledAt: true, totpEnabledAt: true, createdAt: true,
-        _count: { select: { memberships: true, sessions: true, passkeys: true } } } });
-  return { ...selection, total, users };
-}
-
 export async function listRootWorkspaces(input: { q?: string; page?: string }, pageSize: number) {
   let selection = rootDirectoryQuery(input, pageSize);
   const where = selection.query ? { OR: [

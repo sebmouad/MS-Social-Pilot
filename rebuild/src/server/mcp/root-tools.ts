@@ -6,9 +6,14 @@ import { OperationError, operationFailure } from '@/lib/operation-error';
 import { setRootWorkspaceAccess } from '../root/workspace-access';
 import { listRootWorkspaces } from '../root/directory';
 import { listRootActivity } from '../root/activity';
+import { loadRootUsers } from '../root/users';
+import { resetRootUserTwoStep, revokeRootUserSessions, setRootUserDisabled } from '../root/user-controls';
+import { rootUserActions, rootUserConfirmationSchema, rootUserIdSchema } from '@/lib/root-user-controls';
 import type { RootMcpActor } from './types';
 
 export const rootToolDefinitions = [
+  { name: 'list_root_users', description: 'Private installation user directory. Filter name/email and all, active, disabled or owners. Active sessions exclude expired and pending verification sessions. Credentials and factor material are excluded. Workspace API keys cannot use this tool.', inputSchema: { type: 'object', properties: { q: { type: 'string' }, status: { type: 'string', enum: ['all', 'active', 'disabled', 'owners'] }, page: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
+  { name: 'manage_root_user', description: 'Private installation-owner account access and recovery. Confirmation must exactly match DISABLE <email>, ENABLE <email>, SIGN OUT <email> or RESET TWO-STEP <email>. Self-actions are denied; owner second-factor reset is denied. Disabling revokes sessions and blocks keys. Sign out revokes browser sessions only; API keys retain current access. Every change has a transactional domain audit.', inputSchema: { type: 'object', required: ['userId', 'action', 'confirmation'], properties: { userId: { type: 'string', minLength: 1, maxLength: 200 }, action: { type: 'string', enum: [...rootUserActions] }, confirmation: { type: 'string', minLength: 1, maxLength: 400 } }, additionalProperties: false } },
   { name: 'get_root_config', description: 'Read installation configuration definitions and safe values. Only available to the signed-in instance owner; secrets are masked.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'list_root_workspaces', description: 'Private installation-owner workspace directory, including access state and record counts. Workspace API keys cannot use this tool.', inputSchema: { type: 'object', properties: { q: { type: 'string' }, page: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'list_root_activity', description: 'Private installation-owner audit history. Search actions or people; filter exact workspace ID and inclusive UTC dates. Raw audit detail is omitted. Follow olderCursor/newerCursor with the same filters. Workspace API keys cannot use this tool.', inputSchema: { type: 'object', properties: { q: { type: 'string' }, workspaceId: { type: 'string' }, from: { type: 'string', description: 'UTC date, YYYY-MM-DD.' }, to: { type: 'string', description: 'Inclusive UTC date, YYYY-MM-DD.' }, limit: { type: 'integer', minimum: 1 }, cursor: { type: 'string' } }, additionalProperties: false } },
@@ -19,6 +24,7 @@ export const rootToolDefinitions = [
 export const rootTools = new Set(rootToolDefinitions.map(tool => tool.name));
 export const canUseRootTool = (viewer: RootMcpActor) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
 const resourceDefinitions = [
+  { uri: 'msp://root/users', name: 'Installation users', description: 'Private bounded user directory, access and verification status; credentials excluded.', tool: 'list_root_users' },
   { uri: 'msp://root/config', name: 'Root configuration', description: 'Installation setting definitions and safe values.', tool: 'get_root_config' },
   { uri: 'msp://root/workspaces', name: 'Installation workspaces', description: 'Private bounded workspace directory and access state.', tool: 'list_root_workspaces' },
   { uri: 'msp://root/activity', name: 'Installation activity', description: 'Private bounded audit history with safe metadata.', tool: 'list_root_activity' },
@@ -26,6 +32,7 @@ const resourceDefinitions = [
 export const rootResources = resourceDefinitions.map(({ tool: _tool, ...resource }) => ({ ...resource, mimeType: 'application/json' }));
 export const rootResourceTool = (uri: string) => resourceDefinitions.find(resource => resource.uri === uri)?.tool;
 const configInput = z.object({ key: z.string().min(1), value: z.unknown().optional(), clear: z.boolean().optional(), confirmation: z.string().min(1) }).strict();
+const userInput = z.object({ userId: rootUserIdSchema, action: z.enum(rootUserActions), confirmation: rootUserConfirmationSchema }).strict();
 
 /** Shared private dispatcher: never depends on a workspace or its write lock. */
 export async function runRootTool(viewer: RootMcpActor, name: string, args: Record<string, unknown>) {
@@ -35,6 +42,21 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
     if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
     if (!args || typeof args !== 'object' || Array.isArray(args)) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
     switch (name) {
+      case 'list_root_users': {
+        if (Object.keys(args).some(key => !['q', 'page', 'status'].includes(key)) || args.q !== undefined && typeof args.q !== 'string' || args.status !== undefined && typeof args.status !== 'string' || args.page !== undefined && (typeof args.page !== 'number' || !Number.isSafeInteger(args.page) || args.page < 1)) throw new OperationError('invalid_request', 'Choose valid user filters and page.');
+        const input = { ...(args.q === undefined ? {} : { q: args.q as string }), ...(args.status === undefined ? {} : { status: args.status as string }), ...(args.page === undefined ? {} : { page: String(args.page) }) };
+        return await loadRootUsers(viewer.userId, input, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
+      }
+      case 'manage_root_user': {
+        const parsed = userInput.safeParse(args);
+        if (!parsed.success) throw new OperationError('invalid_request', 'Enter a valid account action and exact confirmation.');
+        const { userId, action, confirmation } = parsed.data;
+        const result = action === 'disable' || action === 'enable'
+          ? await setRootUserDisabled(viewer.userId, userId, action === 'disable', confirmation)
+          : action === 'sign-out' ? await revokeRootUserSessions(viewer.userId, userId, confirmation)
+            : await resetRootUserTwoStep(viewer.userId, userId, confirmation);
+        return { userId, action, ...result };
+      }
       case 'get_root_config':
         if (Object.keys(args).length) throw new OperationError('invalid_request', 'This read does not accept filters.');
         return { schemaVersion: CONFIG_SCHEMA_VERSION, definitions: safeConfigShape(), values: await readConfig() };

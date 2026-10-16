@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { PrismaClient, Prisma } from '../generated/client';
-import { hashLegacyPassword } from '../src/server/auth';
+import { hashLegacyPassword, hashLegacySessionToken } from '../src/server/auth';
 import { newTotpSecret, totpCode, timeStep } from '../src/server/totp';
 import { encryptSecret } from '../src/server/secret-crypto';
 
@@ -20,6 +20,8 @@ async function main() {
   check(origin.origin === originValue && origin.protocol === 'http:' && origin.hostname === 'localhost', 'Origin must be an explicit localhost HTTP origin.');
   const client = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
   const id = `preview_installation_${randomUUID()}`;
+  const targetId = `${id}_target`;
+  const targetEmail = `${targetId}@example.test`;
   const keyId = `${id}_key`;
   const workspaceId = `${id}_workspace`;
   const membershipId = `${id}_membership`;
@@ -55,12 +57,12 @@ async function main() {
     check(initialized.result.instructions.includes('Private installation access'), 'Membership-free owner must receive automatic private context.');
     const listed = await rpc('installation', 'tools/list');
     const names = (await listed.json()).result.tools.map((tool: { name: string }) => tool.name);
-    check(listed.headers.get('cache-control') === 'no-store' && names.length === 5 && names.every((name: string) => /root/.test(name)), 'Installation discovery must be private and Root-only.');
+    check(listed.headers.get('cache-control') === 'no-store' && names.length === 7 && names.every((name: string) => /root/.test(name)), 'Installation discovery must be private and Root-only.');
     check((await rpc('workspace', 'tools/list')).status === 401, 'Explicit workspace scope must require real membership.');
     const denied = await (await rpc('installation', 'tools/call', { name: 'list_posts', arguments: {} })).json();
     check(denied.result.structuredContent.code === 'forbidden', 'Private context must refuse customer data.');
     const resources = await (await rpc('installation', 'resources/list')).json();
-    check(resources.result.resources.length === 3 && resources.result.resources.every((resource: { uri: string }) => resource.uri.startsWith('msp://root/')), 'Installation resources must be Root-only.');
+    check(resources.result.resources.length === 4 && resources.result.resources.every((resource: { uri: string }) => resource.uri.startsWith('msp://root/')), 'Installation resources must be Root-only.');
     const config = await (await rpc('installation', 'tools/call', { name: 'get_root_config', arguments: {} })).json();
     const value = config.result.structuredContent.values.find((item: { key: string }) => item.key === configKey).value;
     const secretKeys = new Set(config.result.structuredContent.definitions.filter((item: { kind: string }) => item.kind === 'secret').map((item: { key: string }) => item.key));
@@ -70,12 +72,39 @@ async function main() {
     check(changed.result.structuredContent.saved === true, 'Membership-free owner configuration write must succeed.');
     const audit = await client.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM root_activities WHERE "actorId" = ${id} AND action = 'config.changed' AND detail->>'key' = ${configKey}`;
     check(Number(audit[0]?.count) === 1, 'Configuration change must have its transactional domain audit.');
+    // Real HTTP/MCP account controls affect only this disposable synthetic target.
+    await client.user.create({ data: { id: targetId, email: targetEmail, name: 'Disposable user control probe', passwordHash: hashLegacyPassword(randomBytes(24).toString('base64url')), totpSecret: encryptSecret(newTotpSecret()), totpEnabledAt: new Date() } });
+    const targetToken = randomBytes(32).toString('base64url');
+    await client.session.create({ data: { id: `${targetId}_active`, userId: targetId, tokenHash: hashLegacySessionToken(targetToken)!, expiresAt: new Date(Date.now() + 300000), pending: null } });
+    await client.session.create({ data: { id: `${targetId}_pending`, userId: targetId, tokenHash: randomUUID(), expiresAt: new Date(Date.now() + 300000), pending: 'verify' } });
+    await client.passkey.create({ data: { id: `${targetId}_passkey`, userId: targetId, credentialId: randomUUID(), publicKey: Buffer.from('synthetic-unused-public-key'), counter: 0, transports: [], name: 'Synthetic unused credential', createdAt: new Date() } });
+    await client.recoveryCode.create({ data: { id: `${targetId}_recovery`, userId: targetId, codeHash: randomUUID(), createdAt: new Date() } });
+    const userRead = await (await rpc('installation', 'tools/call', { name: 'list_root_users', arguments: { q: targetEmail } })).json();
+    check(userRead.result.structuredContent.users.length === 1 && userRead.result.structuredContent.users[0]._count.sessions === 1, 'User directory must count only active verified sessions.');
+    check(!/passwordHash|totpSecret|tokenHash|publicKey|codeHash/.test(JSON.stringify(userRead)), 'User directory must not expose credential or factor material.');
+    const nonRootRead = await fetch(new URL('/api/root/users', origin), { headers: { cookie: `msp_session=${targetToken}` } });
+    check(nonRootRead.status === 404, 'Non-Root sessions must not read the private user directory.');
+    const manage = async (userId: string, action: string, confirmation: string) => (await (await rpc('installation', 'tools/call', { name: 'manage_root_user', arguments: { userId, action, confirmation } })).json()).result;
+    check((await manage(targetId, 'disable', 'wrong')).structuredContent.code === 'invalid_request', 'Wrong account confirmation must be refused.');
+    check((await manage(id, 'disable', `DISABLE ${email}`)).structuredContent.code === 'conflict', 'Root self actions must be refused.');
+    check((await manage(targetId, 'disable', `DISABLE ${targetEmail}`)).structuredContent.sessionsRevoked === 2, 'Disabling must revoke all target sessions.');
+    check((await client.user.findUnique({ where: { id: targetId } }))?.disabledAt && await client.session.count({ where: { userId: targetId } }) === 0, 'Disabled account and session removal must persist.');
+    check((await manage(targetId, 'enable', `ENABLE ${targetEmail}`)).structuredContent.changed === true, 'Re-enable must persist.');
+    await client.session.create({ data: { id: `${targetId}_new`, userId: targetId, tokenHash: randomUUID(), expiresAt: new Date(Date.now() + 300000) } });
+    check((await manage(targetId, 'sign-out', `SIGN OUT ${targetEmail}`)).structuredContent.sessionsRevoked === 1, 'Sign out must revoke target sessions.');
+    check(!(await manage(targetId, 'reset-two-step', `RESET TWO-STEP ${targetEmail}`)).isError, 'Non-Root factor reset must complete.');
+    const reset = await client.user.findUnique({ where: { id: targetId } });
+    check(reset?.totpSecret === null && reset.totpEnabledAt === null && await client.passkey.count({ where: { userId: targetId } }) === 0 && await client.recoveryCode.count({ where: { userId: targetId } }) === 0, 'Factor reset must clear stored target factors and recovery codes.');
+    const userAudits = await client.$queryRaw<Array<{ action: string }>>`SELECT action FROM root_activities WHERE "actorId" = ${id} AND action LIKE 'root.user_%'`;
+    check(userAudits.length === 4 && ['root.user_disabled','root.user_enabled','root.user_signed_out','root.user_two_step_reset'].every(action => userAudits.some(row => row.action === action)), 'All four user controls must have their transactional domain audit.');
     const rawKey = `mcp_${randomBytes(32).toString('base64url')}`;
     await client.workspace.create({ data: { id: workspaceId, name: 'Installation scope probe', slug: workspaceId, timezone: 'UTC', memberships: { create: { id: membershipId, userId: fixture.id, role: 'owner' } } } });
     await client.mcpApiKey.create({ data: { id: keyId, name: 'Installation boundary probe', workspaceId, createdById: fixture.id, tokenHash: createHash('sha256').update(rawKey).digest('hex'), tokenPrefix: rawKey.slice(0, 12), readFeatures: ['publishing/posts'], writeFeatures: [], expiresAt: new Date(Date.now() + 300000) } });
     const keyTools = await (await rpc(null, 'tools/list', {}, `Bearer ${rawKey}`)).json();
     check(keyTools.result.tools.length === 1 && keyTools.result.tools[0].name === 'list_posts', 'Workspace bearer must keep its own scope despite the owner cookie.');
     check((await rpc('installation', 'tools/list', {}, `Bearer ${rawKey}`)).status === 401, 'Workspace bearer must not enter installation context.');
+    const keyUserControl = await (await rpc(null, 'tools/call', { name: 'manage_root_user', arguments: { userId: targetId, action: 'disable', confirmation: `DISABLE ${targetEmail}` } }, `Bearer ${rawKey}`)).json();
+    check(keyUserControl.result.structuredContent.code === 'forbidden', 'Owner-created workspace keys must not manage users.');
     const suspend = await (await rpc('installation', 'tools/call', { name: 'set_root_workspace_access', arguments: { workspaceId, suspended: true, confirmation: `SUSPEND WORKSPACE ${workspaceId}` } })).json();
     check(suspend.result.structuredContent.suspended === true, 'Membership-free owner must suspend the disposable workspace.');
     const suspendedRead = await (await rpc(null, 'tools/call', { name: 'list_posts', arguments: {} }, `Bearer ${rawKey}`)).json();
@@ -95,7 +124,7 @@ async function main() {
     check((await rpc('installation', 'tools/list')).status === 401, 'Demoted owner must lose private context immediately.');
     await client.user.update({ where: { id }, data: { isInstanceOwner: true, disabledAt: new Date() } });
     check((await rpc('installation', 'tools/list')).status === 401, 'Disabled owner must lose private context immediately.');
-    console.log(JSON.stringify({ passwordAndTotp: true, pendingDenied: true, memberships: 0, rootTools: names.length, privateResources: 3, workspaceCallsDenied: true, configDomainAudit: true, bearerScopeEnforced: true, ownerCreatedKeySuspensionDenied: true, restoredKeyRead: true, ownerUiRecovery: true, demotionAndDisableDenied: true }));
+    console.log(JSON.stringify({ passwordAndTotp: true, pendingDenied: true, memberships: 0, rootTools: names.length, privateResources: 4, workspaceCallsDenied: true, configDomainAudit: true, bearerScopeEnforced: true, ownerCreatedKeySuspensionDenied: true, restoredKeyRead: true, ownerUiRecovery: true, demotionAndDisableDenied: true, userDirectorySafe: true, userControlsAndAudits: true, nonRootAndKeyUserDenial: true }));
   } finally {
     try {
       await client.$transaction(async tx => {
@@ -109,10 +138,13 @@ async function main() {
           else await tx.appSetting.deleteMany({ where: { key: configKey } });
         }
         await tx.$executeRaw`DELETE FROM root_activities WHERE "actorId" = ${id}`;
-        await tx.user.deleteMany({ where: { id } });
+        await tx.session.deleteMany({ where: { userId: targetId } });
+        await tx.passkey.deleteMany({ where: { userId: targetId } });
+        await tx.recoveryCode.deleteMany({ where: { userId: targetId } });
+        await tx.user.deleteMany({ where: { id: { in: [id, targetId] } } });
       });
       const audit = await client.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM root_activities WHERE "actorId" = ${id}`;
-      check(await client.user.count({ where: { id } }) === 0 && await client.session.count({ where: { userId: id } }) === 0 && await client.mcpApiKey.count({ where: { id: keyId } }) === 0 && await client.workspace.count({ where: { id: workspaceId } }) === 0 && await client.membership.count({ where: { id: membershipId } }) === 0 && Number(audit[0]?.count) === 0, 'Temporary user, sessions, key, workspace, membership and audits must be removed.');
+      check(await client.user.count({ where: { id: { in: [id, targetId] } } }) === 0 && await client.session.count({ where: { userId: { in: [id, targetId] } } }) === 0 && await client.passkey.count({ where: { userId: targetId } }) === 0 && await client.recoveryCode.count({ where: { userId: targetId } }) === 0 && await client.mcpApiKey.count({ where: { id: keyId } }) === 0 && await client.workspace.count({ where: { id: workspaceId } }) === 0 && await client.membership.count({ where: { id: membershipId } }) === 0 && Number(audit[0]?.count) === 0, 'Temporary user, sessions, key, workspace, membership and audits must be removed.');
       if (settingTouched) {
         const restored = await client.appSetting.findUnique({ where: { key: configKey } });
         check(savedSetting ? restored?.encrypted === savedSetting.encrypted && restored.updatedAt.getTime() === savedSetting.updatedAt.getTime() && JSON.stringify(restored.value) === JSON.stringify(savedSetting.value) : restored === null, 'Original configuration record must be restored.');

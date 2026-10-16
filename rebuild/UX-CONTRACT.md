@@ -90,3 +90,10 @@ The private Root overview explains installation MCP session access and provides 
 ## MCP error and recovery contract
 
 MCP text and structured failures expose safe product messages and stable codes. Unexpected database, provider and filesystem text must not reach customer clients. An unknown write outcome asks the client to inspect current app/remote state before repeating. When a domain service has returned but its secondary MCP audit fails, preserve its receipt and report the audit warning separately. Do not turn partial publishing outcomes into full-success claims. These response rules do not replace durable provider reconciliation or transactional domain audits.
+
+
+## Root module organization — user clarification, 2026-10-16
+
+Root controls every installed product and platform module through its private interface. The design and sidebar must reflect ownership: shared installation controls separately from product modules and platform modules. A module's configuration, availability, capabilities and operational information belong together under that module. No third settings menu. Source folders stay self-contained outside Root; source organization alone does not satisfy this UX requirement. The current Root module-management design remains incomplete until those screens and controls work.
+
+Root Users uses sidebar name/email and status filters, bounded pagination, active verified session counts and both authenticator/passkey status. Access/recovery dialogs require exact confirmations, preserve failed input, guard duplicate submissions and accept only matching success receipts. Sign-out copy distinguishes sessions from API keys.

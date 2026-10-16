@@ -17,6 +17,8 @@ Migrate needed data. Obsolete data may be deleted only after backup, restore ver
 
 Root is the private installation control plane. It is separate from customer modules and workspace administration. A workspace owner/admin is not automatically Root.
 
+User clarification, 2026-10-16: **Root manages every product and platform module; source stays in self-contained module folders.** Root is the private administration surface, not the parent source folder for customer features. Each module owns its implementation and declares its configuration, operations, entitlements and health/control metadata to the host. Shared infrastructure remains separate and platform-neutral. Root must provide a unified module-management flow for installed product and platform modules, using those declarations; scattered settings alone are not complete module management. The same ownership must be visible in Root design, menus and sections: shared installation controls stay separate, and each product/platform module groups its own settings, availability, capabilities and operational information. Customer navigation remains permission-aware and exposes usable features only. Physical moves or manifests alone do not prove encapsulation or working Root controls.
+
 Product modules must work with any installed platform exposing the required capability. A platform may support content, messages, analytics, ads, or a subset. An unsupported operation is absent from customer choices; never show a working-looking stub or internal setup warning.
 
 ## 3. Strict platform ownership

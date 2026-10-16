@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({ requireRootPage: vi.fn(), listRootUsers: vi.fn(), listRootWorkspaces: vi.fn(), runtimeConfig: vi.fn() }));
 vi.mock('@/server/config/access', () => ({ requireRootPage: state.requireRootPage }));
+vi.mock('@/server/root/users', () => ({ loadRootUsers: state.listRootUsers }));
 vi.mock('@/server/root/directory', () => ({ listRootUsers: state.listRootUsers, listRootWorkspaces: state.listRootWorkspaces }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: state.runtimeConfig }));
 vi.mock('@/server/root/RootFrame', () => ({ RootFrame: 'div' }));

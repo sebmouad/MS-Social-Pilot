@@ -190,3 +190,14 @@ The guarded installation MCP probe passed again: real password/TOTP, pending den
 Independent lower-cost read-only review found no actionable regressions in the MCP response boundary, request checks, typed-error conversions, permission/confirmation checks or secondary-audit receipts. The reviewer did not run the suite; integrated checks above were run by the main agent.
 
 Remaining: complete core/Root design and legacy parity, durable operation-specific provider reconciliation and audit guarantees, wider MCP clients, complete Facebook engine and live verification, migration/rollback/release gates.
+
+
+## Root user workflow — 2026-10-16
+
+Integrated verification passed **663 tests across 122 files**, including six guarded rollback-only PostgreSQL probes (the four existing probes plus Root user mutation/directory checks), typecheck, isolated production build and whitespace checks. Directory probes verify literal wildcard search, active-only verified session counts, credential exclusion, current-owner checks and rollback cleanup. Account controls have service/HTTP/MCP and UI tests for exact confirmations, current actor checks, self/last-owner/Root-factor protections, conflicts, safe failures, duplicate submit, malformed receipts and focus restoration. Source review was completed by the main agent; lower-cost workers stopped with workspace-credit errors before an independent final review, which remains unavailable for this batch.
+
+The actual guarded password/TOTP/MCP probe passed with seven private tools/four resources. It created a disposable non-Root target with active/pending sessions and synthetic factors; verified safe user reads, non-Root/key denials, wrong/self confirmations, disable/enable/sign-out/factor reset, persisted outcomes and exactly four domain audits. All probe users, factors, sessions, workspaces, keys, audit rows and the prior config value were cleaned/restored. No provider call or production change occurred.
+
+Actual Chrome displayed the filtered Users table with filters/pagination in the contextual sidebar. Its confirmation dialog focused Cancel; entering the exact phrase enabled submission, produced a successful receipt and refreshed to Disabled/Enable. A later read verified persisted disabled state; direct preview SQL verified exactly its `root.user_disabled` audit and then removed that disposable user/audit. An initial read raced the in-flight write and was not treated as failure evidence; the completed receipt and subsequent read established the outcome. Desktop had no page overflow. At 390×844, the mobile drawer contained the status/search controls with focused close action; temporary four-theme measurements found no page overflow. This does not claim full route/theme visual QA.
+
+The module organization requirement is now explicit in architecture and UX documents; a unified Root module menu/control layout remains to be implemented. Production remains legacy.

@@ -1,39 +1,114 @@
 'use client';
 
-import { useState } from 'react';
-import { ModalDialog } from '@/components/ModalDialog';
+import { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/Button';
+import { ModalDialog } from '@/components/ModalDialog';
+import { rootUserConfirmation, type RootUserAction } from '@/lib/root-user-controls';
 
-type Action = 'disable' | 'enable' | 'sign-out' | 'reset-two-step';
+const titles: Record<RootUserAction, string> = {
+  disable: 'Disable account',
+  enable: 'Enable account',
+  'sign-out': 'Sign out sessions',
+  'reset-two-step': 'Reset two-step verification',
+};
 
 export function RootUserControls({ id, email, disabled, root, self }: { id: string; email: string; disabled: boolean; root: boolean; self: boolean }) {
-  const [action, setAction] = useState<Action | null>(null);
+  const router = useRouter();
+  const [action, setAction] = useState<RootUserAction | null>(null);
   const [confirmation, setConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const phrase = action ? `${action === 'disable' ? 'DISABLE' : action === 'enable' ? 'ENABLE' : action === 'sign-out' ? 'SIGN OUT' : 'RESET TWO-STEP'} ${email}` : '';
-  const title = action === 'disable' ? 'Disable account' : action === 'enable' ? 'Enable account' : action === 'sign-out' ? 'Sign out sessions' : 'Reset two-step verification';
-  function begin(next: Action) { setConfirmation(''); setError(''); setAction(next); }
-  async function save() {
-    if (!action) return;
-    setBusy(true); setError('');
-    try {
-      const accessChange = action === 'disable' || action === 'enable';
-      const response = await fetch(`/api/root/users/${encodeURIComponent(id)}`, {
-        method: accessChange ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(accessChange ? { disabled: action === 'disable', confirmation } : { action, confirmation }),
-      });
-      const payload = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? 'Account change failed.');
-      window.location.reload();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Account change failed.'); setBusy(false); }
+  const [notice, setNotice] = useState('');
+  const inFlight = useRef(false);
+  const phrase = action ? rootUserConfirmation(action, email) : '';
+
+  function begin(next: RootUserAction) {
+    setConfirmation('');
+    setError('');
+    setNotice('');
+    setAction(next);
   }
+
+  async function save() {
+    if (!action || inFlight.current || confirmation !== phrase) return;
+    const requestedAction = action;
+    inFlight.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      const accessChange = requestedAction === 'disable' || requestedAction === 'enable';
+      const response = await fetch(`/api/root/users/${encodeURIComponent(id)}`, {
+        method: accessChange ? 'PATCH' : 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(accessChange
+          ? { disabled: requestedAction === 'disable', confirmation }
+          : { action: requestedAction, confirmation }),
+      });
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        const apiError = isRecord(payload) && typeof payload.error === 'string' ? payload.error : null;
+        setError(apiError ?? 'The account change could not be confirmed. Check the directory and installation activity before retrying.');
+        return;
+      }
+      if (response.redirected || !isRecord(payload) || payload.ok !== true || payload.userId !== id || payload.action !== requestedAction) {
+        setError('The response did not confirm the account change. Check the directory and installation activity before retrying.');
+        return;
+      }
+      setNotice(successMessage(requestedAction));
+      setAction(null);
+      setConfirmation('');
+      router.refresh();
+    } catch {
+      setError('The result could not be confirmed. Check the directory and installation activity before retrying.');
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+
   if (self) return <span className="root-directory__self">Your account</span>;
-  return <><div className="root-directory__actions"><Button type="button" onClick={() => begin(disabled ? 'enable' : 'disable')}>{disabled ? 'Enable' : 'Disable'}</Button><Button type="button" onClick={() => begin('sign-out')}>Sign out</Button>{!root && <Button type="button" onClick={() => begin('reset-two-step')}>Reset two-step</Button>}</div>
-    {action && <ModalDialog className="ui-dialog" labelledBy={`root-user-${id}`} onDismiss={() => { if (!busy) setAction(null); }} busy={busy}>
-      <div className="ui-dialog__header"><h2 id={`root-user-${id}`}>{title}?</h2></div>
-      <div className="ui-dialog__body"><p>{email}</p><p>{action === 'disable' ? 'The account will be disabled and all sessions will end.' : action === 'enable' ? 'The user can sign in again.' : action === 'sign-out' ? 'All current sessions will end. The account stays active.' : 'Authenticator, passkeys, recovery codes and sessions will be cleared. The user must set up verification again when required by policy.'}</p><label className="ui-field"><span>Type <strong>{phrase}</strong> to confirm</span><input className="ui-input" value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" /></label>{error && <p role="alert" className="ui-error">{error}</p>}</div>
-      <div className="ui-dialog__actions"><Button type="button" data-dialog-cancel onClick={() => setAction(null)} disabled={busy}>Cancel</Button><Button type="button" variant={action === 'enable' ? 'primary' : 'danger'} onClick={() => void save()} disabled={busy || confirmation !== phrase}>{busy ? 'Saving…' : title}</Button></div>
+  return <>
+    <div className="root-directory__actions" aria-label={`Account actions for ${email}`}>
+      <Button type="button" size="sm" onClick={() => begin(disabled ? 'enable' : 'disable')}>{disabled ? 'Enable' : 'Disable'}</Button>
+      <Button type="button" size="sm" onClick={() => begin('sign-out')}>Sign out</Button>
+      {!root && <Button type="button" size="sm" onClick={() => begin('reset-two-step')}>Reset two-step</Button>}
+    </div>
+    {notice && <p className="root-config__status" role="status" aria-live="polite">{notice}</p>}
+    {action && <ModalDialog className="ui-dialog" labelledBy={`root-user-${id}`} busy={busy} onDismiss={() => { if (!busy) setAction(null); }}>
+      <div className="ui-dialog__header"><h2 id={`root-user-${id}`}>{titles[action]}?</h2></div>
+      <div className="ui-dialog__body">
+        <p><strong>{email}</strong></p>
+        <p>{actionDescription(action)}</p>
+        <label className="ui-field"><span>Type <strong>{phrase}</strong> to confirm</span><input className="ui-input" value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" disabled={busy} /></label>
+        {error && <p role="alert" className="ui-error">{error}</p>}
+      </div>
+      <div className="ui-dialog__actions">
+        <Button type="button" data-dialog-cancel onClick={() => setAction(null)} disabled={busy}>Cancel</Button>
+        <Button type="button" variant={action === 'enable' ? 'primary' : 'danger'} onClick={() => void save()} disabled={busy || confirmation !== phrase}>{busy ? 'Saving…' : titles[action]}</Button>
+      </div>
     </ModalDialog>}
   </>;
+}
+
+function actionDescription(action: RootUserAction) {
+  switch (action) {
+    case 'disable': return 'This account will be disabled and its active sessions will end. Re-enable it here to restore sign-in.';
+    case 'enable': return 'This account will be allowed to sign in again.';
+    case 'sign-out': return 'All active browser and app sessions will end. Workspace API keys are managed separately and will not change.';
+    case 'reset-two-step': return 'Registered two-step methods and recovery material will be cleared. The user will need to set up verification again when required by policy.';
+  }
+}
+
+function successMessage(action: RootUserAction) {
+  switch (action) {
+    case 'disable': return 'Account disabled and active sessions ended.';
+    case 'enable': return 'Account enabled.';
+    case 'sign-out': return 'Active sessions ended.';
+    case 'reset-two-step': return 'Two-step verification reset.';
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

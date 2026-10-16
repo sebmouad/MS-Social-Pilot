@@ -1,0 +1,17 @@
+.root-user-filters { display: grid; gap: 12px; }
+.root-user-filters form { display: grid; gap: 12px; }
+.root-user-filters > a { color: var(--accent); width: fit-content; }
+.root-user__status { display: grid; justify-items: start; gap: 6px; }
+.root-user__owner { color: var(--ink-soft); font-size: 12px; font-weight: 650; }
+.root-user__factors { margin: 0; padding-left: 18px; color: var(--ink-soft); }
+.root-user-table:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.root-user-table table { min-width: 880px; }
+.root-user-table .root-directory__actions { min-width: 0; }
+
+@media (max-width: 719px) {
+  .root-user-filters .ui-button { width: 100%; }
+  .root-directory__pager { align-items: flex-start; }
+}
+
+.root-user-filters nav { display: grid; gap: 10px; }
+.root-user-filters nav p { margin: 0; color: var(--ink-soft); }

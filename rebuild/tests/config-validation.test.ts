@@ -27,7 +27,12 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(32);
+    expect(CONFIG_SCHEMA_VERSION).toBe(33);
+    for (const [key, value] of [['root.userSearchMaxCharacters', 200], ['root.accountOperationTimeoutMs', 15000], ['root.accountOperationLockWaitMs', 5000]] as const) {
+      expect(CONFIG_BY_KEY.get(key)!.defaultValue).toBe(value);
+      expect(CONFIG_BY_KEY.get(key)!.consumption).toBe('active');
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(0).success).toBe(false);
+    }
     expect(CONFIG_BY_KEY.get('root.activityPageSize')!.defaultValue).toBe(50);
     expect(CONFIG_BY_KEY.get('root.activitySearchMaxCharacters')!.defaultValue).toBe(200);
     expect(CONFIG_BY_KEY.get('root.activitySearchMaxCharacters')!.consumption).toBe('active');

@@ -119,7 +119,7 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const writeTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
+const writeTools = new Set(['manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;

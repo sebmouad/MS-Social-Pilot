@@ -26,9 +26,9 @@ describe('installation-only MCP context', () => {
     const initialized = await (await invoke('initialize')).json();
     expect(initialized.result.instructions).toContain('Private installation access');
     const names = (await (await invoke('tools/list')).json()).result.tools.map((tool: { name: string }) => tool.name);
-    expect(names.sort()).toEqual(['get_root_config', 'list_root_activity', 'list_root_workspaces', 'set_root_config', 'set_root_workspace_access']);
+    expect(names.sort()).toEqual(['get_root_config', 'list_root_activity', 'list_root_users', 'list_root_workspaces', 'manage_root_user', 'set_root_config', 'set_root_workspace_access']);
     const resources = (await (await invoke('resources/list')).json()).result.resources.map((resource: { uri: string }) => resource.uri);
-    expect(resources.sort()).toEqual(['msp://root/activity', 'msp://root/config', 'msp://root/workspaces']);
+    expect(resources.sort()).toEqual(['msp://root/activity', 'msp://root/config', 'msp://root/users', 'msp://root/workspaces']);
   });
   it('rejects forced workspace calls before write locks or data/provider queries', async () => {
     for (const name of ['list_posts', 'create_draft', 'delete_workspace_data', 'get_live_ad_status']) {
@@ -58,7 +58,7 @@ describe('installation-only MCP context', () => {
   });
   it.each([null, { isInstanceOwner: false, disabledAt: null }, { isInstanceOwner: true, disabledAt: new Date() }])('rechecks current owner authority before Root data or mutations', async actor => {
     state.actor.mockResolvedValue(actor);
-    for (const name of ['get_root_config', 'set_root_config', 'list_root_workspaces', 'list_root_activity', 'set_root_workspace_access']) expect((await (await call(name)).json()).result.structuredContent.code).toBe('forbidden');
+    for (const name of ['get_root_config', 'set_root_config', 'list_root_workspaces', 'list_root_activity', 'set_root_workspace_access', 'list_root_users', 'manage_root_user']) expect((await (await call(name)).json()).result.structuredContent.code).toBe('forbidden');
     expect(state.read).not.toHaveBeenCalled(); expect(state.save).not.toHaveBeenCalled(); expect(state.activity).not.toHaveBeenCalled(); expect(state.workspaces).not.toHaveBeenCalled(); expect(state.access).not.toHaveBeenCalled();
   });
   it('validates config types/keys/confirmation, retains the atomic domain audit and masks unexpected failures', async () => {

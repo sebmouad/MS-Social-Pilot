@@ -58,3 +58,10 @@ No visual controls, theme tokens, route structure, schema or Root configuration 
 The legacy app is a reference, not a source of shared provider-specific business rules. Existing production remains running. Local previews use synthetic data. Design coverage, implemented actions, automated checks, browser evidence and live-provider evidence must remain distinct. This plan does not declare the design, adapter, MCP parity or cutover complete.
 
 The paused Inbox pagination/MCP deletion expansion is not shipped. The reviewed Graph comment-delete confirmation fix is retained as a safety correction; durable deletion reconciliation is still required before claiming safe complete deletion parity.
+
+
+## Root user workflow batch
+
+The existing Users workflow now shares a current-Root-authorized directory across UI/HTTP/MCP and current-actor-checked transactional account actions. Search, account-state filters and pagination use the contextual sidebar; safe counts and both factor types are visible. Confirmation dialogs recover from failed/unconfirmed responses without erasing input or repeating submissions. Actual local checks cover directory/session semantics, all four account actions and audits, non-Root/key denial and a Chrome confirmation with persisted state/audit verification and cleanup. User deletion and other operator controls remain incomplete.
+
+User clarification also applies module boundaries to design, menus and sections. The shared architecture/UX contracts now explicitly require Root shared controls, product module controls and platform module controls to be organized by ownership. The current scattered module controls are recorded as incomplete; the next Root design batch must implement that organization, not just move source files.
