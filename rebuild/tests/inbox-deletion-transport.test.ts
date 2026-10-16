@@ -71,7 +71,7 @@ describe('Inbox deletion HTTP transport', () => {
   });
 
   it('masks unexpected status lookup failures while preserving typed service failures', async () => {
-    mocks.getDeletion.mockRejectedValueOnce(new Error('postgres://private-password@db')); 
+    mocks.getDeletion.mockRejectedValueOnce(new Error('postgres://private-password@db'));
     const unexpected = await GET(makeGet('?itemId=comment_1'));
     expect(unexpected.status).toBe(502);
     const body = await unexpected.json();
