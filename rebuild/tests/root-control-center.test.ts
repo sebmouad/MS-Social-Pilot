@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rootActivityLimit, sanitizeRootActivity } from '../src/server/root/read-model';
+import { sanitizeRootActivity } from '../src/server/root/read-model';
 
 describe('Root activity read model', () => {
   it('only exposes allowlisted metadata and never returns raw audit detail', () => {
@@ -15,11 +15,4 @@ describe('Root activity read model', () => {
     expect(JSON.stringify(activity)).not.toMatch(/secret|private text|ws_123/);
   });
 
-  it('bounds activity limits to a safe fixed range', () => {
-    expect(rootActivityLimit(undefined, 75)).toBe(75);
-    expect(rootActivityLimit('2000', 1000)).toBe(1000);
-    expect(rootActivityLimit('1', 50)).toBe(1);
-    expect(rootActivityLimit('junk', 50)).toBe(50);
-    expect(rootActivityLimit('1.5', 50)).toBe(50);
-  });
 });

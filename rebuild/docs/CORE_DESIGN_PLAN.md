@@ -35,6 +35,12 @@ The shared workspace lock rejects new side effects after suspension. Background 
 
 Root workspace deletion, plans, backups, the complete legacy operator inventory and full MCP parity remain separate work. This batch adds no database schema migration or new configuration key; its lock timeouts use existing validated Root settings.
 
+## Historical audit batch
+
+Root Activity now has action/person search, exact workspace ID and inclusive UTC date filters, all in the contextual sidebar alongside page size and Latest/Newer/Older navigation. A private shared service authorizes current installation owners, validates filters and configured limits, and exposes the existing safe metadata projection. HTTP and MCP use the same service; workspace API keys remain excluded. Cursor pagination handles equal timestamps and new records without offset drift. The UI distinguishes no history, no matches, a changed/empty page, invalid filters and an unavailable store.
+
+Registry version 32 supplies active search/cursor character limits and extends the page limit to historical reads. Local browser checks cover filtered UI/HTTP/MCP agreement, real Root setting changes/restoration, phone drawer keyboard/empty/error recovery and four-theme overflow. PostgreSQL probes cover tied timestamps, reverse pagination, literal wildcard characters, date/workspace scope, demotion and rollback cleanup. Large-installation query plans, audit export/retention, generic log/error administration and membership-independent Root MCP transport remain open.
+
 ## Remaining boundaries
 
 The legacy app is a reference, not a source of shared provider-specific business rules. Existing production remains running. Local previews use synthetic data. Design coverage, implemented actions, automated checks, browser evidence and live-provider evidence must remain distinct. This plan does not declare the design, adapter, MCP parity or cutover complete.

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({ requireRootPage: vi.fn(), getRootOverview: vi.fn(), listRootActivity: vi.fn(), runtimeConfig: vi.fn() }));
 vi.mock('@/server/config/access', () => ({ requireRootPage: state.requireRootPage }));
-vi.mock('@/server/root/read-model', () => ({ getRootOverview: state.getRootOverview, listRootActivity: state.listRootActivity }));
+vi.mock('@/server/root/read-model', () => ({ getRootOverview: state.getRootOverview }));
+vi.mock('@/server/root/activity', () => ({ listRootActivity: state.listRootActivity }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: state.runtimeConfig }));
 vi.mock('@/server/root/RootFrame', () => ({ RootFrame: 'div' }));
 vi.mock('@/server/jobs/RootJobHealth', () => ({ RootJobHealth: 'section' }));

@@ -22,6 +22,12 @@
 .root-activity__heading h2 { margin: 0; font-size: 16px; text-transform: capitalize; }
 .root-activity__heading time, .root-activity__actor { color: var(--ink-soft); font-size: 13px; }
 .root-activity__actor { margin: 7px 0; }
+.root-activity__heading h2, .root-activity__actor { overflow-wrap: anywhere; }
+.root-activity__summary { color: var(--ink-soft); font-size: 13px; }
+.root-audit-filters, .root-audit-filters form, .root-audit-pages { display: grid; gap: 14px; }
+.root-audit-filters .shell-subnav__label { margin: 0; }
+.root-audit-filters a { color: var(--accent); font-size: 13px; line-height: 1.5; }
+.root-audit-pages { border-top: 1px solid var(--line); padding-top: 14px; }
 .root-activity ul { display: flex; flex-wrap: wrap; gap: 7px 16px; margin: 8px 0 0; padding-left: 18px; color: var(--ink-soft); font-size: 13px; }
 @media (max-width: 680px) {
   .root-control__panel, .root-control__notice { padding: var(--space-4); }

@@ -21,6 +21,8 @@ vi.mock('../src/server/post-mutations', () => ({ createLocalDraft: mutations.cre
 vi.mock('../src/server/connection-mutations', () => ({ setConnectionSelections: mutations.select }));
 const rootConfig = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn() }));
 const rootWorkspaces = vi.hoisted(() => ({ list: vi.fn(), change: vi.fn() }));
+const rootActivity = vi.hoisted(() => ({ list: vi.fn() }));
+vi.mock('../src/server/root/activity', () => ({ listRootActivity: rootActivity.list }));
 vi.mock('../src/server/root/directory', () => ({ listRootWorkspaces: rootWorkspaces.list }));
 vi.mock('../src/server/root/workspace-access', () => ({ setRootWorkspaceAccess: rootWorkspaces.change }));
 vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save, runtimeConfig: vi.fn().mockResolvedValue(366) }));
@@ -98,6 +100,7 @@ beforeEach(() => {
   rootConfig.save.mockResolvedValue(undefined);
   rootWorkspaces.list.mockResolvedValue({ workspaces: [{ id: 'workspace-b', suspendedAt: null }], total: 1 });
   rootWorkspaces.change.mockResolvedValue({ changed: true, suspended: true });
+  rootActivity.list.mockResolvedValue({ items: [{ id: 'audit-a', action: 'config.changed', metadata: [] }], olderCursor: null, newerCursor: null });
   dataControls.preview.mockResolvedValue({ posts: 2 });
   dataControls.export.mockResolvedValue({ format: 'ms-social-pilot-workspace-export', workspace: { id: 'workspace-a' } });
   dataControls.remove.mockResolvedValue({ posts: 2 });
@@ -112,6 +115,36 @@ beforeEach(() => {
 });
 
 describe('MCP workspace boundaries', () => {
+  it('protects audit tools/resources from non-Root users and every workspace API key', async () => {
+    for (const actor of [viewer, { ...viewer, isInstanceOwner: true, apiKeyId: 'key-1' }]) {
+      const invoke = (method: string, params = {}) => handleMcpMessage(actor, { jsonrpc: '2.0', id: 1, method, params });
+      expect((await (await invoke('tools/list')).json()).result.tools.map((tool: { name: string }) => tool.name)).not.toContain('list_root_activity');
+      expect((await (await invoke('resources/list')).json()).result.resources.map((resource: { uri: string }) => resource.uri)).not.toContain('msp://root/activity');
+      expect((await (await invoke('tools/call', { name: 'list_root_activity', arguments: {} })).json()).result.structuredContent.code).toBe('forbidden');
+      expect((await (await invoke('resources/read', { uri: 'msp://root/activity' })).json()).error).toBeDefined();
+    }
+    expect(rootActivity.list).not.toHaveBeenCalled();
+  });
+
+  it('uses the authorized audit service and configured MCP cap for tools and resources', async () => {
+    const root = { ...viewer, isInstanceOwner: true, maxResultItems: 10 };
+    const input = { q: 'config', from: '2026-10-01', to: '2026-10-16', limit: 50 };
+    await handleMcpMessage(root, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_root_activity', arguments: input } });
+    expect(rootActivity.list).toHaveBeenLastCalledWith('user-a', input, 10);
+    const response = await handleMcpMessage(root, { jsonrpc: '2.0', id: 1, method: 'resources/read', params: { uri: 'msp://root/activity' } });
+    expect(rootActivity.list).toHaveBeenLastCalledWith('user-a', {}, 10);
+    expect(JSON.parse((await response.json()).result.contents[0].text).items[0].id).toBe('audit-a');
+  });
+
+  it('preserves typed audit validation errors and redacts database failures', async () => {
+    const invoke = () => handleMcpMessage({ ...viewer, isInstanceOwner: true }, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_root_activity', arguments: {} } });
+    rootActivity.list.mockRejectedValueOnce(new OperationError('invalid_request', 'Choose valid activity filters.'));
+    expect((await (await invoke()).json()).result.structuredContent.code).toBe('invalid_request');
+    rootActivity.list.mockRejectedValueOnce(new Error('postgres://private-password@host'));
+    const result = (await (await invoke()).json()).result;
+    expect(result.structuredContent.code).toBe('upstream_failure');
+    expect(JSON.stringify(result)).not.toContain('private-password');
+  });
   it('keeps Root workspace tools and resources private to signed-in installation owners', async () => {
     for (const actor of [viewer, { ...viewer, isInstanceOwner: true, apiKeyId: 'key-1' }]) {
       const invoke = (method: string, params = {}) => handleMcpMessage(actor, { jsonrpc: '2.0', id: 1, method, params });

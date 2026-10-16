@@ -1,6 +1,6 @@
 import { prisma } from '@/server/data';
 
-type ActivityRow = {
+export type ActivityRow = {
   id: string;
   action: string;
   detail: unknown;
@@ -21,13 +21,6 @@ const ACTIVITY_METADATA: Record<string, { label: string; format?: 'boolean' }> =
   remoteDeletionRequested: { label: 'remote deletion requested', format: 'boolean' },
   remoteDeletedCount: { label: 'remote items deleted' }, targetCountRequested: { label: 'destinations requested' },
 };
-
-export function rootActivityLimit(value: string | undefined, configuredLimit: number) {
-  if (!Number.isSafeInteger(configuredLimit) || configuredLimit < 1) throw new Error('Invalid Root activity page size.');
-  const parsed = value !== undefined && /^[1-9]\d*$/.test(value) ? Number(value) : NaN;
-  const requested = Number.isSafeInteger(parsed) ? parsed : configuredLimit;
-  return Math.min(requested, configuredLimit);
-}
 
 export function sanitizeRootActivity(row: ActivityRow) {
   const detail = row.detail && typeof row.detail === 'object' && !Array.isArray(row.detail)
@@ -56,16 +49,4 @@ export async function getRootOverview() {
     prisma.post.count({ where: { status: 'published' } }),
   ]);
   return { users, workspaces, sources, failedPosts, publishedPosts };
-}
-
-export async function listRootActivity(limitValue: string | undefined, configuredLimit: number) {
-  const limit = rootActivityLimit(limitValue, configuredLimit);
-  const rows = await prisma.$queryRaw<ActivityRow[]>`
-    SELECT a.id, a.action, a.detail, a."createdAt", u.name AS "actorName", u.email AS "actorEmail"
-    FROM root_activities AS a
-    LEFT JOIN users AS u ON u.id = a."actorId"
-    ORDER BY a."createdAt" DESC, a.id DESC
-    LIMIT ${limit}
-  `;
-  return rows.map(sanitizeRootActivity);
 }

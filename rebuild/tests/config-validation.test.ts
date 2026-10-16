@@ -27,8 +27,16 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(31);
+    expect(CONFIG_SCHEMA_VERSION).toBe(32);
     expect(CONFIG_BY_KEY.get('root.activityPageSize')!.defaultValue).toBe(50);
+    expect(CONFIG_BY_KEY.get('root.activitySearchMaxCharacters')!.defaultValue).toBe(200);
+    expect(CONFIG_BY_KEY.get('root.activitySearchMaxCharacters')!.consumption).toBe('active');
+    expect(CONFIG_BY_KEY.get('root.activitySearchMaxCharacters')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('root.activitySearchMaxCharacters')!.schema.safeParse(2001).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('root.activityCursorMaxCharacters')!.defaultValue).toBe(4096);
+    expect(CONFIG_BY_KEY.get('root.activityCursorMaxCharacters')!.consumption).toBe('active');
+    expect(CONFIG_BY_KEY.get('root.activityCursorMaxCharacters')!.schema.safeParse(511).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('root.activityCursorMaxCharacters')!.schema.safeParse(65537).success).toBe(false);
     expect(CONFIG_BY_KEY.get('root.activityPageSize')!.consumption).toBe('active');
     expect(CONFIG_BY_KEY.get('root.activityPageSize')!.schema.safeParse(1).success).toBe(true);
     expect(CONFIG_BY_KEY.get('root.activityPageSize')!.schema.safeParse(1000).success).toBe(true);
