@@ -261,7 +261,10 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     async moderateComment(token, commentId, hidden) {
       await request(encodeURIComponent(commentId), { method: 'POST', token, body: { is_hidden: String(hidden) } });
     },
-    async deleteComment(token, commentId) { await request(encodeURIComponent(commentId), { method: 'DELETE', token }); },
+    async deleteComment(token, commentId) {
+      const result = object(await request(encodeURIComponent(commentId), { method: 'DELETE', token }));
+      if (result.success !== true) throw new FacebookApiError('Facebook did not confirm comment deletion.', 200);
+    },
     async listInbox(token, pageId) {
       const raw = await pages<JsonObject>(collectionUrl(`${encodeURIComponent(pageId)}/conversations`, token, 'id,snippet,updated_time,unread_count,message_count,messages.limit(20){id,message,created_time,from{id,name}}'), token);
       return raw.flatMap(c => {

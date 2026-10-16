@@ -150,6 +150,21 @@ describe('Facebook Graph adapter', () => {
     await expect(engine.deletePost('token', 'p1_2')).rejects.toThrow('did not confirm post deletion');
   });
 
+  it('does not claim comment deletion when Graph returns success false', async () => {
+    const engine = createFacebookEngine(config, mockFetch(response({ success: false })));
+    await expect(engine.deleteComment('token', 'comment-1')).rejects.toThrow('did not confirm comment deletion');
+  });
+
+  it.each([response({}), new Response('{', { status: 200 })])('rejects comment deletion without a valid success confirmation', async providerResponse => {
+    const engine = createFacebookEngine(config, mockFetch(providerResponse));
+    await expect(engine.deleteComment('token', 'comment-1')).rejects.toThrow('did not confirm comment deletion');
+  });
+
+  it('accepts comment deletion only when Graph returns success true', async () => {
+    const engine = createFacebookEngine(config, mockFetch(response({ success: true })));
+    await expect(engine.deleteComment('token', 'comment-1')).resolves.toBeUndefined();
+  });
+
   it('creates campaigns in a paused state with the selected objective and returns the provider id', async () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toContain('/v99.0/act_12/campaigns');
