@@ -47,6 +47,12 @@ Root has a session-authenticated installation MCP context that does not depend o
 
 Root overview includes private connection guidance and a copy action. Membership-free installation owners recover from the empty workspace route into Root. Customers retain invitation/sign-out recovery and see workspace policy copy rather than internal Root setup instructions. Real local password/TOTP testing uses disposable identifiable records and verifies cleanup and exact configuration restoration. Private long-lived credential issuance/OAuth, remaining Root operations, general workspace MCP error hardening and full release gates remain unfinished.
 
+## Shared MCP recovery batch
+
+Workspace MCP failures now follow the same safe error contract as Root, Ads and media. Shared Publishing, Inbox, connection selection and data-control validation/access errors retain useful public codes; unexpected infrastructure/provider text is masked. Invalid argument containers and calendar-date rollover are rejected. Secondary MCP audit failures preserve the returned service outcome with an explicit warning, so clients do not repeat a completed write merely to repair an audit entry. Unknown write outcomes direct clients to inspect current state first. This closes the generic MCP message-leak gap above; domain audit durability and remote reconciliation remain separate work.
+
+No visual controls, theme tokens, route structure, schema or Root configuration keys changed in this batch. Live local Chrome MCP tests created, read, updated and deleted a disposable draft, verified all three write audit records and removed those probe audit records. Broader core design coverage, Root controls and Facebook coverage remain unfinished.
+
 ## Remaining boundaries
 
 The legacy app is a reference, not a source of shared provider-specific business rules. Existing production remains running. Local previews use synthetic data. Design coverage, implemented actions, automated checks, browser evidence and live-provider evidence must remain distinct. This plan does not declare the design, adapter, MCP parity or cutover complete.

@@ -118,6 +118,82 @@ beforeEach(() => {
 });
 
 describe('MCP workspace boundaries', () => {
+  it.each([
+    ['list_pages', () => db.target.findMany],
+    ['list_posts', () => db.post.findMany],
+    ['list_inbox', () => db.conversation.findMany],
+    ['get_analytics_overview', () => analytics.load],
+    ['preview_workspace_data_deletion', () => dataControls.preview],
+    ['export_workspace_data', () => dataControls.export],
+  ] as const)('masks unexpected %s read failures with a stable public code', async (name, mock) => {
+    mock().mockRejectedValueOnce(new Error('postgres://private-password@db access_token=private-token /srv/private'));
+    const response = await call(name);
+    const body = await response.json();
+    expect(body.result.isError).toBe(true);
+    expect(body.result.structuredContent.code).toBe('upstream_failure');
+    expect(JSON.stringify(body)).not.toMatch(/private-password|private-token|\/srv\/private|postgres:/);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+  it('masks unknown write failures without claiming no change happened', async () => {
+    inboxMutations.reply.mockRejectedValueOnce(new Error('access_token=private-token'));
+    const result = (await (await call('reply_to_inbox', { kind: 'message', id: 'conversation-a', text: 'Hello', confirmation: 'REPLY message conversation-a' })).json()).result;
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent.code).toBe('upstream_failure');
+    expect(result.structuredContent.error).toMatch(/outcome.*not.*confirmed/i);
+    expect(result.structuredContent.error).toMatch(/before.*repeat/i);
+    expect(JSON.stringify(result)).not.toContain('private-token');
+  });
+  it('keeps typed shared-service recovery errors useful', async () => {
+    inboxMutations.reply.mockRejectedValueOnce(new OperationError('reconnect_required', 'Reconnect this channel before replying.'));
+    const result = (await (await call('reply_to_inbox', { kind: 'comment', id: 'comment-a', text: 'Hello', confirmation: 'REPLY comment comment-a' })).json()).result;
+    expect(result.structuredContent).toEqual({ code: 'reconnect_required', error: 'Reconnect this channel before replying.' });
+  });
+  it('preserves resource error codes without exposing unexpected query failures', async () => {
+    db.post.findMany.mockRejectedValueOnce(new Error('postgres://private-password@db'));
+    const failed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'resources/read', params: { uri: 'msp://posts' } });
+    const failedBody = await failed.json();
+    expect(failedBody.error.data.code).toBe('upstream_failure');
+    expect(JSON.stringify(failedBody)).not.toContain('private-password');
+    analytics.load.mockRejectedValueOnce(new OperationError('unavailable', 'Analytics is temporarily unavailable.'));
+    const unavailable = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'resources/read', params: { uri: 'msp://analytics/overview' } });
+    expect((await unavailable.json()).error).toMatchObject({ message: 'Analytics is temporarily unavailable.', data: { code: 'unavailable' } });
+  });
+  it.each(['2026-02-31', '2026-13-01', 'not-a-date'])('rejects invalid analytics date %s before querying', async start => {
+    const result = (await (await call('get_analytics_overview', { start })).json()).result;
+    expect(result.structuredContent.code).toBe('invalid_request');
+    expect(analytics.load).not.toHaveBeenCalled();
+  });
+  it.each([{ id: {} }, { id: [] }, { id: true }, { params: [] }, { params: null }])('rejects invalid protocol fields before tool dispatch: %j', async fields => {
+    const response = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_posts' }, ...fields });
+    expect((await response.json()).error.code).toBe(-32600);
+    expect(db.post.findMany).not.toHaveBeenCalled();
+  });
+  it.each([null, [], 'bad', 42, true])('rejects malformed workspace arguments before domain access: %j', async input => {
+    const response = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_posts', arguments: input } });
+    expect((await response.json()).result.structuredContent.code).toBe('invalid_request');
+    expect(db.post.findMany).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['create_draft', { message: 'Hello', confirmation: 'CREATE DRAFT' }, () => mutations.create, { id: 'new-post', status: 'draft' }],
+    ['reply_to_inbox', { kind: 'message', id: 'conversation-a', text: 'Hello', confirmation: 'REPLY message conversation-a' }, () => inboxMutations.reply, { ok: true, itemId: 'conversation-a' }],
+    ['publish_post', { postId: 'post-a', confirmation: 'PUBLISH POST post-a' }, () => publishingMutations.publish, { postId: 'post-a', published: 1 }],
+    ['delete_post', { postId: 'post-a', deleteRemote: false, confirmation: 'DELETE POST post-a LOCAL' }, () => publishingMutations.remove, { postId: 'post-a', deleted: true }],
+    ['upload_workspace_image', { fileName: 'new.png', mimeType: 'image/png', base64: 'AQID', confirmation: 'UPLOAD WORKSPACE IMAGE new.png' }, () => media.upload, { id: 'image-b' }],
+    ['set_connection_selection', { kind: 'target', id: 'target-a', enabled: true, confirmation: 'SET CONNECTION target target-a ENABLED' }, () => mutations.select, { id: 'target-a', enabled: true }],
+    ['update_ad', { adAccountId: 'account-a', objectId: 'ad-a', objectType: 'ad', status: 'paused', confirmation: 'SET AD STATUS ad-a TO PAUSED' }, () => adsMutations.update, { objectId: 'ad-a', updated: true }],
+  ] as const)('preserves the %s receipt when its secondary MCP audit fails', async (name, args, mutation, expected) => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      db.$executeRaw.mockRejectedValueOnce(new Error('postgres://private-password@db'));
+      const body = await (await call(name, args)).json();
+      expect(body.result.isError).not.toBe(true);
+      expect(body.result.structuredContent).toMatchObject({ ...expected, mcpAuditRecorded: false });
+      expect(body.result.structuredContent.warning).toMatch(/completed/i);
+      expect(body.result.structuredContent.warning).toMatch(/not.*repeat/i);
+      expect(mutation()).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify([body, log.mock.calls])).not.toContain('private-password');
+    } finally { log.mockRestore(); }
+  });
   it('protects audit tools/resources from non-Root users and every workspace API key', async () => {
     for (const actor of [viewer, { ...viewer, isInstanceOwner: true, apiKeyId: 'key-1' }]) {
       const invoke = (method: string, params = {}) => handleMcpMessage(actor, { jsonrpc: '2.0', id: 1, method, params });
@@ -273,7 +349,7 @@ describe('MCP workspace boundaries', () => {
     expect((await bad.json()).result.isError).toBe(true);
     expect(media.remove).not.toHaveBeenCalled();
     const deleted = await call('delete_workspace_image', { imageId: 'image-a', confirmation: 'DELETE WORKSPACE IMAGE image-a' });
-    expect((await deleted.json()).result.structuredContent).toEqual({ imageId: 'image-a', deleted: true });
+    expect((await deleted.json()).result.structuredContent).toEqual({ imageId: 'image-a', deleted: true, mcpAuditRecorded: true });
     expect(media.remove).toHaveBeenCalledWith('workspace-a', 'image-a');
     expect(db.$executeRaw).toHaveBeenCalledTimes(1);
 
@@ -607,17 +683,17 @@ describe('MCP workspace boundaries', () => {
     expect(mutations.create).not.toHaveBeenCalled();
 
     const created = await call('create_draft', { message: ' hello ', confirmation: 'CREATE DRAFT' });
-    expect((await created.json()).result.structuredContent).toEqual({ id: 'new-post', status: 'draft' });
+    expect((await created.json()).result.structuredContent).toEqual({ id: 'new-post', status: 'draft', mcpAuditRecorded: true });
     expect(mutations.create).toHaveBeenCalledWith(viewer, 'hello');
     expect(db.$executeRaw).toHaveBeenCalled();
 
     const deleted = await call('delete_draft', { postId: 'post-a', confirmation: 'DELETE DRAFT post-a' });
-    expect((await deleted.json()).result.structuredContent).toEqual({ id: 'post-a', deleted: true });
+    expect((await deleted.json()).result.structuredContent).toEqual({ id: 'post-a', deleted: true, mcpAuditRecorded: true });
     expect(mutations.remove).toHaveBeenCalledWith(viewer, 'post-a');
   });
 
   it('blocks MCP writes before a mutation while workspace deletion is pending', async () => {
-    purgeGuard.mockRejectedValueOnce(new Error('Workspace data deletion is in progress.'));
+    purgeGuard.mockRejectedValueOnce(new OperationError('conflict', 'Workspace data deletion is in progress.'));
     const response = await call('publish_post', { postId: 'post-a', confirmation: 'PUBLISH POST post-a' });
     expect((await response.json()).result).toMatchObject({ isError: true, structuredContent: { error: 'Workspace data deletion is in progress.' } });
     expect(publishingMutations.publish).not.toHaveBeenCalled();
@@ -625,7 +701,7 @@ describe('MCP workspace boundaries', () => {
 
   it('uses the existing selection mutation and prevents non-admin selection changes', async () => {
     const response = await call('set_connection_selection', { kind: 'target', id: 'page-a', enabled: false, confirmation: 'SET CONNECTION target page-a DISABLED' });
-    expect((await response.json()).result.structuredContent).toEqual({ kind: 'target', id: 'page-a', enabled: false });
+    expect((await response.json()).result.structuredContent).toEqual({ kind: 'target', id: 'page-a', enabled: false, mcpAuditRecorded: true });
     expect(mutations.select).toHaveBeenCalledWith(viewer, [{ kind: 'target', id: 'page-a', enabled: false }]);
 
     const editor = { ...viewer, role: 'editor' };
@@ -691,7 +767,7 @@ describe('MCP workspace boundaries', () => {
     expect(publishingMutations.create).not.toHaveBeenCalled();
 
     const created = await call('create_post', { message: 'hello', firstComment: 'follow-up', targetIds: ['page-a'], imageUrl: 'https://example.com/photo.jpg', confirmation: 'CREATE POST' });
-    expect((await created.json()).result.structuredContent).toEqual({ id: 'new-post', status: 'draft' });
+    expect((await created.json()).result.structuredContent).toEqual({ id: 'new-post', status: 'draft', mcpAuditRecorded: true });
     expect(publishingMutations.create).toHaveBeenCalledWith(viewer, expect.objectContaining({ targetIds: ['page-a'], firstComment: 'follow-up', media: [{ kind: 'image', url: 'https://example.com/photo.jpg' }] }));
 
     const time = '2030-01-02T12:00:00.000Z';
@@ -699,7 +775,7 @@ describe('MCP workspace boundaries', () => {
     expect((await scheduled.json()).result.structuredContent).toMatchObject({ postId: 'new-post', status: 'scheduled' });
     expect(publishingMutations.schedule).toHaveBeenCalledWith(viewer, 'new-post', new Date(time));
     const updated = await call('update_post', { postId: 'new-post', message: 'edited', targetIds: ['page-a'], confirmation: 'UPDATE POST new-post' });
-    expect((await updated.json()).result.structuredContent).toEqual({ postId: 'new-post', updated: true });
+    expect((await updated.json()).result.structuredContent).toEqual({ postId: 'new-post', updated: true, mcpAuditRecorded: true });
     expect(publishingMutations.update).toHaveBeenCalledWith(viewer, expect.objectContaining({ postId: 'new-post', targetIds: ['page-a'] }));
     expect(db.$executeRaw).toHaveBeenCalled();
   });

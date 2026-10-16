@@ -1,3 +1,4 @@
+import { OperationError } from '@/lib/operation-error';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
@@ -117,8 +118,8 @@ async function assertManager(actor: DataControlActor) {
     where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } },
     select: { role: true },
   });
-  if (!membership) throw new Error('You are no longer a member of this workspace.');
-  if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can manage workspace data.');
+  if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
+  if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage workspace data.');
 }
 
 /** Export workspace content and operational history while stripping provider credentials. */
@@ -126,7 +127,7 @@ export async function exportWorkspaceData(actor: DataControlActor) {
   await assertManager(actor);
   const maxBytes = await runtimeConfig('data.maxArchiveBytes') as number;
   const workspace = await prisma.workspace.findUnique({ where: { id: actor.workspaceId } });
-  if (!workspace) throw new Error('This workspace is unavailable.');
+  if (!workspace) throw new OperationError('unavailable', 'This workspace is unavailable.');
   const [memberships, socialAccounts, targets, adAccounts, instagramAccounts, posts, legacy, indirect] = await Promise.all([
     prisma.membership.findMany({ where: { workspaceId: actor.workspaceId }, select: { id: true, role: true, user: { select: { id: true, name: true, email: true } } } }),
     prisma.socialAccount.findMany({ where: { workspaceId: actor.workspaceId }, select: { id: true, provider: true, providerUserId: true, name: true, pictureUrl: true, tokenExpiresAt: true, scopes: true, invalidatedAt: true, invalidReason: true, createdAt: true, updatedAt: true } }),
@@ -177,7 +178,7 @@ export async function exportWorkspaceData(actor: DataControlActor) {
     },
     security: { credentialsExcluded: true, auditLogExcluded: true, note: 'Provider access tokens and instance-wide audit records are excluded.' },
   }) as Record<string, any>;
-  if (Buffer.byteLength(JSON.stringify(exported)) > maxBytes) throw new Error('Workspace database export exceeds the configured archive size limit.');
+  if (Buffer.byteLength(JSON.stringify(exported)) > maxBytes) throw new OperationError('invalid_request', 'Workspace database export exceeds the configured archive size limit.');
   return exported;
 }
 
@@ -185,7 +186,7 @@ export async function exportWorkspaceData(actor: DataControlActor) {
 export async function previewWorkspaceDataDeletion(actor: DataControlActor) {
   await assertManager(actor);
   const workspace = await prisma.workspace.findUnique({ where: { id: actor.workspaceId }, select: { id: true } });
-  if (!workspace) throw new Error('This workspace is unavailable.');
+  if (!workspace) throw new OperationError('unavailable', 'This workspace is unavailable.');
   return { ...await collectWorkspaceDeletionCounts(prisma, actor.workspaceId), ...await indirectWorkspaceCounts(prisma, actor.workspaceId), ...await directWorkspaceCounts(prisma, actor.workspaceId) };
 }
 
@@ -253,16 +254,16 @@ function savedCounts(value: unknown): Record<string, number> {
 
 /** Queue a resumable purge, erase database rows, then remove the two workspace storage trees. */
 export async function deleteWorkspaceData(actor: DataControlActor, confirmation: string) {
-  if (confirmation !== 'DELETE') throw new Error('Type DELETE to confirm this action.');
+  if (confirmation !== 'DELETE') throw new OperationError('invalid_request', 'Type DELETE to confirm this action.');
   validateWorkspaceId(actor.workspaceId);
   const timeout = await runtimeConfig('data.deleteTransactionTimeoutMs');
   await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM workspaces WHERE id = ${actor.workspaceId} FOR UPDATE`;
     const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
-    if (!membership) throw new Error('You are no longer a member of this workspace.');
-    if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can manage workspace data.');
+    if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
+    if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage workspace data.');
     const workspace = await tx.workspace.findUnique({ where: { id: actor.workspaceId }, select: { id: true } });
-    if (!workspace) throw new Error('This workspace is unavailable.');
+    if (!workspace) throw new OperationError('unavailable', 'This workspace is unavailable.');
     const existing = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId } });
     if (existing?.status === 'requested' || existing?.status === 'db_deleted') return;
     const configuredRoot = await runtimeConfig('storage.mediaRoot');

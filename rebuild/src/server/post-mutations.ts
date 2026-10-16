@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { OperationError } from "@/lib/operation-error";
 import { prisma } from "./data";
 
 const EDITOR_ROLES = new Set(["owner", "admin", "editor"]);
@@ -12,7 +13,7 @@ export type PostMutationActor = { userId: string; workspaceId: string };
  */
 export async function createLocalDraft(actor: PostMutationActor, message: string) {
   const membership = await getCurrentMembership(actor);
-  if (!AUTHOR_ROLES.has(membership.role)) throw new Error("You do not have permission to create drafts.");
+  if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to create drafts.");
 
   const now = new Date();
   return prisma.post.create({
@@ -34,7 +35,7 @@ export async function createLocalDraft(actor: PostMutationActor, message: string
 /** Edit only an unconnected, unpublished draft in the actor's current workspace. */
 export async function updateLocalDraft(actor: PostMutationActor, postId: string, message: string) {
   const membership = await getCurrentMembership(actor);
-  if (!AUTHOR_ROLES.has(membership.role)) throw new Error("You do not have permission to edit drafts.");
+  if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to edit drafts.");
 
   const ownsPost = membership.role === "contributor";
   const result = await prisma.post.updateMany({
@@ -48,7 +49,7 @@ export async function updateLocalDraft(actor: PostMutationActor, postId: string,
     },
     data: { message, updatedAt: new Date() },
   });
-  if (result.count !== 1) throw new Error("This draft is unavailable or can no longer be edited.");
+  if (result.count !== 1) throw new OperationError('conflict', "This draft is unavailable or can no longer be edited.");
 }
 
 /**
@@ -57,7 +58,7 @@ export async function updateLocalDraft(actor: PostMutationActor, postId: string,
  */
 export async function deleteLocalDraft(actor: PostMutationActor, postId: string) {
   const membership = await getCurrentMembership(actor);
-  if (!AUTHOR_ROLES.has(membership.role)) throw new Error("You do not have permission to delete drafts.");
+  if (!AUTHOR_ROLES.has(membership.role)) throw new OperationError('forbidden', "You do not have permission to delete drafts.");
 
   const ownsPost = membership.role === "contributor";
   const result = await prisma.post.deleteMany({
@@ -70,7 +71,7 @@ export async function deleteLocalDraft(actor: PostMutationActor, postId: string)
       targets: { none: {} },
     },
   });
-  if (result.count !== 1) throw new Error("This draft is unavailable or can no longer be deleted.");
+  if (result.count !== 1) throw new OperationError('conflict', "This draft is unavailable or can no longer be deleted.");
 }
 
 async function getCurrentMembership(actor: PostMutationActor) {
@@ -78,6 +79,6 @@ async function getCurrentMembership(actor: PostMutationActor) {
     where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } },
     select: { role: true },
   });
-  if (!membership) throw new Error("You are no longer a member of this workspace.");
+  if (!membership) throw new OperationError('unauthorized', "You are no longer a member of this workspace.");
   return membership;
 }

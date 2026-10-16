@@ -28,6 +28,7 @@ vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: 
 import { hashLegacySessionToken } from '../src/server/auth';
 import { GET, POST } from '../src/app/api/mcp/route';
 import { clear } from '../src/server/rate-limit';
+import { runtimeConfig } from '../src/server/config/store';
 
 const token = Buffer.alloc(32, 3).toString('base64url');
 const session = {
@@ -60,6 +61,15 @@ beforeEach(() => {
 });
 
 describe('MCP route authentication', () => {
+  it('returns no-store JSON errors when ingress configuration is unavailable', async () => {
+    vi.mocked(runtimeConfig).mockRejectedValueOnce(new Error('postgres://private-password@db'));
+    const response = await POST(request());
+    expect(response.status).toBe(502);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const body = await response.json();
+    expect(body.error.code).toBe(-32603);
+    expect(JSON.stringify(body)).not.toContain('private-password');
+  });
   it('enforces the global MCP switch and a per-owner installation request budget', async () => {
     state.user = { id: 'u1', isInstanceOwner: true, disabledAt: null };
     const root = () => new Request('http://localhost/api/mcp?scope=installation', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) });

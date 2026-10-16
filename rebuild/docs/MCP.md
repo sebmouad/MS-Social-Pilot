@@ -40,8 +40,18 @@ The implemented private tools are `get_root_config`, `set_root_config`, `list_ro
 
 Root audit history accepts literal action/person search, exact workspace ID, inclusive UTC dates, bounded limits and filter-bound older/newer cursors. Raw audit payloads are omitted. Continue with the same filters, or reset to the latest page when the cursor becomes invalid.
 
+## Errors and write receipts
+
+Tool failures use `result.isError: true`; text and `structuredContent` contain the same public `error` and stable `code`. Only intentionally typed product errors retain their messages. Unexpected database, provider, storage and configuration exceptions are masked. Resource failures use JSON-RPC `error` with the safe operation code in `error.data.code`. Protocol/authentication errors remain JSON-RPC transport errors; responses are `no-store`.
+
+Malformed argument containers are rejected before tool dispatch. Analytics rejects rolled-over calendar dates rather than silently interpreting them as another day. Validation, unavailable selections, permissions, reconnect requirements and state conflicts remain actionable; internal paths, provider payloads and Root setup instructions do not become customer errors.
+
+A normal returned receipt describes the service outcome. Workspace writes with an additional MCP audit now include `mcpAuditRecorded`. If that secondary insert fails after the service returned, the outcome stays available with `mcpAuditRecorded: false` and a do-not-repeat warning. It does not erase a separate domain audit or guarantee one exists. Ads creation retains its existing `confirmedSuccess`, domain `auditRecorded` and `mcpAuditRecorded` receipt.
+
+An unexpected write error means the outcome could not be confirmed. Check the app and relevant remote state before repeating it, especially for publishing, replies and paid operations. Remote actions and local persistence are not one transaction; durable reconciliation, operation-specific idempotency and fully durable audit coverage remain release requirements. The response boundary alone does not solve those gaps.
+
 ## Evidence and gaps
 
 The guarded local script `scripts/verify-installation-mcp.ts` exercises actual password/TOTP login, pending-session denial, a zero-membership owner, private discovery, config audit, owner-created workspace-key isolation, disposable workspace suspension/restoration, UI recovery, demotion/disable denial and cleanup. Set `REBUILD_PREVIEW_ORIGIN` explicitly and use the isolated seeded loopback `_preview` database; the script rejects remote/production-shaped targets and prints no credentials.
 
-See `PREVIEW_QA.md` for actual checks. Remaining work includes the rest of Root and customer capability parity, generic workspace tool error hardening, wider client interoperability, provider verification and the migration/rollback/cutover gates. Production still runs the legacy application.
+See `PREVIEW_QA.md` for actual checks. Remaining work includes the rest of Root and customer capability parity, durable remote-write reconciliation and audit coverage, wider client interoperability, provider verification and the migration/rollback/cutover gates. Production still runs the legacy application.

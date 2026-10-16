@@ -126,6 +126,14 @@ async function readBodyLimited(request: Request, maxBytes: number): Promise<stri
 }
 
 export async function POST(request: Request) {
+  try { return await handlePost(request); }
+  catch (error) {
+    const failure = operationFailure(error, 'The MCP response could not be confirmed. Check the current state before repeating a write.');
+    return json({ jsonrpc: '2.0', id: null, error: { code: -32603, message: failure.error } }, { status: failure.status });
+  }
+}
+
+async function handlePost(request: Request) {
   const origin = request.headers.get('origin');
   if (origin && origin !== new URL(request.url).origin) {
     return json({ jsonrpc: '2.0', id: null, error: { code: -32003, message: 'Origin is not allowed.' } }, { status: 403 });

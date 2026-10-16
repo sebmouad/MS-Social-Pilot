@@ -1,3 +1,4 @@
+import { OperationError } from '@/lib/operation-error';
 import { prisma } from "./data";
 import { connectionState } from '@/lib/connection-status';
 import { isPlatformEnabled } from '@/server/platforms/registry';
@@ -11,9 +12,9 @@ export type ConnectionSelection = { kind: 'target' | 'adAccount'; id: string; en
 /** Read-only estimate of the local rows removed by disconnect delete mode. */
 export async function previewSocialAccountDeletion(actor: ConnectionMutationActor, socialAccountId: string) {
   const membership = await currentMembership(actor);
-  if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can change connections.');
+  if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
   const account = await prisma.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
-  if (!account) throw new Error('This source is unavailable in the current workspace.');
+  if (!account) throw new OperationError('unavailable', 'This source is unavailable in the current workspace.');
   return countDisconnectRows(prisma, actor.workspaceId, account);
 }
 
@@ -56,20 +57,20 @@ async function requireSelectableSource(tx: import('../../generated/client').Pris
     where: { id: socialAccountId, workspaceId },
     select: { id: true, provider: true, invalidatedAt: true, tokenExpiresAt: true },
   }) : null;
-  if (!source || connectionState(source) !== 'connected') throw new Error('Reconnect this source before selecting it.');
-  if (!await isPlatformEnabled(source.provider)) throw new Error('This connection is unavailable in the current workspace.');
+  if (!source || connectionState(source) !== 'connected') throw new OperationError('reconnect_required', 'Reconnect this source before selecting it.');
+  if (!await isPlatformEnabled(source.provider)) throw new OperationError('unavailable', 'This connection is unavailable in the current workspace.');
 }
 
 /** Apply a confirmed set of channel and ad account choices atomically. */
 export async function setConnectionSelections(actor: ConnectionMutationActor, items: ConnectionSelection[]) {
   const membership = await currentMembership(actor);
-  if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can change connections.');
-  if (items.length > 250 || new Set(items.map(item => `${item.kind}:${item.id}`)).size !== items.length) throw new Error('Invalid selection list.');
+  if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
+  if (items.length > 250 || new Set(items.map(item => `${item.kind}:${item.id}`)).size !== items.length) throw new OperationError('invalid_request', 'Invalid selection list.');
   await prisma.$transaction(async tx => {
     for (const item of items) {
       if (item.kind === 'target') {
         const target = await tx.target.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, type: true, providerId: true, socialAccountId: true } });
-        if (!target) throw new Error('This channel is unavailable in the current workspace.');
+        if (!target) throw new OperationError('unavailable', 'This channel is unavailable in the current workspace.');
         if (item.enabled) {
           await requireSelectableSource(tx, actor.workspaceId, target.socialAccountId);
         }
@@ -77,7 +78,7 @@ export async function setConnectionSelections(actor: ConnectionMutationActor, it
         if (target.type === 'instagram') await tx.instagramAccount.updateMany({ where: { workspaceId: actor.workspaceId, igUserId: target.providerId }, data: { enabled: item.enabled } });
       } else {
         const account = await tx.adAccount.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, socialAccountId: true } });
-        if (!account) throw new Error('This advertising account is unavailable in the current workspace.');
+        if (!account) throw new OperationError('unavailable', 'This advertising account is unavailable in the current workspace.');
         if (item.enabled) {
           await requireSelectableSource(tx, actor.workspaceId, account.socialAccountId);
         }
@@ -93,7 +94,7 @@ async function currentMembership(actor: ConnectionMutationActor) {
     where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } },
     select: { role: true },
   });
-  if (!membership) throw new Error("You are no longer a member of this workspace.");
+  if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
   return membership;
 }
 
@@ -102,11 +103,11 @@ async function currentMembership(actor: ConnectionMutationActor) {
 export async function disconnectSocialAccount(actor: ConnectionMutationActor, socialAccountId: string, mode: 'retain' | 'delete' = 'retain', confirmation?: string) {
   return prisma.$transaction(async tx => {
     const membership = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
-    if (!membership) throw new Error('You are no longer a member of this workspace.');
-    if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can change connections.');
-    if (mode === 'delete' && confirmation !== 'DELETE') throw new Error('Type DELETE to confirm related data removal.');
+    if (!membership) throw new OperationError('forbidden', 'You are no longer a member of this workspace.');
+    if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
+    if (mode === 'delete' && confirmation !== 'DELETE') throw new OperationError('invalid_request', 'Type DELETE to confirm related data removal.');
     const account = await tx.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
-    if (!account) throw new Error('This source is unavailable in the current workspace.');
+    if (!account) throw new OperationError('unavailable', 'This source is unavailable in the current workspace.');
     const targetIds = account.targets.map(item => item.id);
     const adAccountIds = account.adAccounts.map(item => item.id);
     const stillScheduled = targetIds.length ? await tx.postTarget.count({ where: { targetId: { in: targetIds }, status: 'scheduled_remote' } }) : 0;
@@ -121,7 +122,7 @@ export async function disconnectSocialAccount(actor: ConnectionMutationActor, so
       return { mode, stillScheduled, retained: { channels: targetIds.length, adAccounts: adAccountIds.length, instagramAccounts: instagramAccounts.length } };
     }
 
-    if (stillScheduled > 0) throw new Error('This source has posts still scheduled at the provider. Cancel or reconcile those posts before deleting its local records.');
+    if (stillScheduled > 0) throw new OperationError('conflict', 'This source has posts still scheduled at the provider. Cancel or reconcile those posts before deleting its local records.');
 
     const targetLinks = targetIds.length ? await tx.postTarget.findMany({ where: { targetId: { in: targetIds } }, select: { id: true, postId: true } }) : [];
     const instagramAccounts = await linkedInstagramAccounts(tx, actor.workspaceId, account.id, targetIds);

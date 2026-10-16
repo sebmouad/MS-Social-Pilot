@@ -9,6 +9,7 @@ import type { PlatformAdapter, PublishMedia } from '@/platforms/types';
 import { resolveCsvDestinationIds } from '@/lib/publishing/csv-destinations';
 import { readWorkspaceImage } from '@/server/media/storage';
 import { isValidTimeZone, wallTimeToInstant } from '@/lib/calendar-dates';
+import { OperationError } from '@/lib/operation-error';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
@@ -31,15 +32,17 @@ function storedImageId(media: PublishMedia): string | null {
 
 export function validatePostAttachments(input: PostAttachments, maxMedia: number, maxAlt: number) {
   const secureUrl = (value: string) => {
-    const parsed = new URL(value);
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new Error('Attachments require a public HTTPS URL without credentials.');
+    let parsed: URL;
+    try { parsed = new URL(value); }
+    catch { throw new OperationError('invalid_request', 'Attachments require a public HTTPS URL without credentials.'); }
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new OperationError('invalid_request', 'Attachments require a public HTTPS URL without credentials.');
     return parsed.toString();
   };
   const link = input.link?.trim() ? secureUrl(input.link.trim()) : null;
   const media = input.media ?? [];
-  if (media.length > maxMedia || media.some(item => !item || (item.kind !== 'image' && item.kind !== 'video') || typeof item.url !== 'string')) throw new Error(`Choose up to ${maxMedia} supported media attachments.`);
-  if (media.some(item => item.altText?.trim() && item.altText.trim().length > maxAlt)) throw new Error(`Image descriptions must be ${maxAlt} characters or fewer.`);
-  if ((link && media.length) || (media.some(item => item.kind === 'image') && media.some(item => item.kind === 'video'))) throw new Error('Choose a link, images, or a video; these formats cannot be combined in one post.');
+  if (media.length > maxMedia || media.some(item => !item || (item.kind !== 'image' && item.kind !== 'video') || typeof item.url !== 'string')) throw new OperationError('invalid_request', `Choose up to ${maxMedia} supported media attachments.`);
+  if (media.some(item => item.altText?.trim() && item.altText.trim().length > maxAlt)) throw new OperationError('invalid_request', `Image descriptions must be ${maxAlt} characters or fewer.`);
+  if ((link && media.length) || (media.some(item => item.kind === 'image') && media.some(item => item.kind === 'video'))) throw new OperationError('invalid_request', 'Choose a link, images, or a video; these formats cannot be combined in one post.');
   return { link, media: media.map(item => ({ kind: item.kind, url: storedImageId(item) ? item.url : secureUrl(item.url), ...(item.altText?.trim() ? { altText: item.altText.trim() } : {}) })) };
 }
 
@@ -57,46 +60,46 @@ export function assertLocalImageLimits(adapter: Pick<PlatformAdapter, 'localImag
     if (!item.localFile) continue;
     const limits = adapter.localImageUpload;
     if (!limits || item.localFile.bytes.byteLength > limits.maxBytes || !limits.mimeTypes.includes(item.localFile.mimeType)) {
-      throw new Error('A selected destination cannot publish this uploaded image. Choose an image within its supported type and size.');
+      throw new OperationError('invalid_request', 'A selected destination cannot publish this uploaded image. Choose an image within its supported type and size.');
     }
   }
 }
 
 async function membership(actor: PublishingActor) {
   const result = await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
-  if (!result) throw new Error('You are no longer a member of this workspace.');
-  if (!WRITERS.has(result.role)) throw new Error('You do not have permission to manage posts.');
+  if (!result) throw new OperationError('unauthorized', 'You are no longer a member of this workspace.');
+  if (!WRITERS.has(result.role)) throw new OperationError('forbidden', 'You do not have permission to manage posts.');
   return result;
 }
 
 function validText(value: string, maxText: number) {
   const text = value.trim();
-  if (!text || text.length > maxText) throw new Error(`Post text must be between 1 and ${maxText.toLocaleString()} characters.`);
+  if (!text || text.length > maxText) throw new OperationError('invalid_request', `Post text must be between 1 and ${maxText.toLocaleString()} characters.`);
   return text;
 }
 
 function validFirstComment(value: string, maxText: number) {
   const text = value.trim();
-  if (text.length > maxText) throw new Error(`First comment must be ${maxText.toLocaleString()} characters or fewer.`);
+  if (text.length > maxText) throw new OperationError('invalid_request', `First comment must be ${maxText.toLocaleString()} characters or fewer.`);
   return text || null;
 }
 
 async function validateTargets(actor: PublishingActor, ids: string[], maxTargets: number, media: PublishMedia[] = []) {
-  if (ids.length > maxTargets || new Set(ids).size !== ids.length) throw new Error(`Choose up to ${maxTargets} distinct destinations.`);
-  if (actor.allowedTargetIds && ids.some(id => !actor.allowedTargetIds!.includes(id))) throw new Error('One or more destinations are outside your channel access.');
+  if (ids.length > maxTargets || new Set(ids).size !== ids.length) throw new OperationError('invalid_request', `Choose up to ${maxTargets} distinct destinations.`);
+  if (actor.allowedTargetIds && ids.some(id => !actor.allowedTargetIds!.includes(id))) throw new OperationError('forbidden', 'One or more destinations are outside your channel access.');
   if (!ids.length) return [];
   const targets = await prisma.target.findMany({
     where: { id: { in: ids }, workspaceId: actor.workspaceId, enabled: true, canPublish: true },
     select: { id: true, type: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } },
   });
-  if (targets.length !== ids.length) throw new Error('One or more destinations are unavailable or cannot publish.');
+  if (targets.length !== ids.length) throw new OperationError('unavailable', 'One or more destinations are unavailable or cannot publish.');
   const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
-  if (!entitlements) throw new Error('This workspace is unavailable.');
+  if (!entitlements) throw new OperationError('unavailable', 'This workspace is unavailable.');
   for (const target of targets) {
     const provider = target.socialAccount?.provider;
     const adapter = provider ? await platformFor(provider, 'publishing') : null;
     if (!provider || !hasPlatformCapability(entitlements, provider) || !adapter?.publish || !adapter.supportsTargetKind?.(target.type, 'publishing') || target.socialAccount?.invalidatedAt || !target.accessToken) {
-      throw new Error('One or more destinations are unavailable or cannot publish.');
+      throw new OperationError('unavailable', 'One or more destinations are unavailable or cannot publish.');
     }
     assertLocalImageLimits(adapter, media);
   }
@@ -106,7 +109,7 @@ async function validateTargets(actor: PublishingActor, ids: string[], maxTargets
 async function assertPostScope(actor: PublishingActor, postId: string) {
   if (!actor.allowedTargetIds) return;
   const rows = await prisma.postTarget.findMany({ where: { postId, post: { workspaceId: actor.workspaceId } }, select: { targetId: true } });
-  if (rows.some(row => !actor.allowedTargetIds!.includes(row.targetId))) throw new Error('This post is unavailable in your channel scope.');
+  if (rows.some(row => !actor.allowedTargetIds!.includes(row.targetId))) throw new OperationError('forbidden', 'This post is unavailable in your channel scope.');
 }
 
 function canManage(role: string, authorId: string, userId: string) {
@@ -119,7 +122,7 @@ export async function submitPostForApproval(actor: PublishingActor, postId: stri
   await assertPostScope(actor, postId);
   await prisma.$transaction(async tx => {
     const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true } } } });
-    if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length) throw new Error('This post cannot be submitted for approval.');
+    if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length) throw new OperationError('conflict', 'This post cannot be submitted for approval.');
     await tx.post.update({ where: { id: post.id }, data: { status: 'pending_approval', scheduledAt: null, updatedAt: new Date() } });
     await audit(tx, actor, 'publishing.post_submitted_for_approval', { postId: post.id });
   });
@@ -128,20 +131,20 @@ export async function submitPostForApproval(actor: PublishingActor, postId: stri
 /** Reviewers may approve to draft or reject; clients cannot review their own posts. */
 export async function reviewPost(actor: PublishingActor, postId: string, decision: 'approve' | 'reject', note?: string) {
   const reviewNote = (note ?? '').trim();
-  if (reviewNote.length > 500) throw new Error('Keep the review note to 500 characters or fewer.');
+  if (reviewNote.length > 500) throw new OperationError('invalid_request', 'Keep the review note to 500 characters or fewer.');
   const member = await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
-  if (!member || !['owner', 'admin', 'editor', 'client'].includes(member.role)) throw new Error('You do not have permission to review posts.');
+  if (!member || !['owner', 'admin', 'editor', 'client'].includes(member.role)) throw new OperationError('forbidden', 'You do not have permission to review posts.');
   if (member.role === 'client') {
     const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { authorId: true } });
-    if (post?.authorId === actor.userId) throw new Error('You cannot review your own post.');
+    if (post?.authorId === actor.userId) throw new OperationError('forbidden', 'You cannot review your own post.');
   }
   await assertPostScope(actor, postId);
   await prisma.$transaction(async tx => {
     const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, status: true } });
-    if (!post || post.status !== 'pending_approval') throw new Error('This post is no longer awaiting approval.');
+    if (!post || post.status !== 'pending_approval') throw new OperationError('conflict', 'This post is no longer awaiting approval.');
     const status = decision === 'approve' ? 'draft' : 'rejected';
     const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'pending_approval' }, data: { status, updatedAt: new Date() } });
-    if (changed.count !== 1) throw new Error('This post is no longer awaiting approval.');
+    if (changed.count !== 1) throw new OperationError('conflict', 'This post is no longer awaiting approval.');
     await audit(tx, actor, decision === 'approve' ? 'publishing.post_approved' : 'publishing.post_rejected', { postId: post.id, ...(reviewNote ? { note: reviewNote } : {}) });
   });
 }
@@ -150,10 +153,10 @@ export async function reviewPost(actor: PublishingActor, postId: string, decisio
 export async function schedulePost(actor: PublishingActor, postId: string, scheduledAt: Date) {
   const role = await membership(actor);
   await assertPostScope(actor, postId);
-  if (!(scheduledAt instanceof Date) || !Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) throw new Error('Choose a future publishing time.');
+  if (!(scheduledAt instanceof Date) || !Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
   await prisma.$transaction(async tx => {
     const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { status: true } } } });
-    if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length || post.targets.some(target => target.status !== 'pending')) throw new Error('This post cannot be scheduled.');
+    if (!post || !canManage(role.role, post.authorId, actor.userId) || !['draft', 'rejected'].includes(post.status) || !post.targets.length || post.targets.some(target => target.status !== 'pending')) throw new OperationError('conflict', 'This post cannot be scheduled.');
     await tx.post.update({ where: { id: post.id }, data: { status: 'scheduled', scheduledAt, updatedAt: new Date() } });
     await audit(tx, actor, 'publishing.post_scheduled', { postId: post.id, scheduledAt: scheduledAt.toISOString() });
   });
@@ -169,17 +172,17 @@ export type RescheduleInput = { postId: string; date: string; time: string; time
 export async function reschedulePost(actor: PublishingActor, input: RescheduleInput) {
   const role = await membership(actor);
   await assertPostScope(actor, input.postId);
-  if (!isValidTimeZone(input.timeZone)) throw new Error('This workspace has no valid time zone.');
+  if (!isValidTimeZone(input.timeZone)) throw new OperationError('unavailable', 'This workspace has no valid time zone.');
   const resolved = wallTimeToInstant(input.date, input.time, input.timeZone);
-  if (!resolved.ok) throw new Error(resolved.reason === 'skipped' ? 'That time does not exist on that day because the clocks change. Choose another time.' : 'Choose a valid date and time.');
+  if (!resolved.ok) throw new OperationError('invalid_request', resolved.reason === 'skipped' ? 'That time does not exist on that day because the clocks change. Choose another time.' : 'Choose a valid date and time.');
   const scheduledAt = resolved.instant;
-  if (scheduledAt.getTime() <= Date.now()) throw new Error('Choose a future publishing time.');
+  if (scheduledAt.getTime() <= Date.now()) throw new OperationError('invalid_request', 'Choose a future publishing time.');
   await prisma.$transaction(async tx => {
     const post = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, scheduledAt: true, targets: { select: { status: true, remotePostId: true } } } });
-    if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new Error('This post cannot be rescheduled.');
-    if (post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new Error('Only posts that are still waiting to publish can be rescheduled.');
+    if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('conflict', 'This post cannot be rescheduled.');
+    if (post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new OperationError('conflict', 'Only posts that are still waiting to publish can be rescheduled.');
     const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'scheduled' }, data: { scheduledAt, updatedAt: new Date() } });
-    if (changed.count !== 1) throw new Error('Only posts that are still waiting to publish can be rescheduled.');
+    if (changed.count !== 1) throw new OperationError('conflict', 'Only posts that are still waiting to publish can be rescheduled.');
     await audit(tx, actor, 'publishing.post_rescheduled', { postId: post.id, from: post.scheduledAt?.toISOString() ?? null, to: scheduledAt.toISOString() });
   });
   return { scheduledAt };
@@ -191,9 +194,9 @@ export async function cancelScheduledPost(actor: PublishingActor, postId: string
   await assertPostScope(actor, postId);
   await prisma.$transaction(async tx => {
     const post = await tx.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { status: true, remotePostId: true } } } });
-    if (!post || !canManage(role.role, post.authorId, actor.userId) || post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new Error('This queued post can no longer be cancelled locally.');
+    if (!post || !canManage(role.role, post.authorId, actor.userId) || post.status !== 'scheduled' || post.targets.some(target => target.status !== 'pending' || target.remotePostId)) throw new OperationError('conflict', 'This queued post can no longer be cancelled locally.');
     const changed = await tx.post.updateMany({ where: { id: post.id, workspaceId: actor.workspaceId, status: 'scheduled' }, data: { status: 'draft', scheduledAt: null, updatedAt: new Date() } });
-    if (changed.count !== 1) throw new Error('This queued post can no longer be cancelled locally.');
+    if (changed.count !== 1) throw new OperationError('conflict', 'This queued post can no longer be cancelled locally.');
     await audit(tx, actor, 'publishing.post_schedule_cancelled', { postId: post.id });
   });
 }
@@ -206,7 +209,7 @@ export async function createPost(actor: PublishingActor, input: { message: strin
   const attachments = validatePostAttachments(input, config.maxMedia, config.maxAlt);
   const uploadMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
   const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia);
-  if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new Error('Choose a future publishing time and at least one destination.');
+  if (input.scheduledAt && (!Number.isFinite(input.scheduledAt.getTime()) || input.scheduledAt.getTime() <= Date.now() || !targets.length)) throw new OperationError('invalid_request', 'Choose a future publishing time and at least one destination.');
   const now = new Date();
   const id = randomUUID();
   await prisma.$transaction(async tx => {
@@ -229,8 +232,8 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
   const targets = await validateTargets(actor, input.targetIds, config.maxTargets, uploadMedia);
   await prisma.$transaction(async tx => {
     const existing = await tx.post.findFirst({ where: { id: input.postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, publishedAt: true, targets: { select: { id: true, status: true, remotePostId: true } } } });
-    if (!existing || (role.role === 'contributor' && existing.authorId !== actor.userId)) throw new Error('This post is unavailable in the current workspace.');
-    if (existing.publishedAt || ['publishing', 'published', 'partially_failed', 'scheduled'].includes(existing.status) || existing.targets.some(target => target.remotePostId || target.status === 'processing' || target.status === 'published' || target.status === 'scheduled_remote')) throw new Error('This post can no longer be edited.');
+    if (!existing || (role.role === 'contributor' && existing.authorId !== actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
+    if (existing.publishedAt || ['publishing', 'published', 'partially_failed', 'scheduled'].includes(existing.status) || existing.targets.some(target => target.remotePostId || target.status === 'processing' || target.status === 'published' || target.status === 'scheduled_remote')) throw new OperationError('conflict', 'This post can no longer be edited.');
     await tx.postTarget.deleteMany({ where: { postId: existing.id } });
     await tx.post.update({ where: { id: existing.id }, data: { message: text, firstComment, link: attachments.link, media: attachments.media, updatedAt: new Date(), targets: { create: targets.map(target => ({ id: randomUUID(), targetId: target.id, status: 'pending' as const })) } } });
     await audit(tx, actor, 'publishing.post_updated', { postId: existing.id, targetCount: targets.length });
@@ -241,21 +244,21 @@ export async function updatePost(actor: PublishingActor, input: { postId: string
 export async function deletePost(actor: PublishingActor, postId: string, deleteRemote: boolean) {
   const role = await membership(actor);
   await assertPostScope(actor, postId);
-  if (deleteRemote && !MANAGERS.has(role.role)) throw new Error('Only workspace owners, admins, and editors can delete remote posts.');
+  if (deleteRemote && !MANAGERS.has(role.role)) throw new OperationError('forbidden', 'Only workspace owners, admins, and editors can delete remote posts.');
   const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, providerId: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
-  if (!post || (role.role === 'contributor' && post.authorId !== actor.userId)) throw new Error('This post is unavailable in the current workspace.');
+  if (!post || (role.role === 'contributor' && post.authorId !== actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
   const remoteRows = post.targets.filter(row => row.remotePostId);
   const entitlements = deleteRemote ? await loadEntitlements(actor.userId, actor.workspaceId) : null;
   if (deleteRemote) for (const row of remoteRows) {
     const provider = row.target.socialAccount?.provider;
     const adapter = provider ? await platformFor(provider, 'remoteDelete') : null;
-    if (!provider || !entitlements || !hasPlatformCapability(entitlements, provider) || !adapter?.deleteRemote) throw new Error('Remote deletion is not supported for every destination. No remote deletion was attempted.');
+    if (!provider || !entitlements || !hasPlatformCapability(entitlements, provider) || !adapter?.deleteRemote) throw new OperationError('unavailable', 'Remote deletion is not supported for every destination. No remote deletion was attempted.');
   }
   if (deleteRemote && remoteRows.length) {
     for (const row of remoteRows) {
       const provider = row.target.socialAccount?.provider;
       const adapter = provider ? await platformFor(provider, 'remoteDelete') : null;
-      if (!adapter?.deleteRemote || !row.target.accessToken || row.target.socialAccount?.invalidatedAt) throw new Error('Reconnect this source before remote deletion. The local post is preserved.');
+      if (!adapter?.deleteRemote || !row.target.accessToken || row.target.socialAccount?.invalidatedAt) throw new OperationError('reconnect_required', 'Reconnect this source before remote deletion. The local post is preserved.');
       try {
         await adapter.deleteRemote({ credential: { accessToken: decryptSecret(row.target.accessToken) }, remoteId: row.remotePostId! });
         await prisma.$transaction(async tx => {
@@ -264,13 +267,13 @@ export async function deletePost(actor: PublishingActor, postId: string, deleteR
         });
       } catch {
         await prisma.$transaction(tx => audit(tx, actor, 'publishing.remote_delete_failed', { postId: post.id, postTargetId: row.id }));
-        throw new Error('The platform could not confirm remote deletion. The local post and publishing history are preserved.');
+        throw new OperationError('upstream_failure', 'The platform could not confirm remote deletion. The local post and publishing history are preserved.');
       }
     }
   }
   await prisma.$transaction(async tx => {
     const current = await tx.post.findFirst({ where: { id: post.id, workspaceId: actor.workspaceId }, select: { id: true } });
-    if (!current) throw new Error('This post was already deleted.');
+    if (!current) throw new OperationError('not_found', 'This post was already deleted.');
     await tx.postComment.deleteMany({ where: { postTarget: { postId: post.id } } });
     await tx.postTarget.deleteMany({ where: { postId: post.id } });
     await tx.post.delete({ where: { id: post.id } });
@@ -283,15 +286,15 @@ export async function publishPost(actor: PublishingActor, postId: string) {
   const role = await membership(actor);
   await assertPostScope(actor, postId);
   const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
-  if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new Error('This post is unavailable in the current workspace.');
-  if (!['draft', 'scheduled', 'failed', 'partially_failed'].includes(post.status)) throw new Error('This post cannot be published in its current state.');
-  if (post.status === 'scheduled' && (!post.scheduledAt || post.scheduledAt > new Date())) throw new Error('This post is scheduled for a future time.');
-  if (!post.targets.length) throw new Error('Select at least one destination before publishing.');
-  if (!Array.isArray(post.media)) throw new Error('Stored post media needs review before publishing.');
+  if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
+  if (!['draft', 'scheduled', 'failed', 'partially_failed'].includes(post.status)) throw new OperationError('conflict', 'This post cannot be published in its current state.');
+  if (post.status === 'scheduled' && (!post.scheduledAt || post.scheduledAt > new Date())) throw new OperationError('conflict', 'This post is scheduled for a future time.');
+  if (!post.targets.length) throw new OperationError('invalid_request', 'Select at least one destination before publishing.');
+  if (!Array.isArray(post.media)) throw new OperationError('invalid_request', 'Stored post media needs review before publishing.');
   const attachments = validatePostAttachments({ link: post.link ?? undefined, media: post.media as unknown as PublishMedia[] }, Number(await runtimeConfig('publishing.maxRemoteMediaPerPost')), Number(await runtimeConfig('publishing.maxImageAltCharacters')));
   const publishMedia = await resolvePublishMedia(actor.workspaceId, attachments.media);
   const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
-  if (!entitlements) throw new Error('This workspace is unavailable.');
+  if (!entitlements) throw new OperationError('unavailable', 'This workspace is unavailable.');
   if (publishMedia.some(item => item.localFile)) {
     for (const item of post.targets) {
       if (item.status === 'published' || item.remotePostId || !['pending', 'failed'].includes(item.status)) continue;
@@ -338,9 +341,9 @@ export async function syncPostStatus(actor: PublishingActor, postId: string) {
   const role = await membership(actor);
   await assertPostScope(actor, postId);
   const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, accessToken: true, socialAccount: { select: { provider: true, scopes: true, invalidatedAt: true } } } } } } } });
-  if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new Error('This post is unavailable in the current workspace.');
+  if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
   const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
-  if (!entitlements) throw new Error('This workspace is unavailable.');
+  if (!entitlements) throw new OperationError('unavailable', 'This workspace is unavailable.');
   const requiredScopes = new Set(((await runtimeConfig('meta.postReadScopes')) as string[]).map(scope => scope.trim()).filter(Boolean));
   let synced = 0;
   for (const item of post.targets) {
@@ -374,17 +377,17 @@ export async function syncPostStatus(actor: PublishingActor, postId: string) {
 /** Strict CSV with readable, semicolon-separated channel labels. */
 export async function importPostsCsv(actor: PublishingActor, csv: string) {
   const role = await membership(actor);
-  if (!MANAGERS.has(role.role)) throw new Error('Only workspace managers can import batches of posts.');
+  if (!MANAGERS.has(role.role)) throw new OperationError('forbidden', 'Only workspace managers can import batches of posts.');
   const config = await limits();
-  if (new TextEncoder().encode(csv).length > config.maxImportBytes) throw new Error(`CSV file must be ${Math.ceil(config.maxImportBytes / 1024)} KiB or smaller.`);
+  if (new TextEncoder().encode(csv).length > config.maxImportBytes) throw new OperationError('invalid_request', `CSV file must be ${Math.ceil(config.maxImportBytes / 1024)} KiB or smaller.`);
   const rows = parsePublishingCsv(csv);
-  if (rows.length < 2 || rows.length > config.maxImportRows + 1) throw new Error(`CSV must include a header and contain at most ${config.maxImportRows} posts.`);
+  if (rows.length < 2 || rows.length > config.maxImportRows + 1) throw new OperationError('invalid_request', `CSV must include a header and contain at most ${config.maxImportRows} posts.`);
   const header = rows[0]!.map(value => value.trim());
-  if (header.length !== 3 || header[0] !== 'message' || header[1] !== 'firstComment' || header[2] !== 'channels') throw new Error('CSV header must be message,firstComment,channels.');
+  if (header.length !== 3 || header[0] !== 'message' || header[1] !== 'firstComment' || header[2] !== 'channels') throw new OperationError('invalid_request', 'CSV header must be message,firstComment,channels.');
   const available = await prisma.target.findMany({ where: { workspaceId: actor.workspaceId, enabled: true, canPublish: true, ...(actor.allowedTargetIds ? { id: { in: [...actor.allowedTargetIds] } } : {}) }, select: { id: true, name: true, type: true, socialAccount: { select: { provider: true } } } });
   const choices = available.map(target => ({ id: target.id, name: target.name, type: target.type, provider: target.socialAccount?.provider ?? null }));
   const inputs = rows.slice(1).map((row, index) => {
-    if (row.length !== 3) throw new Error(`CSV row ${index + 2} must have exactly three columns.`);
+    if (row.length !== 3) throw new OperationError('invalid_request', `CSV row ${index + 2} must have exactly three columns.`);
     return { message: validText(row[0]!, config.maxText), firstComment: validFirstComment(row[1]!, config.maxText), targetIds: resolveCsvDestinationIds(row[2]!, choices, index + 2) };
   });
   for (const input of inputs) await validateTargets(actor, input.targetIds, config.maxTargets);
@@ -408,7 +411,7 @@ export function parsePublishingCsv(source: string): string[][] {
       if (char === '"' && source[i + 1] === '"') { cell += '"'; i++; }
       else if (char === '"') { quoted = false; closedQuote = true; }
       else cell += char;
-    } else if (closedQuote && char !== ',' && char !== '\n' && char !== '\r') throw new Error('CSV has characters after a closing quote.');
+    } else if (closedQuote && char !== ',' && char !== '\n' && char !== '\r') throw new OperationError('invalid_request', 'CSV has characters after a closing quote.');
     else if (char === '"' && cell.length === 0) quoted = true;
     else if (char === ',') { row.push(cell); cell = ''; closedQuote = false; }
     else if (char === '\n' || char === '\r') {
@@ -418,7 +421,7 @@ export function parsePublishingCsv(source: string): string[][] {
       row = []; closedQuote = false;
     } else cell += char;
   }
-  if (quoted) throw new Error('CSV contains an unclosed quoted field.');
+  if (quoted) throw new OperationError('invalid_request', 'CSV contains an unclosed quoted field.');
   row.push(cell);
   if (row.some(value => value.trim())) rows.push(row);
   return rows;
