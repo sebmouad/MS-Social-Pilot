@@ -46,6 +46,7 @@ vi.mock('../src/server/media/storage', () => ({ listWorkspaceImages: media.list,
 
 import { handleMcpMessage, type McpViewer } from '../src/server/mcp/server';
 import { resolvePermissions } from '../src/server/permissions';
+import { OperationError } from '../src/lib/operation-error';
 
 const viewer: McpViewer = {
   userId: 'user-a', workspaceId: 'workspace-a', role: 'owner',
@@ -105,6 +106,41 @@ beforeEach(() => {
 });
 
 describe('MCP workspace boundaries', () => {
+  it('does not expose provider exception details from live Ads reads', async () => {
+    adsMutations.read.mockRejectedValueOnce(new Error('Provider unavailable: access_token=private-example'));
+    const response = await call('get_live_ad_status', { adAccountId: 'account-a', objectId: 'campaign-a', objectType: 'campaign' });
+    const result = (await response.json()).result;
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result)).not.toMatch(/access_token|private-example|Provider/);
+  });
+  it('preserves actionable module errors through MCP with the same public code as HTTP', async () => {
+    adsMutations.read.mockRejectedValueOnce(new OperationError('reconnect_required', 'Reconnect this advertising connection and allow advertising changes.'));
+    const response = await call('get_live_ad_status', { adAccountId: 'account-a', objectId: 'campaign-a', objectType: 'campaign' });
+    const result = (await response.json()).result;
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toEqual({ code: 'reconnect_required', error: 'Reconnect this advertising connection and allow advertising changes.' });
+  });
+  it('rejects string budgets instead of coercing a different input shape than HTTP accepts', async () => {
+    const response = await call('update_ad', { adAccountId: 'account-a', objectId: 'campaign-a', objectType: 'campaign', dailyBudgetMinor: '500', confirmation: 'SET AD BUDGET campaign-a TO 500 MINOR UNITS' });
+    const result = (await response.json()).result;
+    expect(result.isError).toBe(true);
+    expect(adsMutations.update).not.toHaveBeenCalled();
+  });
+  it('sanitizes unexpected failures from Ads creation metadata as well as provider requests', async () => {
+    db.adAccount.findFirst.mockResolvedValueOnce({ id: 'account-a', currency: 'USD', socialAccount: { provider: 'facebook' } });
+    const { canManageWorkspaceAds } = await import('../src/server/ads/actions');
+    vi.mocked(canManageWorkspaceAds).mockRejectedValueOnce(new Error('Root configuration unavailable: private-example'));
+    const result = (await (await call('get_ad_creation_options', { adAccountId: 'account-a' })).json()).result;
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result)).not.toMatch(/Root|private-example/);
+  });
+  it('returns a safe JSON-RPC error when an Ads resource read fails', async () => {
+    adsQueries.dataset.mockRejectedValueOnce(new Error('Private provider or database detail: private-example'));
+    const response = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 90, method: 'resources/read', params: { uri: 'msp://ads/performance' } });
+    const result = await response.json();
+    expect(result.error).toBeDefined();
+    expect(JSON.stringify(result)).not.toMatch(/Private|private-example/);
+  });
   it('lists and reads image metadata only inside the authenticated workspace scope', async () => {
     const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 30, method: 'tools/list' });
     expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('list_workspace_images');

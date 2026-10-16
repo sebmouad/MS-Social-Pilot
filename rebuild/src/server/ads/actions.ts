@@ -8,6 +8,7 @@ import type { ScopedPageAccess } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { runtimeConfig } from '@/server/config/store';
 import { platformAds } from '@/server/platforms/registry';
+import { OperationError } from '@/lib/operation-error';
 
 const MANAGER_ROLES = new Set(['owner', 'admin']);
 const OBJECT_TYPES = new Set<AdMutationRequest['objectType']>(['campaign', 'adset', 'ad']);
@@ -47,7 +48,7 @@ export async function campaignCreationConfirmation(workspaceId: string, adAccoun
     select: { socialAccount: { select: { provider: true } } },
   });
   const host = account?.socialAccount ? await platformAds(account.socialAccount.provider) : null;
-  if (!host) throw new Error('The selected advertising account is unavailable.');
+  if (!host) throw new OperationError('unavailable', 'The selected advertising account is unavailable.');
   const normalizedName = name.trim();
   host.validateCampaign(normalizedName, objective);
   return host.campaignConfirmation(adAccountId, normalizedName, objective);
@@ -93,8 +94,8 @@ export async function canReadWorkspaceAds(actor: AdsActionActor, adAccountId: st
 
 /** Read one stored-history-verified ad object using its account's provider module. */
 export async function readWorkspaceAdObject(actor: AdsActionActor, input: AdsObjectReadInput, allowedTargetIds?: readonly string[]) {
-  if (!OBJECT_TYPES.has(input.objectType) || !/^[A-Za-z0-9_-]{1,100}$/.test(input.objectId)) throw new Error('Invalid ad object.');
-  if (!(await canReadWorkspaceAds(actor, input.adAccountId, allowedTargetIds))) throw new Error('Ads performance access is unavailable.');
+  if (!OBJECT_TYPES.has(input.objectType) || !/^[A-Za-z0-9_-]{1,100}$/.test(input.objectId)) throw new OperationError('invalid_request', 'Invalid ad object.');
+  if (!(await canReadWorkspaceAds(actor, input.adAccountId, allowedTargetIds))) throw new OperationError('forbidden', 'Ads performance access is unavailable.');
   const account = await prisma.adAccount.findFirst({
     where: {
       id: input.adAccountId, workspaceId: actor.workspaceId, ...ACCOUNT_WHERE,
@@ -103,23 +104,23 @@ export async function readWorkspaceAdObject(actor: AdsActionActor, input: AdsObj
     select: { id: true, actId: true, socialAccount: { select: { provider: true, accessToken: true, invalidatedAt: true, tokenExpiresAt: true } } },
   });
   const connection = account?.socialAccount;
-  if (!account || !connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) throw new Error('This advertising account is unavailable.');
+  if (!account || !connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) throw new OperationError('unavailable', 'This advertising account is unavailable.');
   const owned = await prisma.adInsight.findFirst({ where: { adAccountId: account.id, level: input.objectType, objectId: input.objectId }, select: { id: true } });
-  if (!owned) throw new Error('This ad object cannot be verified for the selected account.');
+  if (!owned) throw new OperationError('not_found', 'This ad object cannot be verified for the selected account.');
   const accessToken = decryptSecret(connection.accessToken);
-  if (!accessToken) throw new Error('This advertising account is unavailable.');
+  if (!accessToken) throw new OperationError('unavailable', 'This advertising account is unavailable.');
   const ads = await platformAds(connection.provider);
-  if (!ads) throw new Error('Ads object reads are unavailable.');
+  if (!ads) throw new OperationError('unavailable', 'Ads object reads are unavailable.');
   return ads.read({ credential: { accessToken }, accountId: account.actId, objectId: input.objectId, objectType: input.objectType });
 }
 
 async function requireAdsManager(actor: AdsActionActor) {
   const membership = await prisma.membership.findUnique({ where: { userId_workspaceId: { userId: actor.userId, workspaceId: actor.workspaceId } }, select: { role: true } });
-  if (!membership) throw new Error('You are no longer a member of this workspace.');
-  if (!MANAGER_ROLES.has(membership.role)) throw new Error('Only workspace owners and admins can manage ads.');
+  if (!membership) throw new OperationError('unauthorized', 'You are no longer a member of this workspace.');
+  if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage ads.');
   const [entitlements, permissions] = await Promise.all([loadEntitlements(actor.userId, actor.workspaceId), loadPermissions(actor.userId, actor.workspaceId)]);
-  if (!entitlements || !permissions) throw new Error('Workspace access is unavailable.');
-  if (!canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', 'write')) throw new Error('Ads management is not enabled for this workspace.');
+  if (!entitlements || !permissions) throw new OperationError('unavailable', 'Workspace access is unavailable.');
+  if (!canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', 'write')) throw new OperationError('forbidden', 'Ads management is not available for this workspace.');
   return permissions;
 }
 
@@ -136,14 +137,14 @@ async function managedAccount(actor: AdsActionActor, adAccountId: string, permis
     select: { id: true, actId: true, socialAccount: { select: { provider: true, accessToken: true, scopes: true, invalidatedAt: true, tokenExpiresAt: true } } },
   });
   const connection = account?.socialAccount;
-  if (!account || !connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) throw new Error('This advertising account or its connection is unavailable. Reconnect it before managing ads.');
+  if (!account || !connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) throw new OperationError('reconnect_required', 'This advertising account or its connection is unavailable. Reconnect it before managing ads.');
   const ads = await platformAds(connection.provider);
-  if (!ads) throw new Error('The advertising platform is disabled or Ads capability is unavailable.');
+  if (!ads) throw new OperationError('unavailable', 'Advertising changes are currently unavailable.');
   const [required, managementEnabled] = await Promise.all([ads.manageScopes(), runtimeConfig('ads.managementEnabled') as Promise<boolean>]);
-  if (managementEnabled !== true) throw new Error('Ads management is disabled in Root configuration.');
+  if (managementEnabled !== true) throw new OperationError('unavailable', 'Ads management is currently unavailable.');
   ads.validateManageScopes(required, scopes(connection.scopes));
   const accessToken = decryptSecret(connection.accessToken);
-  if (!accessToken) throw new Error('This advertising connection is unavailable. Reconnect it before managing ads.');
+  if (!accessToken) throw new OperationError('reconnect_required', 'This advertising connection is unavailable. Reconnect it before managing ads.');
   return { account, connection, ads, credential: { accessToken } };
 }
 
@@ -151,16 +152,16 @@ async function managedAccount(actor: AdsActionActor, adAccountId: string, permis
 export async function updateWorkspaceAd(actor: AdsActionActor, input: AdsActionInput) {
   const permissions = await requireAdsManager(actor);
   const hasStatus = input.status !== undefined, hasDailyBudget = input.dailyBudgetMinor !== undefined, hasLifetimeBudget = input.lifetimeBudgetMinor !== undefined;
-  if (!OBJECT_TYPES.has(input.objectType) || !input.objectId || !/^[A-Za-z0-9_-]{1,100}$/.test(input.objectId)) throw new Error('Invalid ad object.');
-  if (![hasStatus, hasDailyBudget, hasLifetimeBudget].filter(Boolean).length || (hasDailyBudget && hasLifetimeBudget)) throw new Error('Choose one valid ad change.');
-  if (hasStatus && input.status !== 'active' && input.status !== 'paused') throw new Error('Invalid ad status.');
+  if (!OBJECT_TYPES.has(input.objectType) || !input.objectId || !/^[A-Za-z0-9_-]{1,100}$/.test(input.objectId)) throw new OperationError('invalid_request', 'Invalid ad object.');
+  if ([hasStatus, hasDailyBudget, hasLifetimeBudget].filter(Boolean).length !== 1) throw new OperationError('invalid_request', 'Choose one valid ad change.');
+  if (hasStatus && input.status !== 'active' && input.status !== 'paused') throw new OperationError('invalid_request', 'Invalid ad status.');
   const budget = hasDailyBudget ? input.dailyBudgetMinor : input.lifetimeBudgetMinor;
-  if (budget !== undefined && (!Number.isSafeInteger(budget) || budget < 1)) throw new Error('Budgets must be positive whole minor currency units.');
+  if (budget !== undefined && (!Number.isSafeInteger(budget) || budget < 1)) throw new OperationError('invalid_request', 'Budgets must be positive whole minor currency units.');
   const confirmation = budget !== undefined ? `SET AD BUDGET ${input.objectId} TO ${budget} MINOR UNITS` : `SET AD STATUS ${input.objectId} TO ${input.status!.toUpperCase()}`;
-  if (input.confirmation !== confirmation) throw new Error(`Confirmation required. Repeat with confirmation exactly: ${confirmation}`);
+  if (input.confirmation !== confirmation) throw new OperationError('invalid_request', `Confirmation required. Repeat with confirmation exactly: ${confirmation}`);
   const { account, ads, credential } = await managedAccount(actor, input.adAccountId, permissions);
   const owned = await prisma.adInsight.findFirst({ where: { adAccountId: account.id, level: input.objectType, objectId: input.objectId }, select: { id: true } });
-  if (!owned) throw new Error('This ad object cannot be verified for the selected account.');
+  if (!owned) throw new OperationError('not_found', 'This ad object cannot be verified for the selected account.');
   await ads.update({ credential, accountId: account.actId, objectId: input.objectId, objectType: input.objectType,
     ...(hasStatus ? { status: input.status } : {}), ...(hasDailyBudget ? { dailyBudgetMinor: input.dailyBudgetMinor } : {}), ...(hasLifetimeBudget ? { lifetimeBudgetMinor: input.lifetimeBudgetMinor } : {}) });
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`ads_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'ads.object_updated', ${JSON.stringify({ workspaceId: actor.workspaceId, adAccountId: account.id, objectId: input.objectId, objectType: input.objectType, ...(hasStatus ? { status: input.status } : {}), ...(hasDailyBudget ? { dailyBudgetMinor: input.dailyBudgetMinor } : {}), ...(hasLifetimeBudget ? { lifetimeBudgetMinor: input.lifetimeBudgetMinor } : {}) })}::jsonb, NOW())`;
@@ -173,7 +174,7 @@ export async function createWorkspaceAdCampaign(actor: AdsActionActor, input: Ad
   const name = input.name.trim();
   ads.validateCampaign(name, input.objective);
   const confirmation = ads.campaignConfirmation(input.adAccountId, name, input.objective);
-  if (input.confirmation !== confirmation) throw new Error(`Confirmation required. Repeat with confirmation exactly: ${confirmation}`);
+  if (input.confirmation !== confirmation) throw new OperationError('invalid_request', `Confirmation required. Repeat with confirmation exactly: ${confirmation}`);
   const result = await ads.createCampaign({ credential, accountId: account.actId, name, objective: input.objective });
   const auditRecorded = await recordAdsCreationAudit(actor, 'ads.campaign_created', { adAccountId: account.id, campaignId: result.remoteId, name, objective: input.objective, status: 'PAUSED' }, { adAccountId: account.id, campaignId: result.remoteId });
   return { created: true as const, campaignId: result.remoteId, status: 'paused' as const, auditRecorded, ...(auditRecorded ? {} : { warning: creationAuditWarning }) };
@@ -181,16 +182,16 @@ export async function createWorkspaceAdCampaign(actor: AdsActionActor, input: Ad
 
 /** Create a paused ad set under a campaign verified in this account's insight history. */
 export async function createWorkspaceAdSet(actor: AdsActionActor, input: AdsAdSetCreateInput, pageScopeAll: boolean) {
-  if (!pageScopeAll) throw new Error('Ad set creation is unavailable for limited page access.');
+  if (!pageScopeAll) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
   const permissions = await requireAdsManager(actor);
-  if (!permissions.pageScope.all) throw new Error('Ad set creation is unavailable for limited page access.');
+  if (!permissions.pageScope.all) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
   const { account, ads, credential } = await managedAccount(actor, input.adAccountId, permissions);
   const name = input.name.trim();
   ads.validateAdSet({ ...input, name });
   const confirmation = ads.adSetConfirmation({ ...input, name });
-  if (input.confirmation !== confirmation) throw new Error(`Confirmation required. Repeat with confirmation exactly: ${confirmation}`);
+  if (input.confirmation !== confirmation) throw new OperationError('invalid_request', `Confirmation required. Repeat with confirmation exactly: ${confirmation}`);
   const parentCampaign = await prisma.adInsight.findFirst({ where: { adAccountId: account.id, level: 'campaign', objectId: input.campaignId }, select: { id: true } });
-  if (!parentCampaign) throw new Error('This campaign cannot be verified for the selected account.');
+  if (!parentCampaign) throw new OperationError('not_found', 'This campaign cannot be verified for the selected account.');
   const result = await ads.createAdSet({ credential, accountId: account.actId, campaignId: input.campaignId, name, dailyBudgetMinor: input.dailyBudgetMinor, countryCode: input.countryCode, optimizationGoal: input.optimizationGoal });
   const auditRecorded = await recordAdsCreationAudit(actor, 'ads.adset_created', { adAccountId: account.id, campaignId: input.campaignId, adSetId: result.remoteId, name, dailyBudgetMinor: input.dailyBudgetMinor, countryCode: input.countryCode, optimizationGoal: input.optimizationGoal, status: 'PAUSED' }, { adAccountId: account.id, campaignId: input.campaignId, adSetId: result.remoteId });
   return { created: true as const, adSetId: result.remoteId, status: 'paused' as const, auditRecorded, ...(auditRecorded ? {} : { warning: creationAuditWarning }) };

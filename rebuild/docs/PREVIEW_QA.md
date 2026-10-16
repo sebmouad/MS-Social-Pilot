@@ -73,4 +73,14 @@ Facebook owns Messenger reply-window calculation, its configuration read and saf
 
 The combined suite passed 415 tests across 88 files, including both rollback-only PostgreSQL probes against the dedicated preview database. TypeScript checking, the production build and `git diff --check` passed.
 
+## Typed Ads failures and write shape
+
+Regression tests reproduced raw internal/provider exception exposure through the four Ads HTTP routes, a live-read MCP tool and Ads creation metadata. Shared routes now accept explicitly safe operation errors and mask unknown exceptions, without matching provider strings. Facebook scope-policy failures use availability/reconnect copy rather than Root setup instructions. All MCP Ads tool calls share the boundary and preserve public messages and codes. A failing Ads resource read also has regression coverage for safe JSON-RPC failure responses.
+
+The actual local browser session checked management refusal through HTTP and MCP with `ads.managementEnabled` temporarily off. HTTP returned **409**, MCP returned a tool error, and both carried `code: unavailable` and `Ads management is currently unavailable.` The original Root value was verified and restored in a `finally` block. The open Publishing page was unchanged and no provider mutation was attempted.
+
+Separate regressions caught combined status-and-budget changes accepted by the shared service and numeric-string budgets coerced by MCP despite HTTP rejecting them. The service now enforces exactly one change; MCP rejects non-number budgets. The current full suite passed **442 tests**, with **2 database probes explicitly skipped** because this run omitted their database environment variable. Both probes passed in the preceding Inbox batch. Current TypeScript checking passed. These are synthetic and automated boundary checks, not live provider or full authorization-parity evidence.
+
+Final local HTTP/MCP checks returned `invalid_request` for a string budget; MCP also refused a combined status/budget update before any provider request. The production build passed in an isolated temporary source copy so the user's running preview was not interrupted. Existing Autoprefixer CSS start/end compatibility warnings remain. `git diff --check` passed.
+
 Consolidation verification: **406 tests in 87 files**, both PostgreSQL probes, TypeScript checking and production compilation passed. A limited scan of 74 generated browser chunks found none of the checked module-runtime/credential-helper markers; this is supporting boundary evidence, not a complete security audit.

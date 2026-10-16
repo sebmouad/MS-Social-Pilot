@@ -1,3 +1,4 @@
+import { adsErrorResponse } from '@/server/ads/errors';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
@@ -24,16 +25,7 @@ export async function POST(request: Request) {
     const object = await withWorkspaceOperation(viewer.workspaceId, () => readWorkspaceAdObject({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input, allowedTargetIds));
     return NextResponse.json({ object }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
-    if (error instanceof z.ZodError || error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid ad object request.' }, { status: 400 });
-    if (!(error instanceof Error)) return NextResponse.json({ error: 'The ad object could not be read.' }, { status: 500 });
-    const known: Array<[string, number]> = [
-      ['Invalid ad object', 400], ['Ads performance access is unavailable', 403],
-      ['cannot be verified', 404], ['unavailable', 409], ['Workspace data deletion is in progress.', 409],
-    ];
-    const match = known.find(([phrase]) => error.message.includes(phrase));
-    return match
-      ? NextResponse.json({ error: error.message }, { status: match[1], headers: { 'cache-control': 'no-store' } })
-      : NextResponse.json({ error: 'The ad object could not be read. Check the connection and try again.' }, { status: 502, headers: { 'cache-control': 'no-store' } });
+    return adsErrorResponse(error, 'Invalid ad object request.');
   }
 }
 

@@ -25,6 +25,8 @@ up), the generic routes `/api/connections/<id>/start|callback`, and the
 Product code reaches a platform only through `src/server/platforms/registry.ts`
 (`platformFor(id, capability)`, `isPlatformEnabled`, `connectionFlow`). `host.ts` defines neutral server ports; `index.ts` maps provider IDs to module-owned host exports and contains no provider orchestration. Shared retry code consumes `PlatformApiError.retryable`; each adapter classifies its own protocol errors.
 
+Ads policy failures use the neutral `OperationError` contract with an intentional public message and stable code. Shared HTTP routes map codes to HTTP protocol status without interpreting provider text. MCP live reads and mutations use the same safe boundary. Unknown provider failures receive generic customer copy; adapter setup and scope identifiers are not forwarded as customer instructions. A module must never construct an `OperationError` from untrusted remote text.
+
 To add a platform: build its engine, `module.ts`, host connection flow, and job
 hooks, then add it to both installed lists and add its tests. This makes it
 available in Root; customer capabilities must be wired and verified before

@@ -1,5 +1,6 @@
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
+import { OperationError } from '@/lib/operation-error';
 
 /** Fail closed before any workspace mutation or provider call during erasure. */
 export async function assertWorkspaceNotPurging(workspaceId: string): Promise<void> {
@@ -7,7 +8,7 @@ export async function assertWorkspaceNotPurging(workspaceId: string): Promise<vo
     where: { workspaceId }, select: { status: true },
   });
   if (purge && purge.status !== 'completed') {
-    throw new Error('Workspace data deletion is in progress.');
+    throw new OperationError('conflict', 'Workspace data deletion is in progress.');
   }
 }
 
@@ -23,9 +24,9 @@ export async function withWorkspaceOperation<T>(workspaceId: string, operation: 
   ]);
   return prisma.$transaction(async tx => {
     const rows = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM workspaces WHERE id = ${workspaceId} FOR SHARE`;
-    if (!rows.length) throw new Error('This workspace is unavailable.');
+    if (!rows.length) throw new OperationError('unavailable', 'This workspace is unavailable.');
     const purge = await tx.workspaceDataPurge.findUnique({ where: { workspaceId }, select: { status: true } });
-    if (purge && purge.status !== 'completed') throw new Error('Workspace data deletion is in progress.');
+    if (purge && purge.status !== 'completed') throw new OperationError('conflict', 'Workspace data deletion is in progress.');
     return operation();
   }, { timeout, maxWait });
 }

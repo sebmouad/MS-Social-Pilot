@@ -11,9 +11,17 @@ const sharedFiles = [
   'src/server/analytics/aggregate.ts', 'src/server/analytics/reports.ts',
   'src/server/platforms/host.ts', 'src/server/ads/actions.ts', 'src/server/jobs/retry.ts', 'src/app/analytics/page.tsx',
   'src/app/ads/CampaignCreateForm.tsx', 'src/app/ads/AdSetCreateForm.tsx',
+  'src/app/api/ads/actions/route.ts', 'src/app/api/ads/campaigns/route.ts', 'src/app/api/ads/adsets/route.ts', 'src/app/api/ads/object/route.ts', 'src/server/ads/errors.ts',
 ];
 
 describe('completed platform boundaries', () => {
+  it('uses typed Ads errors without matching provider or configuration messages', () => {
+    for (const file of ['actions', 'campaigns', 'adsets', 'object']) {
+      const content = readFileSync(resolve(`src/app/api/ads/${file}/route.ts`), 'utf8');
+      expect(content).not.toMatch(/Facebook|Root has not configured|\.message\.includes/);
+      expect(content).toContain('adsErrorResponse');
+    }
+  });
   it.each(sharedFiles)('%s imports neutral contracts or dispatch rather than a provider implementation', file => {
     const source = ts.createSourceFile(file, readFileSync(resolve(file), 'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
     const violations: string[] = [];

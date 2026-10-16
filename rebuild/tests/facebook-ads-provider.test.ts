@@ -13,6 +13,17 @@ const input = { credential: { accessToken: 'secret-token' }, accountId: 'act_99'
 const response = (body: unknown, ok = true) => ({ ok, status: ok ? 200 : 400, json: async () => body }) as Response;
 
 describe('Facebook ad set creation', () => {
+  it('exposes safe actionable failures without internal Root setup or scope identifiers', () => {
+    for (const required of [[], ['ads_read']]) {
+      try { facebookAdsHost.validateManageScopes(required, ['ads_management']); throw new Error('Expected refusal'); }
+      catch (error) {
+        expect(error).toMatchObject({ code: 'unavailable', message: 'Advertising changes are currently unavailable.' });
+      }
+    }
+    try { facebookAdsHost.validateManageScopes(['ads_management'], ['ads_read']); throw new Error('Expected refusal'); }
+    catch (error) { expect(error).toMatchObject({ code: 'reconnect_required', message: 'Reconnect this advertising connection and allow advertising changes.' }); }
+    expect(() => facebookAdsHost.validateManageScopes(['ads_management'], ['ads_management'])).not.toThrow();
+  });
   it('owns the campaign and ad set form options, copy, and exact-confirmation formats', () => {
     expect(facebookAdsHost.ui.campaign?.options.map(option => option.value)).toContain('OUTCOME_TRAFFIC');
     expect(facebookAdsHost.ui.campaign?.confirmationTemplate).toContain('FACEBOOK CAMPAIGN');

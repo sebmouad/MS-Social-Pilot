@@ -1,4 +1,6 @@
 import { inboxTargetWhere } from '../inbox/providers';
+import { withAdsErrorBoundary } from '../ads/errors';
+import { OperationError } from '@/lib/operation-error';
 import { selectedResourceConnectionWhere } from '../platforms/resource-visibility';
 import { prisma } from '../data';
 import { enabledSocialAccountWhere } from '../platforms/registry';
@@ -148,12 +150,12 @@ function confirmedAdsReceipt(result: Record<string, unknown>, mcpAuditRecorded: 
 }
 
 function requireConfirmation(args: Record<string, unknown>, expected: string) {
-  if (args.confirmation !== expected) throw new Error(`Confirmation required. Repeat the call with confirmation exactly: ${expected}`);
+  if (args.confirmation !== expected) throw new OperationError('invalid_request', `Confirmation required. Repeat the call with confirmation exactly: ${expected}`);
 }
 
 function requiredString(args: Record<string, unknown>, key: string) {
   const value = args[key];
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`${key} is required.`);
+  if (typeof value !== 'string' || !value.trim()) throw new OperationError('invalid_request', `${key} is required.`);
   return value.trim();
 }
 
@@ -182,12 +184,18 @@ async function loadScopedAnalytics(viewer: McpViewer, args: Record<string, unkno
 }
 
 async function runTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
+  return toolFeatures[name] === 'ads/campaigns'
+    ? withAdsErrorBoundary(() => executeTool(viewer, name, args))
+    : executeTool(viewer, name, args);
+}
+
+async function executeTool(viewer: McpViewer, name: string, args: Record<string, unknown>) {
   if (rootTools.has(name) && !canUseRootTool(viewer)) throw new Error('Root configuration is unavailable.');
   if (dataTools.has(name) && !canManageData(viewer)) throw new Error('Only workspace owners and admins can manage workspace data.');
-  if (adsManagerTools.has(name) && !canManageData(viewer)) throw new Error('Only workspace owners and admins can manage ads.');
+  if (adsManagerTools.has(name) && !canManageData(viewer)) throw new OperationError('forbidden', 'Only workspace owners and admins can manage ads.');
   const feature = toolFeatures[name];
-  if (feature) requireFeature(viewer.entitlements, feature);
-  if (feature && (!viewer.permissions || !canAccessFeature(viewer.permissions, feature, writeTools.has(name) ? 'write' : 'read'))) throw new Error('You do not have permission to use this feature.');
+  if (feature && !canUseFeature(viewer.entitlements, feature)) throw new OperationError('forbidden', 'This feature is unavailable.');
+  if (feature && (!viewer.permissions || !canAccessFeature(viewer.permissions, feature, writeTools.has(name) ? 'write' : 'read'))) throw new OperationError('forbidden', 'You do not have permission to use this feature.');
   if (writeTools.has(name) && name !== 'delete_workspace_data' && name !== 'set_root_config') {
     await assertWorkspaceNotPurging(viewer.workspaceId);
   }
@@ -335,10 +343,10 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       return { range, metric: { key: metric.key, label: metric.label, sourceLabel: metric.sourceLabel, unit: metric.unit, kind: metric.kind }, detailKind: kind, totalCount: details.length, offset, items, nextOffset: offset + items.length < details.length ? offset + items.length : null };
     }
     case 'list_ad_accounts': {
-      if (viewer.role !== 'owner' && viewer.role !== 'admin') throw new Error('Only workspace owners and admins can list advertising accounts.');
+      if (viewer.role !== 'owner' && viewer.role !== 'admin') throw new OperationError('forbidden', 'Only workspace owners and admins can list advertising accounts.');
       const offset = args.offset === undefined ? 0 : Number(args.offset);
       const limit = args.limit === undefined ? cap : Number(args.limit);
-      if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('offset and limit must be valid integers.');
+      if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new OperationError('invalid_request', 'offset and limit must be valid integers.');
       const pageLimit = Math.min(limit, cap);
       const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer));
       const [accounts, accountCount] = await Promise.all([
@@ -351,32 +359,32 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const date = (key: 'start' | 'end') => {
         const value = args[key];
         if (value === undefined) return undefined;
-        if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error(`${key} must be a valid YYYY-MM-DD date.`);
+        if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new OperationError('invalid_request', `${key} must be a valid YYYY-MM-DD date.`);
         const parsed = new Date(`${value}T00:00:00.000Z`);
-        if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) throw new Error(`${key} must be a valid YYYY-MM-DD date.`);
+        if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) throw new OperationError('invalid_request', `${key} must be a valid YYYY-MM-DD date.`);
         return value;
       };
       const start = date('start');
       const end = date('end');
-      if (start && end && start > end) throw new Error('start must not be after end.');
+      if (start && end && start > end) throw new OperationError('invalid_request', 'start must not be after end.');
       const range = analyticsRange(start, end);
       const maxRangeDays = Number(await runtimeConfig('analytics.maxRangeDays'));
-      if ((range.to.getTime() - range.from.getTime()) / 86_400_000 > maxRangeDays) throw new Error(`Date range exceeds the configured ${maxRangeDays}-day maximum.`);
+      if ((range.to.getTime() - range.from.getTime()) / 86_400_000 > maxRangeDays) throw new OperationError('invalid_request', `Date range exceeds the configured ${maxRangeDays}-day maximum.`);
       const allowedTargetIds = pageIdsFor(viewer);
       const accounts = await getAdsAccounts(viewer.workspaceId, allowedTargetIds);
-      if (args.accountId !== undefined && (typeof args.accountId !== 'string' || !accounts.some(account => account.id === args.accountId))) throw new Error('Ad account is unavailable in this workspace.');
+      if (args.accountId !== undefined && (typeof args.accountId !== 'string' || !accounts.some(account => account.id === args.accountId))) throw new OperationError('unavailable', 'Ad account is unavailable in this workspace.');
       const accountId = args.accountId as string | undefined;
       const filters = { period: 'custom' as const, since: range.from, until: range.to, accountId: accountId ?? null };
       const { insights } = await getAdsDataset(viewer.workspaceId, filters, allowedTargetIds);
       const level = args.level;
-      if (level !== undefined && !['campaign', 'adset', 'ad'].includes(String(level))) throw new Error('level must be campaign, adset, or ad.');
+      if (level !== undefined && !['campaign', 'adset', 'ad'].includes(String(level))) throw new OperationError('invalid_request', 'level must be campaign, adset, or ad.');
       const rows = summarizeInsights(insights, level as string | undefined).filter(row => ['campaign', 'adset', 'ad'].includes(row.level));
       const offset = args.offset === undefined ? 0 : Number(args.offset);
       const limit = args.limit === undefined ? Math.min(cap, 50) : Number(args.limit);
-      if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('offset and limit must be valid integers.');
+      if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new OperationError('invalid_request', 'offset and limit must be valid integers.');
       const pageLimit = Math.min(limit, cap);
       const accountOffset = args.accountOffset === undefined ? 0 : Number(args.accountOffset);
-      if (!Number.isInteger(accountOffset) || accountOffset < 0) throw new Error('accountOffset must be a non-negative integer.');
+      if (!Number.isInteger(accountOffset) || accountOffset < 0) throw new OperationError('invalid_request', 'accountOffset must be a non-negative integer.');
       const performance = rows.slice(offset, offset + pageLimit).map(row => ({
         id: row.id, name: row.name, level: row.level, accountId: row.accountId, accountName: row.accountName, currency: row.currency,
         spend: row.spend, impressions: row.impressions, clicks: row.clicks, reach: row.reach, reachDate: row.reachDate,
@@ -390,12 +398,12 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const adAccountId = requiredString(args, 'adAccountId');
       const objectId = requiredString(args, 'objectId');
       const objectType = requiredString(args, 'objectType') as 'campaign' | 'adset' | 'ad';
-      if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(objectId) || !['campaign', 'adset', 'ad'].includes(objectType)) throw new Error('Invalid ad object request.');
+      if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(objectId) || !['campaign', 'adset', 'ad'].includes(objectType)) throw new OperationError('invalid_request', 'Invalid ad object request.');
       return readWorkspaceAdObject({ userId: viewer.userId, workspaceId: viewer.workspaceId }, { adAccountId, objectId, objectType }, pageIdsFor(viewer));
     }
     case 'get_ad_creation_options': {
       const adAccountId = requiredString(args, 'adAccountId');
-      if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId)) throw new Error('Invalid ad account ID.');
+      if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId)) throw new OperationError('invalid_request', 'Invalid ad account ID.');
       const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer));
       const account = await prisma.adAccount.findFirst({
         where: { ...where, id: adAccountId },
@@ -404,7 +412,7 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const provider = account?.socialAccount?.provider;
       const host = provider ? await platformAds(provider) : null;
       const manageable = account && await canManageWorkspaceAds({ userId: viewer.userId, workspaceId: viewer.workspaceId }, adAccountId);
-      if (!account || !provider || !host || !manageable) throw new Error('The selected advertising account is unavailable.');
+      if (!account || !provider || !host || !manageable) throw new OperationError('unavailable', 'The selected advertising account is unavailable.');
       return {
         adAccountId: account.id,
         provider,
@@ -431,15 +439,15 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const countryCode = requiredString(args, 'countryCode');
       const optimizationGoal = requiredString(args, 'optimizationGoal');
       const confirmation = requiredString(args, 'confirmation');
-      if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(campaignId) || typeof dailyBudgetMinor !== 'number' || !Number.isSafeInteger(dailyBudgetMinor) || dailyBudgetMinor < 1 || !/^[A-Z]{2}$/.test(countryCode)) throw new Error('Invalid ad set request.');
-      if (viewer.permissions?.pageScope.all !== true) throw new Error('Ad set creation is unavailable for limited page access.');
+      if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(campaignId) || typeof dailyBudgetMinor !== 'number' || !Number.isSafeInteger(dailyBudgetMinor) || dailyBudgetMinor < 1 || !/^[A-Z]{2}$/.test(countryCode)) throw new OperationError('invalid_request', 'Invalid ad set request.');
+      if (viewer.permissions?.pageScope.all !== true) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
       const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer));
       const account = await prisma.adAccount.findFirst({
         where: { ...where, id: adAccountId },
         select: { socialAccount: { select: { provider: true } } },
       });
       const host = account?.socialAccount ? await platformAds(account.socialAccount.provider) : null;
-      if (!host) throw new Error('The selected advertising account is unavailable.');
+      if (!host) throw new OperationError('unavailable', 'The selected advertising account is unavailable.');
       requireConfirmation(args, host.adSetConfirmation({ adAccountId, campaignId, name: nameValue.trim(), dailyBudgetMinor, countryCode, optimizationGoal }));
       const result = await createWorkspaceAdSet(viewer, { adAccountId, campaignId, name: nameValue, dailyBudgetMinor, countryCode, optimizationGoal, confirmation }, true);
       const mcpAuditRecorded = await auditConfirmedAdsWrite(viewer, name, { adAccountId, campaignId, adSetId: result.adSetId });
@@ -450,8 +458,9 @@ async function runTool(viewer: McpViewer, name: string, args: Record<string, unk
       const objectId = requiredString(args, 'objectId');
       const objectType = requiredString(args, 'objectType') as AdMutationRequest['objectType'];
       const status = args.status === undefined ? undefined : requiredString(args, 'status') as AdMutationRequest['status'];
-      const dailyBudgetMinor = args.dailyBudgetMinor === undefined ? undefined : Number(args.dailyBudgetMinor);
-      const lifetimeBudgetMinor = args.lifetimeBudgetMinor === undefined ? undefined : Number(args.lifetimeBudgetMinor);
+      const dailyBudgetMinor = args.dailyBudgetMinor;
+      const lifetimeBudgetMinor = args.lifetimeBudgetMinor;
+      if ((dailyBudgetMinor !== undefined && typeof dailyBudgetMinor !== 'number') || (lifetimeBudgetMinor !== undefined && typeof lifetimeBudgetMinor !== 'number')) throw new OperationError('invalid_request', 'Budgets must be positive whole minor currency units.');
       const confirmation = requiredString(args, 'confirmation');
       const budget = dailyBudgetMinor ?? lifetimeBudgetMinor;
       if (budget !== undefined) requireConfirmation(args, `SET AD BUDGET ${objectId} TO ${budget} MINOR UNITS`);
@@ -603,7 +612,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
   if (method === 'ping') return reply({});
   if (method === 'initialize') {
     const requested = String(params.protocolVersion ?? '');
-    return reply({ protocolVersion: versions.includes(requested) ? requested : versions[0], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } }, serverInfo: { name: 'ms-social-pilot', version: '0.1.0' }, instructions: `Workspace-scoped access for ${viewer.workspace.name}. Writes can manage local posts, publish posts, sync provider status, change channel/ad account selections, or manage Facebook Inbox items. Publishing, remote post deletion, Inbox replies, and comment moderation contact social platforms. Every write requires an explicit confirmation string. Times use ${viewer.workspace.timezone}.` });
+    return reply({ protocolVersion: versions.includes(requested) ? requested : versions[0], capabilities: { tools: { listChanged: false }, resources: { subscribe: false, listChanged: false } }, serverInfo: { name: 'ms-social-pilot', version: '0.1.0' }, instructions: `Workspace-scoped access for ${viewer.workspace.name}. Writes can manage local posts, publish posts, sync provider status, change channel/ad account selections, or manage connected-platform Inbox items. Publishing, remote post deletion, Inbox replies, and comment moderation contact social platforms. Every write requires an explicit confirmation string. Times use ${viewer.workspace.timezone}.` });
   }
   if (method === 'tools/list') return reply({ tools: tools.filter(tool => rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (!adsManagerTools.has(tool.name) || canManageData(viewer)) && (!dataTools.has(tool.name) || canManageData(viewer))) });
   if (method === 'tools/call') {
@@ -618,7 +627,7 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
         : await runTool(viewer, name, args);
       return reply(textResult(result));
     }
-    catch (e) { return reply({ ...textResult({ error: e instanceof Error ? e.message : 'Tool failed.' }), isError: true }); }
+    catch (e) { return reply({ ...textResult({ error: e instanceof Error ? e.message : 'Tool failed.', ...(e instanceof OperationError ? { code: e.code } : {}) }), isError: true }); }
   }
   if (method === 'resources/list') return reply({ resources: [
     { uri: 'msp://workspace', name: 'Workspace', description: 'Current workspace details.', mimeType: 'application/json' },
@@ -637,18 +646,22 @@ export async function handleMcpMessage(viewer: McpViewer, message: Record<string
   if (method === 'resources/read') {
     const uri = String(params.uri ?? '');
     if (dataResource(uri) && (!canManageData(viewer) || !canUseFeature(viewer.entitlements, 'settings/data') || !viewer.permissions || !canAccessFeature(viewer.permissions, 'settings/data', 'read'))) return error(-32602, 'Resource unavailable.');
-    let contents: unknown;
-    if (uri === 'msp://workspace') contents = viewer.workspace;
-    else if (uri === 'msp://targets') contents = await runTool(viewer, 'list_pages', {});
-    else if (uri === 'msp://posts') contents = await runTool(viewer, 'list_posts', { limit: 100 });
-    else if (uri === 'msp://media/images') contents = await runTool(viewer, 'list_workspace_images', { limit: 100 });
-    else if (uri === 'msp://inbox') contents = await runTool(viewer, 'list_inbox', { limit: 50 });
-    else if (uri === 'msp://analytics/overview') contents = await runTool(viewer, 'get_analytics_overview', {});
-    else if (uri === 'msp://ads/performance') contents = await runTool(viewer, 'get_ads_performance', {});
-    else if (uri === 'msp://data/deletion-preview') contents = await runTool(viewer, 'preview_workspace_data_deletion', {});
-    else if (uri === 'msp://root/config') contents = await runTool(viewer, 'get_root_config', {});
-    else return error(-32602, `Unknown resource: ${uri}`);
-    return reply({ contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(contents, null, 2) }] });
+    try {
+      let contents: unknown;
+      if (uri === 'msp://workspace') contents = viewer.workspace;
+      else if (uri === 'msp://targets') contents = await runTool(viewer, 'list_pages', {});
+      else if (uri === 'msp://posts') contents = await runTool(viewer, 'list_posts', { limit: 100 });
+      else if (uri === 'msp://media/images') contents = await runTool(viewer, 'list_workspace_images', { limit: 100 });
+      else if (uri === 'msp://inbox') contents = await runTool(viewer, 'list_inbox', { limit: 50 });
+      else if (uri === 'msp://analytics/overview') contents = await runTool(viewer, 'get_analytics_overview', {});
+      else if (uri === 'msp://ads/performance') contents = await runTool(viewer, 'get_ads_performance', {});
+      else if (uri === 'msp://data/deletion-preview') contents = await runTool(viewer, 'preview_workspace_data_deletion', {});
+      else if (uri === 'msp://root/config') contents = await runTool(viewer, 'get_root_config', {});
+      else return error(-32602, `Unknown resource: ${uri}`);
+      return reply({ contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(contents, null, 2) }] });
+    } catch (failure) {
+      return error(-32603, failure instanceof OperationError ? failure.message : 'The resource could not be read.');
+    }
   }
   if (method === 'notifications/initialized' || method === 'notifications/cancelled') return new Response(null, { status: 202 });
   return error(-32601, `Method not found: ${String(method)}`);

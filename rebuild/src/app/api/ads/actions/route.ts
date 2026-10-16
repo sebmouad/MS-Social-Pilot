@@ -1,3 +1,4 @@
+import { adsErrorResponse } from '@/server/ads/errors';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireViewer } from '@/server/context';
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     await withWorkspaceOperation(viewer.workspaceId, () => updateWorkspaceAd({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, input));
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
-    return actionError(error);
+    return adsErrorResponse(error, 'Invalid ads action.');
   }
 }
 
@@ -35,29 +36,4 @@ function sameOrigin(request: Request) {
   const origin = request.headers.get('origin');
   if (!origin) return false;
   try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
-}
-
-function actionError(error: unknown) {
-  if (error instanceof z.ZodError || error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid ads action.' }, { status: 400 });
-  if (!(error instanceof Error)) return NextResponse.json({ error: 'The ads action could not be completed.' }, { status: 500 });
-  const known: Array<[string, number]> = [
-    ['Confirmation required.', 400],
-    ['Invalid ad', 400],
-    ['Budgets must', 400],
-    ['Choose one valid', 400],
-    ['Only workspace owners and admins', 403],
-    ['Ads management is not enabled', 403],
-    ['Ads management is disabled in Root configuration', 403],
-    ['Facebook platform is disabled', 403],
-    ['Root has not configured', 403],
-    ['Reconnect this Facebook source', 403],
-    ['no longer a member', 401],
-    ['cannot be verified', 404],
-    ['unavailable', 409],
-    ['Workspace data deletion is in progress.', 409],
-  ];
-  const match = known.find(([phrase]) => error.message.includes(phrase));
-  return match
-    ? NextResponse.json({ error: error.message }, { status: match[1], headers: { 'cache-control': 'no-store' } })
-    : NextResponse.json({ error: 'The ads action could not be completed. Check the connection and try again.' }, { status: 502, headers: { 'cache-control': 'no-store' } });
 }
