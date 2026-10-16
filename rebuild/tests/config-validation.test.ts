@@ -27,7 +27,13 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(30);
+    expect(CONFIG_SCHEMA_VERSION).toBe(31);
+    expect(CONFIG_BY_KEY.get('root.activityPageSize')!.defaultValue).toBe(50);
+    expect(CONFIG_BY_KEY.get('root.activityPageSize')!.consumption).toBe('active');
+    expect(CONFIG_BY_KEY.get('root.activityPageSize')!.schema.safeParse(1).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('root.activityPageSize')!.schema.safeParse(1000).success).toBe(true);
+    expect(CONFIG_BY_KEY.get('root.activityPageSize')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('root.activityPageSize')!.schema.safeParse(1001).success).toBe(false);
     expect(CONFIG_BY_KEY.get('connections.statusLabels')!.schema.safeParse({ connected: 'Connected', expired: 'Reconnect needed', revoked: 'Reconnect needed' }).success).toBe(true);
     expect(CONFIG_BY_KEY.get('connections.statusLabels')!.schema.safeParse({ connected: ' ', expired: 'Expired' }).success).toBe(false);
     expect(CONFIG_BY_KEY.get('publishing.maxImageAltCharacters')!.schema.safeParse(500).success).toBe(true);

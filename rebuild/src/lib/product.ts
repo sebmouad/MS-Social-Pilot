@@ -18,6 +18,7 @@ export interface ProductModule {
   title: string;
   mobileTitle?: string;
   href: string;
+  primaryAction?: { readonly href: string; readonly label: string; readonly featureId: string };
 }
 
 export const MODULES: readonly ProductModule[] = moduleManifests.map((module) => ({
@@ -25,6 +26,7 @@ export const MODULES: readonly ProductModule[] = moduleManifests.map((module) =>
   title: module.title,
   mobileTitle: 'mobileTitle' in module ? module.mobileTitle : undefined,
   href: module.href,
+  primaryAction: 'primaryAction' in module ? module.primaryAction : undefined,
 }));
 
 export const PAGES: readonly ProductPage[] = moduleManifests.flatMap(({ id: module, pages }) =>

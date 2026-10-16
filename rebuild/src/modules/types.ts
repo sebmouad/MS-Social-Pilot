@@ -14,4 +14,5 @@ export interface ModuleManifest {
   readonly mobileTitle?: string;
   readonly href: string;
   readonly pages: readonly ModulePageManifest[];
+  readonly primaryAction?: { readonly href: string; readonly label: string; readonly featureId: string };
 }

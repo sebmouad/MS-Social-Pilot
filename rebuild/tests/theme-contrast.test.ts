@@ -22,6 +22,17 @@ function contrast(first: string, second: string) {
 }
 
 describe('theme text contrast', () => {
+  it('keeps module rail and primary-action labels readable in every theme', () => {
+    for (const theme of THEMES) {
+      const override = css.match(new RegExp(`:root\\[data-theme="${theme.id}"\\]\\s*\\{([^}]+)\\}`))?.[1] ?? '';
+      const value = (name: string) => token(override, name) ?? token(base, name);
+      for (const [ink, surface] of [['rail-ink', 'rail-bg'], ['rail-active-ink', 'rail-active-bg'], ['on-accent', 'accent'], ['on-accent', 'accent-hover']]) {
+        const foreground = value(ink), background = value(surface);
+        expect(foreground && background, `${theme.name}: ${ink} on ${surface} should have tokens`).toBeTruthy();
+        expect(contrast(foreground!, background!), `${theme.name}: ${ink} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
   it('keeps small secondary text at WCAG AA contrast on every shared surface', () => {
     for (const theme of THEMES) {
       const override = css.match(new RegExp(`:root\\[data-theme="${theme.id}"\\]\\s*\\{([^}]+)\\}`))?.[1] ?? '';

@@ -24,7 +24,7 @@ rounded:
   lg: "18px"
 spacing:
   unit: "4px"
-  content: "36px"
+  content: "32px"
 components:
   button: {}
   panel: {}
@@ -50,6 +50,8 @@ Do not use pill-shaped control groups that wrap unpredictably, nested settings m
 
 Grove uses the exact frontmatter palette. Accent identifies the active module and primary safe actions; danger is reserved for destructive actions; warning flags recoverable risk. Borders and tonal surfaces establish hierarchy before shadows do. Charts must label metrics and units in text and must not rely on color alone. Muted text uses `#5f6c62` in Grove, `#596e78` in Coast, and `#7e6558` in Clay so small helper text meets WCAG AA on their canvas, panels, and muted surfaces. Nightfall preserves the same semantic hierarchy with lighter text and accent on dark surfaces. Forced-colors mode should retain system contrast.
 
+The module rail has its own semantic palette: Grove `#172e24`, Coast `#162e3b`, Clay `#392a23`, Nightfall `#0b141a`. Use `--rail-ink`, `--rail-active-bg` and `--rail-active-ink` for its controls, and `--on-accent` for primary action text. Contrast regressions cover normal/selected rail labels and primary action normal/hover text in all four themes.
+
 ## Typography
 
 Inter and the system sans stack carry navigation, forms, and prose. Use a restrained display scale for route titles and a tighter tabular/data treatment for counts and IDs. Use sentence case in controls and plain verbs. Numeric totals need visible coverage, period, and source when ambiguity matters. Do not shrink interactive labels merely to make a crowded layout fit.
@@ -58,7 +60,11 @@ Inter and the system sans stack carry navigation, forms, and prose. Use a restra
 
 The desktop shell uses **two left sidebars**: a narrow module rail and a contextual sidebar for the active module. This restores the legacy structure at the user's explicit request on 2026-10-16; it supersedes the earlier single 256px sidebar direction. Workspace selection, quick creation, page links, filters, view pickers and Root configuration categories belong in the contextual sidebar. Do not add a third settings/category menu inside the content. The work area remains flexible and readable, with a capped content measure and responsive inset. Each sidebar owns its vertical scroll. A keyboard skip link leads directly to the main content. On narrow screens, module navigation stays accessible and contextual navigation/filters open from a labeled top-bar control with focus trapping, Escape and focus return. Tables own horizontal overflow. The publishing calendar becomes an agenda below 720px. Forms and data panels keep natural document scrolling unless a component has its own bounded surface.
 
+Current geometry is an 84px module rail and 252px contextual sidebar, reduced to 74px/224px from 1024–1240px. Below 1024px the context opens as a drawer; at phone widths the module rail becomes bottom navigation. Content caps at 1600px, with responsive insets. The drawer makes the work area and module rail inert, locks background scrolling and keeps its own close control. Root uses the same shell with separate private navigation; route-local controls use `SidebarDock` rather than creating a content-side menu.
+
 Publishing should lead with content rather than an always-expanded composer and import form. Its shared social-style post preview shows channel identity, actual status/time, text, media/link content, first comment and destination outcomes. Feed, card and table views share the same scoped data and actions, with the view picker in the contextual sidebar. Full creation has its own composer; batch import is an explicit secondary task. Do not invent engagement counts, imitate provider-only controls, or mix platform business rules into shared previews. URL and file controls inherit the active theme rather than browser-default light styling.
+
+The user approved Table as the default, with Feed and Cards available. Keep row actions collapsed under Manage post and CSV import as a secondary disclosure. First comments and per-destination outcomes appear in previews; safe media references resolve through the authorized media API. Missing author profile data must use an honest fallback rather than an invented identity.
 
 ## Elevation & Depth
 

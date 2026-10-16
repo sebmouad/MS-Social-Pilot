@@ -5,6 +5,7 @@ export const publishingManifest = {
   title: 'Publishing',
   mobileTitle: 'Publish',
   href: '/publishing/posts',
+  primaryAction: { href: '/publishing/compose', label: 'New post', featureId: 'publishing/posts' },
   pages: [
     { id: 'publishing/posts', title: 'Posts', href: '/publishing/posts', description: 'Create and manage content across your channels.' },
     { id: 'publishing/calendar', title: 'Calendar', href: '/publishing/calendar', description: 'See what is planned and published.' },

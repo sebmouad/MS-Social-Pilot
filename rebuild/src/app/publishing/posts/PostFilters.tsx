@@ -9,6 +9,11 @@ const statuses = [
   ['partially_failed', 'Partially Failed'], ['failed', 'Failed'], ['cancelled', 'Cancelled'],
 ] as const;
 
+export type PostView = 'table' | 'feed' | 'cards';
+export function parsePostView(value: string | null | undefined): PostView {
+  return value === 'feed' || value === 'cards' ? value : 'table';
+}
+
 export function PostFilters({ channels, currentMonth }: { channels: Array<{ id: string; name: string }>; currentMonth: string }) {
   const pathname = usePathname();
   const params = useSearchParams();
@@ -21,6 +26,12 @@ export function PostFilters({ channels, currentMonth }: { channels: Array<{ id: 
   </form>;
   return <form action="/publishing/posts" method="get" className={styles.postFilters} key={params.toString()}>
     <p className="shell-subnav__label">Post Filters</p>
+    <label htmlFor="post-view-filter">View</label>
+    <select id="post-view-filter" name="view" defaultValue={parsePostView(params.get('view'))}>
+      <option value="table">Table</option>
+      <option value="feed">Feed</option>
+      <option value="cards">Cards</option>
+    </select>
     <label htmlFor="post-status-filter">Status</label>
     <select id="post-status-filter" name="status" defaultValue={params.get('status') ?? ''}>
       <option value="">All statuses</option>

@@ -1,9 +1,11 @@
-import { DataTable, type TableColumn } from "@/components";
+import { DataTable, StatusChip, type TableColumn } from "@/components";
+import { PostPreview, type PostPreviewPost } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
 import { getTargets, listPostPage } from "@/server/data";
-import { PageHeading, PostMessage, PostTargets, StatusBadge, formatDate } from "../publishing-ui";
+import { PageHeading, PostMessage, PostTargets, formatDate } from "../publishing-ui";
 import styles from "../publishing.module.css";
-import { CsvImportForm, PostEditorForm, PostRowActions } from "./PostActions";
+import previewStyles from '@/components/PostPreview.module.css';
+import { CsvImportForm, PostRowActions } from "./PostActions";
 import { hasPlatformCapability } from "@/server/entitlements";
 import { platformFor } from '@/server/platforms/registry';
 import { runtimeConfig } from '@/server/config/store';
@@ -27,9 +29,10 @@ const NOTICE_TEXT: Record<string, string> = {
   synced: "Remote status sync completed.",
 };
 
-export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; page?: string; status?: string; channel?: string }> }) {
+export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; page?: string; status?: string; channel?: string; view?: string }> }) {
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
-  const { notice, page: pageParam, status, channel } = await searchParams;
+  const { notice, page: pageParam, status, channel, view: viewParam } = await searchParams;
+  const view = viewParam === 'feed' || viewParam === 'cards' ? viewParam : 'table';
   const [allowedMimeTypes, maxUploadBytes, maxAltCharacters] = await Promise.all([
     runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'), runtimeConfig('publishing.maxImageAltCharacters'),
   ]);
@@ -46,7 +49,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     const adapter = provider && hasPlatformCapability(viewer.entitlements, provider) ? await platformFor(provider, 'publishing') : null;
     return { id: target.id, name: target.name, type: target.type, provider, canPublish: Boolean(target.canPublish && !target.socialAccount?.invalidatedAt && adapter?.publish && adapter.supportsTargetKind?.(target.type, 'publishing')) };
   }));
-  const rows = listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string }> }));
+  const rows = listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }> }));
   const noticeText = notice ? NOTICE_TEXT[notice] ?? (notice.startsWith('imported-') ? `${notice.slice('imported-'.length)} posts imported as drafts.` : undefined) : undefined;
   const canManageDrafts = ["owner", "admin", "editor"].includes(viewer.membership.role);
   const canAuthorDrafts = canManageDrafts || viewer.membership.role === "contributor";
@@ -55,26 +58,38 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     const params = new URLSearchParams({ page: String(page) });
     if (selectedStatus) params.set('status', selectedStatus);
     if (channel) params.set('channel', channel);
+    if (viewParam === 'table' || viewParam === 'feed' || viewParam === 'cards') params.set('view', viewParam);
     return `/publishing/posts?${params}`;
   };
+  const actionFor = (post: (typeof rows)[number]) => {
+    const canEdit = canManageDrafts || post.authorId === viewer.user.id;
+    return <details className={previewStyles.managePost}>
+      <summary>Manage post</summary>
+      {canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish} imageRules={imageRules}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>}
+    </details>;
+  };
+  const previewFor = (post: (typeof rows)[number], variant: 'feed' | 'card') => <PostPreview
+    post={post as PostPreviewPost}
+    authorName={post.authorId === viewer.user.id ? viewer.user.name : 'Workspace member'}
+    timeZone={viewer.membership.workspace.timezone}
+    variant={variant}
+    actions={canAuthorDrafts ? actionFor(post) : undefined}
+  />;
   const columns: TableColumn<(typeof rows)[number]>[] = [
     { key: "post", label: "Post", render: post => <PostMessage message={post.message}/> },
     { key: "channels", label: "Channels", render: post => <PostTargets post={post}/> },
-    { key: "status", label: "Status", render: post => <StatusBadge status={post.status}/> },
+    { key: "status", label: "Status", render: post => <StatusChip status={post.status}/> },
     { key: "scheduled", label: "Publish time", render: post => <span className={styles.date}>{formatDate(post.scheduledAt ?? post.publishedAt, viewer.membership.workspace.timezone)}</span> },
   ];
-  if (canAuthorDrafts) columns.push({ key: "actions", label: "Post actions", render: post => {
-    const canEdit = canManageDrafts || post.authorId === viewer.user.id;
-    return canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish} imageRules={imageRules}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>;
-  } });
+  if (canAuthorDrafts) columns.push({ key: "actions", label: "Post actions", render: actionFor });
   return <>
     <PageHeading title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary={`${listing.total} ${listing.total === 1 ? "post" : "posts"} · page ${listing.page} of ${listing.pages}`}/>
     {noticeText ? <p className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} role={notice?.startsWith('failed') ? 'alert' : 'status'}>{noticeText}</p> : null}
-    {(canAuthorDrafts || canManageDrafts) ? <div className={styles.postWorkbench}>
-      {canAuthorDrafts ? <section className={`${styles.card} ${styles.createCard}`}><h2>Create a post</h2><p>Choose an enabled destination now or save this as a local draft.</p><PostEditorForm targets={targetChoices} imageRules={imageRules}/></section> : null}
-      {canManageDrafts ? <section className={`${styles.card} ${styles.createCard} ${styles.importCard}`}><h2>Import a batch</h2><p>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section> : null}
-    </div> : null}
-    <section className={styles.card}><DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage={selectedStatus || selectedChannel ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}/>
+    {canManageDrafts ? <div className={previewStyles.toolbar}><details className={previewStyles.importDisclosure}><summary>Import CSV</summary><section className={`${styles.card} ${styles.createCard}`}><p className={styles.help}>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section></details></div> : null}
+    <section className={styles.card} aria-label={`${view === 'table' ? 'Table' : view === 'feed' ? 'Feed' : 'Cards'} post view`}>
+      {view === 'table' ? <DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage={selectedStatus || selectedChannel ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}/> : rows.length ? <ul className={view === 'feed' ? previewStyles.feedList : previewStyles.cardsGrid}>
+        {rows.map(post => <li key={post.id}>{previewFor(post, view === 'feed' ? 'feed' : 'card')}</li>)}
+      </ul> : <p className={styles.empty}>{selectedStatus || selectedChannel ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}</p>}
       {listing.pages > 1 ? <nav className={styles.postPagination} aria-label="Post pages">
         {listing.page > 1 ? <a className="ui-button ui-button--secondary" href={pageLink(listing.page - 1)}>Previous page</a> : <span />}
         <span>Page {listing.page} of {listing.pages}</span>

@@ -1,0 +1,44 @@
+.preview { display: grid; gap: 15px; min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--ink); }
+.preview[data-variant="card"] { height: 100%; align-content: start; }
+.header { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.authorAvatar, .channelAvatar, .channelFallback { width: 40px; height: 40px; flex: 0 0 auto; border-radius: 50%; }
+.authorAvatar, .channelFallback { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 750; }
+.headerText { display: grid; gap: 3px; min-width: 0; }
+.headerText strong { overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.headerText time { color: var(--ink-faint); font-size: 11px; }
+.destinations { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.destination { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ink-soft); font-size: 11px; }
+.destination .channelAvatar, .destination .channelFallback { width: 26px; height: 26px; }
+.channelAvatar { object-fit: cover; background: var(--surface-muted); }
+.channelFallback { font-size: 9px; }
+.channelName { overflow: hidden; color: var(--ink); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.destination :global(.ui-chip) { margin-left: auto; }
+.destination a, .sharedLink a, .attachmentLink { color: var(--accent); font-weight: 650; text-decoration: underline; text-underline-offset: 2px; }
+.noDestinations { margin: 0; color: var(--ink-faint); font-size: 11px; }
+.deliveryNotice { margin: 0; padding: 9px 11px; border-radius: var(--radius-sm); background: var(--danger-soft); color: var(--danger); font-size: 12px; line-height: 1.45; }
+.message { overflow-wrap: anywhere; color: var(--ink); font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+.media { display: grid; gap: 10px; min-width: 0; }
+.imageLink { display: block; max-height: 520px; overflow: hidden; border-radius: var(--radius-sm); background: var(--surface-raised); }
+.imageLink img { display: block; width: 100%; max-height: 520px; object-fit: contain; }
+.video { display: block; width: 100%; max-height: 520px; border-radius: var(--radius-sm); background: var(--surface-muted); }
+.sharedLink { margin: 0; overflow-wrap: anywhere; font-size: 12px; }
+.firstComment { padding: 12px 14px; border-left: 3px solid var(--line-strong); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface-raised); }
+.firstComment strong { color: var(--ink-soft); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.firstComment p { margin: 5px 0 0; color: var(--ink); font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+.actions { padding-top: 12px; border-top: 1px solid var(--line-subtle); }
+.feedList, .cardsGrid { display: grid; margin: 0; padding: 0; list-style: none; }
+.feedList { gap: 18px; max-width: 720px; margin: 0 auto; }
+.cardsGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items: stretch; gap: 16px; }
+.toolbar { display: flex; justify-content: flex-end; margin: 0 0 12px; }
+.importDisclosure { position: relative; }
+.importDisclosure > summary, .managePost > summary { cursor: pointer; color: var(--accent); font-size: 12px; font-weight: 700; list-style-position: inside; }
+.importDisclosure[open] { z-index: 2; }
+.importDisclosure section { width: min(520px, calc(100vw - 40px)); margin-top: 10px; }
+.managePost { color: var(--ink-soft); font-size: 12px; }
+.managePost > summary { color: var(--ink-soft); }
+.managePost[open] { display: grid; gap: 10px; padding-top: 8px; }
+@media (max-width: 560px) {
+  .preview { padding: 14px; }
+  .destination { flex-wrap: wrap; }
+  .destination :global(.ui-chip) { margin-left: 0; }
+}
