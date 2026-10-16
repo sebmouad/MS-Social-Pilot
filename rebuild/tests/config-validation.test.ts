@@ -27,7 +27,20 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(42);
+    expect(CONFIG_SCHEMA_VERSION).toBe(43);
+    for (const [key, value, maximum] of [
+      ['publishing.postPageSize', 50, 100],
+      ['publishing.readMaxItems', 200, 1000],
+      ['publishing.calendarMaxRangeDays', 70, 366],
+    ] as const) {
+      const setting = CONFIG_BY_KEY.get(key)!;
+      expect(setting.defaultValue).toBe(value);
+      expect(setting.consumption).toBe('active');
+      expect(setting.schema.safeParse(key === 'publishing.calendarMaxRangeDays' ? 50 : 1).success).toBe(true);
+      expect(setting.schema.safeParse(maximum).success).toBe(true);
+      expect(setting.schema.safeParse(maximum + 1).success).toBe(false);
+      expect(setting.schema.safeParse(0).success).toBe(false);
+    }
     expect(CONFIG_BY_KEY.get('publishing.deletionHistoryLimit')!.defaultValue).toBe(20);
     expect(CONFIG_BY_KEY.get('publishing.deletionHistoryLimit')!.schema.safeParse(100).success).toBe(true);
     expect(CONFIG_BY_KEY.get('publishing.deletionHistoryLimit')!.schema.safeParse(101).success).toBe(false);

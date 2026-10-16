@@ -1,7 +1,7 @@
 import { DataTable, StatusChip, type TableColumn } from "@/components";
 import { PostPreview, type PostPreviewPost } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
-import { listPostPage } from "@/server/data";
+import { readPublishingPostPage } from "@/modules/publishing/server/read";
 import { publishingDestinationChoices } from '@/server/publishing/destinations';
 import { PageHeading, PostMessage, PostTargets, formatDate } from "../publishing-ui";
 import styles from "../publishing.module.css";
@@ -37,11 +37,10 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'), runtimeConfig('publishing.maxImageAltCharacters'),
   ]);
   const imageRules = { allowedMimeTypes: allowedMimeTypes as string[], maxUploadBytes: Number(maxUploadBytes), maxAltCharacters: Number(maxAltCharacters) };
-  const allowedTargetIds = viewer.permissions.pageScope.all ? null : viewer.permissions.pageScope.ids;
-  const requestedPage = pageParam && /^\d+$/.test(pageParam) ? Number(pageParam) : 1;
+  const requestedPage = pageParam && /^[1-9]\d*$/.test(pageParam) && Number.isSafeInteger(Number(pageParam)) ? Number(pageParam) : 1;
   const selectedStatus = Object.values(PostStatus).find(value => value === status);
   const selectedChannel = channel || undefined;
-  const listing = await listPostPage(viewer.workspaceId, requestedPage, 50, allowedTargetIds, viewer.user.id, { status: selectedStatus, channelId: selectedChannel });
+  const listing = await readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status: selectedStatus, channelId: selectedChannel });
   const targetChoices = await publishingDestinationChoices(viewer);
   const rows = listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }> }));
   const noticeText = notice ? NOTICE_TEXT[notice] ?? (notice.startsWith('imported-') ? `${notice.slice('imported-'.length)} posts imported as drafts.` : undefined) : undefined;
@@ -78,6 +77,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   if (canAuthorDrafts) columns.push({ key: "actions", label: "Post actions", render: actionFor });
   return <>
     <PageHeading title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary={`${listing.total} ${listing.total === 1 ? "post" : "posts"} · page ${listing.page} of ${listing.pages}`}/>
+    {listing.channelUnavailable ? <p className={styles.errorNotice} role="status">The selected channel is unavailable. Choose another channel or reset the sidebar filters.</p> : null}
     {noticeText ? <p className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} role={notice?.startsWith('failed') ? 'alert' : 'status'}>{noticeText}</p> : null}
     {canManageDrafts ? <div className={previewStyles.toolbar}><details className={previewStyles.importDisclosure}><summary>Import CSV</summary><section className={`${styles.card} ${styles.createCard}`}><p className={styles.help}>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section></details></div> : null}
     <section className={styles.card} aria-label={`${view === 'table' ? 'Table' : view === 'feed' ? 'Feed' : 'Cards'} post view`}>

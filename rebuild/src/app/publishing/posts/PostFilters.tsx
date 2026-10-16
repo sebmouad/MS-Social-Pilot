@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
+import { PublishingChannelOptions } from '../PublishingChannelOptions';
 import styles from '../publishing.module.css';
 
 const statuses = [
@@ -39,8 +40,7 @@ export function PostFilters({ channels, currentMonth }: { channels: Array<{ id: 
     </select>
     <label htmlFor="post-channel-filter">Channel</label>
     <select id="post-channel-filter" name="channel" defaultValue={params.get('channel') ?? ''}>
-      <option value="">All accessible channels</option>
-      {channels.map(channel => <option value={channel.id} key={channel.id}>{channel.name}</option>)}
+      <PublishingChannelOptions channels={channels} selected={params.get("channel")} />
     </select>
     <button type="submit">Apply Filters</button>
     <a href="/publishing/posts">Reset Filters</a>

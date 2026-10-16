@@ -1,6 +1,6 @@
 import { PostPreview } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
-import { listPostPage } from "@/server/data";
+import { readPublishingPostPage } from "@/modules/publishing/server/read";
 import { addDaysToKey, workspaceDateKey } from "@/lib/calendar-dates";
 import { PageHeading, PublishingPagination } from "../publishing-ui";
 import { EmptyState } from "../worklist";
@@ -12,10 +12,9 @@ import { cancelScheduledPostAction } from "../posts/actions";
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const viewer = await requireViewer({ feature: "publishing/queue", channelScoped: true });
   const timeZone = viewer.membership.workspace.timezone;
-  const allowedTargetIds = viewer.permissions.pageScope.all ? null : viewer.permissions.pageScope.ids;
   const { page: pageParam } = await searchParams;
-  const requestedPage = pageParam && /^\d+$/.test(pageParam) ? Number(pageParam) : 1;
-  const listing = await listPostPage(viewer.workspaceId, requestedPage, 50, allowedTargetIds, viewer.user.id, { status: "scheduled", order: "scheduled_asc" });
+  const requestedPage = pageParam && /^[1-9]\d*$/.test(pageParam) && Number.isSafeInteger(Number(pageParam)) ? Number(pageParam) : 1;
+  const listing = await readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status: "scheduled", order: "scheduled_asc" }, "publishing/queue");
   const now = new Date();
   const today = workspaceDateKey(now, timeZone);
   const tomorrow = addDaysToKey(today, 1);

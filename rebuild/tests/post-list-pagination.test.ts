@@ -28,11 +28,29 @@ describe('scoped post pagination', () => {
     expect(result).toMatchObject({ total: 101, page: 3, pages: 3 });
   });
 
+  it('excludes mixed-destination posts as a whole and treats an empty current selection as no targets', async () => {
+    const count = vi.spyOn(prisma.post, 'count').mockResolvedValue(0);
+    vi.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
+    await listPostPage('workspace-1', 1, 50, ['page-1'], 'author-1');
+    expect(count.mock.calls[0]?.[0]?.where).toEqual({ workspaceId: 'workspace-1', OR: [
+      { targets: { some: { targetId: { in: ['page-1'] } }, every: { targetId: { in: ['page-1'] } } } },
+      { targets: { none: {} }, authorId: 'author-1' },
+    ] });
+    await listPostPage('workspace-1', 1, 50, [], 'author-1');
+    expect(count.mock.calls[1]?.[0]?.where).toEqual({ workspaceId: 'workspace-1', OR: [
+      { targets: { some: { targetId: { in: [] } }, every: { targetId: { in: [] } } } },
+      { targets: { none: {} }, authorId: 'author-1' },
+    ] });
+  });
+
   it('clamps an out-of-range page without exposing another workspace', async () => {
     vi.spyOn(prisma.post, 'count').mockResolvedValue(1);
     const findMany = vi.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
     const result = await listPostPage('workspace-2', 99, 50, null, 'author-1');
-    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { workspaceId: 'workspace-2' }, skip: 0, take: 50 }));
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { workspaceId: 'workspace-2', OR: [
+      { targets: { some: { targetId: { in: [] } }, every: { targetId: { in: [] } } } },
+      { targets: { none: {} }, authorId: 'author-1' },
+    ] }, skip: 0, take: 50 }));
     expect(result).toMatchObject({ total: 1, page: 1, pages: 1 });
   });
 

@@ -203,3 +203,25 @@ The subsequent first-comment batch separates adapter post creation from comment 
 `modules/publishing/server/deletion.ts` now commits content-free remote identity intent before dispatch, records confirmed or uncertain outcomes, and atomically finalizes local removal and audits only after required remote confirmation. Provider exceptions remain uncertain; there is no automatic provider verification or retry. Per-destination receipts preserve partial success. Status, delete, finish, and externally verified outcome recording share the Publishing service across UI and workspace MCP. Private Root UI/HTTP/MCP provides bounded history and explicit human attestation. Local post/destination aliases support status after cleanup and cleanup of duplicate references; non-rejected identities remain tombstoned until workspace erasure. Normal mutations and worker status sync cannot resuscitate those remote identities, and cleanup refuses unresolved evidence. Registry 42 provides consumed bounds for Root history and per-operation aliases.
 
 The fourth additive migration is pinned in the cutover verifier and was applied only to the isolated preview after a restore-verified backup; production was not changed. The backup at `/private/tmp/socialpilot-preview-before-post-deletion-20261016T210904Z.dump` was 244200 bytes, the exact source-table counts matched, and the migration restore matched 97 tables. This does not prove the full four-file rehearsal on a production-shaped baseline. The earlier publication receipt gap remains: accepted post creation with failed local receipt persistence has no equivalent journal. See [POST_DELETION_RECOVERY.md](POST_DELETION_RECOVERY.md) and [CUTOVER.md](CUTOVER.md). Provider/live checks, broad capability parity, full migration rehearsal, production backup/media recovery and rollback remain release blockers.
+
+## Shared selected-resource Publishing reads — 2026-10-17
+
+`modules/publishing/server/read.ts` now owns current-authorized post pages,
+calendar range reads, bounded MCP lists, HTTP pages and Home publishing counts.
+`read-scope.ts` resolves selected non-revoked enabled publishing-capable resources
+through neutral adapters and platform entitlements. Expired credentials and
+removed write readiness do not hide stored history. Destination-bound posts
+must have every destination in the resolved current scope, preserving the
+existing conservative whole-post permission rule. Unconnected-draft visibility
+retains the unrestricted-workspace versus scoped-author distinction. Counts and
+pagination share the same predicate; the unused unscoped post/calendar helpers
+were removed. Thin customer routes, MCP and no-store Posts HTTP use this service.
+
+Registry 43 exposes consumed page, list and calendar bounds. Sidebar and composer
+choices use the same resource resolver. Unavailable URL selections remain
+explicit and return no matches. Shared drawer Escape handling respects an open
+native select before closing navigation. This closes the previously observed
+retained unselected post leakage in normal Publishing views and Home counts;
+it is not a complete retained-data archive UI or Publishing parity claim.
+See PUBLISHING_READS.md and PREVIEW_QA.md. PUBLICATION_RECOVERY_PLAN.md is a
+planned, unfinished design for the remaining accepted-publication receipt gap.

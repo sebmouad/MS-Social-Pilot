@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   queryRaw: vi.fn(),
   executeRaw: vi.fn(),
   appSettingFindMany: vi.fn(),
+  publishingRead: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({
@@ -24,6 +25,7 @@ vi.mock('../src/server/data', () => ({
   prisma: { user: { findUnique: state.userFindUnique }, appSetting: { findMany: state.appSettingFindMany }, $queryRaw: state.queryRaw, $executeRaw: state.executeRaw },
 }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => key === 'mcp.enabled' ? state.enabled : key === 'mcp.authenticatedRoles' ? ['owner', 'admin'] : key === 'mcp.requestsPerMinute' ? state.budget : 1_048_576) }));
+vi.mock('../src/modules/publishing/server/read', () => ({ readPublishingPostList: state.publishingRead }));
 
 import { hashLegacySessionToken } from '../src/server/auth';
 import { GET, POST } from '../src/app/api/mcp/route';
@@ -136,6 +138,7 @@ describe('MCP route authentication', () => {
       const response = await POST(new Request('http://localhost/api/mcp?scope=workspace', { method: 'POST', headers: { 'content-type': 'application/json', ...(bearer ? { authorization: `Bearer mcp_${'a'.repeat(43)}` } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_posts', arguments: {} } }) }));
       expect((await response.json()).result.structuredContent.code).toBe('forbidden');
     }
+    expect(state.publishingRead).not.toHaveBeenCalled();
   });
 
   it('rejects malformed/repeated scopes and never replaces an invalid bearer with the owner cookie', async () => {

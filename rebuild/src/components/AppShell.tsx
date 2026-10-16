@@ -45,7 +45,15 @@ export function AppShell({ children, activeModule, enabledModules, enabledFeatur
     const focusable = () => [...(panel?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])].filter(item => item.getClientRects().length > 0);
     (focusable()[0] ?? panel)?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.preventDefault(); closeFilters(); }
+      if (event.key === 'Escape') {
+        if (event.defaultPrevented || event.isComposing) return;
+        // An open native select owns the first Escape. Its browser popup must
+        // close without also dismissing the surrounding navigation drawer.
+        if (event.target instanceof HTMLSelectElement) {
+          try { if (event.target.matches(':open')) return; } catch { /* Older engines do not expose native popup state. */ }
+        }
+        event.preventDefault(); closeFilters();
+      }
       if (event.key !== 'Tab') return;
       const items = focusable();
       if (!items.length) { event.preventDefault(); panel?.focus(); return; }

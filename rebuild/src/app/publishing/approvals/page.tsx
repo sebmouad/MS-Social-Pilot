@@ -1,7 +1,7 @@
 import { AutoTextarea } from '@/components/AutoTextarea';
 import { PostPreview } from "@/components/PostPreview";
 import { requireViewer } from "@/server/context";
-import { listPostPage } from "@/server/data";
+import { readPublishingPostPage } from "@/modules/publishing/server/read";
 import { PageHeading, PublishingPagination } from "../publishing-ui";
 import { EmptyState } from "../worklist";
 import workflow from "../workflow.module.css";
@@ -19,10 +19,9 @@ const NOTICES: Record<string, { text: string; error?: boolean }> = {
 
 export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<{ notice?: string; page?: string }> }) {
   const viewer = await requireViewer({ feature: "publishing/approvals", channelScoped: true });
-  const allowedTargetIds = viewer.permissions.pageScope.all ? null : viewer.permissions.pageScope.ids;
   const { notice, page: pageParam } = await searchParams;
-  const requestedPage = pageParam && /^\d+$/.test(pageParam) ? Number(pageParam) : 1;
-  const listing = await listPostPage(viewer.workspaceId, requestedPage, 50, allowedTargetIds, viewer.user.id, { status: "pending_approval", order: "created_asc" });
+  const requestedPage = pageParam && /^[1-9]\d*$/.test(pageParam) && Number.isSafeInteger(Number(pageParam)) ? Number(pageParam) : 1;
+  const listing = await readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status: "pending_approval", order: "created_asc" }, "publishing/approvals");
   const canReview = viewer.permissions.features["publishing/approvals"].write;
   const timeZone = viewer.membership.workspace.timezone;
   const feedback = notice ? NOTICES[notice] : undefined;

@@ -95,4 +95,20 @@ describe('two-sidebar app shell', () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(document.activeElement).toBe(toggle);
   });
+  it('lets an open native select handle Escape before dismissing its drawer', async () => {
+    await render(undefined, { sidebar: createElement('select', { 'aria-label': 'Channel' }, createElement('option', null, 'Example channel')) });
+    await act(async () => container.querySelector<HTMLButtonElement>('.shell-filter-toggle')!.click());
+    const select = container.querySelector<HTMLSelectElement>('select[aria-label=Channel]')!;
+    select.focus();
+    const matches = vi.spyOn(select, 'matches').mockImplementation(selector => selector === ':open');
+    const first = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    await act(async () => select.dispatchEvent(first));
+    expect(first.defaultPrevented).toBe(false);
+    expect(container.querySelector('[role=dialog]')).not.toBeNull();
+    matches.mockReturnValue(false);
+    await act(async () => select.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+    expect(container.querySelector('[role=dialog]')).toBeNull();
+    expect(document.activeElement).toBe(container.querySelector('.shell-filter-toggle'));
+  });
+
 });

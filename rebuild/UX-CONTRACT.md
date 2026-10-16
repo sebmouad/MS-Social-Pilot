@@ -129,3 +129,21 @@ Analytics filters, comparison choice, channel/ad-account selection, metric searc
 Post previews and row actions show first-comment delivery separately from post publication. A confirmed post stays published if its comment fails. Ready comments allow one explicitly confirmed send; uncertain comments require an explicit externally checked outcome, with a late-result warning and a comment ID for SENT. Manual absence records no remote operation and permits a separate send. The app never presents human attestation as automatic platform verification.
 
 The existing shared dialog/theme/form controls retain outcome, acknowledgement, identifier and focused error after a rejected or unconfirmed request. Closing/reopening clears old dialog inputs/errors; cancelling an uncertain send preserves its review state. Pending actions disable submission and closing. An error receipt cannot trigger native form reset or a server-refresh remount. Successful recording closes the dialog and moves focus to the delivery group if its original button disappears. Actual phone failure/success and representative themed checks are recorded in PREVIEW_QA.md; automatic remote reconciliation and full all-state accessibility remain open.
+
+## Publishing read visibility — 2026-10-17
+
+Posts, Queue, Approvals, Calendar, Home publishing counts and MCP post reads use
+the shared current-authorized Publishing read service. Channel choices use one
+selected-resource resolver, including publishing capability/kind and entitlement
+checks. Expired credentials may retain readable history while publishing stays
+unavailable. A mixed visible/hidden-destination post is excluded whole, avoiding
+partial previews and misleading action scope. No retained data is erased.
+
+An unavailable channel URL produces zero matches and an explanation; shared
+native options preserve “Unavailable channel” until the user chooses another
+channel or resets. Filters remain in the contextual sidebar / phone drawer.
+The drawer gives open native selects the first Escape on supported engines,
+respects already-handled/composing events and restores its opener when dismissed.
+Read bounds are Root-managed. The new HTTP Posts route shares page/service
+validation and returns no-store success/errors. PUBLISHING_READS.md owns the
+business/authorization references; PREVIEW_QA.md records evidence and limits.

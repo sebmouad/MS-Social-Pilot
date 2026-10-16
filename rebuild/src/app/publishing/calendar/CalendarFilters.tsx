@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { PublishingChannelOptions } from '../PublishingChannelOptions';
 import styles from "../publishing.module.css";
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 
@@ -27,8 +28,7 @@ export function CalendarFilters({ channels, today }: { channels: Array<{ id: str
     <FieldError {...validation.errorProps('date')} />
     <label htmlFor="calendar-channel-filter">Channel</label>
     <select id="calendar-channel-filter" name="channel" defaultValue={params.get("channel") ?? ""}>
-      <option value="">All accessible channels</option>
-      {channels.map(channel => <option value={channel.id} key={channel.id}>{channel.name}</option>)}
+      <PublishingChannelOptions channels={channels} selected={params.get("channel")} />
     </select>
     <label htmlFor="calendar-status-filter">Status</label>
     <select id="calendar-status-filter" name="status" defaultValue={params.get("status") ?? ""}>

@@ -2,6 +2,7 @@ import { PrismaClient, type Prisma, type PostStatus } from "../../generated/clie
 import { selectedResourceConnectionWhere } from './platforms/resource-visibility';
 import { enabledSocialAccountWhere } from './platforms/registry';
 import { FIRST_COMMENT_REJECTED } from '@/modules/publishing/first-comment-state';
+import { publishingPostVisibilityWhere } from '@/modules/publishing/server/read-scope';
 
 /** Legacy error strings can contain provider details; never serialize them to clients. */
 function safeCommentErrors<T extends { targets: Array<{ firstCommentError: string | null }> }>(posts: T[]): T[] {
@@ -97,43 +98,12 @@ export async function getTargets(workspaceId: string, allowedTargetIds?: readonl
   });
 }
 
-/** Return posts and their destinations, newest activity first. */
-export async function listPosts(workspaceId: string, limit = 100): Promise<PostSummary[]> {
-  const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 500));
-  const posts = await prisma.post.findMany({
-    where: { workspaceId },
-    orderBy: [{ scheduledAt: "desc" }, { createdAt: "desc" }],
-    take: safeLimit,
-    select: {
-      id: true,
-      message: true,
-      status: true,
-      scheduledAt: true,
-      publishedAt: true,
-      createdAt: true,
-      targets: {
-        select: {
-          status: true,
-          remotePostId: true,
-          remoteUrl: true,
-          target: { select: { id: true, type: true, name: true, pictureUrl: true } },
-        },
-      },
-    },
-  });
-  return posts;
-}
-
 /** Paginate posts after workspace and channel scope have been enforced in the query. */
-export async function listPostPage(workspaceId: string, page: number, pageSize: number, allowedTargetIds: readonly string[] | null, authorId: string, filters: { status?: PostStatus; channelId?: string; order?: 'scheduled_asc' | 'created_asc' } = {}) {
+export async function listPostPage(workspaceId: string, page: number, pageSize: number, allowedTargetIds: readonly string[] | null, authorId: string | undefined, filters: { status?: PostStatus; channelId?: string; order?: 'scheduled_asc' | 'created_asc' } = {}) {
   const size = Math.max(1, Math.min(Math.trunc(pageSize), 100));
   const requestedPage = Number.isSafeInteger(page) && page > 0 ? page : 1;
   const where: Prisma.PostWhereInput = {
-    workspaceId,
-    ...(allowedTargetIds === null ? {} : { OR: [
-      { targets: { some: { targetId: { in: [...allowedTargetIds] } }, every: { targetId: { in: [...allowedTargetIds] } } } },
-      { targets: { none: {} }, authorId },
-    ] }),
+    ...publishingPostVisibilityWhere(workspaceId, allowedTargetIds, authorId),
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.channelId ? { targets: { some: { targetId: filters.channelId } } } : {}),
   };
@@ -156,37 +126,14 @@ export async function listPostPage(workspaceId: string, page: number, pageSize: 
   return { posts: safeCommentErrors(posts), total, page: currentPage, pages };
 }
 
-/** Read a calendar month without truncating it to the newest workspace posts. */
-export function listCalendarPosts(workspaceId: string, year: number, month: number, allowedTargetIds: readonly string[] | null, authorId: string) {
-  const from = new Date(Date.UTC(year, month - 1, -1));
-  const to = new Date(Date.UTC(year, month, 3));
-  const scope: Prisma.PostWhereInput = allowedTargetIds === null ? {} : { OR: [
-    { targets: { some: { targetId: { in: [...allowedTargetIds] } }, every: { targetId: { in: [...allowedTargetIds] } } } },
-    { targets: { none: {} }, authorId },
-  ] };
-  return prisma.post.findMany({
-    where: { workspaceId, AND: [scope, { OR: [
-      { scheduledAt: { gte: from, lt: to } },
-      { publishedAt: { gte: from, lt: to } },
-    ] }] },
-    orderBy: [{ scheduledAt: 'asc' }, { publishedAt: 'asc' }, { id: 'asc' }],
-    select: { id: true, message: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true },
-  });
-}
-
 /**
  * Read posts whose scheduled or published time falls in [from, to), with their
  * channels and the channel provider, after workspace and channel scope are
  * applied in the query. Callers pad the range and group by workspace-local day.
  */
-export async function listCalendarRange(workspaceId: string, from: Date, to: Date, allowedTargetIds: readonly string[] | null, authorId: string, filters: { channelId?: string; status?: PostStatus } = {}) {
-  const scope: Prisma.PostWhereInput = allowedTargetIds === null ? {} : { OR: [
-    { targets: { some: { targetId: { in: [...allowedTargetIds] } }, every: { targetId: { in: [...allowedTargetIds] } } } },
-    { targets: { none: {} }, authorId },
-  ] };
+export async function listCalendarRange(workspaceId: string, from: Date, to: Date, allowedTargetIds: readonly string[] | null, authorId: string | undefined, filters: { channelId?: string; status?: PostStatus } = {}) {
   const posts = await prisma.post.findMany({
-    where: { workspaceId, AND: [
-      scope,
+    where: { ...publishingPostVisibilityWhere(workspaceId, allowedTargetIds, authorId), AND: [
       { OR: [{ scheduledAt: { gte: from, lt: to } }, { publishedAt: { gte: from, lt: to } }] },
       ...(filters.channelId ? [{ targets: { some: { targetId: filters.channelId } } }] : []),
       ...(filters.status ? [{ status: filters.status }] : []),

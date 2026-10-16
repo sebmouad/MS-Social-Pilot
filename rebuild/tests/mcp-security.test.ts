@@ -36,6 +36,8 @@ const dataControls = vi.hoisted(() => ({ preview: vi.fn(), export: vi.fn(), remo
 vi.mock('../src/server/data-control', () => ({ previewWorkspaceDataDeletion: dataControls.preview, exportWorkspaceData: dataControls.export, deleteWorkspaceData: dataControls.remove }));
 const inboxReads = vi.hoisted(() => ({ list: vi.fn(), thread: vi.fn() }));
 vi.mock('../src/modules/inbox/server/read', () => ({ readInboxList: inboxReads.list, readInboxThread: inboxReads.thread }));
+const publishingReads = vi.hoisted(() => ({ list: vi.fn() }));
+vi.mock('../src/modules/publishing/server/read', () => ({ readPublishingPostList: publishingReads.list }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
 vi.mock('../src/server/inbox/actions', () => ({ replyToInbox: inboxMutations.reply, setInboxResolved: inboxMutations.resolve, moderateInboxComment: inboxMutations.moderate }));
 const inboxDeletions = vi.hoisted(() => ({ get: vi.fn(), remove: vi.fn(), finish: vi.fn() }));
@@ -104,6 +106,7 @@ beforeEach(() => {
   mutations.select.mockResolvedValue(undefined);
   inboxReads.list.mockResolvedValue({ channels: [], items: [], total: 0, olderCursor: null, newerCursor: null });
   inboxReads.thread.mockResolvedValue({ thread: { id: 'conv-a' }, history: {} });
+  publishingReads.list.mockResolvedValue([]);
   inboxMutations.reply.mockResolvedValue({ ok: true });
   inboxMutations.resolve.mockResolvedValue({ ok: true });
   inboxMutations.moderate.mockResolvedValue({ ok: true });
@@ -155,7 +158,7 @@ beforeEach(() => {
 describe('MCP workspace boundaries', () => {
   it.each([
     ['list_pages', () => db.target.findMany],
-    ['list_posts', () => db.post.findMany],
+    ['list_posts', () => publishingReads.list],
     ['list_inbox', () => inboxReads.list],
     ['get_analytics_overview', () => analytics.snapshot],
     ['preview_workspace_data_deletion', () => dataControls.preview],
@@ -184,7 +187,7 @@ describe('MCP workspace boundaries', () => {
     expect(result.structuredContent).toEqual({ code: 'reconnect_required', error: 'Reconnect this channel before replying.' });
   });
   it('preserves resource error codes without exposing unexpected query failures', async () => {
-    db.post.findMany.mockRejectedValueOnce(new Error('postgres://private-password@db'));
+    publishingReads.list.mockRejectedValueOnce(new Error('postgres://private-password@db'));
     const failed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'resources/read', params: { uri: 'msp://posts' } });
     const failedBody = await failed.json();
     expect(failedBody.error.data.code).toBe('upstream_failure');
@@ -203,12 +206,12 @@ describe('MCP workspace boundaries', () => {
   it.each([{ id: {} }, { id: [] }, { id: true }, { params: [] }, { params: null }])('rejects invalid protocol fields before tool dispatch: %j', async fields => {
     const response = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_posts' }, ...fields });
     expect((await response.json()).error.code).toBe(-32600);
-    expect(db.post.findMany).not.toHaveBeenCalled();
+    expect(publishingReads.list).not.toHaveBeenCalled();
   });
   it.each([null, [], 'bad', 42, true])('rejects malformed workspace arguments before domain access: %j', async input => {
     const response = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_posts', arguments: input } });
     expect((await response.json()).result.structuredContent.code).toBe('invalid_request');
-    expect(db.post.findMany).not.toHaveBeenCalled();
+    expect(publishingReads.list).not.toHaveBeenCalled();
   });
   it.each([
     ['create_draft', { message: 'Hello', confirmation: 'CREATE DRAFT' }, () => mutations.create, { id: 'new-post', status: 'draft' }],
@@ -679,13 +682,12 @@ describe('MCP workspace boundaries', () => {
     expect((await bearer.json()).result.structuredContent.deleted).toBe(true);
     expect(dataControls.remove).toHaveBeenLastCalledWith({ userId: 'user-a', workspaceId: 'workspace-a', apiKeyId: 'key-a' }, 'DELETE');
   });
-  it('scopes destination and post queries to the authenticated workspace and clamps limits', async () => {
+  it('scopes destination queries and delegates post reads with the MCP result cap', async () => {
     db.target.findMany.mockResolvedValue([]);
-    db.post.findMany.mockResolvedValue([]);
     await call('list_pages');
     await call('list_posts', { limit: 900 });
     expect(db.target.findMany.mock.calls[0][0].where).toEqual({ workspaceId: 'workspace-a', enabled: true, socialAccount: { is: { workspaceId: 'workspace-a', invalidatedAt: null, provider: { in: ['facebook'] } } } });
-    expect(db.post.findMany.mock.calls[0][0]).toMatchObject({ where: { workspaceId: 'workspace-a' }, take: 100 });
+    expect(publishingReads.list).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { limit: 900 }, { maxItems: 100 });
   });
 
   it('does not advertise or dispatch the removed legacy page analytics tool', async () => {
@@ -706,18 +708,19 @@ describe('MCP workspace boundaries', () => {
     expect(names).not.toContain('create_draft');
     expect(names).not.toContain('list_ad_accounts');
 
-    db.post.findMany.mockResolvedValue([]);
     await handleMcpMessage(limited, { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'list_posts', arguments: {} } });
-    expect(db.post.findMany.mock.calls.at(-1)?.[0].where).toMatchObject({ workspaceId: 'workspace-a', OR: [{ targets: { some: {}, none: { targetId: { notIn: ['page-a'] } } } }, { authorId: 'user-a', targets: { none: {} } }] });
-    expect(db.post.findMany.mock.calls.at(-1)?.[0].select.targets.where).toEqual({ targetId: { in: ['page-a'] } });
+    expect(publishingReads.list).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a', allowedTargetIds: ['page-a'] }, {}, { maxItems: 100 });
   });
 
-  it('rejects unknown statuses and invalid dates before querying posts', async () => {
+  it('delegates post filter validation and preserves typed service errors', async () => {
+    publishingReads.list.mockRejectedValueOnce(new OperationError('invalid_request', 'Choose a valid post status.'));
     const invalidStatus = await call('list_posts', { status: 'draft,owner' });
     expect((await invalidStatus.json()).result.isError).toBe(true);
+    expect(publishingReads.list).toHaveBeenLastCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { status: 'draft,owner' }, { maxItems: 100 });
+    publishingReads.list.mockRejectedValueOnce(new OperationError('invalid_request', 'Choose valid ISO date filters.'));
     const invalidDate = await call('list_posts', { from: 'not-a-date' });
     expect((await invalidDate.json()).result.isError).toBe(true);
-    expect(db.post.findMany).not.toHaveBeenCalled();
+    expect(publishingReads.list).toHaveBeenLastCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, { from: 'not-a-date' }, { maxItems: 100 });
   });
 
   it('uses the same scoped Inbox services as UI and HTTP with a bounded projection', async () => {
@@ -923,7 +926,7 @@ describe('MCP workspace boundaries', () => {
   });
 
   it('normalizes first-comment state in list_posts and never returns stored error text', async () => {
-    db.post.findMany.mockResolvedValueOnce([{ id: 'post-a', message: 'Saved post', firstComment: 'Details below', status: 'published', targets: [{ id: 'post-target-a', status: 'published', remotePostId: 'remote-post-a', remoteUrl: null, firstCommentId: null, firstCommentAt: new Date('2026-10-16T12:00:00.000Z'), firstCommentError: 'private provider error', target: { id: 'target-a', type: 'page', name: 'Studio' } }] }]);
+    publishingReads.list.mockResolvedValueOnce([{ id: 'post-a', message: 'Saved post', firstComment: 'Details below', status: 'published', targets: [{ id: 'post-target-a', status: 'published', remotePostId: 'remote-post-a', remoteUrl: null, firstCommentId: null, firstCommentAt: new Date('2026-10-16T12:00:00.000Z'), firstCommentError: 'review_required', target: { id: 'target-a', type: 'page', name: 'Studio' } }] }]);
     const response = await call('list_posts');
     const post = (await response.json()).result.structuredContent.items[0];
     expect(post.targets[0]).toMatchObject({ id: 'post-target-a', firstComment: { state: 'needs_review', label: 'First comment needs review', errorPresent: true } });

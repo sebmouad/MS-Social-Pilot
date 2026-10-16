@@ -5,7 +5,7 @@ import { THEMES } from '@/lib/themes';
 import { configurationOwner } from './ownership';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 42;
+export const CONFIG_SCHEMA_VERSION = 43;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -18,6 +18,9 @@ import { PLATFORM_CONFIG } from '@/platforms';
 export const CONFIG_REGISTRY = [
   // Each installed platform module owns its settings (src/platforms/<id>/module.ts).
   ...PLATFORM_CONFIG,
+  entry({ key: 'publishing.postPageSize', group: 'Publishing · Reads', label: 'Posts per page', kind: 'number', description: 'Result page size shared by Posts, Queue and Approvals.', defaultValue: 50, schema: z.number().int().min(1).max(100), consumption: 'active' }),
+  entry({ key: 'publishing.readMaxItems', group: 'Publishing · Reads', label: 'Post list result limit', kind: 'number', description: 'Maximum post rows returned by a bounded MCP list request.', defaultValue: 200, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
+  entry({ key: 'publishing.calendarMaxRangeDays', group: 'Publishing · Reads', label: 'Calendar read range', kind: 'number', description: 'Maximum requested calendar range, including the grid boundary days.', defaultValue: 70, schema: z.number().int().min(50).max(366), consumption: 'active' }),
   entry({ key: 'publishing.deletionHistoryLimit', group: 'Publishing · Recovery', label: 'Post deletion history limit', kind: 'number', description: 'Maximum recent content-free remote post deletion records shown in private Root recovery.', defaultValue: 20, schema: z.number().int().min(1).max(100), consumption: 'active' }),
   entry({ key: 'publishing.deletionMaxAliases', group: 'Publishing · Recovery', label: 'Post deletion alias limit', kind: 'number', description: 'Maximum local post and destination aliases retained for one remote deletion attempt.', defaultValue: 1000, schema: z.number().int().min(1).max(10000), consumption: 'active' }),
   entry({ key: 'auth.loginAttempts', group: 'Security · rate limits', label: 'Sign-in attempts allowed', kind: 'number', description: 'Maximum password or verification attempts per account during one window.', defaultValue: 10, schema: z.number().int().min(1).max(1000), consumption: 'active' }),

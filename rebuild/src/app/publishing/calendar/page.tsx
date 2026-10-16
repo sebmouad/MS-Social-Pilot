@@ -1,5 +1,5 @@
 import { requireViewer } from "@/server/context";
-import { getTargets, listCalendarRange } from "@/server/data";
+import { readPublishingCalendar } from "@/modules/publishing/server/read";
 import { canAccessFeature } from "@/server/permissions";
 import { PageHeading } from "../publishing-ui";
 import { adjacentCalendarMonth, addDaysToKey, calendarMonth, instantToWall, isDateKey, postCalendarDate, wallTimeToInstant, weekStartKey, weekdayOfKey, workspaceDateKey } from "@/lib/calendar-dates";
@@ -30,10 +30,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const month = params.month && /^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(params.month) ? params.month : undefined;
   const anchor = isDateKey(params.date) ? params.date : month ? (month === today.slice(0, 7) ? today : `${month}-01`) : today;
 
-  const pageScope = viewer.permissions.pageScope;
-  const allowedIds = pageScope.all ? null : pageScope.ids;
-  const channels = (await getTargets(viewer.workspaceId)).filter(target => allowedIds === null || allowedIds.includes(target.id));
-  const channelId = channels.some(channel => channel.id === params.channel) ? params.channel : undefined;
+  const channelId = params.channel || undefined;
   const status = (STATUSES as readonly string[]).includes(params.status ?? "") ? params.status as (typeof STATUSES)[number] : undefined;
 
   // The days on screen: a whole month grid (weeks start on Sunday) or one week.
@@ -46,7 +43,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   const from = new Date(utcNoon(keys[0]!).getTime() - 2 * DAY);
   const to = new Date(utcNoon(keys[keys.length - 1]!).getTime() + 2 * DAY);
-  const posts = await listCalendarRange(viewer.workspaceId, from, to, allowedIds, viewer.user.id, { channelId, status });
+  const { posts, channels, channelUnavailable } = await readPublishingCalendar({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { from, to, channelId, status });
 
   const canEditCalendar = canAccessFeature(viewer.permissions, "publishing/calendar", "write");
   const canCreate = canAccessFeature(viewer.permissions, "publishing/posts", "write");
@@ -101,6 +98,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return <>
     <PageHeading title="Calendar" description="Plan, check and reschedule posts in your workspace time zone." />
+    {channelUnavailable ? <p role="status">The selected channel is unavailable. Choose another channel or reset the sidebar filters.</p> : null}
     <h2 className={styles.range} aria-live="polite">{rangeLabel}</h2>
     <CalendarBoard view={view} days={days} timeZone={timeZone} nowIso={now.toISOString()} canCreate={canCreate} filterQuery={filterQuery} defaultScheduleTime={defaultScheduleTime}
       navigation={{ previous: href(view, previous), today: href(view, today), next: href(view, next), unit }} />

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ actor: vi.fn(), read: vi.fn(), save: vi.fn(), workspaces: vi.fn(), activity: vi.fn(), access: vi.fn(), lock: vi.fn(), post: vi.fn(), execute: vi.fn(), diagnostics: vi.fn(), diagnosticRun: vi.fn(), operations: vi.fn(), deletions: vi.fn(), confirmDeletion: vi.fn() }));
+const state = vi.hoisted(() => ({ actor: vi.fn(), read: vi.fn(), save: vi.fn(), workspaces: vi.fn(), activity: vi.fn(), access: vi.fn(), lock: vi.fn(), post: vi.fn(), execute: vi.fn(), diagnostics: vi.fn(), diagnosticRun: vi.fn(), operations: vi.fn(), deletions: vi.fn(), confirmDeletion: vi.fn(), publishingRead: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: state.actor }, post: { findMany: state.post }, $executeRaw: state.execute } }));
 vi.mock('../src/server/config/store', () => ({ readConfig: state.read, saveConfig: state.save, runtimeConfig: async () => 100 }));
 vi.mock('../src/server/root/inbox-deletions', () => ({ listRootInboxDeletions: state.deletions, confirmRootInboxDeletion: state.confirmDeletion }));
@@ -8,6 +8,7 @@ vi.mock('../src/server/root/operations', () => ({ loadRootOperations: state.oper
 vi.mock('../src/server/root/directory', () => ({ listRootWorkspaces: state.workspaces }));
 vi.mock('../src/server/root/activity', () => ({ listRootActivity: state.activity }));
 vi.mock('../src/server/root/workspace-access', () => ({ setRootWorkspaceAccess: state.access }));
+vi.mock('../src/modules/publishing/server/read', () => ({ readPublishingPostList: state.publishingRead }));
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: state.lock, assertWorkspaceNotPurging: vi.fn() }));
 import { runRootTool } from '../src/server/mcp/root-tools';
 import { handleMcpMessage, type McpInstallationViewer } from '../src/server/mcp/server';
@@ -41,6 +42,7 @@ describe('installation-only MCP context', () => {
     for (const uri of ['msp://workspace', 'msp://posts', 'msp://ads/performance']) expect((await (await invoke('resources/read', { uri })).json()).error).toBeDefined();
     expect(state.lock).not.toHaveBeenCalled();
     expect(state.post).not.toHaveBeenCalled();
+    expect(state.publishingRead).not.toHaveBeenCalled();
     expect(state.save).not.toHaveBeenCalled();
     expect(state.actor).not.toHaveBeenCalled();
   });

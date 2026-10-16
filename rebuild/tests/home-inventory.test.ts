@@ -1,11 +1,13 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ viewer: vi.fn(), targets: vi.fn(), selectedTargets: vi.fn(), posts: vi.fn(), ads: vi.fn(), adWhere: vi.fn() }));
+const state = vi.hoisted(() => ({ viewer: vi.fn(), targets: vi.fn(), selectedTargets: vi.fn(), posts: vi.fn(), summary: vi.fn(), permitted: vi.fn(), ads: vi.fn(), adWhere: vi.fn() }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children }: { children: unknown }) => children }));
 vi.mock('../src/server/platforms/registry', () => ({ enabledSocialAccountWhere: async () => ({ provider: { in: ['facebook'] } }) }));
 vi.mock('../src/server/entitlements', () => ({ canUseFeature: () => true }));
+vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.permitted }));
+vi.mock('../src/modules/publishing/server/read', () => ({ readPublishingSummary: state.summary }));
 vi.mock('../src/server/ads/queries', () => ({ getAdsAccountWhere: state.adWhere }));
 vi.mock('../src/server/data', () => ({ getTargets: state.selectedTargets, prisma: { target: { findMany: state.targets }, post: { count: state.posts }, adAccount: { count: state.ads } } }));
 import HomePage from '../src/app/home/page';
@@ -17,6 +19,7 @@ beforeEach(() => {
   state.viewer.mockResolvedValue({ user: { id: 'owner' }, workspaceId, membership: { workspace: { name: 'Example workspace' } }, entitlements: {}, permissions: { pageScope: { all: true, ids: [] } } });
   state.targets.mockResolvedValue(Array.from({ length: 5 }, (_, i) => ({ socialAccountId: `source-${i}` })));
   state.selectedTargets.mockResolvedValue(Array.from({ length: 4 }, (_, i) => ({ id: `channel-${i}`, socialAccount: { invalidatedAt: null } })));
+  state.permitted.mockReturnValue(true); state.summary.mockResolvedValue({ published: 2, scheduled: 2 });
   state.posts.mockResolvedValue(2); state.ads.mockResolvedValue(3); state.adWhere.mockResolvedValue(accountWhere);
 });
 
@@ -31,6 +34,14 @@ describe('Home resource inventory', () => {
     state.viewer.mockResolvedValue({ user: { id: 'member' }, workspaceId, membership: { workspace: { name: 'Example workspace' } }, entitlements: {}, permissions: { pageScope: { all: false, ids: ['channel-allowed'] } } });
     await HomePage();
     expect(state.adWhere).toHaveBeenCalledWith(workspaceId, ['channel-allowed']);
-    expect(state.posts).toHaveBeenCalledWith({ where: { workspaceId, status: 'published', targets: { some: { targetId: { in: ['channel-allowed'] } }, every: { targetId: { in: ['channel-allowed'] } } } } });
+    expect(state.summary).toHaveBeenCalledWith({ userId: 'member', workspaceId });
+    expect(state.posts).not.toHaveBeenCalled();
   });
+  it('does not read publishing counts when the current feature permission is absent', async () => {
+    state.permitted.mockImplementation((_permissions, feature) => feature !== 'publishing/posts');
+    const html = renderToStaticMarkup(await HomePage());
+    expect(state.summary).not.toHaveBeenCalled();
+    expect(html).not.toContain('Published posts');
+  });
+
 });

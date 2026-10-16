@@ -404,3 +404,70 @@ unselected channels still appear), deletion redirect list/filter restoration
 and focus after the removed customer action, complete Root/MCP/legacy parity,
 production-shaped migration/authorization and cutover/media/rollback checks.
 Production remains legacy.
+
+## Selected-resource Publishing reads — 2026-10-17
+
+Normal Publishing reads now exclude retained posts with unselected destinations,
+including mixed posts where only part of the destination set is visible. Posts,
+Queue, Approvals, Calendar, Home counts, HTTP and MCP use one current-authorized
+service. Sidebar and composer choices use its selected-resource resolver.
+Expired credentials and missing write readiness do not hide eligible stored
+history. See PUBLISHING_READS.md for exact scope and remaining archive limits.
+
+Final automated evidence: **1101 tests in 184 files passed**, including **43
+actual PostgreSQL checks in 16 files**. Typecheck and an isolated production
+build passed; the running preview build directory was preserved. Database
+tests exercise selected/unselected, disabled/revoked, expired, cross-workspace,
+limited-grant, unconnected-author and whole-post pagination/count boundaries.
+A final four-case PostgreSQL rerun passed after ensuring fixture cleanup also
+refuses writes when its database safety preflight has failed.
+No schema migration, background worker or provider call occurred in this batch.
+
+The guarded `scripts/verify-publishing-reads.ts` passed against localhost:3200
+and the dedicated loopback `_preview` database. Actual HTTP, MCP list and MCP
+resource results obeyed the same limited channel grant. Unassigned selection
+returned zero matches rather than broadening scope. Invalid/repeated HTTP and
+invalid MCP filters failed safely; HTTP returned no-store. Read-only keys could
+not delete, grant revocation took effect immediately, and disabling the actor
+invalidated both its existing session and key. The preview-only viewer-role
+MCP policy change was restored to its exact original row or absence, and all
+disposable probe fixtures were verified absent in `finally` cleanup. This is
+local request/authorization evidence, not live-provider evidence.
+
+Actual Chrome checks covered 1440×1000 desktop and 390×844 phone. Published
+Posts and HTTP/MCP lists contained only the expected selected-channel fixture.
+Unavailable Posts and Calendar URL selections produced explicit no-match
+feedback; the sidebar retained an opaque Unavailable channel choice without
+revealing a hidden channel name. Drawer form submission preserved Feed and
+Published filters, and returned to the report. Home showed the expected
+synthetic counts: four selected channels, three linked ad accounts, one
+published post and one scheduled post. A final desktop Cards snapshot after
+probe cleanup showed one published post and the two-sidebar layout.
+
+Browser testing found that the shared drawer captured Escape while a native
+select popup was open. The handler now respects handled/composing events and
+the native select's `:open` state. Chrome verified that popup dismissal retains
+the drawer; Escape after the popup closes dismisses the drawer and restores
+opener focus. Native popup state can settle asynchronously. Older engines
+without `:open` support need separate compatibility verification.
+
+Representative Clay desktop/phone and Nightfall phone views were inspected
+with no horizontal page overflow. The saved Clay preference was restored.
+This is not exhaustive four-theme, keyboard or accessibility coverage of every
+read state. Browser access was checked again before publication and returned
+the expected one-post desktop Cards view.
+
+Independent lower-cost review reported no remaining actionable P1/P2 issue
+for this batch. The premium strict static audit still exits nonzero for the
+same two documented scanner false positives: forwarded Button action/type
+props and AutoTextarea's explicit `resize: 'none'`. It is not a clean strict
+audit; shared primitive tests and browser checks provide separate evidence.
+
+Private artifacts: `/private/tmp/socialpilot-selected-reads-tests.log`,
+`/private/tmp/socialpilot-selected-reads-build.log`,
+`/private/tmp/socialpilot-selected-reads-live-probe.log` and
+`/private/tmp/socialpilot-selected-reads-premium-audit.json`.
+Remaining work includes durable publication receipt recovery (planned in
+PUBLICATION_RECOVERY_PLAN.md), retained-data browsing, full Facebook/legacy /
+MCP/Root parity, live-provider testing and all migration/rollback/cutover gates.
+Production remains legacy.
