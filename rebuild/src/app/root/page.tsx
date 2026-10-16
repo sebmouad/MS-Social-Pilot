@@ -1,6 +1,7 @@
 import { requireRootPage } from '@/server/config/access';
 import { getRootOverview } from '@/server/root/read-model';
 import { RootFrame } from '@/server/root/RootFrame';
+import { RootMcpConnection } from '@/components/RootMcpConnection';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Root · Control center' };
@@ -29,5 +30,6 @@ export default async function RootOverviewPage() {
         <div className="root-control__links"><a href="/root/operations">Background job health</a><a href="/root/activity">Recent activity</a><a href="/root/config">Runtime configuration</a></div>
       </section>
     </>}
+    <RootMcpConnection />
   </RootFrame>;
 }

@@ -22,6 +22,6 @@ export default async function McpKeysPage() {
   const features = PAGES.filter(feature => canUseFeature(viewer.entitlements, feature.id)).map(feature => ({ ...feature, name: feature.title, canRead: canAccessFeature(viewer.permissions, feature.id, 'read'), canWrite: canAccessFeature(viewer.permissions, feature.id, 'write') })).filter(feature => feature.canRead || feature.canWrite);
   return <PageFrame module="settings"><SettingsPage active="settings/mcp" title="MCP API keys" description={`Issue workspace-scoped bearer keys for ${viewer.membership.workspace.name}.`}>
     <SettingsPanel title="Create a key" detail="The full token appears once and is stored only as a hash."><McpKeyManager features={features} initialKeys={keys.map(key => ({ ...key, expiresAt: key.expiresAt.toISOString(), revokedAt: key.revokedAt?.toISOString() ?? null, createdAt: key.createdAt.toISOString(), lastUsedAt: key.lastUsedAt?.toISOString() ?? null }))} maxLifetimeDays={maxLifetimeDays} /></SettingsPanel>
-    <p className={styles['settings-note']}>Bearer keys are fixed to this workspace and inherit your current feature and channel permissions. Keep the token in a secret store. Root controls active key limits, key lifetime, and request budgets.</p>
+    <p className={styles['settings-note']}>Bearer keys are fixed to this workspace and inherit your current feature and channel permissions. Keep the token in a secret store. Key lifetime and request limits follow your workspace policy.</p>
   </SettingsPage></PageFrame>;
 }

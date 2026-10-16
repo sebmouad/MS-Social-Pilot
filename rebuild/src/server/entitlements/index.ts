@@ -118,7 +118,7 @@ export function requireFeature(entitlements: Entitlements, feature: string): ass
 
 /** Load the current member's workspace and subscriber plan from the existing
  * schema. A missing membership returns null; callers must treat it as denied. */
-export async function loadEntitlements(userId: string, workspaceId: string): Promise<Entitlements | null> {
+export async function loadEntitlements(userId: string, workspaceId: string, options: { allowInstallationInspection?: boolean } = {}): Promise<Entitlements | null> {
   // Raw SQL is intentional here: this rebuild's generated Prisma client can
   // lag the legacy schema during the transition, while the columns below are
   // already present in the deployed legacy tables. Identifiers are static;
@@ -153,7 +153,7 @@ export async function loadEntitlements(userId: string, workspaceId: string): Pro
     workspace: { id: row.workspaceId, disabledModules: row.workspaceDisabled, suspendedAt: row.suspendedAt },
     membership: { userId, disabledModules: row.memberDisabled },
     planFeatures: row.planFeatures,
-    isInstanceOwner: row.isInstanceOwner,
+    isInstanceOwner: row.isInstanceOwner && options.allowInstallationInspection !== false,
     installationAvailability,
   });
 }

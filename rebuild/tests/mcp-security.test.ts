@@ -14,6 +14,7 @@ const db = vi.hoisted(() => ({
   $executeRaw: vi.fn(),
   $transaction: vi.fn(),
   membership: { findUnique: vi.fn() },
+  user: { findUnique: vi.fn() },
 }));
 vi.mock('../src/server/data', () => ({ prisma: db }));
 const mutations = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), remove: vi.fn(), select: vi.fn() }));
@@ -25,7 +26,7 @@ const rootActivity = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock('../src/server/root/activity', () => ({ listRootActivity: rootActivity.list }));
 vi.mock('../src/server/root/directory', () => ({ listRootWorkspaces: rootWorkspaces.list }));
 vi.mock('../src/server/root/workspace-access', () => ({ setRootWorkspaceAccess: rootWorkspaces.change }));
-vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save, runtimeConfig: vi.fn().mockResolvedValue(366) }));
+vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save, runtimeConfig: vi.fn(async (key: string) => key === 'mcp.maxResultItems' ? 100 : key === 'root.directoryPageSize' ? 25 : 366) }));
 const analytics = vi.hoisted(() => ({ load: vi.fn(), build: vi.fn() }));
 vi.mock('../src/server/analytics/data', () => ({ analyticsRange: (start?: string, end?: string) => ({ from: new Date(`${start ?? '2026-10-01'}T00:00:00`), to: new Date(`${end ?? '2026-10-15'}T23:59:59.999`) }), loadAnalytics: analytics.load }));
 vi.mock('../src/server/analytics/aggregate', () => ({ buildAnalytics: analytics.build }));
@@ -55,6 +56,7 @@ import { OperationError } from '../src/lib/operation-error';
 import { MediaStorageUnavailable, MediaValidationError } from '../src/server/media/errors';
 
 const viewer: McpViewer = {
+  scope: 'workspace',
   userId: 'user-a', workspaceId: 'workspace-a', role: 'owner',
   workspace: { id: 'workspace-a', name: 'Alpha', timezone: 'UTC' },
   entitlements: {
@@ -72,6 +74,7 @@ const call = (name: string, args: Record<string, unknown> = {}) => handleMcpMess
 beforeEach(() => {
   vi.clearAllMocks();
   db.$executeRaw.mockResolvedValue(1);
+  db.user.findUnique.mockResolvedValue({ isInstanceOwner: true, disabledAt: null });
   mutations.create.mockResolvedValue({ id: 'new-post' });
   mutations.update.mockResolvedValue(undefined);
   mutations.remove.mockResolvedValue(undefined);
@@ -163,7 +166,7 @@ describe('MCP workspace boundaries', () => {
   it('routes Root workspace operations through shared services with bounded reads and strict input types', async () => {
     const invoke = (name: string, args: Record<string, unknown>) => handleMcpMessage({ ...viewer, isInstanceOwner: true }, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
     await invoke('list_root_workspaces', { q: 'Studio', page: 2 });
-    expect(rootWorkspaces.list).toHaveBeenCalledWith({ q: 'Studio', page: '2' }, 100);
+    expect(rootWorkspaces.list).toHaveBeenCalledWith({ q: 'Studio', page: '2' }, 25);
     const invalid = await (await invoke('set_root_workspace_access', { workspaceId: 'workspace-b', suspended: 'true', confirmation: 'yes' })).json();
     expect(invalid.result.structuredContent.code).toBe('invalid_request');
     expect(rootWorkspaces.change).not.toHaveBeenCalled();
@@ -722,6 +725,6 @@ describe('MCP workspace boundaries', () => {
     const saved = await handleMcpMessage(root, { jsonrpc: '2.0', id: 15, method: 'tools/call', params: { name: 'set_root_config', arguments: { key: 'mcp.enabled', value: false, confirmation: 'SET ROOT CONFIG mcp.enabled' } } });
     expect((await saved.json()).result.structuredContent).toMatchObject({ key: 'mcp.enabled', saved: true });
     expect(rootConfig.save).toHaveBeenCalledWith({ key: 'mcp.enabled', value: false, clear: false }, 'user-a');
-    expect(db.$executeRaw).toHaveBeenCalled();
+    expect(db.$executeRaw).not.toHaveBeenCalled(); // Domain service owns its atomic audit.
   });
 });
