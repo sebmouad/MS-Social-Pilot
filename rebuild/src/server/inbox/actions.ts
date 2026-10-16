@@ -2,6 +2,8 @@ import { prisma } from '@/server/data';
 import { inboxPlatformIds } from '@/server/platforms/registry';
 import { platformInbox } from '@/server/platforms/registry';
 import { OperationError } from '@/lib/operation-error';
+import { canManageInboxWorkflow, setInboxWorkflowResolved } from '@/modules/inbox/server/workflow';
+import type { InboxReadConstraints } from '@/modules/inbox/server/types';
 
 export type InboxActor = { userId: string; workspaceId: string };
 export type InboxActionKind = 'message' | 'comment';
@@ -53,9 +55,10 @@ export async function syncInbox(actor: InboxActor, targetId?: string) {
 export async function replyToInbox(actor: InboxActor, input: { kind: InboxActionKind; id: string; text: string }) {
   return (await host(await providerForItem(input.kind, input.id, actor.workspaceId))).reply(actor, input);
 }
-export async function setInboxResolved(actor: InboxActor, input: { kind: InboxActionKind; id: string; resolved: boolean }) {
-  return (await host(await providerForItem(input.kind, input.id, actor.workspaceId))).resolve(actor, input);
+export async function setInboxResolved(actor: InboxActor, input: { kind: InboxActionKind; id: string; resolved: boolean; action?: 'resolve' }, constraints: InboxReadConstraints = {}) {
+  return setInboxWorkflowResolved(actor, { kind: input.kind, id: input.id, resolved: input.resolved }, constraints);
 }
+export { canManageInboxWorkflow };
 export async function moderateInboxComment(actor: InboxActor, input: { id: string; hidden: boolean }) {
   return (await host(await providerForItem('comment', input.id, actor.workspaceId))).moderate(actor, input);
 }

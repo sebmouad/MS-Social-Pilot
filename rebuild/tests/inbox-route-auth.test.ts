@@ -1,3 +1,4 @@
+import { OperationError } from '../src/lib/operation-error';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: vi.fn(), withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
 
@@ -20,7 +21,7 @@ const request = (body: unknown) => new Request('http://localhost/api/inbox/actio
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.requireViewer.mockResolvedValue({ user: { id: 'user-1' }, workspaceId: 'workspace-1' });
-  for (const action of [mocks.sync, mocks.reply, mocks.resolve, mocks.moderate, mocks.remove]) action.mockResolvedValue({});
+  for (const action of [mocks.sync, mocks.reply, mocks.resolve, mocks.moderate, mocks.remove]) action.mockResolvedValue({ ok: true });
 });
 
 describe('inbox route scoped authorization', () => {
@@ -31,19 +32,19 @@ describe('inbox route scoped authorization', () => {
   });
 
   it('returns denial for an unassigned channel on read and write operations', async () => {
-    mocks.sync.mockRejectedValueOnce(new Error('You do not have access to this Facebook Page.'));
+    mocks.sync.mockRejectedValueOnce(new OperationError('forbidden', 'You do not have access to this Facebook Page.'));
     const readDenied = await POST(request({ action: 'sync', targetId: 'page-other' }));
     expect(readDenied.status).toBe(403);
 
-    mocks.reply.mockRejectedValueOnce(new Error('You do not have access to this Facebook Page.'));
+    mocks.reply.mockRejectedValueOnce(new OperationError('forbidden', 'You do not have access to this Facebook Page.'));
     const writeDenied = await POST(request({ action: 'reply', kind: 'message', id: 'message-1', text: 'Hello' }));
     expect(writeDenied.status).toBe(403);
   });
 
   it('returns unavailable for a record that belongs to another workspace', async () => {
-    mocks.reply.mockRejectedValueOnce(new Error('This conversation is unavailable in the current workspace.'));
+    mocks.reply.mockRejectedValueOnce(new OperationError('not_found', 'This conversation is unavailable in the current workspace.'));
     const response = await POST(request({ action: 'reply', kind: 'message', id: 'foreign-message', text: 'Hello' }));
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(404);
     expect(mocks.reply).toHaveBeenCalledWith(
       { userId: 'user-1', workspaceId: 'workspace-1' },
       { action: 'reply', kind: 'message', id: 'foreign-message', text: 'Hello' },
@@ -51,7 +52,7 @@ describe('inbox route scoped authorization', () => {
   });
 
   it('returns a conflict when the stored Messenger thread is outside the reply window', async () => {
-    mocks.reply.mockRejectedValueOnce(new Error('The Messenger reply window closed 24 hours after the visitor’s last message.'));
+    mocks.reply.mockRejectedValueOnce(new OperationError('conflict', 'The Messenger reply window closed 24 hours after the visitor’s last message.'));
     const response = await POST(request({ action: 'reply', kind: 'message', id: 'message-1', text: 'Hello' }));
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ error: expect.stringContaining('reply window closed') });

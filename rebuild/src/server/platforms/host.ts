@@ -41,7 +41,6 @@ export interface PlatformInboxHost {
   canManage(actor: InboxActor, targetId: string): Promise<boolean>;
   sync(actor: InboxActor, targetId?: string): Promise<{ targetCount: number; failedCount: number; conversationCount: number; messageCount: number; commentCount: number; syncedAt: string }>;
   reply(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; text: string }): Promise<{ ok: boolean }>;
-  resolve(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; resolved: boolean }): Promise<{ ok: boolean }>;
   moderate(actor: InboxActor, input: { id: string; hidden: boolean }): Promise<{ ok: boolean }>;
   deleteComment(actor: InboxActor, input: { id: string }): Promise<{ ok: boolean }>;
 }

@@ -76,3 +76,7 @@ Configuration validation checks only the current owner’s registry entries and 
 ## Inbox browsing bounds — registry 36
 
 The Inbox product owns `inbox.listPageSize` (default 25, 1–200), `inbox.threadPageSize` (50, 1–200), `inbox.searchMaxCharacters` (200, 1–2000) and `inbox.cursorMaxCharacters` (4096, 512–65536). The shared list/thread service validates input and caps caller requests with these settings; MCP also applies its result cap. Sidebar count/search controls consume the same bounds. Cursor version, canonical encoding, ID grammar and timestamp precision are isolated read-protocol invariants, not provider policy. These settings do not change provider fetch coverage or sync schedules.
+
+## Local Inbox workflow — registry 37
+
+Inbox owns active `inbox.workflowTransactionTimeoutMs` (default 5000, 1000–60000 ms) and `inbox.workflowTransactionMaxWaitMs` (default 2000, 500–30000 ms). The resolve/reopen service consumes both when opening the atomic state/audit transaction. They do not change provider request deadlines. The existing Shared workspace-operation timeout/wait controls independently govern the one service-owned workspace guard. Root module settings and private configuration MCP expose these typed values through the existing ownership registry.

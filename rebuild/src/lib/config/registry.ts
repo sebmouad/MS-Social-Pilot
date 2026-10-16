@@ -5,7 +5,7 @@ import { THEMES } from '@/lib/themes';
 import { configurationOwner } from './ownership';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 36;
+export const CONFIG_SCHEMA_VERSION = 37;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -52,6 +52,8 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'inbox.threadPageSize', group: 'Inbox · Browsing', label: 'Inbox history page limit', kind: 'number', description: 'Default and maximum stored messages or comment replies per thread history page. The original comment remains visible separately.', defaultValue: 50, schema: z.number().int().min(1).max(200), consumption: 'active' }),
   entry({ key: 'inbox.searchMaxCharacters', group: 'Inbox · Browsing', label: 'Inbox search character limit', kind: 'number', description: 'Maximum literal message/person search length in Inbox UI, HTTP and MCP.', defaultValue: 200, schema: z.number().int().min(1).max(2000), consumption: 'active' }),
   entry({ key: 'inbox.cursorMaxCharacters', group: 'Inbox · Browsing', label: 'Inbox cursor character limit', kind: 'number', description: 'Maximum canonical encoded cursor length for Inbox activity and thread history. Cursors are positions, not authorization grants.', defaultValue: 4096, schema: z.number().int().min(512).max(65536), consumption: 'active' }),
+  entry({ key: 'inbox.workflowTransactionTimeoutMs', group: 'Inbox · Workflow', label: 'Local workflow transaction deadline', kind: 'number', description: 'Maximum database transaction duration in milliseconds for local resolve/reopen state and its atomic audit. Does not bound provider requests.', defaultValue: 5000, schema: z.number().int().min(1000).max(60000), consumption: 'active' }),
+  entry({ key: 'inbox.workflowTransactionMaxWaitMs', group: 'Inbox · Workflow', label: 'Local workflow transaction acquisition wait', kind: 'number', description: 'Maximum milliseconds to wait for the local workflow database transaction to start. Workspace operation locking uses its separate Shared data controls.', defaultValue: 2000, schema: z.number().int().min(500).max(30000), consumption: 'active' }),
   entry({ key: 'connections.statusLabels', group: 'Connections', label: 'Connection status labels', kind: 'json', description: 'Customer-facing labels for connected, expired and revoked sources. Health and permission checks are independent of these labels.', defaultValue: { connected: 'Connected', expired: 'Reconnect needed', revoked: 'Reconnect needed' }, schema: z.object({ connected: z.string().trim().min(1).max(80), expired: z.string().trim().min(1).max(80), revoked: z.string().trim().min(1).max(80) }).strict(), consumption: 'active' }),
 
   entry({ key: 'ads.managementEnabled', group: 'Ads controls', label: 'Ads management enabled', kind: 'boolean', description: 'Allow authorized workspace owners and admins to use supported advertising management operations. Platform grants, account scope and confirmations are still required.', defaultValue: false, schema: z.boolean(), consumption: 'active' }),

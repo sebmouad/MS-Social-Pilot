@@ -20,10 +20,10 @@ UI and MCP Inbox reads use the same channel predicate: selected, in the current 
 
 ## Actions and checks
 
-Reply, resolve/reopen, hide/unhide and delete go through `/api/inbox/actions` and the functions in `src/server/inbox/actions.ts`. Each action rechecks the active workspace membership, Inbox entitlement and feature permission, channel scope, enabled channel ownership, token validity and the configured scope grants. `meta.inboxReadScopes` gates reads and `meta.inboxWriteScopes` gates replies, moderation and deletion. Existing connections must reconnect and grant any missing configured scopes.
+Reply, resolve/reopen, hide/unhide and delete go through `/api/inbox/actions` and the functions in `src/server/inbox/actions.ts`. Local resolve/reopen now dispatches to the platform-neutral `modules/inbox/server/workflow.ts`; it rechecks current write/channel grants but does not require usable remote credentials. Its scoped state change and domain audit are atomic. The obsolete Facebook local-resolution implementation and host hook were removed. All actions enforce active membership, Inbox entitlement/feature permission, selected channel scope and ownership. Remote actions additionally require current token validity and configured provider grants. `meta.inboxReadScopes` gates reads and `meta.inboxWriteScopes` gates replies, moderation and deletion. Existing connections must reconnect and grant any missing configured scopes.
 
 - Replies are sent to the platform first, then stored with the acting user and audited.
-- Resolve/reopen is local workflow state.
+- Resolve/reopen is local workflow state, including when credentials have expired and stored history remains available. UI, HTTP and MCP use one shared service with a single service-owned workspace operation lock; transports do not nest that lock. MCP additionally passes its current channel scope for intersection.
 - Hide/unhide is sent to the platform; the local state changes only after provider success.
 - Delete (comments only, offered when the adapter supports it) asks for confirmation that names the consequence: the comment and any replies under it are removed from the platform and from the inbox, and this cannot be undone. The platform call comes first; the local rows (the comment and replies stored under it) are removed only after it succeeds. Audit entry `inbox.comment_deleted`.
 - Controls appear only for members who can write to the channel; others see a plain statement that replying is unavailable.
@@ -45,3 +45,7 @@ Stable `(time, kind, id)` cursors bind normalized filters, workspace, current ch
 Registry version 36 supplies `inbox.listPageSize`, `inbox.threadPageSize`, `inbox.searchMaxCharacters` and `inbox.cursorMaxCharacters`; MCP result bounds can reduce page sizes further. The old duplicate overview/list read paths have been removed. `msp://inbox` returns a configured first page; use returned cursors with tools to continue. No DDL or provider writes were introduced.
 
 Evidence and limitations are recorded in `docs/PREVIEW_QA.md`. Stored browsing is paginated; nested visitor-reply sync, assignment/notes/saved replies, durable remote-write reconciliation and MCP comment deletion remain unfinished.
+
+## Failure and receipt handling
+
+HTTP returns typed safe codes/messages and no-store on every response; unexpected provider/database text is masked even if it contains a formerly whitelisted phrase. A non-sync write succeeds only with an explicit `{ok:true}` receipt. The UI validates successful responses and sync counts/timestamps before claiming completion. Malformed/false receipts or lost responses preserve reply text/delete dialog and direct the user to inspect current Inbox/platform state before repeating. These changes do not implement durable remote deletion reconciliation. See `docs/INBOX_WRITE_RECOVERY.md` for its required journal, concurrency, tombstone, lifecycle and cutover work.

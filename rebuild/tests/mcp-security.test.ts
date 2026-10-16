@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const purgeGuard = vi.hoisted(() => vi.fn());
+const workspaceGuard = vi.hoisted(() => vi.fn());
 vi.mock('../src/server/platforms/registry', () => ({ inboxPlatformIds: async () => ['facebook'], enabledSocialAccountWhere: async () => ({ provider: { in: ['facebook'] } }), platformAds: vi.fn(async () => ({ ui: { campaign: { options: [{ value: 'OUTCOME_TRAFFIC', label: 'Traffic' }], defaultOption: 'OUTCOME_TRAFFIC', confirmationTemplate: 'CREATE PAUSED FACEBOOK CAMPAIGN {nameJson} IN ACCOUNT {adAccountId} WITH OBJECTIVE {objective}' }, adSet: { options: [{ value: 'LINK_CLICKS', label: 'Link clicks' }, { value: 'IMPRESSIONS', label: 'Impressions' }], defaultOption: 'LINK_CLICKS', confirmationTemplate: 'CREATE PAUSED FACEBOOK AD SET {nameJson} UNDER CAMPAIGN {campaignId} IN ACCOUNT {adAccountId} WITH DAILY BUDGET {dailyBudgetMinor} MINOR UNITS TARGETING {countryCode} OPTIMIZED FOR {optimizationGoal}' } }, adSetConfirmation: (input: { adAccountId: string; campaignId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }) => `CREATE PAUSED FACEBOOK AD SET ${JSON.stringify(input.name)} UNDER CAMPAIGN ${input.campaignId} IN ACCOUNT ${input.adAccountId} WITH DAILY BUDGET ${input.dailyBudgetMinor} MINOR UNITS TARGETING ${input.countryCode} OPTIMIZED FOR ${input.optimizationGoal}` })) }));
-vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: purgeGuard, withWorkspaceOperation: (_id: string, run: () => Promise<unknown>) => run() }));
+vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: purgeGuard, withWorkspaceOperation: workspaceGuard }));
 
 const db = vi.hoisted(() => ({
   target: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
@@ -75,6 +76,7 @@ const call = (name: string, args: Record<string, unknown> = {}) => handleMcpMess
 
 beforeEach(() => {
   vi.clearAllMocks();
+  workspaceGuard.mockImplementation((_id: string, run: () => Promise<unknown>) => run());
   db.$executeRaw.mockResolvedValue(1);
   db.user.findUnique.mockResolvedValue({ isInstanceOwner: true, disabledAt: null });
   mutations.create.mockResolvedValue({ id: 'new-post' });
@@ -738,6 +740,15 @@ describe('MCP workspace boundaries', () => {
     const denied = await handleMcpMessage(client, { jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'set_inbox_resolved', arguments: { kind: 'comment', id: 'comment-a', resolved: true, confirmation: 'RESOLVE comment comment-a' } } });
     expect((await denied.json()).result.isError).toBe(true);
     expect(inboxMutations.resolve).not.toHaveBeenCalled();
+  });
+
+  it('passes narrowed channel scope to local workflow and leaves exactly one service-owned workspace guard', async () => {
+    const scoped = { ...viewer, role: 'editor', apiKeyId: 'scoped-key', permissions: resolvePermissions({ role: 'editor', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-a' }] }) };
+    inboxMutations.resolve.mockImplementation(async () => workspaceGuard('workspace-a', async () => ({ ok: true, resolved: true })));
+    const response = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name: 'set_inbox_resolved', arguments: { kind: 'comment', id: 'comment-a', resolved: true, confirmation: 'RESOLVE comment comment-a' } } });
+    expect((await response.json()).result.structuredContent).toMatchObject({ ok: true, resolved: true });
+    expect(inboxMutations.resolve).toHaveBeenCalledWith(scoped, { kind: 'comment', id: 'comment-a', resolved: true }, { allowedChannelIds: ['page-a'] });
+    expect(workspaceGuard).toHaveBeenCalledTimes(1);
   });
 
   it('requires exact post-specific confirmations for publishing, status sync and deletion', async () => {

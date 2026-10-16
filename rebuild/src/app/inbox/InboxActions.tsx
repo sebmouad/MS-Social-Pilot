@@ -5,19 +5,28 @@ import { useId, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Dialog } from '@/components';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
+import { isOperationErrorCode } from '@/lib/operation-error';
 import styles from './inbox.module.css';
 
 type Kind = 'message' | 'comment';
 type Outcome = { ok: true; body: Record<string, number | string | boolean> } | { ok: false; error: string };
 
+const uncertainOutcome = 'The outcome is unconfirmed. Check the current Inbox and platform state before repeating this action.';
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
 async function send(payload: Record<string, unknown>): Promise<Outcome> {
   try {
     const response = await fetch('/api/inbox/actions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) return { ok: false, error: typeof body.error === 'string' ? body.error : 'The inbox action failed.' };
-    return { ok: true, body };
+    let body: unknown;
+    try { body = await response.json(); } catch { return { ok: false, error: uncertainOutcome }; }
+    if (!response.ok) {
+      if (isRecord(body) && typeof body.error === 'string' && isOperationErrorCode(body.code)) return { ok: false, error: body.error };
+      return { ok: false, error: uncertainOutcome };
+    }
+    if (!isRecord(body) || body.ok !== true) return { ok: false, error: uncertainOutcome };
+    return { ok: true, body: body as Record<string, number | string | boolean> };
   } catch {
-    return { ok: false, error: 'The inbox action could not reach the server. Check your connection and try again.' };
+    return { ok: false, error: uncertainOutcome };
   }
 }
 
@@ -35,10 +44,15 @@ export function InboxSyncBar({ targetId, lastSynced, timeZone, disabled = false 
     const outcome = await send({ action: 'sync', ...(targetId ? { targetId } : {}) });
     setBusy(false);
     if (!outcome.ok) { setResult({ kind: 'error', text: outcome.error }); return; }
-    const { conversationCount = 0, messageCount = 0, commentCount = 0, targetCount = 0, failedCount = 0, syncedAt } = outcome.body as Record<string, number | string>;
-    const failed = Number(failedCount);
+    const fields = ['conversationCount', 'messageCount', 'commentCount', 'targetCount', 'failedCount'] as const;
+    const countsValid = fields.every(key => Number.isSafeInteger(outcome.body[key]) && (outcome.body[key] as number) >= 0);
+    const syncedAt = outcome.body.syncedAt;
+    const dateValid = typeof syncedAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(syncedAt) && Number.isFinite(Date.parse(syncedAt)) && new Date(syncedAt).toISOString() === syncedAt;
+    if (!countsValid || !dateValid) { setResult({ kind: 'error', text: uncertainOutcome }); return; }
+    const { conversationCount, messageCount, commentCount, targetCount, failedCount } = outcome.body as Record<typeof fields[number], number>;
+    const failed = failedCount;
     setResult({ kind: failed ? 'error' : 'ok', text: `Checked ${plural(Number(targetCount), 'channel')}: ${plural(Number(conversationCount), 'conversation')} (${plural(Number(messageCount), 'message')}) and ${plural(Number(commentCount), 'comment')} up to date.${failed ? ` ${plural(failed, 'channel')} could not be read. Reconnect it in Connections, then sync again.` : ''}` });
-    if (typeof syncedAt === 'string') setSyncedNow(new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(new Date(syncedAt)));
+    setSyncedNow(new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(new Date(syncedAt)));
     router.refresh();
   }
 

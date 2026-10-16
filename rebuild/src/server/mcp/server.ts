@@ -278,7 +278,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       if (!kind || !id || typeof args.resolved !== 'boolean') throw new OperationError('invalid_request', 'kind, id, and resolved are required.');
       const verb = args.resolved ? 'RESOLVE' : 'REOPEN';
       requireConfirmation(args, `${verb} ${kind} ${id}`);
-      const result = await setInboxResolved(viewer, { kind, id, resolved: args.resolved });
+      const result = await setInboxResolved(viewer, { kind, id, resolved: args.resolved }, { allowedChannelIds: pageIdsFor(viewer) });
       return auditedReceipt(viewer, name, { kind, itemId: id, resolved: args.resolved }, { ...result, kind, itemId: id, resolved: args.resolved });
     }
     case 'moderate_inbox_comment': {
@@ -604,7 +604,8 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       if (name === 'set_connection_selection' && viewer.role !== 'owner' && viewer.role !== 'admin') throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
       if (params.arguments !== undefined && (!params.arguments || typeof params.arguments !== 'object' || Array.isArray(params.arguments))) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
       const args = (params.arguments ?? {}) as Record<string, unknown>;
-      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !rootTools.has(name)) || name === 'get_live_ad_status'
+      // Data deletion and local Inbox workflow own their service-level lock.
+      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && name !== 'set_inbox_resolved' && !rootTools.has(name)) || name === 'get_live_ad_status'
         ? await withWorkspaceOperation(viewer.workspaceId, () => runTool(viewer, name, args))
         : await runTool(viewer, name, args);
       return reply(textResult(result));

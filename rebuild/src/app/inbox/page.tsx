@@ -6,7 +6,7 @@ import type { InboxFilters, InboxListPage, InboxThreadPage, OpenThread } from '@
 import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
-import { canManageInbox } from '@/server/inbox/actions';
+import { canManageInbox, canManageInboxWorkflow } from '@/server/inbox/actions';
 import { inboxReplyPolicy } from '@/server/inbox/policy';
 import { inboxCapabilities } from '@/server/inbox/providers';
 import { formatInboxTime } from '@/server/inbox/threads';
@@ -83,8 +83,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
   let threadView = null;
   if (thread) {
-    const [canWrite, capabilities, rule] = await Promise.all([
+    const [canWrite, canResolve, capabilities, rule] = await Promise.all([
       canManageInbox(actor, thread.target.id),
+      canManageInboxWorkflow(actor, thread.target.id),
       thread.target.provider ? inboxCapabilities(thread.target.provider) : Promise.resolve({ reply: false, hide: false, remove: false }),
       inboxReplyPolicy(thread.target.provider, { kind: thread.kind, channelRemoteId: thread.target.providerId, lastInbound: thread.lastInbound, timeZone }),
     ]);
@@ -118,7 +119,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           <p>{entry.text || 'No text in this message.'}</p>
         </li>)}
       </ol>
-      {canWrite ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canWrite} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} /> : null}
+      {canResolve ? <ThreadToolbar id={thread.id} kind={thread.kind} resolved={thread.resolved} hidden={thread.hidden} canResolve={canResolve} canHide={canWrite && capabilities.hide} canDelete={canWrite && capabilities.remove} platformName={badge.platformName} listHref={clearThreadHref} /> : null}
       {canWrite && capabilities.reply ? <ReplyBox key={thread.id} id={thread.id} kind={thread.kind} allowed={rule.allowed} headline={rule.headline} detail={rule.detail} />
         : <p className={styles.readOnly}>{canWrite ? 'Replies are not available for this channel.' : 'You can read this conversation, but replying and moderation are unavailable right now. Your role may be read-only, or the channel may need to be reconnected in Connections.'}</p>}
     </section>;

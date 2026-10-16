@@ -161,24 +161,6 @@ export async function replyToFacebookInbox(actor: InboxActor, input: { kind: 'me
   return { ok: true };
 }
 
-export async function setFacebookInboxResolved(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; resolved: boolean }) {
-  if (!/^[A-Za-z0-9_-]{1,200}$/.test(input.id)) throw new OperationError('invalid_request', 'Invalid inbox item.');
-  if (input.kind === 'message') {
-    const row = await prisma.conversation.findFirst({ where: { id: input.id, target: { workspaceId: actor.workspaceId } }, select: { id: true, targetId: true } });
-    if (!row) throw new OperationError('not_found', 'This conversation is unavailable in the current workspace.');
-    await page(actor, row.targetId, true);
-    await prisma.conversation.update({ where: { id: row.id }, data: { resolvedAt: input.resolved ? new Date() : null } });
-    await audit(actor, input.resolved ? 'inbox.conversation_resolved' : 'inbox.conversation_reopened', { targetId: row.targetId, conversationId: row.id });
-  } else {
-    const row = await prisma.postComment.findFirst({ where: { id: input.id, postTarget: { post: { workspaceId: actor.workspaceId }, target: { workspaceId: actor.workspaceId } } }, select: { id: true, postTarget: { select: { targetId: true } } } });
-    if (!row) throw new OperationError('not_found', 'This comment is unavailable in the current workspace.');
-    await page(actor, row.postTarget.targetId, true);
-    await prisma.postComment.update({ where: { id: row.id }, data: { resolvedAt: input.resolved ? new Date() : null } });
-    await audit(actor, input.resolved ? 'inbox.comment_resolved' : 'inbox.comment_reopened', { targetId: row.postTarget.targetId, commentId: row.id });
-  }
-  return { ok: true };
-}
-
 export async function moderateFacebookComment(actor: InboxActor, input: { id: string; hidden: boolean }) {
   if (!/^[A-Za-z0-9_-]{1,200}$/.test(input.id)) throw new OperationError('invalid_request', 'Invalid inbox item.');
   const row = await prisma.postComment.findFirst({ where: { id: input.id, postTarget: { post: { workspaceId: actor.workspaceId }, target: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, postTarget: { select: { targetId: true } } } });

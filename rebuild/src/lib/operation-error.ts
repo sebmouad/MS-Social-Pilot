@@ -14,6 +14,11 @@ const HTTP_STATUS: Record<OperationErrorCode, number> = {
   unavailable: 409, reconnect_required: 409, conflict: 409, upstream_failure: 502,
 };
 
+/** Shared protocol vocabulary for client receipt validation and server errors. */
+export function isOperationErrorCode(value: unknown): value is OperationErrorCode {
+  return typeof value === 'string' && Object.hasOwn(HTTP_STATUS, value);
+}
+
 export function operationFailure(error: unknown, fallback: string) {
   const safe = error instanceof OperationError ? error : new OperationError('upstream_failure', fallback);
   return { error: safe.message, code: safe.code, status: HTTP_STATUS[safe.code] };

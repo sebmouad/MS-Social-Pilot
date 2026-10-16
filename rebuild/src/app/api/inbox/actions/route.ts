@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireViewer } from '@/server/context';
 import { deleteInboxComment, moderateInboxComment, replyToInbox, setInboxResolved, syncInbox } from '@/server/inbox/actions';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
+import { OperationError, operationFailure } from '@/lib/operation-error';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,31 +16,36 @@ const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('moderate'), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), hidden: z.boolean() }).strict(),
 ]);
 
+const noStore = { 'cache-control': 'no-store' };
+const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: noStore });
+const unconfirmed = 'The inbox action outcome is unconfirmed. Inspect the current Inbox item and platform before repeating this action.';
+
 export async function POST(request: Request) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin request denied.' }, { status: 403 });
+  if (!sameOrigin(request)) return reply({ error: 'Cross-origin request denied.', code: 'forbidden' }, 403);
   let viewer;
   try { viewer = await requireViewer({ feature: 'inbox/conversations', channelScoped: true }); }
-  catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
+  catch { return reply({ error: 'Not authorized.', code: 'unauthorized' }, 401); }
   try {
+    if ([...new URL(request.url).searchParams.keys()].length) throw new OperationError('invalid_request', 'Inbox actions do not accept URL filters.');
     const input = schema.parse(await request.json());
     const actor = { userId: viewer.user.id, workspaceId: viewer.workspaceId };
-    const result = await withWorkspaceOperation(viewer.workspaceId, async () => input.action === 'sync' ? await syncInbox(actor, input.targetId)
+    // Local workflow services own their workspace lock. Acquiring it twice on
+    // separate connections can wait behind a queued purge's exclusive lock.
+    const result = input.action === 'resolve' ? await setInboxResolved(actor, input)
+      : await withWorkspaceOperation(viewer.workspaceId, async () => input.action === 'sync' ? await syncInbox(actor, input.targetId)
       : input.action === 'reply' ? await replyToInbox(actor, input)
-      : input.action === 'resolve' ? await setInboxResolved(actor, input)
       : input.action === 'delete' ? await deleteInboxComment(actor, input)
       : await moderateInboxComment(actor, input));
-    return NextResponse.json({ ok: true, ...result }, { headers: { 'cache-control': 'no-store' } });
+    if (input.action !== 'sync' && (!result || typeof result !== 'object' || (result as { ok?: unknown }).ok !== true)) {
+      throw new OperationError('upstream_failure', unconfirmed);
+    }
+    return reply({ ok: true, ...result });
   } catch (error) {
-    if (error instanceof z.ZodError || error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid inbox action.' }, { status: 400 });
-    const message = error instanceof Error ? error.message : '';
-    const known: Array<[string, number]> = [
-      ['Invalid inbox item', 400], ['Write a reply', 400], ['no longer a member', 401], ['not have access', 403], ['not enabled', 403],
-      ['unavailable', 409], ['reply window closed', 409], ['no stored visitor message', 409], ['Reconnect this source', 403], ['Inbox is unavailable for this connection', 403],
-      ['Workspace data deletion is in progress.', 409],
-    ];
-    const match = known.find(([phrase]) => message.includes(phrase));
-    return match ? NextResponse.json({ error: message }, { status: match[1], headers: { 'cache-control': 'no-store' } })
-      : NextResponse.json({ error: 'The inbox action could not be completed. Check the channel connection and try again.' }, { status: 502, headers: { 'cache-control': 'no-store' } });
+    const typedError = error instanceof z.ZodError || error instanceof SyntaxError
+      ? new OperationError('invalid_request', 'Invalid inbox action.')
+      : error;
+    const failure = operationFailure(typedError, unconfirmed);
+    return reply({ error: failure.error, code: failure.code }, failure.status);
   }
 }
 

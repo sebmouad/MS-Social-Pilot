@@ -11,7 +11,7 @@ import { ThreadToolbar } from '../src/app/inbox/InboxActions';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
-let finish: (response: { ok: boolean; json: () => Promise<{ error: string }> }) => void;
+let finish: (response: { ok: boolean; json: () => Promise<{ error: string; code: string }> }) => void;
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
@@ -41,7 +41,7 @@ describe('Inbox deletion recovery', () => {
 
   it('keeps the failed deletion and its error in the open dialog', async () => {
     await startDeletion();
-    await act(async () => finish({ ok: false, json: async () => ({ error: 'Example platform could not remove the comment.' }) }));
+    await act(async () => finish({ ok: false, json: async () => ({ error: 'Example platform could not remove the comment.', code: 'upstream_failure' }) }));
     const dialog = container.querySelector('dialog');
     expect(dialog?.open).toBe(true);
     expect(dialog?.querySelector('[role=alert]')?.textContent).toBe('Example platform could not remove the comment.');
