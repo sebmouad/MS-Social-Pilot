@@ -25,14 +25,14 @@ Reply, resolve/reopen, hide/unhide and delete go through `/api/inbox/actions` an
 - Replies are sent to the platform first, then stored with the acting user and audited.
 - Resolve/reopen is local workflow state, including when credentials have expired and stored history remains available. UI, HTTP and MCP use one shared service with a single service-owned workspace operation lock; transports do not nest that lock. MCP additionally passes its current channel scope for intersection.
 - Hide/unhide is sent to the platform; the local state changes only after provider success.
-- Delete (comments only, offered when the adapter supports it) asks for confirmation that names the consequence: the comment and any replies under it are removed from the platform and from the inbox, and this cannot be undone. The platform call comes first; the local rows (the comment and replies stored under it) are removed only after it succeeds. Audit entry `inbox.comment_deleted`.
+- Comment deletion now uses the shared durable journal: exact object confirmation, committed intent before one provider dispatch, conservative uncertainty, stored remote confirmation and atomic local finalization/audit. Status checks never repeat the provider call; recovery only finishes local work. Existing operations remain in the dialog until both sides are confirmed. Local cleanup follows the scoped stored descendant graph; durable alias IDs preserve completed status, and tombstones propagate through parent-first sync batches. Full provider reply discovery remains open. See `docs/INBOX_WRITE_RECOVERY.md`.
 - Controls appear only for members who can write to the channel; others see a plain statement that replying is unavailable.
 
 Audit details contain workspace and object identifiers but no message content or credentials. A provider failure is shown as a generic customer-safe error and never as a confirmed action.
 
 ## Known gaps
 
-Visitor replies nested under a comment are not synced (the sync reads top-level comments), so only replies sent here appear under a comment. Assignment, notes, saved replies and an MCP delete tool do not exist. Delete and the other operations have only mocked provider tests; no live platform calls were made.
+Visitor replies nested under a comment are not synced (the sync reads top-level comments), so only replies sent here appear under a comment. Assignment, notes and saved replies remain absent. MCP deletion/status/local recovery now share the durable workflow described below. Delete and the other operations have only mocked provider tests; no live platform calls were made.
 
 Run the isolated checks from `app/rebuild` with `npm test` and `npm run typecheck`. Mocked provider tests do not send live messages or moderation operations.
 
@@ -44,8 +44,8 @@ Stable `(time, kind, id)` cursors bind normalized filters, workspace, current ch
 
 Registry version 36 supplies `inbox.listPageSize`, `inbox.threadPageSize`, `inbox.searchMaxCharacters` and `inbox.cursorMaxCharacters`; MCP result bounds can reduce page sizes further. The old duplicate overview/list read paths have been removed. `msp://inbox` returns a configured first page; use returned cursors with tools to continue. No DDL or provider writes were introduced.
 
-Evidence and limitations are recorded in `docs/PREVIEW_QA.md`. Stored browsing is paginated; nested visitor-reply sync, assignment/notes/saved replies, durable remote-write reconciliation and MCP comment deletion remain unfinished.
+Evidence and limitations are recorded in `docs/PREVIEW_QA.md`. Stored browsing is paginated; nested visitor-reply discovery, assignment/notes/saved replies and automatic remote-write reconciliation remain unfinished.
 
 ## Failure and receipt handling
 
-HTTP returns typed safe codes/messages and no-store on every response; unexpected provider/database text is masked even if it contains a formerly whitelisted phrase. A non-sync write succeeds only with an explicit `{ok:true}` receipt. The UI validates successful responses and sync counts/timestamps before claiming completion. Malformed/false receipts or lost responses preserve reply text/delete dialog and direct the user to inspect current Inbox/platform state before repeating. These changes do not implement durable remote deletion reconciliation. See `docs/INBOX_WRITE_RECOVERY.md` for its required journal, concurrency, tombstone, lifecycle and cutover work.
+HTTP returns typed safe codes/messages and no-store on every response; unexpected provider/database text is masked even if it contains a formerly whitelisted phrase. A non-sync write succeeds only with an explicit `{ok:true}` receipt. The UI validates successful responses and sync counts/timestamps before claiming completion. Malformed/false receipts or lost responses preserve reply text/delete dialog and direct the user to inspect current Inbox/platform state before repeating. The durable journal and manual Root recovery now extend these boundaries; automatic provider verification and full provider visitor-reply discovery remain incomplete. See `docs/INBOX_WRITE_RECOVERY.md` for its required journal, concurrency, tombstone, lifecycle and cutover work.

@@ -147,6 +147,8 @@ model Workspace {
   mcpApiKeys     McpApiKey[]
   dataPurge      WorkspaceDataPurge?
 
+  inboxDeletions RebuildInboxDeletion[]
+
   @@map("workspaces")
 }
 
@@ -514,4 +516,28 @@ model RebuildSyncRun {
   @@index([job, startedAt])
   @@index([finishedAt])
   @@map("rebuild_sync_runs")
+}
+
+/// Durable Inbox deletion recovery and content-free tombstones.
+model RebuildInboxDeletion {
+  id                  String    @id
+  workspaceId         String
+  targetId            String
+  provider            String
+  remoteId            String
+  localItemId         String
+  localAliases        String[]  @default([])
+  suppressedRemoteIds String[]  @default([])
+  actorId             String
+  state               String
+  reason              String?
+  createdAt           DateTime  @default(now()) @db.Timestamp(3)
+  updatedAt           DateTime  @default(now()) @updatedAt @db.Timestamp(3)
+  remoteConfirmedAt   DateTime? @db.Timestamp(3)
+  completedAt         DateTime? @db.Timestamp(3)
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, provider, targetId, remoteId])
+  @@index([workspaceId, targetId, updatedAt])
+  @@map("rebuild_inbox_deletions")
 }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireViewer } from '@/server/context';
 import { deleteInboxComment, moderateInboxComment, replyToInbox, setInboxResolved, syncInbox } from '@/server/inbox/actions';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
+import { finishInboxDeletion } from '@/modules/inbox/server/deletion';
 import { OperationError, operationFailure } from '@/lib/operation-error';
 
 export const runtime = 'nodejs';
@@ -12,7 +13,8 @@ const schema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('sync'), targetId: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).optional() }).strict(),
   z.object({ action: z.literal('reply'), kind: z.enum(['message', 'comment']), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), text: z.string().max(2000) }).strict(),
   z.object({ action: z.literal('resolve'), kind: z.enum(['message', 'comment']), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), resolved: z.boolean() }).strict(),
-  z.object({ action: z.literal('delete'), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/) }).strict(),
+  z.object({ action: z.literal('delete'), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), confirmation: z.string().max(240) }).strict(),
+  z.object({ action: z.literal('finish_delete'), operationId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), confirmation: z.string().max(240) }).strict(),
   z.object({ action: z.literal('moderate'), id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), hidden: z.boolean() }).strict(),
 ]);
 
@@ -32,9 +34,10 @@ export async function POST(request: Request) {
     // Local workflow services own their workspace lock. Acquiring it twice on
     // separate connections can wait behind a queued purge's exclusive lock.
     const result = input.action === 'resolve' ? await setInboxResolved(actor, input)
+      : input.action === 'delete' ? await deleteInboxComment(actor, input)
+      : input.action === 'finish_delete' ? await finishInboxDeletion(actor, input)
       : await withWorkspaceOperation(viewer.workspaceId, async () => input.action === 'sync' ? await syncInbox(actor, input.targetId)
       : input.action === 'reply' ? await replyToInbox(actor, input)
-      : input.action === 'delete' ? await deleteInboxComment(actor, input)
       : await moderateInboxComment(actor, input));
     if (input.action !== 'sync' && (!result || typeof result !== 'object' || (result as { ok?: unknown }).ok !== true)) {
       throw new OperationError('upstream_failure', unconfirmed);

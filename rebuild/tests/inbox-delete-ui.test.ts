@@ -11,13 +11,15 @@ import { ThreadToolbar } from '../src/app/inbox/InboxActions';
 
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
-let finish: (response: { ok: boolean; json: () => Promise<{ error: string; code: string }> }) => void;
+let finish: (response: { ok: boolean; json: () => Promise<unknown> }) => void;
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); this.tabIndex = -1; };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
-  vi.stubGlobal('fetch', vi.fn(() => new Promise(resolve => { finish = resolve; })));
+  vi.stubGlobal('fetch', vi.fn((_url: string | URL | Request, init?: RequestInit) => init?.method === 'POST'
+    ? new Promise(resolve => { finish = resolve; })
+    : Promise.resolve({ ok: true, json: async () => ({ operation: null }) })));
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(createElement(ThreadToolbar, { id: 'example-comment', kind: 'comment', resolved: false, hidden: false, canResolve: true, canHide: true, canDelete: true, platformName: 'Example platform', listHref: '/inbox' })));
   await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Delete comment')!.click());

@@ -1,3 +1,4 @@
+import { assertInboxDeletionsSettled } from '@/modules/inbox/server/comment-guard';
 import { OperationError } from '@/lib/operation-error';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@/server/data';
@@ -266,6 +267,7 @@ export async function deleteWorkspaceData(actor: DataControlActor, confirmation:
     if (!workspace) throw new OperationError('unavailable', 'This workspace is unavailable.');
     const existing = await tx.workspaceDataPurge.findUnique({ where: { workspaceId: actor.workspaceId } });
     if (existing?.status === 'requested' || existing?.status === 'db_deleted') return;
+    await assertInboxDeletionsSettled(tx, actor.workspaceId);
     const configuredRoot = await runtimeConfig('storage.mediaRoot');
     if (!configuredRoot) throw new Error('Set the media storage root in Root before deleting workspace data. No data was deleted.');
     const mediaRoot = await canonicalMediaRoot(configuredRoot);

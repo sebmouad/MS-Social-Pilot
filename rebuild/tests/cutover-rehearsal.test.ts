@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const script = 'scripts/cutover-rehearsal.sh';
-const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs';
+const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions';
 
 describe('cutover rehearsal safety gates', () => {
   it('compares counts for every public base table and detects table-set drift', () => {
@@ -65,18 +65,49 @@ describe('cutover rehearsal safety gates', () => {
     expect(run({ CUTOVER_DUMP_SANITIZED: 'YES', CUTOVER_APPROVED_MIGRATION_SET: 'all' })).toContain('migration set must exactly match');
   });
 
-  it('pins exactly the two reviewed migration files and applies them before mapped-schema checks', () => {
+  it('pins the reviewed migration files and applies them before mapped-schema checks', () => {
     const source = readFileSync(script, 'utf8');
     const root = readFileSync('../prisma/migrations/20261015120000_mcp_api_keys/migration.sql', 'utf8');
     const worker = readFileSync('../prisma/migrations/20261023100000_rebuild_worker_jobs/migration.sql', 'utf8');
+    const inbox = readFileSync('../prisma/migrations/20261016190000_rebuild_inbox_deletions/migration.sql', 'utf8');
     const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 
     expect(source).toContain(hash(root));
     expect(source).toContain(hash(worker));
+    expect(source).toContain(hash(inbox));
+    expect(source).toContain('migration_name IN ($1, $2, $3)');
+    expect(source).toContain("USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions'");
     expect(source).toContain('CUTOVER_APPROVED_MIGRATION_SET');
     expect(source.indexOf('migration.sql"')) .toBeLessThan(source.indexOf('Required tables/columns are taken'));
     expect(source).toContain('staging dump already contains reviewed migration objects');
     expect(source).toContain("WHERE n.nspname = 'public' AND c.relkind = 'r'");
     expect(source).toContain('backup/restore row counts changed');
+    expect(source).toContain("ARRAY['rebuild_inbox_deletions','remoteConfirmedAt']");
+    expect(source).toContain("ARRAY['rebuild_inbox_deletions','completedAt']");
+    expect(source).toContain("ARRAY['rebuild_inbox_deletions','localAliases']");
+    expect(source).toContain("ARRAY['rebuild_inbox_deletions','suppressedRemoteIds']");
+  });
+
+  it('maps the content-free deletion journal and guards its SQL constraints', () => {
+    const schema = readFileSync('prisma/schema.prisma', 'utf8');
+    const migration = readFileSync('../prisma/migrations/20261016190000_rebuild_inbox_deletions/migration.sql', 'utf8');
+    const model = schema.split('model RebuildInboxDeletion {')[1]?.split('\n}')[0] ?? '';
+
+    expect(model).toContain('workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)');
+    expect(model).toContain('@@unique([workspaceId, provider, targetId, remoteId])');
+    expect(model).toContain('@@index([workspaceId, targetId, updatedAt])');
+    expect(model).toContain('@@map("rebuild_inbox_deletions")');
+    expect(model).toContain('localAliases        String[]  @default([])');
+    expect(model).toContain('suppressedRemoteIds String[]  @default([])');
+    expect(model).not.toMatch(/accessToken|refreshToken|message|content/i);
+    expect(migration).toContain('REFERENCES "workspaces"("id") ON DELETE CASCADE');
+    expect(migration).toContain('"localAliases" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]');
+    expect(migration).toContain('"suppressedRemoteIds" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]');
+    expect(migration).toContain('CHECK ("state" IN (\'started\', \'uncertain\', \'remote_confirmed\', \'completed\', \'rejected\'))');
+    expect(migration).toContain('CHECK ("reason" IS NULL OR "reason" IN (\'transport_unconfirmed\', \'provider_rejected\', \'local_pending\'))');
+    expect(migration).toContain('"state" <> \'completed\' OR ("remoteConfirmedAt" IS NOT NULL AND "completedAt" IS NOT NULL)');
+    expect(migration).toContain('"state" <> \'remote_confirmed\' OR "remoteConfirmedAt" IS NOT NULL');
+    expect(migration).toContain('"state" IN (\'completed\', \'remote_confirmed\') OR "completedAt" IS NULL');
+    expect(migration).not.toMatch(/REFERENCES "(targets|users)"/);
   });
 });

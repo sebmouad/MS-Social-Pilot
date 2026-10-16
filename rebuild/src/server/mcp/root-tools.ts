@@ -1,3 +1,4 @@
+import { listRootInboxDeletions, confirmRootInboxDeletion } from '../root/inbox-deletions';
 import { z } from 'zod';
 import { listRootDiagnostics, runRootDiagnostics } from '../root/diagnostics';
 import { loadRootOperations } from '../root/operations';
@@ -14,6 +15,8 @@ import { rootUserActions, rootUserConfirmationSchema, rootUserIdSchema } from '@
 import type { RootMcpActor } from './types';
 
 export const rootToolDefinitions = [
+  { name: 'list_root_inbox_deletions', description: 'Private bounded Inbox deletion recovery history. Includes remote object identity for operator verification, never credentials or comment content. Workspace keys cannot use this tool.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'confirm_root_inbox_deletion', description: 'Record an operator attestation only after separately verifying actual remote deletion. This is not an automatic provider check; it never contacts the platform or removes local rows. Require verifiedOnPlatform:true and exact CONFIRM REMOTE DELETION <operationId>. Workspace keys cannot use this tool.', inputSchema: { type: 'object', required: ['operationId', 'verifiedOnPlatform', 'confirmation'], properties: { operationId: { type: 'string' }, verifiedOnPlatform: { const: true, type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_root_operations', description: 'Private rebuild-only worker heartbeat and bounded job history. Optional product module ID. Stored raw summaries, provider errors and worker hostnames are excluded. Workspace keys cannot use this tool.', inputSchema: { type: 'object', properties: { moduleId: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_root_diagnostics', description: 'Private diagnostic history and bounded recent connection choices. Scope is shared, product:<installed module id>, or platform:<installed provider id>. No credentials or raw transport errors.', inputSchema: { type: 'object', properties: { scope: { type: 'string' } }, additionalProperties: false } },
   { name: 'run_root_diagnostics', description: 'Run private predefined module checks and read-only provider connectivity tests. Confirmation must exactly match RUN DIAGNOSTICS <scope>. Scope-wide cooldown and durable start audit apply across interfaces. Optional connectionId belongs to the selected platform. No publishing, ads or message changes. Inspect check statuses and auditRecorded; a pass verifies only its stated check.', inputSchema: { type: 'object', required: ['scope', 'confirmation'], properties: { scope: { type: 'string' }, connectionId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -29,6 +32,7 @@ export const rootToolDefinitions = [
 export const rootTools = new Set(rootToolDefinitions.map(tool => tool.name));
 export const canUseRootTool = (viewer: RootMcpActor) => viewer.isInstanceOwner === true && !viewer.apiKeyId;
 const resourceDefinitions = [
+  { uri: 'msp://root/inbox-deletions', name: 'Inbox deletion recovery', description: 'Private bounded operator deletion history and remote identity; credentials excluded.', tool: 'list_root_inbox_deletions' },
   { uri: 'msp://root/operations', name: 'Replacement operations', description: 'Private replacement-only worker health; no raw errors.', tool: 'get_root_operations' },
   { uri: 'msp://root/diagnostics', name: 'Shared diagnostics', description: 'Private shared diagnostic history and configuration.', tool: 'get_root_diagnostics' },
   { uri: 'msp://root/users', name: 'Installation users', description: 'Private bounded user directory, access and verification status; credentials excluded.', tool: 'list_root_users' },
@@ -41,7 +45,7 @@ export const rootResourceTool = (uri: string) => resourceDefinitions.find(resour
 const configInput = z.object({ key: z.string().min(1), value: z.unknown().optional(), clear: z.boolean().optional(), confirmation: z.string().min(1) }).strict();
 const userInput = z.object({ userId: rootUserIdSchema, action: z.enum(rootUserActions), confirmation: rootUserConfirmationSchema }).strict();
 
-/** Shared private dispatcher: never depends on a workspace or its write lock. */
+/** Shared private dispatcher. Each service owns any required lifecycle locks. */
 export async function runRootTool(viewer: RootMcpActor, name: string, args: Record<string, unknown>) {
   try {
     if (!canUseRootTool(viewer)) throw new OperationError('forbidden', 'Installation-owner access is required.');
@@ -49,6 +53,10 @@ export async function runRootTool(viewer: RootMcpActor, name: string, args: Reco
     if (!actor?.isInstanceOwner || actor.disabledAt) throw new OperationError('forbidden', 'Installation-owner access is required.');
     if (!args || typeof args !== 'object' || Array.isArray(args)) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
     switch (name) {
+      case 'list_root_inbox_deletions':
+        if (Object.keys(args).length) throw new OperationError('invalid_request', 'This read does not accept filters.');
+        return await listRootInboxDeletions(viewer.userId, viewer.maxResultItems ?? Number(await runtimeConfig('mcp.maxResultItems')));
+      case 'confirm_root_inbox_deletion': return await confirmRootInboxDeletion(viewer.userId, args);
       case 'get_root_operations': {
         const parsed = z.object({ moduleId: z.string().optional() }).strict().safeParse(args);
         if (!parsed.success) throw new OperationError('invalid_request', 'Choose a valid product module.');

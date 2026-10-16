@@ -4,7 +4,7 @@ import { configuredFacebookAdapter, configuredFacebookOAuth } from './runtime';
 import { finishFacebookConnection, startFacebookConnection } from './connection';
 import { facebookAdsHost } from './ads';
 import { facebookAnalyticsHost } from './analytics';
-import { facebookReplyPolicy, canManageFacebookInbox, syncFacebookInbox, replyToFacebookInbox, moderateFacebookComment, deleteFacebookComment } from './inbox';
+import { facebookReplyPolicy, canManageFacebookInbox, syncFacebookInbox, replyToFacebookInbox, moderateFacebookComment, prepareDeleteFacebookComment } from './inbox';
 import { syncAdsAnalytics, syncInbox, syncPageAnalytics, syncScheduledPostStatus } from './jobs';
 
 /** Facebook-owned assembly; shared registration knows only the host contract. */
@@ -13,7 +13,7 @@ export const facebookHost = {
   diagnostics: facebookDiagnostics,
   ads: facebookAdsHost,
   analytics: facebookAnalyticsHost,
-  inbox: { replyPolicy: facebookReplyPolicy, canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, moderate: moderateFacebookComment, deleteComment: deleteFacebookComment },
+  inbox: { replyPolicy: facebookReplyPolicy, canManage: canManageFacebookInbox, sync: syncFacebookInbox, reply: replyToFacebookInbox, moderate: moderateFacebookComment, prepareDeleteComment: prepareDeleteFacebookComment },
   connection: {
     isReady: () => configuredFacebookOAuth().then(() => true, () => false),
     start: startFacebookConnection,

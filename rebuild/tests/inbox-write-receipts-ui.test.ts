@@ -90,7 +90,7 @@ describe('Inbox write receipts', () => {
   });
 
   it('keeps deletion confirmation open after a missing receipt and re-enables controls', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => respond(200, {}))); await showToolbar();
+    vi.stubGlobal('fetch', vi.fn(async (_url: string | URL | Request, init?: RequestInit) => init?.method === 'POST' ? respond(200, {}) : respond(200, { operation: null }))); await showToolbar();
     expect(container.querySelector('dialog')?.open).toBe(true);
     expect(container.querySelector('dialog [role=alert]')?.textContent).toBe(uncertain);
     expect(container.querySelector<HTMLButtonElement>('dialog button:not([data-dialog-cancel])')?.disabled).toBe(false);

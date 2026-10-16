@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
     conversationMessage: { create: vi.fn(), findFirst: vi.fn() }, postComment: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn() }, $executeRaw: vi.fn(), $transaction: vi.fn(), postTarget: { findMany: vi.fn() },
   },
   config: vi.fn(), decrypt: vi.fn(), engine: { replyToConversation: vi.fn(), replyToComment: vi.fn(), moderateComment: vi.fn(), deleteComment: vi.fn(), listInbox: vi.fn(), listComments: vi.fn() },
-  configuredEngine: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), canUseFeature: vi.fn(), canAccessFeature: vi.fn(), canAccessPage: vi.fn(),
+  configuredEngine: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), canUseFeature: vi.fn(), canAccessFeature: vi.fn(), canAccessPage: vi.fn(), guard: vi.fn(), suppressed: vi.fn(), orderBatch: vi.fn(),
 }));
 
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
@@ -16,8 +16,9 @@ vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: 
 vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: mocks.canUseFeature }));
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature, canAccessPage: mocks.canAccessPage }));
+vi.mock('@/modules/inbox/server/comment-guard', () => ({ withInboxChannelOperation: mocks.guard, inboxCommentSuppressed: mocks.suppressed, orderInboxCommentBatch: mocks.orderBatch }));
 
-import { deleteFacebookComment, moderateFacebookComment, replyToFacebookInbox, syncFacebookInbox } from '../src/platforms/facebook/inbox';
+import { prepareDeleteFacebookComment, moderateFacebookComment, replyToFacebookInbox, syncFacebookInbox } from '../src/platforms/facebook/inbox';
 
 const actor = { userId: 'user-1', workspaceId: 'workspace-1' };
 
@@ -37,6 +38,10 @@ beforeEach(() => {
   mocks.prisma.postComment.findFirst.mockResolvedValue({ id: 'comment-1', remoteId: 'remote-comment-1', postTarget: { targetId: 'target-1' } });
   mocks.prisma.postComment.update.mockResolvedValue({}); mocks.prisma.$executeRaw.mockResolvedValue(1);
   mocks.engine.deleteComment.mockResolvedValue(undefined); mocks.prisma.postComment.deleteMany.mockResolvedValue({ count: 2 });
+  mocks.prisma.$transaction.mockImplementation(async (work: (tx: typeof mocks.prisma) => Promise<unknown>) => work(mocks.prisma));
+  mocks.guard.mockImplementation(async (_workspaceId: string, _targetId: string, operation: (signal: AbortSignal) => Promise<unknown>) => operation(new AbortController().signal));
+  mocks.suppressed.mockResolvedValue(false);
+  mocks.orderBatch.mockImplementation(items => items);
 });
 
 describe('workspace Facebook inbox actions', () => {
@@ -104,31 +109,70 @@ describe('workspace Facebook inbox actions', () => {
     expect(JSON.stringify(mocks.prisma.$executeRaw.mock.calls)).toContain('inbox.comment_hidden');
   });
 
-  it('deletes a comment on the platform first, then removes it and its replies locally with an audit entry', async () => {
-    mocks.prisma.postComment.findFirst.mockResolvedValue({ id: 'comment-1', remoteId: 'remote-comment-1', postTargetId: 'post-target-1', postTarget: { targetId: 'target-1' } });
-    await deleteFacebookComment(actor, { id: 'comment-1' });
+  it('blocks comment reply when a nonrejected deletion tombstone exists', async () => {
+    mocks.suppressed.mockResolvedValue(true);
+    await expect(replyToFacebookInbox(actor, { kind: 'comment', id: 'comment-1', text: 'Reply' })).rejects.toThrow(/pending or confirmed deletion/);
+    expect(mocks.engine.replyToComment).not.toHaveBeenCalled();
+    expect(mocks.guard).toHaveBeenCalledWith(actor.workspaceId, 'target-1', expect.any(Function));
+  });
+
+  it('does not apply comment reply or moderation locally after the provider call is aborted', async () => {
+    const controller = new AbortController();
+    mocks.guard.mockImplementationOnce(async (_workspaceId: string, _targetId: string, operation: (signal: AbortSignal) => Promise<unknown>) => operation(controller.signal));
+    mocks.engine.replyToComment.mockImplementationOnce(async () => { controller.abort(); return 'remote-reply'; });
+    await expect(replyToFacebookInbox(actor, { kind: 'comment', id: 'comment-1', text: 'Reply' })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(mocks.configuredEngine).toHaveBeenCalledWith({ signal: controller.signal });
+    expect(mocks.prisma.postComment.create).not.toHaveBeenCalled();
+    expect(mocks.prisma.postComment.update).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    mocks.prisma.membership.findUnique.mockResolvedValue({ id: 'membership-1', role: 'owner' });
+    mocks.entitlements.mockResolvedValue({}); mocks.permissions.mockResolvedValue({});
+    mocks.canUseFeature.mockReturnValue(true); mocks.canAccessFeature.mockReturnValue(true); mocks.canAccessPage.mockReturnValue(true);
+    mocks.prisma.postComment.findFirst.mockResolvedValue({ id: 'comment-1', remoteId: 'remote-comment-1', postTarget: { targetId: 'target-1' } });
+    mocks.config.mockImplementation(async key => key === 'platforms.facebook.enabled' ? true : key === 'meta.inboxWriteScopes' ? ['pages_messaging', 'pages_manage_engagement'] : ['pages_messaging']);
+    mocks.decrypt.mockReturnValue('page-secret');
+    const moderationController = new AbortController();
+    mocks.guard.mockImplementationOnce(async (_workspaceId: string, _targetId: string, operation: (signal: AbortSignal) => Promise<unknown>) => operation(moderationController.signal));
+    mocks.configuredEngine.mockResolvedValue(mocks.engine);
+    mocks.engine.moderateComment.mockImplementationOnce(async () => { moderationController.abort(); });
+    await expect(moderateFacebookComment(actor, { id: 'comment-1', hidden: true })).rejects.toMatchObject({ name: 'AbortError' });
+    expect(mocks.engine.moderateComment).toHaveBeenCalledWith('page-secret', 'remote-comment-1', true);
+    expect(mocks.prisma.postComment.update).not.toHaveBeenCalled();
+  });
+
+  it('prepares only the provider deletion call; shared Inbox owns local cleanup and audit', async () => {
+    const remove = await prepareDeleteFacebookComment(actor, { targetId: 'target-1', remoteId: 'remote-comment-1' });
+    expect(mocks.engine.deleteComment).not.toHaveBeenCalled();
+    await remove(new AbortController().signal);
     expect(mocks.engine.deleteComment).toHaveBeenCalledWith('page-secret', 'remote-comment-1');
-    expect(mocks.prisma.postComment.deleteMany).toHaveBeenCalledWith({ where: { postTargetId: 'post-target-1', OR: [{ id: 'comment-1' }, { parentRemoteId: 'remote-comment-1' }] } });
-    expect(JSON.stringify(mocks.prisma.$executeRaw.mock.calls)).toContain('inbox.comment_deleted');
-    expect(mocks.prisma.postComment.findFirst.mock.calls[0][0].where).toMatchObject({ id: 'comment-1', postTarget: { post: { workspaceId: actor.workspaceId } } });
+    expect(mocks.prisma.postComment.deleteMany).not.toHaveBeenCalled();
+    expect(mocks.prisma.$executeRaw).not.toHaveBeenCalled();
   });
 
   it('keeps the local comment when the platform refuses the deletion', async () => {
-    mocks.prisma.postComment.findFirst.mockResolvedValue({ id: 'comment-1', remoteId: 'remote-comment-1', postTargetId: 'post-target-1', postTarget: { targetId: 'target-1' } });
     mocks.engine.deleteComment.mockRejectedValue(new Error('provider refused'));
-    await expect(deleteFacebookComment(actor, { id: 'comment-1' })).rejects.toThrow('provider refused');
+    const remove = await prepareDeleteFacebookComment(actor, { targetId: 'target-1', remoteId: 'remote-comment-1' });
+    await expect(remove(new AbortController().signal)).rejects.toThrow('provider refused');
     expect(mocks.prisma.postComment.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('checks scope, permissions and workspace before any deletion', async () => {
-    mocks.prisma.postComment.findFirst.mockResolvedValue({ id: 'comment-1', remoteId: 'remote-comment-1', postTargetId: 'post-target-1', postTarget: { targetId: 'target-1' } });
+  it('checks page scope and permissions before preparing deletion', async () => {
     mocks.canAccessPage.mockReturnValue(false);
-    await expect(deleteFacebookComment(actor, { id: 'comment-1' })).rejects.toThrow(/do not have access/);
+    await expect(prepareDeleteFacebookComment(actor, { targetId: 'target-1', remoteId: 'remote-comment-1' })).rejects.toThrow(/do not have access/);
     mocks.canAccessPage.mockReturnValue(true); mocks.canAccessFeature.mockReturnValue(false);
-    await expect(deleteFacebookComment(actor, { id: 'comment-1' })).rejects.toThrow(/not enabled/);
-    mocks.canAccessFeature.mockReturnValue(true); mocks.prisma.postComment.findFirst.mockResolvedValue(null);
-    await expect(deleteFacebookComment(actor, { id: 'foreign' })).rejects.toThrow(/unavailable in the current workspace/);
-    await expect(deleteFacebookComment(actor, { id: 'bad id!' })).rejects.toThrow(/Invalid inbox item/);
+    await expect(prepareDeleteFacebookComment(actor, { targetId: 'target-1', remoteId: 'remote-comment-1' })).rejects.toThrow(/not enabled/);
+    mocks.canAccessFeature.mockReturnValue(true);
+    await expect(prepareDeleteFacebookComment(actor, { targetId: 'target-1', remoteId: 'bad id!' })).rejects.toThrow(/Invalid inbox item/);
+    expect(mocks.engine.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('passes the lock cancellation signal to the provider engine and aborts before dispatch', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const remove = await prepareDeleteFacebookComment(actor, { targetId: 'target-1', remoteId: 'remote-comment-1' });
+    await expect(remove(controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(mocks.configuredEngine).toHaveBeenCalledWith({ signal: controller.signal });
     expect(mocks.engine.deleteComment).not.toHaveBeenCalled();
   });
 
@@ -154,5 +198,43 @@ describe('workspace Facebook inbox actions', () => {
 
     mocks.prisma.target.findFirst.mockResolvedValue({ id: 'x', providerId: 'p', accessToken: 'encrypted', socialAccount: { scopes: '', tokenExpiresAt: null, invalidatedAt: null } });
     await expect(syncFacebookInbox(actor)).rejects.toThrow(/Inbox is unavailable for this connection/);
+  });
+
+  it('checks comment and parent tombstones inside the locked sync transaction', async () => {
+    mocks.config.mockImplementation(async key => key === 'platforms.facebook.enabled' ? true : key === 'meta.pageSize' ? 25 : key === 'meta.maxPages' ? 2 : key === 'meta.inboxReadScopes' ? ['pages_messaging'] : []);
+    mocks.prisma.target.findMany.mockResolvedValue([{ id: 'target-1' }]);
+    mocks.engine.listInbox.mockResolvedValue([]);
+    mocks.prisma.postTarget.findMany.mockResolvedValue([{ id: 'post-target-1', remotePostId: 'post-remote-1' }]);
+    mocks.engine.listComments.mockResolvedValue([{ id: 'reply-1', parentId: 'parent-1', message: 'reply', fromName: 'Visitor', fromId: 'visitor-1', likeCount: 0, replyCount: 0, isHidden: false, createdAt: new Date() }]);
+    await syncFacebookInbox(actor, 'target-1');
+    expect(mocks.guard).toHaveBeenCalledWith(actor.workspaceId, 'target-1', expect.any(Function));
+    expect(mocks.suppressed).toHaveBeenCalledWith(mocks.prisma, actor.workspaceId, 'target-1', 'reply-1', 'parent-1');
+  });
+
+  it('orders each manual comment batch parent-first before checking tombstones', async () => {
+    mocks.config.mockImplementation(async key => key === 'platforms.facebook.enabled' ? true : key === 'meta.pageSize' ? 25 : key === 'meta.maxPages' ? 2 : key === 'meta.inboxReadScopes' ? ['pages_messaging'] : []);
+    mocks.prisma.target.findMany.mockResolvedValue([{ id: 'target-1' }]);
+    mocks.engine.listInbox.mockResolvedValue([]);
+    mocks.prisma.postTarget.findMany.mockResolvedValue([{ id: 'post-target-1', remotePostId: 'post-remote-1' }]);
+    const comments = [
+      { id: 'grandchild', parentId: 'child', message: 'grandchild', fromName: null, fromId: null, likeCount: 0, replyCount: 0, isHidden: false, createdAt: new Date() },
+      { id: 'child', parentId: 'root', message: 'child', fromName: null, fromId: null, likeCount: 0, replyCount: 0, isHidden: false, createdAt: new Date() },
+      { id: 'root', parentId: null, message: 'root', fromName: null, fromId: null, likeCount: 0, replyCount: 0, isHidden: false, createdAt: new Date() },
+    ];
+    mocks.engine.listComments.mockResolvedValue(comments);
+    mocks.orderBatch.mockImplementation((items: typeof comments) => {
+      const byId = new Map(items.map(item => [item.id, item]));
+      const ordered: typeof items = []; const done = new Set<string>();
+      while (ordered.length < items.length) for (const item of items) {
+        if (done.has(item.id) || (item.parentId && byId.has(item.parentId) && !done.has(item.parentId))) continue;
+        ordered.push(item); done.add(item.id);
+      }
+      return ordered;
+    });
+
+    await syncFacebookInbox(actor, 'target-1');
+
+    expect(mocks.orderBatch).toHaveBeenCalledWith(comments);
+    expect(mocks.suppressed.mock.calls.map(call => call[3])).toEqual(['root', 'child', 'grandchild']);
   });
 });

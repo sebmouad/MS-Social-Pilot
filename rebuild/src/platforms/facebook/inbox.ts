@@ -8,6 +8,7 @@ import { canAccessFeature, canAccessPage } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
 import { runtimeConfig } from '@/server/config/store';
 import { messengerReplyWindow } from './reply-window';
+import { withInboxChannelOperation, inboxCommentSuppressed, orderInboxCommentBatch } from '@/modules/inbox/server/comment-guard';
 
 import type { InboxReplyPolicyRequest } from '@/server/inbox/policy';
 import { facebookReplyRule } from './reply-policy';
@@ -92,39 +93,50 @@ export async function syncFacebookInbox(actor: InboxActor, targetId?: string) {
   }
   if (failures.length && !batches.length) throw failures[0];
   let conversationCount = 0; let messageCount = 0; let commentCount = 0;
-  await prisma.$transaction(async tx => {
+  const syncedTargetIds: string[] = [];
   for (const batch of batches) {
-    for (const conversation of batch.conversations) {
-      const stored = await tx.conversation.upsert({
-        where: { targetId_remoteId: { targetId: batch.targetId, remoteId: conversation.id } },
-        create: { id: `conv_${randomBytes(12).toString('hex')}`, targetId: batch.targetId, remoteId: conversation.id, snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: new Date() },
-        update: { snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: new Date() },
-        select: { id: true },
+    try {
+      let batchConversationCount = 0; let batchMessageCount = 0; let batchCommentCount = 0;
+      await withInboxChannelOperation(actor.workspaceId, batch.targetId, async signal => {
+        signal.throwIfAborted();
+        await prisma.$transaction(async tx => {
+          for (const conversation of batch.conversations) {
+            const stored = await tx.conversation.upsert({
+              where: { targetId_remoteId: { targetId: batch.targetId, remoteId: conversation.id } },
+              create: { id: `conv_${randomBytes(12).toString('hex')}`, targetId: batch.targetId, remoteId: conversation.id, snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: new Date() },
+              update: { snippet: conversation.snippet, unreadCount: conversation.unreadCount, messageCount: conversation.messageCount, updatedTime: conversation.updatedAt, fetchedAt: new Date() },
+              select: { id: true },
+            });
+            batchConversationCount++;
+            for (const message of conversation.messages) {
+              await tx.conversationMessage.upsert({
+                where: { conversationId_remoteId: { conversationId: stored.id, remoteId: message.id } },
+                create: { id: `msg_${randomBytes(12).toString('hex')}`, conversationId: stored.id, remoteId: message.id, fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
+                update: { fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
+              });
+              batchMessageCount++;
+            }
+          }
+          for (const postComments of batch.comments) {
+            for (const comment of orderInboxCommentBatch(postComments.items)) {
+              if (await inboxCommentSuppressed(tx, actor.workspaceId, batch.targetId, comment.id, comment.parentId)) continue;
+              await tx.postComment.upsert({
+                where: { postTargetId_remoteId: { postTargetId: postComments.postTargetId, remoteId: comment.id } },
+                create: { id: `comment_${randomBytes(12).toString('hex')}`, postTargetId: postComments.postTargetId, remoteId: comment.id, parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, createdTime: comment.createdAt, fetchedAt: new Date() },
+                update: { parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, fetchedAt: new Date() },
+              });
+              batchCommentCount++;
+            }
+          }
+        });
       });
-      conversationCount++;
-      for (const message of conversation.messages) {
-        await tx.conversationMessage.upsert({
-          where: { conversationId_remoteId: { conversationId: stored.id, remoteId: message.id } },
-          create: { id: `msg_${randomBytes(12).toString('hex')}`, conversationId: stored.id, remoteId: message.id, fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
-          update: { fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
-        });
-        messageCount++;
-      }
-    }
-    for (const postComments of batch.comments) {
-      for (const comment of postComments.items) {
-        await tx.postComment.upsert({
-          where: { postTargetId_remoteId: { postTargetId: postComments.postTargetId, remoteId: comment.id } },
-          create: { id: `comment_${randomBytes(12).toString('hex')}`, postTargetId: postComments.postTargetId, remoteId: comment.id, parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, createdTime: comment.createdAt, fetchedAt: new Date() },
-          update: { parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, fetchedAt: new Date() },
-        });
-        commentCount++;
-      }
-    }
+      syncedTargetIds.push(batch.targetId);
+      conversationCount += batchConversationCount; messageCount += batchMessageCount; commentCount += batchCommentCount;
+    } catch (error) { failures.push(error); }
   }
-    await tx.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`inbox_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'inbox.synced', ${JSON.stringify({ workspaceId: actor.workspaceId, targetIds: batches.map(batch => batch.targetId), targetCount: batches.length, failedCount: failures.length, conversationCount, messageCount, commentCount })}::jsonb, NOW())`;
-  });
-  return { targetCount: batches.length, failedCount: failures.length, conversationCount, messageCount, commentCount, syncedAt: new Date().toISOString() };
+  if (failures.length && !syncedTargetIds.length) throw failures[0];
+  await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`inbox_${randomBytes(12).toString('hex')}`}, ${actor.userId}, 'inbox.synced', ${JSON.stringify({ workspaceId: actor.workspaceId, targetIds: syncedTargetIds, targetCount: syncedTargetIds.length, failedCount: failures.length, conversationCount, messageCount, commentCount })}::jsonb, NOW())`;
+  return { targetCount: syncedTargetIds.length, failedCount: failures.length, conversationCount, messageCount, commentCount, syncedAt: new Date().toISOString() };
 }
 
 export async function replyToFacebookInbox(actor: InboxActor, input: { kind: 'message' | 'comment'; id: string; text: string }) {
@@ -152,37 +164,50 @@ export async function replyToFacebookInbox(actor: InboxActor, input: { kind: 'me
   }
   const row = await prisma.postComment.findFirst({ where: { id: input.id, postTarget: { post: { workspaceId: actor.workspaceId }, target: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, postTargetId: true, postTarget: { select: { targetId: true } } } });
   if (!row) throw new OperationError('not_found', 'This comment is unavailable in the current workspace.');
-  const channel = await page(actor, row.postTarget.targetId, true);
-  const engine = await configuredFacebookEngine();
-  const remoteId = await engine.replyToComment(channel.token, row.remoteId, text);
-  await prisma.postComment.create({ data: { id: `comment_${randomBytes(12).toString('hex')}`, postTargetId: row.postTargetId, remoteId, parentRemoteId: row.remoteId, message: text, fromName: null, fromId: null, createdTime: new Date(), sentById: actor.userId } });
-  await prisma.postComment.update({ where: { id: row.id }, data: { replyCount: { increment: 1 } } });
-  await audit(actor, 'inbox.comment_replied', { targetId: row.postTarget.targetId, commentId: row.id, remoteId });
-  return { ok: true };
+  const targetId = row.postTarget.targetId;
+  return withInboxChannelOperation(actor.workspaceId, targetId, async signal => {
+    const current = await prisma.postComment.findFirst({ where: { id: row.id, postTargetId: row.postTargetId, postTarget: { target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, postTargetId: true, parentRemoteId: true } });
+    if (!current) throw new OperationError('not_found', 'This comment is unavailable in the current workspace.');
+    if (await prisma.$transaction(tx => inboxCommentSuppressed(tx, actor.workspaceId, targetId, current.remoteId, current.parentRemoteId))) throw new OperationError('conflict', 'This comment has a pending or confirmed deletion. Check its Inbox status before trying again.');
+    const channel = await page(actor, targetId, true);
+    signal.throwIfAborted();
+    const engine = await configuredFacebookEngine({ signal });
+    const remoteId = await engine.replyToComment(channel.token, current.remoteId, text);
+    signal.throwIfAborted();
+    await prisma.postComment.create({ data: { id: `comment_${randomBytes(12).toString('hex')}`, postTargetId: current.postTargetId, remoteId, parentRemoteId: current.remoteId, message: text, fromName: null, fromId: null, createdTime: new Date(), sentById: actor.userId } });
+    await prisma.postComment.update({ where: { id: current.id }, data: { replyCount: { increment: 1 } } });
+    await audit(actor, 'inbox.comment_replied', { targetId, commentId: current.id, remoteId });
+    return { ok: true };
+  });
 }
 
 export async function moderateFacebookComment(actor: InboxActor, input: { id: string; hidden: boolean }) {
   if (!/^[A-Za-z0-9_-]{1,200}$/.test(input.id)) throw new OperationError('invalid_request', 'Invalid inbox item.');
   const row = await prisma.postComment.findFirst({ where: { id: input.id, postTarget: { post: { workspaceId: actor.workspaceId }, target: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, postTarget: { select: { targetId: true } } } });
   if (!row) throw new OperationError('not_found', 'This comment is unavailable in the current workspace.');
-  const channel = await page(actor, row.postTarget.targetId, true);
-  const engine = await configuredFacebookEngine();
-  await engine.moderateComment(channel.token, row.remoteId, input.hidden);
-  await prisma.postComment.update({ where: { id: row.id }, data: { isHidden: input.hidden } });
-  await audit(actor, input.hidden ? 'inbox.comment_hidden' : 'inbox.comment_unhidden', { targetId: row.postTarget.targetId, commentId: row.id });
-  return { ok: true };
+  const targetId = row.postTarget.targetId;
+  return withInboxChannelOperation(actor.workspaceId, targetId, async signal => {
+    const current = await prisma.postComment.findFirst({ where: { id: row.id, postTarget: { target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, parentRemoteId: true } });
+    if (!current) throw new OperationError('not_found', 'This comment is unavailable in the current workspace.');
+    if (await prisma.$transaction(tx => inboxCommentSuppressed(tx, actor.workspaceId, targetId, current.remoteId, current.parentRemoteId))) throw new OperationError('conflict', 'This comment has a pending or confirmed deletion. Check its Inbox status before trying again.');
+    const channel = await page(actor, targetId, true);
+    signal.throwIfAborted();
+    const engine = await configuredFacebookEngine({ signal });
+    await engine.moderateComment(channel.token, current.remoteId, input.hidden);
+    signal.throwIfAborted();
+    await prisma.postComment.update({ where: { id: current.id }, data: { isHidden: input.hidden } });
+    await audit(actor, input.hidden ? 'inbox.comment_hidden' : 'inbox.comment_unhidden', { targetId, commentId: current.id });
+    return { ok: true };
+  });
 }
 
-/** Delete a comment on the platform, then remove it and its stored replies locally. */
-export async function deleteFacebookComment(actor: InboxActor, input: { id: string }) {
-  if (!/^[A-Za-z0-9_-]{1,200}$/.test(input.id)) throw new OperationError('invalid_request', 'Invalid inbox item.');
-  const row = await prisma.postComment.findFirst({ where: { id: input.id, postTarget: { post: { workspaceId: actor.workspaceId }, target: { workspaceId: actor.workspaceId } } }, select: { id: true, remoteId: true, postTargetId: true, postTarget: { select: { targetId: true } } } });
-  if (!row) throw new OperationError('not_found', 'This comment is unavailable in the current workspace.');
-  const channel = await page(actor, row.postTarget.targetId, true);
-  const engine = await configuredFacebookEngine();
-  await engine.deleteComment(channel.token, row.remoteId);
-  // Local removal happens only after the platform confirmed the deletion.
-  await prisma.postComment.deleteMany({ where: { postTargetId: row.postTargetId, OR: [{ id: row.id }, { parentRemoteId: row.remoteId }] } });
-  await audit(actor, 'inbox.comment_deleted', { targetId: row.postTarget.targetId, commentId: row.id });
-  return { ok: true };
+/** Prepare the provider call; shared Inbox owns intent, journal and local finalization. */
+export async function prepareDeleteFacebookComment(actor: InboxActor, input: { targetId: string; remoteId: string }): Promise<(signal: AbortSignal) => Promise<void>> {
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(input.remoteId)) throw new OperationError('invalid_request', 'Invalid inbox item.');
+  const channel = await page(actor, input.targetId, true);
+  return async signal => {
+    const engine = await configuredFacebookEngine({ signal });
+    signal.throwIfAborted();
+    await engine.deleteComment(channel.token, input.remoteId);
+  };
 }

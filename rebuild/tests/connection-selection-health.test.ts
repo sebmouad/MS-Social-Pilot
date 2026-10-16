@@ -5,7 +5,7 @@ const state = vi.hoisted(() => ({
   target: { findFirst: vi.fn(), updateMany: vi.fn() },
   adAccount: { findFirst: vi.fn(), updateMany: vi.fn() },
   socialAccount: { findFirst: vi.fn() },
-  platformEnabled: vi.fn(), executeRaw: vi.fn(), transaction: vi.fn(),
+  queryRaw: vi.fn(), platformEnabled: vi.fn(), executeRaw: vi.fn(), transaction: vi.fn(),
 }));
 vi.mock('../src/server/data', () => ({ prisma: { membership: state.membership, $transaction: state.transaction } }));
 vi.mock('../src/server/platforms/registry', () => ({ isPlatformEnabled: state.platformEnabled }));
@@ -25,7 +25,8 @@ describe('connection selection readiness', () => {
     state.adAccount.findFirst.mockResolvedValue({ id: 'ad', socialAccountId: 'source' });
     state.socialAccount.findFirst.mockResolvedValue({ id: 'source', provider: 'facebook', invalidatedAt: null, tokenExpiresAt: null });
     state.platformEnabled.mockResolvedValue(true);
-    state.transaction.mockImplementation(callback => callback({ ...state, $executeRaw: state.executeRaw }));
+    state.queryRaw.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('pg_try_advisory') ? [{ acquired: true }] : [{ pending: false }]);
+    state.transaction.mockImplementation(callback => callback({ ...state, $queryRaw: state.queryRaw, $executeRaw: state.executeRaw }));
   });
 
   it.each(['target', 'adAccount'] as const)('rejects enabling an expired %s without changing selection', async kind => {
@@ -48,6 +49,12 @@ describe('connection selection readiness', () => {
     const changes = kind === 'target' ? state.target.updateMany : state.adAccount.updateMany;
     expect(changes).toHaveBeenCalledWith({ where: { id: kind === 'target' ? 'channel' : 'ad', workspaceId: actor.workspaceId }, data: { enabled: false } });
     expect(state.socialAccount.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('keeps a channel selected while its comment deletion needs recovery', async () => {
+    state.queryRaw.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('pg_try_advisory') ? [{ acquired: true }] : [{ pending: true }]);
+    await expect(setConnectionSelections(actor, [{ kind: 'target', id: 'channel', enabled: false }])).rejects.toMatchObject({ code: 'conflict' });
+    expect(state.target.updateMany).not.toHaveBeenCalled();
   });
 
   it('accepts a selected resource with a valid connection and records the change', async () => {

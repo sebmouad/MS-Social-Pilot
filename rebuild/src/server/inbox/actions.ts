@@ -3,6 +3,7 @@ import { inboxPlatformIds } from '@/server/platforms/registry';
 import { platformInbox } from '@/server/platforms/registry';
 import { OperationError } from '@/lib/operation-error';
 import { canManageInboxWorkflow, setInboxWorkflowResolved } from '@/modules/inbox/server/workflow';
+import { deleteInboxCommentDurably } from '@/modules/inbox/server/deletion';
 import type { InboxReadConstraints } from '@/modules/inbox/server/types';
 
 export type InboxActor = { userId: string; workspaceId: string };
@@ -62,6 +63,6 @@ export { canManageInboxWorkflow };
 export async function moderateInboxComment(actor: InboxActor, input: { id: string; hidden: boolean }) {
   return (await host(await providerForItem('comment', input.id, actor.workspaceId))).moderate(actor, input);
 }
-export async function deleteInboxComment(actor: InboxActor, input: { id: string }) {
-  return (await host(await providerForItem('comment', input.id, actor.workspaceId))).deleteComment(actor, input);
+export async function deleteInboxComment(actor: InboxActor, input: { id: string; confirmation: string }, constraints: InboxReadConstraints = {}) {
+  return deleteInboxCommentDurably(actor, input, constraints);
 }

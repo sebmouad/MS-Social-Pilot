@@ -7,6 +7,7 @@ import { Prisma } from '../../../generated/client';
 import { withRetries } from '@/server/jobs/retry';
 import type { RetryBackoff } from '@/server/jobs/retry';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
+import { withInboxChannelOperation, inboxCommentSuppressed, orderInboxCommentBatch } from '@/modules/inbox/server/comment-guard';
 import type { JobSummary } from '@/server/jobs/types';
 
 const DAY_MS = 86_400_000;
@@ -179,13 +180,16 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
     const granted = new Set((account?.scopes ?? '').split(',').map(scope => scope.trim()).filter(Boolean));
     if (!account || account.workspaceId !== target.workspaceId || account.invalidatedAt || (account.tokenExpiresAt && account.tokenExpiresAt <= now) || !encrypted || !required.size || [...required].some(scope => !granted.has(scope))) { result.skipped++; continue; }
     try {
+      let targetUpdated = 0;
       await withWorkspaceOperation(target.workspaceId, async () => {
         const token = decryptSecret(encrypted);
         const conversations = await withRetries(() => engine.listInbox(token, target.providerId), retryLimit, retryBackoff);
         const posts = await prisma.postTarget.findMany({ where: { targetId: target.id, status: 'published', remotePostId: { not: null } }, orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }], take: limit, select: { id: true, remotePostId: true } });
         const commentBatches: Array<{ postTargetId: string; comments: Awaited<ReturnType<typeof engine.listComments>> }> = [];
         for (const post of posts) if (post.remotePostId) commentBatches.push({ postTargetId: post.id, comments: await withRetries(() => engine.listComments(token, post.remotePostId!), retryLimit, retryBackoff) });
-        await prisma.$transaction(async tx => {
+        await withInboxChannelOperation(target.workspaceId, target.id, async signal => {
+          signal.throwIfAborted();
+          await prisma.$transaction(async tx => {
           for (const conversation of conversations) {
             const stored = await tx.conversation.upsert({
               where: { targetId_remoteId: { targetId: target.id, remoteId: conversation.id } },
@@ -199,20 +203,23 @@ export async function syncInbox(now = new Date(), retryLimit = 0, retryBackoff?:
                 create: { id: `rebuild_${randomUUID()}`, conversationId: stored.id, remoteId: message.id, fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
                 update: { fromName: message.fromName, fromId: message.fromId, message: message.text, createdTime: message.createdAt },
               });
-              result.updated++;
+              targetUpdated++;
             }
-            result.updated++;
+            targetUpdated++;
           }
-          for (const batch of commentBatches) for (const comment of batch.comments) {
+          for (const batch of commentBatches) for (const comment of orderInboxCommentBatch(batch.comments)) {
+            if (await inboxCommentSuppressed(tx, target.workspaceId, target.id, comment.id, comment.parentId)) continue;
             await tx.postComment.upsert({
               where: { postTargetId_remoteId: { postTargetId: batch.postTargetId, remoteId: comment.id } },
               create: { id: `rebuild_${randomUUID()}`, postTargetId: batch.postTargetId, remoteId: comment.id, parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, createdTime: comment.createdAt, fetchedAt: now },
               update: { parentRemoteId: comment.parentId, message: comment.message, fromName: comment.fromName, fromId: comment.fromId, likeCount: comment.likeCount, replyCount: comment.replyCount, isHidden: comment.isHidden, fetchedAt: now },
             });
-            result.updated++;
+            targetUpdated++;
           }
+          });
         });
       });
+      result.updated += targetUpdated;
     } catch { result.failed++; }
   }
   return result;

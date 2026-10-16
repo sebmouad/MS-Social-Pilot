@@ -7,7 +7,7 @@ const state = vi.hoisted(() => ({
   instagramAccount: { updateMany: vi.fn() },
   executeRaw: vi.fn(), transaction: vi.fn(),
 }));
-state.transaction.mockImplementation((callback: (tx: unknown) => unknown) => callback({ ...state, $executeRaw: state.executeRaw }));
+state.transaction.mockImplementation((callback: (tx: unknown) => unknown) => callback({ ...state, $queryRaw: vi.fn(async (sql: TemplateStringsArray) => sql.join('').includes('pg_try_advisory') ? [{ acquired: true }] : [{ pending: false }]), $executeRaw: state.executeRaw }));
 vi.mock('@/server/data', () => ({ prisma: { membership: state.membership, $transaction: state.transaction } }));
 
 import { setConnectionSelections } from '@/server/connection-mutations';

@@ -60,8 +60,8 @@ cutover runbook and host configuration are supplied.
    production. For the local rehearsal, use a sanitized, pre-migration custom
    format dump and a loopback-only PostgreSQL admin URL. Set
    `CUTOVER_DUMP_SANITIZED=YES` only after a separate sanitization review, and
-   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs`.
-   `rebuild/scripts/cutover-rehearsal.sh` pins those two SQL files by SHA-256,
+   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions`.
+   `rebuild/scripts/cutover-rehearsal.sh` pins those three SQL files by SHA-256,
    restores the dump into local scratch databases, refuses migration objects
    or success records already present, applies only those files, checks the
    explicitly enumerated mapped columns and enum labels, reports aggregate
@@ -119,7 +119,7 @@ cutover runbook and host configuration are supplied.
   operational options, MCP parity, and live provider integration tests.
 - Production currently has no rebuild web or worker systemd unit and no
   verified proxy switch from 3100 to 3200.
-- The rebuild schema is not a migration schema. Its two checksum-pinned
+- The rebuild schema is not a migration schema. Its three checksum-pinned
   additive migrations still need application and data-impact review against a
   sanitized production-shaped copy and a restore-aware plan.
 - There is no sanitized production-shaped staging evidence covering the full
@@ -130,3 +130,11 @@ cutover runbook and host configuration are supplied.
 Until these blockers are closed, `rebuild-deploy.sh` and
 `rebuild-rollback.sh` are guardrails that print the unresolved requirements and
 exit without SSH, service, proxy, database, or filesystem changes.
+
+## Inbox deletion journal addition — 2026-10-16
+
+The third reviewed additive migration, `20261016190000_rebuild_inbox_deletions`, adds only the durable Inbox deletion journal and its constraints/indexes. The cutover script now pins all three checksums, checks all three migration-history entries and enumerates the new mapped columns. The original two-migration schema-only rehearsal above remains historical evidence; it does not prove the new three-migration rehearsal.
+
+Before applying the new table to the isolated synthetic preview, a private custom-format backup was restored into a scratch database and users/workspaces/posts/audit/comments/conversations counts matched (1/1/6/37/3/2). The scratch database was removed; the backup remains private at `/private/tmp/socialpilot-preview-before-inbox-deletion-20261016T182951Z.dump`. The table was applied only to the preview, without db push or production changes. The complete three-migration rehearsal against a sanitized pre-migration production-shaped baseline, exact cutover backup/media recovery and proxy/service rollback remain required.
+
+The final journal schema also retains local alias IDs and suppressed descendant remote IDs. Its current checksum-pinned SQL was applied from scratch to a private pre-journal restore, then independently backed up/restored with matching counts across 96 public tables; both scratch databases were removed. The isolated preview’s array-column amendment was separately preceded by another restore-verified backup. These are local journal-migration checks; they do not substitute for the full approved three-file rehearsal on a sanitized production-shaped baseline or production proxy/service/media rollback.

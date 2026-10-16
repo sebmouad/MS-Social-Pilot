@@ -75,9 +75,10 @@ describe('workspace data controls', () => {
       adAccount: { findMany: vi.fn().mockResolvedValue([]) },
       instagramAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'ig1', workspaceId: 'w1', socialAccountId: 's1', targetId: 't1', igUserId: 'ig-user', username: 'studio', name: 'Studio IG', profilePictureUrl: 'https://cdn.test/profile.jpg', followersCount: 8, followsCount: 4, mediaCount: 2, enabled: true, lastSyncedAt: new Date('2026-01-01'), createdAt: new Date('2025-01-01'), updatedAt: new Date('2026-01-01'), insights: [{ id: 'ii1', metric: 'followers', value: { count: 8, access_token: 'must-redact' } }], media: [{ id: 'im1', remoteId: 'remote1', caption: 'A post', mediaUrl: 'https://cdn.test/media.jpg', insights: { reach: 20 }, timestamp: new Date('2026-01-01') }] }]) },
       post: { findMany: vi.fn().mockResolvedValue([]) },
-      $queryRaw: vi.fn().mockResolvedValue([{ tableName: 'media' }]),
+      $queryRaw: vi.fn().mockResolvedValue([{ tableName: 'media' }, { tableName: 'rebuild_inbox_deletions' }]),
       $queryRawUnsafe: vi.fn().mockImplementation(async (sql: string) => {
         if (sql.startsWith('SELECT COUNT')) return [{ count: BigInt(0) }];
+        if (sql.includes('"rebuild_inbox_deletions"')) return [{ id: 'deletion1', workspaceId: 'w1', state: 'completed', remoteId: 'opaque_remote' }];
         if (sql.includes('"media"')) return [{ id: 'm1', workspaceId: 'w1', ordinal: BigInt(5), accessToken: 'legacy-secret', settings: { client_secret: 'nested-secret', label: 'ok' } }];
         if (sql.includes('"external_posts"')) return [{ id: 'ep1', message: 'outside post', insights: { reach: 5, api_key: 'nested-legacy-secret' } }];
         return [];
@@ -97,8 +98,9 @@ describe('workspace data controls', () => {
     expect(JSON.stringify(data)).not.toContain('legacy-secret');
     expect(JSON.stringify(data)).not.toContain('nested-secret');
     expect(JSON.stringify(data)).not.toContain('nested-legacy-secret');
-    expect(data.coverage).toMatchObject({ directlyOwnedLegacyTables: ['media'], directlyOwnedLegacyRowCounts: { media: 1 }, directlyOwnedLegacyTablesComplete: true, complete: false });
+    expect(data.coverage).toMatchObject({ directlyOwnedLegacyTables: ['media', 'rebuild_inbox_deletions'], directlyOwnedLegacyRowCounts: { media: 1, rebuild_inbox_deletions: 1 }, directlyOwnedLegacyTablesComplete: true, complete: false });
     expect(mocks.prisma.$queryRawUnsafe).toHaveBeenCalledWith('SELECT * FROM "public"."media" WHERE "workspaceId" = $1', 'w1');
+    expect(data.legacyTables.rebuild_inbox_deletions).toEqual([{ id: 'deletion1', workspaceId: 'w1', state: 'completed', remoteId: 'opaque_remote' }]);
     expect(data.security).toMatchObject({ credentialsExcluded: true, auditLogExcluded: true });
     mocks.runtimeConfig.mockImplementation(async (key: string) => key === 'data.maxArchiveBytes' ? 100 : undefined);
     await expect(exportWorkspaceData({ userId: 'u1', workspaceId: 'w1' })).rejects.toThrow('exceeds the configured archive size limit');
@@ -156,6 +158,15 @@ describe('workspace data controls', () => {
     const { deleteWorkspaceData } = await import('../src/server/data-control');
     await expect(deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'delete')).rejects.toThrow(/Type DELETE/);
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not queue erasure while remote comment deletion needs recovery', async () => {
+    const { tx } = makePurgeClient();
+    tx.$queryRaw.mockResolvedValue([{ pending: true }] as never);
+    const { deleteWorkspaceData } = await import('../src/server/data-control');
+    await expect(deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'DELETE')).rejects.toThrow(/needs recovery/);
+    expect(tx.workspaceDataPurge.create).not.toHaveBeenCalled();
+    expect(tx.$executeRawUnsafe).not.toHaveBeenCalled();
   });
 
   it.each(['owner', 'admin'])('rechecks %s access and runs the three purge phases transactionally', async role => {

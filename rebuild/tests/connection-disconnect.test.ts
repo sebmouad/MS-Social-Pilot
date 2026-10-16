@@ -8,6 +8,7 @@ afterEach(() => vi.clearAllMocks());
 describe('disconnect local data choices', () => {
   it('includes linked Instagram rows in preview and delete mode', async () => {
     const tx = {
+      $queryRaw: vi.fn(async (sql: TemplateStringsArray) => sql.join('').includes('pg_try_advisory') ? [{ acquired: true }] : [{ pending: false }]),
       membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }) },
       socialAccount: { findFirst: vi.fn().mockResolvedValue({ id: 's1', targets: [{ id: 'page-1' }], adAccounts: [] }), deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
       instagramAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'ig-1' }]), deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
@@ -31,6 +32,7 @@ describe('disconnect local data choices', () => {
   });
   it('retains related records and only disables the source when retain mode is selected', async () => {
     const tx = {
+      $queryRaw: vi.fn(async (sql: TemplateStringsArray) => sql.join('').includes('pg_try_advisory') ? [{ acquired: true }] : [{ pending: false }]),
       membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }) },
       socialAccount: { findFirst: vi.fn().mockResolvedValue({ id: 's1', targets: [{ id: 't1' }], adAccounts: [{ id: 'a1' }] }), updateMany: vi.fn() },
       instagramAccount: { findMany: vi.fn().mockResolvedValue([]), updateMany: vi.fn() },
@@ -43,6 +45,19 @@ describe('disconnect local data choices', () => {
     expect(tx.target.updateMany).toHaveBeenCalled();
     expect(tx.socialAccount.updateMany).toHaveBeenCalled();
     expect('deleteMany' in tx.socialAccount).toBe(false);
+  });
+
+  it.each(['retain', 'delete'] as const)('blocks %s disconnection while deletion recovery is pending', async mode => {
+    const tx = {
+      $queryRaw: vi.fn(async (sql: TemplateStringsArray) => sql.join('').includes('pg_try_advisory') ? [{ acquired: true }] : [{ pending: true }]),
+      membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }) },
+      socialAccount: { findFirst: vi.fn().mockResolvedValue({ id: 's1', targets: [{ id: 't1' }], adAccounts: [] }), updateMany: vi.fn(), deleteMany: vi.fn() },
+    };
+    mocks.transaction.mockImplementation(async run => run(tx));
+    const { disconnectSocialAccount } = await import('../src/server/connection-mutations');
+    await expect(disconnectSocialAccount({ userId: 'u1', workspaceId: 'w1' }, 's1', mode, 'DELETE')).rejects.toThrow(/needs recovery/);
+    expect(tx.socialAccount.updateMany).not.toHaveBeenCalled(); expect(tx.socialAccount.deleteMany).not.toHaveBeenCalled();
+    expect(tx.$queryRaw.mock.calls[0][0].join('')).toContain('pg_try_advisory_xact_lock');
   });
 
   it('requires typed confirmation before removing related local records', async () => {
@@ -75,6 +90,7 @@ describe('disconnect local data choices', () => {
 
   it('preserves local records while provider-scheduled posts remain', async () => {
     const tx = {
+      $queryRaw: vi.fn(async (sql: TemplateStringsArray) => sql.join('').includes('pg_try_advisory') ? [{ acquired: true }] : [{ pending: false }]),
       membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }) },
       socialAccount: { findFirst: vi.fn().mockResolvedValue({ id: 's1', targets: [{ id: 't1' }], adAccounts: [] }) },
       postTarget: { count: vi.fn().mockResolvedValue(1), findMany: vi.fn() },
@@ -88,6 +104,7 @@ describe('disconnect local data choices', () => {
   it('deletes dependent local rows before channels and preserves posts linked elsewhere', async () => {
     const order: string[] = [];
     const tx = {
+      $queryRaw: vi.fn(async (sql: TemplateStringsArray) => sql.join('').includes('pg_try_advisory') ? [{ acquired: true }] : [{ pending: false }]),
       membership: { findUnique: vi.fn().mockResolvedValue({ role: 'admin' }) },
       socialAccount: { findFirst: vi.fn().mockResolvedValue({ id: 's1', targets: [{ id: 't1' }], adAccounts: [{ id: 'a1' }] }), deleteMany: vi.fn(async () => { order.push('source'); return { count: 1 }; }) },
       instagramAccount: { findMany: vi.fn().mockResolvedValue([]) },

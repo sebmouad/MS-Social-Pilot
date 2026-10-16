@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { requireRootPage } from '@/server/config/access';
 import { RootModuleSettings } from '@/server/root/RootModuleSettings';
+import { RootInboxDeletions } from '@/server/root/RootInboxDeletions';
 import { moduleManifests } from '@/modules';
 
 export const dynamic = 'force-dynamic';
@@ -13,5 +14,7 @@ export default async function RootProductModulePage({ params }: { params: Promis
   const { id } = await params;
   const module = moduleManifests.find(item => item.id === id);
   if (!module) notFound();
-  return <RootModuleSettings kind="product" id={module.id} title={module.title} description={`Installation controls for ${module.title}. Availability is an installation limit; workspace access and implemented platform operations still determine what customers can use.`} />;
+  return <RootModuleSettings kind="product" id={module.id} title={module.title} description={`Installation controls for ${module.title}. Availability is an installation limit; workspace access and implemented platform operations still determine what customers can use.`}>
+    {module.id === 'inbox' ? await RootInboxDeletions() : null}
+  </RootModuleSettings>;
 }

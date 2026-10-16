@@ -59,15 +59,15 @@ describe('inbox route scoped authorization', () => {
   });
 
   it('routes a delete to the delete action and validates its shape', async () => {
-    expect((await POST(request({ action: 'delete', id: 'comment-1' }))).status).toBe(200);
-    expect(mocks.remove).toHaveBeenCalledWith({ userId: 'user-1', workspaceId: 'workspace-1' }, { action: 'delete', id: 'comment-1' });
+    expect((await POST(request({ action: 'delete', id: 'comment-1', confirmation: 'DELETE COMMENT comment-1' }))).status).toBe(200);
+    expect(mocks.remove).toHaveBeenCalledWith({ userId: 'user-1', workspaceId: 'workspace-1' }, { action: 'delete', id: 'comment-1', confirmation: 'DELETE COMMENT comment-1' });
     expect((await POST(request({ action: 'delete', id: 'comment-1', kind: 'message' }))).status).toBe(400);
     expect((await POST(request({ action: 'delete', id: '../x' }))).status).toBe(400);
   });
 
   it('keeps a failed provider deletion generic and never claims it succeeded', async () => {
     mocks.remove.mockRejectedValueOnce(new Error('upstream exploded with token abc'));
-    const response = await POST(request({ action: 'delete', id: 'comment-1' }));
+    const response = await POST(request({ action: 'delete', id: 'comment-1', confirmation: 'DELETE COMMENT comment-1' }));
     expect(response.status).toBe(502);
     expect(JSON.stringify(await response.json())).not.toContain('abc');
   });

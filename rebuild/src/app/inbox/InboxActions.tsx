@@ -10,9 +10,34 @@ import styles from './inbox.module.css';
 
 type Kind = 'message' | 'comment';
 type Outcome = { ok: true; body: Record<string, number | string | boolean> } | { ok: false; error: string };
+type DeleteState = 'started' | 'uncertain' | 'remote_confirmed' | 'completed' | 'rejected';
+type DeleteReceipt = { ok: true; operationId: string; itemId: string; state: DeleteState; remoteConfirmed: boolean; localConfirmed: boolean };
+type DeleteStatus = { kind: 'loading' | 'none' | 'error' } | { kind: 'operation'; receipt: DeleteReceipt };
 
 const uncertainOutcome = 'The outcome is unconfirmed. Check the current Inbox and platform state before repeating this action.';
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const deleteStates = new Set<DeleteState>(['started', 'uncertain', 'remote_confirmed', 'completed', 'rejected']);
+
+function deleteReceipt(value: unknown, itemId: string, operationId?: string): DeleteReceipt | null {
+  if (!isRecord(value) || value.ok !== true || (operationId ? value.operationId !== operationId : value.itemId !== itemId) || typeof value.operationId !== 'string' || !value.operationId ||
+      typeof value.state !== 'string' || !deleteStates.has(value.state as DeleteState) ||
+      typeof value.remoteConfirmed !== 'boolean' || typeof value.localConfirmed !== 'boolean') return null;
+  return value as DeleteReceipt;
+}
+
+async function readDeleteStatus(itemId: string): Promise<DeleteReceipt | null> {
+  const response = await fetch(`/api/inbox/deletions?itemId=${encodeURIComponent(itemId)}`, { cache: 'no-store' });
+  const body: unknown = await response.json();
+  if (!response.ok || !isRecord(body) || !('operation' in body)) throw new Error('Could not check deletion status.');
+  if (body.operation === null) return null;
+  const receipt = deleteReceipt(body.operation, itemId);
+  if (!receipt) throw new Error('Could not check deletion status.');
+  return receipt;
+}
+
+function completeDeletion(receipt: DeleteReceipt) {
+  return receipt.state === 'completed' && receipt.remoteConfirmed && receipt.localConfirmed;
+}
 
 async function send(payload: Record<string, unknown>): Promise<Outcome> {
   try {
@@ -71,30 +96,107 @@ export function ThreadToolbar({ id, kind, resolved, hidden, canResolve, canHide,
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
+  const [deleteStatus, setDeleteStatus] = useState<DeleteStatus>({ kind: 'loading' });
   const router = useRouter();
 
   async function run(kindOfAction: 'resolve' | 'hide' | 'delete', payload: Record<string, unknown>, message: string) {
     setBusy(kindOfAction); setError(''); setDone('');
     const outcome = await send(payload);
     setBusy(null);
-    if (!outcome.ok) { setError(outcome.error); return false; }
+    if (!outcome.ok) { if (kindOfAction === 'delete') setDeleteStatus({ kind: 'error' }); setError(outcome.error); return false; }
+    if (kindOfAction === 'delete') {
+      const receipt = deleteReceipt(outcome.body, id);
+      if (!receipt) { setError(uncertainOutcome); setDeleteStatus({ kind: 'error' }); return false; }
+      if (completeDeletion(receipt)) {
+        setDone(message);
+        setConfirming(false);
+        router.replace(listHref);
+        return true;
+      }
+      setDeleteStatus({ kind: 'operation', receipt });
+      setError('');
+      return false;
+    }
     setDone(message);
-    if (kindOfAction === 'delete') router.replace(listHref); else router.refresh();
+    router.refresh();
     return true;
   }
+
+  async function checkDeletionStatus() {
+    setBusy('delete'); setError('');
+    try {
+      const receipt = await readDeleteStatus(id);
+      if (receipt && completeDeletion(receipt)) {
+        setDeleteStatus({ kind: 'operation', receipt });
+        setDone('Comment deleted.');
+        setConfirming(false);
+        router.replace(listHref);
+      } else {
+        setDeleteStatus(receipt ? { kind: 'operation', receipt } : { kind: 'none' });
+      }
+    } catch {
+      setDeleteStatus({ kind: 'error' });
+      setError('Could not check deletion status. Keep this dialog open and check again.');
+    } finally { setBusy(null); }
+  }
+
+  async function finishDeletion() {
+    if (deleteStatus.kind !== 'operation' || deleteStatus.receipt.state !== 'remote_confirmed') return;
+    setBusy('delete'); setError('');
+    const outcome = await send({ action: 'finish_delete', operationId: deleteStatus.receipt.operationId, confirmation: `FINISH DELETION ${deleteStatus.receipt.operationId}` });
+    setBusy(null);
+    if (!outcome.ok) { setError(outcome.error); return; }
+    const receipt = deleteReceipt(outcome.body, id, deleteStatus.receipt.operationId);
+    if (!receipt || !completeDeletion(receipt)) {
+      if (receipt) setDeleteStatus({ kind: 'operation', receipt });
+      setError(uncertainOutcome);
+      return;
+    }
+    setDeleteStatus({ kind: 'operation', receipt });
+    setDone('Comment deleted.'); setConfirming(false); router.replace(listHref);
+  }
+
+  async function openDeleteDialog() {
+    setError(''); setDeleteStatus({ kind: 'loading' }); setConfirming(true);
+    try {
+      const receipt = await readDeleteStatus(id);
+      if (receipt && completeDeletion(receipt)) {
+        setDeleteStatus({ kind: 'operation', receipt });
+        setDone('Comment deleted.'); setConfirming(false); router.replace(listHref);
+      } else {
+        setDeleteStatus(receipt ? { kind: 'operation', receipt } : { kind: 'none' });
+      }
+    } catch {
+      setDeleteStatus({ kind: 'error' });
+      setError('Could not check deletion status. Keep this dialog open and check again.');
+    }
+  }
+
+  const deleteBusy = busy === 'delete';
+  const operation = deleteStatus.kind === 'operation' ? deleteStatus.receipt : null;
+  const canStartDelete = deleteStatus.kind === 'none';
+  const canFinishDelete = operation?.state === 'remote_confirmed' && operation.remoteConfirmed && !operation.localConfirmed;
 
   if (!canResolve) return <p className={styles.readOnly}>You can read this conversation but not change it.</p>;
   return <div className={styles.toolbar}>
     <div className={styles.toolbarButtons}>
       <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('resolve', { action: 'resolve', id, kind, resolved: !resolved }, resolved ? 'Reopened.' : 'Marked as resolved.')}>{resolved ? 'Reopen' : 'Mark resolved'}</Button>
       {kind === 'comment' && canHide && <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => void run('hide', { action: 'moderate', id, hidden: !hidden }, hidden ? 'Comment is visible again.' : 'Comment hidden.')}>{hidden ? 'Unhide comment' : 'Hide comment'}</Button>}
-      {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => setConfirming(true)}>Delete comment</Button>}
+      {kind === 'comment' && canDelete && <Button size="sm" variant="quiet" disabled={busy !== null} onClick={() => void openDeleteDialog()}>Delete comment</Button>}
     </div>
     <div role="status" aria-live="polite" className={styles.toolbarStatus}>{done}</div>
     {error && !confirming && <p role="alert" className={styles.error}>{error}</p>}
-    <Dialog open={confirming} busy={busy === 'delete'} title="Delete this comment?" description={`This removes the comment, and any replies under it, from ${platformName} and from your inbox. This cannot be undone.`} onClose={() => { if (busy !== 'delete') { setConfirming(false); } }}
-      actions={<><Button variant="secondary" data-dialog-cancel disabled={busy === 'delete'} onClick={() => setConfirming(false)}>Keep comment</Button><Button variant="danger" disabled={busy === 'delete'} onClick={() => void run('delete', { action: 'delete', id }, 'Comment deleted.').then(success => { if (success) setConfirming(false); })}>{busy === 'delete' ? 'Deleting…' : 'Delete comment'}</Button></>}>
-      <p className={styles.dialogNote}>Hiding the comment instead keeps it in your inbox and can be undone.</p>
+    <Dialog open={confirming} busy={deleteBusy} title={canStartDelete ? "Delete this comment?" : "Comment deletion status"} description={canStartDelete ? `This removes the comment, and any replies under it, from ${platformName} and from your inbox. This cannot be undone.` : "Check the current deletion outcome. Closing this dialog does not undo an existing deletion request."} onClose={() => { if (!deleteBusy) { setConfirming(false); } }}
+      actions={<><Button variant="secondary" data-dialog-cancel disabled={deleteBusy} onClick={() => setConfirming(false)}>{canStartDelete ? 'Keep comment' : 'Close'}</Button>
+        {(operation || deleteStatus.kind === 'error') && <Button variant="secondary" disabled={deleteBusy} onClick={() => void checkDeletionStatus()}>{deleteBusy ? 'Checking…' : 'Check deletion status'}</Button>}
+        {canFinishDelete && <Button variant="danger" disabled={deleteBusy} onClick={() => void finishDeletion()}>{deleteBusy ? 'Finishing…' : 'Finish removal from Inbox'}</Button>}
+        {canStartDelete && <Button variant="danger" disabled={deleteBusy} onClick={() => void run('delete', { action: 'delete', id, confirmation: `DELETE COMMENT ${id}` }, 'Comment deleted.')}>{deleteBusy ? 'Deleting…' : 'Delete comment'}</Button>}</>}>
+      {deleteStatus.kind === 'loading' && <p className={styles.dialogNote} role="status">Checking whether a deletion is already in progress…</p>}
+      {canStartDelete && <p className={styles.dialogNote}>Hiding the comment instead keeps it in your inbox and can be undone.</p>}
+      {operation?.state === 'started' || operation?.state === 'uncertain' ? <p className={styles.dialogNote} role="status">The platform outcome is unconfirmed. Check deletion status before taking another action.</p> : null}
+      {operation?.state === 'remote_confirmed' ? <p className={styles.dialogNote} role="status">{operation.remoteConfirmed ? 'The platform confirmed deletion.' : 'The platform outcome is unconfirmed.'} Finish removal from Inbox only completes the local cleanup.</p> : null}
+      {operation?.state === 'rejected' ? <p className={styles.dialogNote} role="alert">The platform rejected this deletion. Contact your administrator before trying again.</p> : null}
+      {operation?.state === 'completed' && !completeDeletion(operation) ? <p className={styles.dialogNote} role="alert">Deletion is not fully confirmed. Check status or contact your administrator.</p> : null}
       {error && <p role="alert" className={styles.error}>{error}</p>}
     </Dialog>
   </div>;

@@ -39,6 +39,8 @@ const inboxReads = vi.hoisted(() => ({ list: vi.fn(), thread: vi.fn() }));
 vi.mock('../src/modules/inbox/server/read', () => ({ readInboxList: inboxReads.list, readInboxThread: inboxReads.thread }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
 vi.mock('../src/server/inbox/actions', () => ({ replyToInbox: inboxMutations.reply, setInboxResolved: inboxMutations.resolve, moderateInboxComment: inboxMutations.moderate }));
+const inboxDeletions = vi.hoisted(() => ({ get: vi.fn(), remove: vi.fn(), finish: vi.fn() }));
+vi.mock('../src/modules/inbox/server/deletion', () => ({ getInboxDeletion: inboxDeletions.get, deleteInboxCommentDurably: inboxDeletions.remove, finishInboxDeletion: inboxDeletions.finish }));
 const adsMutations = vi.hoisted(() => ({ create: vi.fn(), createAdSet: vi.fn(), update: vi.fn(), read: vi.fn() }));
 vi.mock('../src/server/ads/actions', () => ({
   createWorkspaceAdCampaign: adsMutations.create,
@@ -88,6 +90,9 @@ beforeEach(() => {
   inboxMutations.reply.mockResolvedValue({ ok: true });
   inboxMutations.resolve.mockResolvedValue({ ok: true });
   inboxMutations.moderate.mockResolvedValue({ ok: true });
+  inboxDeletions.get.mockResolvedValue({ operation: null });
+  inboxDeletions.remove.mockResolvedValue({ ok: true, operationId: 'opaque-operation-1', itemId: 'comment-a', state: 'uncertain', remoteConfirmed: false, localConfirmed: false });
+  inboxDeletions.finish.mockResolvedValue({ ok: true, operationId: 'opaque-operation-1', itemId: 'comment-a', state: 'remote_confirmed', remoteConfirmed: true, localConfirmed: false });
   adsMutations.create.mockResolvedValue({ campaignId: 'campaign-1' });
   adsMutations.createAdSet.mockResolvedValue({ adSetId: 'adset-1', auditRecorded: true });
   adsMutations.update.mockResolvedValue(undefined);
@@ -740,6 +745,62 @@ describe('MCP workspace boundaries', () => {
     const denied = await handleMcpMessage(client, { jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'set_inbox_resolved', arguments: { kind: 'comment', id: 'comment-a', resolved: true, confirmation: 'RESOLVE comment comment-a' } } });
     expect((await denied.json()).result.isError).toBe(true);
     expect(inboxMutations.resolve).not.toHaveBeenCalled();
+  });
+
+  it('routes scoped deletion status through the read service and rejects extra arguments', async () => {
+    const scoped = { ...viewer, role: 'editor', apiKeyId: 'narrow-key', permissions: resolvePermissions({ role: 'editor', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-a' }] }) };
+    const read = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_inbox_deletion', arguments: { itemId: 'comment-a' } } });
+    expect((await read.json()).result.structuredContent).toEqual({ operation: null });
+    expect(inboxDeletions.get).toHaveBeenCalledWith(scoped, { itemId: 'comment-a' }, { allowedChannelIds: ['page-a'] });
+
+    const invalid = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'get_inbox_deletion', arguments: { itemId: 'comment-a', remoteId: 'provider-private' } } });
+    expect((await invalid.json()).result.structuredContent.code).toBe('invalid_request');
+    expect(inboxDeletions.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires exact deletion confirmation, forwards current channel scope, and preserves opaque uncertain receipts on audit failure', async () => {
+    const scoped = { ...viewer, role: 'editor', apiKeyId: 'narrow-key', permissions: resolvePermissions({ role: 'editor', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-a' }] }) };
+    const invalid = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'delete_inbox_comment', arguments: { id: 'comment-a', confirmation: 'DELETE COMMENT another-item' } } });
+    expect((await invalid.json()).result.structuredContent.code).toBe('invalid_request');
+    expect(inboxDeletions.remove).not.toHaveBeenCalled();
+
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      db.$executeRaw.mockRejectedValueOnce(new Error('postgres://private-password@db'));
+      const response = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'delete_inbox_comment', arguments: { id: 'comment-a', confirmation: 'DELETE COMMENT comment-a' } } });
+      const result = (await response.json()).result;
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({ ok: true, operationId: 'opaque-operation-1', itemId: 'comment-a', state: 'uncertain', remoteConfirmed: false, localConfirmed: false, mcpAuditRecorded: false });
+      expect(result.structuredContent.warning).toMatch(/Do not repeat/i);
+      expect(JSON.stringify([result, log.mock.calls])).not.toContain('private-password');
+      expect(JSON.stringify(result)).not.toMatch(/remoteId|provider|accessToken|message/);
+      expect(inboxDeletions.remove).toHaveBeenCalledTimes(1);
+      expect(inboxDeletions.remove).toHaveBeenCalledWith(scoped, { id: 'comment-a', confirmation: 'DELETE COMMENT comment-a' }, { allowedChannelIds: ['page-a'] });
+      expect(workspaceGuard).not.toHaveBeenCalled();
+    } finally { log.mockRestore(); }
+  });
+
+  it('denies read-only Inbox API keys and rejects unknown deletion arguments before service calls', async () => {
+    const client = { ...viewer, role: 'client', apiKeyId: 'read-only-key', permissions: resolvePermissions({ role: 'client', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: ['inbox'], allPages: false, pageAccess: [{ targetId: 'page-a' }] }) };
+    const denied = await handleMcpMessage(client, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'delete_inbox_comment', arguments: { id: 'comment-a', confirmation: 'DELETE COMMENT comment-a' } } });
+    expect((await denied.json()).result.structuredContent.code).toBe('forbidden');
+    expect(inboxDeletions.remove).not.toHaveBeenCalled();
+
+    const invalidDelete = await call('delete_inbox_comment', { id: 'comment-a', confirmation: 'DELETE COMMENT comment-a', extra: true });
+    expect((await invalidDelete.json()).result.structuredContent.code).toBe('invalid_request');
+    const invalidFinish = await call('finish_inbox_deletion', { operationId: 'opaque-operation-1', confirmation: 'FINISH DELETION opaque-operation-1', remoteId: 'x' });
+    expect((await invalidFinish.json()).result.structuredContent.code).toBe('invalid_request');
+    expect(inboxDeletions.remove).not.toHaveBeenCalled();
+    expect(inboxDeletions.finish).not.toHaveBeenCalled();
+  });
+
+  it('routes exact deletion recovery once through the service without a generic workspace guard', async () => {
+    const response = await call('finish_inbox_deletion', { operationId: 'opaque-operation-1', confirmation: 'FINISH DELETION opaque-operation-1' });
+    const result = (await response.json()).result;
+    expect(result.structuredContent).toMatchObject({ ok: true, operationId: 'opaque-operation-1', state: 'remote_confirmed', remoteConfirmed: true, localConfirmed: false, mcpAuditRecorded: true });
+    expect(inboxDeletions.finish).toHaveBeenCalledTimes(1);
+    expect(inboxDeletions.finish).toHaveBeenCalledWith(viewer, { operationId: 'opaque-operation-1', confirmation: 'FINISH DELETION opaque-operation-1' }, { allowedChannelIds: undefined });
+    expect(workspaceGuard).not.toHaveBeenCalled();
   });
 
   it('passes narrowed channel scope to local workflow and leaves exactly one service-owned workspace guard', async () => {

@@ -3,26 +3,33 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({
   targets: vi.fn(), accounts: vi.fn(), settings: new Map<string, string>(),
   settingRead: vi.fn(), settingWrite: vi.fn(), postTargets: vi.fn(), accountUpdate: vi.fn(),
-  observations: vi.fn(), adInsights: vi.fn(), remoteStatus: vi.fn(), targetUpdate: vi.fn(), targetGroup: vi.fn(), postUpdate: vi.fn(), transaction: vi.fn(),
+  observations: vi.fn(), adInsights: vi.fn(), remoteStatus: vi.fn(), targetUpdate: vi.fn(), targetGroup: vi.fn(), postUpdate: vi.fn(), transaction: vi.fn(), inboxList: vi.fn(), postComments: vi.fn(), suppressed: vi.fn(), orderBatch: vi.fn(), suppressedOrder: [] as string[],
 }));
 
 vi.mock('../src/server/data-control/guard', () => ({ withWorkspaceOperation: (_workspaceId: string, operation: () => Promise<unknown>) => operation() }));
+vi.mock('../src/modules/inbox/server/comment-guard', () => ({
+  withInboxChannelOperation: (_workspaceId: string, _targetId: string, operation: (signal: AbortSignal) => Promise<unknown>) => operation(new AbortController().signal),
+  inboxCommentSuppressed: state.suppressed,
+  orderInboxCommentBatch: state.orderBatch,
+}));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: async (key: string) => {
   if (key === 'platforms.facebook.enabled') return true;
   if (key === 'sync.maxItemsPerJob') return 1;
   if (key === 'meta.postReadScopes') return ['pages_read_engagement'];
+  if (key === 'meta.inboxReadScopes') return ['pages_messaging'];
   return [];
 } }));
 vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
 vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: async () => ({
   getPageInsightObservations: state.observations, getAdInsights: state.adInsights,
   getStatus: state.remoteStatus,
-  listInbox: vi.fn(), listComments: vi.fn(),
+  listInbox: state.inboxList, listComments: state.postComments,
 }), configuredFacebookAdapter: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: {
   target: { findMany: state.targets }, adAccount: { findMany: state.accounts, updateMany: state.accountUpdate },
   appSetting: { findUnique: state.settingRead, upsert: state.settingWrite },
   pageInsight: { upsert: vi.fn() }, adInsight: { upsert: vi.fn() }, postTarget: { findMany: state.postTargets, updateMany: state.targetUpdate, groupBy: state.targetGroup }, post: { updateMany: state.postUpdate },
+  conversation: { upsert: vi.fn() }, conversationMessage: { upsert: vi.fn() }, postComment: { upsert: vi.fn() },
   $transaction: state.transaction,
 } }));
 
@@ -44,7 +51,7 @@ const accounts = [
 ];
 
 beforeEach(() => {
-  vi.clearAllMocks(); state.settings.clear();
+  vi.clearAllMocks(); state.settings.clear(); state.suppressedOrder.length = 0;
   state.settingRead.mockImplementation(async ({ where }: { where: { key: string } }) => {
     const value = state.settings.get(where.key);
     return value === undefined ? null : { value };
@@ -54,11 +61,16 @@ beforeEach(() => {
   });
   state.targets.mockImplementation((query: { where: { AND: Array<Record<string, unknown>> }; take: number }) => applyQuery(targets, query));
   state.accounts.mockImplementation((query: { where: { AND: Array<Record<string, unknown>> }; take: number }) => applyQuery(accounts, query));
-  state.postTargets.mockResolvedValue([]); state.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<void>) => callback({}));
+  state.postTargets.mockResolvedValue([]); state.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<void>) => callback({ postComment: { upsert: vi.fn().mockResolvedValue({}) } }));
   state.remoteStatus.mockResolvedValue({ state: 'published', publishedAt: new Date('2026-10-15T00:00:00Z') });
   state.targetUpdate.mockResolvedValue({ count: 1 });
   state.targetGroup.mockResolvedValue([{ status: 'published', _count: 1 }]);
   state.postUpdate.mockResolvedValue({ count: 1 });
+  state.inboxList.mockResolvedValue([]);
+  state.postComments.mockResolvedValue([]);
+  state.postTargets.mockResolvedValue([]);
+  state.suppressed.mockResolvedValue(false);
+  state.orderBatch.mockImplementation((items: Array<{ id: string; parentId?: string | null }>) => items);
 });
 
 describe('fair sync batches', () => {
@@ -84,6 +96,47 @@ describe('fair sync batches', () => {
     expect((await syncInbox()).examined).toBe(1);
     expect(state.settings.get('sync.cursor.inbox')).toBe('target-b');
     expect(state.targets.mock.calls[1][0].where.AND).toContainEqual({ id: { gt: 'target-a' } });
+  });
+
+  it('does not report Inbox updates when the locked persistence transaction rolls back', async () => {
+    state.targets.mockResolvedValueOnce([{ id: 'target-a', workspaceId: 'w', providerId: 'page-a', accessToken: 'encrypted', socialAccount: {
+      workspaceId: 'w', accessToken: 'encrypted', scopes: 'pages_messaging', tokenExpiresAt: null, invalidatedAt: null,
+    } }]);
+    state.postTargets.mockResolvedValueOnce([]);
+    state.inboxList.mockResolvedValueOnce([{ id: 'conversation-1', snippet: 'hello', unreadCount: 0, messageCount: 1, updatedAt: new Date(), messages: [] }]);
+    state.transaction.mockImplementationOnce(async (callback: (tx: unknown) => Promise<void>) => {
+      await callback({ conversation: { upsert: async () => ({ id: 'stored-conversation' }) }, conversationMessage: { upsert: vi.fn() }, postComment: { upsert: vi.fn() } });
+      throw new Error('commit failed');
+    });
+
+    await expect(syncInbox()).resolves.toMatchObject({ examined: 1, updated: 0, skipped: 0, failed: 1 });
+  });
+
+  it('orders worker comment batches parent-first before tombstone checks', async () => {
+    state.targets.mockResolvedValue([{ id: 'target-a', workspaceId: 'w', providerId: 'pa', accessToken: null, socialAccount: { workspaceId: 'w', accessToken: 'token', scopes: 'pages_messaging', tokenExpiresAt: null, invalidatedAt: null } }]);
+    state.postTargets.mockResolvedValue([{ id: 'post-target-a', remotePostId: 'remote-post-a' }]);
+    const comments = [
+      { id: 'grandchild', parentId: 'child', message: 'g', fromName: null, fromId: null, likeCount: 0, replyCount: 0, isHidden: false, createdAt: new Date() },
+      { id: 'child', parentId: 'root', message: 'c', fromName: null, fromId: null, likeCount: 0, replyCount: 0, isHidden: false, createdAt: new Date() },
+      { id: 'root', parentId: null, message: 'r', fromName: null, fromId: null, likeCount: 0, replyCount: 0, isHidden: false, createdAt: new Date() },
+    ];
+    state.postComments.mockResolvedValue(comments);
+    state.orderBatch.mockImplementation((items: typeof comments) => {
+      const byId = new Map(items.map(item => [item.id, item]));
+      const ordered: typeof items = []; const done = new Set<string>();
+      while (ordered.length < items.length) for (const item of items) {
+        if (done.has(item.id) || (item.parentId && byId.has(item.parentId) && !done.has(item.parentId))) continue;
+        ordered.push(item); done.add(item.id);
+      }
+      return ordered;
+    });
+    state.suppressed.mockImplementation(async (_tx, _workspaceId, _targetId, remoteId: string) => { state.suppressedOrder.push(remoteId); return false; });
+
+    const result = await syncInbox();
+
+    expect(result).toMatchObject({ examined: 1, updated: 3, failed: 0 });
+    expect(state.orderBatch).toHaveBeenCalledWith(comments);
+    expect(state.suppressedOrder).toEqual(['root', 'child', 'grandchild']);
   });
 
   it('skips scheduled post status refresh when the Page connection lacks the configured read grant', async () => {

@@ -1,3 +1,4 @@
+import { deleteInboxCommentDurably, finishInboxDeletion, getInboxDeletion } from '@/modules/inbox/server/deletion';
 import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
 import { withAdsErrorBoundary } from '../ads/errors';
 import { withMediaErrorBoundary } from '../media/mcp-errors';
@@ -47,6 +48,9 @@ const tools = [
   { name: 'list_inbox', description: 'Read the same merged, scoped Inbox activity as the app. Top-level comments and conversations have shared literal text/person search, channel/status/hidden filters and Older/Newer cursors. Root page and MCP result limits apply. Cursors reset when selection or filters change; activity can move when new messages arrive.', inputSchema: { type: 'object', properties: { channelId: { type: 'string' }, kind: { type: 'string', enum: ['all', 'comment', 'message'] }, state: { type: 'string', enum: ['open', 'resolved', 'all'] }, hidden: { type: 'string', enum: ['visible', 'all'] }, q: { type: 'string' }, cursor: { type: 'string' }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'get_inbox_thread', description: 'Read one authorized stored Inbox thread by message:<id> or comment:<id>. Defaults to newest stored messages/replies displayed chronologically; follow history Older/Newer cursors. Original comment remains visible on every reply page. History does not imply all provider history was fetched.', inputSchema: { type: 'object', required: ['key'], properties: { key: { type: 'string' }, cursor: { type: 'string' }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'reply_to_inbox', description: 'Send a reply to a synced conversation or comment through its connected platform. This contacts the remote platform. Confirmation must exactly match REPLY <message|comment> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'text', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment'] }, id: { type: 'string' }, text: { type: 'string', minLength: 1, maxLength: 2000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'get_inbox_deletion', description: 'Read current scoped comment-deletion status without contacting the platform. Missing remote confirmation is not proof of deletion.', inputSchema: { type: 'object', required: ['itemId'], properties: { itemId: { type: 'string' } }, additionalProperties: false } },
+  { name: 'delete_inbox_comment', description: 'Request permanent remote and local comment deletion once. Confirmation: DELETE COMMENT <id>. Read the returned state: only completed with remoteConfirmed and localConfirmed means deleted. Uncertain operations must be verified; repeating this tool never retries the remote call.', inputSchema: { type: 'object', required: ['id', 'confirmation'], properties: { id: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'finish_inbox_deletion', description: 'Complete only local cleanup after stored remote confirmation. Never contacts the platform. Confirmation: FINISH DELETION <operationId>.', inputSchema: { type: 'object', required: ['operationId', 'confirmation'], properties: { operationId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'set_inbox_resolved', description: 'Resolve or reopen a synced conversation or comment. Confirmation must exactly match RESOLVE <message|comment> <id> or REOPEN <message|comment> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'resolved', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment'] }, id: { type: 'string' }, resolved: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'moderate_inbox_comment', description: 'Hide or unhide a synced comment through its connected platform. This contacts the remote platform. Confirmation must exactly match HIDE COMMENT <id> or UNHIDE COMMENT <id>.', inputSchema: { type: 'object', required: ['id', 'hidden', 'confirmation'], properties: { id: { type: 'string' }, hidden: { type: 'boolean' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_page_analytics', description: 'Read stored daily insights for one workspace Page.', inputSchema: { type: 'object', required: ['pageId'], properties: { pageId: { type: 'string' }, days: { type: 'integer', minimum: 1, maximum: 365 } }, additionalProperties: false } },
@@ -92,6 +96,9 @@ const toolFeatures: Record<string, string> = {
   get_inbox_thread: 'inbox/conversations',
   reply_to_inbox: 'inbox/conversations',
   set_inbox_resolved: 'inbox/conversations',
+  get_inbox_deletion: 'inbox/conversations',
+  delete_inbox_comment: 'inbox/conversations',
+  finish_inbox_deletion: 'inbox/conversations',
   moderate_inbox_comment: 'inbox/conversations',
   get_page_analytics: 'analytics/overview',
   get_analytics_overview: 'analytics/overview',
@@ -121,7 +128,7 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const writeTools = new Set(['manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
+const writeTools = new Set(['manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'sync_post_status', 'delete_post', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -271,6 +278,24 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const text = typeof args.text === 'string' ? args.text.trim() : '';
       const result = await replyToInbox(viewer, { kind, id, text });
       return auditedReceipt(viewer, name, { kind, itemId: id }, { ...result, kind, itemId: id });
+    }
+    case 'get_inbox_deletion': {
+      if (Object.keys(args).some(key => key !== 'itemId')) throw new OperationError('invalid_request', 'Choose one comment.');
+      return getInboxDeletion(viewer, { itemId: requiredString(args, 'itemId') }, { allowedChannelIds: pageIdsFor(viewer) });
+    }
+    case 'delete_inbox_comment': {
+      if (Object.keys(args).some(key => !['id', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Choose one comment and confirm deletion.');
+      const id = requiredString(args, 'id');
+      requireConfirmation(args, `DELETE COMMENT ${id}`);
+      const result = await deleteInboxCommentDurably(viewer, { id, confirmation: String(args.confirmation) }, { allowedChannelIds: pageIdsFor(viewer) });
+      return auditedReceipt(viewer, name, { itemId: id, operationId: result.operationId, state: result.state }, result);
+    }
+    case 'finish_inbox_deletion': {
+      if (Object.keys(args).some(key => !['operationId', 'confirmation'].includes(key))) throw new OperationError('invalid_request', 'Choose one deletion and confirm recovery.');
+      const operationId = requiredString(args, 'operationId');
+      requireConfirmation(args, `FINISH DELETION ${operationId}`);
+      const result = await finishInboxDeletion(viewer, { operationId, confirmation: String(args.confirmation) }, { allowedChannelIds: pageIdsFor(viewer) });
+      return auditedReceipt(viewer, name, { itemId: result.itemId, operationId, state: result.state }, result);
     }
     case 'set_inbox_resolved': {
       const kind = args.kind === 'message' || args.kind === 'comment' ? args.kind : null;
@@ -605,7 +630,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       if (params.arguments !== undefined && (!params.arguments || typeof params.arguments !== 'object' || Array.isArray(params.arguments))) throw new OperationError('invalid_request', 'Tool arguments must be an object.');
       const args = (params.arguments ?? {}) as Record<string, unknown>;
       // Data deletion and local Inbox workflow own their service-level lock.
-      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && name !== 'set_inbox_resolved' && !rootTools.has(name)) || name === 'get_live_ad_status'
+      const result = (writeTools.has(name) && name !== 'delete_workspace_data' && !['set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion'].includes(name) && !rootTools.has(name)) || name === 'get_live_ad_status'
         ? await withWorkspaceOperation(viewer.workspaceId, () => runTool(viewer, name, args))
         : await runTool(viewer, name, args);
       return reply(textResult(result));
