@@ -371,3 +371,20 @@ workspace owners/keys cannot acquire Root access. ADS_REPORT_FILTERS.md defines
 date semantics; PREVIEW_QA.md distinguishes automated, rendered HTTP and actual
 interactive browser proof. General copy configuration and complete reporting,
 visual/accessibility and legacy parity remain open.
+
+## Ads report pages and size failures — batch 58
+
+Ads account cards and object summaries now have server-rendered pages. Sidebar
+Previous/Next links retain period, custom dates and account; Apply and Reset
+begin page 1. Headers/sidebar distinguish visible ranges from full scoped totals.
+On phones, page navigation uses the same drawer and closes it after following a
+link. Invalid page values fail before insight/readiness work; stale positive page
+links show the clamped actual page. Page recovery retains filters.
+
+Reports exceeding Root's row ceiling show a focused actionable correction and no
+partial metrics/counts. The complete-or-refused rule is shared with MCP. Root
+controls the default page size; MCP still caps explicit result requests. Stable
+tuple identity/latest object naming prevent arbitrary tie order for unchanged
+data. These are representative report flows; full-screen copy, status/freshness,
+comparison/export and accessibility coverage remain open. ADS_REPORT_FILTERS.md
+and PREVIEW_QA.md distinguish scope and actual proof.

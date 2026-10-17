@@ -175,3 +175,13 @@ persistence; empty/stale filters fail without broadening scope. This addresses
 those batch-56 policy gaps only. General copy configuration, report row bounds,
 complete pagination, comparisons, exports, freshness/status presentation and
 broader Ads/legacy/MCP capability and cutover gates remain open.
+
+Ads report browsing, batch 58: account cards and complete object summaries have
+server-rendered sidebar pages with scope-preserving URLs and explicit counts.
+Root page-size/read-row controls apply to both customer reports and MCP; scoped
+oversize datasets are refused before partial aggregation. Current connection scope
+and normalized level filters precede the row ceiling. Summary identity/order is
+stable for unchanged data. This closes bounded synchronous UI browsing gaps only;
+database object/directory paging, byte/time bounds, asynchronous reports, daily
+MCP detail coverage, comparisons/exports/freshness/status and wider Ads/legacy/
+release requirements remain open. Production is unchanged.

@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../generated/client';
 import { hashLegacySessionToken } from '../src/server/auth';
+import { CONFIG_SCHEMA_VERSION } from '../src/lib/config/registry';
 
 class ProbeFailure extends Error {}
 function check(value: unknown, message: string): asserts value { if (!value) throw new ProbeFailure(message); }
@@ -25,13 +26,15 @@ async function main() {
   const cookie = (token: string, workspaceId: string) => `msp_session=${token}; sp_workspace=${workspaceId}`;
   const policy = { presets: [{ id: '14d', days: 14, label: 'Last 14 days Root Probe' }], defaultPreset: '14d', maxRangeDays: 14, maxFilterCharacters: 200 };
   let workspaceId = '';
-  let originalSetting: { key: string; value: Prisma.JsonValue; encrypted: boolean; updatedAt: Date } | null = null;
-  let settingCaptured = false;
+  const configKeys = ['ads.reportingFilters', 'ads.reportPageSize', 'ads.reportMaxRows'] as const;
+  type AdsConfigKey = typeof configKeys[number];
+  type SettingRow = { key: string; value: Prisma.JsonValue; encrypted: boolean; updatedAt: Date };
+  const originalSettings = new Map<AdsConfigKey, SettingRow | null>();
+  let settingsCaptured = false;
   let originalAuditIds = new Set<string>();
   let rootCookie = '';
-  let changedSetting = false;
-  const configKey = 'ads.reportingFilters';
-  const audits = async () => db.$queryRaw<Array<{ id: string; detail: unknown }>>`SELECT id, detail FROM root_activities WHERE "actorId" = ${rootId} AND action = 'config.changed' AND detail->>'key' = ${configKey}`;
+  let rootWriteAttempted = false;
+  const audits = async () => db.$queryRaw<Array<{ id: string; detail: unknown }>>`SELECT id, detail FROM root_activities WHERE "actorId" = ${rootId} AND action = 'config.changed' AND detail->>'key' = ANY(${[...configKeys]})`;
   const rpc = async (name: string, args: object, workspaceKey = false) => {
     const response = await fetch(`${previewOrigin.origin}/api/mcp?scope=${workspaceKey ? 'workspace' : 'installation'}`, {
       method: 'POST', headers: { origin, 'content-type': 'application/json', ...(workspaceKey ? { authorization: `Bearer ${bearer}` } : { cookie: rootCookie }) },
@@ -40,15 +43,22 @@ async function main() {
     const body = await response.json();
     return { response, body, data: body.result?.structuredContent };
   };
-  const rootConfig = (value: unknown) => fetch(`${previewOrigin.origin}/api/root/config`, {
+  const rootConfig = (key: AdsConfigKey, value: unknown) => fetch(`${previewOrigin.origin}/api/root/config`, {
     method: 'PUT', headers: { origin, cookie: rootCookie, 'content-type': 'application/json' },
-    body: JSON.stringify({ key: configKey, value }), redirect: 'manual',
+    body: JSON.stringify({ key, value }), redirect: 'manual',
   });
   const restore = async () => {
-    if (!changedSetting) return;
-    if (originalSetting) {
-      await db.appSetting.upsert({ where: { key: configKey }, create: { ...originalSetting, value: originalSetting.value === null ? Prisma.JsonNull : originalSetting.value }, update: { value: originalSetting.value === null ? Prisma.JsonNull : originalSetting.value, encrypted: originalSetting.encrypted, updatedAt: originalSetting.updatedAt } });
-    } else await db.appSetting.deleteMany({ where: { key: configKey } });
+    if (!rootWriteAttempted || !settingsCaptured) return;
+    for (const key of configKeys) {
+      const original = originalSettings.get(key);
+      if (original) {
+        await db.appSetting.upsert({ where: { key }, create: { ...original, value: original.value === null ? Prisma.JsonNull : original.value }, update: { value: original.value === null ? Prisma.JsonNull : original.value, encrypted: original.encrypted, updatedAt: original.updatedAt } });
+      } else await db.appSetting.deleteMany({ where: { key } });
+    }
+  };
+  const writeRootConfig = async (key: AdsConfigKey, value: unknown) => {
+    rootWriteAttempted = true;
+    return rootConfig(key, value);
   };
 
   try {
@@ -60,10 +70,13 @@ async function main() {
     }
     const accounts = workspaceId ? await db.adAccount.findMany({ where: { workspaceId, enabled: true }, select: { id: true } }) : [];
     check(accounts.length > 0, 'At least one enabled fixture ad account is required.');
-    originalSetting = await db.appSetting.findUnique({ where: { key: configKey }, select: { key: true, value: true, encrypted: true, updatedAt: true } });
-    settingCaptured = true;
-    check(!originalSetting || !originalSetting.encrypted, 'Ads report policy fixture must be a non-secret setting.');
-    originalAuditIds = new Set((await db.$queryRaw<Array<{ id: string }>>`SELECT id FROM root_activities WHERE "actorId" = ${rootId} AND action = 'config.changed' AND detail->>'key' = ${configKey}`).map(row => row.id));
+    for (const key of configKeys) {
+      const setting = await db.appSetting.findUnique({ where: { key }, select: { key: true, value: true, encrypted: true, updatedAt: true } });
+      check(!setting || !setting.encrypted, `Ads setting ${key} must not be encrypted.`);
+      originalSettings.set(key, setting);
+    }
+    settingsCaptured = true;
+    originalAuditIds = new Set((await audits()).map(row => row.id));
     rootCookie = cookie(rootToken, workspaceId);
 
     stage = 'temporary identity';
@@ -75,66 +88,117 @@ async function main() {
     await db.mcpApiKey.create({ data: { id: keyId, workspaceId, createdById: userId, name: 'Disposable Ads report reader', tokenHash: createHash('sha256').update(bearer).digest('hex'), tokenPrefix: bearer.slice(0, 12), readFeatures: ['ads/campaigns'], writeFeatures: [], expiresAt } });
     const userCookie = cookie(userToken, workspaceId);
     check((await fetch(`${previewOrigin.origin}/api/root/config`, { headers: { cookie: userCookie } })).status === 404, 'Workspace owner must not read Root configuration.');
-    changedSetting = true;
-    const deniedRootSave = await fetch(`${previewOrigin.origin}/api/root/config`, { method: 'PUT', headers: { origin, cookie: userCookie, 'content-type': 'application/json' }, body: JSON.stringify({ key: configKey, value: policy }), redirect: 'manual' });
+    rootWriteAttempted = true;
+    const deniedRootSave = await fetch(`${previewOrigin.origin}/api/root/config`, { method: 'PUT', headers: { origin, cookie: userCookie, 'content-type': 'application/json' }, body: JSON.stringify({ key: configKeys[0], value: policy }), redirect: 'manual' });
     check(deniedRootSave.status === 404, 'Workspace owner must not change Root configuration.');
     const keyRootGet = await fetch(`${previewOrigin.origin}/api/root/config`, { headers: { authorization: `Bearer ${bearer}` } });
     check(keyRootGet.status === 401, 'Workspace API key must not read Root configuration.');
-    const keyRootSet = await rpc('set_root_config', { key: configKey, value: policy, confirmation: `SET ROOT CONFIG ${configKey}` }, true);
+    rootWriteAttempted = true;
+    const keyRootSet = await rpc('set_root_config', { key: configKeys[0], value: policy, confirmation: `SET ROOT CONFIG ${configKeys[0]}` }, true);
     check(keyRootSet.body.error || keyRootSet.body.result?.isError || !keyRootSet.response.ok, 'Workspace key must not change Root configuration.');
 
     stage = 'Root validation and save';
     const before = await audits();
-    const invalid = await rootConfig({ ...policy, defaultPreset: 'missing' });
+    const invalid = await writeRootConfig(configKeys[0], { ...policy, defaultPreset: 'missing' });
     check(invalid.status === 400 && (await audits()).length === before.length, 'Invalid Root policy must not audit or persist.');
-    const afterInvalid = await db.appSetting.findUnique({ where: { key: configKey }, select: { value: true, encrypted: true, updatedAt: true } });
-    check(JSON.stringify(afterInvalid) === JSON.stringify(originalSetting && { value: originalSetting.value, encrypted: originalSetting.encrypted, updatedAt: originalSetting.updatedAt }), 'Invalid Root policy must leave the prior setting unchanged.');
-    const httpSave = await rootConfig(policy);
-    check(httpSave.ok && (await httpSave.json()).schemaVersion === 52, 'Valid Root HTTP policy save must apply schema version 52.');
-    const mcpSave = await rpc('set_root_config', { key: configKey, value: policy, confirmation: `SET ROOT CONFIG ${configKey}` });
-    check(mcpSave.response.ok && !mcpSave.body.result?.isError && mcpSave.data?.saved === true && mcpSave.data?.schemaVersion === 52, 'Confirmed Root MCP policy save must apply schema version 52.');
-    const newAudits = (await audits()).filter(row => !originalAuditIds.has(row.id));
-    check(newAudits.length === before.length - originalAuditIds.size + 2 && newAudits.every(row => !JSON.stringify(row.detail).includes(policy.presets[0]!.label)), 'Both saves must have value-free Root audits.');
+    const afterInvalid = await db.appSetting.findUnique({ where: { key: configKeys[0] }, select: { key: true, value: true, encrypted: true, updatedAt: true } });
+    check(JSON.stringify(afterInvalid) === JSON.stringify(originalSettings.get(configKeys[0])), 'Invalid Root policy must leave the prior setting unchanged.');
+    const httpSave = await writeRootConfig(configKeys[0], policy);
+    check(httpSave.ok && (await httpSave.json()).schemaVersion === CONFIG_SCHEMA_VERSION, 'Valid Root HTTP policy save must apply the current build schema version.');
+    const mcpSave = await rpc('set_root_config', { key: configKeys[0], value: policy, confirmation: `SET ROOT CONFIG ${configKeys[0]}` });
+    check(mcpSave.response.ok && !mcpSave.body.result?.isError && mcpSave.data?.saved === true && mcpSave.data?.schemaVersion === CONFIG_SCHEMA_VERSION, 'Confirmed Root MCP policy save must apply the current build schema version.');
 
     stage = 'customer Ads reports';
     const accountList = await rpc('list_ad_accounts', {}, true);
-    const account = accountList.data?.accounts?.[0];
-    check(accountList.response.ok && account?.id, 'Readonly Ads key must list a selected fixture account.');
+    const firstAccount = accountList.data?.accounts?.[0];
+    check(accountList.response.ok && firstAccount?.id, 'Readonly Ads key must list a selected fixture account.');
     const readPerformance = async (args: object) => rpc('get_ads_performance', args, true);
+    const pageSizeSave = await writeRootConfig(configKeys[1], 1);
+    check(pageSizeSave.ok && (await pageSizeSave.json()).schemaVersion === CONFIG_SCHEMA_VERSION, 'Root must save the one-row Ads report page size.');
+    const maxRowsReset = await writeRootConfig(configKeys[2], 20000);
+    check(maxRowsReset.ok && (await maxRowsReset.json()).schemaVersion === CONFIG_SCHEMA_VERSION, 'Root must set a sufficient row ceiling before pagination checks.');
     const defaults = await readPerformance({});
     check(!defaults.body.result?.isError && defaults.data?.reportOptions?.defaultPreset === '14d' && defaults.data?.reportOptions?.maxRangeDays === 14 && defaults.data?.reportOptions?.presets?.some((item: { id: string; label: string }) => item.id === '14d' && item.label === policy.presets[0]!.label), 'Customer MCP must expose the saved preset, label and configured maximum.');
     check(defaults.data?.range?.endExclusive === true && defaults.data.range.to === new Date(new Date(defaults.data.range.from).getTime() + 14 * 86_400_000).toISOString(), 'Default MCP period must report an exclusive end and cover exactly 14 UTC days.');
+    check(defaults.data?.resultCount > 1 && defaults.data.performance.length <= 1 && defaults.data.nextOffset === 1, 'MCP Ads performance must use the Root page size and expose a continuation for seeded results.');
+    const secondPage = await readPerformance({ offset: defaults.data.nextOffset });
+    check(!secondPage.body.result?.isError && secondPage.data?.resultCount === defaults.data.resultCount && secondPage.data.performance.length <= 1 && secondPage.data.performance[0]?.id !== defaults.data.performance[0]?.id, 'MCP Ads performance must return a distinct next page with the same result count.');
     const explicitPreset = await readPerformance({ period: '14d' });
     check(!explicitPreset.body.result?.isError && explicitPreset.data?.range?.endExclusive === true && explicitPreset.data?.range?.to === new Date(new Date(explicitPreset.data.range.from).getTime() + 14 * 86_400_000).toISOString(), 'Explicit configured 14d preset must be accepted with the bounded UTC range.');
-    const exact = await readPerformance({ period: 'custom', start: '2026-10-01', end: '2026-10-14', accountId: account.id });
+    const exact = await readPerformance({ period: 'custom', start: '2026-10-01', end: '2026-10-14', accountId: firstAccount.id });
     check(!exact.body.result?.isError && exact.data?.range?.from === '2026-10-01T00:00:00.000Z' && exact.data?.range?.to === '2026-10-15T00:00:00.000Z', 'Inclusive maximum custom range must be accepted with exclusive UTC end.');
-    const over = await readPerformance({ period: 'custom', start: '2026-10-01', end: '2026-10-15', accountId: account.id });
+    const over = await readPerformance({ period: 'custom', start: '2026-10-01', end: '2026-10-15', accountId: firstAccount.id });
     check(over.body.result?.isError === true, 'Custom range above the configured ceiling must be refused.');
-    const endOnly = await readPerformance({ end: '2026-10-17', accountId: account.id });
+    const endOnly = await readPerformance({ end: '2026-10-17', accountId: firstAccount.id });
     check(!endOnly.body.result?.isError && endOnly.data?.range?.from === '2026-10-04T00:00:00.000Z' && endOnly.data?.range?.to === '2026-10-18T00:00:00.000Z', 'End-only query must anchor to the configured default duration.');
     const stale = await readPerformance({ period: '30d' });
     check(stale.body.result?.isError === true && stale.data?.range === undefined, 'Unknown stale preset must fail before returning or broadening a report.');
 
-    stage = 'server-rendered Ads UI';
-    for (const path of ['/ads', '/ads/campaigns']) {
-      const response = await fetch(`${previewOrigin.origin}${path}`, { headers: { cookie: userCookie }, redirect: 'manual' });
-      const html = (await response.text()).replace(/<!--[\s\S]*?-->/g, '');
-      const selectedPreset = html.match(/<option\b[^>]*value="14d"[^>]*>/)?.[0] ?? '';
-      check(response.ok && selectedPreset.includes('selected') && html.includes(policy.presets[0]!.label) && html.includes('14 days'), `${path} must render the selected configured preset and range limit.`);
+    stage = 'server-rendered Ads pagination';
+    const accountCandidates = accountList.data.accounts as Array<{ id: string }>;
+    let pagedAccount: { id: string } | undefined;
+    for (const candidate of accountCandidates) {
+      const report = await readPerformance({ period: 'custom', start: '2026-10-01', end: '2026-10-14', accountId: candidate.id });
+      if (!report.body.result?.isError && report.data?.resultCount > 1) { pagedAccount = candidate; break; }
     }
-    console.log(JSON.stringify({ adsPolicyHttpMcpAndRenderedUi: true, customPresetAndUtcBounds: true, invalidAndStaleInputsRefused: true, workspaceOwnerAndKeyRootAccessDenied: true, providerRequests: false }));
+    check(pagedAccount, 'Seeded fixture data must include a selected account with multiple campaign report objects.');
+    check((accountList.data.accountCount ?? accountCandidates.length) > 1, 'Seeded fixtures must include multiple ad accounts for overview pagination.');
+    const htmlPage = async (path: '/ads' | '/ads/campaigns', page: 1 | 2, accountId?: string) => {
+      const query = new URLSearchParams({ period: 'custom', since: '2026-10-01', until: '2026-10-14' });
+      if (accountId) query.set('account', accountId);
+      if (page === 2) query.set('page', '2');
+      const response = await fetch(`${previewOrigin.origin}${path}?${query}`, { headers: { cookie: userCookie }, redirect: 'manual' });
+      const html = (await response.text()).replace(/<!--[\s\S]*?-->/g, '');
+      check(response.ok && html.includes('Showing ') && html.includes(`Page ${page} of`), `${path} must render report counts and page state.`);
+      check(html.includes('2026-10-01') && html.includes('2026-10-14') && (!accountId || html.includes(accountId)), `${path} must render its selected date and account filters.`);
+      const navLabel = path === '/ads' ? 'Account report pages' : 'Object report pages';
+      check(html.includes(`aria-label="${navLabel}"`), `${path} must render report page navigation.`);
+      if (page === 1) {
+        const nextHref = html.match(/href="([^"]*page=2[^"]*)"/)?.[1]?.replaceAll('&amp;', '&');
+        check(nextHref, `${path} must offer a link to page 2.`);
+        const next = new URL(nextHref, previewOrigin.origin);
+        check(next.searchParams.get('period') === 'custom' && next.searchParams.get('since') === '2026-10-01' && next.searchParams.get('until') === '2026-10-14' && next.searchParams.get('account') === (accountId ?? null), `${path} page links must retain report filters.`);
+      }
+    };
+    for (const path of ['/ads', '/ads/campaigns'] as const) {
+      await htmlPage(path, 1, path === '/ads/campaigns' ? pagedAccount.id : undefined);
+      await htmlPage(path, 2, path === '/ads/campaigns' ? pagedAccount.id : undefined);
+    }
+
+    stage = 'Ads maximum row bound';
+    const maxRowsSave = await writeRootConfig(configKeys[2], 1);
+    check(maxRowsSave.ok && (await maxRowsSave.json()).schemaVersion === CONFIG_SCHEMA_VERSION, 'Root must save the one-row Ads report ceiling.');
+    const boundedRead = await readPerformance({ period: 'custom', start: '2026-10-01', end: '2026-10-14', accountId: pagedAccount.id });
+    const boundedData = boundedRead.body.result?.structuredContent;
+    check(boundedRead.response.ok && boundedRead.body.result?.isError === true && !boundedData?.performance && boundedData?.resultCount === undefined, 'MCP must refuse an over-limit report without partial rows or a count.');
+    for (const path of ['/ads', '/ads/campaigns'] as const) {
+      const query = new URLSearchParams({ period: 'custom', since: '2026-10-01', until: '2026-10-14', account: pagedAccount.id });
+      const response = await fetch(`${previewOrigin.origin}${path}?${query}`, { headers: { cookie: userCookie }, redirect: 'manual' });
+      const html = (await response.text()).replace(/<!--[\s\S]*?-->/g, '');
+      check(response.ok && html.includes('Report could not be loaded completely') && html.includes('No partial report is shown'), `${path} must render the actionable report limit state.`);
+      check(!html.includes('class="metric-grid"') && !html.includes('class="ads-results-panel"') && html.includes('2026-10-01') && html.includes('2026-10-14') && html.includes(pagedAccount.id), `${path} must not render partial metrics and must retain selected filters.`);
+    }
+    const newAudits = (await audits()).filter(row => !originalAuditIds.has(row.id));
+    check(newAudits.length === 5 && newAudits.every(row => {
+      if (!row.detail || typeof row.detail !== 'object') return false;
+      const detail = row.detail as Record<string, unknown>;
+      return configKeys.includes(detail.key as AdsConfigKey) && !Object.hasOwn(detail, 'value') && !JSON.stringify(detail).includes(policy.presets[0]!.label);
+    }), 'Root writes must produce scoped, value-free configuration audits.');
+    console.log(JSON.stringify({ adsPolicyHttpMcpAndRenderedUi: true, reportPaginationAndBounds: true, invalidAndStaleInputsRefused: true, workspaceOwnerAndKeyRootAccessDenied: true, providerRequests: false }));
   } finally {
     try {
       await restore();
-      if (settingCaptured) {
-        const restored = await db.appSetting.findUnique({ where: { key: configKey }, select: { key: true, value: true, encrypted: true, updatedAt: true } });
-        check(JSON.stringify(restored) === JSON.stringify(originalSetting), 'Original Ads report policy row must be restored exactly.');
-        console.log('Original Ads report policy setting restoration verified.');
+      if (settingsCaptured) {
+        for (const key of configKeys) {
+          const restored = await db.appSetting.findUnique({ where: { key }, select: { key: true, value: true, encrypted: true, updatedAt: true } });
+          check(JSON.stringify(restored) === JSON.stringify(originalSettings.get(key)), `Original Ads setting ${key} must be restored exactly.`);
+        }
+        console.log('Original Ads report settings restoration verified.');
       }
     } finally {
       try {
         if (workspaceId) {
-          const created = (await db.$queryRaw<Array<{ id: string }>>`SELECT id FROM root_activities WHERE "actorId" = ${rootId} AND action = 'config.changed' AND detail->>'key' = ${configKey}`).map(row => row.id).filter(id => !originalAuditIds.has(id));
+          const created = (await audits()).map(row => row.id).filter(id => !originalAuditIds.has(id));
           if (created.length) await db.$executeRaw`DELETE FROM root_activities WHERE id = ANY(${created})`;
         }
         await db.mcpApiKey.deleteMany({ where: { id: keyId, workspaceId } });

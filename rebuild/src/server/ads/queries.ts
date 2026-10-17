@@ -1,18 +1,34 @@
 import { prisma } from "@/server/data";
 import { selectedResourceConnectionWhere } from '@/server/platforms/resource-visibility';
 import type { AdsFilters } from '@/modules/ads/report-filters';
+import { OperationError } from '@/lib/operation-error';
+import { AdsReportLimitError } from '@/modules/ads/read-policy';
+import { loadAdsReadPolicy } from '@/modules/ads/server/read-policy';
 export { parseAdsFilters, AdsFilterError, type AdsFilters, type AdsPeriod, type AdsSearchParams } from '@/modules/ads/report-filters';
 
+export type AdsInsightLevel = 'account' | 'campaign' | 'adset' | 'ad';
+export type AdsDatasetOptions = { levels?: readonly AdsInsightLevel[] };
+const ADS_INSIGHT_LEVELS: readonly AdsInsightLevel[] = ['account', 'campaign', 'adset', 'ad'];
+
 /** Read only the accounts and stored insight rows belonging to this workspace. */
-export async function getAdsDataset(workspaceId: string, filters: AdsFilters, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[]) {
+export async function getAdsDataset(workspaceId: string, filters: AdsFilters, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[], options: AdsDatasetOptions = {}) {
+  const policy = await loadAdsReadPolicy();
+  const levels: unknown = options.levels;
+  if (levels !== undefined && (!Array.isArray(levels) || levels.length === 0 || new Set(levels).size !== levels.length || levels.some(level => typeof level !== 'string' || !ADS_INSIGHT_LEVELS.includes(level as AdsInsightLevel)))) {
+    throw new OperationError('invalid_request', 'Choose valid Ads report levels.');
+  }
+  const selectedLevels = levels as readonly AdsInsightLevel[] | undefined;
   const accounts = await getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders);
   const visibleAccountIds = accounts.map(account => account.id);
+  const currentAccountScope = await getAdsAccountWhere(workspaceId, allowedTargetIds, allowedProviders);
   const insights = await prisma.adInsight.findMany({
     where: {
-      adAccount: { workspaceId, id: { in: filters.accountId ? visibleAccountIds.filter(id => id === filters.accountId) : visibleAccountIds } },
+      adAccount: { ...currentAccountScope, id: { in: filters.accountId ? visibleAccountIds.filter(id => id === filters.accountId) : visibleAccountIds } },
       date: { gte: filters.since, lt: filters.until },
+      ...(selectedLevels !== undefined ? { level: { in: [...selectedLevels] } } : {}),
     },
-    orderBy: [{ level: "asc" }, { objectName: "asc" }, { date: "desc" }],
+    orderBy: [{ level: "asc" }, { objectName: "asc" }, { date: "desc" }, { id: "asc" }],
+    take: policy.maxRows + 1,
     select: {
       id: true, adAccountId: true, level: true, objectId: true, objectName: true, date: true,
       spend: true, impressions: true, clicks: true, reach: true, cpc: true, cpm: true,
@@ -20,7 +36,8 @@ export async function getAdsDataset(workspaceId: string, filters: AdsFilters, al
       adAccount: { select: { id: true, name: true, currency: true } },
     },
   });
-  return { accounts, insights };
+  if (insights.length > policy.maxRows) throw new AdsReportLimitError();
+  return { accounts, insights, pageSize: policy.pageSize };
 }
 
 /** Query predicate for enabled, selected ad accounts from installed and enabled platform modules. */

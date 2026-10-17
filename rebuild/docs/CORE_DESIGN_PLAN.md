@@ -101,3 +101,13 @@ validates JSON policies before persistence and keeps useful field guidance.
 ADS_REPORT_FILTERS.md and PREVIEW_QA.md own detailed scope and proof. General
 copy configuration, table selection/pagination, status/freshness, comparisons,
 exports and full app design/accessibility coverage remain unfinished.
+
+## Ads report browsing — batch 58
+
+Both Ads routes now page displayed accounts/objects in the contextual sidebar,
+with filter-preserving Previous/Next controls and explicit visible/full counts.
+Root default sizes and complete-or-refused stored-row limits are shared with MCP.
+Page errors retain filters and support first-page recovery. Representative actual
+phone/desktop and HTTP/MCP evidence is in PREVIEW_QA.md. Byte/time/query pagination,
+large async reports, general copy, provider status/freshness, comparisons/exports,
+numeric Root input hints and the wider full-app UX/parity matrix remain open.

@@ -1425,3 +1425,65 @@ The existing Facebook photo-cleanup ledger and Page lock remain held and were
 not modified; unreadable provider objects are not treated as absent.
 
 Final full-suite log: `/private/tmp/socialpilot-ads57-full-final.log`.
+
+## Ads bounded reports and server pages — batch 58, 2026-10-17
+
+Scope: isolated synthetic localhost preview only. Registry 53 adds consumed Ads
+page-size and report-row limits; no DDL, provider request or production cutover.
+
+- Test-first checks reproduced an unbounded stored-row fetch, stale object names,
+  colliding delimiter-based summary keys, absent server report pages and missing
+  MCP policy-sized/strict-integer paging. Independent review covered current
+  scope predicates, level filters before the row cap, complete aggregation before
+  paging, creation/readiness placement and correction paths; no findings remained.
+- Final guarded PostgreSQL suite: **1,589 tests in 229 files passed**, 45.84s.
+  Focused checks, final TypeScript and whitespace checks passed. The isolated
+  production build passed and left preview `.next` unchanged. Earlier agent
+  checks encountered in-flight module/test edits and an unconfigured run skipped
+  database suites; neither was used as final acceptance evidence.
+- The actual authenticated HTTP/installation-MCP probe saved all three report
+  settings. Root page size one produced distinct MCP pages with the same complete
+  result count and a continuation. Both server-rendered report routes exposed
+  first/second pages, retained dates/account in links and rendered explicit scope
+  counts. A one-row ceiling refused oversize UI/MCP reports with actionable
+  correction and no partial metrics or result count.
+- The probe also retained its batch-57 date-policy, stale-input, UTC, workspace-
+  owner/key Root denial and value-free audit checks. It restored all three exact
+  prior setting rows (including absence/timestamps) and verified disposable
+  identities/sessions/key/membership cleanup before exit 0. Four separate dummy-
+  credential guard checks rejected remote origin, remote/non-preview database and
+  production mode before database access.
+- Actual desktop Chrome Clay: saved page size one through Root's numeric control
+  and observed Saved/database-source feedback. Ads overview showed one of three
+  cards, while Linked/Enabled/Synced totals remained three and Campaigns remained
+  two. Following Next page changed the visible account and retained the custom
+  October 1–14 URL/date state and full scoped totals. Both pager directions
+  measured 40px high without document overflow.
+- Actual Nightfall DOM preview at 390×844/reduced motion: the EUR account's
+  Campaigns route showed one of three objects. Its single 330px navigation drawer
+  exposed correctly scoped Previous/Next links, range and page text. The native
+  drawer screenshot was visually inspected; both directions measured 40px high,
+  with no horizontal overflow. Following Next page preserved EUR/custom dates,
+  showed the next object, and closed the drawer. A malformed page later produced
+  the focused correction and a first-page link preserving all selected filters,
+  with no result panel or overflow.
+- The browser setting's original absent row was backed up privately and restored
+  exactly after verifying its current value was still this test's one. Its
+  legitimate value-free Root change audit was retained. Temporary Nightfall DOM
+  styling was not saved. Only the owned test tab was closed; the user's existing
+  preview tab was left untouched. Representative checks are not a complete
+  four-theme/keyboard/every-screen accessibility matrix.
+
+The current query bounds rows and aggregates the whole admitted dataset before
+server display paging. It does not provide byte/time ceilings, database object
+paging, asynchronous reports or a stable snapshot across requests. Directory
+paging, comparisons/export/freshness/status, general copy/native Root numeric
+hints, daily MCP details, full Ads/legacy parity and cutover remain open. Personal
+Chrome was still not exposed by browser inventory; the existing Facebook cleanup
+ledger and lock were not modified and visual cleanup remains pending.
+
+Final logs: `/private/tmp/socialpilot-ads58-full-final.log`,
+`/private/tmp/socialpilot-ads58-build-final.log`. Test-first MCP reproduction:
+`/private/tmp/socialpilot-ads58-mcp-red.log`. One-setting browser backup:
+`/private/tmp/socialpilot-ads58-page-size-original.json` (contains only the original
+public setting row, not credentials).

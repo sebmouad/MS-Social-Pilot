@@ -4,6 +4,11 @@ import { AdsFilterError, type AdsSearchParams } from '@/modules/ads/report-filte
 import { PageFrame } from '@/server/PageFrame';
 import { RouteNotice } from '@/components/RouteNotice';
 import type { AdsReportPolicy } from '@/modules/ads/report-policy';
+import { AdsPageError } from '@/modules/ads/report-page';
+import { OperationError } from '@/lib/operation-error';
+import { AdsReportLimitError } from '@/modules/ads/read-policy';
+import type { AdsPageSlice } from '@/modules/ads/report-page';
+import { AdsReportPager } from './AdsReportPager';
 
 type AdsAccountOption = { id: string; name: string };
 
@@ -20,6 +25,21 @@ export function AdsFilterErrorView({ accounts, input, error, action, title, poli
     <header className="page-heading"><div><p className="eyebrow">Ads</p><h1>{title}</h1></div></header>
     <section className="panel"><h2>Check your filters</h2><RouteNotice error className="ui-error" focusKey={JSON.stringify(input)}>{error.message}</RouteNotice><p>Correct your selection in Filters, or use Reset filters. No report was loaded.</p></section>
   </div></PageFrame>;
+}
+
+export function AdsReportFailureView({ accounts, input, filters, error, action, title, policy }: { accounts: AdsAccountOption[]; input: AdsSearchParams & { page?: string | string[] }; filters: AdsFilters; error: unknown; action: string; title: string; policy: AdsReportPolicy }) {
+  const isPageError = error instanceof AdsPageError;
+  if (!isPageError && !(error instanceof AdsReportLimitError) && !(error instanceof OperationError && error.code === 'unavailable')) throw error;
+  const message = error.message;
+  const href = adsQuery(filters, action);
+  return <PageFrame module="ads" sidebar={<><AdsFiltersSidebar accounts={accounts} filters={filters} action={action} policy={policy} /><a className="ads-page-reset" href={href}>{isPageError ? 'Return to page 1' : 'Retry from page 1'}</a></>}><div className="page-stack">
+    <header className="page-heading"><div><p className="eyebrow">Ads</p><h1>{title}</h1></div></header>
+    <section className="panel"><h2>{isPageError ? 'Check the report page' : 'Report could not be loaded completely'}</h2><RouteNotice error className="ui-error" focusKey={`${action}:${String(input.page)}:${message}`}>{message}</RouteNotice><p>{isPageError ? 'Use the page controls in Filters or return to the first page. No report was loaded.' : 'No partial report is shown. Narrow the account or date range, then try again.'}</p></section>
+  </div></PageFrame>;
+}
+
+export function AdsReportSidebar<T>({ accounts, filters, policy, action, kind, page }: { accounts: AdsAccountOption[]; filters: AdsFilters; policy: AdsReportPolicy; action: string; kind: 'accounts' | 'objects'; page: AdsPageSlice<T> }) {
+  return <><AdsFiltersSidebar accounts={accounts} filters={filters} action={action} policy={policy} /><AdsReportPager filters={filters} path={action} kind={kind} page={page} /></>;
 }
 
 export function adsQuery(filters: AdsFilters, page: string) {

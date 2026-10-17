@@ -104,3 +104,10 @@ The shared sidebar form shows the configured custom-range ceiling beside date
 controls; error views retain the same choices and input. This adds no new visual
 component or third menu. Root edits the coupled policy in its existing themed
 JSON setting control within the Ads product module.
+
+Ads report paging sits below the sidebar filter form, separated by the shared
+line token. It shows range/count and current page above two aligned 40px shared
+secondary controls. Unavailable directions are noninteractive text with a clear
+disabled state. The same layout fits the phone drawer; it adds no content-side
+menu. Report headers explain the visible slice, while metric cards retain scoped
+totals. Page/size failures reuse the existing focused notice and sidebar controls.

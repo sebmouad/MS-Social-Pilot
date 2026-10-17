@@ -27,8 +27,14 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(52);
+    expect(CONFIG_SCHEMA_VERSION).toBe(53);
     expect(safeConfigShape().find(setting => setting.key === 'ads.reportingFilters')).toMatchObject({ kind: 'json', consumption: 'active', owner: { kind: 'product', id: 'ads' } });
+    for (const [key, value, maximum] of [['ads.reportPageSize', 25, 100], ['ads.reportMaxRows', 20000, 100000]] as const) {
+      expect(CONFIG_BY_KEY.get(key)).toMatchObject({ defaultValue: value, consumption: 'active' });
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(0).success).toBe(false);
+      expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(maximum + 1).success).toBe(false);
+      expect(safeConfigShape().find(setting => setting.key === key)?.owner).toEqual({ kind: 'product', id: 'ads' });
+    }
     expect(CONFIG_BY_KEY.get('meta.manualMediaAttestationEnabled')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'platform', id: 'facebook' } });
     expect(CONFIG_BY_KEY.get('meta.manualMediaCleanupEnabled')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'platform', id: 'facebook' } });
     for (const key of ['meta.mediaReadScopes', 'meta.mediaDeleteScopes']) {

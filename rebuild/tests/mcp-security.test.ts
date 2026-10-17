@@ -71,6 +71,7 @@ vi.mock('../src/server/media/storage', () => ({ listWorkspaceImages: media.list,
 import { handleMcpMessage, type McpViewer } from '../src/server/mcp/server';
 import { resolvePermissions } from '../src/server/permissions';
 import { OperationError } from '../src/lib/operation-error';
+import { AdsReportLimitError } from '../src/modules/ads/read-policy';
 import { MediaStorageUnavailable, MediaValidationError } from '../src/server/media/errors';
 
 const snapshot = (overrides: Record<string, unknown> = {}) => {
@@ -161,7 +162,7 @@ beforeEach(() => {
     { ...snapshot().allMetrics[0], key: 'clicks', points: [], rows: [] },
   ] }));
   adsQueries.accounts.mockResolvedValue([{ id: 'account-a', name: 'Account A', currency: 'USD' }]);
-  adsQueries.dataset.mockResolvedValue({ insights: [
+  adsQueries.dataset.mockResolvedValue({ pageSize: 25, insights: [
     { id: 'row-1', adAccountId: 'account-a', level: 'campaign', objectId: 'campaign-a', objectName: 'Campaign A', date: new Date('2026-10-14T00:00:00.000Z'), spend: 20, impressions: 1000, clicks: 20, reach: 900, cpc: 1, cpm: 20, cpp: null, ctr: 2, frequency: 1.1, actions: [], fields: {}, adAccount: { id: 'account-a', name: 'Account A', currency: 'USD' } },
     { id: 'row-2', adAccountId: 'account-a', level: 'ad', objectId: 'ad-a', objectName: 'Ad A', date: new Date('2026-10-14T00:00:00.000Z'), spend: 5, impressions: 500, clicks: 10, reach: 400, cpc: 0.5, cpm: 10, cpp: null, ctr: 2, frequency: 1.25, actions: [], fields: {}, adAccount: { id: 'account-a', name: 'Account A', currency: 'USD' } },
   ] });
@@ -431,6 +432,37 @@ describe('MCP workspace boundaries', () => {
     expect(filters.since.getUTCHours()).toBe(0);
     expect(filters.until.getUTCHours()).toBe(0);
   });
+  it('uses the shared Root report page size for default performance paging', async () => {
+    const complete = await adsQueries.dataset();
+    adsQueries.dataset.mockResolvedValue({ ...complete, pageSize: 1 });
+    const first = (await (await call('get_ads_performance')).json()).result.structuredContent;
+    expect(first.performance).toHaveLength(1);
+    expect(first.resultCount).toBe(2);
+    expect(first.nextOffset).toBe(1);
+    const second = (await (await call('get_ads_performance', { offset: 1 })).json()).result.structuredContent;
+    expect(second.performance).toHaveLength(1);
+    expect(second.performance[0].id).not.toBe(first.performance[0].id);
+    expect(second.nextOffset).toBeNull();
+  });
+  it('applies the requested performance level before the bounded insight read', async () => {
+    const result = (await (await call('get_ads_performance', { level: 'ad' })).json()).result.structuredContent;
+    expect(result.performance.map((row: { id: string }) => row.id)).toEqual(['ad-a']);
+    expect(adsQueries.dataset).toHaveBeenCalledWith('workspace-a', expect.anything(), undefined, ['facebook'], { levels: ['ad'] });
+  });
+  it('returns no partial metrics or counts when the report row limit is exceeded', async () => {
+    adsQueries.dataset.mockRejectedValue(new AdsReportLimitError());
+    const result = (await (await call('get_ads_performance')).json()).result;
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent.code).toBe('invalid_request');
+    expect(result.structuredContent).not.toHaveProperty('performance');
+    expect(result.structuredContent).not.toHaveProperty('resultCount');
+    expect(result.content[0].text).toContain('shorter date range');
+  });
+  it.each([{ offset: '1' }, { offset: null }, { limit: '1' }, { limit: null }, { accountOffset: '0' }, { accountOffset: null }, { offset: Number.MAX_SAFE_INTEGER + 1 }, { level: ['campaign'] }])('rejects malformed Ads paging before insight reads: %j', async input => {
+    const result = (await (await call('get_ads_performance', input)).json()).result;
+    expect(result.isError).toBe(true);
+    expect(adsQueries.dataset).not.toHaveBeenCalled();
+  });
   it('rejects an Ads range over its own policy before report reads', async () => {
     const response = await call('get_ads_performance', { start: '2026-10-01', end: '2026-10-15' });
     const result = (await response.json()).result;
@@ -452,7 +484,7 @@ describe('MCP workspace boundaries', () => {
   it('accepts the exact inclusive Ads range ceiling', async () => {
     const response = await call('get_ads_performance', { start: '2026-10-01', end: '2026-10-14' });
     expect((await response.json()).result.isError).not.toBe(true);
-    expect(adsQueries.dataset).toHaveBeenCalledWith('workspace-a', expect.objectContaining({ since: new Date('2026-10-01T00:00:00.000Z'), until: new Date('2026-10-15T00:00:00.000Z') }), undefined, ['facebook']);
+    expect(adsQueries.dataset).toHaveBeenCalledWith('workspace-a', expect.objectContaining({ since: new Date('2026-10-01T00:00:00.000Z'), until: new Date('2026-10-15T00:00:00.000Z') }), undefined, ['facebook'], { levels: ['campaign', 'adset', 'ad'] });
   });
   it('reads paginated Ads performance through workspace and channel scoped services', async () => {
     const scoped = { ...viewer, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
@@ -464,7 +496,7 @@ describe('MCP workspace boundaries', () => {
     expect(result.performance[0]).toMatchObject({ id: 'campaign-a', spend: 20, accountId: 'account-a' });
     expect(result.nextOffset).toBe(1);
     expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', ['page-allowed'], ['facebook']);
-    expect(adsQueries.dataset).toHaveBeenCalledWith('workspace-a', expect.objectContaining({ accountId: 'account-a' }), ['page-allowed'], ['facebook']);
+    expect(adsQueries.dataset).toHaveBeenCalledWith('workspace-a', expect.objectContaining({ accountId: 'account-a' }), ['page-allowed'], ['facebook'], { levels: ['campaign', 'adset', 'ad'] });
 
     const denied = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 491, method: 'tools/call', params: { name: 'get_ads_performance', arguments: { accountId: 'other-workspace-account' } } });
     expect((await denied.json()).result.isError).toBe(true);

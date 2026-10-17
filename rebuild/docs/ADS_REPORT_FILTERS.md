@@ -1,4 +1,4 @@
-# Ads report filters and Root policy — batches 56–57
+# Ads report filters and Root policy — batches 56–58
 
 ## Current behavior
 
@@ -113,10 +113,9 @@ installation owners; workspace API keys cannot read or save Root policy.
 Persistence failures remain generic and do not expose database details.
 
 This closes the preset, label/default, date and filter-string policy gaps only.
-General filter/error copy still needs the requested Root copy catalog. Database
-row bounds, complete UI pagination, Ads comparisons/exports/freshness, readable
-provider-owned account status, wider module encapsulation and full legacy/MCP
-parity remain unfinished. No DDL, provider write or production cutover occurs.
+General filter/error copy still needs the requested Root copy catalog. The bounded synchronous query and pagination gaps are addressed below.
+Ads comparisons/exports/freshness, readable provider-owned account status, wider
+module encapsulation and full legacy/MCP parity remain unfinished. No DDL, provider write or production cutover occurs.
 PREVIEW_QA.md records automated and actual runtime/browser evidence separately.
 
 ## Guarded local runtime probe
@@ -129,6 +128,65 @@ HTTP origin. Production mode, other origins and database host overrides are
 refused. The seeded `preview-qa@example.test` owner/workspace and example ad
 accounts are required. The probe creates identifiable temporary identities,
 saves the public policy through Root HTTP/MCP, reads stored example reports and
-rendered pages, and finally restores the exact prior policy row and removes its
-fixtures. Do not run concurrent policy edits during this temporary local check.
+rendered pages, and finally restores the exact prior rows for all three Ads report settings and
+removes its fixtures. Do not run concurrent policy edits during this temporary local check.
 No provider API or production application is exercised by it.
+
+## Bounded complete reports and paging — batch 58
+
+Registry **53** adds two active Ads-owned Root controls:
+
+| Setting | Default | Valid range | Runtime effect |
+| --- | --- | --- | --- |
+| `ads.reportPageSize` | 25 | Integer 1–100 | Account/object rows per UI page and default MCP performance rows, capped again by MCP access limits |
+| `ads.reportMaxRows` | 20000 | Integer 1–100000 | Stored insight rows permitted in one complete synchronous report |
+
+`getAdsDataset` reads the current policy, reapplies the selected/enabled current
+connection and account predicates, and fetches at most `maxRows + 1`. Exceeding
+the configured ceiling returns a safe correction failure before aggregation or
+any result is returned. There is no truncated metric total, successful partial
+report or partial result count. Root controls do not confer account access.
+
+Trusted report-level filters apply in the database before this ceiling.
+Campaign UI and MCP request only normalized campaign/ad-set/ad levels; an MCP
+single-level request narrows the same query. Overview still reads all levels
+because its account summaries and object counts require them. Empty/duplicate/
+unknown level selections are rejected rather than dropped.
+
+Within that complete bounded dataset, the server summarizes every matching
+row before slicing displayed results. Account cards use one page; scoped
+Linked/Enabled/Synced/Campaign counts still describe all matching accounts.
+Campaign pages contain one slice of object summaries before account grouping;
+visible object accounts alone need read/action readiness checks, while campaign
+creation remains available for the selected accounts. This is server-rendered
+pagination after bounded aggregation, not database object-level pagination.
+
+Page URLs are canonical positive safe integers. Invalid/repeated/empty numbers
+produce a focused correction before insight/readiness reads. A stale positive
+page clamps to the last available page and displays its actual number. Empty
+results show 0–0 of 0 on page 1. Previous/Next links in the contextual sidebar
+preserve dates, account and period; Apply/Reset start a new first page. A safe
+first-page recovery link retains the selected scope after page/limit failures.
+The phone drawer closes after following a page link.
+
+MCP retains independent object/account offsets and result counts. Performance's
+default size now comes from Root instead of a second literal. Explicit paging
+values must be safe JSON integers; strings, null and malformed levels are
+refused before the insight query. The existing MCP result ceiling still caps an
+explicit request. Account metadata retains its independent MCP cap/offset.
+
+Summary identity is a lossless account/level/object tuple. The latest day's
+object name is used, and equal-spend/equal-name results have a stable identity
+tie-break. Sums, latest-day reach/frequency/CPP, daily measures, actions and raw
+stored fields remain intact; currencies never merge across accounts. Ordering
+is deterministic for unchanged input, not a snapshot guarantee across requests
+while data or Root settings change.
+
+These bounds limit row count, not JSON bytes or database execution time. The
+account directory itself remains unpaged for filter options. Large asynchronous
+reports, database-level object pagination, report comparisons/exports/freshness,
+provider-owned status labels, general copy configuration, raw daily MCP detail
+coverage, wider Ads/legacy/MCP parity and release gates remain open. Root numeric
+forms still rely on server schemas rather than generated native min/max hints.
+No DDL or provider/production change was made. PREVIEW_QA.md records actual tests,
+HTTP/MCP probe, browser checks and exact local setting restoration.

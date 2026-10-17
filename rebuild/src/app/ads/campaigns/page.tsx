@@ -1,7 +1,7 @@
 import { entitledPlatformIds } from '@/server/entitlements';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
-import { AdsFiltersSidebar, AdsFilterErrorView, dateRangeLabel } from '../ads-filters';
+import { AdsFilterErrorView, AdsReportFailureView, AdsReportSidebar, dateRangeLabel } from '../ads-filters';
 import { getAdsAccounts, getAdsDataset, parseAdsFilters, AdsFilterError, type AdsSearchParams } from '@/server/ads/queries';
 import { groupSummariesByAccount, summarizeInsights } from '@/server/ads/summary';
 import { StoredFields } from '../stored-fields';
@@ -11,12 +11,13 @@ import { CampaignCreateForm } from '../CampaignCreateForm';
 import { AdSetCreateForm } from '../AdSetCreateForm';
 import { platformAds } from '@/server/platforms/registry';
 import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
+import { pageAdsRows, parseAdsResultPage } from '@/modules/ads/report-page';
 
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const money = (value: number | null, currency: string | null) => value === null ? '—' : `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
 const date = (value: Date) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(value);
 
-export default async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams> }) {
+export default async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams & { page?: string | string[] }> }) {
   const viewer = await requireViewer({ feature: 'ads/campaigns' });
   const { workspaceId } = viewer;
   const policy = await loadAdsReportPolicy();
@@ -26,9 +27,16 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   let filters;
   try { filters = parseAdsFilters(params, accounts.map(account => account.id), undefined, policy); }
   catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView accounts={accounts} input={params} error={error} action="/ads/campaigns" title="Campaign, ad set, and ad results" policy={policy} />; }
-  const { insights } = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders);
-  const summaries = summarizeInsights(insights).filter(row => ['campaign', 'adset', 'ad'].includes(row.level));
-  const byAccount = groupSummariesByAccount(summaries);
+  let requestedPage: number;
+  try { requestedPage = parseAdsResultPage(params.page); }
+  catch (error) { return <AdsReportFailureView accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title="Campaign, ad set, and ad results" policy={policy} />; }
+  let dataset;
+  try { dataset = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders, { levels: ['campaign', 'adset', 'ad'] }); }
+  catch (error) { return <AdsReportFailureView accounts={accounts} input={params} filters={filters} error={error} action="/ads/campaigns" title="Campaign, ad set, and ad results" policy={policy} />; }
+  const summaries = summarizeInsights(dataset.insights).filter(row => ['campaign', 'adset', 'ad'].includes(row.level))
+    .sort((left, right) => left.accountName.localeCompare(right.accountName) || left.level.localeCompare(right.level) || left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
+  const objectPage = pageAdsRows(summaries, requestedPage, dataset.pageSize);
+  const byAccount = groupSummariesByAccount(objectPage.items);
   const actionAvailability = new Map(await Promise.all([...byAccount.keys()].map(async accountId => [
     accountId,
     await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, accountId),
@@ -39,11 +47,11 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   ] as const)));
   const createAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, account.id)] as const)));
   const adsUi = new Map(await Promise.all(accounts.map(async account => [account.id, account.socialAccount ? (await platformAds(account.socialAccount.provider))?.ui ?? null : null] as const)));
-  const sidebar = <AdsFiltersSidebar accounts={accounts} filters={filters} action="/ads/campaigns" policy={policy} />;
+  const sidebar = <AdsReportSidebar accounts={accounts} filters={filters} action="/ads/campaigns" kind="objects" policy={policy} page={objectPage} />;
   return <PageFrame module="ads" sidebar={accounts.length ? sidebar : undefined}><div className="page-stack">
-    <header className="page-heading"><div><p className="eyebrow">Ads / Performance</p><h1>Campaign, ad set, and ad results</h1><p>{accounts.length ? `Stored daily insight records · ${dateRangeLabel(filters)}. Select an account and date range in the sidebar.` : 'Connect an advertising account to review and manage its campaigns.'}</p></div></header>
+    <header className="page-heading"><div><p className="eyebrow">Ads / Performance</p><h1>Campaign, ad set, and ad results</h1><p>{accounts.length ? `Showing ${objectPage.from}–${objectPage.to} of ${objectPage.resultCount} objects · Page ${objectPage.page} of ${objectPage.pageCount}. Stored daily insight records · ${dateRangeLabel(filters)}. Select an account and date range in the sidebar.` : 'Connect an advertising account to review and manage its campaigns.'}</p></div></header>
     {!accounts.length ? <section className="panel empty-state"><h2>No ad accounts connected</h2><p>Connect and select an advertising account to see campaign results and available actions here.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <>
-    {byAccount.size ? [...byAccount].map(([accountId, rows]) => {
+    {objectPage.resultCount ? [...byAccount].map(([accountId, rows]) => {
       const account = accounts.find(item => item.id === accountId);
       const levels = [
         { value: 'campaign', label: 'Campaigns' }, { value: 'adset', label: 'Ad sets' }, { value: 'ad', label: 'Ads' },

@@ -52,10 +52,10 @@ function actionItems(value: unknown): ActionItem[] {
 
 /** Roll daily rows up per account and object. Reach/frequency/other fields are snapshots, so use latest row. */
 export function summarizeInsights(rows: readonly InsightRow[], level?: string): AdsSummary[] {
-  const groups = new Map<string, AdsSummary & { actionTotals: Map<string, number> }>();
+  const groups = new Map<string, AdsSummary & { actionTotals: Map<string, number>; nameDate: Date }>();
   for (const row of rows) {
     if (level && row.level !== level) continue;
-    const key = `${row.adAccountId}:${row.level}:${row.objectId}`;
+    const key = JSON.stringify([row.adAccountId, row.level, row.objectId]);
     let current = groups.get(key);
     if (!current) {
       current = {
@@ -63,7 +63,7 @@ export function summarizeInsights(rows: readonly InsightRow[], level?: string): 
         accountId: row.adAccount.id, accountName: row.adAccount.name, currency: row.adAccount.currency,
         spend: 0, impressions: 0, clicks: 0, reach: row.reach, reachDate: row.date,
         cpc: null, cpm: null, cpp: row.cpp, ctr: null, frequency: row.frequency, actions: [],
-        fields: row.fields, fieldsDate: row.date, dailyMetrics: [], rows: 0, actionTotals: new Map(),
+        fields: row.fields, fieldsDate: row.date, dailyMetrics: [], rows: 0, actionTotals: new Map(), nameDate: row.date,
       };
       groups.set(key, current);
     }
@@ -72,6 +72,10 @@ export function summarizeInsights(rows: readonly InsightRow[], level?: string): 
     current.clicks += row.clicks;
     current.rows += 1;
     current.dailyMetrics.push({ date: row.date, cpc: row.cpc, cpm: row.cpm, cpp: row.cpp, ctr: row.ctr, frequency: row.frequency, actions: row.actions, fields: row.fields });
+    if (row.date > current.nameDate) {
+      current.name = row.objectName || row.objectId;
+      current.nameDate = row.date;
+    }
     if (row.date > current.reachDate) {
       current.reach = row.reach;
       current.reachDate = row.date;
@@ -88,14 +92,14 @@ export function summarizeInsights(rows: readonly InsightRow[], level?: string): 
       if (Number.isFinite(numericValue)) current.actionTotals.set(action.action_type, (current.actionTotals.get(action.action_type) ?? 0) + numericValue);
     }
   }
-  return [...groups.values()].map(({ actionTotals, ...summary }) => {
+  return [...groups.values()].map(({ actionTotals, nameDate: _nameDate, ...summary }) => {
     summary.cpc = summary.clicks > 0 ? summary.spend / summary.clicks : null;
     summary.cpm = summary.impressions > 0 ? summary.spend * 1000 / summary.impressions : null;
     summary.ctr = summary.impressions > 0 ? summary.clicks * 100 / summary.impressions : null;
     summary.actions = [...actionTotals].map(([name, value]) => ({ name, value })).sort((a, b) => a.name.localeCompare(b.name));
     summary.dailyMetrics.sort((a, b) => b.date.getTime() - a.date.getTime());
     return summary;
-  }).sort((a, b) => b.spend - a.spend || a.name.localeCompare(b.name));
+  }).sort((a, b) => b.spend - a.spend || a.name.localeCompare(b.name) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 }
 
 export function groupSummariesByAccount(summaries: readonly AdsSummary[]) {

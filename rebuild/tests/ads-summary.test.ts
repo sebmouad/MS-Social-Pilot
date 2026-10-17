@@ -27,6 +27,34 @@ describe('ads summaries', () => {
     expect(summary.fields).toEqual({ provider_metric: 7 });
   });
 
+  it('uses the newest row name and latest snapshots independently of input order', () => {
+    const rows = [
+      { ...base, date: new Date('2026-10-11T00:00:00Z'), objectName: 'Old name', reach: 600, fields: { version: 1 } },
+      { ...base, date: new Date('2026-10-12T00:00:00Z'), objectName: 'New name', reach: 700, fields: { version: 2 } },
+      { ...base, date: new Date('2026-10-13T00:00:00Z'), objectName: null, reach: 800, fields: { version: 3 } },
+    ];
+
+    const forward = summarizeInsights(rows);
+    const reverse = summarizeInsights([...rows].reverse());
+    expect(forward).toEqual(reverse);
+    expect(forward[0]).toMatchObject({ name: 'campaign-1', reach: 800, fields: { version: 3 } });
+    expect(forward[0].reachDate.toISOString()).toBe('2026-10-13T00:00:00.000Z');
+    expect(forward[0].fieldsDate.toISOString()).toBe('2026-10-13T00:00:00.000Z');
+  });
+
+  it('keeps delimiter-colliding tuples separate and orders equal summaries by stable key', () => {
+    const first = { ...base, adAccountId: 'a:b', level: 'c', objectId: 'd', objectName: 'Same', adAccount: { id: 'a:b', name: 'First', currency: 'USD' } };
+    const second = { ...base, adAccountId: 'a', level: 'b:c', objectId: 'd', objectName: 'Same', adAccount: { id: 'a', name: 'Second', currency: 'EUR' } };
+    const expectedKeys = ['["a","b:c","d"]', '["a:b","c","d"]'];
+
+    const forward = summarizeInsights([first, second]);
+    const reverse = summarizeInsights([second, first]);
+    expect(forward).toHaveLength(2);
+    expect(forward.map(summary => summary.key)).toEqual(expectedKeys);
+    expect(reverse.map(summary => summary.key)).toEqual(expectedKeys);
+    expect(forward).toEqual(reverse);
+  });
+
   it('uses UTC calendar boundaries for the explicitly selected accessible account', () => {
     const filters = parseAdsFilters({ period: 'custom', since: '2026-10-01', until: '2026-10-03', account: 'known' }, ['known'], new Date('2026-10-14T12:00:00Z'));
     expect(filters.since.toISOString()).toBe('2026-10-01T00:00:00.000Z');

@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({ targets: vi.fn(), accounts: vi.fn(), insights: vi.fn() }));
+const readPolicy = vi.hoisted(() => vi.fn(async () => ({ pageSize: 25, maxRows: 20000 })));
 vi.mock('../src/server/platforms/resource-visibility', () => ({ selectedResourceConnectionWhere: vi.fn(async (_workspaceId: string, providers: readonly string[]) => ({ provider: { in: [...providers] } })) }));
+vi.mock('../src/modules/ads/server/read-policy', () => ({ loadAdsReadPolicy: readPolicy }));
 vi.mock('../src/server/data', () => ({ prisma: {
   target: { findMany: db.targets },
   adAccount: { findMany: db.accounts },
@@ -27,13 +29,16 @@ describe('Ads channel scope', () => {
       workspaceId: 'workspace-a', enabled: true, socialAccountId: { in: ['social-allowed'] },
       socialAccount: { is: { provider: { in: ['facebook'] } } },
     } }));
-    expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: { workspaceId: 'workspace-a', id: { in: ['ad-allowed'] } } }) }));
+    expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: {
+      workspaceId: 'workspace-a', enabled: true, id: { in: ['ad-allowed'] },
+      socialAccount: { is: { provider: { in: ['facebook'] } } }, socialAccountId: { in: ['social-allowed'] },
+    } }) }));
   });
 
   it('keeps the mandatory account intersection even for a directly supplied unavailable selection', async () => {
     const filters = { ...parseAdsFilters({}, ['ad-allowed']), accountId: 'ad-hidden' };
     await getAdsDataset('workspace-a', filters, ['target-allowed'], ['facebook']);
-    expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: { workspaceId: 'workspace-a', id: { in: [] } } }) }));
+    expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: expect.objectContaining({ workspaceId: 'workspace-a', id: { in: [] }, enabled: true }) }) }));
   });
 
   it('returns no accounts or insights for an empty channel scope', async () => {
@@ -45,7 +50,7 @@ describe('Ads channel scope', () => {
       socialAccount: { is: { provider: { in: [] } } },
     } }));
     await getAdsDataset('workspace-a', parseAdsFilters({}, [], new Date('2026-10-15T00:00:00Z')), [], []);
-    expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: { workspaceId: 'workspace-a', id: { in: [] } } }) }));
+    expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: expect.objectContaining({ workspaceId: 'workspace-a', id: { in: [] }, enabled: true }) }) }));
   });
 
   it('applies account and connection visibility even when no channel restriction is supplied', async () => {

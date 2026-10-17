@@ -18,6 +18,12 @@
 .empty-state p { max-width: 580px; margin: 0 auto 16px; color: var(--ink-soft); font-size: 14px; line-height: 1.6; }
 .empty-state__icon { display: inline-grid; width: 42px; height: 42px; place-items: center; border-radius: 14px; background: var(--accent-soft); color: var(--accent); font-size: 21px; }
 .ads-sidebar-filter { display: grid; gap: 11px; }
+.ads-report-pager { display: grid; gap: 7px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.ads-report-pager > p { margin: 0; }
+.ads-report-pager__current { color: var(--ink); font-size: 12px; font-weight: 650; }
+.ads-report-pager__nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.ads-report-pager__nav .ui-button { width: 100%; }
+.ads-report-pager__nav [aria-disabled="true"] { cursor: default; opacity: .7; }
 .ads-filter-field { display: grid; gap: 8px; }
 .ads-filter-heading { margin: 0 0 2px; color: var(--ink-faint); font-size: 10px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
 .ads-sidebar-filter .ui-button { margin-top: 8px; }

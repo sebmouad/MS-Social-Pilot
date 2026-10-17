@@ -30,7 +30,7 @@ import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion 
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
 import { campaignCreationConfirmation, canManageWorkspaceAds, createWorkspaceAdCampaign, createWorkspaceAdSet, readWorkspaceAdObject, updateWorkspaceAd } from '../ads/actions';
 import type { AdMutationRequest } from '@/platforms/types';
-import { getAdsAccountWhere, getAdsAccounts, getAdsDataset } from '../ads/queries';
+import { getAdsAccountWhere, getAdsAccounts, getAdsDataset, type AdsInsightLevel } from '../ads/queries';
 import { platformAds } from '../platforms/registry';
 import { summarizeInsights } from '../ads/summary';
 import { deleteUnusedWorkspaceImage, getWorkspaceImageMetadata, listWorkspaceImages, uploadWorkspaceImage } from '../media/storage';
@@ -441,16 +441,17 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const filters = parseAdsPerformanceFilters(args, accounts.map(account => account.id), new Date(), policy);
       const accountId = filters.accountId;
       const range = { from: filters.since, to: filters.until, endExclusive: true };
-      const { insights } = await getAdsDataset(viewer.workspaceId, filters, allowedTargetIds, entitledPlatformIds(viewer.entitlements));
       const level = args.level;
-      if (level !== undefined && !['campaign', 'adset', 'ad'].includes(String(level))) throw new OperationError('invalid_request', 'level must be campaign, adset, or ad.');
+      if (level !== undefined && (typeof level !== 'string' || !['campaign', 'adset', 'ad'].includes(level))) throw new OperationError('invalid_request', 'level must be campaign, adset, or ad.');
+      const offset = args.offset === undefined ? 0 : args.offset;
+      const accountOffset = args.accountOffset === undefined ? 0 : args.accountOffset;
+      if (typeof offset !== 'number' || !Number.isSafeInteger(offset) || offset < 0 || (args.limit !== undefined && (typeof args.limit !== 'number' || !Number.isSafeInteger(args.limit) || args.limit < 1 || args.limit > 200))) throw new OperationError('invalid_request', 'offset and limit must be valid integers.');
+      if (typeof accountOffset !== 'number' || !Number.isSafeInteger(accountOffset) || accountOffset < 0) throw new OperationError('invalid_request', 'accountOffset must be a non-negative integer.');
+      const levels: AdsInsightLevel[] = level === undefined ? ['campaign', 'adset', 'ad'] : [level as AdsInsightLevel];
+      const { insights, pageSize } = await getAdsDataset(viewer.workspaceId, filters, allowedTargetIds, entitledPlatformIds(viewer.entitlements), { levels });
       const rows = summarizeInsights(insights, level as string | undefined).filter(row => ['campaign', 'adset', 'ad'].includes(row.level));
-      const offset = args.offset === undefined ? 0 : Number(args.offset);
-      const limit = args.limit === undefined ? Math.min(cap, 50) : Number(args.limit);
-      if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new OperationError('invalid_request', 'offset and limit must be valid integers.');
+      const limit = args.limit === undefined ? pageSize : args.limit as number;
       const pageLimit = Math.min(limit, cap);
-      const accountOffset = args.accountOffset === undefined ? 0 : Number(args.accountOffset);
-      if (!Number.isInteger(accountOffset) || accountOffset < 0) throw new OperationError('invalid_request', 'accountOffset must be a non-negative integer.');
       const performance = rows.slice(offset, offset + pageLimit).map(row => ({
         id: row.id, name: row.name, level: row.level, accountId: row.accountId, accountName: row.accountName, currency: row.currency,
         spend: row.spend, impressions: row.impressions, clicks: row.clicks, reach: row.reach, reachDate: row.reachDate,

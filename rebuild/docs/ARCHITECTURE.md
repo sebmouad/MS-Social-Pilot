@@ -509,3 +509,22 @@ independent of filters. No adapter logic, DDL or production deployment changed.
 ADS_REPORT_FILTERS.md and PREVIEW_QA.md record scope/evidence. General copy
 configuration, report row bounds/pagination, status/freshness/comparison/export,
 broader Ads/legacy/MCP parity and release gates remain open.
+
+## Complete bounded Ads datasets and report pages — batch 58
+
+Registry 53 installs Ads-owned `ads.reportPageSize` and `ads.reportMaxRows`.
+The stored insight query reapplies current selected/enabled account/connection
+scope and trusted normalized levels before fetching at most the ceiling plus
+one. Over-limit reads fail before aggregation or returning partial results.
+Both customer report pages and MCP use that same boundary and Root default size.
+
+Ads paginates account cards or complete object summaries on the server after
+aggregation; sidebar links preserve filters and counts identify the full selected
+scope. Invalid page/paging input is refused before report reads. Current latest
+object names and a lossless identity tie-break stabilize pages for unchanged data.
+Typed page/limit failures preserve correction context; private policy failures
+stay customer-safe. ADS_REPORT_FILTERS.md and PREVIEW_QA.md own detail and proof.
+This is bounded synchronous aggregation, not database object pagination or a
+cross-request snapshot. Byte/time bounds, asynchronous large reports, directory
+paging, comparisons/export/freshness/status, full daily MCP details, broader
+Ads/legacy parity and cutover remain unfinished. Production remains legacy.

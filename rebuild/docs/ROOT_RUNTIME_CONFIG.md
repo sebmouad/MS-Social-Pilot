@@ -109,3 +109,14 @@ installation MCP writes and atomic value-free configuration audits remain in
 force. ADS_REPORT_FILTERS.md defines the object, integrity bounds and incomplete
 copy/reporting scope. Bootstrap dependencies and general copy coverage remain
 separate open requirements; this is not complete configuration coverage.
+
+## Ads read controls — registry 53
+
+Ads owns active `ads.reportPageSize` (25, range 1–100) and `ads.reportMaxRows`
+(20000, range 1–100000) beside its date policy. UI report pages and default MCP
+performance results consume the page size, subject to MCP's independent result
+cap. The shared stored-insight query reads the row ceiling and refuses oversize
+reports without partial aggregates. Root saves retain the normal schema/access/
+confirmation/audit boundary. These numeric controls limit synchronous report rows;
+they do not impose byte/time ceilings or configure provider quotas. Native Root
+input min/max metadata generation remains open. See ADS_REPORT_FILTERS.md.

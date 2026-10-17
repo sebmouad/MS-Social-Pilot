@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
 import { ADS_REPORT_DEFAULT_POLICY } from './report-policy';
+import { ADS_READ_DEFAULT_POLICY, ADS_READ_MAX_ROWS_SCHEMA, ADS_READ_PAGE_SIZE_SCHEMA } from './read-policy';
 
 const preset = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/).refine(value => value !== 'custom', 'The custom range id is reserved.'),
@@ -28,4 +29,12 @@ export const ADS_CONFIG = [entry({
   key: 'ads.reportingFilters', group: 'Ads · Reporting', label: 'Report filters', kind: 'json',
   description: 'Configure the available report date presets, default range and maximum filter bounds.',
   defaultValue: ADS_REPORT_DEFAULT_POLICY, schema: ADS_REPORT_POLICY_SCHEMA, consumption: 'active',
+}), entry({
+  key: 'ads.reportPageSize', group: 'Ads · Reporting', label: 'Report page size', kind: 'number',
+  description: 'Default number of Ads report results per page.',
+  defaultValue: ADS_READ_DEFAULT_POLICY.pageSize, schema: ADS_READ_PAGE_SIZE_SCHEMA, consumption: 'active',
+}), entry({
+  key: 'ads.reportMaxRows', group: 'Ads · Reporting', label: 'Maximum report rows', kind: 'number',
+  description: 'Maximum stored insight rows loaded by one Ads report request.',
+  defaultValue: ADS_READ_DEFAULT_POLICY.maxRows, schema: ADS_READ_MAX_ROWS_SCHEMA, consumption: 'active',
 })] as const;
