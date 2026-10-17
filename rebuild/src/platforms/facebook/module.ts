@@ -17,12 +17,15 @@ export const facebookModule = {
   capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
   channelKinds: [{ kind: 'page', label: 'Facebook Page' }],
   enabledKey: 'platforms.facebook.enabled',
+  access: { includedByDefaultKey: 'platforms.facebook.includedByDefault', planFeaturesKey: 'platforms.facebook.planFeatures' },
   requiredSettings: ['meta.appId', 'meta.appSecret', 'meta.oauthRedirectUri', 'meta.oauthScopes'],
   settingsGroup: 'Facebook',
 } as const satisfies PlatformModule;
 
 const facebookConfigEntries = [
   entry({ ...enabledEntry('facebook', 'Facebook', true), schema: z.boolean() }),
+  entry({ key: facebookModule.access.includedByDefaultKey, group: 'Facebook · Workspace access', label: 'Facebook included by default', kind: 'boolean', description: 'Allow workspaces to use Facebook without a matching plan access key. Turning this off retains stored data; plans with a configured access key may still use the enabled module.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
+  entry({ key: facebookModule.access.planFeaturesKey, group: 'Facebook · Workspace access', label: 'Facebook plan access keys', kind: 'json', description: 'JSON array of existing subscriber plan feature keys that grant Facebook access when default inclusion is off. An empty array grants no plan access. Installation enablement and member permissions are still required.', defaultValue: ['platform_facebook'], schema: stringList, consumption: 'active' }),
   entry({ key: 'meta.graphBaseUrl', group: 'Facebook · API endpoints', label: 'Meta Graph API base URL', kind: 'text', description: 'HTTPS origin and optional path used by Meta Graph requests.', defaultValue: 'https://graph.facebook.com', schema: url, consumption: 'active' }),
   entry({ key: 'meta.oauthBaseUrl', group: 'Facebook · API endpoints', label: 'Meta OAuth dialog base URL', kind: 'text', description: 'HTTPS origin used to display the Meta authorization dialog.', defaultValue: 'https://www.facebook.com', schema: url, consumption: 'active' }),
   entry({ key: 'meta.graphVersion', group: 'Facebook · API endpoints', label: 'Meta Graph API version', kind: 'text', description: 'Version used by Meta integrations when connected.', defaultValue: 'v25.0', schema: z.string().regex(/^v\d+\.\d+$/, 'Use a version such as v25.0.'), consumption: 'active' }),

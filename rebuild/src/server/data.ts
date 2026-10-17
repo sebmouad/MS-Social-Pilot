@@ -80,9 +80,9 @@ export async function listWorkspaces(userId: string): Promise<WorkspaceSummary[]
 }
 
 /** Return connected destinations for a workspace without exposing access tokens. */
-export async function getTargets(workspaceId: string, allowedTargetIds?: readonly string[]) {
+export async function getTargets(workspaceId: string, allowedTargetIds?: readonly string[], allowedProviders?: readonly string[]) {
   return prisma.target.findMany({
-    where: { workspaceId, enabled: true, socialAccount: { is: await selectedResourceConnectionWhere(workspaceId) }, ...(allowedTargetIds === undefined ? {} : { id: { in: [...allowedTargetIds] } }) },
+    where: { workspaceId, enabled: true, socialAccount: { is: await selectedResourceConnectionWhere(workspaceId, allowedProviders) }, ...(allowedTargetIds === undefined ? {} : { id: { in: [...allowedTargetIds] } }) },
     orderBy: [{ type: "asc" }, { name: "asc" }],
     select: {
       id: true,
@@ -156,9 +156,9 @@ export function workspaceSummary(workspaceId: string) {
   });
 }
 
-export async function listConnections(workspaceId: string) {
+export async function listConnections(workspaceId: string, allowedProviders: readonly string[]) {
   return prisma.socialAccount.findMany({
-    where: { workspaceId, ...await enabledSocialAccountWhere() },
+    where: { workspaceId, ...await enabledSocialAccountWhere(allowedProviders) },
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -175,9 +175,9 @@ export async function listConnections(workspaceId: string) {
 }
 
 /** Read linked advertising account metadata. */
-export async function getAdAccounts(workspaceId: string) {
+export async function getAdAccounts(workspaceId: string, allowedProviders: readonly string[]) {
   return prisma.adAccount.findMany({
-    where: { workspaceId, socialAccount: { is: await enabledSocialAccountWhere() } },
+    where: { workspaceId, socialAccount: { is: await enabledSocialAccountWhere(allowedProviders) } },
     orderBy: { name: "asc" },
     select: { id: true, actId: true, name: true, currency: true, accountStatus: true, enabled: true, lastSyncedAt: true, socialAccountId: true },
   });

@@ -37,7 +37,7 @@ describe('platform modules', () => {
     expect(await isPlatformEnabled('facebook')).toBe(false);
     expect(await platformFor('facebook', 'publishing')).toBeNull();
     expect(await connectionFlow('facebook')).toBeNull();
-    expect(await connectablePlatforms()).toEqual([]);
+    expect(await connectablePlatforms(['facebook'])).toEqual([]);
     expect(mocks.adapter).not.toHaveBeenCalled();
   });
 
@@ -62,14 +62,19 @@ describe('platform modules', () => {
     enabled.set('platforms.facebook.enabled', true);
     expect(await platformFor('facebook', 'publishing')).not.toBeNull();
     expect(await platformFor('facebook', 'inbox')).toBeNull();
-    expect((await connectablePlatforms()).map((module) => module.id)).toEqual(['facebook']);
+    expect((await connectablePlatforms(['facebook'])).map((module) => module.id)).toEqual(['facebook']);
   });
 
   it('a module that is on but not set up is not offered to customers', async () => {
     enabled.set('platforms.facebook.enabled', true);
     mocks.oauth.mockRejectedValue(new Error('Meta connection is not configured.'));
-    expect(await connectablePlatforms()).toEqual([]);
+    expect(await connectablePlatforms(['facebook'])).toEqual([]);
     expect((await platformStatuses())[0]).toMatchObject({ enabled: true, ready: false });
+  });
+
+  it('omits a configured provider from connection choices without workspace access', async () => {
+    enabled.set('platforms.facebook.enabled', true);
+    expect(await connectablePlatforms([])).toEqual([]);
   });
 
   it('unknown platforms are refused', async () => {

@@ -2,7 +2,7 @@ import { PageFrame } from '@/server/PageFrame';
 import { getAdsAccountWhere } from '@/server/ads/queries';
 import { requireViewer } from '@/server/context';
 import { getTargets, prisma } from '@/server/data';
-import { canUseFeature } from '@/server/entitlements';
+import { canUseFeature, entitledPlatformIds } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { readPublishingSummary } from '@/modules/publishing/server/read';
 
@@ -13,10 +13,11 @@ export default async function HomePage() {
   const showAds = canUseFeature(viewer.entitlements, 'ads/overview') && canAccessFeature(viewer.permissions, 'ads/overview', 'read');
   const scope = viewer.permissions.pageScope;
   const allowedTargetIds = scope.all ? undefined : scope.ids;
-  const visibleTargets = await getTargets(viewer.workspaceId, allowedTargetIds);
+  const allowedProviders = entitledPlatformIds(viewer.entitlements);
+  const visibleTargets = await getTargets(viewer.workspaceId, allowedTargetIds, allowedProviders);
   const [postSummary, adAccounts] = await Promise.all([
     showPosts ? readPublishingSummary({ userId: viewer.user.id, workspaceId: viewer.workspaceId }) : Promise.resolve({ published: 0, scheduled: 0 }),
-    showAds ? prisma.adAccount.count({ where: await getAdsAccountWhere(viewer.workspaceId, allowedTargetIds) }) : Promise.resolve(0),
+    showAds ? prisma.adAccount.count({ where: await getAdsAccountWhere(viewer.workspaceId, allowedTargetIds, allowedProviders) }) : Promise.resolve(0),
   ]);
   const { published, scheduled } = postSummary;
   return <PageFrame module="home"><div className="page-stack">

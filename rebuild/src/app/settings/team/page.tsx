@@ -1,3 +1,4 @@
+import { entitledPlatformIds } from '@/server/entitlements';
 import type { Metadata } from 'next';
 import { enabledSocialAccountWhere } from '@/server/platforms/registry';
 import { PageFrame } from '@/server/PageFrame';
@@ -21,7 +22,7 @@ export default async function TeamPage() {
       WHERE m."workspaceId" = ${viewer.workspaceId}
       GROUP BY m.id, u.name, u.email ORDER BY m.role, u.name
     `,
-    prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: await enabledSocialAccountWhere() } }, orderBy: [{ type: 'asc' }, { name: 'asc' }], select: { id: true, name: true, type: true } }),
+    prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: await enabledSocialAccountWhere(entitledPlatformIds(viewer.entitlements)) } }, orderBy: [{ type: 'asc' }, { name: 'asc' }], select: { id: true, name: true, type: true } }),
   ]);
 
   return <PageFrame module="settings"><SettingsPage active="settings/team" title="Team" description={`People with access to ${viewer.membership.workspace.name}.`}>

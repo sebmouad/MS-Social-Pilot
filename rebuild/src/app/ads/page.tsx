@@ -1,3 +1,4 @@
+import { entitledPlatformIds } from '@/server/entitlements';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
 import { AdsFiltersSidebar, adsQuery, dateRangeLabel } from './ads-filters';
@@ -9,12 +10,13 @@ const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const money = (value: number | null, currency: string | null) => value === null ? '—' : `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
 
 export default async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams> }) {
-  const { workspaceId, permissions } = await requireViewer({ feature: 'ads/overview' });
+  const { workspaceId, permissions, entitlements } = await requireViewer({ feature: 'ads/overview' });
   const allowedTargetIds = permissions.pageScope.all ? undefined : permissions.pageScope.ids;
+  const allowedProviders = entitledPlatformIds(entitlements);
   const params = await searchParams;
-  const accounts = await getAdsAccounts(workspaceId, allowedTargetIds);
+  const accounts = await getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders);
   const filters = parseAdsFilters(params, accounts.map(account => account.id));
-  const dataset = await getAdsDataset(workspaceId, filters, allowedTargetIds);
+  const dataset = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders);
   const accountSummaries = summarizeInsights(dataset.insights, 'account');
   const campaigns = summarizeInsights(dataset.insights, 'campaign');
   const adsets = summarizeInsights(dataset.insights, 'adset');

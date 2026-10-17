@@ -46,8 +46,8 @@ export function parseAdsFilters(params: AdsSearchParams, accountIds: readonly st
 }
 
 /** Read only the accounts and stored insight rows belonging to this workspace. */
-export async function getAdsDataset(workspaceId: string, filters: AdsFilters, allowedTargetIds?: readonly string[]) {
-  const accounts = await getAdsAccounts(workspaceId, allowedTargetIds);
+export async function getAdsDataset(workspaceId: string, filters: AdsFilters, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[]) {
+  const accounts = await getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders);
   const visibleAccountIds = accounts.map(account => account.id);
   const insights = await prisma.adInsight.findMany({
     where: {
@@ -66,7 +66,7 @@ export async function getAdsDataset(workspaceId: string, filters: AdsFilters, al
 }
 
 /** Query predicate for enabled, selected ad accounts from installed and enabled platform modules. */
-export async function getAdsAccountWhere(workspaceId: string, allowedTargetIds?: readonly string[]) {
+export async function getAdsAccountWhere(workspaceId: string, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[]) {
   const socialAccountIds = allowedTargetIds === undefined ? undefined : (await prisma.target.findMany({
     where: { workspaceId, id: { in: [...allowedTargetIds] } },
     select: { socialAccountId: true },
@@ -74,13 +74,13 @@ export async function getAdsAccountWhere(workspaceId: string, allowedTargetIds?:
   return {
     workspaceId,
     enabled: true,
-    socialAccount: { is: await selectedResourceConnectionWhere(workspaceId) },
+    socialAccount: { is: await selectedResourceConnectionWhere(workspaceId, allowedProviders) },
     ...(socialAccountIds !== undefined ? { socialAccountId: { in: socialAccountIds } } : {}),
   };
 }
 
-export async function getAdsAccounts(workspaceId: string, allowedTargetIds?: readonly string[]) {
-  const where = await getAdsAccountWhere(workspaceId, allowedTargetIds);
+export async function getAdsAccounts(workspaceId: string, allowedTargetIds: readonly string[] | undefined, allowedProviders: readonly string[]) {
+  const where = await getAdsAccountWhere(workspaceId, allowedTargetIds, allowedProviders);
   return prisma.adAccount.findMany({
     where,
     orderBy: { name: "asc" },

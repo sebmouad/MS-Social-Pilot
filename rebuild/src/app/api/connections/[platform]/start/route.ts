@@ -1,3 +1,4 @@
+import { hasPlatformCapability } from '@/server/entitlements';
 import { NextResponse } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { connectionFlow } from '@/server/platforms/registry';
@@ -12,7 +13,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ pla
   try { viewer = await requireViewer({ feature: 'settings/connections' }); }
   catch { return NextResponse.json({ error: 'Not authorized.' }, { status: 401 }); }
   if (viewer.membership.role !== 'owner' && viewer.membership.role !== 'admin') return NextResponse.json({ error: 'Not authorized.' }, { status: 403 });
-  const flow = await connectionFlow((await params).platform);
+  const provider = (await params).platform;
+  const flow = hasPlatformCapability(viewer.entitlements, provider) ? await connectionFlow(provider) : null;
   if (!flow) return NextResponse.json({ error: 'This connection is unavailable.' }, { status: 404 });
   return flow.start(request, viewer);
 }

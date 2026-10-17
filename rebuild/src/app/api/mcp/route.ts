@@ -60,7 +60,7 @@ async function getViewer(scope: RequestScope): Promise<McpIdentity | null> {
   const membership = workspaces.find(item => item.workspace.id === selected) ?? workspaces.find(item => item.role === 'owner' || item.role === 'admin') ?? workspaces[0];
   const roles: readonly string[] = await runtimeConfig('mcp.authenticatedRoles');
   if (!membership || !roles.includes(membership.role)) return fallback;
-  const entitlements = await loadEntitlements(user.id, membership.workspace.id, { allowInstallationInspection: scope === 'automatic' && user.isInstanceOwner === true });
+  const entitlements = await loadEntitlements(user.id, membership.workspace.id, { allowInstallationInspection: false });
   const permissions = await loadPermissions(user.id, membership.workspace.id);
   if (!entitlements || !permissions) return fallback;
   return { scope: 'workspace', userId: user.id, workspaceId: membership.workspace.id, role: membership.role, workspace: membership.workspace, entitlements, permissions, maxResultItems, isInstanceOwner: scope === 'workspace' ? false : user.isInstanceOwner };

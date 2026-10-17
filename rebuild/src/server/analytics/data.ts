@@ -12,8 +12,8 @@ export function analyticsRange(start?: string, end?: string, now = new Date()): 
 }
 
 /** Provider modules own storage reads and map them to the shared analytics vocabulary. */
-export async function loadAnalytics(workspaceId: string, targetIds: string[], range: AnalyticsRange, allowedTargetIds?: readonly string[], selectedAdAccountIds?: readonly string[]) {
-  const ids = await analyticsPlatformIds();
+export async function loadAnalytics(workspaceId: string, targetIds: string[], range: AnalyticsRange, allowedTargetIds: readonly string[] | undefined, selectedAdAccountIds: readonly string[] | undefined, allowedProviders: readonly string[]) {
+  const ids = (await analyticsPlatformIds()).filter(id => allowedProviders.includes(id));
   const loaded = await Promise.all(ids.map(async provider => {
     const host = await platformAnalytics(provider);
     if (!host) return null;

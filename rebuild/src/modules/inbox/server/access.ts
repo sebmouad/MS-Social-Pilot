@@ -1,8 +1,8 @@
 import { prisma } from '@/server/data';
-import { canUseFeature, loadEntitlements } from '@/server/entitlements';
+import { canUseFeature, hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
-import { inboxTargetWhere } from '@/server/inbox/providers';
+import { inboxProviders, inboxTargetWhere } from '@/server/inbox/providers';
 import { OperationError } from '@/lib/operation-error';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 import type { InboxReadActor, InboxReadConstraints } from './types';
@@ -22,8 +22,9 @@ export async function authorizeInbox(actor: InboxReadActor, constraints: InboxRe
   }
   const grants = permissions.pageScope.all ? undefined : permissions.pageScope.ids;
   const allowed = constraints.allowedChannelIds === undefined ? grants : constraints.allowedChannelIds.filter(id => grants === undefined || grants.includes(id));
+  const entitledProviders = (await inboxProviders()).filter(provider => hasPlatformCapability(entitlements, provider));
   const [channels, workspace] = await Promise.all([
-    prisma.target.findMany({ where: await inboxTargetWhere(actor.workspaceId, allowed), orderBy: [{ name: 'asc' }, { id: 'asc' }], select: { id: true, name: true } }),
+    prisma.target.findMany({ where: await inboxTargetWhere(actor.workspaceId, allowed, entitledProviders), orderBy: [{ name: 'asc' }, { id: 'asc' }], select: { id: true, name: true } }),
     prisma.workspace.findUnique({ where: { id: actor.workspaceId }, select: { timezone: true } }),
   ]);
   if (!workspace) throw new OperationError('unavailable', 'This workspace is unavailable.');

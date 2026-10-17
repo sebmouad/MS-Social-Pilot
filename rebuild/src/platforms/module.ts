@@ -26,6 +26,8 @@ export interface PlatformModule {
   readonly channelKinds: readonly { readonly kind: string; readonly label: string }[];
   /** Root setting that switches the module on or off (`platforms.<id>.enabled`). */
   readonly enabledKey: string;
+  /** Module-owned Root policies for workspace defaults and existing plan grants. */
+  readonly access: { readonly includedByDefaultKey: string; readonly planFeaturesKey: string };
   /** Root settings that must be filled in before customers can connect. */
   readonly requiredSettings: readonly string[];
   /** Settings group prefix used on Root's configuration screen. */

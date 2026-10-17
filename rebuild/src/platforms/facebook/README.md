@@ -23,3 +23,12 @@ First comments use their own Root `meta.firstCommentScopes` policy, included in 
 Meta scope defaults are operator policies, not evidence that the app has been reviewed or that the current API accepts a request. Verify current Meta permissions and API-version behavior in the official documentation and app dashboard before enabling a live connection. Official references: [Page Photos](https://developers.facebook.com/docs/graph-api/reference/page/photos/) and [Pages API](https://developers.facebook.com/docs/pages-api/).
 
 `PublishRequest.operationId` is optional opaque attempt-correlation metadata. Facebook does not map it to a Graph idempotency key, and its presence makes no promise that repeating a create is safe. `classifyPublishingFailure` returns `rejected` only for the explicit recognized Graph error-code set on non-transient HTTP 4xx responses other than 429. Generic or unknown errors, transport loss, cancellation, malformed success responses, throttling and server failures remain `uncertain`; the shared recovery service must preserve the attempt for reconciliation rather than infer that no post was created. This classification follows the same conservative provider rule used for first comments, applied to post creation errors too. Local tests cover the boundary; live Graph behavior and current Meta documentation have not been verified in this batch.
+
+Workspace access is declared by this module and configured in Root through
+`platforms.facebook.includedByDefault` and `platforms.facebook.planFeatures`.
+Facebook remains included by default; Root may require an existing subscriber
+plan key instead. Shared policy resolution also requires installation enablement
+and denies invalid policies and suspended customer workspaces. These policies
+control current customer access, not provider approval or data retention.
+Complete subscription administration and provider-owned background collector
+plan gating remain separate unfinished work.

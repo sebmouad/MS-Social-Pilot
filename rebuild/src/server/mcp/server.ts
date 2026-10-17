@@ -7,7 +7,7 @@ import { OperationError, operationFailure, type OperationErrorCode } from '@/lib
 import { selectedResourceConnectionWhere } from '../platforms/resource-visibility';
 import { prisma } from '../data';
 import { enabledSocialAccountWhere } from '../platforms/registry';
-import { canUseFeature, requireFeature } from '../entitlements';
+import { canUseFeature, requireFeature, entitledPlatformIds } from '../entitlements';
 import { createLocalDraft, deleteLocalDraft, updateLocalDraft } from '../post-mutations';
 import { setConnectionSelections } from '../connection-mutations';
 import { randomBytes } from 'node:crypto';
@@ -279,7 +279,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
     }
     case 'list_pages': {
       const pageIds = pageIdsFor(viewer);
-      const targets = await prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: await selectedResourceConnectionWhere(viewer.workspaceId) }, ...(pageIds ? { id: { in: pageIds } } : {}) }, orderBy: [{ type: 'asc' }, { name: 'asc' }], take: cap, select: { id: true, type: true, providerId: true, name: true, pictureUrl: true, canPublish: true } });
+      const targets = await prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: await selectedResourceConnectionWhere(viewer.workspaceId, entitledPlatformIds(viewer.entitlements)) }, ...(pageIds ? { id: { in: pageIds } } : {}) }, orderBy: [{ type: 'asc' }, { name: 'asc' }], take: cap, select: { id: true, type: true, providerId: true, name: true, pictureUrl: true, canPublish: true } });
       const choices = await publishingTargetChoices(viewer.workspaceId, viewer.entitlements, targets.map(target => target.id));
       const ready = new Map(choices.map(choice => [choice.id, choice.canPublish]));
       return targets.map(target => ({ ...target, canPublish: ready.get(target.id) === true }));
@@ -380,7 +380,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const limit = args.limit === undefined ? cap : Number(args.limit);
       if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new OperationError('invalid_request', 'offset and limit must be valid integers.');
       const pageLimit = Math.min(limit, cap);
-      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer));
+      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer), entitledPlatformIds(viewer.entitlements));
       const [accounts, accountCount] = await Promise.all([
         prisma.adAccount.findMany({ where, orderBy: { name: 'asc' }, skip: offset, take: pageLimit, select: { id: true, actId: true, name: true, enabled: true, currency: true } }),
         prisma.adAccount.count({ where }),
@@ -403,11 +403,11 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const maxRangeDays = Number(await runtimeConfig('analytics.maxRangeDays'));
       if ((range.to.getTime() - range.from.getTime()) / 86_400_000 > maxRangeDays) throw new OperationError('invalid_request', `Date range exceeds the configured ${maxRangeDays}-day maximum.`);
       const allowedTargetIds = pageIdsFor(viewer);
-      const accounts = await getAdsAccounts(viewer.workspaceId, allowedTargetIds);
+      const accounts = await getAdsAccounts(viewer.workspaceId, allowedTargetIds, entitledPlatformIds(viewer.entitlements));
       if (args.accountId !== undefined && (typeof args.accountId !== 'string' || !accounts.some(account => account.id === args.accountId))) throw new OperationError('unavailable', 'Ad account is unavailable in this workspace.');
       const accountId = args.accountId as string | undefined;
       const filters = { period: 'custom' as const, since: range.from, until: range.to, accountId: accountId ?? null };
-      const { insights } = await getAdsDataset(viewer.workspaceId, filters, allowedTargetIds);
+      const { insights } = await getAdsDataset(viewer.workspaceId, filters, allowedTargetIds, entitledPlatformIds(viewer.entitlements));
       const level = args.level;
       if (level !== undefined && !['campaign', 'adset', 'ad'].includes(String(level))) throw new OperationError('invalid_request', 'level must be campaign, adset, or ad.');
       const rows = summarizeInsights(insights, level as string | undefined).filter(row => ['campaign', 'adset', 'ad'].includes(row.level));
@@ -436,7 +436,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
     case 'get_ad_creation_options': {
       const adAccountId = requiredString(args, 'adAccountId');
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId)) throw new OperationError('invalid_request', 'Invalid ad account ID.');
-      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer));
+      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer), entitledPlatformIds(viewer.entitlements));
       const account = await prisma.adAccount.findFirst({
         where: { ...where, id: adAccountId },
         select: { id: true, currency: true, socialAccount: { select: { provider: true } } },
@@ -473,7 +473,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const confirmation = requiredString(args, 'confirmation');
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(adAccountId) || !/^[A-Za-z0-9_-]{1,100}$/.test(campaignId) || typeof dailyBudgetMinor !== 'number' || !Number.isSafeInteger(dailyBudgetMinor) || dailyBudgetMinor < 1 || !/^[A-Z]{2}$/.test(countryCode)) throw new OperationError('invalid_request', 'Invalid ad set request.');
       if (viewer.permissions?.pageScope.all !== true) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
-      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer));
+      const where = await getAdsAccountWhere(viewer.workspaceId, pageIdsFor(viewer), entitledPlatformIds(viewer.entitlements));
       const account = await prisma.adAccount.findFirst({
         where: { ...where, id: adAccountId },
         select: { socialAccount: { select: { provider: true } } },

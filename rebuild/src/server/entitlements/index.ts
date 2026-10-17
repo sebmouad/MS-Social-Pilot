@@ -1,5 +1,7 @@
 import { PAGES, type FeatureId, type ModuleId } from '@/lib/product';
 import { prisma } from '@/server/data';
+import { PLATFORM_CONFIG, PLATFORM_MODULES } from '@/platforms';
+import { resolvePlatformAccess, type StoredPlatformSetting } from '@/platforms/access';
 
 /** Values read from the existing Root-managed columns. Keep IDs at the boundary
  * as strings: old rows can contain keys unknown to this version of the app. */
@@ -9,13 +11,14 @@ export interface EntitlementSource {
   planFeatures?: readonly string[] | null;
   isInstanceOwner?: boolean;
   installationAvailability?: Readonly<Record<string, boolean>>;
+  platformSettings?: readonly StoredPlatformSetting[];
 }
 
 export interface Entitlements {
   workspaceId: string;
   modules: Readonly<Record<ModuleId, boolean>>;
   features: Readonly<Record<FeatureId, boolean>>;
-  /** Platform availability comes from plan add-ons, not module/feature switches. */
+  /** Installed platform Root policy intersected with current workspace/plan access. */
   platformCapabilities: Readonly<Record<string, boolean>>;
 }
 
@@ -81,9 +84,9 @@ export function resolveEntitlements(source: EntitlementSource): Entitlements {
     return [id, modules[page.module] && !isOff(rootSwitch, disabled) && planAllowsFeature(id, source.planFeatures) && source.installationAvailability?.[`entitlements.features.${id}`] !== false];
   })) as Record<FeatureId, boolean>;
 
-  const platformCapabilities = { facebook: true, ...Object.fromEntries((source.planFeatures ?? [])
-    .filter((key) => key.startsWith('platform_'))
-    .map((key) => [key.slice('platform_'.length), true])) };
+  const platformCapabilities = resolvePlatformAccess(PLATFORM_MODULES, PLATFORM_CONFIG, {
+    settings: source.platformSettings, planFeatures: source.planFeatures, suspended,
+  });
 
   return { workspaceId: source.workspace.id, modules, features, platformCapabilities };
 }
@@ -98,6 +101,11 @@ export function canUseFeature(entitlements: Entitlements, feature: string): bool
 
 export function hasPlatformCapability(entitlements: Entitlements, platform: string): boolean {
   return entitlements.platformCapabilities[platform] === true;
+}
+
+/** Safe provider constraints for customer resource queries; [] means no access. */
+export function entitledPlatformIds(entitlements: Entitlements): string[] {
+  return Object.entries(entitlements.platformCapabilities).filter(([, allowed]) => allowed === true).map(([id]) => id);
 }
 
 export class EntitlementDeniedError extends Error {
@@ -144,7 +152,7 @@ export async function loadEntitlements(userId: string, workspaceId: string, opti
   const row = rows[0];
   if (!row) return null;
   const availabilityRows = await prisma.appSetting.findMany({
-    where: { OR: [{ key: { startsWith: 'entitlements.modules.' } }, { key: { startsWith: 'entitlements.features.' } }] },
+    where: { OR: [{ key: { startsWith: 'entitlements.modules.' } }, { key: { startsWith: 'entitlements.features.' } }, { key: { in: PLATFORM_MODULES.flatMap(module => [module.enabledKey, module.access.includedByDefaultKey, module.access.planFeaturesKey]) } }] },
     select: { key: true, value: true, encrypted: true },
   });
   // Invalid values fail closed. Root's registry validates all new writes.
@@ -153,7 +161,8 @@ export async function loadEntitlements(userId: string, workspaceId: string, opti
     workspace: { id: row.workspaceId, disabledModules: row.workspaceDisabled, suspendedAt: row.suspendedAt },
     membership: { userId, disabledModules: row.memberDisabled },
     planFeatures: row.planFeatures,
-    isInstanceOwner: row.isInstanceOwner && options.allowInstallationInspection !== false,
+    isInstanceOwner: row.isInstanceOwner && options.allowInstallationInspection === true,
     installationAvailability,
+    platformSettings: availabilityRows,
   });
 }

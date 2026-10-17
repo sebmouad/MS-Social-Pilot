@@ -6,7 +6,7 @@ const state = vi.hoisted(() => ({
   config: vi.fn(), load: vi.fn(), groupBy: vi.fn(),
 }));
 vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: state.user }, post: { groupBy: state.groupBy } } }));
-vi.mock('../src/server/entitlements', () => ({ loadEntitlements: state.entitlements, canUseFeature: state.feature }));
+vi.mock('../src/server/entitlements', () => ({ loadEntitlements: state.entitlements, canUseFeature: state.feature, entitledPlatformIds: (value: { platformCapabilities: Record<string, boolean> }) => Object.keys(value.platformCapabilities).filter(id => value.platformCapabilities[id]) }));
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: state.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.permission }));
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: state.purge }));
@@ -42,7 +42,7 @@ const metrics = (request: { range: { from: Date } ; selectedTargetIds: readonly 
 beforeEach(() => {
   vi.clearAllMocks();
   state.user.mockResolvedValue({ disabledAt: null });
-  state.entitlements.mockResolvedValue({});
+  state.entitlements.mockResolvedValue({ platformCapabilities: { 'provider-a': true } });
   state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['channel-1', 'channel-2'] } });
   state.feature.mockReturnValue(true); state.permission.mockReturnValue(true); state.purge.mockResolvedValue(undefined);
   state.groupBy.mockResolvedValue([{ status: 'published', _count: { _all: 3 } }, { status: 'scheduled', _count: { _all: 2 } }, { status: 'failed', _count: { _all: 1 } }, { status: 'partially_failed', _count: { _all: 4 } }]);

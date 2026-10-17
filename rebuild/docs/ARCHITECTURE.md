@@ -4,7 +4,7 @@
 
 [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md) is the mandatory target for Codex, Claude and subagents. This file describes implementation and gaps only. Follow [../../AGENTS.md](../../AGENTS.md); do not infer architecture permission from an unfinished boundary.
 
-Updated 2026-10-16. This document distinguishes the intended production architecture from the current rebuild. A component existing in source is not proof that its complete workflow is production-ready.
+Updated 2026-10-17. This document distinguishes the intended production architecture from the current rebuild. A component existing in source is not proof that its complete workflow is production-ready.
 
 ## Structure
 
@@ -93,7 +93,7 @@ Every customer workspace operation must enforce authenticated identity, workspac
 
 MCP is served at `/api/mcp`. It supports authenticated workspace access, scoped API keys, tools/resources, confirmations for writes, and audit records. It calls the same application services as the web app wherever those services exist. Root MCP access is restricted separately; workspace API keys cannot gain installation-owner privileges. Full UI/API/MCP parity is still incomplete and must be verified capability by capability. All tool calls now expose only deliberate `OperationError` messages/codes; unexpected failures are masked at the shared MCP response boundary. Resource failures carry the same safe code in JSON-RPC `error.data`. Publishing, Inbox, connection selection and data-control validation/access failures use typed public errors, while raw database/provider/storage exceptions remain untrusted. Unknown write failures tell clients to check current state before repeating. Secondary MCP audit failures preserve returned service outcomes with `mcpAuditRecorded: false` and an explicit warning rather than falsely reporting action failure. Domain audits, remote-success/local-persistence uncertainty and durable reconciliation still require operation-specific guarantees; this boundary is not proof of exactly-once delivery or complete audit durability.
 
-Private Root workspace access uses `server/root/workspace-access.ts` for UI API and MCP. It rechecks current installation-owner authority and disabled-account state, takes an exclusive workspace row lock, refuses active data purges, requires an exact stable-ID action confirmation and commits the state change with its audit entry. The legacy `suspendedAt` column is accessed through bounded compatibility SQL; no schema migration was applied. Shared workspace operations take a compatible shared row lock and refuse a suspended workspace before side effects. Provider background sync now uses that same lock across network retries and storage. In-flight work finishes before suspension commits. Ordinary customer entitlements are denied; private installation-owner inspection and restoration remain possible.
+Private Root workspace access uses `server/root/workspace-access.ts` for UI API and MCP. It rechecks current installation-owner authority and disabled-account state, takes an exclusive workspace row lock, refuses active data purges, requires an exact stable-ID action confirmation and commits the state change with its audit entry. The legacy `suspendedAt` column is accessed through bounded compatibility SQL; no schema migration was applied. Shared workspace operations take a compatible shared row lock and refuse a suspended workspace before side effects. Provider background sync now uses that same lock across network retries and storage. In-flight work finishes before suspension commits. Ordinary customer entitlements are denied; private Root inspection and restoration remain possible.
 
 The new Root MCP tools are `list_root_workspaces` and `set_root_workspace_access`, with `msp://root/workspaces`. Reads use the smaller configured Root directory and MCP result limits. These tools have typed public errors and redact unexpected failures; workspace API keys cannot list or invoke them. Root operations deliberately bypass the ordinary shared workspace operation wrapper to avoid upgrading a held shared lock to exclusive and to permit restoration. The HTTP MCP authentication path now supports a distinct installation identity without workspace membership; see the context rules below.
 
@@ -101,7 +101,7 @@ Private Root audit history now uses `server/root/activity.ts`. UI `/root/activit
 
 Operational audit page, search and encoded cursor bounds are validated Root settings. The only fixed cursor invariants are its version, canonical base64url JSON shape, SHA-256 filter digest and timestamp precision matching `TIMESTAMP(3)`. This adds no DDL. Substring/workspace queries still need production-volume plan/load evidence and possible reviewed indexes; exports, raw-detail inspection, retention and generic log/error administration are not implemented by this read surface. Private MCP context authentication is now independent of membership as described below.
 
-MCP identities are discriminated as workspace or installation in `server/mcp/types.ts`. `?scope=installation` accepts only a fully verified active installation-owner session, does not load workspace grants, and exposes only private Root tools/resources. `?scope=workspace` requires actual membership, current grants and a permitted workspace role, and does not expose Root privileges even to an installation owner. Without an explicit scope, current workspace behavior remains; an owner falls back to private installation context when membership/role/grants are absent. A supplied bearer always controls authentication and never falls back to a browser cookie; workspace keys cannot enter installation context. Workspace keys and explicit workspace context also disable the installation-owner suspension-inspection exception in `loadEntitlements`; a key does not inherit that privilege from its creator. Invalid/repeated scope values are rejected. Global MCP availability and configured limits still apply, with a per-owner installation rate key and no fabricated workspace ID/entitlements.
+MCP identities are discriminated as workspace or installation in `server/mcp/types.ts`. `?scope=installation` accepts only a fully verified active installation-owner session, does not load workspace grants, and exposes only private Root tools/resources. `?scope=workspace` requires actual membership, current grants and a permitted workspace role, and does not expose Root privileges even to an installation owner. Without an explicit scope, current workspace behavior remains; an owner falls back to private installation context when membership/role/grants are absent. A supplied bearer always controls authentication and never falls back to a browser cookie; workspace keys cannot enter installation context. All workspace contexts disable the installation-owner suspension-inspection exception in `loadEntitlements`; workspace access does not inherit private authority from its session or key creator. Invalid/repeated scope values are rejected. Global MCP availability and configured limits still apply, with a per-owner installation rate key and no fabricated workspace ID/entitlements.
 
 `server/mcp/root-tools.ts` owns private definitions, resources and the shared dispatcher for both session contexts. Every Root operation rechecks current account/owner state before services; all its unexpected failures are masked. Configuration input is checked against the same typed registry and exact confirmation, then `saveConfig` commits its setting and value-free audit atomically. The former independent post-save MCP audit was removed for this operation so a secondary audit failure cannot misreport a committed change as failed. Workspace access retains its own transactional audit. HTTP authentication/transport responses and protocol replies use `no-store`. Root overview contains private session-connection guidance; a membership-free owner encountering `/no-workspace` recovers to `/root`. Customer empty states retain invitation/sign-out recovery without private setup copy.
 
@@ -255,3 +255,34 @@ retained selected history follows read authorization independently of grants.
 Single-photo receipts prefer an explicitly valid provider post identity rather
 than its photo identity. PUBLISHING_READINESS.md records ownership, local proof
 and limitations. No DDL, live provider verification or production change.
+
+## Installed platform workspace access — 2026-10-17
+
+Each platform manifest declares its Root default-inclusion and plan-grant
+policy keys. `platforms/access.ts` resolves only installed modules against
+their registered validated defaults/current values and installation enablement.
+Unknown plan provider IDs never install/grant a provider. Invalid or encrypted
+policy values fail closed. Registry 46 adds consumed Facebook-owned workspace
+access controls; Facebook remains included by default. Shared entitlements no
+longer name Facebook or infer providers from arbitrary plan strings.
+
+Normal web and all MCP workspace contexts explicitly deny suspension inspection;
+the entitlement loader also defaults to denial. Installation-owner authority
+alone cannot restore customer access to a suspended workspace. Private Root
+session authorization and its own inspection/restore services remain separate.
+This supersedes earlier descriptions of an automatic workspace inspection
+exception. Explicit internal inspection remains an opt-in loader contract.
+
+Connection choices, OAuth start/callback and enabling discovered resources now
+apply current platform access. Home/team/MCP destination lists, Analytics
+provider loading, Inbox channel/actions/manual sync and Ads choices/reports/
+actions use entitled-provider constraints alongside existing selected-resource,
+tenant, role and feature rules. Local deselection/disconnection/data controls
+retain their separate cleanup semantics. HTTP connection failures use typed
+safe errors and no-store instead of matching raw exception phrases.
+
+See PLATFORM_ACCESS_PLAN.md and PREVIEW_QA.md for actual local policy changes,
+MCP/HTTP/browser checks, restoration failure testing and remaining boundaries.
+This does not implement complete plan/billing administration, provider-owned
+background collector plan gating, webhook lifecycle or full module/legacy/MCP
+coverage. No migration, live provider request or production change occurred.

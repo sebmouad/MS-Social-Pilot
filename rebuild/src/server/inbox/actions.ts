@@ -4,6 +4,7 @@ import { platformInbox } from '@/server/platforms/registry';
 import { OperationError } from '@/lib/operation-error';
 import { canManageInboxWorkflow, setInboxWorkflowResolved } from '@/modules/inbox/server/workflow';
 import { deleteInboxCommentDurably } from '@/modules/inbox/server/deletion';
+import { authorizeInbox } from '@/modules/inbox/server/access';
 import type { InboxReadConstraints } from '@/modules/inbox/server/types';
 
 export type InboxActor = { userId: string; workspaceId: string };
@@ -16,13 +17,20 @@ async function providerForTarget(targetId: string, workspaceId: string): Promise
   return provider;
 }
 
-async function providerForItem(kind: InboxActionKind, id: string, workspaceId: string): Promise<string> {
+async function providerForItem(kind: InboxActionKind, id: string, workspaceId: string): Promise<{ provider: string; targetId: string }> {
   const row = kind === 'message'
-    ? await prisma.conversation.findFirst({ where: { id, target: { workspaceId } }, select: { target: { select: { socialAccount: { select: { provider: true } } } } } })
-    : await prisma.postComment.findFirst({ where: { id, postTarget: { post: { workspaceId }, target: { workspaceId } } }, select: { postTarget: { select: { target: { select: { socialAccount: { select: { provider: true } } } } } } } });
-  const provider = kind === 'message' ? (row as { target: { socialAccount: { provider: string } | null } } | null)?.target.socialAccount?.provider : (row as { postTarget: { target: { socialAccount: { provider: string } | null } } } | null)?.postTarget.target.socialAccount?.provider;
-  if (!provider) throw new OperationError('not_found', `This ${kind === 'message' ? 'conversation' : 'comment'} is unavailable in the current workspace.`);
-  return provider;
+    ? await prisma.conversation.findFirst({ where: { id, target: { workspaceId } }, select: { target: { select: { id: true, socialAccount: { select: { provider: true } } } } } })
+    : await prisma.postComment.findFirst({ where: { id, postTarget: { post: { workspaceId }, target: { workspaceId } } }, select: { postTarget: { select: { target: { select: { id: true, socialAccount: { select: { provider: true } } } } } } } });
+  const target = kind === 'message'
+    ? (row as { target: { id: string; socialAccount: { provider: string } | null } } | null)?.target
+    : (row as { postTarget: { target: { id: string; socialAccount: { provider: string } | null } } } | null)?.postTarget.target;
+  if (!target?.socialAccount?.provider) throw new OperationError('not_found', `This ${kind === 'message' ? 'conversation' : 'comment'} is unavailable in the current workspace.`);
+  return { provider: target.socialAccount.provider, targetId: target.id };
+}
+
+async function requireVisibleChannel(actor: InboxActor, targetId: string, mode: 'read' | 'write' = 'read') {
+  const access = await authorizeInbox(actor, { allowedChannelIds: [targetId] }, mode);
+  if (!access.channelIds.includes(targetId)) throw new OperationError('not_found', 'This Inbox item is unavailable in the current workspace.');
 }
 
 async function host(provider: string) {
@@ -32,12 +40,21 @@ async function host(provider: string) {
 }
 
 export async function canManageInbox(actor: InboxActor, targetId: string): Promise<boolean> {
-  try { return await (await host(await providerForTarget(targetId, actor.workspaceId))).canManage(actor, targetId); } catch { return false; }
+  try {
+    await requireVisibleChannel(actor, targetId, 'write');
+    return await (await host(await providerForTarget(targetId, actor.workspaceId))).canManage(actor, targetId);
+  } catch { return false; }
 }
 
 export async function syncInbox(actor: InboxActor, targetId?: string) {
-  if (targetId) return (await host(await providerForTarget(targetId, actor.workspaceId))).sync(actor, targetId);
-  const providers = await inboxPlatformIds();
+  const access = await authorizeInbox(actor);
+  if (targetId) {
+    if (!access.channelIds.includes(targetId)) throw new OperationError('not_found', 'This Inbox channel is unavailable in the current workspace.');
+    return (await host(await providerForTarget(targetId, actor.workspaceId))).sync(actor, targetId);
+  }
+  const eligibleTargets = access.channelIds.length ? await prisma.target.findMany({ where: { workspaceId: actor.workspaceId, id: { in: access.channelIds } }, select: { id: true, socialAccount: { select: { provider: true } } } }) : [];
+  const eligibleProviders = new Set(eligibleTargets.map(target => target.socialAccount?.provider).filter((provider): provider is string => Boolean(provider)));
+  const providers = (await inboxPlatformIds()).filter(provider => eligibleProviders.has(provider));
   if (!providers.length) throw new OperationError('unavailable', 'This channel is unavailable in the inbox.');
   const totals = { targetCount: 0, failedCount: 0, conversationCount: 0, messageCount: 0, commentCount: 0, syncedAt: new Date().toISOString() };
   const errors: unknown[] = [];
@@ -54,14 +71,18 @@ export async function syncInbox(actor: InboxActor, targetId?: string) {
 }
 
 export async function replyToInbox(actor: InboxActor, input: { kind: InboxActionKind; id: string; text: string }) {
-  return (await host(await providerForItem(input.kind, input.id, actor.workspaceId))).reply(actor, input);
+  const item = await providerForItem(input.kind, input.id, actor.workspaceId);
+  await requireVisibleChannel(actor, item.targetId, 'write');
+  return (await host(item.provider)).reply(actor, input);
 }
 export async function setInboxResolved(actor: InboxActor, input: { kind: InboxActionKind; id: string; resolved: boolean; action?: 'resolve' }, constraints: InboxReadConstraints = {}) {
   return setInboxWorkflowResolved(actor, { kind: input.kind, id: input.id, resolved: input.resolved }, constraints);
 }
 export { canManageInboxWorkflow };
 export async function moderateInboxComment(actor: InboxActor, input: { id: string; hidden: boolean }) {
-  return (await host(await providerForItem('comment', input.id, actor.workspaceId))).moderate(actor, input);
+  const item = await providerForItem('comment', input.id, actor.workspaceId);
+  await requireVisibleChannel(actor, item.targetId, 'write');
+  return (await host(item.provider)).moderate(actor, input);
 }
 export async function deleteInboxComment(actor: InboxActor, input: { id: string; confirmation: string }, constraints: InboxReadConstraints = {}) {
   return deleteInboxCommentDurably(actor, input, constraints);

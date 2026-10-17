@@ -84,8 +84,8 @@ export async function platformStatuses(): Promise<PlatformStatus[]> {
 }
 
 /** Modules a customer can connect now: switched on and set up. */
-export async function connectablePlatforms(): Promise<PlatformModule[]> {
-  return (await platformStatuses()).filter((status) => status.enabled && status.ready).map((status) => status.module);
+export async function connectablePlatforms(allowedProviders: readonly string[]): Promise<PlatformModule[]> {
+  return (await platformStatuses()).filter((status) => allowedProviders.includes(status.module.id) && status.enabled && status.ready).map((status) => status.module);
 }
 
 /** The connection flow of an installed, switched-on module. */
@@ -107,8 +107,9 @@ export async function enabledPlatformIds(): Promise<string[]> {
  * switched-on platform. Every customer-facing list applies it, so a module that
  * is off disappears everywhere at once while its data stays stored.
  */
-export async function enabledSocialAccountWhere() {
-  return { provider: { in: await enabledPlatformIds() } };
+export async function enabledSocialAccountWhere(allowedProviders?: readonly string[]) {
+  const enabled = await enabledPlatformIds();
+  return { provider: { in: allowedProviders === undefined ? enabled : enabled.filter(id => allowedProviders.includes(id)) } };
 }
 
 /** Run a job hook for each installed and enabled module that provides it. */

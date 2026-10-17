@@ -606,3 +606,66 @@ Private logs: `/private/tmp/socialpilot-credential-tests-final.log`,
 `/private/tmp/socialpilot-credential-build-final.log`, and
 `/private/tmp/socialpilot-readiness-live.log`, and
 `/private/tmp/socialpilot-readiness-cleanup-proof.log`.
+
+## Installed platform access policies — 2026-10-17
+
+Final verification passed **1,175 tests across 196 files**, including actual
+isolated PostgreSQL tests. Rebuild typecheck and an isolated production build
+passed. Registry 46 adds Facebook-owned default inclusion and plan-grant policy
+controls; Facebook's default availability is retained. No schema migration,
+production deployment or provider request was made.
+
+Regression failures reproduced uninstalled provider grants from arbitrary plan
+strings, stale default Facebook access under Root disable/suspension, OAuth
+start without entitlement, resource selection without entitlement, and an HTTP
+error path that treated raw exception text matching a phrase as safe. Those
+regressions now pass. Shared policy tests use an example provider independent
+of Facebook and exercise Root changes, missing definitions, malformed and
+encrypted settings. Inbox/Ads service work used a lower-cost independent agent;
+old audit/permission/concurrency/expired-local-history test semantics remain.
+
+`scripts/verify-platform-access.ts` changed the actual isolated app's policies
+through private Root MCP. The same temporary workspace key then saw no
+unentitled destinations, Inbox activity, Analytics provider metrics or Ads
+accounts/reports. HTTP Inbox/Analytics/Posts agreed; authorized unconnected
+drafts remain local. HTTP and MCP selection attempts were denied without
+changing selected flags. OAuth start and callback denied before provider code
+exchange. Private Root still opened and exposed module controls.
+
+Review found ordinary workspace loads inherited a private owner inspection
+exception; it now requires explicit internal opt-in and normal web/MCP loads
+explicitly disable it. A regression reproduced default loader access first.
+The actual probe then suspended the synthetic workspace through Root MCP:
+the instance owner's customer OAuth start was denied (401), private Root stayed
+available, and Root restored workspace access. No provider call occurred.
+
+Review also found failed audited restoration could skip the probe snapshot
+restore. The probe now attempts exact database restoration even after API
+failure, verifies original row values/presence/times and active workspace state,
+then removes temporary credentials. Injecting 503 only into audited restore
+requests produced the expected failed diagnostic after exact restoration.
+An independent database check confirmed zero probe keys/sessions and an active
+workspace. Normal restoration/readiness was separately verified. Audited
+synthetic configuration/workspace test activity is retained; business records
+and original selected flags are unchanged.
+
+Chrome checked denied Connections on Clay desktop 1440×1000 and phone 390×844,
+with no Root setup instructions or unavailable connect action. Its empty copy
+was corrected to No available connections, avoiding a false claim that retained
+records never existed. Root's Workspace access category stayed in the existing
+sidebar/drawer. Nightfall phone controls were visually inspected: the plan-key
+textarea was 324px wide, labels/copy/actions fit, and no horizontal page overflow
+occurred. Clay desktop controls were also inspected. Policy restoration returned
+the seeded connections; appearance and desktop geometry were restored. These
+are representative checks, not full four-theme/all-state/accessibility proof.
+
+Independent review found the two issues above, confirmed their fixes, and
+reported no further concrete introduced issue. Full plan/billing controls,
+provider-owned background collector subscription gating, complete legacy/Root/
+MCP coverage, live provider checks and release/cutover gates remain unfinished.
+
+Private logs: `/private/tmp/socialpilot-platform-access-tests-final.log`,
+`/private/tmp/socialpilot-platform-access-typecheck.log`,
+`/private/tmp/socialpilot-platform-access-build-final.log`,
+`/private/tmp/socialpilot-platform-access-live.log`, and
+`/private/tmp/socialpilot-platform-restore-failure.log`.

@@ -8,6 +8,19 @@ const source = {
 };
 
 describe('Root installation availability', () => {
+  it('does not grant uninstalled providers named by plan features', () => {
+    const access = resolveEntitlements({ ...source, planFeatures: ['platform_uninstalled-network'] });
+    expect(access.platformCapabilities['uninstalled-network']).not.toBe(true);
+  });
+  it('denies platform capabilities in a suspended customer workspace', () => {
+    const access = resolveEntitlements({ ...source, workspace: { ...source.workspace, suspendedAt: new Date() } });
+    expect(access.platformCapabilities.facebook).toBe(false);
+  });
+  it('applies installed platform Root enablement to platform entitlements', () => {
+    const access = resolveEntitlements({ ...source, platformSettings: [{ key: 'platforms.facebook.enabled', value: false, encrypted: false }] });
+    expect(access.platformCapabilities.facebook).toBe(false);
+  });
+
   it('denies all customer modules in a suspended workspace while permitting private owner inspection', () => {
     const suspended = { ...source, workspace: { ...source.workspace, suspendedAt: new Date() } };
     expect(Object.values(resolveEntitlements(suspended).modules).every(enabled => !enabled)).toBe(true);

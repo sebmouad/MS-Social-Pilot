@@ -5,7 +5,7 @@ const state = vi.hoisted(() => ({ viewer: vi.fn(), targets: vi.fn(), selectedTar
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
 vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children }: { children: unknown }) => children }));
 vi.mock('../src/server/platforms/registry', () => ({ enabledSocialAccountWhere: async () => ({ provider: { in: ['facebook'] } }) }));
-vi.mock('../src/server/entitlements', () => ({ canUseFeature: () => true }));
+vi.mock('../src/server/entitlements', () => ({ canUseFeature: () => true, entitledPlatformIds: (value: { platformCapabilities: Record<string, boolean> }) => Object.keys(value.platformCapabilities).filter(id => value.platformCapabilities[id]) }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.permitted }));
 vi.mock('../src/modules/publishing/server/read', () => ({ readPublishingSummary: state.summary }));
 vi.mock('../src/server/ads/queries', () => ({ getAdsAccountWhere: state.adWhere }));
@@ -16,7 +16,7 @@ const workspaceId = 'workspace-a';
 const accountWhere = { workspaceId, enabled: true, socialAccount: { is: { workspaceId, invalidatedAt: null, provider: { in: ['facebook'] } } } };
 beforeEach(() => {
   vi.resetAllMocks();
-  state.viewer.mockResolvedValue({ user: { id: 'owner' }, workspaceId, membership: { workspace: { name: 'Example workspace' } }, entitlements: {}, permissions: { pageScope: { all: true, ids: [] } } });
+  state.viewer.mockResolvedValue({ user: { id: 'owner' }, workspaceId, membership: { workspace: { name: 'Example workspace' } }, entitlements: { platformCapabilities: { facebook: true } }, permissions: { pageScope: { all: true, ids: [] } } });
   state.targets.mockResolvedValue(Array.from({ length: 5 }, (_, i) => ({ socialAccountId: `source-${i}` })));
   state.selectedTargets.mockResolvedValue(Array.from({ length: 4 }, (_, i) => ({ id: `channel-${i}`, socialAccount: { invalidatedAt: null } })));
   state.permitted.mockReturnValue(true); state.summary.mockResolvedValue({ published: 2, scheduled: 2 });
@@ -27,13 +27,14 @@ describe('Home resource inventory', () => {
   it('counts the same selected resources as customer lists', async () => {
     const html = renderToStaticMarkup(await HomePage());
     expect(html).toContain('<dt>Connected channels</dt><dd>4</dd>');
+    expect(state.selectedTargets).toHaveBeenCalledWith(workspaceId, undefined, ['facebook']);
     expect(state.ads).toHaveBeenCalledWith({ where: accountWhere });
-    expect(state.adWhere).toHaveBeenCalledWith(workspaceId, undefined);
+    expect(state.adWhere).toHaveBeenCalledWith(workspaceId, undefined, ['facebook']);
   });
   it('uses the current member scope and excludes posts partly assigned elsewhere', async () => {
-    state.viewer.mockResolvedValue({ user: { id: 'member' }, workspaceId, membership: { workspace: { name: 'Example workspace' } }, entitlements: {}, permissions: { pageScope: { all: false, ids: ['channel-allowed'] } } });
+    state.viewer.mockResolvedValue({ user: { id: 'member' }, workspaceId, membership: { workspace: { name: 'Example workspace' } }, entitlements: { platformCapabilities: { facebook: true } }, permissions: { pageScope: { all: false, ids: ['channel-allowed'] } } });
     await HomePage();
-    expect(state.adWhere).toHaveBeenCalledWith(workspaceId, ['channel-allowed']);
+    expect(state.adWhere).toHaveBeenCalledWith(workspaceId, ['channel-allowed'], ['facebook']);
     expect(state.summary).toHaveBeenCalledWith({ userId: 'member', workspaceId });
     expect(state.posts).not.toHaveBeenCalled();
   });

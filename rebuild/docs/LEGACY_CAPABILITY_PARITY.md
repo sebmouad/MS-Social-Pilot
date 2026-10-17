@@ -66,3 +66,13 @@ local preflight/identity defects, not complete grant or format coverage. Durable
 intermediate upload receipts/cleanup, local video, Reels/Stories/native scheduling,
 real provider permission/task/response verification and full parity stay open.
 See PUBLISHING_READINESS.md.
+
+Platform access update, 2026-10-17: installed module manifests own Root-managed
+default inclusion and plan-grant keys. Shared policy resolution no longer
+hardcodes Facebook or grants uninstalled providers from plan text. Normal
+customer web/MCP access cannot inherit private Root suspension inspection.
+Connections/OAuth/selection, Analytics provider loading, Inbox and Ads resource
+services and destination/Home/team choices now enforce current platform access.
+Synthetic real HTTP/MCP/Chrome tests cover denied and restored access; complete
+provider collector subscription policy, plans/billing management and broader
+operator/legacy/provider proof remain missing. See PLATFORM_ACCESS_PLAN.md.

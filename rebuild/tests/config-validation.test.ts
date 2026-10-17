@@ -27,7 +27,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(45);
+    expect(CONFIG_SCHEMA_VERSION).toBe(46);
     for (const [key, value, maximum] of [
       ['publishing.publicationHistoryLimit', 100, 1000],
       ['publishing.postPageSize', 50, 100],

@@ -13,8 +13,9 @@ export async function inboxCapabilities(provider: string): Promise<InboxCapabili
 }
 
 /** UI and MCP read the same selected, authorized and module-supported channels. */
-export async function inboxTargetWhere(workspaceId: string, allowedTargetIds?: readonly string[]) {
-  const providers = await inboxProviders();
+export async function inboxTargetWhere(workspaceId: string, allowedTargetIds?: readonly string[], allowedProviders?: readonly string[]) {
+  const installedProviders = await inboxProviders();
+  const providers = allowedProviders === undefined ? installedProviders : installedProviders.filter(provider => allowedProviders.includes(provider));
   return {
     workspaceId, enabled: true, type: { in: await inboxChannelKinds(providers) },
     socialAccount: { is: { workspaceId, invalidatedAt: null, provider: { in: providers } } },

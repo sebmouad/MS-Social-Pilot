@@ -24,7 +24,7 @@ export async function requireViewer(access?: { module?: string; feature?: string
   // The preview remains owner/admin-only except for routes whose data layer
   // enforces workspace and assigned-channel scope on every operation.
   if (!access?.channelScoped && membership.role !== 'owner' && membership.role !== 'admin') redirect('/access-limited');
-  const entitlements = await loadEntitlements(user.id, membership.workspace.id);
+  const entitlements = await loadEntitlements(user.id, membership.workspace.id, { allowInstallationInspection: false });
   if (!entitlements) redirect('/no-workspace');
   const permissions = await loadPermissions(user.id, membership.workspace.id);
   if (!permissions) redirect('/access-limited');

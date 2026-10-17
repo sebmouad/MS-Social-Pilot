@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { AdMutationRequest } from '@/platforms/types';
 import { prisma } from '@/server/data';
 import { decryptSecret } from '@/server/secret-crypto';
-import { loadEntitlements, canUseFeature } from '@/server/entitlements';
+import { loadEntitlements, canUseFeature, hasPlatformCapability } from '@/server/entitlements';
 import { canAccessFeature } from '@/server/permissions';
 import type { ScopedPageAccess } from '@/server/permissions';
 import { loadPermissions } from '@/server/permissions/loader';
@@ -68,6 +68,7 @@ export async function canManageWorkspaceAds(actor: AdsActionActor, adAccountId: 
   });
   const connection = account?.socialAccount;
   if (!connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) return false;
+  if (!hasPlatformCapability(entitlements, connection.provider)) return false;
   const host = await platformAds(connection.provider);
   if (!host) return false;
   const required = await host.manageScopes();
@@ -88,6 +89,7 @@ export async function canReadWorkspaceAds(actor: AdsActionActor, adAccountId: st
   });
   const connection = account?.socialAccount;
   if (!connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) return false;
+  if (!hasPlatformCapability(entitlements, connection.provider)) return false;
   const host = await platformAds(connection.provider);
   return !!host && host.hasReadScopes(await host.readScopes(), scopes(connection.scopes));
 }
@@ -121,7 +123,7 @@ async function requireAdsManager(actor: AdsActionActor) {
   const [entitlements, permissions] = await Promise.all([loadEntitlements(actor.userId, actor.workspaceId), loadPermissions(actor.userId, actor.workspaceId)]);
   if (!entitlements || !permissions) throw new OperationError('unavailable', 'Workspace access is unavailable.');
   if (!canUseFeature(entitlements, 'ads/campaigns') || !canAccessFeature(permissions, 'ads/campaigns', 'write')) throw new OperationError('forbidden', 'Ads management is not available for this workspace.');
-  return permissions;
+  return { permissions, entitlements };
 }
 
 function scopedConnectionWhere(workspaceId: string, pageScope: ScopedPageAccess) {
@@ -131,13 +133,14 @@ function scopedConnectionWhere(workspaceId: string, pageScope: ScopedPageAccess)
   };
 }
 
-async function managedAccount(actor: AdsActionActor, adAccountId: string, permissions: NonNullable<Awaited<ReturnType<typeof loadPermissions>>>) {
+async function managedAccount(actor: AdsActionActor, adAccountId: string, access: { permissions: NonNullable<Awaited<ReturnType<typeof loadPermissions>>>; entitlements: NonNullable<Awaited<ReturnType<typeof loadEntitlements>>> }) {
   const account = await prisma.adAccount.findFirst({
-    where: { id: adAccountId, workspaceId: actor.workspaceId, ...ACCOUNT_WHERE, socialAccount: { is: scopedConnectionWhere(actor.workspaceId, permissions.pageScope) } },
+    where: { id: adAccountId, workspaceId: actor.workspaceId, ...ACCOUNT_WHERE, socialAccount: { is: scopedConnectionWhere(actor.workspaceId, access.permissions.pageScope) } },
     select: { id: true, actId: true, socialAccount: { select: { provider: true, accessToken: true, scopes: true, invalidatedAt: true, tokenExpiresAt: true } } },
   });
   const connection = account?.socialAccount;
   if (!account || !connection || connection.invalidatedAt || (connection.tokenExpiresAt && connection.tokenExpiresAt <= new Date())) throw new OperationError('reconnect_required', 'This advertising account or its connection is unavailable. Reconnect it before managing ads.');
+  if (!hasPlatformCapability(access.entitlements, connection.provider)) throw new OperationError('unavailable', 'This advertising account is unavailable.');
   const ads = await platformAds(connection.provider);
   if (!ads) throw new OperationError('unavailable', 'Advertising changes are currently unavailable.');
   const [required, managementEnabled] = await Promise.all([ads.manageScopes(), runtimeConfig('ads.managementEnabled') as Promise<boolean>]);
@@ -150,7 +153,7 @@ async function managedAccount(actor: AdsActionActor, adAccountId: string, permis
 
 /** Mutate one previously observed object after rechecking every server-side boundary. */
 export async function updateWorkspaceAd(actor: AdsActionActor, input: AdsActionInput) {
-  const permissions = await requireAdsManager(actor);
+  const access = await requireAdsManager(actor);
   const hasStatus = input.status !== undefined, hasDailyBudget = input.dailyBudgetMinor !== undefined, hasLifetimeBudget = input.lifetimeBudgetMinor !== undefined;
   if (!OBJECT_TYPES.has(input.objectType) || !input.objectId || !/^[A-Za-z0-9_-]{1,100}$/.test(input.objectId)) throw new OperationError('invalid_request', 'Invalid ad object.');
   if ([hasStatus, hasDailyBudget, hasLifetimeBudget].filter(Boolean).length !== 1) throw new OperationError('invalid_request', 'Choose one valid ad change.');
@@ -159,7 +162,7 @@ export async function updateWorkspaceAd(actor: AdsActionActor, input: AdsActionI
   if (budget !== undefined && (!Number.isSafeInteger(budget) || budget < 1)) throw new OperationError('invalid_request', 'Budgets must be positive whole minor currency units.');
   const confirmation = budget !== undefined ? `SET AD BUDGET ${input.objectId} TO ${budget} MINOR UNITS` : `SET AD STATUS ${input.objectId} TO ${input.status!.toUpperCase()}`;
   if (input.confirmation !== confirmation) throw new OperationError('invalid_request', `Confirmation required. Repeat with confirmation exactly: ${confirmation}`);
-  const { account, ads, credential } = await managedAccount(actor, input.adAccountId, permissions);
+  const { account, ads, credential } = await managedAccount(actor, input.adAccountId, access);
   const owned = await prisma.adInsight.findFirst({ where: { adAccountId: account.id, level: input.objectType, objectId: input.objectId }, select: { id: true } });
   if (!owned) throw new OperationError('not_found', 'This ad object cannot be verified for the selected account.');
   await ads.update({ credential, accountId: account.actId, objectId: input.objectId, objectType: input.objectType,
@@ -169,8 +172,8 @@ export async function updateWorkspaceAd(actor: AdsActionActor, input: AdsActionI
 
 /** Create a paused campaign after rechecking workspace, account and provider boundaries. */
 export async function createWorkspaceAdCampaign(actor: AdsActionActor, input: AdsCampaignCreateInput) {
-  const permissions = await requireAdsManager(actor);
-  const { account, ads, credential } = await managedAccount(actor, input.adAccountId, permissions);
+  const access = await requireAdsManager(actor);
+  const { account, ads, credential } = await managedAccount(actor, input.adAccountId, access);
   const name = input.name.trim();
   ads.validateCampaign(name, input.objective);
   const confirmation = ads.campaignConfirmation(input.adAccountId, name, input.objective);
@@ -183,9 +186,9 @@ export async function createWorkspaceAdCampaign(actor: AdsActionActor, input: Ad
 /** Create a paused ad set under a campaign verified in this account's insight history. */
 export async function createWorkspaceAdSet(actor: AdsActionActor, input: AdsAdSetCreateInput, pageScopeAll: boolean) {
   if (!pageScopeAll) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
-  const permissions = await requireAdsManager(actor);
-  if (!permissions.pageScope.all) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
-  const { account, ads, credential } = await managedAccount(actor, input.adAccountId, permissions);
+  const access = await requireAdsManager(actor);
+  if (!access.permissions.pageScope.all) throw new OperationError('forbidden', 'Ad set creation is unavailable for limited page access.');
+  const { account, ads, credential } = await managedAccount(actor, input.adAccountId, access);
   const name = input.name.trim();
   ads.validateAdSet({ ...input, name });
   const confirmation = ads.adSetConfirmation({ ...input, name });

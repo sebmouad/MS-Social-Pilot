@@ -33,7 +33,7 @@ describe('shared analytics loading', () => {
 
   it('delegates scoped storage reads and normalization to the installed analytics host', async () => {
     const range = { from: date('2026-10-01'), to: date('2026-10-31') };
-    const available = await loadAnalytics('workspace-a', [], range, ['page-1']);
+    const available = await loadAnalytics('workspace-a', [], range, ['page-1'], undefined, ['facebook']);
     expect(state.ids).toHaveBeenCalledOnce();
     expect(state.analytics).toHaveBeenCalledWith('facebook');
     expect(state.load).toHaveBeenCalledWith({ workspaceId: 'workspace-a', range, selectedTargetIds: [], allowedTargetIds: ['page-1'], selectedAdAccountIds: undefined });
@@ -43,7 +43,7 @@ describe('shared analytics loading', () => {
 
   it('merges only normalized selected-channel and ad-account data into the shared result', async () => {
     const range = { from: date('2026-10-01'), to: date('2026-10-31') };
-    const result = await loadAnalytics('workspace-a', ['page-1'], range, ['page-1'], ['ad-2']);
+    const result = await loadAnalytics('workspace-a', ['page-1'], range, ['page-1'], ['ad-2'], ['facebook']);
     expect(result.selectedTargets.map(target => target.id)).toEqual(['page-1']);
     expect(result.selectedAdIds).toEqual(['ad-2']);
     expect(result.adAccountCount).toBe(1);
@@ -54,8 +54,15 @@ describe('shared analytics loading', () => {
 
   it('returns empty neutral inputs when no installed provider exposes analytics', async () => {
     state.ids.mockResolvedValue([]);
-    const result = await loadAnalytics('workspace-a', [], { from: date('2026-10-01'), to: date('2026-10-31') });
+    const result = await loadAnalytics('workspace-a', [], { from: date('2026-10-01'), to: date('2026-10-31') }, undefined, undefined, ['facebook', 'provider-a', 'provider-b']);
     expect(result).toMatchObject({ targets: [], selectedTargets: [], adAccounts: [], selectedAdIds: [], metrics: [], audienceEntries: [], audienceSelected: 0 });
+    expect(state.load).not.toHaveBeenCalled();
+  });
+
+  it('never loads an installed analytics module without current platform entitlement', async () => {
+    const result = await loadAnalytics('workspace-a', [], { from: date('2026-10-01'), to: date('2026-10-31') }, undefined, undefined, []);
+    expect(result.targets).toEqual([]);
+    expect(state.analytics).not.toHaveBeenCalled();
     expect(state.load).not.toHaveBeenCalled();
   });
 
@@ -65,7 +72,7 @@ describe('shared analytics loading', () => {
       targets: [], selectedTargets: [], adAccounts: [], selectedAdAccountIds: [], audienceEntries: [], audienceSelected: 0,
       metrics: [{ key: 'reach', label: 'Reach', sourceLabel: provider === 'provider-a' ? 'Community' : 'Video', kind: 'stock', unit: 'count', observations: [], available: 0 }],
     }) }));
-    const result = await loadAnalytics('workspace-a', [], { from: date('2026-10-01'), to: date('2026-10-31') });
+    const result = await loadAnalytics('workspace-a', [], { from: date('2026-10-01'), to: date('2026-10-31') }, undefined, undefined, ['facebook', 'provider-a', 'provider-b']);
     expect(result.metrics.map(metric => metric.key)).toEqual(['provider-a:reach', 'provider-b:reach']);
   });
 });

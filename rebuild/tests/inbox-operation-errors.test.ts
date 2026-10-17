@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   engine: { replyToConversation: vi.fn(), replyToComment: vi.fn(), moderateComment: vi.fn(), deleteComment: vi.fn(), listInbox: vi.fn(), listComments: vi.fn() },
   configuredEngine: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), canUseFeature: vi.fn(), canAccessFeature: vi.fn(), canAccessPage: vi.fn(),
   platformInbox: vi.fn(), inboxPlatformIds: vi.fn(),
+  authorizeInbox: vi.fn(),
 }));
 
 vi.mock('../src/server/data', () => ({ prisma: mocks.prisma }));
@@ -25,6 +26,7 @@ vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitleme
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature, canAccessPage: mocks.canAccessPage }));
 vi.mock('../src/server/platforms/registry', () => ({ platformInbox: mocks.platformInbox, inboxPlatformIds: mocks.inboxPlatformIds }));
+vi.mock('../src/modules/inbox/server/access', () => ({ authorizeInbox: mocks.authorizeInbox }));
 
 import { replyToInbox, syncInbox } from '../src/server/inbox/actions';
 import { replyToFacebookInbox } from '../src/platforms/facebook/inbox';
@@ -50,6 +52,7 @@ beforeEach(() => {
   mocks.engine.replyToConversation.mockResolvedValue('remote-message-1');
   mocks.platformInbox.mockResolvedValue({ reply: mocks.engine.replyToConversation });
   mocks.inboxPlatformIds.mockResolvedValue(['facebook']);
+  mocks.authorizeInbox.mockResolvedValue({ channels: [{ id: 'target-1', name: 'Page' }], channelIds: ['target-1'], timeZone: 'UTC' });
 });
 
 describe('Inbox operation errors', () => {

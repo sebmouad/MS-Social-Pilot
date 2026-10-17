@@ -11,6 +11,15 @@ vi.mock('../src/server/data', () => ({ get prisma() { return database.prisma; } 
 vi.mock('../src/server/entitlements', () => ({
   loadEntitlements: async () => ({ inbox: true }),
   canUseFeature: () => true,
+  hasPlatformCapability: (_entitlements: unknown, provider: string) => provider === 'facebook',
+}));
+vi.mock('../src/server/inbox/providers', () => ({
+  inboxProviders: async () => ['facebook'],
+  inboxTargetWhere: async (workspaceId: string, allowedTargetIds?: readonly string[], allowedProviders?: readonly string[]) => ({
+    workspaceId, enabled: true, type: 'page',
+    socialAccount: { is: { workspaceId, invalidatedAt: null, provider: { in: (allowedProviders ?? ['facebook']).filter(provider => provider === 'facebook') } } },
+    ...(allowedTargetIds === undefined ? {} : { id: { in: [...allowedTargetIds] } }),
+  }),
 }));
 vi.mock('../src/server/permissions/loader', () => ({
   loadPermissions: async () => ({ pageScope: { all: false, ids: database.memberChannelIds } }),

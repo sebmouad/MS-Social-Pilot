@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ user: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), feature: vi.fn(), permission: vi.fn(), purge: vi.fn(), channels: vi.fn(), workspace: vi.fn(), where: vi.fn(), query: vi.fn(), config: vi.fn() }));
+const state = vi.hoisted(() => ({ user: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), feature: vi.fn(), platform: vi.fn(), providers: vi.fn(), permission: vi.fn(), purge: vi.fn(), channels: vi.fn(), workspace: vi.fn(), where: vi.fn(), query: vi.fn(), config: vi.fn() }));
 vi.mock('../src/server/data', () => ({ prisma: { user: { findUnique: state.user }, target: { findMany: state.channels }, workspace: { findUnique: state.workspace }, $queryRaw: state.query } }));
-vi.mock('../src/server/entitlements', () => ({ loadEntitlements: state.entitlements, canUseFeature: state.feature }));
+vi.mock('../src/server/entitlements', () => ({ loadEntitlements: state.entitlements, canUseFeature: state.feature, hasPlatformCapability: state.platform }));
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: state.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.permission }));
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: state.purge }));
-vi.mock('../src/server/inbox/providers', () => ({ inboxTargetWhere: state.where }));
+vi.mock('../src/server/inbox/providers', () => ({ inboxTargetWhere: state.where, inboxProviders: state.providers }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: state.config }));
 import { readInboxList, readInboxThread } from '../src/modules/inbox/server/read';
 const actor = { userId: 'reader', workspaceId: 'workspace' };
 beforeEach(() => {
-  vi.clearAllMocks(); state.user.mockResolvedValue({ disabledAt: null }); state.entitlements.mockResolvedValue({}); state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['allowed', 'other'] } }); state.feature.mockReturnValue(true); state.permission.mockReturnValue(true); state.purge.mockResolvedValue(undefined); state.where.mockResolvedValue({}); state.channels.mockResolvedValue([]); state.workspace.mockResolvedValue({ timezone: 'Africa/Casablanca' });
+  vi.clearAllMocks(); state.user.mockResolvedValue({ disabledAt: null }); state.entitlements.mockResolvedValue({}); state.permissions.mockResolvedValue({ pageScope: { all: false, ids: ['allowed', 'other'] } }); state.feature.mockReturnValue(true); state.platform.mockReturnValue(true); state.providers.mockResolvedValue(['facebook']); state.permission.mockReturnValue(true); state.purge.mockResolvedValue(undefined); state.where.mockResolvedValue({}); state.channels.mockResolvedValue([]); state.workspace.mockResolvedValue({ timezone: 'Africa/Casablanca' });
   state.config.mockImplementation(async key => ({ 'inbox.listPageSize': 25, 'inbox.threadPageSize': 50, 'inbox.searchMaxCharacters': 200, 'inbox.cursorMaxCharacters': 4096 }[key as string]));
 });
 describe('Inbox shared read authorization and input boundaries', () => {
@@ -30,8 +30,14 @@ describe('Inbox shared read authorization and input boundaries', () => {
   });
   it('intersects trusted key constraints with current member grants before channel selection', async () => {
     const result = await readInboxList(actor, {}, { allowedChannelIds: ['allowed', 'not-granted'], maxItems: 3 });
-    expect(state.where).toHaveBeenCalledWith('workspace', ['allowed']);
+    expect(state.where).toHaveBeenCalledWith('workspace', ['allowed'], ['facebook']);
     expect(result).toMatchObject({ items: [], total: 0, limit: 3, channels: [], timeZone: 'Africa/Casablanca' });
+    expect(state.query).not.toHaveBeenCalled();
+  });
+  it('does not expose selected channels from a platform the workspace is not entitled to use', async () => {
+    state.platform.mockReturnValue(false);
+    await expect(readInboxList(actor)).resolves.toMatchObject({ items: [], total: 0 });
+    expect(state.where).toHaveBeenCalledWith('workspace', ['allowed', 'other'], []);
     expect(state.query).not.toHaveBeenCalled();
   });
   it.each([{ kind: ['message', 'comment'] }, { state: 'invalid' }, { limit: '2' }, { limit: 0 }, { limit: 1.5 }, { hidden: false }, { q: 'x'.repeat(201) }, { cursor: '' }, { unexpected: true }])('rejects ambiguous/invalid filters %j before content reads', async input => {

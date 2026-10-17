@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   entitlements: vi.fn(),
   permissions: vi.fn(),
   canUseFeature: vi.fn(),
+  hasPlatformCapability: vi.fn(),
   canAccessFeature: vi.fn(),
 }));
 
@@ -32,7 +33,7 @@ vi.mock('../src/server/platforms/registry', () => ({
     };
   }),
 }));
-vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: mocks.canUseFeature }));
+vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: mocks.canUseFeature, hasPlatformCapability: mocks.hasPlatformCapability }));
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.canAccessFeature }));
 
@@ -51,6 +52,7 @@ beforeEach(() => {
   mocks.entitlements.mockResolvedValue({});
   mocks.permissions.mockResolvedValue({ pageScope: { all: true } });
   mocks.canUseFeature.mockReturnValue(true);
+  mocks.hasPlatformCapability.mockReturnValue(true);
   mocks.canAccessFeature.mockReturnValue(true);
   mocks.prisma.adAccount.findFirst.mockResolvedValue({
     id: 'local-account-1', actId: 'act_99',
@@ -68,6 +70,18 @@ beforeEach(() => {
 });
 
 describe('workspace Ads actions', () => {
+  it('denies stored and live Ads reads when the selected platform is not entitled', async () => {
+    mocks.hasPlatformCapability.mockReturnValue(false);
+    expect(await canReadWorkspaceAds(actor, 'local-account-1')).toBe(false);
+    await expect(readWorkspaceAdObject(actor, { adAccountId: 'local-account-1', objectId: 'campaign-44', objectType: 'campaign' })).rejects.toThrow(/performance access is unavailable/);
+    expect(platformAds).not.toHaveBeenCalled();
+    expect(mocks.engine.readAdObject).not.toHaveBeenCalled();
+  });
+  it('denies spend-changing Ads actions when the selected platform is not entitled', async () => {
+    mocks.hasPlatformCapability.mockReturnValue(false);
+    await expect(updateWorkspaceAd(actor, statusChange)).rejects.toThrow(/unavailable/);
+    expect(mocks.engine.updateAd).not.toHaveBeenCalled();
+  });
   it('rejects combined status and budget changes before contacting a provider', async () => {
     await expect(updateWorkspaceAd(actor, { ...statusChange, dailyBudgetMinor: 500, confirmation: 'SET AD BUDGET campaign-44 TO 500 MINOR UNITS' })).rejects.toThrow('Choose one valid ad change.');
     expect(mocks.engine.updateAd).not.toHaveBeenCalled();

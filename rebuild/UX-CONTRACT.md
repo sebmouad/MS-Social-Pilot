@@ -177,3 +177,20 @@ the shared RouteNotice after the initiating row disappears. Query notice copy
 is an allowlisted UI result, not evidence of server success on its own. The
 service receipt is validated before navigating. Root operation rows preserve
 their focused success notice after their available action changes.
+
+## Platform workspace availability — 2026-10-17
+
+Root groups default inclusion and plan access keys with their owning platform
+under Workspace access in the existing contextual sidebar/mobile drawer. An
+installation switch remains distinct from a workspace inclusion policy. These
+technical controls never become customer setup instructions. Connection
+choices, resources, reports and supported actions honor the same current
+platform entitlement across UI/HTTP/MCP. A suspended customer workspace does
+not gain access from its member's installation-owner status; private Root
+recovery remains available.
+
+An empty Connections view says No available connections; it does not imply
+that retained records were deleted or that the workspace never connected.
+Root policy changes retain data and selected-resource state. Actual local
+representative Clay desktop/Nightfall phone checks and restoration evidence
+are recorded in PREVIEW_QA.md. All-state/four-theme coverage remains open.

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const purgeGuard = vi.hoisted(() => vi.fn());
 const workspaceGuard = vi.hoisted(() => vi.fn());
-vi.mock('../src/server/platforms/registry', () => ({ inboxPlatformIds: async () => ['facebook'], enabledSocialAccountWhere: async () => ({ provider: { in: ['facebook'] } }), platformAds: vi.fn(async () => ({ ui: { campaign: { options: [{ value: 'OUTCOME_TRAFFIC', label: 'Traffic' }], defaultOption: 'OUTCOME_TRAFFIC', confirmationTemplate: 'CREATE PAUSED FACEBOOK CAMPAIGN {nameJson} IN ACCOUNT {adAccountId} WITH OBJECTIVE {objective}' }, adSet: { options: [{ value: 'LINK_CLICKS', label: 'Link clicks' }, { value: 'IMPRESSIONS', label: 'Impressions' }], defaultOption: 'LINK_CLICKS', confirmationTemplate: 'CREATE PAUSED FACEBOOK AD SET {nameJson} UNDER CAMPAIGN {campaignId} IN ACCOUNT {adAccountId} WITH DAILY BUDGET {dailyBudgetMinor} MINOR UNITS TARGETING {countryCode} OPTIMIZED FOR {optimizationGoal}' } }, adSetConfirmation: (input: { adAccountId: string; campaignId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }) => `CREATE PAUSED FACEBOOK AD SET ${JSON.stringify(input.name)} UNDER CAMPAIGN ${input.campaignId} IN ACCOUNT ${input.adAccountId} WITH DAILY BUDGET ${input.dailyBudgetMinor} MINOR UNITS TARGETING ${input.countryCode} OPTIMIZED FOR ${input.optimizationGoal}` })) }));
+vi.mock('../src/server/platforms/registry', () => ({ inboxPlatformIds: async () => ['facebook'], enabledSocialAccountWhere: async (allowedProviders?: readonly string[]) => ({ provider: { in: allowedProviders === undefined ? ['facebook'] : ['facebook'].filter(id => allowedProviders.includes(id)) } }), platformAds: vi.fn(async () => ({ ui: { campaign: { options: [{ value: 'OUTCOME_TRAFFIC', label: 'Traffic' }], defaultOption: 'OUTCOME_TRAFFIC', confirmationTemplate: 'CREATE PAUSED FACEBOOK CAMPAIGN {nameJson} IN ACCOUNT {adAccountId} WITH OBJECTIVE {objective}' }, adSet: { options: [{ value: 'LINK_CLICKS', label: 'Link clicks' }, { value: 'IMPRESSIONS', label: 'Impressions' }], defaultOption: 'LINK_CLICKS', confirmationTemplate: 'CREATE PAUSED FACEBOOK AD SET {nameJson} UNDER CAMPAIGN {campaignId} IN ACCOUNT {adAccountId} WITH DAILY BUDGET {dailyBudgetMinor} MINOR UNITS TARGETING {countryCode} OPTIMIZED FOR {optimizationGoal}' } }, adSetConfirmation: (input: { adAccountId: string; campaignId: string; name: string; dailyBudgetMinor: number; countryCode: string; optimizationGoal: string }) => `CREATE PAUSED FACEBOOK AD SET ${JSON.stringify(input.name)} UNDER CAMPAIGN ${input.campaignId} IN ACCOUNT ${input.adAccountId} WITH DAILY BUDGET ${input.dailyBudgetMinor} MINOR UNITS TARGETING ${input.countryCode} OPTIMIZED FOR ${input.optimizationGoal}` })) }));
 vi.mock('../src/server/data-control/guard', () => ({ assertWorkspaceNotPurging: purgeGuard, withWorkspaceOperation: workspaceGuard }));
 
 const db = vi.hoisted(() => ({
@@ -91,7 +91,7 @@ const viewer: McpViewer = {
     workspaceId: 'workspace-a',
     modules: { home: true, publishing: true, inbox: true, analytics: true, ads: true, settings: true },
     features: { 'home/overview': true, 'publishing/posts': true, 'publishing/calendar': true, 'publishing/queue': true, 'publishing/approvals': true, 'publishing/media': true, 'inbox/conversations': true, 'analytics/overview': true, 'analytics/reports': true, 'ads/overview': true, 'ads/campaigns': true, 'settings/connections': true, 'settings/team': true, 'settings/mcp': true, 'settings/account': true, 'settings/appearance': true, 'settings/data': true },
-    platformCapabilities: {},
+    platformCapabilities: { facebook: true },
   },
   permissions: resolvePermissions({ role: 'owner', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: true, pageAccess: [] }),
 };
@@ -423,8 +423,8 @@ describe('MCP workspace boundaries', () => {
     expect(result.performance).toHaveLength(1);
     expect(result.performance[0]).toMatchObject({ id: 'campaign-a', spend: 20, accountId: 'account-a' });
     expect(result.nextOffset).toBe(1);
-    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', ['page-allowed']);
-    expect(adsQueries.dataset).toHaveBeenCalledWith('workspace-a', expect.objectContaining({ accountId: 'account-a' }), ['page-allowed']);
+    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', ['page-allowed'], ['facebook']);
+    expect(adsQueries.dataset).toHaveBeenCalledWith('workspace-a', expect.objectContaining({ accountId: 'account-a' }), ['page-allowed'], ['facebook']);
 
     const denied = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 491, method: 'tools/call', params: { name: 'get_ads_performance', arguments: { accountId: 'other-workspace-account' } } });
     expect((await denied.json()).result.isError).toBe(true);
@@ -496,7 +496,7 @@ describe('MCP workspace boundaries', () => {
 
     const adsResource = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 54, method: 'resources/read', params: { uri: 'msp://ads/performance' } });
     expect((await adsResource.json()).result.contents[0].text).toContain('"performance"');
-    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', undefined);
+    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', undefined, ['facebook']);
   });
   it('caps nested Analytics result rows and reports truncation', async () => {
     const limited = { ...viewer, maxResultItems: 1 };
@@ -695,6 +695,15 @@ describe('MCP workspace boundaries', () => {
     expect(destinationReadiness).toHaveBeenCalledWith('workspace-a', viewer.entitlements, ['page-allowed']);
     const resource = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 91, method: 'resources/read', params: { uri: 'msp://targets' } });
     expect(JSON.parse((await resource.json()).result.contents[0].text)[0].canPublish).toBe(false);
+  });
+
+  it('constrains customer destination and Ads queries when platform access is absent', async () => {
+    db.target.findMany.mockResolvedValue([]);
+    const denied = { ...viewer, entitlements: { ...viewer.entitlements, platformCapabilities: {} } };
+    await handleMcpMessage(denied, { jsonrpc: '2.0', id: 93, method: 'tools/call', params: { name: 'list_pages', arguments: {} } });
+    expect(db.target.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ socialAccount: { is: expect.objectContaining({ provider: { in: [] } }) } }) }));
+    await handleMcpMessage(denied, { jsonrpc: '2.0', id: 94, method: 'tools/call', params: { name: 'get_ads_performance', arguments: {} } });
+    expect(adsQueries.accounts).toHaveBeenCalledWith('workspace-a', undefined, []);
   });
 
   it('scopes destination queries and delegates post reads with the MCP result cap', async () => {

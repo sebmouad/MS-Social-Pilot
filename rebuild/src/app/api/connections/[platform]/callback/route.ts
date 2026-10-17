@@ -1,3 +1,4 @@
+import { hasPlatformCapability } from '@/server/entitlements';
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireViewer } from '@/server/context';
 import { connectionFlow } from '@/server/platforms/registry';
@@ -10,7 +11,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const viewer = await requireViewer({ feature: 'settings/connections' });
   const failed = NextResponse.redirect(new URL('/settings/connections?notice=connect_failed', request.url), { status: 303, headers: { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' } });
   if (viewer.membership.role !== 'owner' && viewer.membership.role !== 'admin') return failed;
-  const flow = await connectionFlow((await params).platform);
+  const provider = (await params).platform;
+  const flow = hasPlatformCapability(viewer.entitlements, provider) ? await connectionFlow(provider) : null;
   if (!flow) return failed;
   return flow.callback(request, viewer);
 }

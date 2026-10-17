@@ -1,3 +1,4 @@
+import { entitledPlatformIds } from '@/server/entitlements';
 import type { Metadata } from 'next';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
@@ -15,7 +16,8 @@ const providerName = (provider: string) => platformModule(provider)?.name ?? pro
 
 export default async function ConnectionsPage({ searchParams }: { searchParams: Promise<{ notice?: string; select?: string; source?: string; action?: string }> }) {
   const [viewer, params] = await Promise.all([requireViewer({ feature: 'settings/connections' }), searchParams]);
-  const [accounts, adAccounts, platforms, statusLabels] = await Promise.all([listConnections(viewer.workspaceId), getAdAccounts(viewer.workspaceId), connectablePlatforms(), runtimeConfig('connections.statusLabels')]);
+  const allowedProviders = entitledPlatformIds(viewer.entitlements);
+  const [accounts, adAccounts, platforms, statusLabels] = await Promise.all([listConnections(viewer.workspaceId, allowedProviders), getAdAccounts(viewer.workspaceId, allowedProviders), connectablePlatforms(allowedProviders), runtimeConfig('connections.statusLabels')]);
   const connectable = platforms.map(({ id, name, mark }) => ({ id, name, mark }));
   const socialById = new Map(accounts.map(account => [account.id, account]));
   const adRows = adAccounts.map(ad => {
@@ -33,8 +35,8 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
     {params.notice === 'oauth_invalid_state' && <p className={styles['settings-note']} role="alert">The authorization session expired or changed. Start again from this page.</p>}
     {params.notice === 'saved' && <p className={styles['settings-note']} role="status">Selection saved.</p>}
     {params.notice === 'failed' && <p className={styles['settings-note']} role="alert">The selection could not be saved. Check your workspace access and try again.</p>}
-    {!accounts.length && !adRows.length ? <SettingsPanel title="No connections yet" detail="Channels and ad accounts you select will appear here.">
-      <p className={styles['settings-empty']}>{connectable.length && canManage ? 'Connect a source above to choose what this workspace uses.' : 'There are no channels or advertising accounts in this workspace yet.'}</p>
+    {!accounts.length && !adRows.length ? <SettingsPanel title="No available connections" detail="Available channels and ad accounts you select will appear here.">
+      <p className={styles['settings-empty']}>{connectable.length && canManage ? 'Connect a source above to choose what this workspace uses.' : 'No channels or advertising accounts are currently available.'}</p>
     </SettingsPanel> : <>
     <SettingsPanel title="Social accounts" detail={`${accounts.length} connected account${accounts.length === 1 ? '' : 's'} in this workspace`}>
       {accounts.length ? <div className={styles['settings-table-wrap']}><table className={styles['settings-table']}><thead><tr><th scope="col">Account</th><th scope="col">Platform</th><th scope="col">Channels</th><th scope="col">Status</th>{canManage && <th scope="col">Actions</th>}</tr></thead><tbody>

@@ -46,7 +46,7 @@ afterEach(() => {
 
 beforeEach(() => {
   process.env.ENCRYPTION_KEY = validKey;
-  mocks.requireViewer.mockResolvedValue({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' } });
+  mocks.requireViewer.mockResolvedValue({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' }, entitlements: { platformCapabilities: { facebook: true } } });
   mocks.runtimeConfig.mockImplementation((key: string) => Promise.resolve(key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.adsManageScopes' ? ['ads_management'] : key === 'meta.postReadScopes' ? ['pages_read_engagement'] : key === 'meta.oauthStateMinutes' ? 10 : key === 'platforms.facebook.enabled' ? true : key === 'ads.managementEnabled' ? false : undefined));
   mocks.configuredFacebookAdapter.mockResolvedValue({ id: 'facebook', capabilities: { connection: 'supported' }, getAuthorizationUrl: vi.fn() });
   mocks.engine.getAuthorizationUrl.mockImplementation((input: { state: string; scopes: string[] }) => `https://www.facebook.com/dialog/oauth?state=${input.state}&scope=${input.scopes.join(',')}`);
@@ -62,6 +62,13 @@ beforeEach(() => {
 });
 
 describe('Meta OAuth start route', () => {
+  it('denies a platform no longer entitled before preparing provider authorization', async () => {
+    mocks.requireViewer.mockResolvedValueOnce({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' }, entitlements: { platformCapabilities: { facebook: false } } });
+    const response = await POST(new Request(startUrl, { method: 'POST', headers: { origin: 'https://social.example.test' } }));
+    expect(response.status).toBe(404);
+    expect(mocks.engine.getAuthorizationUrl).not.toHaveBeenCalled();
+  });
+
   it('enforces same-origin and sets a short-lived HttpOnly callback state cookie', async () => {
     const request = new Request(startUrl, { method: 'POST', headers: { origin: 'https://social.example.test' } });
     const response = await POST(request);
@@ -86,6 +93,14 @@ describe('Meta OAuth start route', () => {
 });
 
 describe('Meta OAuth callback route', () => {
+  it('rechecks platform entitlement on return before exchanging or persisting', async () => {
+    mocks.requireViewer.mockResolvedValueOnce({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' }, entitlements: { platformCapabilities: { facebook: false } } });
+    const response = await GET(new NextRequest(callbackUrl + '?code=never-exchange'));
+    expect(response.headers.get('location')).toContain('notice=connect_failed');
+    expect(mocks.engine.exchangeCode).not.toHaveBeenCalled();
+    expect(mocks.persistFacebookDiscovery).not.toHaveBeenCalled();
+  });
+
   it('exchanges, discovers, and persists only the long-lived token, then opens selections', async () => {
     const pending = createFacebookOAuthState('user-1', 'workspace-1', ['pages_show_list', 'ads_read'], 600);
     const request = new NextRequest(`${callbackUrl}?code=oauth-code&state=${pending.state}`, {

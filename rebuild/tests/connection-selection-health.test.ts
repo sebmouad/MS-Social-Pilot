@@ -7,9 +7,10 @@ const state = vi.hoisted(() => ({
   target: { findFirst: vi.fn(), updateMany: vi.fn() },
   adAccount: { findFirst: vi.fn(), updateMany: vi.fn() },
   socialAccount: { findFirst: vi.fn() },
-  queryRaw: vi.fn(), platformEnabled: vi.fn(), executeRaw: vi.fn(), transaction: vi.fn(),
+  entitlements: vi.fn(), queryRaw: vi.fn(), platformEnabled: vi.fn(), executeRaw: vi.fn(), transaction: vi.fn(),
 }));
 vi.mock('../src/server/data', () => ({ prisma: { membership: state.membership, $transaction: state.transaction } }));
+vi.mock('../src/server/entitlements', async importOriginal => ({ ...await importOriginal<typeof import('../src/server/entitlements')>(), loadEntitlements: state.entitlements }));
 vi.mock('../src/server/platforms/registry', () => ({ isPlatformEnabled: state.platformEnabled }));
 import { setConnectionSelections } from '../src/server/connection-mutations';
 
@@ -27,6 +28,7 @@ describe('connection selection readiness', () => {
     state.adAccount.findFirst.mockResolvedValue({ id: 'ad', socialAccountId: 'source' });
     state.socialAccount.findFirst.mockResolvedValue({ id: 'source', provider: 'facebook', invalidatedAt: null, tokenExpiresAt: null });
     state.platformEnabled.mockResolvedValue(true);
+    state.entitlements.mockResolvedValue({ workspaceId: 'workspace', features: { 'settings/connections': true }, platformCapabilities: { facebook: true } });
     state.queryRaw.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('pg_try_advisory') ? [{ acquired: true }] : [{ pending: false }]);
     state.transaction.mockImplementation(callback => callback({ ...state, $queryRaw: state.queryRaw, $executeRaw: state.executeRaw }));
   });
@@ -37,6 +39,13 @@ describe('connection selection readiness', () => {
     expect(state.target.updateMany).not.toHaveBeenCalled();
     expect(state.adAccount.updateMany).not.toHaveBeenCalled();
     expect(state.executeRaw).not.toHaveBeenCalled();
+  });
+
+  it.each(['target', 'adAccount'] as const)('denies selecting an unentitled %s', async kind => {
+    state.entitlements.mockResolvedValue({ workspaceId: 'workspace', features: { 'settings/connections': true }, platformCapabilities: { facebook: false } });
+    await expect(setConnectionSelections(actor, [{ kind, id: kind === 'target' ? 'channel' : 'ad', enabled: true }])).rejects.toMatchObject({ code: 'unavailable' });
+    expect(state.target.updateMany).not.toHaveBeenCalled();
+    expect(state.adAccount.updateMany).not.toHaveBeenCalled();
   });
 
   it('rejects enabling resources from a disabled platform module', async () => {

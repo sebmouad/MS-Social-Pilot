@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { OperationError } from '@/lib/operation-error';
 import { runtimeConfig } from '@/server/config/store';
-import { canUseFeature, loadEntitlements } from '@/server/entitlements';
+import { canUseFeature, loadEntitlements, entitledPlatformIds } from '@/server/entitlements';
 import { prisma } from '@/server/data';
 import { assertWorkspaceNotPurging } from '@/server/data-control/guard';
 import { canAccessFeature } from '@/server/permissions';
@@ -131,7 +131,7 @@ async function authorizeAnalytics(actor: AnalyticsReadActor, constraints: Analyt
   const allowedChannelIds = constraints.allowedChannelIds === undefined
     ? granted
     : constraints.allowedChannelIds.filter(id => granted === undefined || granted.includes(id));
-  return { allowedChannelIds };
+  return { allowedChannelIds, allowedProviders: entitledPlatformIds(entitlements) };
 }
 
 async function runtimeLimits() {
@@ -157,7 +157,7 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
     if (error instanceof AnalyticsComparisonError) throw invalid();
     throw error;
   }
-  const initial = await loadAnalytics(actor.workspaceId, [], period.range, access.allowedChannelIds);
+  const initial = await loadAnalytics(actor.workspaceId, [], period.range, access.allowedChannelIds, undefined, access.allowedProviders);
   const channelOptions = initial.targets;
   const adAccountOptions = initial.adAccounts;
   const requestedChannelIds = input.filter ? idList(input.channel) : channelOptions.map(item => item.id);
@@ -168,14 +168,14 @@ async function loadSnapshot(actor: AnalyticsReadActor, rawInput: unknown, constr
   if (!sameIds(selectedChannelIds, requestedChannelIds) || !sameIds(selectedAdIds, requestedAdIds)) throw forbiddenResource();
   if (selectedChannelIds.length > limits.reportMaxChannels || selectedAdIds.length > limits.reportMaxChannels) throw invalid();
 
-  const currentData = await loadAnalytics(actor.workspaceId, selectedChannelIds, period.range, access.allowedChannelIds, selectedAdIds);
+  const currentData = await loadAnalytics(actor.workspaceId, selectedChannelIds, period.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders);
   const selectedReturnedChannels = currentData.selectedTargets.map(item => item.id);
   if (!sameIds(selectedReturnedChannels, selectedChannelIds) || !sameIds(currentData.selectedAdIds, selectedAdIds)) throw forbiddenResource();
   assertUniqueMetricKeys(currentData.metrics);
   const view = buildAnalytics(currentData.metrics, currentData.audienceEntries, currentData.audienceSelected);
   const allMetrics = view.metrics;
   const comparisonData = period.comparison
-    ? await loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds)
+    ? await loadAnalytics(actor.workspaceId, selectedChannelIds, period.comparison.range, access.allowedChannelIds, selectedAdIds, access.allowedProviders)
     : null;
   if (comparisonData && (!sameIds(comparisonData.selectedTargets.map(item => item.id), selectedChannelIds) || !sameIds(comparisonData.selectedAdIds, selectedAdIds))) throw forbiddenResource();
   if (comparisonData) assertUniqueMetricKeys(comparisonData.metrics);

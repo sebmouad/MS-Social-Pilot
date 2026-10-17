@@ -4,6 +4,7 @@ import { OperationError } from '@/lib/operation-error';
 import { prisma } from "./data";
 import { connectionState } from '@/lib/connection-status';
 import { isPlatformEnabled } from '@/server/platforms/registry';
+import { canUseFeature, hasPlatformCapability, loadEntitlements, type Entitlements } from '@/server/entitlements';
 import { randomBytes } from "node:crypto";
 
 const MANAGER_ROLES = new Set(["owner", "admin"]);
@@ -54,13 +55,13 @@ function linkedInstagramAccounts(tx: typeof prisma | import('../../generated/cli
   return tx.instagramAccount.findMany({ where: { workspaceId, OR: [{ socialAccountId }, ...(targetIds.length ? [{ socialAccountId: null, targetId: { in: targetIds } }] : [])] }, select: { id: true } });
 }
 
-async function requireSelectableSource(tx: import('../../generated/client').Prisma.TransactionClient, workspaceId: string, socialAccountId: string | null) {
+async function requireSelectableSource(tx: import('../../generated/client').Prisma.TransactionClient, workspaceId: string, socialAccountId: string | null, entitlements: Entitlements | null) {
   const source = socialAccountId ? await tx.socialAccount.findFirst({
     where: { id: socialAccountId, workspaceId },
     select: { id: true, provider: true, invalidatedAt: true, tokenExpiresAt: true },
   }) : null;
   if (!source || connectionState(source) !== 'connected') throw new OperationError('reconnect_required', 'Reconnect this source before selecting it.');
-  if (!await isPlatformEnabled(source.provider)) throw new OperationError('unavailable', 'This connection is unavailable in the current workspace.');
+  if (!entitlements || !hasPlatformCapability(entitlements, source.provider) || !await isPlatformEnabled(source.provider)) throw new OperationError('unavailable', 'This connection is unavailable in the current workspace.');
 }
 
 /** Apply a confirmed set of channel and ad account choices atomically. */
@@ -68,13 +69,15 @@ export async function setConnectionSelections(actor: ConnectionMutationActor, it
   const membership = await currentMembership(actor);
   if (!MANAGER_ROLES.has(membership.role)) throw new OperationError('forbidden', 'Only workspace owners and admins can change connections.');
   if (items.length > 250 || new Set(items.map(item => `${item.kind}:${item.id}`)).size !== items.length) throw new OperationError('invalid_request', 'Invalid selection list.');
+  const entitlements = items.some(item => item.enabled) ? await loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }) : null;
+  if (items.some(item => item.enabled) && (!entitlements || !canUseFeature(entitlements, 'settings/connections'))) throw new OperationError('forbidden', 'Connection selection is unavailable in this workspace.');
   await prisma.$transaction(async tx => {
     for (const item of items) {
       if (item.kind === 'target') {
         const target = await tx.target.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, type: true, providerId: true, socialAccountId: true } });
         if (!target) throw new OperationError('unavailable', 'This channel is unavailable in the current workspace.');
         if (item.enabled) {
-          await requireSelectableSource(tx, actor.workspaceId, target.socialAccountId);
+          await requireSelectableSource(tx, actor.workspaceId, target.socialAccountId, entitlements);
         } else {
           await lockPublishingTargets(tx, actor.workspaceId, [target.id]);
           await assertPublishingTargetsSettled(tx, actor.workspaceId, [target.id]);
@@ -87,7 +90,7 @@ export async function setConnectionSelections(actor: ConnectionMutationActor, it
         const account = await tx.adAccount.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, socialAccountId: true } });
         if (!account) throw new OperationError('unavailable', 'This advertising account is unavailable in the current workspace.');
         if (item.enabled) {
-          await requireSelectableSource(tx, actor.workspaceId, account.socialAccountId);
+          await requireSelectableSource(tx, actor.workspaceId, account.socialAccountId, entitlements);
         }
         await tx.adAccount.updateMany({ where: { id: account.id, workspaceId: actor.workspaceId }, data: { enabled: item.enabled } });
       }

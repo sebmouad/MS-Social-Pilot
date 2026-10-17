@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  user: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), feature: vi.fn(), permission: vi.fn(), purge: vi.fn(), channels: vi.fn(), workspace: vi.fn(), where: vi.fn(),
+  user: vi.fn(), entitlements: vi.fn(), permissions: vi.fn(), feature: vi.fn(), platform: vi.fn(), providers: vi.fn(), permission: vi.fn(), purge: vi.fn(), channels: vi.fn(), workspace: vi.fn(), where: vi.fn(),
   conversationFind: vi.fn(), commentFind: vi.fn(), conversationUpdate: vi.fn(), commentUpdate: vi.fn(), audit: vi.fn(), transaction: vi.fn(), onLocked: vi.fn(), storedResolvedAt: null as Date | null,
 }));
 vi.mock('../src/server/data', () => ({ prisma: {
@@ -9,14 +9,14 @@ vi.mock('../src/server/data', () => ({ prisma: {
   conversation: { findFirst: mocks.conversationFind }, postComment: { findFirst: mocks.commentFind },
   $transaction: mocks.transaction,
 } }));
-vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: mocks.feature }));
+vi.mock('../src/server/entitlements', () => ({ loadEntitlements: mocks.entitlements, canUseFeature: mocks.feature, hasPlatformCapability: mocks.platform }));
 vi.mock('../src/server/permissions/loader', () => ({ loadPermissions: mocks.permissions }));
 vi.mock('../src/server/permissions', () => ({ canAccessFeature: mocks.permission }));
 vi.mock('../src/server/data-control/guard', () => ({
   assertWorkspaceNotPurging: mocks.purge,
   withWorkspaceOperation: async (_workspace: string, operation: () => Promise<unknown>) => { await mocks.onLocked(); return operation(); },
 }));
-vi.mock('../src/server/inbox/providers', () => ({ inboxTargetWhere: mocks.where }));
+vi.mock('../src/server/inbox/providers', () => ({ inboxTargetWhere: mocks.where, inboxProviders: mocks.providers }));
 vi.mock('../src/server/config/store', () => ({ runtimeConfig: vi.fn(async key => key === 'inbox.workflowTransactionTimeoutMs' ? 5000 : key === 'inbox.workflowTransactionMaxWaitMs' ? 2000 : 500) }));
 
 import { canManageInboxWorkflow, setInboxResolved } from '../src/server/inbox/actions';
@@ -32,7 +32,7 @@ beforeEach(() => {
   mocks.onLocked.mockReset();
   mocks.user.mockResolvedValue({ disabledAt: null }); mocks.entitlements.mockResolvedValue({});
   mocks.permissions.mockResolvedValue({ pageScope: { all: false, ids: [targetId] } });
-  mocks.feature.mockReturnValue(true); mocks.permission.mockReturnValue(true); mocks.purge.mockResolvedValue(undefined);
+  mocks.feature.mockReturnValue(true); mocks.platform.mockReturnValue(true); mocks.providers.mockResolvedValue(['facebook']); mocks.permission.mockReturnValue(true); mocks.purge.mockResolvedValue(undefined);
   mocks.channels.mockResolvedValue([{ id: targetId, name: 'Channel' }]); mocks.workspace.mockResolvedValue({ timezone: 'UTC' });
   mocks.where.mockImplementation((_workspace: string, ids?: string[]) => ({ scopedIds: ids }));
   mocks.conversationFind.mockResolvedValue({ id: 'item', targetId });
@@ -99,7 +99,7 @@ describe('platform-neutral Inbox resolve workflow', () => {
 
   it('does not require provider credentials for expired-source local resolution', async () => {
     await expect(setInboxResolved(actor, { kind: 'comment', id: 'item', resolved: true })).resolves.toMatchObject({ resolved: true });
-    expect(mocks.where).toHaveBeenCalledWith('workspace', ['channel']);
+    expect(mocks.where).toHaveBeenCalledWith('workspace', ['channel'], ['facebook']);
     expect(mocks.audit).toHaveBeenCalled();
   });
 
@@ -108,7 +108,7 @@ describe('platform-neutral Inbox resolve workflow', () => {
     mocks.channels.mockResolvedValue([]);
     await expect(setInboxResolved(actor, { kind: 'message', id: 'item', resolved: true }, { allowedChannelIds: ['foreign'] }))
       .rejects.toMatchObject({ code: 'not_found' });
-    expect(mocks.where).toHaveBeenCalledWith('workspace', ['foreign']);
+    expect(mocks.where).toHaveBeenCalledWith('workspace', ['foreign'], ['facebook']);
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
