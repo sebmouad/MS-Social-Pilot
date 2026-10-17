@@ -279,6 +279,8 @@ describe.skipIf(!databaseUrl)('Facebook staged-photo cleanup on isolated Postgre
     expect(evidence.rowIdKey).toBe('id');
     expect(evidence.columns.map(column => column.key)).toContain('cleanupState');
     expect(evidence.actions).toHaveLength(2);
+    expect(evidence.actions?.[0].description).toContain('recorded staged Facebook photo');
+    expect(evidence.actions?.[0].description).not.toContain('known unpublished');
     expect(evidence.actions?.[0]).toMatchObject({ actionId: 'delete_staged_photo', confirmation: `DELETE STAGED PHOTO ${f.photoIds[0]}` });
     expect(JSON.stringify(evidence)).not.toMatch(/accessToken|imageUrl|rawError|postText/i);
   });

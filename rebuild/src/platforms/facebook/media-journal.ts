@@ -266,7 +266,7 @@ export async function readFacebookMediaEvidence(operationId?: string, resultCap?
       actionId: 'delete_staged_photo',
       subjectId: row.id,
       label: `Delete staged photo ${row.ordinal}`,
-      description: `Explicitly delete known unpublished Facebook photo ${row.remoteId} for publication ${row.operationId}. This removes that staged photo from the Page; the photo will not be available to a later post. Verify it is unused and accept that another administrator may publish it while this request is in flight.`,
+      description: `Explicitly delete the recorded staged Facebook photo ${row.remoteId} for publication ${row.operationId}. This removes that staged photo from the Page; the photo will not be available to a later post. Verify it is unused and accept that another administrator may publish it while this request is in flight.`,
       acknowledgmentLabel: 'I verified this photo is unused and accept that Facebook state may change while deletion is in flight.',
       confirmation: `DELETE STAGED PHOTO ${row.id}`,
     })) : [];

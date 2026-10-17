@@ -103,7 +103,8 @@ uses parameterized SQL, and no db push/migrate deploy was run.
 
 PREVIEW_QA.md records automated, real PostgreSQL and actual local HTTP/MCP checks.
 The HTTP/MCP probe injects fake Graph responses and does not contact Facebook.
-Browser verification remains pending workspace-credit refill. Production legacy,
+Representative Root phone/desktop browser checks passed after normal approval
+recovered; the complete browser matrix remains open. Production legacy,
 provider data, deployment, worker ownership and customer credentials were unchanged.
 The official protocol reference pages are [Page Photos](https://developers.facebook.com/docs/graph-api/reference/page/photos/),
 [Page Feed](https://developers.facebook.com/docs/graph-api/reference/page/feed/)

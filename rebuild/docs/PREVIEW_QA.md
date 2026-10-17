@@ -1129,3 +1129,44 @@ Final filesystem-only checks after the last safeguard passed: 1,362 tests in
 TypeScript and `git diff --check` also passed. This does not replace the pending
 final guarded full-suite/build/HTTP-MCP reruns. Private offline log:
 `/private/tmp/socialpilot-cleanup53-tests-offline-final.log`.
+
+### Batch 53 final approval recovery and browser evidence
+
+After the transient credit-review rejection, the same normal approval mechanism
+accepted GitHub push and remote verification. The previously blocked guarded
+full suite then passed **1,445 tests in 222 files** against the exact committed
+backend safeguard; isolated production build and the actual HTTP/MCP probe also
+passed, including the added valid-key initialization check. No alternate path
+was used to bypass review. The earlier pending-rerun statements above record the
+intermediate state and are superseded by these results.
+
+Chrome read/write controls subsequently worked through normal approval. A
+disposable synthetic example added one actionable known photo plus confirmed
+and uncertain deletion examples. It had no usable credentials, and temporarily
+enabled manual cleanup through the audited Root MCP setting service. Nightfall
+390×844 checks verified Cancel initial focus, exact confirmation and checkbox
+gating, bounded 358px dialog, no document horizontal overflow (390px), safe
+preflight failure retaining both inputs, focused alert, disabled repeat, Close
+and review refresh, and the same row remaining held afterward. Sidebar drawer
+filter submission retained invalid text with aria-invalid and associated error.
+
+A Grove visual check at 1440×1000 used a temporary DOM-only theme preview, not
+a saved theme-setting workflow. The 520px dialog stayed within the viewport,
+Cancel kept initial focus, and the two sidebars retained navigation/filters.
+Native inline screenshots were visually inspected for both phone error and
+desktop dialog. File-path screenshot export was refused by the browser tool's
+configured roots; no alternate file-write path was used. The old “known
+unpublished” module copy was corrected to “recorded staged” because the provider
+cannot guarantee continued unused state; a PostgreSQL metadata assertion guards
+that distinction.
+
+The browser fixture process completed cleanup and exact prior policy restoration.
+A fresh page showed empty evidence, manual cleanup disabled, original Nightfall
+theme restored and no document overflow (1440px). No live provider operation was
+dispatched. These are representative Root browser checks, not all themes/states,
+remote success, complete keyboard coverage or the older composer phone matrix.
+All remaining live-provider, unknown-step reconciliation and release gaps remain.
+
+Published implementation: `8e2842fa27e1e60c69639e613b42aad59c9bf9f4` on
+`origin/main`, with exact remote verification and clean tree before this final
+copy/evidence follow-up. This section records that follow-up.
