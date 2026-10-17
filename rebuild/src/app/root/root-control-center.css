@@ -36,4 +36,8 @@
 }
 .root-control__module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px; }
 .root-control__module-grid > .root-control__panel { margin-bottom: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.root-platform-evidence-filter { display: grid; gap: 12px; }
+.root-platform-evidence-filter form { display: grid; gap: 12px; }
+.root-platform-evidence-filter .shell-subnav__label { margin: 0; }
+.root-platform-evidence-filter > a { width: fit-content; color: var(--accent); font-size: 13px; }
 .root-control__module-grid .ui-button { margin-top: auto; }

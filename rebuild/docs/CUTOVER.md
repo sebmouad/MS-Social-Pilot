@@ -67,8 +67,8 @@ migration or a claim of the complete production-shaped cutover rehearsal.
    production. For the local rehearsal, use a sanitized, pre-migration custom
    format dump and a loopback-only PostgreSQL admin URL. Set
    `CUTOVER_DUMP_SANITIZED=YES` only after a separate sanitization review, and
-   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts`.
-   `rebuild/scripts/cutover-rehearsal.sh` pins those four SQL files by SHA-256,
+   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps`.
+   `rebuild/scripts/cutover-rehearsal.sh` pins those six SQL files by SHA-256,
    restores the dump into local scratch databases, refuses migration objects
    or success records already present, applies only those files, checks the
    explicitly enumerated mapped columns and enum labels, reports aggregate
@@ -126,7 +126,7 @@ migration or a claim of the complete production-shaped cutover rehearsal.
   operational options, MCP parity, and live provider integration tests.
 - Production currently has no rebuild web or worker systemd unit and no
   verified proxy switch from 3100 to 3200.
-- The rebuild schema is not a migration schema. Its five checksum-pinned
+- The rebuild schema is not a migration schema. Its six checksum-pinned
   additive migrations still need application and data-impact review against a
   sanitized production-shaped copy and a restore-aware plan.
 - There is no sanitized production-shaped staging evidence covering the full
@@ -150,7 +150,7 @@ The final Inbox journal schema also retains local alias IDs and suppressed desce
 
 The fourth pinned additive migration, `20261016220000_rebuild_post_deletions`, adds the content-free remote post deletion journal. Its SHA-256 is now `80e406ae33000a349d07f9e428563d20083bc36c65956a969a5e7ccc77c32f07`; the state/timestamp CHECK is explicitly NULL-safe. Before the isolated synthetic preview received this migration, the private backup `/private/tmp/socialpilot-preview-before-post-deletion-20261016T210904Z.dump` (244200 bytes) was restored; the exact source-table counts matched, and the migration restore matched the 97-table inventory. The revised DDL has not been applied to the preview; the parent will back up and restore it before applying the correction. Production was not changed.
 
-The cutover allowlist, checksum pin, migration-history guard, and mapped-column inventory now contain five migrations. This backup/restore evidence and preview application do not prove a full five-file rehearsal against a sanitized, production-shaped pre-migration baseline. Exact production cutover backup/media recovery, application workflows, and proxy/service rollback remain required. See [POST_DELETION_RECOVERY.md](POST_DELETION_RECOVERY.md) for service semantics and remaining gaps.
+At that snapshot, the cutover allowlist, checksum pin, migration-history guard, and mapped-column inventory contained five migrations. This backup/restore evidence and preview application do not prove a full five-file rehearsal against a sanitized, production-shaped pre-migration baseline. Exact production cutover backup/media recovery, application workflows, and proxy/service rollback remain required. See [POST_DELETION_RECOVERY.md](POST_DELETION_RECOVERY.md) for service semantics and remaining gaps.
 
 The final post-deletion SQL above was reapplied from the pre-journal private
 backup, then independently backed up/restored with matching exact counts for
@@ -168,3 +168,28 @@ The fifth allowlisted additive migration, `20261017010000_rebuild_publication_at
 The migration is checksum-pinned and included in the local cutover rehearsal's mapped-column inventory. Its SHA-256 is `03973b6fb80dcf2580c5e39f0d2be8fd5715f47c1a953127ce939638bfece267`. Before preview application, `/private/tmp/socialpilot-preview-before-publication-20261016T234535Z.dump` (249671 bytes, mode 0600) restored with exact matching counts for all 97 source tables. The migration applied to that scratch restore, and an independent migrated backup restored with exact counts across 98 tables. Only then was the migration applied to the synthetic preview; both scratch databases were removed. Production, workers and remote provider data were unchanged.
 
 This proves the additive local journal and restore path, not a full five-file rehearsal on a sanitized production-shaped pre-migration baseline. The implemented service and fault/authorization evidence are described in PUBLICATION_RECOVERY.md and PREVIEW_QA.md. Exact production backup/media recovery, one-publisher ownership, live provider operations, application/permission migration and proxy/service rollback remain release gates.
+
+
+## Facebook media-step migration — 2026-10-17
+
+The sixth reviewed additive migration, `20261017020000_rebuild_facebook_media_steps`, adds a
+content-free, workspace-owned Facebook photo/feed intent and receipt journal.
+SHA-256: `897464050aedf8c727fd695cc9b1fead0810d6c08606f3074c4d70529940a0e1`. It preserves intermediate provider
+IDs without credentials, content, image URLs or bytes. It has fixed NULL-safe
+phase/state/timestamp constraints, ordered-step uniqueness and per-destination
+known-identity uniqueness. Root controls the consumed runtime transaction, media
+and history bounds; fixed database integrity caps require a reviewed migration.
+
+Before application to the isolated synthetic preview, a private custom-format
+backup `/private/tmp/socialpilot-preview-before-facebook-media-20261017T095438278Z.dump`
+(257294 bytes, mode 0600) restored with exact counts across all 98 source tables.
+The new migration applied to that scratch restore. An independent migrated
+backup `/private/tmp/socialpilot-preview-with-facebook-media-20261017T095438278Z.dump`
+(263157 bytes, mode 0600) then restored with exact counts across 99 tables. Only
+then was the same checksum applied to the preview; all original counts matched,
+the new table was empty, and both scratch databases were removed. The reviewed
+cutover allowlist, checksum, baseline-history refusal and mapped-column inventory
+now include the sixth migration. No production database, service or provider
+changed. This does not prove the full six-file rehearsal on a sanitized
+production-shaped baseline, media restore, application/authorization migration
+or production proxy/worker rollback. Those release gates remain open.

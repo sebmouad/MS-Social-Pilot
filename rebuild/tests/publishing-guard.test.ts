@@ -24,7 +24,7 @@ const operationTx = { $queryRaw: state.query, postTarget: { findFirst: state.pos
 beforeEach(() => {
   vi.clearAllMocks();
   state.transaction.mockImplementation(async (work: (tx: typeof operationTx) => Promise<unknown>) => work(operationTx));
-  state.query.mockImplementation((strings: TemplateStringsArray) => /rebuild_(post_deletions|publication_attempts)/.test(String(strings[0])) ? [] : [{ acquired: true }]);
+  state.query.mockImplementation((strings: TemplateStringsArray) => /rebuild_(post_deletions|publication_attempts|facebook_media_steps)/.test(String(strings[0])) ? [] : [{ acquired: true }]);
   state.post.mockResolvedValue({ id: 'post-1', targets: [{ id: 'post-target-1', targetId: 'channel-a' }] });
   state.postTarget.mockResolvedValue(null);
   state.target.mockImplementation(async (query: { where: { id?: { in?: string[] } } }) => (query.where.id?.in ?? []).map(id => ({ id })));

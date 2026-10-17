@@ -7,6 +7,23 @@ import type { AnalyticsProviderData, AnalyticsProviderRequest } from '@/server/a
 import type { InboxReplyPolicyRequest } from '@/server/inbox/policy';
 import type { ReplyRule } from '@/server/inbox/threads';
 import type { AdsUiSchema } from '@/platforms/ads-ui';
+import type { Prisma } from '../../../generated/client';
+
+export interface PlatformPublicationEvidence {
+  title: string;
+  description: string;
+  columns: Array<{ key: string; label: string }>;
+  items: Array<Record<string, string | number | null>>;
+  truncated: boolean;
+}
+
+/** Installed module safety hooks remain active even while customer access is off. */
+export interface PlatformPublicationRecovery {
+  assertSettled(tx: Prisma.TransactionClient, workspaceId: string, targetIds?: readonly string[]): Promise<void>;
+  assertOutcome(tx: Prisma.TransactionClient, workspaceId: string, operationId: string, outcome: 'PUBLISHED' | 'ABSENT', remotePostId?: string): Promise<void>;
+  /** Trusted Root-only caller; module returns content/credential-free evidence. */
+  readEvidence(operationId?: string, resultCap?: number): Promise<PlatformPublicationEvidence>;
+}
 
 export interface PlatformAnalyticsHost {
   load(request: AnalyticsProviderRequest): Promise<AnalyticsProviderData>;

@@ -23,6 +23,7 @@ export const facebookModule = {
 } as const satisfies PlatformModule;
 
 const facebookConfigEntries = [
+  entry({ key: 'meta.mediaHistoryLimit', group: 'Facebook · Publishing recovery', label: 'Media recovery history limit', kind: 'number', description: 'Maximum content-free media staging records returned in this platform’s private Root evidence and MCP reads.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ ...enabledEntry('facebook', 'Facebook', true), schema: z.boolean() }),
   entry({ key: facebookModule.access.includedByDefaultKey, group: 'Facebook · Workspace access', label: 'Facebook included by default', kind: 'boolean', description: 'Allow workspaces to use Facebook without a matching plan access key. Turning this off retains stored data; plans with a configured access key may still use the enabled module.', defaultValue: true, schema: z.boolean(), consumption: 'active' }),
   entry({ key: facebookModule.access.planFeaturesKey, group: 'Facebook · Workspace access', label: 'Facebook plan access keys', kind: 'json', description: 'JSON array of existing subscriber plan feature keys that grant Facebook access when default inclusion is off. An empty array grants no plan access. Installation enablement and member permissions are still required.', defaultValue: ['platform_facebook'], schema: stringList, consumption: 'active' }),

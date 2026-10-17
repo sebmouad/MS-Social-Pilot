@@ -1,6 +1,7 @@
 import { createFacebookAdapter, createFacebookEngine } from '@/platforms/facebook/publishing';
 import type { FacebookConfig } from '@/platforms/facebook/config';
 import { runtimeConfig, runtimeSecret } from '@/server/config/store';
+import { facebookMediaJournal } from './media-journal';
 
 async function configured<T>(key: string): Promise<T> {
   return await runtimeConfig(key) as T;
@@ -28,14 +29,14 @@ async function configuredFacebookConfig(): Promise<FacebookConfig> {
 export async function configuredFacebookEngine(options?: { signal?: AbortSignal }) {
   const signal = options?.signal;
   const transport: typeof fetch = signal ? (input, init) => fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal }) : fetch;
-  return createFacebookEngine(await configuredFacebookConfig(), transport);
+  return createFacebookEngine(await configuredFacebookConfig(), transport, facebookMediaJournal);
 }
 export async function configuredFacebookAdapter() {
   const [config, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes] = await Promise.all([
     configuredFacebookConfig(), configured<string[]>('meta.postReadScopes'), configured<string[]>('meta.postPublishScopes'),
     configured<string[]>('meta.postDeleteScopes'), configured<string[]>('meta.firstCommentScopes'),
   ]);
-  return createFacebookAdapter(config, fetch, { postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes });
+  return createFacebookAdapter(config, fetch, { postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes, mediaJournalFactory: facebookMediaJournal });
 }
 
 export async function configuredFacebookOAuth() {

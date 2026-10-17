@@ -118,3 +118,11 @@ duplication, scheduling/rescheduling and publication preflight share the same
 minimum-content rule. Empty/first-comment-only posts remain invalid. This is not
 live provider proof, native format support, durable temporary photo recovery,
 full Publishing parity or production readiness.
+
+
+Facebook media staging update, 2026-10-17: FACEBOOK_MEDIA_RECOVERY.md documents
+committed per-photo/feed intent/receipts, held partial effects, orphan-safe data
+cleanup guards, private module-owned Root evidence and matching HTTP/MCP reads.
+Existing local receipt recovery can use an exact known feed ID without resending.
+Cleanup of known staged photos, unknown-step reconciliation, real provider media
+canary/cleanup and complete Facebook/legacy/cutover gates remain unfinished.

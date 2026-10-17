@@ -8,6 +8,7 @@ import { authorizePublishing } from './access';
 import { assertPublicationAttemptsSettled } from './publication-guard';
 import { assertNoPendingPostDeletionForAliases, assertPostDeletionTargetsSettled, loadPostDeletionTargetIds } from './post-deletion-guard';
 import type { PublishingActor, PublishingFeature } from './types';
+import { assertPlatformPublicationsSettled } from '@/server/platforms/publication-recovery';
 
 type PublishingOperationContext = {
   actor: PublishingActor;
@@ -65,6 +66,7 @@ export async function assertPublishingTargetsSettled(
   if (pending) throw new OperationError('conflict', 'A publishing result needs review before this data or connection can be removed. Check the post status first.');
   await assertPostDeletionTargetsSettled(tx, workspaceId, targetIds);
   await assertPublicationAttemptsSettled(tx, workspaceId, targetIds);
+  await assertPlatformPublicationsSettled(tx, workspaceId, targetIds);
 }
 
 /** Holds the workspace operation boundary and fail-fast post/destination locks for one publishing action. */

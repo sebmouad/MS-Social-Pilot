@@ -27,7 +27,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(48);
+    expect(CONFIG_SCHEMA_VERSION).toBe(49);
     const appSecretProof = CONFIG_BY_KEY.get('meta.appSecretProofEnabled')!;
     expect(appSecretProof).toMatchObject({ kind: 'boolean', defaultValue: true, consumption: 'active', owner: { kind: 'platform', id: 'facebook' } });
     expect(appSecretProof.schema.safeParse(false).success).toBe(true);

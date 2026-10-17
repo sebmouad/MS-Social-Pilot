@@ -9,6 +9,7 @@ import { withPublishingOperation, withPublishingTransaction } from './guard';
 import { publishingPostVisibilityWhere, selectedPublishingTargetIds } from './read-scope';
 import { assertNoPostDeletionForRemoteIdentity } from './post-deletion-guard';
 import type { PublishingActor } from './types';
+import { assertPlatformPublicationOutcome, assertPlatformPublicationsSettled } from '@/server/platforms/publication-recovery';
 
 export type PublicationState = 'started' | 'uncertain' | 'receipt_recorded' | 'projected' | 'rejected' | 'attested_absent';
 export type PublicationRow = { id: string; workspaceId: string; postId: string; postTargetId: string; targetId: string; provider: string; actorId: string; state: PublicationState; reason: string | null; remotePostId: string | null; remoteUrl: string | null; receiptAt: Date | null; createdAt: Date; updatedAt: Date };
@@ -82,6 +83,7 @@ export async function recordPublicationOutcomeInTransaction(tx: Prisma.Transacti
   const row = rows[0];
   if (!row) throw missing();
   if (!['started', 'uncertain'].includes(row.state)) throw new OperationError('conflict', 'This publication already has a recorded outcome.');
+  await assertPlatformPublicationOutcome(tx, row.provider, row.workspaceId, row.id, input.outcome, confirmed?.remotePostId);
   if (confirmed) {
     await assertReceiptIdentity(tx, row, confirmed.remotePostId);
     await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='receipt_recorded', reason='external_human_attestation', "remotePostId"=${confirmed.remotePostId}, "remoteUrl"=${confirmed.remoteUrl}, "receiptAt"=CURRENT_TIMESTAMP, "attestedAt"=CURRENT_TIMESTAMP, "attestedBy"=${actorId}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${row.id} AND "workspaceId"=${input.workspaceId}`;
@@ -175,6 +177,7 @@ export async function publishDestinationInOperation(context: { actor: Publishing
   const operation = await withPublishingTransaction(signal, async tx => {
     const existing = await tx.$queryRaw<PublicationRow[]>`SELECT * FROM rebuild_publication_attempts WHERE "workspaceId"=${actor.workspaceId} AND "postTargetId"=${input.postTargetId} AND state NOT IN ('rejected','attested_absent') FOR UPDATE`;
     if (existing.length) return existing[0];
+    await assertPlatformPublicationsSettled(tx, actor.workspaceId, [input.targetId]);
     const claim = await tx.postTarget.updateMany({ where: { id: input.postTargetId, postId: input.postId, targetId: input.targetId, post: { workspaceId: actor.workspaceId }, status: input.expectedStatus, remotePostId: null }, data: { status: 'processing' } });
     if (claim.count !== 1) return null;
     const id = randomUUID();

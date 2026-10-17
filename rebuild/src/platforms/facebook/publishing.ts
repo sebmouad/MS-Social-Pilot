@@ -3,6 +3,7 @@ import { validateFacebookConfig } from './config';
 import { PlatformApiError } from '../errors';
 import { facebookAppSecretProof, graphObjectUrl, isFacebookDefiniteRejection, isFacebookRetryable } from './protocol';
 import type { AdCampaignCreateRequest, AdMutationRequest, AdObjectReadRequest, AdObjectSnapshot, FirstCommentRequest, OAuthExchangeRequest, OAuthStartRequest, PlatformAdapter, PublishRequest, PublishResult, PublishingMediaSupport } from '../types';
+import type { FacebookMediaJournal, FacebookMediaJournalFactory } from './media-journal-port';
 
 export type FacebookFetch = typeof fetch;
 
@@ -10,6 +11,16 @@ export class FacebookApiError extends PlatformApiError {
   constructor(message: string, readonly status: number, readonly code?: number, readonly subcode?: number, readonly transient = false) {
     super(message, isFacebookRetryable(status, code, transient));
     this.name = 'FacebookApiError';
+  }
+}
+
+/** A multi-photo operation may have created remote media or a post, so its
+ * outcome cannot release the publication claim for automatic retry.
+ */
+export class FacebookMediaRecoveryError extends FacebookApiError {
+  constructor() {
+    super('Facebook multi-photo publishing needs recovery.', 0);
+    this.name = 'FacebookMediaRecoveryError';
   }
 }
 
@@ -21,7 +32,7 @@ export interface FacebookLongLivedToken { accessToken: string; expiresAt: Date }
 export interface FacebookAdAccount { id: string; name: string; currency: string | null; status: number | null }
 export type FacebookMedia = { kind: 'image' | 'video'; url: string; altText?: string; localFile?: { bytes: Uint8Array; mimeType: string; fileName: string } };
 export interface FacebookPublishInput {
-  targetId: string; accessToken: string; text?: string; link?: string | null;
+  targetId: string; accessToken: string; text?: string; link?: string | null; operationId?: string;
   media?: readonly FacebookMedia[];
 }
 export interface FacebookPublished { remoteId: string; url: string | null }
@@ -62,6 +73,12 @@ const FACEBOOK_PUBLISHING_MEDIA: PublishingMediaSupport = {
 
 type JsonObject = Record<string, unknown>;
 function object(value: unknown): JsonObject { return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : {}; }
+function providerId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  if (/[\u0000-\u001f\u007f]/.test(value)) return null;
+  const id = value.trim();
+  return id.length > 0 && id.length <= 2048 ? id : null;
+}
 function date(value: unknown): Date | null { if (typeof value !== 'string') return null; const d = new Date(value); return Number.isNaN(d.getTime()) ? null : d; }
 const AD_OBJECT_FIELDS = 'id,name,account_id,configured_status,effective_status';
 function normalizeAdAccountId(value: string): string { return value.replace(/^act_/, ''); }
@@ -73,7 +90,11 @@ function graphError(payload: unknown, status: number): FacebookApiError {
 }
 
 /** Create a bounded Graph client. Tokens are sent in form/query parameters and never logged. */
-export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: FacebookFetch = fetch, operationSignal?: AbortSignal): FacebookEngine {
+export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: FacebookFetch = fetch,
+  operationSignalOrJournalFactory?: AbortSignal | FacebookMediaJournalFactory,
+  suppliedJournalFactory?: FacebookMediaJournalFactory): FacebookEngine {
+  const operationSignal = typeof operationSignalOrJournalFactory === 'function' ? undefined : operationSignalOrJournalFactory;
+  const mediaJournalFactory = typeof operationSignalOrJournalFactory === 'function' ? operationSignalOrJournalFactory : suppliedJournalFactory;
   const config = validateFacebookConfig(rawConfig);
   const assertOperationActive = () => {
     if (operationSignal?.aborted) throw new FacebookApiError('Facebook operation was cancelled.', 0);
@@ -280,16 +301,56 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
         }
         if (typeof payload.post_id === 'string' && payload.post_id.trim()) payload.id = payload.post_id;
       } else if (images.length > 1) {
-        const attached: string[] = [];
-        for (const image of images) {
-          const photo = object(await request(`${encodeURIComponent(input.targetId)}/photos`, { method: 'POST', token: input.accessToken,
-            body: { url: image.localFile ? undefined : image.url, published: 'false', temporary: 'true', alt_text_custom: image.altText }, file: image.localFile }));
-          if (typeof photo.id !== 'string') throw new FacebookApiError('Facebook did not return a photo id.', 200);
-          attached.push(JSON.stringify({ media_fbid: photo.id }));
+        if (mediaJournalFactory && !providerId(input.operationId)) {
+          throw new FacebookMediaRecoveryError();
         }
-        const body: Record<string, string | undefined> = { message: input.text?.trim() || undefined, link: input.link || undefined };
-        attached.forEach((value, i) => { body[`attached_media[${i}]`] = value; });
-        payload = await request(`${encodeURIComponent(input.targetId)}/feed`, { method: 'POST', token: input.accessToken, body });
+        const journal: FacebookMediaJournal | undefined = mediaJournalFactory?.(providerId(input.operationId)!, input.targetId);
+        const photoIds: string[] = [];
+        try {
+          for (let ordinal = 0; ordinal < images.length; ordinal++) {
+            const image = images[ordinal];
+            const journalOrdinal = ordinal + 1;
+            if (journal) await journal.beginPhoto(journalOrdinal);
+            let photoPayload: unknown;
+            try {
+              photoPayload = await request(`${encodeURIComponent(input.targetId)}/photos`, { method: 'POST', token: input.accessToken,
+                body: { url: image.localFile ? undefined : image.url, published: 'false', temporary: 'true', alt_text_custom: image.altText }, file: image.localFile });
+            } catch (error) {
+              if (error instanceof FacebookApiError && isFacebookDefiniteRejection(error.status, error.code, error.transient)) {
+                if (journal) {
+                  try { await journal.rejectPhoto(journalOrdinal); } catch { throw new FacebookMediaRecoveryError(); }
+                }
+                if (ordinal === 0) throw error;
+              }
+              throw new FacebookMediaRecoveryError();
+            }
+            const photoId = providerId(object(photoPayload).id);
+            if (!photoId) throw new FacebookMediaRecoveryError();
+            if (journal) await journal.recordPhoto(journalOrdinal, photoId);
+            photoIds.push(photoId);
+          }
+          if (journal) await journal.beginFeed(photoIds);
+          const body: Record<string, string | undefined> = { message: input.text?.trim() || undefined, link: input.link || undefined };
+          photoIds.forEach((photoId, i) => { body[`attached_media[${i}]`] = JSON.stringify({ media_fbid: photoId }); });
+          try {
+            payload = await request(`${encodeURIComponent(input.targetId)}/feed`, { method: 'POST', token: input.accessToken, body });
+          } catch (error) {
+            if (journal && error instanceof FacebookApiError && isFacebookDefiniteRejection(error.status, error.code, error.transient)) {
+              try { await journal.rejectFeed(); } catch { /* Preserve uncertain publication state. */ }
+            }
+            throw new FacebookMediaRecoveryError();
+          }
+          const feedId = providerId(object(payload).id);
+          if (!feedId) throw new FacebookMediaRecoveryError();
+          if (journal) await journal.recordFeed(feedId);
+          payload = { id: feedId };
+        } catch (error) {
+          if (error instanceof FacebookMediaRecoveryError) throw error;
+          // A definitive rejection of the very first photo request, with its
+          // rejection receipt committed, proves no earlier photo was created.
+          if (error instanceof FacebookApiError && isFacebookDefiniteRejection(error.status, error.code, error.transient) && photoIds.length === 0) throw error;
+          throw new FacebookMediaRecoveryError();
+        }
       } else {
         payload = await request(`${encodeURIComponent(input.targetId)}/feed`, { method: 'POST', token: input.accessToken,
           body: { message: input.text?.trim() || undefined, link: input.link || undefined } });
@@ -439,11 +500,12 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
 }
 
 /** Backward-compatible thin publisher used by the current neutral contract. */
-export function createFacebookPublisher(config: FacebookConfig, fetchImpl: FacebookFetch = fetch) {
+export function createFacebookPublisher(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, mediaJournalFactory?: FacebookMediaJournalFactory) {
   return async (request: PublishRequest): Promise<PublishResult> => {
     if (request.target.kind !== 'page') throw new FacebookApiError('Facebook publishing currently supports Page targets only.', 0);
-    const engine = createFacebookEngine(config, fetchImpl, request.signal);
-    const result = await engine.publish({ targetId: request.target.id, accessToken: request.credential.accessToken, text: request.text, link: request.link, media: request.media });
+    const engine = createFacebookEngine(config, fetchImpl, request.signal, mediaJournalFactory);
+    const result = await engine.publish({ targetId: request.target.id, accessToken: request.credential.accessToken, text: request.text, link: request.link,
+      operationId: request.operationId, media: request.media });
     return result;
   };
 }
@@ -460,7 +522,7 @@ function createFacebookFirstCommentPublisher(config: FacebookConfig, fetchImpl: 
   };
 }
 
-export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { postReadScopes?: readonly string[]; postPublishScopes?: readonly string[]; postDeleteScopes?: readonly string[]; firstCommentScopes?: readonly string[] }): PlatformAdapter {
+export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { postReadScopes?: readonly string[]; postPublishScopes?: readonly string[]; postDeleteScopes?: readonly string[]; firstCommentScopes?: readonly string[]; mediaJournalFactory?: FacebookMediaJournalFactory }): PlatformAdapter {
   const engine = createFacebookEngine(config, fetchImpl);
   const requiredPostReadScopes = policy?.postReadScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
   const requiredPostPublishScopes = policy?.postPublishScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
@@ -493,6 +555,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
     capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
     canUseCredential,
     classifyPublishingFailure(error) {
+      if (error instanceof FacebookMediaRecoveryError) return 'uncertain';
       if (!(error instanceof FacebookApiError)) return 'uncertain';
       return isFacebookDefiniteRejection(error.status, error.code, error.transient) ? 'rejected' : 'uncertain';
     },
@@ -505,7 +568,7 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
     },
     async publish(request) {
       if (!canUseCredential(request.credential, 'publishing')) throw new FacebookApiError('Facebook Page publishing permission is missing or unavailable.', 0);
-      return createFacebookPublisher(config, fetchImpl)(request);
+      return createFacebookPublisher(config, fetchImpl, policy?.mediaJournalFactory)(request);
     },
     async publishFirstComment(request) {
       if (!canUseCredential(request.credential, 'firstComment')) throw new FacebookApiError('Facebook Page first-comment permission is missing or unavailable.', 0);

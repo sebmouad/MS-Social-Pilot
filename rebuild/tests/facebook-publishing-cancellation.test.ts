@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createFacebookAdapter, createFacebookEngine, createFacebookPublisher, FacebookApiError } from '../src/platforms/facebook/publishing';
+import { createFacebookAdapter, createFacebookEngine, createFacebookPublisher, FacebookApiError, FacebookMediaRecoveryError } from '../src/platforms/facebook/publishing';
+import type { FacebookMediaJournal } from '../src/platforms/facebook/media-journal-port';
 import type { FacebookConfig } from '../src/platforms/facebook/config';
 
 const config: FacebookConfig = {
@@ -40,6 +41,34 @@ describe('Facebook publishing cancellation', () => {
       { kind: 'image', url: 'https://cdn.test/b.jpg', localFile: jpeg('b.jpg') },
     ] })).rejects.toBeInstanceOf(FacebookApiError);
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a photo whose response races cancellation in recovery state without dispatching another request', async () => {
+    const controller = new AbortController();
+    const journal: FacebookMediaJournal = {
+      beginPhoto: vi.fn(), recordPhoto: vi.fn(), rejectPhoto: vi.fn(),
+      beginFeed: vi.fn(), recordFeed: vi.fn(), rejectFeed: vi.fn(),
+    };
+    const fetcher = vi.fn(async () => {
+      controller.abort();
+      return response({ id: 'photo-accepted-before-cancel' });
+    }) as unknown as typeof fetch;
+    const adapter = createFacebookAdapter(config, fetcher, {
+      ...policy,
+      mediaJournalFactory: () => journal,
+    });
+    let failure: unknown;
+    try {
+      await adapter.publish!({ ...publishRequest(controller.signal), operationId: 'cancelled-operation', media: [
+        { kind: 'image', url: 'https://cdn.test/a.jpg' }, { kind: 'image', url: 'https://cdn.test/b.jpg' },
+      ] });
+    } catch (error) { failure = error; }
+    expect(failure).toBeInstanceOf(FacebookMediaRecoveryError);
+    expect(adapter.classifyPublishingFailure!(failure)).toBe('uncertain');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(journal.beginPhoto).toHaveBeenCalledWith(1);
+    expect(journal.recordPhoto).not.toHaveBeenCalled();
+    expect(journal.beginFeed).not.toHaveBeenCalled();
   });
 
   it('returns the post result without dispatching a first-comment request', async () => {

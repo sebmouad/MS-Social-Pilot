@@ -385,3 +385,30 @@ branch, setting, migration or schema change was added. Facebook's existing
 engine already omitted blank caption fields; new transport fixtures cover image,
 remote video and link posts without filler text. CAPTIONLESS_POSTS.md and
 PREVIEW_QA.md record evidence and remaining browser/live-provider/release gaps.
+
+
+## Facebook media steps and module-owned Root evidence — batch 52, 2026-10-17
+
+Facebook now owns a content-free photo/feed step journal, pure persistence port,
+engine sequencing and private evidence schema. Configured engines/adapters inject
+it and require the shared opaque publication operation ID for multi-photo writes.
+Each intent/receipt commits independently before the next remote phase; unresolved
+steps are never resent. Only a committed first-photo definite rejection can
+release the parent without earlier effects. Later/ambiguous failures remain held.
+
+Installed neutral recovery hooks guard new claims and data/connection cleanup
+regardless of customer enablement; manual outcomes cannot contradict known feed
+receipts or abandon staged/unknown uploads. The narrow safety registration avoids
+constructing provider API engines in shared guards. Root's generic module panel,
+sidebar operation filter, private GET API and installation MCP tool/resource share
+active owner checks and module-owned safe evidence. Workspace keys cannot read it.
+Registry 49 adds consumed Root/platform evidence limits. The sixth additive SQL
+migration was applied only after restore verification on the synthetic preview;
+CUTOVER.md records the unchanged checksum and exact backup counts.
+
+FACEBOOK_MEDIA_RECOVERY.md describes source ownership, state boundaries and gaps.
+This is durable staging evidence and matching local receipt recovery, **not**
+finished staged-photo cleanup, unknown-step reconciliation, live provider proof,
+full module/legacy parity or cutover. Failed staging remains held until those
+provider-owned recovery operations are implemented and verified. Production is
+still legacy.

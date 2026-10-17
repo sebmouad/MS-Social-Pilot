@@ -282,3 +282,24 @@ saved references are not described as usable attachments. The summary describes
 content only; it does not claim delivery or preview inaccessible remote media.
 CAPTIONLESS_POSTS.md records the service and MCP behavior; PREVIEW_QA.md separates
 automated/local HTTP evidence from the outstanding browser/provider checks.
+
+
+## Module-owned publication evidence in Root — 2026-10-17
+
+A platform with installed publication-recovery metadata adds one evidence panel
+inside its existing private Root module section. Shared tables render its safe
+column schema. Operation ID filtering and reset stay in the contextual sidebar;
+invalid input is retained with field-associated feedback, and clearing it restores
+unfiltered history. Empty history, no matching operation, unavailable storage and
+truncation have different copy. Filtering does not promise to remove configured
+limits. Long identifiers remain in the shared scrollable table and use wrapping
+cells. Modules without evidence omit that panel; disabling customer module access
+does not hide operator evidence or remove safety guards.
+
+Only active installation owners may read this content-free evidence through the
+page, API or installation MCP. Customer recovery errors explain review actions
+without exposing internal journal/protocol terms. Partial uploads are held rather
+than claiming publication failure guarantees remote absence. Cleanup controls are
+not offered until the module implements safe intent/receipt/reconciliation behavior.
+FACEBOOK_MEDIA_RECOVERY.md owns current domain details; PREVIEW_QA.md distinguishes
+component/API/MCP proof from browser and real-provider checks still pending.

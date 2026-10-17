@@ -5,7 +5,7 @@ import { THEMES } from '@/lib/themes';
 import { configurationOwner } from './ownership';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 48;
+export const CONFIG_SCHEMA_VERSION = 49;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -48,6 +48,7 @@ export const CONFIG_REGISTRY = [
   entry({ key: 'diagnostics.databaseTimeoutMs', group: 'Diagnostics', label: 'Diagnostic database timeout (milliseconds)', kind: 'number', description: 'Database statement and transaction wait bound for diagnostic database probes and audit writes. Provider requests use their adapter timeout.', defaultValue: 5000, schema: z.number().int().min(1000).max(30000), consumption: 'active' }),
   entry({ key: 'root.operationalTimezone', group: 'Root · Operations', label: 'Operational display timezone', kind: 'text', description: 'Explicit IANA timezone for worker telemetry and diagnostics in Root. HTTP/MCP timestamps remain ISO UTC. Other Root date screens have not yet adopted this setting.', defaultValue: 'UTC', schema: z.string().min(1).max(100).refine(value => { try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; } }, 'Use an IANA timezone.'), consumption: 'active' }),
   entry({ key: 'root.operationsRecentLimit', group: 'Root · Operations', label: 'Recent worker runs', kind: 'number', description: 'Maximum rebuild job attempts shown in private Root operations or module diagnostics.', defaultValue: 25, schema: z.number().int().min(1).max(200), consumption: 'active' }),
+  entry({ key: 'root.platformEvidenceLimit', group: 'Root · Operations', label: 'Platform publication evidence limit', kind: 'number', description: 'Maximum total content-free platform publication steps returned by private Root UI, API and MCP reads. Provider-specific limits may be lower.', defaultValue: 100, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'root.workerStaleSeconds', group: 'Root · Operations', label: 'Worker heartbeat stale after (seconds)', kind: 'number', description: 'Age beyond which a replacement worker heartbeat is reported stale. Only rebuild worker identities are considered.', defaultValue: 180, schema: z.number().int().min(10).max(86400), consumption: 'active' }),
   entry({ key: 'root.directoryPageSize', group: 'Root', label: 'Root directory page size', kind: 'number', description: 'Users and workspaces shown per page in the private Root directory.', defaultValue: 25, schema: z.number().int().min(1).max(200), consumption: 'active' }),
   entry({ key: 'root.userSearchMaxCharacters', group: 'Root', label: 'User search character limit', kind: 'number', description: 'Maximum name/email search characters in the private user directory and MCP.', defaultValue: 200, schema: z.number().int().min(1).max(2000), consumption: 'active' }),

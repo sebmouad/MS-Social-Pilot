@@ -43,3 +43,11 @@ history. Ads live readiness also checks required signing material. The real
 engine's six read checks passed on Graph v26.0; no live writes were tested.
 See `docs/FACEBOOK_REQUEST_SIGNING.md` for exact evidence and open limitations;
 older local-only evidence statements above remain applicable to their operations.
+
+
+Multi-photo staging now uses the pure `media-journal-port.ts` and module-owned
+`media-journal.ts` store, injected by configured runtime construction. Its
+`media-recovery-host.ts` is registered through the narrow installed safety registry
+without constructing an API engine. Per-photo/feed intents and receipts commit
+before sequencing continues. Partial effects remain held; cleanup/reconciliation
+is unfinished. See `rebuild/docs/FACEBOOK_MEDIA_RECOVERY.md` and current QA evidence.

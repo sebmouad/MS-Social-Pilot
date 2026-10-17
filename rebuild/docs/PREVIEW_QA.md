@@ -957,3 +957,85 @@ Private evidence: `/private/tmp/socialpilot-content51-tests-final.log`,
 `/private/tmp/socialpilot-content51-design-audit.json`. CAPTIONLESS_POSTS.md owns
 this behavior and remaining scope. Native formats, durable temporary-photo
 recovery, full legacy/UI/API/MCP parity, live-provider and cutover gates stay open.
+
+
+## Batch 52: durable Facebook media steps and private module evidence — 2026-10-17
+
+Facebook now commits a photo intent before each multi-image upload, its validated
+receipt before the next photo, then a feed intent and receipt. Configured adapter
+and direct engine construction both inject the module-owned journal. Failures
+with possible partial effects remain held. Installed neutral hooks protect new
+claims, data/connection cleanup and manual outcomes even when customer module
+access is off. Root's owning platform section has one shared evidence table,
+contextual sidebar operation filter/reset, GET API and installation MCP tool and
+resource. Registry 49 consumes Root and Facebook evidence limits.
+
+**1392 tests across 216 files passed**, including six new guarded PostgreSQL
+media tests. Actual database cases cover independent committed ordering, real
+engine/fake transport sequencing, receipt-write fault rollback, held replay,
+feed receipt-write failure, duplicate identities, outcome checks and bounded
+content-free evidence. Protocol tests cover missing operation identity, begin/
+record faults, first-photo versus later rejection, feed uncertainty, malformed
+IDs and cancellation. Root tests cover current authority, disabled-module
+visibility, cap changes, schema bounds, private HTTP/MCP, sidebar validation and
+empty/truncated/unavailable states. Typecheck and isolated production build
+passed; the running preview's `.next` was preserved.
+
+The first full unit run caught old SQL mocks treating the new journal query as
+an advisory-lock/table-list result, an overbroad host import pulling unrelated
+engine mocks into safety checks, and an in-progress journal mock. The registry
+was narrowed to explicit installed module safety wiring, mock queries were made
+accurate, and real PG validation caught/fixed a missing raw-read proxy method.
+The first complete database run then identified two cutover tests still pinned
+to five migrations. The reviewed allowlist checks were updated to require the
+new sixth file/hash and mapped columns; subsequent complete runs passed.
+
+Before preview migration, a private custom-format backup restored exact counts
+across all 98 source tables. The additive SQL applied to that scratch restore,
+and an independent migrated backup restored exact counts across 99 tables. Only
+then did the same checksum apply to the synthetic preview, preserving every
+original count with an empty new table. Both scratch databases were removed.
+CUTOVER.md records the artifact sizes/paths, checksum and outstanding full
+production-shaped/six-file/media/proxy/worker rollback gates. No production
+migration or service change occurred.
+
+Guarded `scripts/verify-facebook-media-evidence.ts` passed actual localhost
+HTTP/MCP checks with disposable synthetic data and injected fake Graph responses:
+three committed photo/feed receipts; exact Root API/tool/resource evidence;
+Root access independent of workspace membership; anonymous and ordinary
+workspace-owner denial; a successfully authenticated workspace key denied Root
+reads; known feed receipt denying ABSENT and a mismatched ID; and matching
+explicit local publication recovery without another provider request. All
+fixture workspace/content/keys/sessions/users/journal/audit records were removed
+and absence checked. No global setting changed and no secret was printed. The
+probe refuses absent preview guards before opening a database. Early attempts
+cleaned their fixtures after missing timestamp fields and a double-slash local
+URL produced invalid responses; corrected timestamps/normalized origins passed.
+
+Independent review found one P2 misleading promise that an operation filter
+would bypass the history limit. Copy now says configured limits still apply;
+new filter/reset and clear-to-unfiltered behavior are covered. The final review
+reported no P1/P2 findings. Three lower-cost implementation agents and a separate
+reviewer worked in explicit service/engine/Root/review ownership boundaries.
+
+Premium strict audit exited 1 with only the same two existing shared-primitive
+detection limitations (Button forwards props, AutoTextarea sets inline resize).
+It is not green; no fake handler or duplicate style was added. Browser automatic
+approval review previously rejected phone actions because credits were exhausted.
+The user said they will refill; no new browser run or alternate automation bypass
+was attempted. Root sidebar/table phone/theme/keyboard behavior remains unverified
+in a live browser. Component and HTTP/MCP checks are not browser evidence.
+
+Known staged-photo cleanup, unknown-step reconciliation/attestation, delayed
+result conflict recovery and real Facebook multi-photo canary/cleanup remain
+unfinished. Failed staged effects can therefore stay held. This batch does not
+claim full Publishing/Facebook/MCP/Root/legacy parity or production readiness.
+Production still runs legacy. FACEBOOK_MEDIA_RECOVERY.md owns this slice.
+
+Private evidence: `/private/tmp/socialpilot-photos52-tests-final.log`,
+`/private/tmp/socialpilot-photos52-typecheck-final.log`,
+`/private/tmp/socialpilot-photos52-build-final.log`,
+`/private/tmp/socialpilot-photos52-live-final.log`,
+`/private/tmp/socialpilot-photos52-migration.log`,
+`/private/tmp/socialpilot-photos52-probe-guard.log`, and
+`/private/tmp/socialpilot-photos52-design-audit.json`.

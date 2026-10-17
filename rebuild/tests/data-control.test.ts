@@ -45,7 +45,7 @@ function makePurgeClient(role: string = 'owner') {
     adInsight: { count: vi.fn().mockResolvedValue(5) },
     instagramInsight: { count: vi.fn().mockResolvedValue(6) },
     socialAccount: { count: vi.fn().mockResolvedValue(1) },
-    $queryRaw: vi.fn().mockImplementation((strings: TemplateStringsArray) => /rebuild_(post_deletions|publication_attempts)/.test(String(strings[0])) ? [] : [{ tableName: 'bio_pages' }, { tableName: 'custom_fields' }, { tableName: 'feed_sources' }, { tableName: 'labels' }, { tableName: 'page_groups' }, { tableName: 'posts' }, { tableName: 'share_links' }, { tableName: 'short_links' }, { tableName: 'targets' }, { tableName: 'ad_accounts' }, { tableName: 'social_accounts' }, { tableName: 'instagram_accounts' }, { tableName: 'media' }]),
+    $queryRaw: vi.fn().mockImplementation((strings: TemplateStringsArray) => /rebuild_(post_deletions|publication_attempts|facebook_media_steps)/.test(String(strings[0])) ? [] : [{ tableName: 'bio_pages' }, { tableName: 'custom_fields' }, { tableName: 'feed_sources' }, { tableName: 'labels' }, { tableName: 'page_groups' }, { tableName: 'posts' }, { tableName: 'share_links' }, { tableName: 'short_links' }, { tableName: 'targets' }, { tableName: 'ad_accounts' }, { tableName: 'social_accounts' }, { tableName: 'instagram_accounts' }, { tableName: 'media' }]),
     $queryRawUnsafe: vi.fn().mockImplementation(async (sql: string) => [{ count: BigInt(sql.includes('"media"') ? 2 : 1) }]),
     $executeRawUnsafe: vi.fn(async (sql: string) => { events.push(sql); return 1; }),
     $executeRaw: vi.fn(async (parts: TemplateStringsArray, ...values: unknown[]) => { events.push('audit'); return { parts, values }; }),
@@ -299,6 +299,15 @@ describe('workspace data controls', () => {
     tx.$queryRaw.mockImplementation((strings: TemplateStringsArray) => String(strings[0]).includes('rebuild_publication_attempts') ? [{ id: 'pending-publication' }] : []);
     await expect(deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'DELETE')).rejects.toMatchObject({ code: 'conflict' });
     expect(tx.workspaceDataPurge.create).not.toHaveBeenCalled();
+  });
+
+  it('retains provider upload evidence even when the parent publication was resolved', async () => {
+    const { tx } = makePurgeClient();
+    const { deleteWorkspaceData } = await import('../src/server/data-control');
+    tx.$queryRaw.mockImplementation((strings: TemplateStringsArray) => String(strings[0]).includes('rebuild_facebook_media_steps') ? [{ id: 'unattached-photo' }] : []);
+    await expect(deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'DELETE')).rejects.toMatchObject({ code: 'conflict' });
+    expect(tx.workspaceDataPurge.create).not.toHaveBeenCalled();
+    expect(tx.$executeRawUnsafe).not.toHaveBeenCalled();
   });
 
 });
