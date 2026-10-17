@@ -1170,3 +1170,91 @@ All remaining live-provider, unknown-step reconciliation and release gaps remain
 Published implementation: `8e2842fa27e1e60c69639e613b42aad59c9bf9f4` on
 `origin/main`, with exact remote verification and clean tree before this final
 copy/evidence follow-up. This section records that follow-up.
+
+## External Facebook media reports and late receipts — batch 54
+
+Facebook now owns explicit human photo/feed/deletion reports, separate immutable
+resolution events, retained late provider evidence and conflict holds. Registry
+51 adds the consumed, default-off `meta.manualMediaAttestationEnabled`. Shared
+Root carries bounded module-defined fields and read-only binding context without
+interpreting provider semantics. HTTP and installation MCP call the same guarded
+service; workspace owners and workspace API keys cannot execute these actions.
+`attested` identifies human evidence, never an independently confirmed provider
+result. No automatic resend, absence inference or arbitrary conflict resolver
+was added. Human-attested feed absence does not authorize destructive staged-photo
+cleanup: only no feed intent or a definitive provider rejection passes that gate.
+
+### Automated, migration and actual HTTP/MCP evidence
+
+- Final full guarded suite: **1,473 tests passed in 222 files**. An earlier run
+  hit five Vitest worker module-loading timeouts; no assertion failed. The full
+  rerun with two workers and file parallelism disabled passed in 41.53 seconds.
+- TypeScript, isolated production build and `git diff --check` passed. The build
+  did not replace the running preview's `.next` directory.
+- Real PostgreSQL cleanup tests include human-absent feed refusal in both action
+  metadata and direct service dispatch, safe no-feed parent absence, canonical
+  projected-identity contradictions, immutable-event update refusal, late receipt
+  races, deletion claim collisions, and workspace export/erase ownership.
+- The actual local HTTP/MCP probe passed default-policy, anonymous/member/key,
+  origin, exact confirmation, acknowledgment and strict module-field denials.
+  It recorded a synthetic human feed receipt, separately finished its matching
+  local publication, recorded photo absence/deletion through MCP and preserved
+  contradictory late provider evidence after parent absence. The workspace
+  archive included the FK-owned ledger; unresolved conflict refused erasure.
+  These probes issued no real provider request.
+- Eighth-migration restore verification matched all 100 original and 101 migrated
+  public-table counts before preview application. CUTOVER.md records the unchanged
+  checksum, private backups and remaining production-shaped rehearsal requirements.
+
+### Representative Chrome evidence
+
+Disposable examples had no usable provider credential and required the synthetic
+`provider-preview.invalid` endpoint. Before read-only binding context was added,
+Nightfall 390×844 checks covered required-ID focus/error association, exact
+confirmation/acknowledgment gating and an offline submit retaining all values,
+focused safe feedback, disabled repeat and Close and review. After restoring the
+network, a Grove 1440×1000 local report succeeded: the action disappeared, the
+table kept a focused human-provenance notice, and separate operator evidence was
+visible. Native inline screenshots were visually inspected at those stages.
+
+After binding context and Root-only scroll layout were added, a second Nightfall
+390×844 check visually confirmed the Page/workspace/target/operation context and
+358px dialog. Its body had 554px visible height and 647px scroll height; header
+and footer remained fixed. Shift+Tab brought the acknowledgment into view;
+Escape closed the dialog and restored its opener. Document width stayed 390px.
+Grove 1440×1000 DOM checks confirmed four binding entries, a 520px-wide dialog
+within the viewport and no document overflow. The final desktop screenshot's
+automatic approval review timed out; it supplies no additional visual evidence.
+This does not prove all themes, states or keyboard combinations.
+
+The prolonged browser/approval wait outlived the disposable fixture's original
+five-minute session. Fixture records were deleted, but its audited policy
+restoration initially failed authentication. A new correctly formatted temporary
+Root session restored the original absent/default-off setting through audited
+MCP and was removed. The probe now renews only its own fixture session before
+restoration; the server still checks current Root authority. The final full probe
+then completed cleanup and exact original-policy restoration successfully. A
+fresh browser page showed empty evidence, manual attestation disabled, original
+Nightfall restored and 1440px document width. No production setting changed.
+
+The previously used premium static-audit plugin file is no longer installed at
+its recorded path, so that audit was not rerun for this batch. The earlier two
+primitive detection limitations remain historical findings, not a green audit.
+
+### Live-provider and release boundaries
+
+A fresh read-only host query found ten selected enabled Page targets and current
+connection-level `pages_manage_posts`/`pages_manage_engagement` grants. This does
+not independently prove Page-specific access. Credentials stayed on the host;
+temporary scripts were removed and health remained HTTP 200. The user selected
+Cuisine Pleine d’Envie for identifiable temporary canary posts and cleanup.
+No live create/delete operation was executed by batch 54. Candidate search,
+arbitrary conflict resolution, complete Facebook formats/permissions/legacy/MCP
+coverage, the eight-file production-shaped migration and production rollback
+gates remain open. Production still runs legacy.
+
+Private evidence: `/private/tmp/socialpilot-resolution54-full-final.log`,
+`/private/tmp/socialpilot-resolution54-typecheck-final.log`,
+`/private/tmp/socialpilot-resolution54-build.log`,
+`/private/tmp/socialpilot-resolution54-http-mcp-final.log`, and
+`/private/tmp/socialpilot-resolution54-migration.log`.

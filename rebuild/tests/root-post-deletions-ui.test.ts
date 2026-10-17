@@ -64,4 +64,41 @@ describe('Root Publishing deletion recovery controls', () => {
     expect(container.querySelector('dialog [role=alert]')?.textContent).toBe('Current Root access is required.');
     expect(deps.refresh).not.toHaveBeenCalled();
   });
+
+  it.each(['network', 'malformed', 'wrong receipt', 'unparseable 404'])('holds %s results against repeat and refreshes on close', async failure => {
+    const fetchMock = vi.fn(async () => {
+      if (failure === 'network') throw new TypeError('offline');
+      if (failure === 'malformed') return new Response('not JSON');
+      if (failure === 'unparseable 404') return new Response('not found', { status: 404 });
+      return Response.json({ ok: true, operationId: 'another-operation', state: 'remote_confirmed' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => container.querySelector<HTMLButtonElement>('button')!.click());
+    await chooseOutcome('deleted', 'ROOT RECORD POST DELETION op-1 DELETED');
+    await act(async () => container.querySelector<HTMLButtonElement>('dialog button[type=submit]')!.click());
+    const submit = container.querySelector<HTMLButtonElement>('dialog button[type=submit]')!;
+    expect(submit.disabled).toBe(true);
+    expect(container.querySelector<HTMLInputElement>('input[name=confirmation]')?.value).toContain('op-1 DELETED');
+    expect(container.querySelector<HTMLInputElement>('input[name=verifiedOnPlatform]')?.checked).toBe(true);
+    expect(document.activeElement).toBe(container.querySelector('[role=alert]'));
+    const close = container.querySelector<HTMLButtonElement>('[data-post-deletion-cancel]')!;
+    expect(close.textContent).toBe('Close and review');
+    await act(async () => close.click());
+    expect(deps.refresh).toHaveBeenCalledOnce();
+    expect(container.querySelector<HTMLButtonElement>('button')?.disabled).toBe(true);
+    await act(async () => root.render(createElement(RootPostDeletionControls, { row: { ...row, state: 'remote_confirmed' } })));
+    expect(container.textContent).toContain('Awaiting local cleanup');
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('keeps structured validation errors correctable', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'Check the exact confirmation.', code: 'invalid_request' }, { status: 400 })));
+    await act(async () => container.querySelector<HTMLButtonElement>('button')!.click());
+    await chooseOutcome('deleted', 'ROOT RECORD POST DELETION op-1 DELETED');
+    await act(async () => container.querySelector<HTMLButtonElement>('dialog button[type=submit]')!.click());
+    expect(container.querySelector<HTMLButtonElement>('dialog button[type=submit]')?.disabled).toBe(false);
+    expect(container.querySelector('[data-post-deletion-cancel]')?.textContent).toBe('Cancel');
+    expect(deps.refresh).not.toHaveBeenCalled();
+  });
+
 });

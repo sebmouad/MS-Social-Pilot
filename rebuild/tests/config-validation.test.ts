@@ -27,7 +27,8 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(50);
+    expect(CONFIG_SCHEMA_VERSION).toBe(51);
+    expect(CONFIG_BY_KEY.get('meta.manualMediaAttestationEnabled')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'platform', id: 'facebook' } });
     expect(CONFIG_BY_KEY.get('meta.manualMediaCleanupEnabled')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'platform', id: 'facebook' } });
     for (const key of ['meta.mediaReadScopes', 'meta.mediaDeleteScopes']) {
       expect(CONFIG_BY_KEY.get(key)?.schema.safeParse([]).success).toBe(false);

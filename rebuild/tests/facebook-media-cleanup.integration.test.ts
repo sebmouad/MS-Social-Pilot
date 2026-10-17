@@ -7,6 +7,7 @@ const integration = vi.hoisted(() => ({
   client: null as any,
   outcome: 'confirmed' as 'confirmed' | 'rejected' | 'uncertain',
   cleanupEnabled: true,
+  attestationEnabled: false,
   callbackCalls: 0,
   prepareCalls: 0,
   failReceiptUpdate: false,
@@ -51,6 +52,7 @@ vi.mock('../src/server/config/store', () => ({
     'publishing.operationMaxWaitMs': 5000,
     'data.workspaceOperationTimeoutMs': 60000,
     'meta.manualMediaCleanupEnabled': integration.cleanupEnabled,
+    'meta.manualMediaAttestationEnabled': integration.attestationEnabled,
   }[key]),
 }));
 vi.mock('../src/server/root/operations', () => ({ requireActiveRoot: async () => undefined }));
@@ -65,6 +67,8 @@ vi.mock('../src/platforms/facebook/media-cleanup-transport', () => ({
 }));
 
 import { cleanupFacebookMedia } from '../src/platforms/facebook/media-cleanup';
+import { resolveFacebookMedia } from '../src/platforms/facebook/media-resolution';
+import { recordFacebookMediaDeletionOutcome } from '../src/platforms/facebook/media-resolution-store';
 import { assertFacebookMediaResolution, assertFacebookMediaSettled, facebookMediaJournal } from '../src/platforms/facebook/media-journal';
 
 describe.skipIf(!databaseUrl)('Facebook staged-photo cleanup on isolated PostgreSQL', () => {
@@ -85,6 +89,8 @@ describe.skipIf(!databaseUrl)('Facebook staged-photo cleanup on isolated Postgre
     if (!client) return;
     for (const workspaceId of workspaceIds) {
       await client.$executeRaw`DELETE FROM root_activities WHERE detail->>'workspaceId'=${workspaceId}`;
+      await client.$executeRaw`DELETE FROM post_targets WHERE "postId" IN (SELECT id FROM posts WHERE "workspaceId"=${workspaceId})`;
+      await client.$executeRaw`DELETE FROM posts WHERE "workspaceId"=${workspaceId}`;
       await client.$executeRaw`DELETE FROM rebuild_facebook_media_deletions WHERE "workspaceId"=${workspaceId}`;
       await client.$executeRaw`DELETE FROM rebuild_facebook_media_steps WHERE "workspaceId"=${workspaceId}`;
       await client.$executeRaw`DELETE FROM rebuild_publication_attempts WHERE "workspaceId"=${workspaceId}`;
@@ -95,12 +101,12 @@ describe.skipIf(!databaseUrl)('Facebook staged-photo cleanup on isolated Postgre
     }
     workspaceIds.clear();
     actorByWorkspace.clear();
-    integration.outcome = 'confirmed'; integration.cleanupEnabled = true; integration.callbackCalls = 0; integration.prepareCalls = 0;
+    integration.outcome = 'confirmed'; integration.cleanupEnabled = true; integration.attestationEnabled = false; integration.callbackCalls = 0; integration.prepareCalls = 0;
     integration.failReceiptUpdate = false; integration.failIntentAudit = false;
   });
   afterAll(async () => { integration.client = client; await client?.$disconnect(); });
 
-  async function fixture(options: { photoCount?: number; feedState?: string; parentState?: string; parentRemotePostId?: string } = {}) {
+  async function fixture(options: { photoCount?: number; photoState?: 'recorded' | 'started'; feedState?: string; parentState?: string; parentRemotePostId?: string; projectedRemotePostId?: string } = {}) {
     if (!client) throw new Error('Guarded preview client was not initialized.');
     const suffix = randomUUID().replaceAll('-', '');
     const workspaceId = `preview_fb_cleanup_${suffix}`;
@@ -115,6 +121,10 @@ describe.skipIf(!databaseUrl)('Facebook staged-photo cleanup on isolated Postgre
     await client.user.create({ data: { id: actorId, email: `${actorId}@example.test`, name: 'Synthetic Root actor', passwordHash: 'synthetic-test-only', isInstanceOwner: true } });
     await client.workspace.create({ data: { id: workspaceId, name: 'Synthetic Facebook cleanup fixture', slug: workspaceId, timezone: 'UTC' } });
     await client.target.create({ data: { id: targetId, workspaceId, type: 'page', providerId: remoteTargetId, name: 'Synthetic Page', enabled: true, canPublish: true, createdAt: new Date() } });
+    if (options.projectedRemotePostId) await client.post.create({ data: {
+      id: postId, workspaceId, authorId: actorId, message: 'Synthetic projection fixture', status: 'draft', createdAt: new Date(), updatedAt: new Date(),
+      targets: { create: { id: postTargetId, targetId, status: 'pending', remotePostId: options.projectedRemotePostId, updatedAt: new Date() } },
+    } });
     const state = options.parentState ?? 'started';
     const parentReason = state === 'uncertain' ? 'outcome_unknown' : state === 'receipt_recorded' ? 'provider_receipt' : null;
     await client.$executeRaw`INSERT INTO rebuild_publication_attempts
@@ -126,16 +136,24 @@ describe.skipIf(!databaseUrl)('Facebook staged-photo cleanup on isolated Postgre
       const id = randomUUID(); photoIds.push(id);
       await client.$executeRaw`INSERT INTO rebuild_facebook_media_steps
         (id, "workspaceId", "operationId", "postId", "postTargetId", "targetId", "actorId", "remoteTargetId", phase, ordinal, state, "remoteId", "receiptAt")
-        VALUES (${id}, ${workspaceId}, ${operationId}, ${postId}, ${postTargetId}, ${targetId}, ${actorId}, ${remoteTargetId}, 'photo', ${ordinal}, 'recorded', ${`remote_photo_${ordinal}_${suffix}`}, CURRENT_TIMESTAMP)`;
+        VALUES (${id}, ${workspaceId}, ${operationId}, ${postId}, ${postTargetId}, ${targetId}, ${actorId}, ${remoteTargetId}, 'photo', ${ordinal}, ${options.photoState ?? 'recorded'}, ${options.photoState === 'started' ? null : `remote_photo_${ordinal}_${suffix}`}, CASE WHEN ${options.photoState ?? 'recorded'}='recorded' THEN CURRENT_TIMESTAMP ELSE NULL END)`;
     }
+    const feedId = options.feedState ? randomUUID() : null;
     if (options.feedState) await client.$executeRaw`INSERT INTO rebuild_facebook_media_steps
       (id, "workspaceId", "operationId", "postId", "postTargetId", "targetId", "actorId", "remoteTargetId", phase, ordinal, state, "remoteId", "receiptAt", "rejectedAt")
-      VALUES (${randomUUID()}, ${workspaceId}, ${operationId}, ${postId}, ${postTargetId}, ${targetId}, ${actorId}, ${remoteTargetId}, 'feed', 0, ${options.feedState},
+      VALUES (${feedId}, ${workspaceId}, ${operationId}, ${postId}, ${postTargetId}, ${targetId}, ${actorId}, ${remoteTargetId}, 'feed', 0, ${options.feedState},
         ${options.feedState === 'recorded' ? 'known_feed' : null}, CASE WHEN ${options.feedState}='recorded' THEN CURRENT_TIMESTAMP ELSE NULL END,
         CASE WHEN ${options.feedState}='rejected' THEN CURRENT_TIMESTAMP ELSE NULL END)`;
-    return { workspaceId, targetId, remoteTargetId, operationId, postId, postTargetId, photoIds, actorId };
+    return { workspaceId, targetId, remoteTargetId, operationId, postId, postTargetId, photoIds, feedId, actorId };
   }
   const action = (stepId: string) => ({ actionId: 'delete_staged_photo', subjectId: stepId, confirmation: `DELETE STAGED PHOTO ${stepId}`, acknowledged: true as const });
+  const attest = (actionId: string, id: string, remoteId?: string) => ({ actionId, subjectId: id,
+    confirmation: actionId === 'record_photo_present' ? `ATTEST FACEBOOK PHOTO ${id} PRESENT`
+      : actionId === 'record_feed_present' ? `ATTEST FACEBOOK FEED ${id} PRESENT`
+        : actionId === 'record_photo_deleted' ? `ATTEST FACEBOOK DELETE ${id} DELETED`
+          : actionId === 'record_photo_still_present' ? `ATTEST FACEBOOK DELETE ${id} STILL PRESENT`
+            : `ATTEST FACEBOOK STEP ${id} ABSENT`, acknowledged: true as const,
+    ...(remoteId ? { fieldValues: { remoteId } } : {}) });
 
   it('commits deletion before the callback, freezes a late feed, and makes confirmed replay idempotent', async () => {
     const f = await fixture({ photoCount: 2 });
@@ -158,6 +176,26 @@ describe.skipIf(!databaseUrl)('Facebook staged-photo cleanup on isolated Postgre
     const recorded = await fixture({ feedState: 'recorded' });
     await expect(cleanupFacebookMedia(recorded.actorId, action(recorded.photoIds[0]))).rejects.toMatchObject({ code: 'conflict' });
     expect(integration.callbackCalls).toBe(0);
+  });
+
+  it('keeps cleanup blocked after a human feed-absent report while allowing the no-feed parent-absent case', async () => {
+    const feedAbsent = await fixture({ feedState: 'started' });
+    integration.attestationEnabled = true;
+    await resolveFacebookMedia(feedAbsent.actorId, attest('record_step_absent', feedAbsent.feedId!));
+    const { readFacebookMediaEvidence } = await import('../src/platforms/facebook/media-journal');
+    const evidence = await readFacebookMediaEvidence(feedAbsent.operationId, 10);
+    expect(evidence.actions?.some(item => item.actionId === 'delete_staged_photo')).toBe(false);
+    await expect(cleanupFacebookMedia(feedAbsent.actorId, action(feedAbsent.photoIds[0])))
+      .rejects.toMatchObject({ code: 'conflict' });
+    expect(integration.callbackCalls).toBe(0);
+
+    const parentAbsentWithoutFeed = await fixture();
+    await client!.$executeRaw`UPDATE rebuild_publication_attempts SET state='attested_absent', reason='external_human_attestation',
+      "attestedAt"=CURRENT_TIMESTAMP, "attestedBy"=${parentAbsentWithoutFeed.actorId}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${parentAbsentWithoutFeed.operationId}`;
+    const noFeedEvidence = await readFacebookMediaEvidence(parentAbsentWithoutFeed.operationId, 10);
+    expect(noFeedEvidence.actions?.some(item => item.actionId === 'delete_staged_photo')).toBe(true);
+    await expect(cleanupFacebookMedia(parentAbsentWithoutFeed.actorId, action(parentAbsentWithoutFeed.photoIds[0])))
+      .resolves.toMatchObject({ ok: true, state: 'confirmed' });
   });
 
   it('allows an explicitly rejected feed cleanup and then resolves ABSENT only after confirmed deletion', async () => {
@@ -264,6 +302,177 @@ describe.skipIf(!databaseUrl)('Facebook staged-photo cleanup on isolated Postgre
     expect(integration.callbackCalls).toBe(0);
   });
 
+  it('records external absence and preserves a contradictory late provider receipt as a conflict event', async () => {
+    const f = await fixture({ photoState: 'started' });
+    integration.attestationEnabled = true;
+    const absent = await resolveFacebookMedia(f.actorId, attest('record_step_absent', f.photoIds[0]));
+    expect(absent).toMatchObject({ ok: true, state: 'attested' });
+    await expect(facebookMediaJournal(f.operationId, f.remoteTargetId).recordPhoto(1, 'late_photo_id')).resolves.toBeUndefined();
+    const step = await client!.$queryRaw<Array<{ state: string; remoteId: string | null }>>`SELECT state, "remoteId" FROM rebuild_facebook_media_steps WHERE id=${f.photoIds[0]}`;
+    expect(step[0]).toEqual({ state: 'conflict', remoteId: null });
+    const event = await client!.$queryRaw<Array<{ outcome: string; remoteId: string | null; source: string }>>`
+      SELECT outcome, "remoteId", source FROM rebuild_facebook_media_resolutions WHERE "mediaStepId"=${f.photoIds[0]} ORDER BY "createdAt" DESC LIMIT 1`;
+    expect(event[0]).toMatchObject({ outcome: 'late_provider_receipt', remoteId: 'late_photo_id', source: 'provider' });
+    const evidence = await (await import('../src/platforms/facebook/media-journal')).readFacebookMediaEvidence(f.operationId, 10);
+    expect(evidence.items).toContainEqual(expect.objectContaining({ recordType: 'event', source: 'operator', state: 'photo_absent', actorId: f.actorId }));
+    expect(evidence.items).toContainEqual(expect.objectContaining({ recordType: 'event', source: 'provider', state: 'late_provider_receipt', remoteId: 'late_photo_id' }));
+    await expect(assertFacebookMediaSettled(client! as never, f.workspaceId)).rejects.toMatchObject({ code: 'conflict' });
+  });
+
+  it('records feed presence only after exact known photos and freezes the publication operation', async () => {
+    const f = await fixture({ photoCount: 2, feedState: 'started' });
+    integration.attestationEnabled = true;
+    const result = await resolveFacebookMedia(f.actorId, attest('record_feed_present', f.feedId!, 'attested_feed_id'));
+    expect(result).toMatchObject({ ok: true, state: 'attested' });
+    await expect(facebookMediaJournal(f.operationId, f.remoteTargetId).recordFeed('attested_feed_id')).resolves.toBeUndefined();
+    const feed = await client!.$queryRaw<Array<{ state: string; remoteId: string | null; attestedBy: string | null }>>`
+      SELECT state, "remoteId", "attestedBy" FROM rebuild_facebook_media_steps WHERE id=${f.feedId!}`;
+    expect(feed[0]).toMatchObject({ state: 'attested_present', remoteId: 'attested_feed_id', attestedBy: f.actorId });
+    await expect(assertFacebookMediaResolution(client! as never, f.workspaceId, f.operationId, 'PUBLISHED', 'attested_feed_id')).resolves.toBeUndefined();
+    const parent = await client!.$queryRaw<Array<{ state: string }>>`SELECT state FROM rebuild_publication_attempts WHERE id=${f.operationId}`;
+    expect(parent[0].state).toBe('uncertain');
+  });
+
+  it('supports photo-present and feed-absent attestations and keeps the two identities separate', async () => {
+    const photo = await fixture({ photoState: 'started' });
+    integration.attestationEnabled = true;
+    await resolveFacebookMedia(photo.actorId, attest('record_photo_present', photo.photoIds[0], 'human_photo_id'));
+    await expect(facebookMediaJournal(photo.operationId, photo.remoteTargetId).recordPhoto(1, 'human_photo_id')).resolves.toBeUndefined();
+    const photoRow = await client!.$queryRaw<Array<{ state: string; remoteId: string | null; receiptAt: Date | null }>>`
+      SELECT state, "remoteId", "receiptAt" FROM rebuild_facebook_media_steps WHERE id=${photo.photoIds[0]}`;
+    expect(photoRow[0]).toMatchObject({ state: 'attested_present', remoteId: 'human_photo_id', receiptAt: null });
+
+    const feed = await fixture({ feedState: 'started' });
+    await resolveFacebookMedia(feed.actorId, attest('record_step_absent', feed.feedId!));
+    const feedRow = await client!.$queryRaw<Array<{ state: string; remoteId: string | null; attestedBy: string | null }>>`
+      SELECT state, "remoteId", "attestedBy" FROM rebuild_facebook_media_steps WHERE id=${feed.feedId!}`;
+    expect(feedRow[0]).toMatchObject({ state: 'attested_absent', remoteId: null, attestedBy: feed.actorId });
+    const events = await client!.$queryRaw<Array<{ outcome: string; eventActorId: string | null }>>`
+      SELECT outcome, "eventActorId" FROM rebuild_facebook_media_resolutions WHERE "operationId"=${feed.operationId}`;
+    expect(events).toContainEqual({ outcome: 'feed_absent', eventActorId: feed.actorId });
+  });
+
+  it('keeps matching late deletion confirmation after a human deleted attestation and records its provider event', async () => {
+    const f = await fixture({ feedState: 'rejected' });
+    integration.attestationEnabled = true;
+    integration.outcome = 'uncertain';
+    await cleanupFacebookMedia(f.actorId, action(f.photoIds[0]));
+    const deletion = await client!.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_facebook_media_deletions WHERE "mediaStepId"=${f.photoIds[0]}`;
+    await resolveFacebookMedia(f.actorId, attest('record_photo_deleted', deletion[0].id));
+    await client!.$transaction(tx => recordFacebookMediaDeletionOutcome(tx as never, deletion[0].id, 'confirmed'));
+    const row = await client!.$queryRaw<Array<{ state: string }>>`SELECT state FROM rebuild_facebook_media_deletions WHERE id=${deletion[0].id}`;
+    expect(row[0].state).toBe('attested_deleted');
+    const event = await client!.$queryRaw<Array<{ outcome: string; remoteId: string | null }>>`
+      SELECT outcome, "remoteId" FROM rebuild_facebook_media_resolutions WHERE "deletionId"=${deletion[0].id} AND source='provider'`;
+    expect(event[0].outcome).toBe('late_provider_receipt');
+    expect(event[0].remoteId).toContain('remote_photo_1_');
+    await expect(assertFacebookMediaResolution(client! as never, f.workspaceId, f.operationId, 'ABSENT')).resolves.toBeUndefined();
+  });
+
+  it('resolves an uncertain deletion when a delayed provider confirmation arrives', async () => {
+    const f = await fixture({ feedState: 'rejected' });
+    integration.outcome = 'uncertain';
+    await cleanupFacebookMedia(f.actorId, action(f.photoIds[0]));
+    const deletion = await client!.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_facebook_media_deletions WHERE "mediaStepId"=${f.photoIds[0]}`;
+    await client!.$transaction(tx => recordFacebookMediaDeletionOutcome(tx as never, deletion[0].id, 'confirmed'));
+    const row = await client!.$queryRaw<Array<{ state: string; receiptAt: Date | null }>>`SELECT state, "receiptAt" FROM rebuild_facebook_media_deletions WHERE id=${deletion[0].id}`;
+    expect(row[0].state).toBe('confirmed');
+    expect(row[0].receiptAt).toBeInstanceOf(Date);
+    await expect(assertFacebookMediaResolution(client! as never, f.workspaceId, f.operationId, 'ABSENT')).resolves.toBeUndefined();
+  });
+
+  it('records a deletion still-present attestation and permits a later explicit cleanup intent', async () => {
+    const f = await fixture({ feedState: 'rejected' });
+    integration.attestationEnabled = true;
+    integration.outcome = 'uncertain';
+    const unknown = await cleanupFacebookMedia(f.actorId, action(f.photoIds[0]));
+    expect(unknown.state).toBe('needs_review');
+    const deletion = await client!.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_facebook_media_deletions WHERE "mediaStepId"=${f.photoIds[0]}`;
+    await resolveFacebookMedia(f.actorId, attest('record_photo_still_present', deletion[0].id));
+    integration.outcome = 'confirmed';
+    const retried = await cleanupFacebookMedia(f.actorId, action(f.photoIds[0]));
+    expect(retried).toMatchObject({ ok: true, state: 'confirmed' });
+    expect(integration.callbackCalls).toBe(2);
+    const history = await client!.$queryRaw<Array<{ state: string }>>`SELECT state FROM rebuild_facebook_media_deletions WHERE "mediaStepId"=${f.photoIds[0]} ORDER BY "createdAt"`;
+    expect(history.map(row => row.state)).toEqual(['attested_present', 'confirmed']);
+  });
+
+  it('holds a newer cleanup claim when an older still-present deletion later confirms', async () => {
+    const f = await fixture({ feedState: 'rejected' });
+    integration.attestationEnabled = true;
+    integration.outcome = 'uncertain';
+    await cleanupFacebookMedia(f.actorId, action(f.photoIds[0]));
+    const oldDeletion = await client!.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_facebook_media_deletions WHERE "mediaStepId"=${f.photoIds[0]}`;
+    await resolveFacebookMedia(f.actorId, attest('record_photo_still_present', oldDeletion[0].id));
+    integration.outcome = 'confirmed';
+    const newer = await cleanupFacebookMedia(f.actorId, action(f.photoIds[0]));
+    expect(newer).toMatchObject({ ok: true, state: 'confirmed' });
+    const late = await client!.$transaction(tx => recordFacebookMediaDeletionOutcome(tx as never, oldDeletion[0].id, 'confirmed'));
+    expect(late).toBe('conflict');
+    const rows = await client!.$queryRaw<Array<{ id: string; state: string }>>`
+      SELECT id, state FROM rebuild_facebook_media_deletions WHERE "mediaStepId"=${f.photoIds[0]} ORDER BY "createdAt", id`;
+    expect(rows.map(row => row.state)).toEqual(['attested_present', 'conflict']);
+    const event = await client!.$queryRaw<Array<{ outcome: string; source: string; remoteId: string | null }>>`
+      SELECT outcome, source, "remoteId" FROM rebuild_facebook_media_resolutions WHERE "deletionId"=${oldDeletion[0].id} AND source='provider'`;
+    expect(event).toHaveLength(1);
+    expect(event[0]).toMatchObject({ outcome: 'late_provider_receipt', source: 'provider' });
+    expect(event[0].remoteId).toContain('remote_photo_1_');
+    await expect(cleanupFacebookMedia(f.actorId, action(f.photoIds[0]))).rejects.toMatchObject({ code: 'conflict' });
+    expect(integration.callbackCalls).toBe(2);
+  });
+
+  it('allows update rejection on the immutable event ledger and permits scoped erasure deletes', async () => {
+    const f = await fixture({ photoState: 'started' });
+    integration.attestationEnabled = true;
+    await resolveFacebookMedia(f.actorId, attest('record_step_absent', f.photoIds[0]));
+    const events = await client!.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_facebook_media_resolutions WHERE "operationId"=${f.operationId}`;
+    await expect(client!.$executeRaw`UPDATE rebuild_facebook_media_resolutions SET outcome='photo_present' WHERE id=${events[0].id}`).rejects.toThrow();
+    await expect(client!.$executeRaw`DELETE FROM rebuild_facebook_media_resolutions WHERE id=${events[0].id}`).resolves.toBe(1);
+  });
+
+  it('keeps parent ABSENT frozen while a later photo receipt becomes a visible conflict', async () => {
+    const f = await fixture({ photoState: 'started' });
+    await client!.$executeRaw`UPDATE rebuild_publication_attempts SET state='attested_absent', reason='external_human_attestation',
+      "attestedAt"=CURRENT_TIMESTAMP, "attestedBy"=${f.actorId}, "updatedAt"=CURRENT_TIMESTAMP WHERE id=${f.operationId}`;
+    await expect(facebookMediaJournal(f.operationId, f.remoteTargetId).recordPhoto(1, 'after_absent_photo')).resolves.toBeUndefined();
+    const step = await client!.$queryRaw<Array<{ state: string; remoteId: string | null }>>`SELECT state, "remoteId" FROM rebuild_facebook_media_steps WHERE id=${f.photoIds[0]}`;
+    expect(step[0]).toEqual({ state: 'conflict', remoteId: null });
+    const event = await client!.$queryRaw<Array<{ outcome: string; remoteId: string | null }>>`
+      SELECT outcome, "remoteId" FROM rebuild_facebook_media_resolutions WHERE "mediaStepId"=${f.photoIds[0]}`;
+    expect(event).toContainEqual({ outcome: 'late_provider_receipt', remoteId: 'after_absent_photo' });
+    await expect(assertFacebookMediaSettled(client! as never, f.workspaceId)).rejects.toMatchObject({ code: 'conflict' });
+  });
+
+  it('rejects manual attestation when disabled, malformed, or bound to a corrupted operation', async () => {
+    const f = await fixture({ photoState: 'started' });
+    await expect(resolveFacebookMedia(f.actorId, attest('record_step_absent', f.photoIds[0]))).rejects.toMatchObject({ code: 'forbidden' });
+    integration.attestationEnabled = true;
+    await expect(resolveFacebookMedia(f.actorId, { ...attest('record_step_absent', f.photoIds[0]), confirmation: 'wrong' }))
+      .rejects.toMatchObject({ code: 'invalid_request' });
+    await client!.$executeRaw`UPDATE rebuild_facebook_media_steps SET "actorId"='different-actor', "updatedAt"=CURRENT_TIMESTAMP WHERE id=${f.photoIds[0]}`;
+    await expect(resolveFacebookMedia(f.actorId, attest('record_step_absent', f.photoIds[0]))).rejects.toMatchObject({ code: 'conflict' });
+    const events = await client!.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) AS count FROM rebuild_facebook_media_resolutions WHERE "operationId"=${f.operationId}`;
+    expect(Number(events[0].count)).toBe(0);
+  });
+
+  it('refuses API attestation and PUBLISHED or ABSENT resolution when the canonical post target is projected', async () => {
+    const absent = await fixture({ photoState: 'started', projectedRemotePostId: 'projected-post' });
+    integration.attestationEnabled = true;
+    await expect(resolveFacebookMedia(absent.actorId, attest('record_step_absent', absent.photoIds[0])))
+      .rejects.toMatchObject({ code: 'conflict' });
+    await expect(assertFacebookMediaResolution(client! as never, absent.workspaceId, absent.operationId, 'ABSENT'))
+      .rejects.toMatchObject({ code: 'conflict' });
+
+    const published = await fixture({ photoCount: 2, feedState: 'recorded', parentState: 'uncertain', projectedRemotePostId: 'different-projection' });
+    await expect(assertFacebookMediaResolution(client! as never, published.workspaceId, published.operationId, 'PUBLISHED', 'known_feed'))
+      .rejects.toMatchObject({ code: 'conflict' });
+
+    const projectedCleanup = await fixture({ projectedRemotePostId: 'already-projected' });
+    await expect(cleanupFacebookMedia(projectedCleanup.actorId, action(projectedCleanup.photoIds[0])))
+      .rejects.toMatchObject({ code: 'conflict' });
+    expect(integration.callbackCalls).toBe(0);
+  });
+
   it('enforces NULL-safe state/receipt constraints in PostgreSQL', async () => {
     const f = await fixture();
     await expect(client!.$executeRaw`INSERT INTO rebuild_facebook_media_deletions
@@ -278,10 +487,19 @@ describe.skipIf(!databaseUrl)('Facebook staged-photo cleanup on isolated Postgre
     const evidence = await readFacebookMediaEvidence(f.operationId, 10);
     expect(evidence.rowIdKey).toBe('id');
     expect(evidence.columns.map(column => column.key)).toContain('cleanupState');
+    expect(evidence.columns.map(column => column.key)).toContain('remoteTargetId');
     expect(evidence.actions).toHaveLength(2);
-    expect(evidence.actions?.[0].description).toContain('recorded staged Facebook photo');
+    expect(evidence.actions?.[0].description).toContain('known staged Facebook photo');
     expect(evidence.actions?.[0].description).not.toContain('known unpublished');
     expect(evidence.actions?.[0]).toMatchObject({ actionId: 'delete_staged_photo', confirmation: `DELETE STAGED PHOTO ${f.photoIds[0]}` });
+    expect(evidence.actions?.[0].context).toEqual([
+      { label: 'Workspace ID', value: f.workspaceId },
+      { label: 'Target ID', value: f.targetId },
+      { label: 'Facebook Page ID', value: f.remoteTargetId },
+      { label: 'Publication operation ID', value: f.operationId },
+      { label: 'Facebook photo ID', value: f.remoteTargetId.replace('remote_page_', 'remote_photo_1_') },
+    ]);
+    expect(evidence.items.find(item => item.recordType === 'step')).toMatchObject({ remoteTargetId: f.remoteTargetId });
     expect(JSON.stringify(evidence)).not.toMatch(/accessToken|imageUrl|rawError|postText/i);
   });
 });

@@ -98,10 +98,13 @@ export async function prepareFacebookMediaDeletion(binding: FacebookMediaDeletio
     }
 
     let dispatched = false;
+    let confirmedResponse = false;
     try {
-      await engine.deletePhoto(credentials.token, pinnedBinding.remotePhotoId, () => { dispatched = true; });
+      await engine.deletePhoto(credentials.token, pinnedBinding.remotePhotoId,
+        () => { dispatched = true; }, () => { confirmedResponse = true; });
       return 'confirmed';
     } catch (error) {
+      if (confirmedResponse) return 'confirmed';
       if (!dispatched) return 'rejected';
       if (error instanceof FacebookApiError && isFacebookDefiniteRejection(error.status, error.code, error.transient)) return 'rejected';
       return 'uncertain';

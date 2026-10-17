@@ -53,7 +53,7 @@ export interface FacebookEngine {
   getStatus(accessToken: string, remoteId: string): Promise<{ state: 'published' | 'scheduled' | 'unknown'; publishedAt: Date | null }>;
   deletePost(accessToken: string, remoteId: string): Promise<void>;
   getPhotoCleanupState(accessToken: string, remoteId: string): Promise<{ id: unknown; page_story_id?: unknown; can_delete: unknown }>;
-  deletePhoto(accessToken: string, remoteId: string, onDispatch?: () => void): Promise<void>;
+  deletePhoto(accessToken: string, remoteId: string, onDispatch?: () => void, onConfirmed?: () => void): Promise<void>;
   listInbox(accessToken: string, pageId: string): Promise<FacebookConversation[]>;
   listComments(accessToken: string, postId: string): Promise<FacebookComment[]>;
   getPageAnalytics(accessToken: string, pageId: string, since?: Date, until?: Date): Promise<Record<string, number | null>>;
@@ -110,7 +110,7 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     if (!config.appSecret) throw new FacebookApiError('Facebook app secret is required for signed Graph requests.', 0);
     return facebookAppSecretProof(token, config.appSecret);
   };
-  async function request<T = unknown>(path: string, options: { method?: string; token: string; params?: Record<string, string | number | undefined>; body?: Record<string, string | undefined>; file?: { bytes: Uint8Array; mimeType: string; fileName: string }; onDispatch?: () => void } ): Promise<T> {
+  async function request<T = unknown>(path: string, options: { method?: string; token: string; params?: Record<string, string | number | undefined>; body?: Record<string, string | undefined>; file?: { bytes: Uint8Array; mimeType: string; fileName: string }; onDispatch?: () => void; onSuccess?: (payload: T) => Promise<void> | void } ): Promise<T> {
     assertOperationActive();
     const url = graphObjectUrl(config, path);
     if (options.method !== 'POST') {
@@ -151,10 +151,12 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       if (signal.aborted) throw new FacebookApiError('Facebook request timed out.', 0);
       throw new FacebookApiError(error instanceof Error ? error.message : 'Facebook request failed.', 0);
     }
-    assertOperationActive();
+    if (!options.onSuccess) assertOperationActive();
     const payload: unknown = await response.json().catch(() => null);
-    assertOperationActive();
+    if (!options.onSuccess) assertOperationActive();
     if (!response.ok || object(payload).error) throw graphError(payload, response.status);
+    if (options.onSuccess) await options.onSuccess(payload as T);
+    assertOperationActive();
     return payload as T;
   }
 
@@ -315,10 +317,15 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
             const image = images[ordinal];
             const journalOrdinal = ordinal + 1;
             if (journal) await journal.beginPhoto(journalOrdinal);
-            let photoPayload: unknown;
+            let photoId: string | null = null;
             try {
-              photoPayload = await request(`${encodeURIComponent(input.targetId)}/photos`, { method: 'POST', token: input.accessToken,
-                body: { url: image.localFile ? undefined : image.url, published: 'false', temporary: 'true', alt_text_custom: image.altText }, file: image.localFile });
+              await request<unknown>(`${encodeURIComponent(input.targetId)}/photos`, { method: 'POST', token: input.accessToken,
+                body: { url: image.localFile ? undefined : image.url, published: 'false', temporary: 'true', alt_text_custom: image.altText }, file: image.localFile,
+                onSuccess: async photoPayload => {
+                  photoId = providerId(object(photoPayload).id);
+                  if (!photoId) throw new FacebookMediaRecoveryError();
+                  if (journal) await journal.recordPhoto(journalOrdinal, photoId);
+                } });
             } catch (error) {
               if (error instanceof FacebookApiError && isFacebookDefiniteRejection(error.status, error.code, error.transient)) {
                 if (journal) {
@@ -328,25 +335,27 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
               }
               throw new FacebookMediaRecoveryError();
             }
-            const photoId = providerId(object(photoPayload).id);
             if (!photoId) throw new FacebookMediaRecoveryError();
-            if (journal) await journal.recordPhoto(journalOrdinal, photoId);
             photoIds.push(photoId);
           }
           if (journal) await journal.beginFeed(photoIds);
           const body: Record<string, string | undefined> = { message: input.text?.trim() || undefined, link: input.link || undefined };
           photoIds.forEach((photoId, i) => { body[`attached_media[${i}]`] = JSON.stringify({ media_fbid: photoId }); });
+          let feedId: string | null = null;
           try {
-            payload = await request(`${encodeURIComponent(input.targetId)}/feed`, { method: 'POST', token: input.accessToken, body });
+            payload = await request(`${encodeURIComponent(input.targetId)}/feed`, { method: 'POST', token: input.accessToken, body,
+              onSuccess: async feedPayload => {
+                feedId = providerId(object(feedPayload).id);
+                if (!feedId) throw new FacebookMediaRecoveryError();
+                if (journal) await journal.recordFeed(feedId);
+              } });
           } catch (error) {
             if (journal && error instanceof FacebookApiError && isFacebookDefiniteRejection(error.status, error.code, error.transient)) {
               try { await journal.rejectFeed(); } catch { /* Preserve uncertain publication state. */ }
             }
             throw new FacebookMediaRecoveryError();
           }
-          const feedId = providerId(object(payload).id);
           if (!feedId) throw new FacebookMediaRecoveryError();
-          if (journal) await journal.recordFeed(feedId);
           payload = { id: feedId };
         } catch (error) {
           if (error instanceof FacebookMediaRecoveryError) throw error;
@@ -375,9 +384,12 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
     async getPhotoCleanupState(token, remoteId) {
       return object(await request(encodeURIComponent(remoteId), { token, params: { fields: 'id,page_story_id,can_delete' } })) as { id: unknown; page_story_id?: unknown; can_delete: unknown };
     },
-    async deletePhoto(token, remoteId, onDispatch) {
-      const result = object(await request(encodeURIComponent(remoteId), { method: 'DELETE', token, onDispatch }));
-      if (result.success !== true) throw new FacebookApiError('Facebook did not confirm photo deletion.', 200);
+    async deletePhoto(token, remoteId, onDispatch, onConfirmed) {
+      await request<unknown>(encodeURIComponent(remoteId), { method: 'DELETE', token, onDispatch,
+        onSuccess: result => {
+          if (object(result).success !== true) throw new FacebookApiError('Facebook did not confirm photo deletion.', 200);
+          onConfirmed?.();
+        } });
     },
     async replyToConversation(token, conversationId, text) {
       const result = object(await request(`${encodeURIComponent(conversationId)}/messages`, { method: 'POST', token, body: { message: text } }));

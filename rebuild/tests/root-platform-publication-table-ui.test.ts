@@ -34,7 +34,7 @@ afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlo
 
 describe('Root publication evidence table action feedback', () => {
   it('keeps the confirmed receipt notice focused when refreshed evidence removes the completed action', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: true, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_2', state: 'confirmed', message: 'Receipt recorded.' }) }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ ok: true, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_2', state: 'attested', message: 'External observation saved.' }) }));
     await act(async () => { root.render(createElement(RootPlatformPublicationTable, { evidence: evidence(), providerId: 'installed_module', filtered: false })); });
     const opener = container.querySelector('button')!;
     await act(async () => opener.click()); await flush();
@@ -44,7 +44,7 @@ describe('Root publication evidence table action feedback', () => {
     await act(async () => submit.click()); await flush();
 
     const notice = container.querySelector('[role="status"]') as HTMLParagraphElement;
-    expect(notice.textContent).toBe('Receipt recorded.');
+    expect(notice.textContent).toBe('Human report recorded. The platform did not independently confirm it. External observation saved.');
     expect(document.activeElement).toBe(notice);
     expect(state.refresh).toHaveBeenCalledOnce();
 
@@ -53,7 +53,7 @@ describe('Root publication evidence table action feedback', () => {
     await act(async () => { root.render(createElement(RootPlatformPublicationTable, { evidence: evidence([], 'confirmed'), providerId: 'installed_module', filtered: false })); });
     const refreshedNotice = container.querySelector('[role="status"]') as HTMLParagraphElement;
     expect(container.querySelector('button')).toBeNull();
-    expect(refreshedNotice.textContent).toBe('Receipt recorded.');
+    expect(refreshedNotice.textContent).toBe('Human report recorded. The platform did not independently confirm it. External observation saved.');
     expect(document.activeElement).toBe(refreshedNotice);
     expect(container.querySelector('tbody tr')).toBe(originalRow);
   });

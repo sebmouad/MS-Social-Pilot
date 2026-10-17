@@ -11,7 +11,7 @@ fail() { echo "cutover rehearsal: $*" >&2; exit 1; }
 : "${CUTOVER_DUMP_SANITIZED:?Set CUTOVER_DUMP_SANITIZED=YES only after confirming the dump is sanitized}"
 : "${CUTOVER_APPROVED_MIGRATION_SET:?Set CUTOVER_APPROVED_MIGRATION_SET to the reviewed migration set}"
 [ "$CUTOVER_DUMP_SANITIZED" = YES ] || fail "CUTOVER_DUMP_SANITIZED must be YES"
-approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions'
+approved_migrations='20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution'
 [ "$CUTOVER_APPROVED_MIGRATION_SET" = "$approved_migrations" ] || fail "migration set must exactly match the reviewed staging allowlist"
 [ -f "$CUTOVER_STAGING_DUMP" ] || fail "staging dump does not exist"
 
@@ -36,6 +36,7 @@ verify_migration 20261016220000_rebuild_post_deletions 80e406ae33000a349d07f9e42
 verify_migration 20261017010000_rebuild_publication_attempts 03973b6fb80dcf2580c5e39f0d2be8fd5715f47c1a953127ce939638bfece267
 verify_migration 20261017020000_rebuild_facebook_media_steps 897464050aedf8c727fd695cc9b1fead0810d6c08606f3074c4d70529940a0e1
 verify_migration 20261017030000_rebuild_facebook_media_deletions 3f5df63bf339fe532581f14738d089ca5f20a4c245f581f1587573b5bfe6cca5
+verify_migration 20261017040000_rebuild_facebook_media_resolution 3227fbe5f381a25c87955ac809ef605fe1f2d51d9bb4f3ca4e5e9ce743c2a844
 
 # Only loopback TCP or the standard local PostgreSQL socket and database
 # /postgres are accepted. A copied production DATABASE_URL must fail closed.
@@ -81,13 +82,14 @@ BEGIN
      OR to_regclass('public.rebuild_post_deletions') IS NOT NULL
      OR to_regclass('public.rebuild_publication_attempts') IS NOT NULL
      OR to_regclass('public.rebuild_facebook_media_steps') IS NOT NULL
-     OR to_regclass('public.rebuild_facebook_media_deletions') IS NOT NULL THEN
+     OR to_regclass('public.rebuild_facebook_media_deletions') IS NOT NULL
+     OR to_regclass('public.rebuild_facebook_media_resolutions') IS NOT NULL THEN
     RAISE EXCEPTION 'staging dump already contains reviewed migration objects; use a pre-migration sanitized baseline';
   END IF;
   IF to_regclass('public._prisma_migrations') IS NOT NULL THEN
-    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
+    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8) AND finished_at IS NOT NULL AND rolled_back_at IS NULL)'
       INTO already_applied
-      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions';
+      USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps', '20261017030000_rebuild_facebook_media_deletions', '20261017040000_rebuild_facebook_media_resolution';
     IF already_applied THEN
       RAISE EXCEPTION 'staging dump migration history already contains an allowlisted migration';
     END IF;
@@ -101,6 +103,7 @@ psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261016220000_rebui
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261017010000_rebuild_publication_attempts/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261017020000_rebuild_facebook_media_steps/migration.sql"
 psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261017030000_rebuild_facebook_media_deletions/migration.sql"
+psql "$source_url" -q -v ON_ERROR_STOP=1 -f "$migration_dir/20261017040000_rebuild_facebook_media_resolution/migration.sql"
 echo "reviewed additive migrations applied to local scratch database"
 
 # Required tables/columns are taken from rebuild/prisma/schema.prisma and
@@ -136,6 +139,7 @@ BEGIN
     ,ARRAY['rebuild_publication_attempts','id'], ARRAY['rebuild_publication_attempts','workspaceId'], ARRAY['rebuild_publication_attempts','postId'], ARRAY['rebuild_publication_attempts','postTargetId'], ARRAY['rebuild_publication_attempts','targetId'], ARRAY['rebuild_publication_attempts','provider'], ARRAY['rebuild_publication_attempts','actorId'], ARRAY['rebuild_publication_attempts','state'], ARRAY['rebuild_publication_attempts','reason'], ARRAY['rebuild_publication_attempts','remotePostId'], ARRAY['rebuild_publication_attempts','remoteUrl'], ARRAY['rebuild_publication_attempts','receiptAt'], ARRAY['rebuild_publication_attempts','projectedAt'], ARRAY['rebuild_publication_attempts','attestedAt'], ARRAY['rebuild_publication_attempts','attestedBy'], ARRAY['rebuild_publication_attempts','createdAt'], ARRAY['rebuild_publication_attempts','updatedAt']
     ,ARRAY['rebuild_facebook_media_steps','id'], ARRAY['rebuild_facebook_media_steps','workspaceId'], ARRAY['rebuild_facebook_media_steps','operationId'], ARRAY['rebuild_facebook_media_steps','postId'], ARRAY['rebuild_facebook_media_steps','postTargetId'], ARRAY['rebuild_facebook_media_steps','targetId'], ARRAY['rebuild_facebook_media_steps','actorId'], ARRAY['rebuild_facebook_media_steps','remoteTargetId'], ARRAY['rebuild_facebook_media_steps','phase'], ARRAY['rebuild_facebook_media_steps','ordinal'], ARRAY['rebuild_facebook_media_steps','state'], ARRAY['rebuild_facebook_media_steps','remoteId'], ARRAY['rebuild_facebook_media_steps','receiptAt'], ARRAY['rebuild_facebook_media_steps','rejectedAt'], ARRAY['rebuild_facebook_media_steps','createdAt'], ARRAY['rebuild_facebook_media_steps','updatedAt']
     ,ARRAY['rebuild_facebook_media_deletions','id'], ARRAY['rebuild_facebook_media_deletions','workspaceId'], ARRAY['rebuild_facebook_media_deletions','mediaStepId'], ARRAY['rebuild_facebook_media_deletions','operationId'], ARRAY['rebuild_facebook_media_deletions','postId'], ARRAY['rebuild_facebook_media_deletions','postTargetId'], ARRAY['rebuild_facebook_media_deletions','targetId'], ARRAY['rebuild_facebook_media_deletions','remoteTargetId'], ARRAY['rebuild_facebook_media_deletions','remotePhotoId'], ARRAY['rebuild_facebook_media_deletions','actorId'], ARRAY['rebuild_facebook_media_deletions','state'], ARRAY['rebuild_facebook_media_deletions','receiptAt'], ARRAY['rebuild_facebook_media_deletions','createdAt'], ARRAY['rebuild_facebook_media_deletions','updatedAt']
+    ,ARRAY['rebuild_facebook_media_resolutions','id'], ARRAY['rebuild_facebook_media_resolutions','workspaceId'], ARRAY['rebuild_facebook_media_resolutions','operationId'], ARRAY['rebuild_facebook_media_resolutions','mediaStepId'], ARRAY['rebuild_facebook_media_resolutions','deletionId'], ARRAY['rebuild_facebook_media_resolutions','postId'], ARRAY['rebuild_facebook_media_resolutions','postTargetId'], ARRAY['rebuild_facebook_media_resolutions','targetId'], ARRAY['rebuild_facebook_media_resolutions','remoteTargetId'], ARRAY['rebuild_facebook_media_resolutions','publicationActorId'], ARRAY['rebuild_facebook_media_resolutions','eventActorId'], ARRAY['rebuild_facebook_media_resolutions','phase'], ARRAY['rebuild_facebook_media_resolutions','ordinal'], ARRAY['rebuild_facebook_media_resolutions','source'], ARRAY['rebuild_facebook_media_resolutions','outcome'], ARRAY['rebuild_facebook_media_resolutions','remoteId'], ARRAY['rebuild_facebook_media_resolutions','createdAt'], ARRAY['rebuild_facebook_media_steps','attestedAt'], ARRAY['rebuild_facebook_media_steps','attestedBy'], ARRAY['rebuild_facebook_media_deletions','attestedAt'], ARRAY['rebuild_facebook_media_deletions','attestedBy']
   ] LOOP
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.columns

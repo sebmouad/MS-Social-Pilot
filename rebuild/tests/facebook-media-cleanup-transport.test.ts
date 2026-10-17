@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFacebookEngine } from '../src/platforms/facebook/publishing';
 import type { FacebookConfig } from '../src/platforms/facebook/config';
 
-const { findTarget, configValues, secret, engine } = vi.hoisted(() => ({
+const { findTarget, configValues, secret, engine, configuredEngine } = vi.hoisted(() => ({
   findTarget: vi.fn(), configValues: new Map<string, unknown>(), secret: vi.fn(), engine: { getPhotoCleanupState: vi.fn(), deletePhoto: vi.fn() },
+  configuredEngine: vi.fn(),
 }));
 vi.mock('@/server/data', () => ({ prisma: { target: { findFirst: findTarget } } }));
 vi.mock('@/server/config/store', () => ({ runtimeConfig: vi.fn(async (key: string) => configValues.get(key)), runtimeSecret: secret }));
 vi.mock('@/server/secret-crypto', () => ({ decryptSecret: vi.fn(() => 'page-token') }));
-vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: vi.fn(async () => engine) }));
+vi.mock('../src/platforms/facebook/runtime', () => ({ configuredFacebookEngine: configuredEngine }));
 
 import { prepareFacebookMediaDeletion } from '../src/platforms/facebook/media-cleanup-transport';
 
@@ -35,6 +36,7 @@ const engineConfig: FacebookConfig = {
 describe('Facebook staged photo cleanup transport', () => {
   beforeEach(() => {
     vi.clearAllMocks(); configValues.clear(); readyConfig();
+    configuredEngine.mockImplementation(async () => engine);
     engine.getPhotoCleanupState.mockResolvedValue(state());
     engine.deletePhoto.mockResolvedValue(undefined);
   });
@@ -55,7 +57,7 @@ describe('Facebook staged photo cleanup transport', () => {
     expect(engine.getPhotoCleanupState).not.toHaveBeenCalled();
     await expect(callback(new AbortController().signal)).resolves.toBe('confirmed');
     expect(engine.getPhotoCleanupState).toHaveBeenCalledWith('page-token', binding.remotePhotoId);
-    expect(engine.deletePhoto).toHaveBeenCalledWith('page-token', binding.remotePhotoId, expect.any(Function));
+    expect(engine.deletePhoto).toHaveBeenCalledWith('page-token', binding.remotePhotoId, expect.any(Function), expect.any(Function));
   });
 
   it('allows a missing story field only under Root cleanup policy and does not treat it as proof of absence', async () => {
@@ -178,6 +180,20 @@ describe('Facebook photo cleanup Graph requests', () => {
     engine.deletePhoto = vi.fn(realEngine.deletePhoto);
     const callback = await prepareFacebookMediaDeletion(binding);
     await expect(callback(new AbortController().signal)).resolves.toBe('uncertain');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[1][1]?.method).toBe('DELETE');
+  });
+
+  it('confirms a valid DELETE receipt delivered after cancellation through the real Graph engine', async () => {
+    const controller = new AbortController();
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'photo-1', can_delete: true }), { status: 200 }))
+      .mockImplementationOnce(async () => { controller.abort(); return new Response(JSON.stringify({ success: true }), { status: 200 }); });
+    configuredEngine.mockImplementation(async (options?: { signal?: AbortSignal }) => options?.signal
+      ? createFacebookEngine({ ...engineConfig, appSecretProofEnabled: false }, fetcher as unknown as typeof fetch, options.signal)
+      : engine);
+    const callback = await prepareFacebookMediaDeletion(binding);
+    await expect(callback(controller.signal)).resolves.toBe('confirmed');
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(fetcher.mock.calls[1][1]?.method).toBe('DELETE');
   });

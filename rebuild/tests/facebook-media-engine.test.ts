@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createFacebookAdapter, FacebookApiError, FacebookMediaRecoveryError } from '../src/platforms/facebook/publishing';
+import { createFacebookAdapter, createFacebookPublisher, FacebookApiError, FacebookMediaRecoveryError } from '../src/platforms/facebook/publishing';
 import type { FacebookMediaJournal, FacebookMediaJournalFactory } from '../src/platforms/facebook/media-journal-port';
 import type { FacebookConfig } from '../src/platforms/facebook/config';
 
@@ -157,5 +157,70 @@ describe('Facebook multi-photo journaling', () => {
     expect(failure).toBeInstanceOf(FacebookMediaRecoveryError);
     expect(harness.journal.recordPhoto).not.toHaveBeenCalled();
     expect(harness.journal.beginFeed).not.toHaveBeenCalled();
+  });
+
+  it('commits a valid late photo receipt before surfacing cancellation and sends no following request', async () => {
+    const harness = journalHarness();
+    const controller = new AbortController();
+    const fetcher = vi.fn(async () => { controller.abort(); return response({ id: 'photo-late' }); }) as unknown as typeof fetch;
+    const publish = createFacebookPublisher(config, fetcher, harness.factory);
+    await expect(publish({
+      credential, target, operationId: 'operation-late-photo', text: 'album', media, signal: controller.signal,
+    })).rejects.toBeInstanceOf(FacebookMediaRecoveryError);
+    expect(harness.journal.recordPhoto).toHaveBeenCalledWith(1, 'photo-late');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(harness.journal.beginPhoto).toHaveBeenCalledTimes(1);
+    expect(harness.journal.beginFeed).not.toHaveBeenCalled();
+  });
+
+  it('commits a valid late feed receipt before surfacing cancellation', async () => {
+    const harness = journalHarness();
+    const controller = new AbortController();
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(response({ id: 'photo-1' }))
+      .mockResolvedValueOnce(response({ id: 'photo-2' }))
+      .mockImplementationOnce(async () => { controller.abort(); return response({ id: 'feed-late' }); }) as unknown as typeof fetch;
+    const publish = createFacebookPublisher(config, fetcher, harness.factory);
+    await expect(publish({
+      credential, target, operationId: 'operation-late-feed', text: 'album', media, signal: controller.signal,
+    })).rejects.toBeInstanceOf(FacebookMediaRecoveryError);
+    expect(harness.journal.recordFeed).toHaveBeenCalledWith('feed-late');
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(harness.journal.beginFeed).toHaveBeenCalledWith(['photo-1', 'photo-2']);
+  });
+
+  it('does not sequence another photo when committing a late receipt fails', async () => {
+    const harness = journalHarness();
+    const controller = new AbortController();
+    vi.mocked(harness.journal.recordPhoto).mockRejectedValueOnce(new Error('database unavailable'));
+    const fetcher = vi.fn(async () => { controller.abort(); return response({ id: 'photo-uncommitted' }); }) as unknown as typeof fetch;
+    const publish = createFacebookPublisher(config, fetcher, harness.factory);
+    await expect(publish({
+      credential, target, operationId: 'operation-late-db-fault', text: 'album', media, signal: controller.signal,
+    })).rejects.toBeInstanceOf(FacebookMediaRecoveryError);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(harness.journal.recordPhoto).toHaveBeenCalledWith(1, 'photo-uncommitted');
+    expect(harness.journal.beginFeed).not.toHaveBeenCalled();
+  });
+
+  it('never records a positive receipt for a malformed or rejected late response', async () => {
+    const malformed = journalHarness();
+    const malformedController = new AbortController();
+    const malformedFetch = vi.fn(async () => { malformedController.abort(); return response({ id: '  ' }); }) as unknown as typeof fetch;
+    await expect(createFacebookPublisher(config, malformedFetch, malformed.factory)({
+      credential, target, operationId: 'operation-late-malformed', text: 'album', media, signal: malformedController.signal,
+    })).rejects.toBeInstanceOf(FacebookMediaRecoveryError);
+    expect(malformed.journal.recordPhoto).not.toHaveBeenCalled();
+    expect(malformedFetch).toHaveBeenCalledTimes(1);
+
+    const rejected = journalHarness();
+    const rejectedController = new AbortController();
+    const rejectedFetch = vi.fn(async () => { rejectedController.abort(); return response({ error: { message: 'rejected', code: 100 } }, 400); }) as unknown as typeof fetch;
+    await expect(createFacebookPublisher(config, rejectedFetch, rejected.factory)({
+      credential, target, operationId: 'operation-late-rejected', text: 'album', media, signal: rejectedController.signal,
+    })).rejects.toBeInstanceOf(FacebookApiError);
+    expect(rejected.journal.recordPhoto).not.toHaveBeenCalled();
+    expect(rejected.journal.rejectPhoto).toHaveBeenCalledWith(1);
+    expect(rejectedFetch).toHaveBeenCalledTimes(1);
   });
 });

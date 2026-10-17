@@ -32,7 +32,7 @@ describe('Root platform publication evidence HTTP boundary', () => {
     expect(JSON.stringify(await response.json())).not.toContain('private-password');
   });
   it('requires same-origin Root access and dispatches the generic action payload', async () => {
-    const body = { providerId: 'platform', actionId: 'module_action', subjectId: 'row_1', confirmation: 'MODULE CONFIRM', acknowledged: true };
+    const body = { providerId: 'platform', actionId: 'module_action', subjectId: 'row_1', confirmation: 'MODULE CONFIRM', acknowledged: true, fieldValues: { observedId: 'remote_1', verified: true } };
     const csrf = await route.POST(postRequest(body, 'https://attacker.example'));
     expect(csrf.status).toBe(403); expect(state.actor).not.toHaveBeenCalled(); expect(state.action).not.toHaveBeenCalled();
     const response = await route.POST(postRequest(body));

@@ -23,22 +23,35 @@ export function RootPostDeletionControls({ row }: { row: DeletionRow }) {
   const [confirmation, setConfirmation] = useState('');
   const [verified, setVerified] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [reviewRequired, setReviewRequired] = useState(false);
+  const previousIdentity = useRef(`${row.operationId}:${row.state}`);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const phrase = outcome ? `ROOT RECORD POST DELETION ${row.operationId} ${outcome === 'deleted' ? 'DELETED' : 'NOT DELETED'}` : '';
   const recoverable = row.state === 'started' || row.state === 'uncertain';
   const confirmationField = validation.fieldProps('confirmation');
 
+  useEffect(() => {
+    const identity = `${row.operationId}:${row.state}`;
+    if (previousIdentity.current !== identity) { previousIdentity.current = identity; setReviewRequired(false); }
+  }, [row.operationId, row.state]);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   useEffect(() => { if (notice && !open) noticeRef.current?.focus(); }, [notice, open]);
 
   function begin() {
+    if (reviewRequired) return;
     setOutcome(''); setConfirmation(''); setVerified(false); setError(''); setNotice(''); validation.clearAll(); setOpen(true);
+  }
+
+  function dismiss() {
+    if (busy) return;
+    setOpen(false);
+    if (reviewRequired) { setNotice('Review the current deletion history before taking another action.'); router.refresh(); }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!recoverable || inFlight.current) return;
+    if (!recoverable || inFlight.current || reviewRequired) return;
     const errors = {
       outcome: outcome ? '' : 'Choose the result you verified on the platform.',
       confirmation: confirmation === phrase ? '' : 'Enter the exact confirmation shown.',
@@ -49,25 +62,29 @@ export function RootPostDeletionControls({ row }: { row: DeletionRow }) {
       const response = await fetch('/api/root/post-deletions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ operationId: row.operationId, outcome, confirmation, verifiedOnPlatform: verified }) });
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) {
+        const validationError = response.status < 500 && record(payload) && payload.code === 'invalid_request' && typeof payload.error === 'string';
+        if (!validationError) setReviewRequired(true);
         setError(record(payload) && typeof payload.error === 'string' ? payload.error : 'The outcome could not be recorded. Check recovery history before repeating it.');
         return;
       }
       const expectedState = outcome === 'deleted' ? 'remote_confirmed' : 'rejected';
       if (response.redirected || !record(payload) || payload.ok !== true || payload.operationId !== row.operationId || payload.state !== expectedState) {
+        setReviewRequired(true);
         setError('The response did not confirm this operation. Check recovery history before repeating it.');
         return;
       }
       setNotice(outcome === 'deleted' ? 'Remote deletion marked as human-verified. Local cleanup remains available to the workspace member.' : 'The platform was verified as not deleted. No new provider request was made.');
       setOpen(false); setConfirmation(''); setVerified(false); setOutcome(''); router.refresh();
     } catch {
+      setReviewRequired(true);
       setError('The result could not be confirmed. Check recovery history before repeating it.');
     } finally { inFlight.current = false; setBusy(false); }
   }
 
   return <>
-    {recoverable ? <Button size="sm" variant="secondary" onClick={begin}>Review</Button> : <span>{row.state === 'remote_confirmed' ? 'Awaiting local cleanup' : 'No operator action'}</span>}
+    {recoverable ? <Button size="sm" variant="secondary" disabled={reviewRequired} onClick={begin}>Review</Button> : <span>{row.state === 'remote_confirmed' ? 'Awaiting local cleanup' : 'No operator action'}</span>}
     {notice && <p role="status" ref={noticeRef} tabIndex={-1}>{notice}</p>}
-    {open && <ModalDialog className="ui-dialog" labelledBy={`root-post-delete-${row.operationId}`} busy={busy} initialFocus="[data-post-deletion-cancel]" onDismiss={() => { if (!busy) setOpen(false); }}>
+    {open && <ModalDialog className="ui-dialog" labelledBy={`root-post-delete-${row.operationId}`} busy={busy} initialFocus="[data-post-deletion-cancel]" onDismiss={dismiss}>
       <div className="ui-dialog__header"><h2 id={`root-post-delete-${row.operationId}`}>Record verified post deletion outcome</h2></div>
       <form method="post" noValidate onSubmit={event => void submit(event)}>
         <div className="ui-dialog__body">
@@ -91,8 +108,8 @@ export function RootPostDeletionControls({ row }: { row: DeletionRow }) {
           {error && <p ref={errorRef} tabIndex={-1} role="alert" className="ui-error">{error}</p>}
         </div>
         <div className="ui-dialog__actions">
-          <Button type="button" data-dialog-cancel data-post-deletion-cancel disabled={busy} onClick={() => setOpen(false)}>Cancel</Button>
-          <Button type="submit" variant="danger" disabled={busy || !outcome || confirmation !== phrase || !verified}>{busy ? 'Recording…' : 'Record verified outcome'}</Button>
+          <Button type="button" data-dialog-cancel data-post-deletion-cancel disabled={busy} onClick={dismiss}>{reviewRequired ? 'Close and review' : 'Cancel'}</Button>
+          <Button type="submit" variant="danger" disabled={busy || reviewRequired || !outcome || confirmation !== phrase || !verified}>{busy ? 'Recording…' : 'Record verified outcome'}</Button>
         </div>
       </form>
     </ModalDialog>}

@@ -67,7 +67,7 @@ describe('Facebook publishing cancellation', () => {
     expect(adapter.classifyPublishingFailure!(failure)).toBe('uncertain');
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(journal.beginPhoto).toHaveBeenCalledWith(1);
-    expect(journal.recordPhoto).not.toHaveBeenCalled();
+    expect(journal.recordPhoto).toHaveBeenCalledWith(1, 'photo-accepted-before-cancel');
     expect(journal.beginFeed).not.toHaveBeenCalled();
   });
 

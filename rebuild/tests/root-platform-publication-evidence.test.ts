@@ -81,14 +81,50 @@ describe('Root platform publication evidence service', () => {
     state.evidence.mockResolvedValueOnce({ ...withActions, actions: [{ ...withActions.actions[0], label: '' }] });
     await expect(readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).rejects.toMatchObject({ code: 'upstream_failure' });
   });
+  it('validates bounded module-owned field metadata and rejects malformed schemas', async () => {
+    const fields = [
+      { key: 'observedId', label: 'Observed ID', kind: 'text' as const, required: true, maxLength: 2048, description: 'ID seen on the destination.' },
+      { key: 'observation', label: 'What did you see?', kind: 'choice' as const, required: true, options: [{ value: 'present', label: 'Present' }, { value: 'absent', label: 'Absent' }] },
+      { key: 'verified', label: 'I checked the destination', kind: 'checkbox' as const, required: true },
+    ];
+    const withFields = { ...panel, rowIdKey: 'operationId', actions: [{ rowId: 'op_1', actionId: 'module_action', subjectId: 'row_1', label: 'Record', description: 'Record human observation.', acknowledgmentLabel: 'I accept the risk', confirmation: 'RECORD op_1', fields }] };
+    state.evidence.mockResolvedValueOnce(withFields);
+    expect(await readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).toMatchObject({ actions: [{ fields }] });
+    state.evidence.mockResolvedValueOnce({ ...withFields, actions: [{ ...withFields.actions[0], fields: [...fields, ...Array(6).fill(fields[0])] }] });
+    await expect(readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).rejects.toMatchObject({ code: 'upstream_failure' });
+    state.evidence.mockResolvedValueOnce({ ...withFields, actions: [{ ...withFields.actions[0], fields: [{ ...fields[0], key: 'bad key' }] }] });
+    await expect(readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).rejects.toMatchObject({ code: 'upstream_failure' });
+  });
+  it('normalizes bounded resolved context and rejects malformed module context', async () => {
+    const action = { rowId: 'op_1', actionId: 'module_action', subjectId: 'row_1', label: 'Resolve', description: 'Review the row.', acknowledgmentLabel: 'I checked it', confirmation: 'RESOLVE op_1', context: [{ label: ' Workspace ', value: '  Example workspace  ' }, { label: 'Publication operation', value: 'op_1' }] };
+    state.evidence.mockResolvedValueOnce({ ...panel, rowIdKey: 'operationId', actions: [action] });
+    expect(await readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).toMatchObject({ actions: [{ context: [{ label: 'Workspace', value: 'Example workspace' }, { label: 'Publication operation', value: 'op_1' }] }] });
+    for (const context of [Array(9).fill({ label: 'Context', value: 'x' }), [{ label: 'Context', value: 'bad\nvalue' }], [{ label: ' ', value: 'x' }], [{ label: 'Context', value: 'x'.repeat(2049) }]]) {
+      state.evidence.mockResolvedValueOnce({ ...panel, rowIdKey: 'operationId', actions: [{ ...action, context }] });
+      await expect(readRootPlatformPublicationEvidence('root', { providerId: 'installed_but_disabled' })).rejects.toMatchObject({ code: 'upstream_failure' });
+    }
+  });
   it('dispatches only strict module action input after active Root verification and validates receipts', async () => {
     const input = { providerId: 'installed_but_disabled', actionId: 'module_action', subjectId: 'row_1', confirmation: 'MODULE CONFIRM', acknowledged: true };
     expect(await runRootPlatformPublicationAction('root', input)).toMatchObject({ state: 'confirmed', ok: true, operationId: 'receipt_1' });
     expect(state.execute).toHaveBeenCalledWith('root', { actionId: 'module_action', subjectId: 'row_1', confirmation: 'MODULE CONFIRM', acknowledged: true });
     state.execute.mockResolvedValueOnce({ ok: false, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_2', state: 'needs_review', message: 'Review receipt.' });
     expect(await runRootPlatformPublicationAction('root', input)).toMatchObject({ state: 'needs_review', ok: false });
+    state.execute.mockResolvedValueOnce({ ok: true, actionId: 'module_action', subjectId: 'row_1', operationId: 'receipt_attested', state: 'attested', message: 'Human report recorded.' });
+    expect(await runRootPlatformPublicationAction('root', input)).toMatchObject({ state: 'attested', ok: true });
     state.execute.mockResolvedValueOnce({ ok: true, actionId: 'other_action', subjectId: 'row_1', operationId: 'receipt_3', state: 'confirmed', message: 'Done.' });
     await expect(runRootPlatformPublicationAction('root', input)).rejects.toMatchObject({ code: 'upstream_failure' });
     await expect(runRootPlatformPublicationAction('root', { ...input, rowId: 'client_remote_id' })).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+  it('bounds field values structurally and delegates well-formed keys and meanings to the module', async () => {
+    const base = { providerId: 'installed_but_disabled', actionId: 'module_action', subjectId: 'row_1', confirmation: 'MODULE CONFIRM', acknowledged: true };
+    const values = { observedId: 'human-observed-id', observation: 'absent', verified: true };
+    state.execute.mockRejectedValueOnce(new OperationError('invalid_request', 'The observed identifier does not match current module evidence.'));
+    await expect(runRootPlatformPublicationAction('root', { ...base, fieldValues: values })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(state.execute).toHaveBeenCalledWith('root', { actionId: base.actionId, subjectId: base.subjectId, confirmation: base.confirmation, acknowledged: true, fieldValues: values });
+    await expect(runRootPlatformPublicationAction('root', { ...base, fieldValues: { bad: { nested: true } } })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(runRootPlatformPublicationAction('root', { ...base, fieldValues: { 'invalid key': 'x' } })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(runRootPlatformPublicationAction('root', { ...base, fieldValues: Object.fromEntries(Array.from({ length: 9 }, (_, index) => [`field${index}`, 'x'])) })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(state.execute).toHaveBeenCalledOnce();
   });
 });

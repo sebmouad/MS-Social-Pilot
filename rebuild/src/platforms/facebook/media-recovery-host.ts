@@ -7,6 +7,10 @@ export const facebookPublicationRecovery: PlatformPublicationRecovery = {
   assertOutcome: assertFacebookMediaResolution,
   readEvidence: readFacebookMediaEvidence,
   async executeRootAction(userId, input) {
+    if (['record_photo_present', 'record_feed_present', 'record_step_absent', 'record_photo_deleted', 'record_photo_still_present'].includes(input.actionId)) {
+      const { resolveFacebookMedia } = await import('./media-resolution');
+      return resolveFacebookMedia(userId, input);
+    }
     const { cleanupFacebookMedia } = await import('./media-cleanup');
     return cleanupFacebookMedia(userId, input);
   },

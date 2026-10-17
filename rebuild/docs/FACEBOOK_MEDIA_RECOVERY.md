@@ -186,3 +186,38 @@ confirmation, durable **synthetic** confirmed replay and unknown-result refusal;
 it performs no provider deletion. Engine fixtures and guarded PostgreSQL fault
 tests cover the dispatch and receipt chain separately. PREVIEW_QA.md records
 full checks and explicitly pending browser/live-provider coverage.
+
+
+## External outcome reports and immutable provenance — batch 54
+
+Root can expose module-declared typed fields and read-only context resolved from
+the evidence row. Shared Root bounds and renders those fields without interpreting
+Facebook policy; the Facebook handler validates their meaning against current
+locked evidence. Context such as resolved workspace/channel/Page/publication
+identifiers is display-only and does not come back in the action request.
+
+When `meta.manualMediaAttestationEnabled` is explicitly enabled, a private Root
+operator can report an externally checked photo or feed ID, a step reported
+absent, or a photo reported deleted/still present. These actions append immutable
+content-free rows to `rebuild_facebook_media_resolutions` with source `operator`.
+Late provider outcomes are stored as separate rows with source `provider`. These
+resolution events are append-only during normal operation; authorized workspace
+erasure may remove them with workspace data. The result state `attested` describes
+a human report only; it does not confirm a provider response, cancel an in-flight
+request, or prove that an unknown request will not complete later. Conflicting
+outcomes are held for review; late provider evidence is retained separately and
+does not by itself imply a conflict. No arbitrary Root resolution action, candidate
+search or automatic retry/resend is provided.
+
+A human report that a feed step is absent does not satisfy the cleanup gate.
+Known-photo cleanup remains limited to a publication with no feed intent or a
+definitively provider-rejected feed, and still requires the separate default-off
+cleanup policy, external unused-photo check and per-action race acknowledgment.
+An absent/null `page_story_id` is not proof that the photo is unattached.
+
+Registry 51 adds the Facebook-owned, consumed
+`meta.manualMediaAttestationEnabled` boolean (default `false`). This capability
+adds a bounded manual evidence path; it does not finish unknown-step or delayed
+receipt reconciliation, search for remote candidates, or provide live proof of
+publication/deletion. PREVIEW_QA.md records the automated/local evidence and
+remaining browser/provider work.

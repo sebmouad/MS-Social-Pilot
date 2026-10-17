@@ -31,8 +31,10 @@ describe('Facebook media upload journal', () => {
     db.queryRaw.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const query = sql(strings);
       if (query.includes('FROM rebuild_publication_attempts')) {
-        return db.parentState === 'started' ? [parent] : [];
+        if (query.includes("a.state = 'started'") && db.parentState !== 'started') return [];
+        return ['started', 'uncertain'].includes(db.parentState) ? [{ ...parent, state: db.parentState }] : [];
       }
+      if (query.includes('FROM rebuild_facebook_media_steps') && query.includes('SELECT id, "workspaceId"')) return db.rows;
       if (query.includes('SELECT id FROM rebuild_facebook_media_steps')) {
         return db.rows.filter(row => row.operationId === values[0] && row.phase === values[1] && row.ordinal === values[2]).map(row => ({ id: row.id }));
       }

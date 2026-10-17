@@ -36,7 +36,7 @@ describe('Root platform publication evidence MCP', () => {
     const tools = (await (await invoke('tools/list')).json()).result.tools;
     const definition = tools.find((tool: { name: string }) => tool.name === 'run_root_platform_publication_action');
     expect(definition.inputSchema.required).toEqual(['providerId', 'actionId', 'subjectId', 'confirmation', 'acknowledged']);
-    const input = { providerId: 'platform', actionId: 'module_action', subjectId: 'row_1', confirmation: 'MODULE CONFIRM', acknowledged: true };
+    const input = { providerId: 'platform', actionId: 'module_action', subjectId: 'row_1', confirmation: 'MODULE CONFIRM', acknowledged: true, fieldValues: { observedId: 'remote_1', verified: true } };
     const result = await (await call('run_root_platform_publication_action', input)).json();
     expect(result.result.structuredContent).toMatchObject({ state: 'confirmed', ok: true });
     expect(state.action).toHaveBeenCalledWith('root', input);

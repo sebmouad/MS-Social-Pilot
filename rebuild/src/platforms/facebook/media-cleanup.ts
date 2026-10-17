@@ -8,6 +8,7 @@ import { requireActiveRoot } from '@/server/root/operations';
 import { withRootPublicationOperation } from '@/server/root/publication-operation';
 import type { PlatformPublicationActionInput, PlatformPublicationActionResult } from '@/server/platforms/host';
 import type { FacebookMediaDeletionBinding } from './media-cleanup-transport-port';
+import { recordFacebookMediaDeletionOutcome } from './media-resolution-store';
 
 type Candidate = FacebookMediaDeletionBinding & {
   id: string;
@@ -30,7 +31,7 @@ type DeletionRow = {
   id: string;
   mediaStepId: string;
   operationId: string;
-  state: 'started' | 'uncertain' | 'confirmed' | 'rejected';
+  state: string;
 };
 
 const actionSchema = z.object({
@@ -68,7 +69,7 @@ async function loadCandidate(stepId: string): Promise<Candidate> {
     JOIN rebuild_publication_attempts a ON a.id=s."operationId" AND a."workspaceId"=s."workspaceId"
     JOIN targets t ON t.id=s."targetId" AND t."workspaceId"=s."workspaceId" AND t."providerId"=s."remoteTargetId"
     LEFT JOIN post_targets pt ON pt.id=s."postTargetId" AND pt."postId"=s."postId"
-    WHERE s.id=${stepId} AND s.phase='photo' AND s.state='recorded' AND s."remoteId" IS NOT NULL
+    WHERE s.id=${stepId} AND s.phase='photo' AND s.state IN ('recorded','attested_present') AND s."remoteId" IS NOT NULL
       AND a.provider='facebook'
     LIMIT 1`;
   const row = rows[0];
@@ -80,6 +81,14 @@ async function loadCandidate(stepId: string): Promise<Candidate> {
 }
 
 async function lockAndValidate(tx: Prisma.TransactionClient, candidate: Candidate) {
+  const parents = await tx.$queryRaw<Array<{ workspaceId: string; postId: string; postTargetId: string; targetId: string; actorId: string; provider: string; parentState: string; parentRemotePostId: string | null; projectedRemotePostId: string | null }>>`
+    SELECT a."workspaceId", a."postId", a."postTargetId", a."targetId", a."actorId", a.provider,
+      a.state AS "parentState", a."remotePostId" AS "parentRemotePostId", pt."remotePostId" AS "projectedRemotePostId"
+    FROM rebuild_publication_attempts a
+    LEFT JOIN post_targets pt ON pt.id=a."postTargetId" AND pt."postId"=a."postId"
+    WHERE a.id=${candidate.operationId} AND a."workspaceId"=${candidate.workspaceId} FOR UPDATE OF a`;
+  const lockedParent = parents[0];
+  if (!lockedParent) throw failure('conflict', 'The Facebook publication attempt is unavailable.');
   const rows = await tx.$queryRaw<Array<Candidate & { phase: string; ordinal: number; state: string; remoteId: string | null }>>`
     SELECT s.id, s."workspaceId", s."operationId", s."postId", s."postTargetId", s."targetId", s."actorId",
       s."remoteTargetId", s."remoteId", s.phase, s.ordinal, s.state, a.provider, a.state AS "parentState",
@@ -89,27 +98,27 @@ async function lockAndValidate(tx: Prisma.TransactionClient, candidate: Candidat
     JOIN rebuild_publication_attempts a ON a.id=s."operationId" AND a."workspaceId"=s."workspaceId"
     LEFT JOIN post_targets pt ON pt.id=s."postTargetId" AND pt."postId"=s."postId"
     WHERE s."workspaceId"=${candidate.workspaceId} AND s."operationId"=${candidate.operationId}
-    ORDER BY s.phase, s.ordinal FOR UPDATE OF a, s`;
+    ORDER BY s.phase, s.ordinal, s.id FOR UPDATE OF s`;
   const photo = rows.find(row => row.id === candidate.id);
   const parent = rows[0];
-  const hasMismatchedStep = rows.some(step => step.workspaceId !== parent?.workspaceId || step.postId !== parent?.parentPostId ||
+  const hasMismatchedStep = rows.some(step => step.workspaceId !== parent?.workspaceId || step.operationId !== parent?.operationId || step.postId !== parent?.parentPostId ||
     step.postTargetId !== parent?.parentPostTargetId || step.targetId !== parent?.parentTargetId || step.actorId !== parent?.parentActorId ||
     step.remoteTargetId !== candidate.remoteTargetId);
-  if (!photo || !parent || photo.phase !== 'photo' || photo.state !== 'recorded' || photo.remoteId !== candidate.remotePhotoId ||
+  if (!photo || !parent || photo.phase !== 'photo' || !['recorded', 'attested_present'].includes(photo.state) || photo.remoteId !== candidate.remotePhotoId ||
     photo.targetId !== candidate.targetId || photo.postTargetId !== candidate.postTargetId || photo.remoteTargetId !== candidate.remoteTargetId || hasMismatchedStep) {
     throw failure('conflict', 'The Facebook photo evidence changed; reload Root recovery history.');
   }
-  if (parent.provider !== 'facebook' || !['started', 'uncertain', 'attested_absent', 'rejected'].includes(parent.parentState) || parent.parentRemotePostId || parent.projectedRemotePostId) {
+  if (parent.provider !== 'facebook' || parent.parentState !== lockedParent.parentState || !['started', 'uncertain', 'attested_absent', 'rejected'].includes(parent.parentState) || parent.parentRemotePostId || parent.projectedRemotePostId || lockedParent.projectedRemotePostId) {
     throw failure('conflict', 'This publication already has a post result and cannot use staged-photo cleanup.');
   }
   const feed = rows.find(row => row.phase === 'feed');
-  if (feed && feed.state !== 'rejected') throw failure('conflict', 'A Facebook feed step exists; staged photos cannot be deleted through this action.');
+  if (feed && feed.state !== 'rejected') throw failure('conflict', 'A Facebook feed step exists; staged photos can only be deleted after a definite provider rejection.');
   const existing = await tx.$queryRaw<DeletionRow[]>`
     SELECT id, "mediaStepId", "operationId", state FROM rebuild_facebook_media_deletions
     WHERE "workspaceId"=${candidate.workspaceId} AND "mediaStepId"=${candidate.id}
     ORDER BY "createdAt" DESC, id DESC FOR UPDATE`;
-  const active = existing.find(row => row.state !== 'rejected');
-  if (active?.state === 'confirmed') return { active, parent, photo };
+  const active = existing.find(row => !['rejected', 'attested_present'].includes(row.state));
+  if (active?.state === 'confirmed' || active?.state === 'attested_deleted') return { active, parent, photo };
   if (active) throw failure('conflict', 'A Facebook photo deletion is already unresolved; do not send it again.');
   return { active: undefined, parent, photo };
 }
@@ -117,7 +126,7 @@ async function lockAndValidate(tx: Prisma.TransactionClient, candidate: Candidat
 async function startDeletion(actorId: string, candidate: Candidate) {
   return transaction(async tx => {
     const locked = await lockAndValidate(tx, candidate);
-    if (locked.active?.state === 'confirmed') return { id: locked.active.id, replay: true };
+    if (locked.active?.state === 'confirmed' || locked.active?.state === 'attested_deleted') return { id: locked.active.id, replay: true };
     if (locked.parent.parentState === 'started') {
       const frozen = await tx.$executeRaw`UPDATE rebuild_publication_attempts SET state='uncertain', reason='outcome_unknown', "updatedAt"=CURRENT_TIMESTAMP
         WHERE id=${candidate.operationId} AND "workspaceId"=${candidate.workspaceId} AND state='started'`;
@@ -134,18 +143,16 @@ async function startDeletion(actorId: string, candidate: Candidate) {
 }
 
 async function finishDeletion(actorId: string, candidate: Candidate, deletionId: string, state: 'uncertain' | 'confirmed' | 'rejected') {
-  await transaction(async tx => {
+  return transaction(async tx => {
     const rows = await tx.$queryRaw<DeletionRow[]>`
       SELECT id, "mediaStepId", "operationId", state FROM rebuild_facebook_media_deletions
-      WHERE id=${deletionId} AND "workspaceId"=${candidate.workspaceId} FOR UPDATE`;
-    if (rows.length !== 1 || rows[0].mediaStepId !== candidate.id || rows[0].operationId !== candidate.operationId || rows[0].state !== 'started') {
+      WHERE id=${deletionId} AND "workspaceId"=${candidate.workspaceId}`;
+    if (rows.length !== 1 || rows[0].mediaStepId !== candidate.id || rows[0].operationId !== candidate.operationId || !['started', 'uncertain', 'attested_deleted', 'attested_present', 'conflict'].includes(rows[0].state)) {
       throw failure('conflict', 'The Facebook photo deletion receipt cannot be matched to its intent.');
     }
-    const changed = await tx.$executeRaw`UPDATE rebuild_facebook_media_deletions SET state=${state},
-      "receiptAt"=CASE WHEN ${state === 'uncertain'} THEN NULL ELSE CURRENT_TIMESTAMP END, "updatedAt"=CURRENT_TIMESTAMP
-      WHERE id=${deletionId} AND "workspaceId"=${candidate.workspaceId} AND state='started'`;
-    if (changed !== 1) throw failure('conflict', 'The Facebook photo deletion intent changed; review its status.');
-    await audit(tx, actorId, candidate, deletionId, state);
+    const resolved = await recordFacebookMediaDeletionOutcome(tx, deletionId, state);
+    await audit(tx, actorId, candidate, deletionId, resolved);
+    return resolved;
   });
 }
 
@@ -167,9 +174,9 @@ export async function cleanupFacebookMedia(userId: string, input: PlatformPublic
     const stillEnabled = await runtimeConfig('meta.manualMediaCleanupEnabled');
     if (stillEnabled !== true) throw failure('forbidden', 'Manual Facebook media cleanup is disabled in Root configuration.');
     const locked = await transaction(tx => lockAndValidate(tx, candidate));
-    if (locked.active?.state === 'confirmed') return {
+    if (locked.active?.state === 'confirmed' || locked.active?.state === 'attested_deleted') return {
       ok: true, actionId: parsed.data.actionId, subjectId: parsed.data.subjectId,
-      operationId: locked.active.id, state: 'confirmed', message: 'Facebook confirmed this staged photo was deleted.',
+      operationId: locked.active.id, state: locked.active.state === 'confirmed' ? 'confirmed' : 'attested', message: 'The staged photo deletion is recorded in Root recovery history.',
     };
 
     const { prepareFacebookMediaDeletion } = await import('./media-cleanup-transport');
@@ -192,18 +199,23 @@ export async function cleanupFacebookMedia(userId: string, input: PlatformPublic
         operationId: intent.id, state: 'needs_review', message: 'Facebook deletion outcome is unknown. Do not repeat this request; review the platform and Root recovery history.',
       };
     }
-    try { await finishDeletion(userId, candidate, intent.id, outcome); }
+    let savedOutcome: 'confirmed' | 'rejected' | 'uncertain' | 'conflict';
+    try { savedOutcome = await finishDeletion(userId, candidate, intent.id, outcome); }
     catch {
       return {
         ok: false, actionId: parsed.data.actionId, subjectId: parsed.data.subjectId,
         operationId: intent.id, state: 'needs_review', message: 'Facebook responded, but its deletion receipt could not be saved. Do not repeat this request; review Root recovery history.',
       };
     }
-    if (outcome === 'confirmed') return {
+    if (savedOutcome === 'conflict') return {
+      ok: false, actionId: parsed.data.actionId, subjectId: parsed.data.subjectId,
+      operationId: intent.id, state: 'needs_review', message: 'Facebook returned a delayed deletion result that conflicts with newer recovery evidence. Do not repeat the request; review the full media history.',
+    };
+    if (outcome === 'confirmed' && savedOutcome === 'confirmed') return {
       ok: true, actionId: parsed.data.actionId, subjectId: parsed.data.subjectId,
       operationId: intent.id, state: 'confirmed', message: 'Facebook confirmed this staged photo was deleted.',
     };
-    if (outcome === 'rejected') return {
+    if (outcome === 'rejected' && savedOutcome === 'rejected') return {
       ok: false, actionId: parsed.data.actionId, subjectId: parsed.data.subjectId,
       operationId: intent.id, state: 'rejected', message: 'Facebook rejected the photo deletion. A new explicit Root action may be available after review.',
     };

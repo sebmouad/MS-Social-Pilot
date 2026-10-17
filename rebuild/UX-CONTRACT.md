@@ -322,3 +322,26 @@ missing story ID never means proven unused. Unknown feed/delete effects remain
 held. No customer setup text, third menu or automatic retry is introduced.
 FACEBOOK_MEDIA_RECOVERY.md owns domain policy; PREVIEW_QA.md separates component,
 HTTP/MCP and browser/provider evidence.
+
+
+## Typed Root outcome reports and resolved context — batch 54
+
+Recovery modules may declare bounded text, choice and checkbox fields, with
+module-owned labels, options, requirements and descriptions. The shared dialog
+preserves entered values on correction/review paths, associates validation with
+each field and focuses the first invalid field. Exact confirmation and explicit
+acknowledgment remain required. Read-only context is derived by the module from
+the selected evidence row, shown in a compact accessible label/value list, and
+is not included in the submitted values.
+
+An `attested` result shows that an operator recorded an external observation; it
+must not be presented as a provider-confirmed success. Only a matching confirmed
+receipt is described as confirmed. Unknown, malformed or conflicting receipts
+keep the action held and require review; late provider evidence is retained
+separately when it does not conflict. The UI does not offer generic conflict
+clearing, remote candidate search or automatic resend. A human feed-absence report
+does not authorize photo cleanup; cleanup still requires no feed intent or a
+definitively provider-rejected feed, alongside the existing external check and
+race acknowledgment. This update supersedes the earlier note that cleanup
+controls awaited module implementation. See FACEBOOK_MEDIA_RECOVERY.md for the
+current policy.

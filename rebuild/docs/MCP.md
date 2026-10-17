@@ -83,3 +83,27 @@ The guarded `scripts/verify-inbox-read.ts` checks actual local HTTP/MCP list/his
 Workspace tools `get_inbox_deletion`, `delete_inbox_comment` and `finish_inbox_deletion` share the same current Inbox services and narrowed channel grants as HTTP/UI. Initial deletion requires `DELETE COMMENT <id>`; local finalization requires `FINISH DELETION <operationId>`. Inspect state and both confirmation booleans: a successful tool response may describe started/uncertain/remote-confirmed work rather than completed deletion. Retrying an existing identity never repeats the provider call; local finalization never contacts the provider. Secondary MCP audit failure preserves the domain receipt with a warning.
 
 Private installation tools `list_root_inbox_deletions`, `confirm_root_inbox_deletion` and resource `msp://root/inbox-deletions` share Root Inbox recovery. Root history alone includes opaque provider/remote object identity for external verification, excluding credentials, raw errors and content. Manual confirmation requires `verifiedOnPlatform:true` and `CONFIRM REMOTE DELETION <operationId>` and records operator attestation, not automatic API proof. Workspace keys cannot invoke these controls. Private inventory is now 12 tools/seven resources. Broader MCP and live-provider parity remain incomplete.
+
+### Platform publication evidence and action reports — 2026-10-17
+
+The private `get_root_platform_publication_evidence` tool reads one installed
+platform's bounded, content-free evidence; optional `operationId` narrows the
+read. The read-only resource `msp://root/platform-publication-evidence` aggregates
+installed panels within shared limits. Both include only module-declared safe
+columns, known receipt/operation identifiers and available action metadata.
+Neither executes an action. The GET page/API and these MCP reads require current
+active installation-owner authority; workspace keys and workspace-scoped calls
+cannot use them.
+
+`run_root_platform_publication_action` invokes one module-declared action using
+providerId, actionId, subjectId, exact confirmation and `acknowledged:true`; a
+bounded scalar `fieldValues` map is optional when the module declares fields.
+Resolved context is read-only metadata and is never supplied by the caller. The
+platform module rechecks current state and semantics. A successful human report
+is returned as `attested`, distinct from a provider-confirmed `confirmed` receipt.
+This tool does not imply every action contacts the provider. Contradictions and
+unknown outcomes remain held; there is no generic conflict-clear or resend tool.
+The cleanup restriction on human feed-absence reports is documented in
+FACEBOOK_MEDIA_RECOVERY.md. Tool inventories elsewhere in this file are dated
+snapshots; this paragraph describes the current capability without changing
+those historical counts.

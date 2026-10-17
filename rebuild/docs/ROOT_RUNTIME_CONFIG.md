@@ -82,3 +82,16 @@ The Inbox product owns `inbox.listPageSize` (default 25, 1–200), `inbox.thread
 Inbox owns active `inbox.workflowTransactionTimeoutMs` (default 5000, 1000–60000 ms) and `inbox.workflowTransactionMaxWaitMs` (default 2000, 500–30000 ms). The resolve/reopen service consumes both when opening the atomic state/audit transaction. They do not change provider request deadlines. The existing Shared workspace-operation timeout/wait controls independently govern the one service-owned workspace guard. Root module settings and private configuration MCP expose these typed values through the existing ownership registry.
 
 Registry version 38 adds Inbox-owned `inbox.commentOperationTimeoutMs` (60000ms, 5000–300000), `inbox.commentOperationMaxWaitMs` (2000ms, 500–30000), `inbox.deletionHistoryLimit` (25, 1–200) and `inbox.deletionRetention` (only `until_workspace_erasure`). The action signal cancels provider work before its database channel-lock deadline; that deadline reserves two configured local workflow transaction budgets plus pool acquisition wait. It must remain below `data.workspaceOperationTimeoutMs`, otherwise comment work refuses before dispatch. Root recovery is grouped under Product modules → Inbox and uses the history bound and existing workflow transaction bounds. Claims/tombstones have no timer-based purge or retry consumer; explicit settled workspace erasure owns their removal.
+
+## Facebook external media outcome reports — registry 51
+
+Facebook owns active boolean `meta.manualMediaAttestationEnabled`, default
+`false`. When explicitly enabled, it permits private Root operators to record
+externally verified photo/feed observations and photo deletion observations
+through the Facebook recovery module. The setting does not grant workspace
+access, change customer module availability, contact Facebook, or convert human
+reports into provider receipts. A delayed request may still complete; contradictory
+evidence remains held, and no automatic retry/resend is enabled. The setting is
+consumed and audited through the existing registry service. The manual cleanup
+setting remains a separate default-off policy; human feed-absence reports do not
+satisfy its no-feed-intent/definitive-provider-rejection gate.

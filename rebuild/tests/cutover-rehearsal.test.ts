@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const script = 'scripts/cutover-rehearsal.sh';
-const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions';
+const approvedMigrationSet = '20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts,20261017020000_rebuild_facebook_media_steps,20261017030000_rebuild_facebook_media_deletions,20261017040000_rebuild_facebook_media_resolution';
 
 describe('cutover rehearsal safety gates', () => {
   it('compares counts for every public base table and detects table-set drift', () => {
@@ -74,6 +74,7 @@ describe('cutover rehearsal safety gates', () => {
     const publicationAttempts = readFileSync('../prisma/migrations/20261017010000_rebuild_publication_attempts/migration.sql', 'utf8');
     const mediaSteps = readFileSync('../prisma/migrations/20261017020000_rebuild_facebook_media_steps/migration.sql', 'utf8');
     const mediaDeletions = readFileSync('../prisma/migrations/20261017030000_rebuild_facebook_media_deletions/migration.sql', 'utf8');
+    const resolutions = readFileSync('../prisma/migrations/20261017040000_rebuild_facebook_media_resolution/migration.sql', 'utf8');
     const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 
     expect(source).toContain(hash(root));
@@ -83,7 +84,8 @@ describe('cutover rehearsal safety gates', () => {
     expect(source).toContain(hash(publicationAttempts));
     expect(source).toContain(hash(mediaSteps));
     expect(source).toContain(hash(mediaDeletions));
-    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7)');
+    expect(source).toContain(hash(resolutions));
+    expect(source).toContain('migration_name IN ($1, $2, $3, $4, $5, $6, $7, $8)');
     expect(source).toContain("USING '20261015120000_mcp_api_keys', '20261023100000_rebuild_worker_jobs', '20261016190000_rebuild_inbox_deletions', '20261016220000_rebuild_post_deletions', '20261017010000_rebuild_publication_attempts', '20261017020000_rebuild_facebook_media_steps'");
     expect(source).toContain('CUTOVER_APPROVED_MIGRATION_SET');
     expect(source.indexOf('migration.sql"')) .toBeLessThan(source.indexOf('Required tables/columns are taken'));
@@ -111,6 +113,9 @@ describe('cutover rehearsal safety gates', () => {
     expect(source).toContain('migration_dir/20261017030000_rebuild_facebook_media_deletions/migration.sql');
     expect(source).toContain("to_regclass('public.rebuild_facebook_media_deletions')");
     for (const column of ['id', 'workspaceId', 'mediaStepId', 'operationId', 'postId', 'postTargetId', 'targetId', 'remoteTargetId', 'remotePhotoId', 'actorId', 'state', 'receiptAt', 'createdAt', 'updatedAt']) expect(source).toContain("ARRAY['rebuild_facebook_media_deletions','" + column + "']");
+    expect(source).toContain('migration_dir/20261017040000_rebuild_facebook_media_resolution/migration.sql');
+    expect(source).toContain("to_regclass('public.rebuild_facebook_media_resolutions')");
+    for (const column of ['id', 'workspaceId', 'operationId', 'mediaStepId', 'deletionId', 'postId', 'postTargetId', 'targetId', 'remoteTargetId', 'publicationActorId', 'eventActorId', 'phase', 'ordinal', 'source', 'outcome', 'remoteId', 'createdAt']) expect(source).toContain("ARRAY['rebuild_facebook_media_resolutions','" + column + "']");
     for (const column of ['workspaceId', 'operationId', 'phase', 'ordinal', 'state', 'remoteId', 'receiptAt']) expect(source).toContain("ARRAY['rebuild_facebook_media_steps','" + column + "']");
   });
 

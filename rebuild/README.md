@@ -25,3 +25,11 @@ The new app reads existing users, sessions, memberships, workspaces, posts, chan
 This remains an isolated candidate, not the live service. The rebuild has browser and bearer-key MCP tools for workspace publishing, inbox actions, connection selection, and data controls, plus private signed-in Root configuration tools. MCP data export and deletion use the same workspace-scoped service as the UI; deletion requires `DELETE WORKSPACE DATA <workspaceId>` and records the bearer key ID in its transactional audit event. Shared Analytics consumes normalized inputs from installed modules. Facebook is currently the only installed module; its stored channel and ad-account metrics and selected-channel follower snapshots feed the overview. Instagram remains unavailable scaffolding. The browser ZIP export includes workspace media but its database snapshot still omits legacy feature tables; the manifest states this limit. Workspace erasure has a resumable database and file cleanup job with a database write gate. Broader provider coverage, comprehensive analytics/ads coverage, live platform testing, functional and authorization checks against migrated production data, and a tested cutover/rollback remain. No customer traffic should be routed here until those gates pass.
 
 See `docs/DATA_COMPATIBILITY.md` and `docs/AUTH_COMPATIBILITY.md` for migration boundaries. The replacement worker and its database lease/audit tables are described in `docs/BACKGROUND_JOBS.md`; apply its additive migration only through the reviewed deployment process.
+
+Private Root platform recovery now includes bounded evidence and module-defined
+operator outcome reports. Facebook's manual outcome-report setting is disabled
+by default; human observations remain distinct from provider receipts, conflicting
+outcomes stay held, and late provider evidence is retained separately. These additions do not prove live remote
+publication/deletion, complete parity or cutover. See
+[`docs/FACEBOOK_MEDIA_RECOVERY.md`](docs/FACEBOOK_MEDIA_RECOVERY.md) and
+[`UX-CONTRACT.md`](UX-CONTRACT.md).

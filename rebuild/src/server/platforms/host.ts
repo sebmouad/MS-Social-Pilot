@@ -28,6 +28,22 @@ export interface PlatformPublicationAction {
   description: string;
   acknowledgmentLabel: string;
   confirmation: string;
+  /** Optional read-only context derived by the module from resolved evidence. */
+  context?: Array<{ label: string; value: string }>;
+  /** Optional, module-owned form fields used to record human observations. */
+  fields?: PlatformPublicationActionField[];
+}
+
+export interface PlatformPublicationActionField {
+  key: string;
+  label: string;
+  kind: 'text' | 'choice' | 'checkbox';
+  required: boolean;
+  description?: string;
+  /** Text field length only; semantic validation remains module-owned. */
+  maxLength?: number;
+  /** Choice fields only; values are opaque and interpreted by the module. */
+  options?: Array<{ value: string; label: string }>;
 }
 
 export interface PlatformPublicationActionInput {
@@ -35,6 +51,7 @@ export interface PlatformPublicationActionInput {
   subjectId: string;
   confirmation: string;
   acknowledged: true;
+  fieldValues?: Record<string, string | boolean>;
 }
 
 export interface PlatformPublicationActionResult {
@@ -42,7 +59,7 @@ export interface PlatformPublicationActionResult {
   actionId: string;
   subjectId: string;
   operationId: string;
-  state: 'confirmed' | 'rejected' | 'needs_review';
+  state: 'confirmed' | 'attested' | 'rejected' | 'needs_review';
   message: string;
 }
 

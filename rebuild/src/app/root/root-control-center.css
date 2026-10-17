@@ -41,4 +41,12 @@
 .root-platform-evidence-filter .shell-subnav__label { margin: 0; }
 .root-platform-evidence-filter > a { width: fit-content; color: var(--accent); font-size: 13px; }
 .root-publication-evidence__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.root-publication-evidence__context { display: grid; gap: 9px; margin: 16px 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-muted); }
+.root-publication-evidence__context > div { display: grid; grid-template-columns: minmax(120px, .7fr) minmax(0, 1.3fr); gap: 8px 14px; }
+.root-publication-evidence__context dt { color: var(--ink-soft); font-size: 13px; }
+.root-publication-evidence__context dd { min-width: 0; margin: 0; overflow-wrap: anywhere; word-break: break-word; }
+.root-platform-action-dialog.ui-dialog { display: flex; flex-direction: column; max-height: min(85vh, 740px); overflow: hidden; }
+.root-platform-action-dialog .ui-dialog__header, .root-platform-action-dialog .ui-dialog__actions { flex: 0 0 auto; }
+.root-platform-action-dialog .ui-dialog__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.root-platform-action-dialog .ui-dialog__body > * { scroll-margin-block: 12px; }
 .root-control__module-grid .ui-button { margin-top: auto; }

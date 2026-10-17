@@ -136,3 +136,16 @@ effects block cleanup; uncertain DELETE results cannot be resent. Confirmed
 synthetic replay and fault tests do not prove live provider deletion. Unknown
 upload/feed/delete reconciliation, native formats, full Facebook/legacy/MCP
 coverage and production cutover remain open. See FACEBOOK_MEDIA_RECOVERY.md.
+
+
+Facebook media recovery update, 2026-10-17: private Root now supports a default-off
+module-owned path for operators to record externally observed photo/feed and
+deletion outcomes. Generic Root actions support bounded typed fields and show
+read-only context resolved from evidence. Human reports and provider results are
+separate immutable facts; conflicting outcomes remain held and late provider
+evidence is retained separately. Human feed
+absence never authorizes cleanup, which still requires no feed intent or a
+definitively provider-rejected feed plus the existing manual checks. This closes
+the manual-reporting gap only. It does not provide arbitrary conflict resolution,
+candidate search, live create/delete proof, complete Publishing/Facebook or MCP
+parity, or cutover. See FACEBOOK_MEDIA_RECOVERY.md and UX-CONTRACT.md.

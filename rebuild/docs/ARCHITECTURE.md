@@ -436,3 +436,32 @@ FACEBOOK_MEDIA_RECOVERY.md and PREVIEW_QA.md distinguish synthetic engine/DB/
 HTTP/MCP proof from pending live browser/provider testing. Unknown-step/delete
 reconciliation, broader Facebook/legacy/MCP parity and cutover remain unfinished.
 Production is still legacy.
+
+
+## Human media outcome reports and late provider evidence — batch 54, 2026-10-17
+
+Installed modules may declare bounded typed fields and read-only resolved context
+on a Root recovery action. Shared Root validates and renders the generic shape;
+the module still owns field meaning, semantic validation, current-evidence checks
+and its locked operation. The context is derived from evidence and is never sent
+back as caller input. Root's evidence API and installation MCP action dispatch
+remain private to the active installation owner.
+
+Facebook now supports explicitly enabled operator reports for externally observed
+photo/feed presence, step absence and photo deletion/presence. Reports append
+content-free immutable resolution facts with human provenance; provider results
+are appended separately with provider provenance. A human report is an assertion,
+not a provider receipt or proof that a delayed request did not succeed. Conflicting
+outcomes remain held; late provider evidence is retained separately. No generic
+conflict-resolution control, candidate search, remote retry or automatic resend
+is exposed. In particular, a human feed-absence report never authorizes destructive
+cleanup. Cleanup requires no feed intent or a definitively provider-rejected feed,
+in addition to the existing explicit unused-photo check and opt-in/race
+acknowledgment. Resolution events are append-only during normal operation; the
+authorized workspace-erasure flow may remove them with workspace data.
+
+Registry 51 adds the consumed Facebook-owned
+`meta.manualMediaAttestationEnabled` boolean, default false. Synthetic service,
+database, HTTP and installation-MCP checks are not live provider proof. This
+extends Root recovery evidence without completing photo/feed/delete reconciliation,
+Facebook/legacy/MCP parity or cutover; production remains legacy.
