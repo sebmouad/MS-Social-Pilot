@@ -345,3 +345,15 @@ definitively provider-rejected feed, alongside the existing external check and
 race acknowledgment. This update supersedes the earlier note that cleanup
 controls awaited module implementation. See FACEBOOK_MEDIA_RECOVERY.md for the
 current policy.
+
+## Ads filter correction and selected totals — batch 56
+
+Ad accounts and Campaigns preserve invalid sidebar selections and show a focused
+route alert plus associated field errors, without loading a fallback report.
+Unavailable accounts remain explicit choices needing correction. Invalid calendar
+text stays editable rather than disappearing from a native date input. Preset
+dates are disabled; selecting Custom dates enables them before submission.
+Inputs use shared 44px fields and buttons. Account summary counts follow the same
+selection as their cards. Actual phone correction/submission, stale account and
+reversed-date checks are recorded in PREVIEW_QA.md; ADS_REPORT_FILTERS.md records
+remaining policy, pagination and broader design/feature gaps.

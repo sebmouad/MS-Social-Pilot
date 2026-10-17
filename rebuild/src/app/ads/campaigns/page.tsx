@@ -1,8 +1,8 @@
 import { entitledPlatformIds } from '@/server/entitlements';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
-import { AdsFiltersSidebar, dateRangeLabel } from '../ads-filters';
-import { getAdsAccounts, getAdsDataset, parseAdsFilters, type AdsSearchParams } from '@/server/ads/queries';
+import { AdsFiltersSidebar, AdsFilterErrorView, dateRangeLabel } from '../ads-filters';
+import { getAdsAccounts, getAdsDataset, parseAdsFilters, AdsFilterError, type AdsSearchParams } from '@/server/ads/queries';
 import { groupSummariesByAccount, summarizeInsights } from '@/server/ads/summary';
 import { StoredFields } from '../stored-fields';
 import { canManageWorkspaceAds, canReadWorkspaceAds } from '@/server/ads/actions';
@@ -21,7 +21,9 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   const allowedProviders = entitledPlatformIds(viewer.entitlements);
   const allowedTargetIds = viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids;
   const [params, accounts] = await Promise.all([searchParams, getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders)]);
-  const filters = parseAdsFilters(params, accounts.map(account => account.id));
+  let filters;
+  try { filters = parseAdsFilters(params, accounts.map(account => account.id)); }
+  catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView accounts={accounts} input={params} error={error} action="/ads/campaigns" title="Campaign, ad set, and ad results" />; }
   const { insights } = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders);
   const summaries = summarizeInsights(insights).filter(row => ['campaign', 'adset', 'ad'].includes(row.level));
   const byAccount = groupSummariesByAccount(summaries);

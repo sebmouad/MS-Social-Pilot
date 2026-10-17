@@ -1,23 +1,24 @@
 import type { AdsFilters } from "@/server/ads/queries";
+import { AdsFilterForm } from './AdsFilterForm';
+import { AdsFilterError, type AdsSearchParams } from '@/modules/ads/report-filters';
+import { PageFrame } from '@/server/PageFrame';
+import { RouteNotice } from '@/components/RouteNotice';
 
 type AdsAccountOption = { id: string; name: string };
 
-export function AdsFiltersSidebar({ accounts, filters, action = "/ads" }: { accounts: AdsAccountOption[]; filters: AdsFilters; action?: string }) {
+export function AdsFiltersSidebar({ accounts, filters, input, errors, action = "/ads" }: { accounts: AdsAccountOption[]; filters?: AdsFilters; input?: AdsSearchParams; errors?: AdsFilterError['fields']; action?: string }) {
   const value = (date: Date) => date.toISOString().slice(0, 10);
-  const untilInclusive = new Date(filters.until.getTime() - 24 * 60 * 60 * 1000);
-  return <form noValidate action={action} method="get" className="ads-sidebar-filter">
-    <p className="ads-filter-heading">Filters</p>
-    <label><span>Date range</span><select name="period" defaultValue={filters.period}>
-      <option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="90d">Last 90 days</option><option value="custom">Custom dates</option>
-    </select></label>
-    <label><span>From</span><input type="date" name="since" defaultValue={value(filters.since)} /></label>
-    <label><span>To</span><input type="date" name="until" defaultValue={value(untilInclusive)} /></label>
-    <label><span>Ad account</span><select name="account" defaultValue={filters.accountId ?? "all"}>
-      <option value="all">All accounts</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
-    </select></label>
-    <button type="submit">Apply filters</button>
-    <a className="ads-filter-reset" href={action}>Reset filters</a>
-  </form>;
+  const first = (raw: string | string[] | undefined, fallback: string) => (Array.isArray(raw) ? raw[0] : raw) ?? fallback;
+  const values = filters ? { period: filters.period, since: value(filters.since), until: value(new Date(filters.until.getTime() - 24 * 60 * 60 * 1000)), account: filters.accountId ?? 'all' }
+    : { period: first(input?.period, '30d'), since: first(input?.since, ''), until: first(input?.until, ''), account: first(input?.account, 'all') || 'all' };
+  return <AdsFilterForm key={JSON.stringify(values)} accounts={accounts} values={values} errors={errors} action={action} />;
+}
+
+export function AdsFilterErrorView({ accounts, input, error, action, title }: { accounts: AdsAccountOption[]; input: AdsSearchParams; error: AdsFilterError; action: string; title: string }) {
+  return <PageFrame module="ads" sidebar={<AdsFiltersSidebar accounts={accounts} input={input} errors={error.fields} action={action} />}><div className="page-stack">
+    <header className="page-heading"><div><p className="eyebrow">Ads</p><h1>{title}</h1></div></header>
+    <section className="panel"><h2>Check your filters</h2><RouteNotice error className="ui-error" focusKey={JSON.stringify(input)}>{error.message}</RouteNotice><p>Correct your selection in Filters, or use Reset filters. No report was loaded.</p></section>
+  </div></PageFrame>;
 }
 
 export function adsQuery(filters: AdsFilters, page: string) {

@@ -18,11 +18,10 @@
 .empty-state p { max-width: 580px; margin: 0 auto 16px; color: var(--ink-soft); font-size: 14px; line-height: 1.6; }
 .empty-state__icon { display: inline-grid; width: 42px; height: 42px; place-items: center; border-radius: 14px; background: var(--accent-soft); color: var(--accent); font-size: 21px; }
 .ads-sidebar-filter { display: grid; gap: 11px; }
+.ads-filter-field { display: grid; gap: 8px; }
 .ads-filter-heading { margin: 0 0 2px; color: var(--ink-faint); font-size: 10px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
-.ads-sidebar-filter label { display: grid; gap: 6px; color: var(--ink-soft); font-size: 11px; font-weight: 650; }
-.ads-sidebar-filter select, .ads-sidebar-filter input { width: 100%; min-width: 0; height: 36px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 11px; }
-.ads-sidebar-filter button { min-height: 40px; margin-top: 8px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--accent); font-size: 12px; font-weight: 700; cursor: pointer; }
-.ads-filter-reset { justify-self: center; color: var(--ink-faint); font-size: 11px; }
+.ads-sidebar-filter .ui-button { margin-top: 8px; }
+.ads-filter-reset { display: inline-flex; min-height: 40px; align-items: center; justify-self: center; color: var(--ink-soft); font-size: 12px; }
 .ads-account-list { display: grid; gap: 12px; margin-top: 18px; }
 .ads-account-card { min-width: 0; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
 .ads-account-card__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }

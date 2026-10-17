@@ -478,3 +478,15 @@ inferred and no unknown write was retried. FACEBOOK_LIVE_MEDIA_CANARY.md records
 the exact scope, immutable artifact hashes, pending verification and operator
 tool. Production application/data configuration and all cutover gates remain
 unchanged; this partial result does not complete the Facebook module.
+
+## Ads report filter consistency — batch 56
+
+Ads now owns the pure filter parser/preset catalog under `modules/ads`, consumed
+by the existing report read boundary and shared sidebar form. Invalid selections
+render field-linked correction state before insight/readiness work. They never
+broaden into an all-account/default-period report. Selected-account counts and
+visible cards agree, while the mandatory workspace/resource/provider intersection
+remains enforced independently in the data query. Shared form primitives replace
+the screen-specific input/button styling. ADS_REPORT_FILTERS.md records tested
+behavior and the remaining Root catalog, report bounds/pagination and broader
+Ads/MCP/parity gaps. No registry, DDL or production/provider state changed.

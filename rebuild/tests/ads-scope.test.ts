@@ -19,7 +19,7 @@ describe('Ads channel scope', () => {
   });
 
   it('derives account visibility from permitted workspace targets and bounds insight reads', async () => {
-    const filters = parseAdsFilters({ period: '7d', account: 'ad-hidden' }, ['ad-allowed'], new Date('2026-10-15T00:00:00Z'));
+    const filters = parseAdsFilters({ period: '7d', account: 'ad-allowed' }, ['ad-allowed'], new Date('2026-10-15T00:00:00Z'));
     const data = await getAdsDataset('workspace-a', filters, ['target-allowed'], ['facebook']);
     expect(data.accounts).toHaveLength(1);
     expect(db.targets).toHaveBeenCalledWith({ where: { workspaceId: 'workspace-a', id: { in: ['target-allowed'] } }, select: { socialAccountId: true } });
@@ -28,6 +28,12 @@ describe('Ads channel scope', () => {
       socialAccount: { is: { provider: { in: ['facebook'] } } },
     } }));
     expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: { workspaceId: 'workspace-a', id: { in: ['ad-allowed'] } } }) }));
+  });
+
+  it('keeps the mandatory account intersection even for a directly supplied unavailable selection', async () => {
+    const filters = { ...parseAdsFilters({}, ['ad-allowed']), accountId: 'ad-hidden' };
+    await getAdsDataset('workspace-a', filters, ['target-allowed'], ['facebook']);
+    expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ adAccount: { workspaceId: 'workspace-a', id: { in: [] } } }) }));
   });
 
   it('returns no accounts or insights for an empty channel scope', async () => {

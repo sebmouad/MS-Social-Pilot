@@ -92,4 +92,9 @@ The line icons in `src/components/AppShell.tsx` use a consistent light stroke an
 - Don't use a light-only surface or raw color in a screen-local style.
 - Don't imply that a partial archive, metric, or provider capability is complete.
 
+Ads report sidebar filters reuse the shared `.ui-field`, `.ui-input` and `Button`
+primitives. Their error descriptions sit outside labels, and custom-date
+correction retains invalid text. Preset date fields are visibly disabled. These
+controls inherit all four themes and use 44px input targets.
+
 Root directory forms use `.ui-field` and `.ui-input` primitives: stacked labels, a 44px input target, semantic surface/line/text colors, invalid borders and disabled state. These primitives currently cover Root directory search, creation and confirmations; other route-specific fields remain to be consolidated. Root dialog actions use the shared `Button` variants. Avoid directory-specific CSS that overrides those variants or restores native unthemed controls.

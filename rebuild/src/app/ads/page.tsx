@@ -1,8 +1,8 @@
 import { entitledPlatformIds } from '@/server/entitlements';
 import { PageFrame } from '@/server/PageFrame';
 import { requireViewer } from '@/server/context';
-import { AdsFiltersSidebar, adsQuery, dateRangeLabel } from './ads-filters';
-import { getAdsAccounts, getAdsDataset, parseAdsFilters, type AdsSearchParams } from '@/server/ads/queries';
+import { AdsFiltersSidebar, AdsFilterErrorView, adsQuery, dateRangeLabel } from './ads-filters';
+import { getAdsAccounts, getAdsDataset, parseAdsFilters, AdsFilterError, type AdsSearchParams } from '@/server/ads/queries';
 import { summarizeInsights } from '@/server/ads/summary';
 import { StoredFields } from './stored-fields';
 
@@ -15,7 +15,9 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
   const allowedProviders = entitledPlatformIds(entitlements);
   const params = await searchParams;
   const accounts = await getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders);
-  const filters = parseAdsFilters(params, accounts.map(account => account.id));
+  let filters;
+  try { filters = parseAdsFilters(params, accounts.map(account => account.id)); }
+  catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView accounts={accounts} input={params} error={error} action="/ads" title="Ad accounts" />; }
   const dataset = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders);
   const accountSummaries = summarizeInsights(dataset.insights, 'account');
   const campaigns = summarizeInsights(dataset.insights, 'campaign');
@@ -23,14 +25,14 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
   const ads = summarizeInsights(dataset.insights, 'ad');
   const accountMetrics = new Map(accountSummaries.map(row => [row.accountId, row]));
   const visibleAccounts = filters.accountId ? dataset.accounts.filter(account => account.id === filters.accountId) : dataset.accounts;
-  const enabled = dataset.accounts.filter(account => account.enabled).length;
-  const synced = dataset.accounts.filter(account => account.lastSyncedAt).length;
+  const enabled = visibleAccounts.filter(account => account.enabled).length;
+  const synced = visibleAccounts.filter(account => account.lastSyncedAt).length;
   const sidebar = <AdsFiltersSidebar accounts={dataset.accounts} filters={filters} />;
   return <PageFrame module="ads" sidebar={dataset.accounts.length ? sidebar : undefined}><div className="page-stack">
     <header className="page-heading"><div><p className="eyebrow">Ads</p><h1>Ad accounts</h1><p>{dataset.accounts.length ? `Stored delivery performance · ${dateRangeLabel(filters)}. Account currencies remain separate.` : 'Connect the advertising accounts you want to manage.'}</p></div></header>
     {!dataset.accounts.length ? <section className="panel empty-state"><h2>No ad accounts connected</h2><p>Connect and select an advertising account to see delivery and manage campaigns here.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <>
     <section className="metric-grid" aria-label="Advertising account totals">
-      <article className="metric-card"><dl><dt>Linked accounts</dt><dd>{dataset.accounts.length}</dd></dl></article>
+      <article className="metric-card"><dl><dt>Linked accounts</dt><dd>{visibleAccounts.length}</dd></dl></article>
       <article className="metric-card"><dl><dt>Enabled accounts</dt><dd>{enabled}</dd></dl></article>
       <article className="metric-card"><dl><dt>Accounts with sync time</dt><dd>{synced}</dd></dl></article>
       <article className="metric-card"><dl><dt>Campaigns with data</dt><dd>{campaigns.length}</dd></dl></article>

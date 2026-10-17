@@ -146,6 +146,14 @@ file ledger and Page lock are retained. This engine-only legacy credential bridg
 does not verify migrated rebuild UI/API/MCP, database journaling, first comments,
 other formats or complete provider parity. See FACEBOOK_LIVE_MEDIA_CANARY.md.
 
+Ads filter correction, batch 56: unavailable accounts and invalid dates now
+produce retained field-linked correction state before insight reads, instead of
+silently broadening the report. Overview counts agree with selected account
+cards; presets and custom editing share the sidebar's themed controls. This
+closes those filter UX defects only. Root-managed report policy/copy, reporting
+pagination/comparisons/exports/freshness, full management/provider/MCP parity and
+production-shaped release verification remain open. See ADS_REPORT_FILTERS.md.
+
 
 Facebook media recovery update, 2026-10-17: private Root now supports a default-off
 module-owned path for operators to record externally observed photo/feed and

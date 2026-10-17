@@ -1317,3 +1317,56 @@ Private local checks: `/private/tmp/socialpilot-canary55-tests.log`,
 `/private/tmp/socialpilot-canary55-typecheck.log` and
 `/private/tmp/socialpilot-canary55-build.log`. The private host ledger is retained
 as documented; do not delete or release it merely to permit another test run.
+
+## Ads report selection and correction — batch 56
+
+Reproduced eleven failing regression cases before implementation: unavailable
+account input became All accounts, malformed/reversed custom dates became the
+default period, summary counts ignored account selection, and preset date inputs
+were editable although their values were ignored. An additional empty-account
+correction case was also observed failing before its normalization fix.
+
+Ads now owns the pure parser/preset catalog; invalid input produces field errors
+before insights or management-readiness work. The picker retains unavailable
+accounts and invalid date text. Shared themed fields/buttons replace separate
+36px controls; error descriptions remain outside labels. Existing dataset scope
+still independently intersects authorized accounts with the requested identity.
+
+Final verification:
+
+- **1,499 tests passed in 224 files**, including nineteen focused Ads tests.
+- TypeScript, isolated production build and whitespace checks passed. The
+  preview's `.next` directory was preserved.
+- Actual local desktop GETs for unavailable accounts on Ad accounts and Campaigns
+  showed a focused alert, retained picker value/associated error and no report.
+  Correcting the account through Apply loaded only the EUR example card, with
+  Linked/Enabled/Synced/Campaign totals all one. A reversed custom range retained
+  both dates and marked its end field invalid without loading a report.
+- Changing the preset to Custom dates enabled its fields immediately. Nightfall
+  390×844 checks retained `2026-02-30` as editable text with its associated error.
+  The Menu & filters drawer exposed all controls at 44px height and document width
+  stayed 390px. Correcting to March 1–3 and submitting loaded the selected example
+  account, closed the drawer and removed the alert, with no horizontal overflow.
+- A native Nightfall phone screenshot and Grove desktop error screenshot were
+  visually inspected. Desktop DOM geometry checks across all four theme previews
+  kept 44px fields and 1440px document width. These are representative checks,
+  not a complete contrast/keyboard/state matrix. Temporary DOM theme previews
+  were not saved; a fresh navigation restored the user's current Clay theme.
+- Actual authenticated workspace MCP rejected the unavailable account with safe
+  `unavailable` failure and accepted a valid selected EUR request. No provider
+  write occurred. MCP already had this unavailable-account guard; the batch does
+  not add new tools or claim complete UI/API/MCP reporting parity.
+
+No DDL, registry change, provider request or production deployment occurred.
+Existing presets/defaults and new correction copy still need the requested Root
+configuration/copy catalog. Query bounds/pagination, account-status presentation,
+comparisons, export/freshness and broader Ads/core/legacy parity remain open.
+The earlier Facebook photo-cleanup ledger and lock remain unresolved and were
+not modified by this batch. ADS_REPORT_FILTERS.md records behavior and boundaries.
+
+Private logs: `/private/tmp/socialpilot-ads56-red.log`,
+`/private/tmp/socialpilot-ads56-empty-red.log`,
+`/private/tmp/socialpilot-ads56-focused-final.log`,
+`/private/tmp/socialpilot-ads56-full-final.log`,
+`/private/tmp/socialpilot-ads56-typecheck-final.log` and
+`/private/tmp/socialpilot-ads56-build-final.log`.
