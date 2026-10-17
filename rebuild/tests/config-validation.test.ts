@@ -27,7 +27,22 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(46);
+    expect(CONFIG_SCHEMA_VERSION).toBe(47);
+    for (const [key, value, minimum, maximum] of [
+      ['publishing.searchMaxCharacters', 200, 1, 2000],
+      ['publishing.exportMaxPosts', 5000, 1, 50000],
+      ['publishing.exportMaxBytes', 10485760, 1024, 52428800],
+      ['publishing.exportBatchSize', 100, 1, 1000],
+    ] as const) {
+      const setting = CONFIG_BY_KEY.get(key)!;
+      expect(setting.defaultValue).toBe(value);
+      expect(setting.consumption).toBe('active');
+      expect(setting.schema.safeParse(minimum).success).toBe(true);
+      expect(setting.schema.safeParse(maximum).success).toBe(true);
+      expect(setting.schema.safeParse(maximum + 1).success).toBe(false);
+      expect(setting.schema.safeParse(minimum - 1).success).toBe(false);
+      expect(setting.group).toMatch(/^Publishing · (Reads|Export)$/);
+    }
     for (const [key, value, maximum] of [
       ['publishing.publicationHistoryLimit', 100, 1000],
       ['publishing.postPageSize', 50, 100],

@@ -4,6 +4,7 @@ import { prisma, listPostPage, listCalendarRange, getTargets } from '@/server/da
 import { runtimeConfig } from '@/server/config/store';
 import { FIRST_COMMENT_REJECTED } from '../first-comment-state';
 import { authorizePublishing } from './access';
+import { publishingPostReadQuery } from './read-query';
 import { publishingPostVisibilityWhere, selectedPublishingTargetIds } from './read-scope';
 import type { PublishingActor, PublishingFeature } from './types';
 
@@ -31,13 +32,12 @@ function integer(value: unknown, fallback: number, max?: number) {
 }
 
 /** Current authorization and selected resource visibility are shared by every Publishing read surface. */
-export async function readPublishingPostPage(actor: PublishingActor, input: { page?: number; status?: string; channelId?: string; order?: 'scheduled_asc' | 'created_asc' } = {}, feature: PublishingFeature = 'publishing/posts') {
+export async function readPublishingPostPage(actor: PublishingActor, input: { page?: number; status?: string; channelId?: string; q?: string; order?: 'scheduled_asc' | 'created_asc' } = {}, feature: PublishingFeature = 'publishing/posts') {
   if (input.order !== undefined && !['scheduled_asc', 'created_asc'].includes(input.order)) invalid('Choose a valid post order.');
-  const access = await scope(actor, feature);
+  const query = await publishingPostReadQuery(actor, { status: input.status, channelId: input.channelId, q: input.q }, feature);
   const size = await runtimeConfig('publishing.postPageSize');
-  const channelId = await channel(input.channelId);
-  const listing = await listPostPage(actor.workspaceId, integer(input.page, 1), size, access.targetIds, access.authorId, { status: status(input.status), channelId, order: input.order });
-  return { ...listing, channelUnavailable: Boolean(channelId && !access.targetIds.includes(channelId)) };
+  const listing = await listPostPage(actor.workspaceId, integer(input.page, 1), size, query.scope.targetIds, query.scope.authorId, { where: query.where, order: input.order });
+  return { ...listing, channelUnavailable: query.channelUnavailable, filters: query.filters };
 }
 
 export async function readPublishingCalendar(actor: PublishingActor, input: { from: Date; to: Date; channelId?: string; status?: string }) {
@@ -66,17 +66,16 @@ function date(value: unknown): Date | undefined {
 export async function readPublishingPostList(actor: PublishingActor, input: unknown = {}, constraints: { maxItems?: number } = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) invalid();
   const values = input as Record<string, unknown>;
-  if (Object.keys(values).some(key => !['status', 'from', 'to', 'limit', 'channelId'].includes(key))) invalid();
+  if (Object.keys(values).some(key => !['status', 'from', 'to', 'limit', 'channelId', 'q'].includes(key))) invalid();
   const statuses = values.status === undefined ? [] : typeof values.status === 'string' ? values.status.split(',').map(value => value.trim()).filter(Boolean).map(value => status(value)!) : invalid('Choose valid post statuses.');
   const from = date(values.from); const to = date(values.to);
   if (from && to && from > to) invalid('The end date must follow the start date.');
   const maximum = await runtimeConfig('publishing.readMaxItems');
   const cap = constraints.maxItems === undefined ? maximum : Math.min(integer(constraints.maxItems, maximum), maximum);
   const limit = Math.min(integer(values.limit, cap), cap);
-  const channelId = await channel(values.channelId);
-  const access = await scope(actor, 'publishing/posts');
-  const where: Prisma.PostWhereInput = { AND: [await publishingPostVisibilityWhere(actor.workspaceId, access.targetIds, access.authorId),
-    ...(statuses.length ? [{ status: { in: statuses } }] : []), ...(channelId ? [{ targets: { some: { targetId: channelId } } }] : []),
+  const query = await publishingPostReadQuery(actor, { channelId: values.channelId as string | undefined, q: values.q as string | undefined });
+  const where: Prisma.PostWhereInput = { AND: [query.where,
+    ...(statuses.length ? [{ status: { in: statuses } }] : []),
     ...(from || to ? [{ scheduledAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }] : [])] };
   const posts = await prisma.post.findMany({ where, orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }], take: limit,
     select: { id: true, authorId: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, publishedAt: true, createdAt: true,

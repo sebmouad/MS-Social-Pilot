@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Prisma } from '../generated/client';
 import { listPostPage, prisma } from '../src/server/data';
 
 describe('scoped post pagination', () => {
@@ -61,6 +62,41 @@ describe('scoped post pagination', () => {
     const where = expect.objectContaining({ workspaceId: 'workspace-1', status: 'published', targets: { some: { targetId: 'page-2' } }, OR: expect.any(Array) });
     expect(count).toHaveBeenCalledWith({ where });
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where, skip: 50, take: 50 }));
+  });
+
+  it('uses one complete authorized search predicate for both page counts and rows', async () => {
+    const count = vi.spyOn(prisma.post, 'count').mockResolvedValue(3);
+    const findMany = vi.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
+    const where: Prisma.PostWhereInput = { AND: [
+      { workspaceId: 'workspace-1', OR: [{ targets: { every: { targetId: { in: ['page-1'] } } } }] },
+      { OR: [{ message: { contains: 'literal\\%', mode: 'insensitive' } }, { firstComment: { contains: 'literal\\%', mode: 'insensitive' } }] },
+    ] };
+    await listPostPage('workspace-1', 1, 50, [], undefined, { where });
+    const scopedWhere = { AND: [
+      { workspaceId: 'workspace-1', OR: [
+        { targets: { some: { targetId: { in: [] } }, every: { targetId: { in: [] } } } },
+        { targets: { none: {} } },
+      ] },
+      where,
+    ] };
+    expect(count).toHaveBeenCalledWith({ where: scopedWhere });
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: scopedWhere }));
+  });
+
+  it('keeps tenant and selected-channel scope when a caller where is partial or foreign', async () => {
+    const count = vi.spyOn(prisma.post, 'count').mockResolvedValue(0);
+    const findMany = vi.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
+    const filter = { workspaceId: 'workspace-attacker', OR: [{ targets: { some: { targetId: 'foreign-channel' } } }] } satisfies Prisma.PostWhereInput;
+    await listPostPage('workspace-1', 1, 50, ['selected-channel'], 'author-1', { where: filter });
+    const where = count.mock.calls[0]?.[0]?.where;
+    expect(where).toEqual({ AND: [
+      { workspaceId: 'workspace-1', OR: [
+        { targets: { some: { targetId: { in: ['selected-channel'] } }, every: { targetId: { in: ['selected-channel'] } } } },
+        { targets: { none: {} }, authorId: 'author-1' },
+      ] },
+      filter,
+    ] });
+    expect(findMany.mock.calls[0]?.[0]?.where).toEqual(where);
   });
 
   it('queries scheduled and approval queues before paging in workflow order', async () => {

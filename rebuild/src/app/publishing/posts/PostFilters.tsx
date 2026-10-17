@@ -3,6 +3,7 @@
 import { usePathname, useSearchParams } from 'next/navigation';
 import { PublishingChannelOptions } from '../PublishingChannelOptions';
 import styles from '../publishing.module.css';
+import { PostExport } from './PostExport';
 
 const statuses = [
   ['draft', 'Draft'], ['pending_approval', 'Pending Approval'], ['rejected', 'Rejected'],
@@ -15,7 +16,7 @@ export function parsePostView(value: string | null | undefined): PostView {
   return value === 'feed' || value === 'cards' ? value : 'table';
 }
 
-export function PostFilters({ channels, currentMonth }: { channels: Array<{ id: string; name: string }>; currentMonth: string }) {
+export function PostFilters({ channels, currentMonth, searchMaxCharacters, exportMaxPosts, exportMaxBytes }: { channels: Array<{ id: string; name: string }>; currentMonth: string; searchMaxCharacters?: number; exportMaxPosts?: number; exportMaxBytes?: number }) {
   const pathname = usePathname();
   const params = useSearchParams();
   if (pathname === '/publishing/calendar') return <form noValidate action="/publishing/calendar" method="get" className={styles.postFilters} key={params.toString()}>
@@ -25,7 +26,8 @@ export function PostFilters({ channels, currentMonth }: { channels: Array<{ id: 
     <button type="submit">Show Month</button>
     <a href="/publishing/calendar">Current Month</a>
   </form>;
-  return <form noValidate action="/publishing/posts" method="get" className={styles.postFilters} key={params.toString()}>
+  return <>
+    <form noValidate action="/publishing/posts" method="get" className={styles.postFilters} key={params.toString()}>
     <p className="shell-subnav__label">Post Filters</p>
     <label htmlFor="post-view-filter">View</label>
     <select id="post-view-filter" name="view" defaultValue={parsePostView(params.get('view'))}>
@@ -42,7 +44,12 @@ export function PostFilters({ channels, currentMonth }: { channels: Array<{ id: 
     <select id="post-channel-filter" name="channel" defaultValue={params.get('channel') ?? ''}>
       <PublishingChannelOptions channels={channels} selected={params.get("channel")} />
     </select>
+    <label htmlFor="post-search-filter">Search posts</label>
+    <input id="post-search-filter" type="search" name="q" maxLength={searchMaxCharacters} defaultValue={params.get('q') ?? ''} placeholder="Post text or first comment" aria-describedby="post-search-help" />
+    <p id="post-search-help" className={styles.help}>Search post text and first comments.</p>
     <button type="submit">Apply Filters</button>
     <a href="/publishing/posts">Reset Filters</a>
-  </form>;
+    </form>
+    {exportMaxPosts !== undefined && exportMaxBytes !== undefined ? <PostExport maxPosts={exportMaxPosts} maxBytes={exportMaxBytes} /> : null}
+  </>;
 }

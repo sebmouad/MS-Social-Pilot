@@ -723,3 +723,73 @@ open. Private logs: `/private/tmp/socialpilot-duplicate-full-tests-final.log`,
 `/private/tmp/socialpilot-duplicate-typecheck-final.log`,
 `/private/tmp/socialpilot-duplicate-build-final.log` and
 `/private/tmp/socialpilot-duplicate-live-final.log`.
+
+## Posts literal search and complete CSV export — 2026-10-17
+
+Final automated verification passed **1,234 tests across 204 files**, including
+actual isolated PostgreSQL suites. Typecheck and an isolated production build
+passed; preview `.next` was preserved. Registry 47 adds consumed Publishing
+search length and CSV post/UTF-8 byte/batch ceilings. No DDL, provider request
+or production change occurred. POST_SEARCH_EXPORT.md records interface and
+consistency/resource limitations; the plan records review refinements.
+
+Test-first regressions cover SQL LIKE metacharacters, status/channel/query
+composition, identical count/row predicates, read-only MCP permission/discovery,
+caller result ceilings, strict no-store HTTP filters, CSV quoting/Unicode/formula
+protection, normalized first-comment/media/outcomes, exact row/byte ceilings,
+multiple keyset batches and no further queries after refusal. UI tests cover
+applied-filter URLs, pending/repeat clicks, metadata/blob byte checks, object
+URL cleanup, safe focused failure and preparation feedback.
+
+Independent review found that the page data helper's new custom predicate could
+replace its mandatory scope. Current routes passed correct scoped predicates;
+no exposed route bypass was observed. A failing regression demonstrated the
+helper contract weakness, then it was corrected to conjoin workspace, selected
+resource and author scope independently. The query helper returns resolved
+scope to the paged reader. Parent review also replaced repeated full-CSV byte
+scans with incremental accounting and single giant reads with bounded snapshot
+batches, and aligned search limits with native HTML UTF-16 maxLength.
+
+`scripts/verify-post-search-export.ts` ran against the actual local app and
+preview database. Disposable scoped-editor/read-key fixtures included a message
+match, first-comment-only match, own unconnected draft, wildcard lookalike, mixed
+hidden destinations, foreign workspace, unselected destination and another
+author's unconnected draft. Literal percent/underscore/backslash search returned
+exactly the three authorized matches across three HTTP pages under temporary
+page size one. HTTP export returned both North matches independent of displayed
+page size. Read-only MCP returned byte-identical CSV and list search agreed.
+
+CSV inspection confirmed quote/formula protection after whitespace, embedded
+line breaks, Unicode, both stored media references and first comments, without
+raw provider error text. Temporary batch size one exercised actual PostgreSQL
+keyset reads. Temporary post/byte ceilings refused oversized matches as JSON,
+with no partial CSV. Current channel-grant revocation immediately removed North
+from that same key's export. Unsupported/repeated parameters were denied. The
+original editor-denying MCP policy was checked before the temporary local test
+grant. Exact setting presence/value/encryption/timestamp restoration and removal
+of all disposable posts, identities, keys, sessions and workspaces were verified.
+No provider transport was invoked.
+
+Chrome exercised Clay desktop Table at 1440×1000: typing/applying waiting
+returned the two seeded waiting/awaiting posts, then the sidebar initiated CSV
+preparation with focused Prepared CSV for 2 posts feedback. Nightfall phone
+390×844 retained Feed and search inside the existing 330px navigation drawer.
+Offline export focused safe recovery feedback and retained filters; reconnecting
+and retrying prepared the same two-post CSV. No page overflow occurred. Root's
+Publishing category exposed the four new consumed defaults in its existing phone
+shell. A forged 201-character search retained the route and focused the precise
+200-character validation message; mutation/import controls were absent during
+that failure. Cards with no matches showed the no-match state. Grove desktop
+1440×900 retained Cards/search and the configured input bound/export control
+without overflow. These are representative local checks, not complete all-state
+accessibility or browser-save proof; prepared/download-initiated does not assert
+that the operating system saved the file.
+
+Synchronous export limits deliberately refuse large sets. Asynchronous archives,
+performance/index work at production volume, saved views, bulk operations, REST
+v1, complete legacy/provider/MCP coverage and migration/rollback/cutover remain
+open. Private evidence logs:
+`/private/tmp/socialpilot-search-full-tests-final.log`,
+`/private/tmp/socialpilot-search-typecheck-final.log`,
+`/private/tmp/socialpilot-search-build-final.log`, and
+`/private/tmp/socialpilot-search-export-live-final.log`.

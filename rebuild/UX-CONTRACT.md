@@ -207,3 +207,22 @@ intent so the next deliberate duplication receives a new ID. Leaving/reloading
 the component loses its local retry ID; the recovery link remains necessary.
 Business/authorization authority is docs/POST_DUPLICATION.md and its service.
 No new dialog, theme rule or third navigation surface is introduced.
+
+## Posts search and CSV — 2026-10-17
+
+Search text and first comments from the existing sidebar or phone drawer.
+Search, channel, status and view are applied together; applying filters resets
+page position, while pagination retains them. Counts reflect the same scoped
+query. Invalid search keeps the entered value and shows focused safe guidance;
+no matches has distinct copy, and failed reads expose no misleading empty list.
+
+Export matching posts uses applied URL filters across all result pages. Root's
+row and byte ceilings are visible; oversized matches are refused rather than
+downloaded partially. Pending prevents duplicate clicks. A confirmed response
+needs the version, safe count and matching actual byte size before a Blob
+download starts. Feedback is focused, retains filters and says Prepared CSV,
+which does not assert the browser saved a file. The phone drawer retains export
+feedback inside its focus boundary. Content, first comments, all valid media
+references and normalized destination outcomes are included; this CSV is not a
+workspace archive or an import template. POST_SEARCH_EXPORT.md owns business
+and interface details; PREVIEW_QA.md records the local checks and limitations.

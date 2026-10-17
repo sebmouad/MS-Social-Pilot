@@ -38,6 +38,8 @@ const inboxReads = vi.hoisted(() => ({ list: vi.fn(), thread: vi.fn() }));
 vi.mock('../src/modules/inbox/server/read', () => ({ readInboxList: inboxReads.list, readInboxThread: inboxReads.thread }));
 const publishingReads = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock('../src/modules/publishing/server/read', () => ({ readPublishingPostList: publishingReads.list }));
+const postExport = vi.hoisted(() => vi.fn());
+vi.mock('../src/modules/publishing/server/export', () => ({ exportPublishingPosts: postExport }));
 const inboxMutations = vi.hoisted(() => ({ reply: vi.fn(), resolve: vi.fn(), moderate: vi.fn() }));
 vi.mock('../src/server/inbox/actions', () => ({ replyToInbox: inboxMutations.reply, setInboxResolved: inboxMutations.resolve, moderateInboxComment: inboxMutations.moderate }));
 const inboxDeletions = vi.hoisted(() => ({ get: vi.fn(), remove: vi.fn(), finish: vi.fn() }));
@@ -114,6 +116,7 @@ beforeEach(() => {
   inboxReads.list.mockResolvedValue({ channels: [], items: [], total: 0, olderCursor: null, newerCursor: null });
   inboxReads.thread.mockResolvedValue({ thread: { id: 'conv-a' }, history: {} });
   publishingReads.list.mockResolvedValue([]);
+  postExport.mockResolvedValue({ format: 'ms-social-pilot-posts-csv', version: 1, csv: 'post_id,message\r\npost-a,Hello\r\n', fileName: 'posts.csv', postCount: 1, byteLength: 32 });
   inboxMutations.reply.mockResolvedValue({ ok: true });
   inboxMutations.resolve.mockResolvedValue({ ok: true });
   inboxMutations.moderate.mockResolvedValue({ ok: true });
@@ -980,6 +983,33 @@ describe('MCP workspace boundaries', () => {
     const post = (await response.json()).result.structuredContent.items[0];
     expect(post.targets[0]).toMatchObject({ id: 'post-target-a', firstComment: { state: 'needs_review', label: 'First comment needs review', errorPresent: true } });
     expect(JSON.stringify(post)).not.toContain('private provider error');
+  });
+
+  it('exports only authorized reads through the shared service with literal filters and the MCP result ceiling', async () => {
+    const scoped = { ...viewer, maxResultItems: 7, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
+    const invoke = (method: string, params: object = {}) => handleMcpMessage(scoped, { jsonrpc: '2.0', id: 1, method, params });
+    const list = await invoke('tools/list');
+    expect((await list.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('export_posts');
+    const args = { q: '100%_\\', status: 'published', channelId: 'page-allowed' };
+    const result = (await (await invoke('tools/call', { name: 'export_posts', arguments: args })).json()).result;
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({ format: 'ms-social-pilot-posts-csv', postCount: 1 });
+    expect(postExport).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a', allowedTargetIds: ['page-allowed'] }, args, { maxItems: 7 });
+    expect(workspaceGuard).not.toHaveBeenCalled();
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+    postExport.mockRejectedValueOnce(new OperationError('invalid_request', 'Too many posts match. Narrow the filters.'));
+    expect((await (await invoke('tools/call', { name: 'export_posts', arguments: args })).json()).result.structuredContent.code).toBe('invalid_request');
+    postExport.mockRejectedValueOnce(new Error('postgres://private-password@db access_token=private-token'));
+    const failed = await invoke('tools/call', { name: 'export_posts' });
+    expect(JSON.stringify(await failed.json())).not.toMatch(/private-password|private-token|postgres:/);
+    expect(failed.headers.get('cache-control')).toBe('no-store');
+    const denied = { ...scoped, permissions: { ...scoped.permissions, features: { ...scoped.permissions.features, 'publishing/posts': { read: false, write: false } } } };
+    const hidden = await handleMcpMessage(denied, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
+    expect((await hidden.json()).result.tools.map((tool: { name: string }) => tool.name)).not.toContain('export_posts');
+    postExport.mockClear();
+    const forbidden = await handleMcpMessage(denied, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'export_posts' } });
+    expect((await forbidden.json()).result.structuredContent.code).toBe('forbidden');
+    expect(postExport).not.toHaveBeenCalled();
   });
 
   it('offers duplication only to writers, binds its confirmation, and preserves service idempotency without a nested lock', async () => {

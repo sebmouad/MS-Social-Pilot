@@ -11,7 +11,7 @@ vi.mock('../src/modules/publishing/server/read-scope', () => ({
   publishingPostVisibilityWhere: (workspaceId: string, targetIds?: readonly string[] | null, authorId?: string) => ({
     workspaceId, OR: [
       { targets: { some: { targetId: { in: [...(targetIds ?? [])] } }, every: { targetId: { in: [...(targetIds ?? [])] } } } },
-      ...(authorId ? [{ targets: { none: {}, authorId } }] : targetIds == null ? [] : [{ targets: { none: {} } }]),
+    ...(authorId ? [{ targets: { none: {} }, authorId }] : targetIds == null ? [] : [{ targets: { none: {} } }]),
     ],
   }),
 }));
@@ -39,7 +39,7 @@ beforeEach(() => {
   state.calendar.mockResolvedValue([]); state.targets.mockResolvedValue([]); state.findMany.mockResolvedValue([]);
   state.config.mockImplementation(async (key: string) => ({
     'publishing.identifierMaxCharacters': 200, 'publishing.postPageSize': 50,
-    'publishing.readMaxItems': 200, 'publishing.calendarMaxRangeDays': 70,
+    'publishing.readMaxItems': 200, 'publishing.calendarMaxRangeDays': 70, 'publishing.searchMaxCharacters': 200,
   }[key]));
 });
 
@@ -48,7 +48,7 @@ describe('shared Publishing read service', () => {
     await readPublishingPostPage(allowedActor, {}, 'publishing/posts');
     expect(state.authorize).toHaveBeenCalledWith(allowedActor, 'publishing/posts', 'read');
     expect(state.selected).toHaveBeenCalledWith('workspace', expect.any(Object), ['selected-a', 'selected-b']);
-    expect(state.page).toHaveBeenCalledWith('workspace', 1, 50, ['selected-a', 'selected-b'], 'reader', expect.any(Object));
+    expect(state.page).toHaveBeenCalledWith('workspace', 1, 50, ['selected-a', 'selected-b'], 'reader', expect.objectContaining({ where: expect.objectContaining({ AND: expect.any(Array) }) }));
 
     state.authorize.mockResolvedValueOnce(access({ ...actor, allowedTargetIds: [] }));
     state.selected.mockResolvedValueOnce([]);
@@ -59,10 +59,19 @@ describe('shared Publishing read service', () => {
   it('uses unrestricted post permission for connected posts while limiting unconnected drafts to the caller', async () => {
     state.authorize.mockResolvedValueOnce(access(actor));
     await readPublishingPostPage(actor);
-    expect(state.page.mock.calls[0]?.[4]).toBeUndefined();
+    expect(state.page.mock.calls[0]?.[5]?.where.AND?.[0].OR).toEqual(expect.arrayContaining([expect.objectContaining({ targets: { none: {} } })]));
     state.authorize.mockResolvedValueOnce(access({ ...actor, allowedTargetIds: ['selected-a'] }));
     await readPublishingPostPage({ ...actor, allowedTargetIds: ['selected-a'] });
-    expect(state.page.mock.calls[1]?.[4]).toBe('reader');
+    expect(state.page.mock.calls[1]?.[5]?.where.AND?.[0].OR).toEqual(expect.arrayContaining([expect.objectContaining({ authorId: 'reader' })]));
+  });
+
+  it('passes normalized literal text search to the paged data query', async () => {
+    await readPublishingPostPage(allowedActor, { q: '  Café 50%  ' });
+    const where = state.page.mock.calls[0]?.[5]?.where;
+    expect(where.AND).toEqual(expect.arrayContaining([{ OR: [
+      { message: { contains: 'Café 50\\%', mode: 'insensitive' } },
+      { firstComment: { contains: 'Café 50\\%', mode: 'insensitive' } },
+    ] }]));
   });
 
   it('counts Home posts with the same current selected-channel and member scope as Posts', async () => {
@@ -114,11 +123,15 @@ describe('shared Publishing read service', () => {
   it('caps trusted caller limits, returns bounded selected-resource rows, and redacts provider error text', async () => {
     state.authorize.mockResolvedValueOnce(access(actor));
     state.findMany.mockResolvedValueOnce([{ id: 'p', targets: [{ firstCommentError: 'provider secret detail' }, { firstCommentError: FIRST_COMMENT_REJECTED }] }]);
-    const result = await readPublishingPostList(actor, { status: 'published,scheduled', from: '2026-10-01', to: '2026-10-31', limit: 100 }, { maxItems: 25 });
-    expect(state.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 25, where: expect.objectContaining({ AND: expect.arrayContaining([expect.objectContaining({ workspaceId: 'workspace' })]) }) }));
+    const result = await readPublishingPostList(actor, { status: 'published,scheduled', from: '2026-10-01', to: '2026-10-31', limit: 100, q: '  match  ' }, { maxItems: 25 });
+    expect(state.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 25, where: expect.objectContaining({ AND: expect.arrayContaining([expect.objectContaining({ AND: expect.arrayContaining([expect.objectContaining({ workspaceId: 'workspace' })]) })]) }) }));
     expect(result[0]?.targets).toEqual([{ firstCommentError: 'review_required' }, { firstCommentError: FIRST_COMMENT_REJECTED }]);
     const query = state.findMany.mock.calls[0]?.[0];
-    expect(query.where.AND[0].OR[0].targets.every.targetId.in).toEqual(['selected-a', 'selected-b']);
+    expect(query.where.AND[0].AND[0].OR[0].targets.every.targetId.in).toEqual(['selected-a', 'selected-b']);
+    expect(query.where.AND[0].AND).toContainEqual({ OR: [
+      { message: { contains: 'match', mode: 'insensitive' } },
+      { firstComment: { contains: 'match', mode: 'insensitive' } },
+    ] });
     expect(query.where.AND).toEqual(expect.arrayContaining([
       { status: { in: ['published', 'scheduled'] } },
       { scheduledAt: { gte: new Date('2026-10-01T00:00:00Z'), lte: new Date('2026-10-31T00:00:00Z') } },

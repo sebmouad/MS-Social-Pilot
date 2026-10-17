@@ -19,6 +19,7 @@ import { finishPostDeletion, getPostDeletion, recordPostDeletionOutcome } from '
 import { adoptLegacyPublication, finishPublicationProjection, getPublicationStatus, recordPublicationOutcome } from '@/modules/publishing/server/publication';
 import { duplicatePost } from '@/modules/publishing/server/duplicate';
 import { readPublishingPostList } from '@/modules/publishing/server/read';
+import { exportPublishingPosts } from '@/modules/publishing/server/export';
 import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
 import { runtimeConfig } from '../config/store';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
@@ -51,7 +52,8 @@ const tools = [
   { name: 'delete_workspace_image', description: 'Permanently delete an unused workspace image. Images attached to posts cannot be deleted. Confirmation must exactly match DELETE WORKSPACE IMAGE <imageId>.', inputSchema: { type: 'object', required: ['imageId', 'confirmation'], properties: { imageId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'upload_workspace_image', description: 'Store a workspace image from standard base64 data. Root image MIME and byte limits apply. Confirmation must exactly match UPLOAD WORKSPACE IMAGE <fileName>.', inputSchema: { type: 'object', required: ['fileName', 'mimeType', 'base64', 'confirmation'], properties: { fileName: { type: 'string', minLength: 1, maxLength: 180 }, mimeType: { type: 'string' }, base64: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'list_pages', description: 'List enabled workspace destinations and their publishing availability.', inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'list_posts', description: 'List workspace posts, newest first. Filter by status and scheduled date.', inputSchema: { type: 'object', properties: { status: { type: 'string', description: 'Comma-separated post statuses.' }, from: { type: 'string', description: 'ISO date or date-time lower bound for scheduledAt.' }, to: { type: 'string', description: 'ISO date or date-time upper bound for scheduledAt.' }, limit: { type: 'integer', minimum: 1 }, channelId: { type: 'string' } }, additionalProperties: false } },
+  { name: 'list_posts', description: 'List workspace posts, newest first. Filter by status, scheduled date and literal case-insensitive post text or first-comment search.', inputSchema: { type: 'object', properties: { status: { type: 'string', description: 'Comma-separated post statuses.' }, from: { type: 'string', description: 'ISO date or date-time lower bound for scheduledAt.' }, to: { type: 'string', description: 'ISO date or date-time upper bound for scheduledAt.' }, limit: { type: 'integer', minimum: 1 }, channelId: { type: 'string' }, q: { type: 'string', description: 'Literal search in post text and first comment.' } }, additionalProperties: false } },
+  { name: 'export_posts', description: 'Prepare a UTF-8 CSV of all matching authorized posts with content, first comments, media, timestamps and destination delivery outcomes. Filter by one status, channel and literal text/first-comment search. Root export limits and the MCP result ceiling apply; oversized results are refused, never silently truncated. CSV cells are protected against spreadsheet formula execution. This is a read and sends no provider request.', inputSchema: { type: 'object', properties: { status: { type: 'string' }, channelId: { type: 'string' }, q: { type: 'string' } }, additionalProperties: false } },
   { name: 'list_inbox', description: 'Read the same merged, scoped Inbox activity as the app. Top-level comments and conversations have shared literal text/person search, channel/status/hidden filters and Older/Newer cursors. Root page and MCP result limits apply. Cursors reset when selection or filters change; activity can move when new messages arrive.', inputSchema: { type: 'object', properties: { channelId: { type: 'string' }, kind: { type: 'string', enum: ['all', 'comment', 'message'] }, state: { type: 'string', enum: ['open', 'resolved', 'all'] }, hidden: { type: 'string', enum: ['visible', 'all'] }, q: { type: 'string' }, cursor: { type: 'string' }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'get_inbox_thread', description: 'Read one authorized stored Inbox thread by message:<id> or comment:<id>. Defaults to newest stored messages/replies displayed chronologically; follow history Older/Newer cursors. Original comment remains visible on every reply page. History does not imply all provider history was fetched.', inputSchema: { type: 'object', required: ['key'], properties: { key: { type: 'string' }, cursor: { type: 'string' }, limit: { type: 'integer', minimum: 1 } }, additionalProperties: false } },
   { name: 'reply_to_inbox', description: 'Send a reply to a synced conversation or comment through its connected platform. This contacts the remote platform. Confirmation must exactly match REPLY <message|comment> <id>.', inputSchema: { type: 'object', required: ['kind', 'id', 'text', 'confirmation'], properties: { kind: { type: 'string', enum: ['message', 'comment'] }, id: { type: 'string' }, text: { type: 'string', minLength: 1, maxLength: 2000 }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -102,6 +104,7 @@ const canManageData = (viewer: McpViewer) => viewer.role === 'owner' || viewer.r
 const dataResource = (uri: string) => uri === 'msp://data/deletion-preview';
 
 const toolFeatures: Record<string, string> = {
+  export_posts: 'publishing/posts',
   list_workspace_images: 'publishing/media',
   get_workspace_image: 'publishing/media',
   delete_workspace_image: 'publishing/media',
@@ -294,6 +297,11 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
         return { id: row.id, status: row.status, remotePostId: row.remotePostId, remoteUrl: row.remoteUrl, target: row.target,
           firstComment: { state, label: FIRST_COMMENT_LABELS[state], ...(row.firstCommentAt ? { attemptedAt: row.firstCommentAt } : {}), ...(row.firstCommentId ? { remoteCommentId: row.firstCommentId } : {}), errorPresent: Boolean(row.firstCommentError) } };
       }) }));
+    }
+    case 'export_posts': {
+      return exportPublishingPosts({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(pageIdsFor(viewer) === undefined ? {} : { allowedTargetIds: pageIdsFor(viewer) }) }, args, {
+        maxItems: viewer.maxResultItems ?? await runtimeConfig('mcp.maxResultItems'),
+      });
     }
     case 'list_inbox': {
       const { channels, ...result } = await readInboxList({ userId: viewer.userId, workspaceId: viewer.workspaceId }, args, { allowedChannelIds: pageIdsFor(viewer), maxItems: cap });

@@ -301,3 +301,23 @@ authority, collisions and deleted copies fail closed. No provider request, DDL
 or registry change is introduced. POST_DUPLICATION.md records the exact
 request/receipt contract and limitations. Bulk actions, complete Publishing
 parity, live provider verification and production cutover remain unfinished.
+
+## Shared Posts search and complete-or-refused CSV — 2026-10-17
+
+Publishing's read-query service now owns current-authorized literal text/first-
+comment, status and channel filters. Count/list, HTTP Posts, CSV and MCP share
+its whole-post selected-resource predicate. The data page helper independently
+conjoins its mandatory tenant/resource/author scope with richer filters. Search
+escapes SQL LIKE metacharacters and uses the same configured UTF-16 bound as
+native maxLength. Sidebar controls and pagination preserve applied filters in
+Table, Feed and Cards. Typed validation failures retain useful focused feedback.
+
+The Publishing-owned export service projects all content/media/first comments
+and normalized delivery outcomes into CSV v1. Read-only HTTP/MCP use the same
+service. Ordered keyset batches share a RepeatableRead snapshot and stop at
+configured post/UTF-8 byte ceilings; oversized exports return no partial file.
+Registry 47 adds consumed search/export row/byte/batch limits under Root's
+Publishing controls and reuses its transaction duration/wait settings. No DDL
+or provider request is involved. POST_SEARCH_EXPORT.md records the protocol,
+permission/UX boundaries and open performance/asynchronous-export/legacy gaps;
+PREVIEW_QA.md owns actual evidence. Production remains legacy.

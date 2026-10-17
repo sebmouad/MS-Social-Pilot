@@ -99,11 +99,12 @@ export async function getTargets(workspaceId: string, allowedTargetIds?: readonl
 }
 
 /** Paginate posts after workspace and channel scope have been enforced in the query. */
-export async function listPostPage(workspaceId: string, page: number, pageSize: number, allowedTargetIds: readonly string[] | null, authorId: string | undefined, filters: { status?: PostStatus; channelId?: string; order?: 'scheduled_asc' | 'created_asc' } = {}) {
+export async function listPostPage(workspaceId: string, page: number, pageSize: number, allowedTargetIds: readonly string[] | null, authorId: string | undefined, filters: { status?: PostStatus; channelId?: string; order?: 'scheduled_asc' | 'created_asc'; where?: Prisma.PostWhereInput } = {}) {
   const size = Math.max(1, Math.min(Math.trunc(pageSize), 100));
   const requestedPage = Number.isSafeInteger(page) && page > 0 ? page : 1;
-  const where: Prisma.PostWhereInput = {
-    ...publishingPostVisibilityWhere(workspaceId, allowedTargetIds, authorId),
+  const scopeWhere = publishingPostVisibilityWhere(workspaceId, allowedTargetIds, authorId);
+  const where: Prisma.PostWhereInput = filters.where ? { AND: [scopeWhere, filters.where] } : {
+    ...scopeWhere,
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.channelId ? { targets: { some: { targetId: filters.channelId } } } : {}),
   };

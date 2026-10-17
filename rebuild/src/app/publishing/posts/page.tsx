@@ -11,6 +11,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { RouteNotice } from '@/components/RouteNotice';
 import { PostStatus } from '../../../../generated/client';
 import { canAccessFeature } from '@/server/permissions';
+import { OperationError, isOperationErrorCode } from '@/lib/operation-error';
 
 const NOTICE_TEXT: Record<string, string> = {
   created: "Post saved.",
@@ -34,9 +35,9 @@ const NOTICE_TEXT: Record<string, string> = {
   duplicated: "A new unscheduled draft was created.",
 };
 
-export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; recovery?: string; page?: string; status?: string; channel?: string; view?: string }> }) {
+export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; recovery?: string; page?: string; status?: string; channel?: string; q?: string; view?: string }> }) {
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
-  const { notice, recovery, page: pageParam, status, channel, view: viewParam } = await searchParams;
+  const { notice, recovery, page: pageParam, status, channel, q, view: viewParam } = await searchParams;
   const view = viewParam === 'feed' || viewParam === 'cards' ? viewParam : 'table';
   const [allowedMimeTypes, maxUploadBytes, maxAltCharacters] = await Promise.all([
     runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'), runtimeConfig('publishing.maxImageAltCharacters'),
@@ -45,7 +46,18 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const requestedPage = pageParam && /^[1-9]\d*$/.test(pageParam) && Number.isSafeInteger(Number(pageParam)) ? Number(pageParam) : 1;
   const selectedStatus = Object.values(PostStatus).find(value => value === status);
   const selectedChannel = channel || undefined;
-  const listing = await readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status: selectedStatus, channelId: selectedChannel });
+  let listing: Awaited<ReturnType<typeof readPublishingPostPage>> | null = null;
+  let listingError: string | null = null;
+  try {
+    listing = await readPublishingPostPage({ userId: viewer.user.id, workspaceId: viewer.workspaceId }, { page: requestedPage, status, channelId: selectedChannel, q });
+  } catch (error) {
+    if (!(error instanceof OperationError) || !isOperationErrorCode(error.code)) throw error;
+    listingError = safeOperationError(error);
+  }
+  if (!listing) return <>
+    <PageHeading title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary="Posts could not be loaded" />
+    <RouteNotice className={styles.errorNotice} error focusKey={`posts-read-error:${q ?? ''}:${status ?? ''}:${channel ?? ''}`}>{`${listingError ?? 'Posts could not be loaded.'} Reset the sidebar filters and try again.`}</RouteNotice>
+  </>;
   const targetChoices = await publishingDestinationChoices(viewer);
   const rows = listing.posts.map(post => ({ ...post, media: post.media as Array<{ kind: string; url: string; altText?: string }> }));
   const noticeText = notice ? NOTICE_TEXT[notice] ?? (notice.startsWith('imported-') ? `${notice.slice('imported-'.length)} posts imported as drafts.` : undefined) : undefined;
@@ -55,8 +67,9 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const canPublish = targetChoices.some(target => target.canPublish);
   const pageLink = (page: number) => {
     const params = new URLSearchParams({ page: String(page) });
-    if (selectedStatus) params.set('status', selectedStatus);
+    if (status) params.set('status', status);
     if (channel) params.set('channel', channel);
+    if (q) params.set('q', q);
     if (viewParam === 'table' || viewParam === 'feed' || viewParam === 'cards') params.set('view', viewParam);
     return `/publishing/posts?${params}`;
   };
@@ -92,9 +105,9 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
     {noticeText ? <RouteNotice className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} error={notice?.startsWith('failed')} focusKey={`${notice}:${recovery ?? ''}`}>{noticeText}</RouteNotice> : null}
     {canManageDrafts ? <div className={previewStyles.toolbar}><details className={previewStyles.importDisclosure}><summary>Import CSV</summary><section className={`${styles.card} ${styles.createCard}`}><p className={styles.help}>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section></details></div> : null}
     <section className={styles.card} aria-label={`${view === 'table' ? 'Table' : view === 'feed' ? 'Feed' : 'Cards'} post view`}>
-      {view === 'table' ? <DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage={selectedStatus || selectedChannel ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}/> : rows.length ? <ul className={view === 'feed' ? previewStyles.feedList : previewStyles.cardsGrid}>
+      {view === 'table' ? <DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage={selectedStatus || selectedChannel || q?.trim() ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}/> : rows.length ? <ul className={view === 'feed' ? previewStyles.feedList : previewStyles.cardsGrid}>
         {rows.map(post => <li key={post.id}>{previewFor(post, view === 'feed' ? 'feed' : 'card')}</li>)}
-      </ul> : <p className={styles.empty}>{selectedStatus || selectedChannel ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}</p>}
+      </ul> : <p className={styles.empty}>{selectedStatus || selectedChannel || q?.trim() ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}</p>}
       {listing.pages > 1 ? <nav className={styles.postPagination} aria-label="Post pages">
         {listing.page > 1 ? <a className="ui-button ui-button--secondary" href={pageLink(listing.page - 1)}>Previous page</a> : <span />}
         <span>Page {listing.page} of {listing.pages}</span>
@@ -102,4 +115,13 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
       </nav> : null}
     </section>
   </>;
+}
+
+function safeOperationError(error: unknown) {
+  const code = error instanceof OperationError && isOperationErrorCode(error.code) ? error.code : null;
+  if (code === 'invalid_request' && error instanceof OperationError) return error.message;
+  if (code === 'unauthorized' || code === 'forbidden') return 'You do not have permission to read these posts.';
+  if (code === 'not_found') return 'These posts are no longer available.';
+  if (code === 'unavailable' || code === 'conflict') return 'Posts are temporarily unavailable.';
+  return 'Posts could not be loaded. Refresh the page and try again.';
 }
