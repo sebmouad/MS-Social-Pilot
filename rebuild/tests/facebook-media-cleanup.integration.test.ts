@@ -397,6 +397,22 @@ describe.skipIf(!databaseUrl)('Facebook staged-photo cleanup on isolated Postgre
     expect(history.map(row => row.state)).toEqual(['attested_present', 'confirmed']);
   });
 
+  it('rejects a late deletion result when another step no longer matches the copied Page binding', async () => {
+    const f = await fixture({ feedState: 'rejected' });
+    integration.outcome = 'uncertain';
+    const unknown = await cleanupFacebookMedia(f.actorId, action(f.photoIds[0]));
+    expect(unknown.state).toBe('needs_review');
+    const deletion = await client!.$queryRaw<Array<{ id: string }>>`SELECT id FROM rebuild_facebook_media_deletions WHERE "mediaStepId"=${f.photoIds[0]}`;
+    await client!.$executeRaw`UPDATE rebuild_facebook_media_steps SET "remoteTargetId"='different-page' WHERE id=${f.feedId!}`;
+    await expect(client!.$transaction(tx => recordFacebookMediaDeletionOutcome(tx as never, deletion[0].id, 'confirmed')))
+      .rejects.toThrow(/immutable publication binding/);
+    const row = await client!.$queryRaw<Array<{ state: string }>>`SELECT state FROM rebuild_facebook_media_deletions WHERE id=${deletion[0].id}`;
+    expect(row[0].state).toBe('uncertain');
+    const events = await client!.$queryRaw<Array<{ count: bigint }>>`
+      SELECT count(*) AS count FROM rebuild_facebook_media_resolutions WHERE "deletionId"=${deletion[0].id} AND source='provider'`;
+    expect(Number(events[0].count)).toBe(0);
+  });
+
   it('holds a newer cleanup claim when an older still-present deletion later confirms', async () => {
     const f = await fixture({ feedState: 'rejected' });
     integration.attestationEnabled = true;

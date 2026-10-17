@@ -93,7 +93,8 @@ export async function recordFacebookMediaDeletionOutcome(
   if (!deletion || !step || deletion.parentProvider !== 'facebook' || deletion.phase !== 'photo' ||
     deletion.operationId !== parent.id || deletion.postId !== parent.postId || deletion.postTargetId !== parent.postTargetId ||
     deletion.targetId !== parent.targetId || deletion.publicationActorId !== parent.actorId ||
-    step.remoteTargetId !== deletion.remoteTargetId || step.remoteId !== deletion.remotePhotoId) {
+    step.remoteTargetId !== deletion.remoteTargetId || step.remoteId !== deletion.remotePhotoId ||
+    allSteps.some(row => row.remoteTargetId !== deletion.remoteTargetId)) {
     throw new Error('Facebook deletion outcome does not match its immutable publication binding.');
   }
 

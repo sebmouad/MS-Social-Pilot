@@ -1258,3 +1258,11 @@ Private evidence: `/private/tmp/socialpilot-resolution54-full-final.log`,
 `/private/tmp/socialpilot-resolution54-build.log`,
 `/private/tmp/socialpilot-resolution54-http-mcp-final.log`, and
 `/private/tmp/socialpilot-resolution54-migration.log`.
+
+Post-publication review tightened one further receipt guard: every step in a
+late-deletion operation must match its copied Facebook Page identity. A real
+PostgreSQL regression corrupts a separate feed binding and verifies refusal
+without changing the deletion state or appending a misleading provider event.
+The media-journal/cleanup suites pass 32 tests and TypeScript passes. No live
+target lookup was added, preserving receipt capture after local object removal;
+the applied migration and its checksum are unchanged.
