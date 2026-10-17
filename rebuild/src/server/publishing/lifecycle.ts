@@ -12,6 +12,7 @@ import { isValidTimeZone, wallTimeToInstant } from '@/lib/calendar-dates';
 import { withPublishingOperation, withPublishingTransaction as publishingTransaction } from '@/modules/publishing/server/guard';
 import { OperationError } from '@/lib/operation-error';
 import { attemptFirstCommentInOperation } from '@/modules/publishing/server/first-comment';
+import { publishDestinationInOperation } from '@/modules/publishing/server/publication';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
 const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
@@ -262,7 +263,7 @@ export { deletePostDurably as deletePost } from '@/modules/publishing/server/del
 
 /** Claim each destination before the provider call. `processing` remains as a manual-reconciliation marker on ambiguous failures. */
 export async function publishPost(actor: PublishingActor, postId: string, expectedScheduledAt?: Date) {
-  return withPublishingOperation(actor, { postId }, async ({ actor, signal, lockTargets }) => {
+  return withPublishingOperation(actor, { postId, allowPublicationRecovery: true }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
     await assertPostScope(actor, postId);
     const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
@@ -297,29 +298,13 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       const adapter = provider ? await platformFor(provider, 'publishing') : null;
       const eligible = Boolean(provider && hasPlatformCapability(entitlements, provider) && adapter?.publish && (!post.firstComment?.trim() || adapter.publishFirstComment) && adapter.supportsTargetKind?.(item.target.type, 'publishing') && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount?.invalidatedAt);
       if (!eligible) { failed++; await markTarget(actor, item.id, 'failed', signal); continue; }
-      const claim = await publishingTransaction(signal, async tx => tx.postTarget.updateMany({ where: { id: item.id, postId: post.id, status: item.status, remotePostId: null }, data: { status: 'processing' } }));
-      if (claim.count !== 1) { pending++; continue; }
-      let result: import('@/platforms/types').PublishResult;
-      try {
-        signal.throwIfAborted();
-        result = await adapter!.publish!({ credential: { accessToken: decryptSecret(item.target.accessToken!) }, target: { id: item.target.providerId, name: '', kind: item.target.type }, text: post.message, link: attachments.link, media: publishMedia, signal });
-      } catch (error) {
-        if (adapter!.classifyPublishingFailure?.(error) === 'rejected') { await markTarget(actor, item.id, 'failed', signal); failed++; }
-        else pending++;
-        continue;
-      }
-      try {
-        const maxId = await runtimeConfig('publishing.identifierMaxCharacters');
-        if (!result || typeof result.remoteId !== 'string' || !result.remoteId.trim() || result.remoteId !== result.remoteId.trim() || result.remoteId.length > maxId || /[\u0000-\u001f\u007f]/.test(result.remoteId)) throw new Error('Unconfirmed publish receipt.');
-        await publishingTransaction(signal, async tx => {
-          await tx.postTarget.update({ where: { id: item.id }, data: { status: 'published', remotePostId: result.remoteId, remoteUrl: result.url, publishedAt: new Date() } });
-          await audit(tx, actor, 'publishing.target_published', { postId: post.id, postTargetId: item.id });
-        });
-      } catch {
-        // The provider receipt was not durably recorded. Never dispatch the comment or create another post.
-        pending++;
-        continue;
-      }
+      const outcome = await publishDestinationInOperation({ actor, signal }, {
+        postId: post.id, postTargetId: item.id, targetId: item.target.id, provider: provider!, expectedStatus: item.status as 'pending' | 'failed',
+        dispatch: operationId => adapter!.publish!({ credential: { accessToken: decryptSecret(item.target.accessToken!) }, target: { id: item.target.providerId, name: '', kind: item.target.type }, text: post.message, link: attachments.link, media: publishMedia, signal, operationId }),
+        classifyFailure: error => adapter!.classifyPublishingFailure?.(error) ?? 'uncertain',
+      });
+      if (outcome === 'failed') { failed++; continue; }
+      if (outcome !== 'published') { pending++; continue; }
       published++;
       if (post.firstComment?.trim()) {
         try {

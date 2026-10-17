@@ -5,6 +5,7 @@ import { runtimeConfig } from '@/server/config/store';
 import { OperationError } from '@/lib/operation-error';
 import { withWorkspaceOperation } from '@/server/data-control/guard';
 import { authorizePublishing } from './access';
+import { assertPublicationAttemptsSettled } from './publication-guard';
 import { assertNoPendingPostDeletionForAliases, assertPostDeletionTargetsSettled, loadPostDeletionTargetIds } from './post-deletion-guard';
 import type { PublishingActor, PublishingFeature } from './types';
 
@@ -14,7 +15,7 @@ type PublishingOperationContext = {
   signal: AbortSignal;
   lockTargets(ids: readonly string[]): Promise<void>;
 };
-type PublishingOperationOptions = { postId?: string; targetIds?: readonly string[]; feature?: PublishingFeature; includeInbox?: boolean; access?: 'read' | 'write'; allowDeletionRecovery?: boolean; allowMissingPost?: boolean };
+type PublishingOperationOptions = { postId?: string; targetIds?: readonly string[]; feature?: PublishingFeature; includeInbox?: boolean; access?: 'read' | 'write'; allowDeletionRecovery?: boolean; allowMissingPost?: boolean; allowPublicationRecovery?: boolean };
 
 function validateIds(ids: readonly string[], maxTargets: number, maxIdCharacters: number): string[] {
   if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string' || !id || id.length > maxIdCharacters || /[\u0000-\u001f\u007f]/.test(id))) {
@@ -63,6 +64,7 @@ export async function assertPublishingTargetsSettled(
   });
   if (pending) throw new OperationError('conflict', 'A publishing result needs review before this data or connection can be removed. Check the post status first.');
   await assertPostDeletionTargetsSettled(tx, workspaceId, targetIds);
+  await assertPublicationAttemptsSettled(tx, workspaceId, targetIds);
 }
 
 /** Holds the workspace operation boundary and fail-fast post/destination locks for one publishing action. */
@@ -150,6 +152,10 @@ export async function withPublishingOperation<T>(
         throw new OperationError('forbidden', 'You do not have access to one or more selected destinations.');
       }
 
+      if (options.postId && !options.allowPublicationRecovery) {
+        await assertPublicationAttemptsSettled(tx, actor.workspaceId, undefined, options.postId);
+        assertActive();
+      }
       assertActive();
       const result = await work({
         actor: current.actor,

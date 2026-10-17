@@ -27,8 +27,9 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(43);
+    expect(CONFIG_SCHEMA_VERSION).toBe(44);
     for (const [key, value, maximum] of [
+      ['publishing.publicationHistoryLimit', 100, 1000],
       ['publishing.postPageSize', 50, 100],
       ['publishing.readMaxItems', 200, 1000],
       ['publishing.calendarMaxRangeDays', 70, 366],
@@ -41,6 +42,8 @@ describe('configuration registry', () => {
       expect(setting.schema.safeParse(maximum + 1).success).toBe(false);
       expect(setting.schema.safeParse(0).success).toBe(false);
     }
+    expect(CONFIG_BY_KEY.get('publishing.publicationUrlMaxCharacters')!.defaultValue).toBe(2048);
+    expect(CONFIG_BY_KEY.get('publishing.publicationUrlMaxCharacters')!.schema.safeParse(2049).success).toBe(false);
     expect(CONFIG_BY_KEY.get('publishing.deletionHistoryLimit')!.defaultValue).toBe(20);
     expect(CONFIG_BY_KEY.get('publishing.deletionHistoryLimit')!.schema.safeParse(100).success).toBe(true);
     expect(CONFIG_BY_KEY.get('publishing.deletionHistoryLimit')!.schema.safeParse(101).success).toBe(false);

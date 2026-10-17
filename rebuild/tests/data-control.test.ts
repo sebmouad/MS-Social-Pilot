@@ -45,7 +45,7 @@ function makePurgeClient(role: string = 'owner') {
     adInsight: { count: vi.fn().mockResolvedValue(5) },
     instagramInsight: { count: vi.fn().mockResolvedValue(6) },
     socialAccount: { count: vi.fn().mockResolvedValue(1) },
-    $queryRaw: vi.fn().mockImplementation((strings: TemplateStringsArray) => String(strings[0]).includes('rebuild_post_deletions') ? [] : [{ tableName: 'bio_pages' }, { tableName: 'custom_fields' }, { tableName: 'feed_sources' }, { tableName: 'labels' }, { tableName: 'page_groups' }, { tableName: 'posts' }, { tableName: 'share_links' }, { tableName: 'short_links' }, { tableName: 'targets' }, { tableName: 'ad_accounts' }, { tableName: 'social_accounts' }, { tableName: 'instagram_accounts' }, { tableName: 'media' }]),
+    $queryRaw: vi.fn().mockImplementation((strings: TemplateStringsArray) => /rebuild_(post_deletions|publication_attempts)/.test(String(strings[0])) ? [] : [{ tableName: 'bio_pages' }, { tableName: 'custom_fields' }, { tableName: 'feed_sources' }, { tableName: 'labels' }, { tableName: 'page_groups' }, { tableName: 'posts' }, { tableName: 'share_links' }, { tableName: 'short_links' }, { tableName: 'targets' }, { tableName: 'ad_accounts' }, { tableName: 'social_accounts' }, { tableName: 'instagram_accounts' }, { tableName: 'media' }]),
     $queryRawUnsafe: vi.fn().mockImplementation(async (sql: string) => [{ count: BigInt(sql.includes('"media"') ? 2 : 1) }]),
     $executeRawUnsafe: vi.fn(async (sql: string) => { events.push(sql); return 1; }),
     $executeRaw: vi.fn(async (parts: TemplateStringsArray, ...values: unknown[]) => { events.push('audit'); return { parts, values }; }),
@@ -219,11 +219,11 @@ describe('workspace data controls', () => {
     mocks.removeWorkspaceStorage.mockRejectedValueOnce(new Error('disk busy'));
     const { deleteWorkspaceData } = await import('../src/server/data-control');
     const actor = { userId: 'u1', workspaceId: 'w1' };
-    await expect(deleteWorkspaceData(actor, 'DELETE')).rejects.toThrow('disk busy');
+    await expect(deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'DELETE')).rejects.toThrow('disk busy');
     expect(job.status).toBe('db_deleted');
     const deleteCallsAfterFailure = tx.$executeRawUnsafe.mock.calls.length;
 
-    const result = await deleteWorkspaceData(actor, 'DELETE');
+    const result = await deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'DELETE');
     expect(result).toMatchObject({ storedFiles: 2, storedBytes: 17 });
     expect(tx.$executeRawUnsafe).toHaveBeenCalledTimes(deleteCallsAfterFailure);
     expect(transaction).toHaveBeenCalledTimes(5);
@@ -293,4 +293,12 @@ describe('workspace data controls', () => {
     await expect(resumePendingWorkspaceDataPurges()).resolves.toEqual({ examined: 1, completed: 1, failed: 0 });
     expect(job.status).toBe('completed');
   });
+  it('refuses workspace erasure when a durable publication remains unresolved', async () => {
+    const { tx } = makePurgeClient();
+    const { deleteWorkspaceData } = await import('../src/server/data-control');
+    tx.$queryRaw.mockImplementation((strings: TemplateStringsArray) => String(strings[0]).includes('rebuild_publication_attempts') ? [{ id: 'pending-publication' }] : []);
+    await expect(deleteWorkspaceData({ userId: 'u1', workspaceId: 'w1' }, 'DELETE')).rejects.toMatchObject({ code: 'conflict' });
+    expect(tx.workspaceDataPurge.create).not.toHaveBeenCalled();
+  });
+
 });

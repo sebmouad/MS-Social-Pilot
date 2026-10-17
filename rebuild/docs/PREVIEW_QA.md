@@ -471,3 +471,87 @@ Remaining work includes durable publication receipt recovery (planned in
 PUBLICATION_RECOVERY_PLAN.md), retained-data browsing, full Facebook/legacy /
 MCP/Root parity, live-provider testing and all migration/rollback/cutover gates.
 Production remains legacy.
+
+
+## Durable publication receipt recovery — 2026-10-17
+
+The fifth additive journal migration was applied only to the isolated synthetic
+preview after restore verification. Private backup
+`/private/tmp/socialpilot-preview-before-publication-20261016T234535Z.dump`
+was 249671 bytes; exact source/restore counts matched for 97 existing tables.
+After applying the checksum-pinned SQL to scratch, an independent backup
+restored with matching exact counts across 98 tables. Scratch databases were
+removed. See CUTOVER.md for the SHA-256 and remaining full-five-file rehearsal.
+No production schema, worker or provider state changed.
+
+Final integrated tests passed **1132 tests in 192 files**, including **55 actual
+PostgreSQL checks in 19 files**. New real-database cases verify visible committed
+intent before dispatch, concurrent exclusion with a single controlled create,
+receipt survival after a projection-audit fault, local-only continuation,
+unknown/rejected outcomes, explicit retry after human absence, late outcome
+conflicts, exact operation confirmation, contributor/current-grant/feature
+refusal, NULL-safe constraints, retained claims and workspace lifecycle. Mocked
+adapters in these tests do not prove live Facebook behavior. Typecheck and an isolated production build passed; the running preview build directory was preserved.
+
+The actual localhost HTTP/MCP probe `scripts/verify-publication-recovery.ts`
+passed scoped no-store status, unknown filter refusal, read-key write denial,
+workspace-key/private Root isolation, exact confirmations, cross-post operation
+binding, legacy claim adoption, external absence, saved external receipts and
+separate local finish, private Root history/attestation/finish, immediate grant
+revocation and disabled-session denial. It uses disposable synthetic records;
+no provider create/read/delete is part of this probe. Fixtures, sessions, keys,
+memberships and journals were removed and verified absent in `finally` cleanup.
+The probe does not change the installed MCP role policy.
+
+Actual Chrome checks covered 390×844 phone and 1440×1000 desktop with reduced
+motion. Customer recovery showed the affected post/channel, no preselected
+outcome, external-check acknowledgement and exact typed confirmation. Cancel
+received initial focus. Offline submission preserved the remote ID, link,
+phrase and checkbox, kept the dialog open and focused its error. Browser-level
+fetch text found during that check was replaced with plain recovery guidance,
+then verified again offline. Successful human-recorded publication saved only
+the receipt; explicit local finish changed the PostgreSQL projection without
+sending content or a first comment. The browser then exposed a filtered-row
+focus loss. The fix preserves status/view/page filters and uses an operation-
+bound route notice with focus after row removal; Chrome verified Cards and
+Publishing filters remained and focus landed on the persistent success notice.
+
+Private Root's dialog showed resolved workspace/channel/post context and an
+explicit external outcome. Offline submission retained its phrase/checkbox
+and focused safe feedback. Successful human-recorded absence closed the dialog,
+retained/focused its success notice after the action disappeared, and the actual
+journal was `attested_absent`. This is a synthetic human-attestation workflow,
+not proof of an external platform check. The separate HTTP/MCP probe covers
+Root saved-receipt projection; Root legacy adoption is not browser-verified.
+
+Representative Clay and Nightfall phone dialogs were visually inspected:
+358px wide at 390px, 16px inset, reachable actions and no horizontal page
+overflow. Root was also opened on desktop. Phone/desktop switching under offline
+emulation reloaded Chrome once; that test setup was restored online and the
+actual offline form test was repeated without a viewport change. Saved Clay
+appearance was restored by normal navigation. Exhaustive four-theme, all-state,
+cross-browser, keyboard and accessibility coverage remains open. The two
+browser test posts, journals and their domain audits were removed and verified.
+
+A lower-cost independent read-only service review found no actionable P1/P2
+issue in dispatch ownership, authority, cleanup or receipt ordering. Parent UI
+review subsequently found and fixed default-outcome/confirmation weakness,
+unsafe success-receipt acceptance, browser error text and disappearing success
+focus. Component regressions cover preserved input, wrong receipts, explicit
+outcomes, focus and route notice behavior. The previously installed premium
+static audit executable disappeared from the plugin cache during this batch;
+an exact cache search found no copy. Its fresh strict scan could not run. The
+earlier two scanner false positives remain historical evidence only, not a
+fresh clean audit of this batch.
+
+Private evidence: `/private/tmp/socialpilot-publication-tests-final.log`,
+`/private/tmp/socialpilot-publication-final-typecheck.log`,
+`/private/tmp/socialpilot-publication-build-final.log`,
+`/private/tmp/socialpilot-publication-live-probe.log`,
+`/private/tmp/socialpilot-publication-backup.log` and
+`/private/tmp/socialpilot-publication-ui-final.log`.
+
+Automatic provider reconciliation/idempotency, full Facebook formats/grants,
+complete legacy/Root/MCP parity, production-shaped data/authorization migration,
+live provider testing/cleanup and exact cutover/media/service rollback remain
+unfinished. Production remains legacy.

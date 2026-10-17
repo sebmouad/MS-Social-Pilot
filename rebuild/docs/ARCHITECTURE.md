@@ -224,4 +224,20 @@ native select before closing navigation. This closes the previously observed
 retained unselected post leakage in normal Publishing views and Home counts;
 it is not a complete retained-data archive UI or Publishing parity claim.
 See PUBLISHING_READS.md and PREVIEW_QA.md. PUBLICATION_RECOVERY_PLAN.md is a
-planned, unfinished design for the remaining accepted-publication receipt gap.
+the original design for publication recovery; the later implemented journal/manual recovery is described below and in PUBLICATION_RECOVERY.md.
+
+
+## Durable publication attempts and local recovery — 2026-10-17
+
+Publishing now owns content-free publication intent, independent remote receipt
+persistence and atomic local projection/audit. Existing intent never dispatches
+again; uncertain outcomes remain held. Current-authorized customer HTTP/MCP
+and private Root services expose explicit external human attestation, legacy
+processing adoption and local-only finish. First comments remain separate and
+start only after the post receipt is projected. The fifth additive journal
+migration has strict NULL-safe state constraints and retains claims through
+projection. Registry 44 owns consumed publication history and URL bounds.
+Cleanup guards preserve unresolved journal evidence independently of legacy
+status rows. See PUBLICATION_RECOVERY.md and PREVIEW_QA.md for evidence and
+limits. No automatic provider reconciliation, live provider proof or production
+cutover is established by this batch; those release requirements stay open.

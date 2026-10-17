@@ -5,6 +5,7 @@ const state = vi.hoisted(() => ({ access: vi.fn(), read: vi.fn(), form: vi.fn() 
 vi.mock('../src/server/root/RootDiagnostics', () => ({ RootDiagnostics: async () => null }));
 vi.mock('../src/server/root/RootInboxDeletions', () => ({ RootInboxDeletions: async () => createElement('section', null, 'Inbox deletion recovery') }));
 vi.mock('../src/server/root/RootPostDeletions', () => ({ RootPostDeletions: async () => createElement('section', null, 'Post deletion recovery') }));
+vi.mock('../src/server/root/RootPublicationAttempts', () => ({ RootPublicationAttempts: async () => createElement('section', null, 'Publication attempt recovery') }));
 vi.mock('../src/server/jobs/RootJobHealth', () => ({ RootJobHealth: async () => null }));
 vi.mock('../src/server/config/access', () => ({ requireRootPage: state.access }));
 vi.mock('../src/server/config/store', () => ({ readConfig: state.read }));
@@ -70,7 +71,9 @@ describe('Root module screens', () => {
     const inboxPage = await ProductPage({ params: Promise.resolve({ id: 'inbox' }) });
     const publishing = renderToStaticMarkup(publishingPage.props.children);
     const inbox = renderToStaticMarkup(inboxPage.props.children);
+    expect(publishing).toContain('Publication attempt recovery');
     expect(publishing).toContain('Post deletion recovery');
+    expect(inbox).not.toContain('Publication attempt recovery');
     expect(inbox).not.toContain('Post deletion recovery');
   });
 });

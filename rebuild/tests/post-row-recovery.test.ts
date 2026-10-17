@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   recordComment: vi.fn(async (_previous: unknown, _data: FormData) => ({ status: 'error', postId: 'post-1', postTargetId: 'post-target-a', message: 'Check its status.' })),
 }));
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
 vi.mock('../src/app/publishing/posts/actions', async importOriginal => ({
   ...await importOriginal<typeof import('../src/app/publishing/posts/actions')>(),
   updatePostWithRecoveryAction: mocks.edit,

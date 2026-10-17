@@ -38,4 +38,15 @@ describe('Facebook publishing failure classification', () => {
     expect(failure).toBeInstanceOf(FacebookApiError);
     expect(adapter.classifyPublishingFailure!(failure)).toBe('uncertain');
   });
+
+  it('applies recognized Graph rejection signals to post creation failures', async () => {
+    const fetcher = async () => new Response(JSON.stringify({ error: { message: 'invalid request', code: 100 } }), { status: 400 });
+    const adapter = createFacebookAdapter(config, fetcher as unknown as typeof fetch);
+    let failure: unknown;
+    try {
+      await adapter.publish!({ credential: { accessToken: 'token' }, target: { id: 'page', name: 'Page', kind: 'page' }, text: 'hello' });
+    } catch (error) { failure = error; }
+    expect(failure).toBeInstanceOf(FacebookApiError);
+    expect(adapter.classifyPublishingFailure!(failure)).toBe('rejected');
+  });
 });

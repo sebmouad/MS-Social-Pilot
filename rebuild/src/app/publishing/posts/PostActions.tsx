@@ -10,6 +10,7 @@ import { csvDestinationLabel } from '@/lib/publishing/csv-destinations';
 import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { validateFields } from '@/lib/ui/form-validation';
 import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
+import { PublicationRecovery } from './PublicationRecovery';
 
 type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean };
 type ImageRules = { allowedMimeTypes: string[]; maxUploadBytes: number; maxAltCharacters: number };
@@ -178,7 +179,7 @@ export function PostRowActions({ post, targets, canEdit, canPublish, imageRules 
     </> : null}
     {canEdit && isQueued ? <form noValidate action={cancelScheduledPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit" disabled={rowPending}>Cancel schedule</button></form> : null}
     {hasRemote ? <form noValidate action={syncPostAction}><input type="hidden" name="postId" value={post.id} /><button className="ui-button ui-button--secondary ui-button--sm" type="submit" disabled={rowPending}>Sync status</button></form> : null}
-    {post.targets.some(item => item.status === 'processing' && !item.remotePostId) ? <span className={styles.noActions}>A publish result needs review on the destination before retrying.</span> : null}
+    <PublicationRecovery postId={post.id} excerpt={post.message} targets={post.targets.map(item => ({ id: item.id, name: item.target.name, status: item.status, remotePostId: item.remotePostId }))} />
     {post.firstComment?.trim() ? <section className={styles.help} aria-label="First comment status">
       <strong>First comment delivery</strong>
       {post.targets.map(target => <FirstCommentControl key={target.id} postId={post.id} postComment={post.firstComment!} target={target} />)}

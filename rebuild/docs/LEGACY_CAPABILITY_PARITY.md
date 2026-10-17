@@ -33,7 +33,7 @@ equivalent workflow; **unverified** means code exists without adequate evidence.
 | P1 | Page profiles/groups/labels, media/watermark, custom fields, AI agents, history and owner export screens under `src/app/(app)/settings` | Partial: image library and data export exist; the other controls are absent. | Working feature screens and shared services, migrated data, permission and visual checks. |
 | P2 | Asynchronous owner ZIP export with job status and expiry in `src/app/(app)/settings/export` | Partial: rebuild has synchronous export and workspace deletion. | Large-data async export, durable status, expiry/cleanup and completeness reporting. |
 
-Publishing safety update, 2026-10-16: all lifecycle/local-draft service writes recheck current authority inside a single workspace operation guard with post/destination locks, bounded atomic writes/audits and adapter cancellation. Stale scheduled candidates are skipped. Inline edit/delete recover entered values and choices after failure; successful browser save/delete and scoped live localhost MCP were verified. A later batch added durable remote post deletion and operator recovery, but no automatic provider verification. This remains **partial**: uncertain publication claims have no auditable resolution action; a successful remote post creation can still lose its local receipt; normal Publishing reads now share selected-resource and current authorization checks, excluding retained unselected and mixed-destination posts before counts/pagination. Dedicated retained-history browsing and complete read/API parity remain. Provider/live verification, full parity and release gates remain. See PUBLISHING_OPERATIONS.md and POST_DELETION_RECOVERY.md; do not infer full Publishing or production readiness.
+Publishing safety update, 2026-10-16: all lifecycle/local-draft service writes recheck current authority inside a single workspace operation guard with post/destination locks, bounded atomic writes/audits and adapter cancellation. Stale scheduled candidates are skipped. Inline edit/delete recover entered values and choices after failure; successful browser save/delete and scoped live localhost MCP were verified. A later batch added durable remote post deletion and operator recovery, but no automatic provider verification. This remains **partial**: publication intent and independently persisted receipts now support explicit human attestation, legacy claim adoption and local-only projection through customer/Root HTTP/MCP; unknown outcomes stay held without automatic resend; normal Publishing reads now share selected-resource and current authorization checks, excluding retained unselected and mixed-destination posts before counts/pagination. Dedicated retained-history browsing and complete read/API parity remain. Provider/live verification, full parity and release gates remain. See PUBLISHING_OPERATIONS.md and POST_DELETION_RECOVERY.md; do not infer full Publishing or production readiness.
 
 First-comment update, 2026-10-16: immediate post creation and comment dispatch are separate adapter operations. A committed post ID survives comment rejection/uncertainty; current-authorized UI/MCP share attempt claims, explicit retry only after recognized rejection, and audited external human reconciliation. Existing legacy comment columns are mapped without DDL. This closes that specific combined receipt-loss defect, while post-receipt persistence failures, delayed comments, automatic remote verification, full publication/deletion journals and live-provider proof remain open. See FIRST_COMMENT_DELIVERY.md.
 
@@ -45,3 +45,13 @@ The cutover blocker is the **capability**, not simply the missing screen. If
 legacy data is needed to implement it, map and migrate that data with backup and
 recovery evidence. Unavailable provider permissions must produce a clear,
 customer-safe state rather than a false claim of support.
+
+
+Publication recovery update, 2026-10-17: PUBLICATION_RECOVERY.md documents the
+implemented durable attempt/receipt/projection journal and exact-scoped manual
+recovery. This closes the earlier missing auditable resolution path, including
+local projection failures after a receipt commits. If the provider accepted a
+request but its receipt never commits, intent remains uncertain and requires
+external review; it is not automatically verified or resent. Automatic provider
+lookup/idempotency, delayed effects, full media/grant coverage, complete legacy
+workflows and real provider/cutover evidence remain incomplete.

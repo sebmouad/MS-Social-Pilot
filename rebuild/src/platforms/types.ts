@@ -60,6 +60,8 @@ export interface DiscoveryResult { targets: PlatformTarget[]; adAccounts?: Platf
 export interface PublishRequest {
   credential: PlatformCredential;
   target: PlatformTarget;
+  /** Opaque correlation identity for this attempt; it does not imply provider idempotency. */
+  operationId?: string;
   text: string;
   link?: string | null;
   media?: PublishMedia[];

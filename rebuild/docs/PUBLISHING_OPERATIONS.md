@@ -59,3 +59,13 @@ The post-deletion batch added one checksum-pinned additive migration, applied on
 Local post and destination aliases retain status after cleanup and let finalization clear duplicate references to one remote identity. Non-rejected rows, including completed ones, remain tombstones until workspace erasure and prevent duplicate dispatch or status-sync resurrection. The journal contains remote IDs and local aliases, not post content or credentials. Registry 42 manages consumed Root history (20 by default, 1–100) and alias bounds (1000 by default, 1–10000). Workspace erasure and relevant connection cleanup refuse unresolved evidence.
 
 The migration is the fourth checksum-pinned additive migration in the cutover verifier. Before its preview-only application, a 244200-byte private backup was restored and checked against its exact 96 source tables; the migration restore matched the 97-table inventory. The backup remains at `/private/tmp/socialpilot-preview-before-post-deletion-20261016T210904Z.dump`. This does not establish a production-shaped four-file rehearsal. The current integrated test counts and build evidence are pending; consult [POST_DELETION_RECOVERY.md](POST_DELETION_RECOVERY.md) and [CUTOVER.md](CUTOVER.md) for evidence boundaries.
+
+
+## Publication receipt journal follow-up — 2026-10-17
+
+The publication receipt gap in item 1 now has durable intent, an independently
+committed receipt, atomic local projection/audit and explicit recovery surfaces.
+See PUBLICATION_RECOVERY.md. Unknown outcomes are never automatically resent;
+Root/customer human attestation is separate from provider verification. Local
+PostgreSQL fault/concurrency evidence does not establish live Facebook behavior,
+full provider formats, complete parity or production cutover. Those gates remain.

@@ -3,6 +3,7 @@ import { requireRootPage } from '@/server/config/access';
 import { RootModuleSettings } from '@/server/root/RootModuleSettings';
 import { RootInboxDeletions } from '@/server/root/RootInboxDeletions';
 import { RootPostDeletions } from '@/server/root/RootPostDeletions';
+import { RootPublicationAttempts } from '@/server/root/RootPublicationAttempts';
 import { moduleManifests } from '@/modules';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,6 @@ export default async function RootProductModulePage({ params }: { params: Promis
   if (!module) notFound();
   return <RootModuleSettings kind="product" id={module.id} title={module.title} description={`Installation controls for ${module.title}. Availability is an installation limit; workspace access and implemented platform operations still determine what customers can use.`}>
     {module.id === 'inbox' ? await RootInboxDeletions() : null}
-    {module.id === 'publishing' ? await RootPostDeletions() : null}
+    {module.id === 'publishing' ? <>{await RootPublicationAttempts()}{await RootPostDeletions()}</> : null}
   </RootModuleSettings>;
 }

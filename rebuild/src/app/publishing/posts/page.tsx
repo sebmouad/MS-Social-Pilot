@@ -8,10 +8,13 @@ import styles from "../publishing.module.css";
 import previewStyles from '@/components/PostPreview.module.css';
 import { CsvImportForm, PostRowActions } from "./PostActions";
 import { runtimeConfig } from '@/server/config/store';
+import { RouteNotice } from '@/components/RouteNotice';
 import { PostStatus } from '../../../../generated/client';
 
 const NOTICE_TEXT: Record<string, string> = {
   created: "Post saved.",
+  "publication-finished": "Local publication record updated. No new publication or first comment was sent.",
+  "publication-absent": "Human-verified absence recorded. No publication was sent. Check the destination again before a separate retry.",
   updated: "Post saved.",
   deleted: "Post deleted locally.",
   failed: "The publishing action could not be completed. Check permissions, connection status, and post state, then try again.",
@@ -29,9 +32,9 @@ const NOTICE_TEXT: Record<string, string> = {
   "failed-sync": "No new delivery status was confirmed. Check the post on its platform, then try syncing again.",
 };
 
-export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; page?: string; status?: string; channel?: string; view?: string }> }) {
+export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; recovery?: string; page?: string; status?: string; channel?: string; view?: string }> }) {
   const viewer = await requireViewer({ feature: 'publishing/posts', channelScoped: true });
-  const { notice, page: pageParam, status, channel, view: viewParam } = await searchParams;
+  const { notice, recovery, page: pageParam, status, channel, view: viewParam } = await searchParams;
   const view = viewParam === 'feed' || viewParam === 'cards' ? viewParam : 'table';
   const [allowedMimeTypes, maxUploadBytes, maxAltCharacters] = await Promise.all([
     runtimeConfig('publishing.allowedImageMimeTypes'), runtimeConfig('publishing.maxImageUploadBytes'), runtimeConfig('publishing.maxImageAltCharacters'),
@@ -78,7 +81,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   return <>
     <PageHeading title="Posts" description="Create posts, choose destinations, publish, and review delivery status." summary={`${listing.total} ${listing.total === 1 ? "post" : "posts"} · page ${listing.page} of ${listing.pages}`}/>
     {listing.channelUnavailable ? <p className={styles.errorNotice} role="status">The selected channel is unavailable. Choose another channel or reset the sidebar filters.</p> : null}
-    {noticeText ? <p className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} role={notice?.startsWith('failed') ? 'alert' : 'status'}>{noticeText}</p> : null}
+    {noticeText ? <RouteNotice className={notice?.startsWith('failed') ? styles.errorNotice : styles.successNotice} error={notice?.startsWith('failed')} focusKey={`${notice}:${recovery ?? ''}`}>{noticeText}</RouteNotice> : null}
     {canManageDrafts ? <div className={previewStyles.toolbar}><details className={previewStyles.importDisclosure}><summary>Import CSV</summary><section className={`${styles.card} ${styles.createCard}`}><p className={styles.help}>Upload a CSV of posts and optional first comments.</p><CsvImportForm targets={targetChoices}/></section></details></div> : null}
     <section className={styles.card} aria-label={`${view === 'table' ? 'Table' : view === 'feed' ? 'Feed' : 'Cards'} post view`}>
       {view === 'table' ? <DataTable columns={columns} rows={rows} rowKey={post => post.id} caption={`Posts, page ${listing.page} of ${listing.pages}`} emptyMessage={selectedStatus || selectedChannel ? 'No posts match these filters. Change or reset the filters to see other posts.' : 'No posts have been created in this workspace yet.'}/> : rows.length ? <ul className={view === 'feed' ? previewStyles.feedList : previewStyles.cardsGrid}>

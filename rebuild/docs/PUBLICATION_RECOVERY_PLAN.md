@@ -1,6 +1,6 @@
 # Durable publication receipt recovery plan
 
-Status: **planned and unfinished**. This document records the required recovery design and implementation sequence. It does not claim that publication journaling, operator recovery, provider reconciliation, or release readiness is implemented. The required product and module boundaries remain in [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md); this plan does not narrow Publishing parity or the release gates.
+Status: **first journal/manual-recovery implementation exists; provider reconciliation and release gates unfinished**. See [PUBLICATION_RECOVERY.md](PUBLICATION_RECOVERY.md) for the implemented slice and [PREVIEW_QA.md](PREVIEW_QA.md) for actual verification. The sections below retain the design and follow-up requirements; their original failure description is historical. This document records the required recovery design and implementation sequence. The plan alone does not prove implementation, provider reconciliation or release readiness. The required product and module boundaries remain in [ARCHITECTURE_CONTRACT.md](ARCHITECTURE_CONTRACT.md); this plan does not narrow Publishing parity or the release gates.
 
 ## Current failure
 

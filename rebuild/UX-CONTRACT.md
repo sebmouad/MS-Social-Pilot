@@ -147,3 +147,26 @@ respects already-handled/composing events and restores its opener when dismissed
 Read bounds are Root-managed. The new HTTP Posts route shares page/service
 validation and returns no-store success/errors. PUBLISHING_READS.md owns the
 business/authorization references; PREVIEW_QA.md records evidence and limits.
+
+
+## Publication recovery — 2026-10-17
+
+Business authority: docs/PUBLICATION_RECOVERY.md and the current service in
+modules/publishing/server/publication.ts. An unconfirmed publication is held;
+the app must not invite another send until its outcome is resolved. Show the
+post and destination context, distinguish a saved receipt awaiting local update
+from an unknown result, and explicitly describe human external verification.
+A reported absence may be followed by a delayed remote effect. Never label a
+human attestation as an automatic platform check. Preserve entered outcome,
+receipt and confirmation on recoverable failure; expose focused feedback and
+status refresh. Local finish sends no provider request or first comment.
+Private Root keeps these controls under Publishing, with workspace/destination
+context and the same exact-operation confirmation model. All controls use the
+shared themed fields, buttons, validation and dialog behavior.
+
+A recovery that changes list membership preserves the committed Posts URL
+filters and view, sets a result notice bound to the opaque operation, and focuses
+the shared RouteNotice after the initiating row disappears. Query notice copy
+is an allowlisted UI result, not evidence of server success on its own. The
+service receipt is validated before navigating. Root operation rows preserve
+their focused success notice after their available action changes.

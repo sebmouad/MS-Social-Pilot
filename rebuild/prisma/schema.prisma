@@ -149,6 +149,7 @@ model Workspace {
 
   inboxDeletions RebuildInboxDeletion[]
   postDeletions  RebuildPostDeletion[]
+  publicationAttempts PublicationAttempt[]
 
   @@map("workspaces")
 }
@@ -567,4 +568,30 @@ model RebuildPostDeletion {
   @@index([workspaceId, targetId, updatedAt])
   @@index([localPostIds], type: Gin)
   @@map("rebuild_post_deletions")
+}
+
+/// Durable, content-free provider publication attempt and receipt journal.
+model PublicationAttempt {
+  id           String    @id @default(uuid())
+  workspaceId  String
+  postId       String
+  postTargetId String
+  targetId     String
+  provider     String
+  actorId      String
+  state        String
+  reason       String?
+  remotePostId String?
+  remoteUrl    String?
+  receiptAt    DateTime? @db.Timestamp(3)
+  projectedAt  DateTime? @db.Timestamp(3)
+  attestedAt   DateTime? @db.Timestamp(3)
+  attestedBy   String?
+  createdAt    DateTime  @default(now()) @db.Timestamp(3)
+  updatedAt    DateTime  @default(now()) @updatedAt @db.Timestamp(3)
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, targetId, updatedAt])
+  @@index([workspaceId, postId, postTargetId])
+  @@map("rebuild_publication_attempts")
 }

@@ -67,7 +67,7 @@ migration or a claim of the complete production-shaped cutover rehearsal.
    production. For the local rehearsal, use a sanitized, pre-migration custom
    format dump and a loopback-only PostgreSQL admin URL. Set
    `CUTOVER_DUMP_SANITIZED=YES` only after a separate sanitization review, and
-   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions`.
+   set `CUTOVER_APPROVED_MIGRATION_SET=20261015120000_mcp_api_keys,20261023100000_rebuild_worker_jobs,20261016190000_rebuild_inbox_deletions,20261016220000_rebuild_post_deletions,20261017010000_rebuild_publication_attempts`.
    `rebuild/scripts/cutover-rehearsal.sh` pins those four SQL files by SHA-256,
    restores the dump into local scratch databases, refuses migration objects
    or success records already present, applies only those files, checks the
@@ -126,7 +126,7 @@ migration or a claim of the complete production-shaped cutover rehearsal.
   operational options, MCP parity, and live provider integration tests.
 - Production currently has no rebuild web or worker systemd unit and no
   verified proxy switch from 3100 to 3200.
-- The rebuild schema is not a migration schema. Its four checksum-pinned
+- The rebuild schema is not a migration schema. Its five checksum-pinned
   additive migrations still need application and data-impact review against a
   sanitized production-shaped copy and a restore-aware plan.
 - There is no sanitized production-shaped staging evidence covering the full
@@ -150,7 +150,7 @@ The final Inbox journal schema also retains local alias IDs and suppressed desce
 
 The fourth pinned additive migration, `20261016220000_rebuild_post_deletions`, adds the content-free remote post deletion journal. Its SHA-256 is now `80e406ae33000a349d07f9e428563d20083bc36c65956a969a5e7ccc77c32f07`; the state/timestamp CHECK is explicitly NULL-safe. Before the isolated synthetic preview received this migration, the private backup `/private/tmp/socialpilot-preview-before-post-deletion-20261016T210904Z.dump` (244200 bytes) was restored; the exact source-table counts matched, and the migration restore matched the 97-table inventory. The revised DDL has not been applied to the preview; the parent will back up and restore it before applying the correction. Production was not changed.
 
-The cutover allowlist, checksum pin, migration-history guard, and mapped-column inventory now contain four migrations. This backup/restore evidence and preview application do not prove a full four-file rehearsal against a sanitized, production-shaped pre-migration baseline. Exact production cutover backup/media recovery, application workflows, and proxy/service rollback remain required. See [POST_DELETION_RECOVERY.md](POST_DELETION_RECOVERY.md) for service semantics and remaining gaps.
+The cutover allowlist, checksum pin, migration-history guard, and mapped-column inventory now contain five migrations. This backup/restore evidence and preview application do not prove a full five-file rehearsal against a sanitized, production-shaped pre-migration baseline. Exact production cutover backup/media recovery, application workflows, and proxy/service rollback remain required. See [POST_DELETION_RECOVERY.md](POST_DELETION_RECOVERY.md) for service semantics and remaining gaps.
 
 The final post-deletion SQL above was reapplied from the pre-journal private
 backup, then independently backed up/restored with matching exact counts for
@@ -160,3 +160,11 @@ by a restore-verified 97-table backup at
 (249411 bytes). These checks establish the local additive migration and
 constraint repair only; they do not close the full four-file production-shaped
 migration, media or proxy/service rollback gates.
+
+## Publication attempt journal — 2026-10-17
+
+The fifth allowlisted additive migration, `20261017010000_rebuild_publication_attempts`, defines the content-free publication attempt journal and its NULL-safe state/timestamp invariants. Identifiers use a fixed 2048-character database integrity cap, independent of runtime limits. The table has only a workspace foreign key; local post and destination IDs remain durable aliases without cascading foreign keys. A partial unique index holds one attempt per workspace/post-target while its state is `started`, `uncertain`, `receipt_recorded`, or `projected`; `rejected` and `attested_absent` release the claim while retaining history. Workspace deletion erases resolved journal rows through the workspace cascade, while the Publishing service refuses erasure with unresolved attempts.
+
+The migration is checksum-pinned and included in the local cutover rehearsal's mapped-column inventory. Its SHA-256 is `03973b6fb80dcf2580c5e39f0d2be8fd5715f47c1a953127ce939638bfece267`. Before preview application, `/private/tmp/socialpilot-preview-before-publication-20261016T234535Z.dump` (249671 bytes, mode 0600) restored with exact matching counts for all 97 source tables. The migration applied to that scratch restore, and an independent migrated backup restored with exact counts across 98 tables. Only then was the migration applied to the synthetic preview; both scratch databases were removed. Production, workers and remote provider data were unchanged.
+
+This proves the additive local journal and restore path, not a full five-file rehearsal on a sanitized production-shaped pre-migration baseline. The implemented service and fault/authorization evidence are described in PUBLICATION_RECOVERY.md and PREVIEW_QA.md. Exact production backup/media recovery, one-publisher ownership, live provider operations, application/permission migration and proxy/service rollback remain release gates.

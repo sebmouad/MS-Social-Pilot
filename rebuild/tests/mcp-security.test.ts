@@ -57,6 +57,8 @@ const firstCommentMutations = vi.hoisted(() => ({ send: vi.fn(), record: vi.fn()
 vi.mock('../src/modules/publishing/server/first-comment', () => ({ sendFirstComment: firstCommentMutations.send, recordFirstCommentOutcome: firstCommentMutations.record }));
 const postDeletions = vi.hoisted(() => ({ get: vi.fn(), finish: vi.fn(), record: vi.fn() }));
 vi.mock('../src/modules/publishing/server/deletion', () => ({ getPostDeletion: postDeletions.get, finishPostDeletion: postDeletions.finish, recordPostDeletionOutcome: postDeletions.record }));
+const publicationRecovery = vi.hoisted(() => ({ get: vi.fn(), record: vi.fn(), finish: vi.fn(), adopt: vi.fn() }));
+vi.mock('../src/modules/publishing/server/publication', () => ({ getPublicationStatus: publicationRecovery.get, recordPublicationOutcome: publicationRecovery.record, finishPublicationProjection: publicationRecovery.finish, adoptLegacyPublication: publicationRecovery.adopt }));
 const media = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), remove: vi.fn(), upload: vi.fn() }));
 vi.mock('../src/server/media/storage', () => ({ listWorkspaceImages: media.list, getWorkspaceImageMetadata: media.get, deleteUnusedWorkspaceImage: media.remove, uploadWorkspaceImage: media.upload }));
 
@@ -903,6 +905,27 @@ describe('MCP workspace boundaries', () => {
     const finished = await call('finish_post_deletion', { postId: 'post-a', confirmation: 'FINISH POST DELETION post-a' });
     expect((await finished.json()).result.structuredContent).toMatchObject({ state: 'completed', localConfirmed: true });
     expect(postDeletions.finish).toHaveBeenCalledWith(viewer, { postId: 'post-a', confirmation: 'FINISH POST DELETION post-a' });
+  });
+
+  it('exposes scoped publication recovery and binds attestation and local projection to exact confirmations', async () => {
+    publicationRecovery.get.mockResolvedValue({ postId: 'post-a', operations: [], legacyProcessingCount: 0, truncated: false });
+    publicationRecovery.record.mockResolvedValue({ postId: 'post-a', operations: [], legacyProcessingCount: 0, truncated: false });
+    publicationRecovery.finish.mockResolvedValue({ postId: 'post-a', operations: [], legacyProcessingCount: 0, truncated: false });
+    publicationRecovery.adopt.mockResolvedValue({ postId: 'post-a', operations: [], legacyProcessingCount: 0, truncated: false });
+    const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    const names = (await listed.json()).result.tools.map((tool: { name: string }) => tool.name);
+    for (const name of ['get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication']) expect(names).toContain(name);
+    await call('get_publication_status', { postId: 'post-a' });
+    expect(publicationRecovery.get).toHaveBeenCalledWith(viewer, { postId: 'post-a' });
+    const bad = await call('record_publication_outcome', { postId: 'post-a', operationId: 'op-a', outcome: 'ABSENT', verifiedExternally: true, confirmation: 'RECORD PUBLICATION other ABSENT' });
+    expect((await bad.json()).result.isError).toBe(true);
+    expect(publicationRecovery.record).not.toHaveBeenCalled();
+    await call('record_publication_outcome', { postId: 'post-a', operationId: 'op-a', outcome: 'ABSENT', verifiedExternally: true, confirmation: 'RECORD PUBLICATION op-a ABSENT' });
+    expect(publicationRecovery.record).toHaveBeenCalledWith(viewer, { postId: 'post-a', operationId: 'op-a', outcome: 'ABSENT', confirmation: 'RECORD PUBLICATION op-a ABSENT', verifiedExternally: true });
+    await call('finish_publication_projection', { postId: 'post-a', operationId: 'op-a', confirmation: 'FINISH PUBLICATION op-a' });
+    expect(publicationRecovery.finish).toHaveBeenCalledWith(viewer, { postId: 'post-a', operationId: 'op-a', confirmation: 'FINISH PUBLICATION op-a' });
+    await call('adopt_legacy_publication', { postId: 'post-a', postTargetId: 'pt-a', confirmation: 'ADOPT PUBLICATION pt-a' });
+    expect(publicationRecovery.adopt).toHaveBeenCalledWith(viewer, { postId: 'post-a', postTargetId: 'pt-a', confirmation: 'ADOPT PUBLICATION pt-a' });
   });
 
   it('exposes scoped first-comment send and manual outcome tools with exact confirmations', async () => {
