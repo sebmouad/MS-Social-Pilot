@@ -545,3 +545,20 @@ fails closed. ADS_REPORT_EXPORT.md owns the protocol and documented redaction,
 snapshot/performance and provider-coverage limitations. PREVIEW_QA.md records
 actual evidence. These stored reads/exports do not complete Ads management,
 Facebook/legacy/MCP parity or production cutover; legacy remains running.
+
+## Workspace-qualified Facebook collectors — batch 60
+
+Registry 55 supplies Shared owner-policy/resource-lock controls and Facebook-
+owned Page insight grants and collection lookbacks. The neutral job access
+service implements the user's any-active-owner decision with same-owner feature
+and platform access and no installation-owner suspension exception. Customer
+per-member authorization remains unchanged.
+
+Facebook's four collectors refresh authority, selected bindings, credentials,
+grants and expiry under resource locks at dispatch/retry and persistence
+boundaries. Selection, disconnection and reconnection share those neutral locks;
+transaction-scoped writes fence late responses and update counts follow commits.
+Provider IO, granted-scope names and mapping remain inside Facebook. See
+WORKER_WORKSPACE_ACCESS.md for semantics and non-instantaneous policy-change
+limits, and PREVIEW_QA.md for actual evidence. No migration, live provider test
+or production cutover is established by this batch.

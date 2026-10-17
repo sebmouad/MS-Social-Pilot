@@ -3,6 +3,7 @@ import { prisma } from '@/server/data';
 import { encryptSecret } from '@/server/secret-crypto';
 import type { FacebookAdAccount, FacebookCurrentUser, FacebookPage } from '@/platforms/facebook/publishing';
 import { auditConnectionEvent, type ConnectionMutationActor } from '@/server/connection-mutations';
+import { lockSelectedResources } from '@/server/platforms/resource-lock';
 
 export interface FacebookDiscoveryPersistenceInput {
   user: FacebookCurrentUser;
@@ -22,6 +23,24 @@ export async function persistFacebookDiscovery(actor: ConnectionMutationActor, i
       select: { role: true },
     });
     if (!membership || !new Set(['owner', 'admin']).has(membership.role)) throw new Error('Only current workspace owners and admins can connect Meta.');
+    // Reconnection rotates source credentials as well as discovered targets.
+    // Fence every existing bound resource before changing that shared source.
+    const previous = await tx.socialAccount.findUnique({
+      where: { workspaceId_provider_providerUserId: { workspaceId: actor.workspaceId, provider: 'facebook', providerUserId: input.user.id } },
+      select: { id: true },
+    });
+    const [existingTargets, existingAds] = await Promise.all([
+      tx.target.findMany({ where: { workspaceId: actor.workspaceId, OR: [
+        { providerId: { in: input.pages.map(page => page.id) } }, ...(previous ? [{ socialAccountId: previous.id }] : []),
+      ] }, select: { id: true } }),
+      tx.adAccount.findMany({ where: { workspaceId: actor.workspaceId, OR: [
+        { actId: { in: input.adAccounts.map(account => account.id) } }, ...(previous ? [{ socialAccountId: previous.id }] : []),
+      ] }, select: { id: true } }),
+    ]);
+    await lockSelectedResources(tx, actor.workspaceId, [
+      ...existingTargets.map(target => ({ kind: 'target' as const, id: target.id })),
+      ...existingAds.map(account => ({ kind: 'adAccount' as const, id: account.id })),
+    ]);
     const account = await tx.socialAccount.upsert({
       where: { workspaceId_provider_providerUserId: { workspaceId: actor.workspaceId, provider: 'facebook', providerUserId: input.user.id } },
       create: {

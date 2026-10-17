@@ -108,10 +108,11 @@ describe('Facebook publishing credential readiness', () => {
     runtime.values = new Map<string, unknown>([
       ['meta.appId', 'synthetic-app-id'], ['meta.oauthRedirectUri', 'https://app.test/callback'], ['meta.oauthScopes', ['pages_show_list']],
       ['meta.inboxReadScopes', []], ['meta.inboxWriteScopes', []], ['meta.firstCommentScopes', ['pages_manage_engagement']],
+      ['meta.pageInsightReadScopes', ['read_insights']],
       ['meta.postReadScopes', ['pages_read_engagement']], ['meta.postPublishScopes', ['pages_manage_posts']], ['meta.postDeleteScopes', ['pages_manage_posts']],
     ]);
     const oauth = await configuredFacebookOAuth();
-    expect(oauth.scopes).toEqual(['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'pages_manage_engagement']);
+    expect(oauth.scopes).toEqual(['pages_show_list', 'read_insights', 'pages_read_engagement', 'pages_manage_posts', 'pages_manage_engagement']);
   });
 
   it('registers active, validated publish and delete scope settings', () => {

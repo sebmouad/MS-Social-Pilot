@@ -115,6 +115,17 @@ Retain and expose every fetched metric, including additional provider fields/bre
 
 Jobs use leases/claims, retries, idempotency/reconciliation, run history and audit. Module hooks own provider sync; the shared worker coordinates. Never run legacy and rebuild publishers against the same queue without a verified single-owner strategy.
 
+User decision, 2026-10-17: **automatic workspace synchronization qualifies through
+any active workspace owner's current plan/access**. The same owner must qualify
+for the needed product feature and installed platform; grants from different
+owners cannot be combined. This worker policy supersedes the legacy first-owner
+subscriber rule only for automatic sync. It does not change per-user UI/API/MCP
+authorization or the billing/subscription data model. Root manages its default
+policy and inspection bounds; private installation-owner inspection cannot
+bypass a suspended workspace. Workers recheck current selection, connection,
+provider grants and access at operation boundaries and must not resurrect data
+after deselection or disconnection.
+
 ## 8. Configuration is a product requirement
 
 Use a typed, versioned registry with validation, defaults, safe secret storage, change history and audited application. Root must manage operational/provider endpoints and credentials/scopes, paths/URLs, module/feature switches, permissions/entitlements, limits, labels/branding/themes, schedules/jobs, retention, logging and MCP settings.

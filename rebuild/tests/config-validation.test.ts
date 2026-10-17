@@ -27,7 +27,24 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(54);
+    expect(CONFIG_SCHEMA_VERSION).toBe(55);
+    expect(CONFIG_BY_KEY.get('jobs.workspaceOwnerPolicy')!.schema.safeParse('any_active_owner').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('jobs.workspaceOwnerPolicy')!.schema.safeParse('all_active_owners').success).toBe(true);
+    expect(CONFIG_BY_KEY.get('jobs.workspaceOwnerPolicy')!.schema.safeParse('root_bypass').success).toBe(false);
+    expect(CONFIG_BY_KEY.get('jobs.workspaceOwnerPolicy')).toMatchObject({ defaultValue: 'any_active_owner', consumption: 'active' });
+    expect(CONFIG_BY_KEY.get('jobs.workspaceOwnerLimit')!.schema.safeParse(1001).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('jobs.workspaceOwnerLimit')!.schema.safeParse(0).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('jobs.workspaceOwnerLimit')).toMatchObject({ defaultValue: 100, consumption: 'active' });
+    for (const key of ['meta.pageAnalyticsLookbackDays', 'meta.adsAnalyticsLookbackDays']) {
+      const setting = CONFIG_BY_KEY.get(key)!;
+      expect(setting.schema.safeParse(1).success).toBe(true);
+      expect(setting.schema.safeParse(366).success).toBe(true);
+      expect(setting.schema.safeParse(367).success).toBe(false);
+      expect(setting.schema.safeParse(0).success).toBe(false);
+      expect(setting).toMatchObject({ consumption: 'active', owner: { kind: 'platform', id: 'facebook' } });
+    }
+    expect(CONFIG_BY_KEY.get('meta.pageInsightReadScopes')!.schema.safeParse([]).success).toBe(false);
+    expect(CONFIG_BY_KEY.get('meta.pageInsightReadScopes')).toMatchObject({ consumption: 'active', owner: { kind: 'platform', id: 'facebook' } });
     expect(safeConfigShape().find(setting => setting.key === 'ads.reportingFilters')).toMatchObject({ kind: 'json', consumption: 'active', owner: { kind: 'product', id: 'ads' } });
     for (const [key, value, maximum] of [['ads.reportPageSize', 25, 100], ['ads.reportMaxRows', 20000, 100000]] as const) {
       expect(CONFIG_BY_KEY.get(key)).toMatchObject({ defaultValue: value, consumption: 'active' });

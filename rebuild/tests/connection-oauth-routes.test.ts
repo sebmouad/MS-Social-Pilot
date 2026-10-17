@@ -47,7 +47,7 @@ afterEach(() => {
 beforeEach(() => {
   process.env.ENCRYPTION_KEY = validKey;
   mocks.requireViewer.mockResolvedValue({ user: { id: 'user-1' }, workspaceId: 'workspace-1', membership: { role: 'owner' }, entitlements: { platformCapabilities: { facebook: true } } });
-  mocks.runtimeConfig.mockImplementation((key: string) => Promise.resolve(key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.adsManageScopes' ? ['ads_management'] : key === 'meta.postReadScopes' ? ['pages_read_engagement'] : key === 'meta.oauthStateMinutes' ? 10 : key === 'platforms.facebook.enabled' ? true : key === 'ads.managementEnabled' ? false : undefined));
+  mocks.runtimeConfig.mockImplementation((key: string) => Promise.resolve(key === 'meta.pageInsightReadScopes' ? ['read_insights', 'pages_read_engagement'] : key === 'meta.adsReadScopes' ? ['ads_read'] : key === 'meta.adsManageScopes' ? ['ads_management'] : key === 'meta.postReadScopes' ? ['pages_read_engagement'] : key === 'meta.oauthStateMinutes' ? 10 : key === 'platforms.facebook.enabled' ? true : key === 'ads.managementEnabled' ? false : undefined));
   mocks.configuredFacebookAdapter.mockResolvedValue({ id: 'facebook', capabilities: { connection: 'supported' }, getAuthorizationUrl: vi.fn() });
   mocks.engine.getAuthorizationUrl.mockImplementation((input: { state: string; scopes: string[] }) => `https://www.facebook.com/dialog/oauth?state=${input.state}&scope=${input.scopes.join(',')}`);
   mocks.configuredFacebookOAuth.mockResolvedValue({ appId: 'app-id', appSecret: 'app-secret', redirectUri: callbackUrl, scopes: ['pages_show_list'] });
@@ -75,7 +75,7 @@ describe('Meta OAuth start route', () => {
     const body = await response.json();
     const state = new URL(body.authorizationUrl).searchParams.get('state');
     expect(response.status).toBe(200);
-    expect(new URL(body.authorizationUrl).searchParams.get('scope')).toBe('pages_show_list,pages_read_engagement,ads_read');
+    expect(new URL(body.authorizationUrl).searchParams.get('scope')).toBe('pages_show_list,pages_read_engagement,read_insights,ads_read');
     expect(state).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(response.headers.get('set-cookie')).toContain(`${FACEBOOK_OAUTH_STATE_COOKIE}=`);
     expect(response.headers.get('set-cookie')).toContain('HttpOnly');

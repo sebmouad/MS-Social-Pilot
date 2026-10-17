@@ -195,3 +195,13 @@ Shared download behavior handles stale/unmounted reads and receipt validation.
 This closes the stored detail/export gaps at that scope. It does not establish
 every provider metric collection, advanced reporting/comparison/status, complete
 Ads creation/management, full MCP/legacy parity or release readiness.
+
+Facebook worker authorization, batch 60: remote scheduled status, Page insights,
+Ads insights and Inbox now qualify a current active workspace owner's feature
+and platform access, refresh selected connection credentials/grants/expiry per
+attempt and recheck before persistence/commit. Shared locks fence selection,
+disconnect and reconnection against collector writes. Scheduled and Inbox reads
+also enforce the parent post's workspace. Root owns worker access/budgets and
+Facebook collection grants/windows. This closes those background-scope/stale-
+credential races; it does not complete provider collection formats, discovery,
+callback lifecycle, Ads management, live operation proof or release gates.

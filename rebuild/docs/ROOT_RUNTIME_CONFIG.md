@@ -133,3 +133,26 @@ row policy and independent MCP row ceilings still apply. Registry saves keep
 the current private authorization, validation, change history and value-free
 atomic audit. These controls do not configure provider quotas, authorize live
 writes or complete Root copy/parameter coverage. See ADS_REPORT_EXPORT.md.
+
+## Collector authorization and locks — registry 55
+
+Shared Jobs controls own `jobs.workspaceOwnerPolicy` (default any active owner,
+optional stricter all-active-owners policy) and `jobs.workspaceOwnerLimit` (100,
+1–1,000). Shared Sync resource-lock controls own the 60-second operation deadline,
+2-second acquisition wait and 5-second cancellation grace. Their combined budget
+must fit inside the workspace operation deadline; incompatible settings fail
+before provider IO. They are consumed controls, not saved-only placeholders.
+
+The Facebook platform owns Page insight read grants plus 7/30-day Page/Ads
+collector lookbacks (1–366 inclusive UTC days). New OAuth requests include the
+configured insight grants; existing connections are not silently granted new
+permissions. Scope/credential readiness is rechecked per attempt and before
+persistence. Root changes use existing private validation/audit/history; they
+do not recall provider requests already sent. WORKER_WORKSPACE_ACCESS.md owns
+the decision, lock ordering, boundaries and remaining coverage.
+
+Private Root configuration HTTP responses now explicitly use `no-store` for
+successful reads/writes and handled failures/denials. Unexpected read failures
+are masked. This matches the existing private MCP boundary and prevents browser
+caching of installation definitions/current safe values. It does not substitute
+for Root authorization or claim that every private route has been audited.

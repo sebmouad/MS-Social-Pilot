@@ -3,9 +3,10 @@ import { moduleManifests } from '@/modules';
 import { MODULES, PAGES } from '@/lib/product';
 import { THEMES } from '@/lib/themes';
 import { configurationOwner } from './ownership';
+import { WORKSPACE_JOB_ACCESS_DEFAULTS, WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, WORKSPACE_JOB_OWNER_POLICY_SCHEMA } from '@/server/jobs/access-policy';
 
 /** Bump when a registry key or its persisted representation changes. */
-export const CONFIG_SCHEMA_VERSION = 54;
+export const CONFIG_SCHEMA_VERSION = 55;
 
 import { cron, url, stringList, optionList, entry, options, type Entry } from './entry';
 import { PLATFORM_CONFIG } from '@/platforms';
@@ -21,6 +22,11 @@ export const CONFIG_REGISTRY = [
   ...PLATFORM_CONFIG,
   // Explicit installed product-module settings; schemas stay out of client manifests.
   ...ADS_CONFIG,
+  entry({ key: 'jobs.workspaceOwnerPolicy', group: 'Jobs · Authorization', label: 'Workspace sync owner access', kind: 'select', description: 'Automatic provider reads require qualifying feature and platform access from the same active workspace owner. Any owner is the default; All owners is stricter. Root inspection never bypasses customer suspension.', defaultValue: WORKSPACE_JOB_ACCESS_DEFAULTS.ownerPolicy, schema: WORKSPACE_JOB_OWNER_POLICY_SCHEMA, consumption: 'active', options: [{ value: 'any_active_owner', label: 'Any active owner qualifies' }, { value: 'all_active_owners', label: 'All active owners qualify' }] }),
+  entry({ key: 'jobs.workspaceOwnerLimit', group: 'Jobs · Authorization', label: 'Workspace sync owner check limit', kind: 'number', description: 'Maximum active owners inspected per workspace synchronization check. Larger owner sets are refused rather than authorized from a partial subset.', defaultValue: WORKSPACE_JOB_ACCESS_DEFAULTS.ownerLimit, schema: WORKSPACE_JOB_OWNER_LIMIT_SCHEMA, consumption: 'active' }),
+  entry({ key: 'sync.resourceOperationTimeoutMs', group: 'Sync schedules · Resource locking', label: 'Sync resource operation deadline (ms)', kind: 'number', description: 'Time budget for a locked resource read and persistence. Must fit inside the workspace operation budget together with wait and finalization grace.', defaultValue: 60000, schema: z.number().int().min(1000).max(300000), consumption: 'active' }),
+  entry({ key: 'sync.resourceOperationMaxWaitMs', group: 'Sync schedules · Resource locking', label: 'Sync resource transaction acquisition wait (ms)', kind: 'number', description: 'Maximum time to acquire the resource transaction connection. Resource contention uses an immediate try-lock rather than queueing.', defaultValue: 2000, schema: z.number().int().min(100).max(30000), consumption: 'active' }),
+  entry({ key: 'sync.resourceFinalizationGraceMs', group: 'Sync schedules · Resource locking', label: 'Sync resource cancellation grace (ms)', kind: 'number', description: 'Additional transaction time after cancellation for the callback to stop and roll back. The transaction deadline fences late writes.', defaultValue: 5000, schema: z.number().int().min(1000).max(30000), consumption: 'active' }),
   entry({ key: 'publishing.postPageSize', group: 'Publishing · Reads', label: 'Posts per page', kind: 'number', description: 'Result page size shared by Posts, Queue and Approvals.', defaultValue: 50, schema: z.number().int().min(1).max(100), consumption: 'active' }),
   entry({ key: 'publishing.readMaxItems', group: 'Publishing · Reads', label: 'Post list result limit', kind: 'number', description: 'Maximum post rows returned by a bounded MCP list request.', defaultValue: 200, schema: z.number().int().min(1).max(1000), consumption: 'active' }),
   entry({ key: 'publishing.calendarMaxRangeDays', group: 'Publishing · Reads', label: 'Calendar read range', kind: 'number', description: 'Maximum requested calendar range, including the grid boundary days.', defaultValue: 70, schema: z.number().int().min(50).max(366), consumption: 'active' }),

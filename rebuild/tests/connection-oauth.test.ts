@@ -36,9 +36,9 @@ describe('Meta discovery persistence', () => {
   it('encrypts user and Page tokens and creates all newly discovered records disabled', async () => {
     const tx = {
       membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }) },
-      socialAccount: { upsert: vi.fn().mockResolvedValue({ id: 'source-1' }) },
-      target: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn(), update: vi.fn() },
-      adAccount: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn(), update: vi.fn() },
+      socialAccount: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn().mockResolvedValue({ id: 'source-1' }) },
+      target: { findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), create: vi.fn(), update: vi.fn() },
+      adAccount: { findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), create: vi.fn(), update: vi.fn() },
       $executeRaw: vi.fn(),
     };
     mocks.transaction.mockImplementation(async (run: (client: typeof tx) => Promise<unknown>) => run(tx));
@@ -72,5 +72,24 @@ describe('Meta discovery persistence', () => {
       user: { id: 'meta-user', name: 'Meta User', pictureUrl: null }, accessToken: 'secret', expiresAt: null,
       scopes: [], pages: [], adAccounts: [],
     })).rejects.toThrow(/owners and admins/);
+  });
+
+  it('locks every existing bound resource before rotating connection credentials', async () => {
+    const tx = {
+      membership: { findUnique: vi.fn().mockResolvedValue({ role: 'owner' }) },
+      socialAccount: { findUnique: vi.fn().mockResolvedValue({ id: 'source-1' }), upsert: vi.fn() },
+      target: { findMany: vi.fn().mockResolvedValue([{ id: 'bound-target' }]) },
+      adAccount: { findMany: vi.fn().mockResolvedValue([{ id: 'bound-ad' }]) },
+      $queryRaw: vi.fn().mockResolvedValue([{ acquired: false }]),
+    };
+    mocks.transaction.mockImplementation(async (run: (client: typeof tx) => Promise<unknown>) => run(tx));
+    const { persistFacebookDiscovery } = await import('../src/platforms/facebook/discovery');
+    await expect(persistFacebookDiscovery({ userId: 'user-1', workspaceId: 'workspace-1' }, {
+      user: { id: 'meta-user', name: 'Meta User', pictureUrl: null }, accessToken: 'synthetic-new-token', expiresAt: null,
+      scopes: ['read_insights'], pages: [], adAccounts: [],
+    })).rejects.toMatchObject({ code: 'conflict' });
+    expect(tx.target.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { workspaceId: 'workspace-1', OR: [{ providerId: { in: [] } }, { socialAccountId: 'source-1' }] } }));
+    expect(tx.adAccount.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { workspaceId: 'workspace-1', OR: [{ actId: { in: [] } }, { socialAccountId: 'source-1' }] } }));
+    expect(tx.socialAccount.upsert).not.toHaveBeenCalled();
   });
 });

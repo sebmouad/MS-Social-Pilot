@@ -6,6 +6,7 @@ import { connectionState } from '@/lib/connection-status';
 import { isPlatformEnabled } from '@/server/platforms/registry';
 import { canUseFeature, hasPlatformCapability, loadEntitlements, type Entitlements } from '@/server/entitlements';
 import { randomBytes } from "node:crypto";
+import { lockSelectedResources } from '@/server/platforms/resource-lock';
 
 const MANAGER_ROLES = new Set(["owner", "admin"]);
 export type ConnectionMutationActor = { userId: string; workspaceId: string };
@@ -72,6 +73,7 @@ export async function setConnectionSelections(actor: ConnectionMutationActor, it
   const entitlements = items.some(item => item.enabled) ? await loadEntitlements(actor.userId, actor.workspaceId, { allowInstallationInspection: false }) : null;
   if (items.some(item => item.enabled) && (!entitlements || !canUseFeature(entitlements, 'settings/connections'))) throw new OperationError('forbidden', 'Connection selection is unavailable in this workspace.');
   await prisma.$transaction(async tx => {
+    await lockSelectedResources(tx, actor.workspaceId, items.map(item => ({ kind: item.kind, id: item.id })));
     for (const item of items) {
       if (item.kind === 'target') {
         const target = await tx.target.findFirst({ where: { id: item.id, workspaceId: actor.workspaceId }, select: { id: true, type: true, providerId: true, socialAccountId: true } });
@@ -119,6 +121,10 @@ export async function disconnectSocialAccount(actor: ConnectionMutationActor, so
     const account = await tx.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: actor.workspaceId }, select: { id: true, targets: { select: { id: true } }, adAccounts: { select: { id: true } } } });
     if (!account) throw new OperationError('unavailable', 'This source is unavailable in the current workspace.');
     const targetIds = account.targets.map(item => item.id);
+    await lockSelectedResources(tx, actor.workspaceId, [
+      ...targetIds.map(id => ({ kind: 'target' as const, id })),
+      ...account.adAccounts.map(item => ({ kind: 'adAccount' as const, id: item.id })),
+    ]);
     await lockPublishingTargets(tx, actor.workspaceId, targetIds);
     await assertPublishingTargetsSettled(tx, actor.workspaceId, targetIds);
     for (const targetId of [...targetIds].sort()) await lockInboxChannel(tx, actor.workspaceId, targetId);

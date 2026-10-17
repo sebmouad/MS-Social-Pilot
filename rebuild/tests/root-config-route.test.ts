@@ -4,7 +4,7 @@ const state = vi.hoisted(() => ({ actor: vi.fn(), read: vi.fn(), save: vi.fn() }
 vi.mock('../src/server/config/access', () => ({ currentRootActor: state.actor }));
 vi.mock('../src/server/config/store', () => ({ readConfig: state.read, saveConfig: state.save }));
 
-import { PUT } from '../src/app/api/root/config/route';
+import { GET, PUT } from '../src/app/api/root/config/route';
 
 const policy = {
   presets: [{ id: '14d', days: 14, label: 'Last two weeks' }],
@@ -22,6 +22,20 @@ beforeEach(() => {
 });
 
 describe('Root config write validation', () => {
+  it.each([[null, 401], [{ id: 'workspace-owner', isInstanceOwner: false }, 404], [{ id: 'root-user', isInstanceOwner: true }, 200]])('never caches private configuration reads: %j', async (actor, status) => {
+    state.actor.mockResolvedValue(actor);
+    const response = await GET();
+    expect(response.status).toBe(status);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    if (status !== 200) expect(state.read).not.toHaveBeenCalled();
+  });
+  it('masks configuration read failures and refuses caching the failure', async () => {
+    state.read.mockRejectedValueOnce(new Error('DATABASE SECRET PAYLOAD'));
+    const response = await GET();
+    expect(response.status).toBe(500);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(JSON.stringify(await response.json())).not.toContain('DATABASE SECRET PAYLOAD');
+  });
   it.each([
     ['invalid default preset', { ...policy, defaultPreset: 'missing' }, /defaultPreset.*preset list/i],
     ['missing default preset', { presets: policy.presets, maxRangeDays: 14, maxFilterCharacters: 80 }, /defaultPreset/i],
@@ -30,6 +44,7 @@ describe('Root config write validation', () => {
     const response = await PUT(request({ key: 'ads.reportingFilters', value }));
     const body = await response.json();
     expect(response.status).toBe(400);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(body.error).toMatch(message);
     expect(state.save).not.toHaveBeenCalled();
   });
@@ -37,6 +52,7 @@ describe('Root config write validation', () => {
   it('saves a valid registry-checked Ads policy', async () => {
     const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }));
     expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(state.save).toHaveBeenCalledWith({ key: 'ads.reportingFilters', value: policy }, 'root-user');
   });
 
@@ -57,6 +73,7 @@ describe('Root config write validation', () => {
   it('refuses cross-origin writes before authorization or persistence', async () => {
     const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }, 'https://attacker.example.test'));
     expect(response.status).toBe(403);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(state.actor).not.toHaveBeenCalled();
     expect(state.save).not.toHaveBeenCalled();
   });
@@ -65,6 +82,7 @@ describe('Root config write validation', () => {
     state.actor.mockResolvedValue(actor);
     const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }));
     expect(response.status).toBe(status);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(state.save).not.toHaveBeenCalled();
   });
 
@@ -73,6 +91,7 @@ describe('Root config write validation', () => {
     const response = await PUT(request({ key: 'ads.reportingFilters', value: policy }));
     const body = await response.json();
     expect(response.status).toBe(500);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(body.error).toBe('Configuration could not be saved.');
     expect(JSON.stringify(body)).not.toContain('DATABASE SECRET PAYLOAD');
   });

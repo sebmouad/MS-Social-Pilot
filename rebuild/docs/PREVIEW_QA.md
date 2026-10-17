@@ -1554,3 +1554,64 @@ limits. Asynchronous exports, stable multi-request snapshots, comprehensive
 provider metric collection/management, comparison/status analysis, wider
 legacy/MCP parity and migration/cutover remain open. Facebook canary cleanup
 evidence/lock remain held and unchanged; this batch makes no remote cleanup claim.
+
+## Workspace-qualified Facebook sync — batch 60, 2026-10-17
+
+The user's selected any-active-owner rule is recorded in ARCHITECTURE_CONTRACT.
+WORKER_WORKSPACE_ACCESS.md describes the neutral gate, current owner/provider/
+feature checks, Root settings and resource-lock protocol. Candidate reads no
+longer capture tokens. Four Facebook collectors re-read current credentials,
+grants, expiry and selected bindings per attempt, after reads and before commit.
+Scheduled status and Inbox also constrain parent post workspace identities.
+Selection, disconnect and reconnection share sorted neutral resource locks;
+collector writes use the locked transaction. Counters describe committed work.
+
+Focused tests exercised policy loss while waiting, new tokens on retry, missing
+grants, lost selections, rebound resources, token expiry during reads and access
+loss after a staged upsert. They also preserve partial metric failure reporting,
+cursor fairness, disabled-module behavior and Inbox deletion ordering. Provider
+engines in these tests are stubs; no real provider outcome is asserted.
+
+Nine actual isolated PostgreSQL checks use unique synthetic users, workspaces,
+memberships and plans. The real entitlement loader and bound SQL validate
+same-owner grants, rejection of pooled grants, any/all policy, disabled-owner
+exclusion, cross-workspace isolation, suspension despite installation ownership
+and owner-ceiling refusal. Two real clients prove resource conflict before the
+second callback, release/reacquisition and rejection/rollback of a late write
+through an expired transaction client. Root policy overrides exist only inside
+an intentionally rolled-back transaction. Cleanup verifies zero fixture records.
+An initial fixture insert lacked the legacy plan timestamp; it was corrected
+and all tests reran with explicit preview database opt-in. Failed-attempt fixtures
+were also removed and aggregate namespace counts verified zero.
+
+Actual Chrome read private Shared configuration Jobs/Sync controls and the
+Facebook Analytics collection category at localhost:3200. Policy defaults,
+owner ceiling, three resource budgets and provider 7/30-day windows displayed in
+their declared sections. A 390×844 Nightfall check retained settings through the
+single drawer; Escape restored Menu & filters focus, with no document overflow.
+No settings or user theme preferences were saved. Authenticated real HTTP and
+private MCP returned schema 55 and matching active Shared/Facebook ownership
+metadata for all eight new keys. Browser review found missing private Root HTTP
+cache headers; regression tests first failed, then passed after explicit
+`no-store` and safe read-error handling were added. Real browser read 200 and
+invalid-policy write 400 both returned `no-store`; the invalid value was refused.
+
+Final integrated verification passed **1,710 tests across 241 files**, with all
+guarded PostgreSQL checks explicitly enabled. Typecheck, whitespace checks and
+the isolated production build passed; the preview build output was retained.
+One Facebook-owned lookback schema is consumed by both Root and collectors,
+avoiding independent copies of the range rule. Final logs are
+`/private/tmp/socialpilot-facebook60-release-tests.log`,
+`/private/tmp/socialpilot-facebook60-release-build.log` and
+`/private/tmp/socialpilot-facebook60-type-verified.log`. Targeted database and
+cache regressions are recorded in `socialpilot-facebook60-database.log` and
+`socialpilot-facebook60-root-cache-red.log`/`root-cache-green.log` in the same
+private temporary directory.
+
+There was no migration, real provider request, worker startup or
+production change. In-flight HTTP reads are not recalled by a policy switch;
+current checks fence subsequent attempts and transaction commits. Complete
+collection metrics/formats, live grant/expiry proof, callback lifecycle, Inbox/
+Ads management, broader legacy/MCP parity and release gates remain unfinished.
+The private Facebook cleanup ledger/lock were not modified. Root numeric input
+min/max hints and the complete visual/accessibility matrix remain open.
