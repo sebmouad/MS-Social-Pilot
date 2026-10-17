@@ -33,3 +33,8 @@ outcomes stay held, and late provider evidence is retained separately. These add
 publication/deletion, complete parity or cutover. See
 [`docs/FACEBOOK_MEDIA_RECOVERY.md`](docs/FACEBOOK_MEDIA_RECOVERY.md) and
 [`UX-CONTRACT.md`](UX-CONTRACT.md).
+
+The host-only [live media canary](docs/FACEBOOK_LIVE_MEDIA_CANARY.md) verified
+basic multi-photo publication/status and feed deletion. Photo cleanup remains
+unconfirmed; its private evidence and Page lock are retained. This is limited
+engine evidence and does not make the rebuild ready for production cutover.

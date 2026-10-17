@@ -465,3 +465,16 @@ Registry 51 adds the consumed Facebook-owned
 database, HTTP and installation-MCP checks are not live provider proof. This
 extends Root recovery evidence without completing photo/feed/delete reconciliation,
 Facebook/legacy/MCP parity or cutover; production remains legacy.
+
+## Bounded live multi-photo evidence — batch 55
+
+The reviewed Facebook engine now has real host-only credential-bridge evidence
+for two generated multipart photo uploads, ordered feed publication, published
+status and exact photo/feed association readback, followed by an explicit feed
+deletion receipt. It is not a rebuild runtime/UI/API/MCP or database-journal
+integration test. Photo objects became unreadable afterward; their cleanup
+remains held with private evidence and a per-Page canary lock. No absence was
+inferred and no unknown write was retried. FACEBOOK_LIVE_MEDIA_CANARY.md records
+the exact scope, immutable artifact hashes, pending verification and operator
+tool. Production application/data configuration and all cutover gates remain
+unchanged; this partial result does not complete the Facebook module.

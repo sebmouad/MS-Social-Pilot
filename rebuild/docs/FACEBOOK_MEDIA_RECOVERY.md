@@ -221,3 +221,9 @@ adds a bounded manual evidence path; it does not finish unknown-step or delayed
 receipt reconciliation, search for remote candidates, or provide live proof of
 publication/deletion. PREVIEW_QA.md records the automated/local evidence and
 remaining browser/provider work.
+
+Batch 55 adds bounded real engine evidence for multi-photo publication/status
+and feed deletion. Photo cleanup remains explicitly unresolved after unavailable
+reads; no production cleanup guard was relaxed. The host-side operator journal
+is separate from these application tables. See FACEBOOK_LIVE_MEDIA_CANARY.md
+and PREVIEW_QA.md before treating the live canary as a complete passing test.

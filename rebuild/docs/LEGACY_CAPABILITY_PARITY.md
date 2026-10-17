@@ -137,6 +137,15 @@ synthetic replay and fault tests do not prove live provider deletion. Unknown
 upload/feed/delete reconciliation, native formats, full Facebook/legacy/MCP
 coverage and production cutover remain open. See FACEBOOK_MEDIA_RECOVERY.md.
 
+Live multi-photo update, batch 55: the current engine published two generated
+multipart photos and one feed post on the user-selected Page. Remote reads
+verified publication and exact photo association; feed deletion returned an
+explicit receipt. Child-photo cleanup is held because reads became unavailable;
+neither API lookup failures nor a bounded photo list prove absence. The private
+file ledger and Page lock are retained. This engine-only legacy credential bridge
+does not verify migrated rebuild UI/API/MCP, database journaling, first comments,
+other formats or complete provider parity. See FACEBOOK_LIVE_MEDIA_CANARY.md.
+
 
 Facebook media recovery update, 2026-10-17: private Root now supports a default-off
 module-owned path for operators to record externally observed photo/feed and

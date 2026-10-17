@@ -1266,3 +1266,54 @@ without changing the deletion state or appending a misleading provider event.
 The media-journal/cleanup suites pass 32 tests and TypeScript passes. No live
 target lookup was added, preserving receipt capture after local object removal;
 the applied migration and its checksum are unchanged.
+
+## Live multi-photo canary — batch 55
+
+Added an import-safe host-only operator verifier and twelve synthetic filesystem
+tests. The verifier uses two generated 640×480 PNGs, a unique visible run label,
+exact selected-Page binding, public artifact hashes and credentials decrypted
+only on the authorized legacy host. Durable file intent/receipts precede each
+phase; an exclusive Page lock prevents concurrent/repeated unknown runs.
+Uncertain photo/feed/delete outcomes remain held. Strict finalization cannot
+remove an unresolved ledger or claim a failed read proves absence.
+
+The final full guarded suite passed **1,486 tests in 223 files**. TypeScript,
+isolated production build and whitespace checks passed. The rebuild preview's
+`.next` directory was preserved. The full suite includes the follow-up late
+deletion binding regression and canary tests for ordering, generated-image bounds,
+unknown states, exact IDs, no-repeat writes, Page concurrency, lock retention and
+verified finalization. These synthetic checks do not establish remote outcomes.
+
+The real engine canary on the user-selected Page recorded two photo receipts,
+then one feed receipt. Signed reads confirmed published status and both exact
+photo/feed associations. Feed deletion returned explicit success. Subsequent
+photo reads failed, so the initial verifier exited 2 with `held_photo_cleanup`;
+it did not declare a complete passing run or automatically send photo deletes.
+
+Read-only investigation revalidated the Page identity and publishing grant.
+ID-only photo reads returned HTTP 400/code 100/subcode 33; the feed returned
+HTTP 400/code 10. A bounded uploaded-photos read returned four identities and
+neither test photo, without establishing absence. A separate user-authorized
+cleanup made the first exact-ID DELETE for each known generated photo after
+durable intent and original-ledger backup. Both returned HTTP 400/code 100/
+subcode 33. Zero explicit photo-deletion receipts exist; those writes will not
+be retried. Evidence and the Page lock remain on the host. No application cleanup
+guard was relaxed, no production database/settings were written and no service,
+worker or proxy changed. Public and loopback port 3100 health returned HTTP 200.
+
+The separate test browser was logged out of Facebook. Local Chrome access was
+disabled; after the user said they will enable it, the available browser inventory
+still contained only the in-app and MCP Apps browsers. Authenticated visual photo
+cleanup verification remains pending. Primary Meta documentation fetches returned
+429; no deletion-cascade guarantee was inferred from secondary pages.
+
+FACEBOOK_LIVE_MEDIA_CANARY.md records hashes, explicit reproduction inputs,
+private evidence paths and scope. This is an engine-only legacy credential bridge,
+not a migrated rebuild runtime/UI/API/MCP or database-journal test. First comments,
+other formats, broader provider/legacy/MCP parity and production cutover remain
+open. The Facebook module and full application are not complete.
+
+Private local checks: `/private/tmp/socialpilot-canary55-tests.log`,
+`/private/tmp/socialpilot-canary55-typecheck.log` and
+`/private/tmp/socialpilot-canary55-build.log`. The private host ledger is retained
+as documented; do not delete or release it merely to permit another test run.

@@ -250,3 +250,16 @@ now include all eight migrations. This does not prove the complete eight-file
 rehearsal on a sanitized production-shaped baseline, production rollback, media
 restore, provider permission migration or publisher ownership. Production
 services, database and provider content are unchanged.
+
+## Live-provider canary boundary — batch 55
+
+The separately reviewed engine-only canary used existing host credentials to
+create two generated photos and one uniquely labelled post on the user-selected
+Page. Publication/association readback and feed deletion were confirmed; child
+photo cleanup remains unresolved with private evidence and a retained Page lock.
+FACEBOOK_LIVE_MEDIA_CANARY.md records the first exact-photo DELETE attempts and
+their unconfirmed results. No production database, schema, configuration, queue,
+service or proxy was modified. This is limited provider evidence, not a rebuild
+deployment or migrated UI/API/MCP/worker proof. It closes none of the remaining
+cutover/rollback or full capability-parity gates. Do not run `socialpilot-deploy`
+as a substitute for the rebuild deployment plan above.
