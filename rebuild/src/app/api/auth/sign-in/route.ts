@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { authRateLimit, signIn } from '@/server/auth-flow';
 import { hit, clear, forgive } from '@/server/rate-limit';
 import { clientIp } from '@/server/client-ip';
+import { postAuthenticationPath } from '@/server/invitation-session';
 
 export async function POST(request: Request) {
   const origin = request.headers.get('origin');
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
       forgive(clientKey, Number.MAX_SAFE_INTEGER - pair.remaining);
       clear(pairKey);
     }
-    return NextResponse.json({ ok: true, next: outcome });
+    return NextResponse.json({ ok: true, next: outcome, nextUrl: await postAuthenticationPath() });
   } catch {
     return NextResponse.json({ code: 'INVALID_CREDENTIALS' }, { status: 401 });
   }

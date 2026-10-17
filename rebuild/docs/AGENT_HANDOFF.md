@@ -44,32 +44,26 @@ session tokens, private environment contents, customer records or raw logs here.
 
 ## Verified application baseline
 
-Latest application batch: `58f43a72dc6c0eaf2af1b6e89ebedc8321856112`
-(`feat(settings): unify team access workflows`), verified on `origin/main` with a
-clean tree after publication. This documentation commit follows that baseline.
+Batch 62 adds invitation-based onboarding and transactional mail, following
+application batch `58f43a7` and continuity commit `f53138b`. Registry 57 owns
+SMTP and invitation policy. No schema migration or production change occurred.
 
-Batch 61 moved team membership into Settings-owned services, added scoped
-confirmations, current authority checks, atomic grants/audits, bounded directory
-reads, recoverable dialogs and four workspace MCP tools plus the team resource.
-Registry version 56 owns six Team defaults/limits. No invitation, registration,
-mail delivery or subscription seat-plan implementation is established by this
-batch. See TEAM_ACCESS.md.
-
-Evidence: 1,743 tests / 244 files passed with guarded PostgreSQL checks enabled;
-rebuild typecheck and isolated build passed. Real localhost HTTP/MCP-key/DB checks
-verified grants, audit, cross-workspace refusal, owner/self protection, current
-disabled/suspended access, and removal preserving unrelated access. Browser
-add/edit/remove and offline failure recovery passed; disposable records and the
-owned browser tab were cleaned up. Details and limitations: PREVIEW_QA.md.
+Evidence: exact index snapshot passed 1,778 tests / 250 files with guarded
+PostgreSQL checks, typecheck and production build. Two additional owner-rank
+regressions passed in the 10-test invitation service file. Real localhost
+HTTP/SMTP capture/Root/MCP/DB verification passed; disposable fixtures and prior
+Root settings were restored. No external mail or provider call was used.
+Fresh browser/phone onboarding remains unverified. See ONBOARDING.md and
+PREVIEW_QA.md for boundaries and remaining account recovery/verification gaps.
 
 ## Immediate continuation
 
-No onboarding implementation was started after batch 61 when this handoff was
-written. Resume DELIVERY_PLAN.md stage 1 with explicit agent ownership for mail,
-invitation/account services, frontend and tests. Inspect legacy Invitation,
-EmailToken and EmailLog tables before extending the rebuild projection. Current
-Prisma models are a partial legacy compatibility view; do not run schema push or
-infer production migration readiness from adding a model.
+Batch 63 work is concurrent and unfinished: Publishing templates/composer reuse,
+Inbox assignment/notes/saved replies, and workspace time zone/approval policies.
+Do not mix these working-tree changes into the already verified batch 62 index.
+Use explicit file staging and exact snapshots for review. Root registry and MCP
+integration belong to the designated integration worker. Full legacy parity,
+provider proof and release rehearsal remain required.
 
 Known phone issue: at 390px emulation the document scroll width reached 601px,
 with a wide fixed module rail and touch click timeouts; keyboard workflows worked.

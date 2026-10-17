@@ -1,0 +1,55 @@
+.invitations { display: grid; gap: 16px; min-width: 0; }
+.heading h2 { margin: 0; color: var(--ink); font-size: 17px; font-weight: 720; letter-spacing: -.25px; }
+.heading p { margin: 5px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+.form { display: grid; gap: 14px; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
+.fields { display: grid; grid-template-columns: minmax(220px, 1.35fr) minmax(160px, .65fr); gap: 14px; max-width: 760px; }
+.field { display: grid; align-content: start; gap: 7px; color: var(--ink); font-size: 12px; font-weight: 650; }
+.field input, .field select, .confirmField input { width: 100%; min-width: 0; min-height: 42px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 450; }
+.field input:focus-visible, .field select:focus-visible, .confirmField input:focus-visible { outline: 3px solid color-mix(in srgb, var(--focus) 35%, transparent); outline-offset: 2px; border-color: var(--focus); }
+.field input[aria-invalid="true"] { border-color: var(--danger); }
+.hint { color: var(--ink-faint); font-size: 11px; font-weight: 450; line-height: 1.45; }
+.scopeNote { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; background: var(--accent-soft); color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
+.warning, .unavailable { margin: 0; padding: 10px 12px; border-left: 3px solid var(--warning); border-radius: 0 8px 8px 0; background: var(--warning-soft); color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
+.unavailable { border-color: var(--line-strong); background: var(--surface-muted); }
+.actions { display: flex; justify-content: flex-end; }
+.empty { margin: 0; padding: 22px 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius-md); color: var(--ink-soft); font-size: 13px; text-align: center; }
+.tableWrap { width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+.table th, .table td { padding: 12px 13px; border-bottom: 1px solid var(--line-subtle); vertical-align: top; }
+.table thead th { background: var(--surface-raised); color: var(--ink-faint); font-size: 10px; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; white-space: nowrap; }
+.table tbody tr:last-child > * { border-bottom: 0; }
+.table tbody tr:hover { background: var(--surface-hover); }
+.table tbody th { min-width: 180px; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.table td { color: var(--ink-soft); }
+.status { display: inline-flex; min-height: 24px; align-items: center; padding: 2px 8px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink-soft); font-size: 10px; font-weight: 700; }
+.status_pending { border-color: var(--warning-soft); background: var(--warning-soft); color: var(--warning); }
+.status_expired { background: var(--surface-muted); }
+.status_accepted { border-color: var(--accent-soft); background: var(--accent-soft); color: var(--accent); }
+.acceptedAt { display: block; margin-top: 5px; color: var(--ink-faint); font-size: 10px; line-height: 1.4; }
+.rowActions { display: flex; justify-content: flex-end; align-items: center; gap: 4px; min-width: 150px; }
+.review { display: grid; gap: 0; margin: -5px 0 20px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.review p { display: grid; grid-template-columns: 105px minmax(0, 1fr); gap: 12px; margin: 0; padding: 10px 12px; border-bottom: 1px solid var(--line-subtle); font-size: 12px; }
+.review p:last-child { border-bottom: 0; }
+.review p span { color: var(--ink-faint); }
+.review p strong { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.confirmField { display: grid; gap: 8px; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
+.confirmField code { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; overflow-wrap: anywhere; }
+.confirmField input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.copy { margin: 0 0 16px; color: var(--ink-soft); font-size: 13px; line-height: 1.55; }
+.error, .success { margin: 0; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; }
+.error { background: var(--danger-soft); color: var(--danger); }
+.success { background: var(--accent-soft); color: var(--ink); }
+.error:focus, .success:focus, .tableWrap:focus-visible { outline: 3px solid color-mix(in srgb, var(--focus) 40%, transparent); outline-offset: 2px; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 760px) {
+  .fields { grid-template-columns: minmax(0, 1fr); }
+  .table { min-width: 680px; }
+}
+@media (max-width: 420px) {
+  .form { padding: 14px; }
+  .actions, .actions :global(.ui-button) { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .invitations *, .invitations *::before, .invitations *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

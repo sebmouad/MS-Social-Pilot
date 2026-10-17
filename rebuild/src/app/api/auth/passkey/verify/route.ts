@@ -3,6 +3,7 @@ import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { authRateLimit } from '@/server/auth-flow';
 import { hit } from '@/server/rate-limit';
 import { pendingUserId, verifyPasskeySecondStep } from '@/server/two-step';
+import { postAuthenticationPath } from '@/server/invitation-session';
 
 export async function POST(request: Request) {
   const origin = request.headers.get('origin');
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     const userId = await pendingUserId('verify');
     if (!hit(`rebuild-passkey-verify:${userId}`, await authRateLimit()).allowed) return NextResponse.json({ code: 'TOO_MANY_ATTEMPTS' }, { status: 429 });
     await verifyPasskeySecondStep(response as AuthenticationResponseJSON);
-    return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store' } });
+    return NextResponse.json({ ok: true, nextUrl: await postAuthenticationPath() }, { headers: { 'cache-control': 'no-store' } });
   } catch {
     return NextResponse.json({ code: 'VERIFICATION_FAILED' }, { status: 401, headers: { 'cache-control': 'no-store' } });
   }

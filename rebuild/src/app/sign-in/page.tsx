@@ -27,7 +27,7 @@ export default function SignIn() {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email: form.get('email'), password: form.get('password') }),
       });
-      const result = await response.json();
+      const result = await response.json() as { next?: string; nextUrl?: string };
       if (!response.ok) {
         setMessage('Sign-in failed. Check your email and password.');
       } else if (result.next === 'verify') {
@@ -35,7 +35,7 @@ export default function SignIn() {
       } else if (result.next === 'enroll') {
         window.location.assign('/two-step/enroll');
       } else {
-        window.location.assign('/home');
+        window.location.assign(result.nextUrl === '/join' ? '/join' : '/home');
       }
     } catch {
       setMessage('Sign-in is temporarily unavailable. Please try again.');

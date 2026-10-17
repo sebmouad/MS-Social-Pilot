@@ -1653,3 +1653,30 @@ Final rebuild typecheck and whitespace check passed; isolated production build
 passed without changing the preview `.next`. The original positional Team service
 and its obsolete test were removed; all entry points use the Settings-owned service.
 The browser test tab was closed, leaving the user's Analytics tab untouched.
+
+## Workspace invitations and onboarding — batch 62
+
+Focused invitation, mail, cookie/session, public-route and component regressions
+passed **171 tests across seven files**. A guarded integration probe then passed
+against isolated loopback PostgreSQL, actual HTTP/Root configuration updates,
+an in-memory local SMTP capture, and scoped workspace MCP keys. It verified
+invite creation and explicit reissue (old token refused), fragment-token
+preview/cookie continuation, correct-email existing-account acceptance,
+wrong-email and pending-MFA denial, existing-account registration refusal,
+new-account registration without a session, non-Root status, email verification
+and zero channel grants, list/revoke scope, read/write MCP-key parity, expiry,
+revocation and replay rejection. Disposable records and exact prior Root
+settings were restored and verified. No external email/provider, production
+database, production setting or schema migration was used.
+
+An integrated preliminary test run had five failures caused by concurrent mock
+export and label fixtures; those fixtures were corrected. A subsequent 136-test
+MCP-targeted run passed. The final exact index snapshot passed 1,778 tests across 250 files with guarded
+PostgreSQL checks enabled; typecheck and production build passed. Two additional
+owner-invitation rank regressions were then added and the complete 10-test
+invitation service file passed. A clean phone/browser join-flow pass remains
+pending. The browser tool returned no usable fresh-flow evidence, so no
+browser-flow pass is claimed. SMTP ambiguous outcomes are `uncertain`, not
+automatically retried; email logs may carry `delivery_unconfirmed` when SMTP
+accepted but its receipt could not be recorded. See ONBOARDING.md for exact
+security boundaries and remaining account-lifecycle parity.

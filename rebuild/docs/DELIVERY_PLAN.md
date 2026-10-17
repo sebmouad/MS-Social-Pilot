@@ -29,8 +29,8 @@ the exact remote revision before ending a session.
   delivery failure and cross-workspace denial. Use reserved synthetic recipients
   and isolated local mail capture before authorized real delivery tests.
 
-These are planned deliverables. Batch 61 implements existing-account team
-management only; invitations, mail and registration are not implemented yet.
+Batch 62 implements invitations, transactional mail and invitation-bound registration.
+General verification/recovery and phone/browser acceptance remain open.
 
 ### 2. Complete customer modules against the full parity inventory
 
@@ -81,3 +81,34 @@ with each batch, including unresolved issues. The current percentage estimates
 are planning judgment, not a measured release score or acceptance criterion.
 
 See AGENT_HANDOFF.md for the latest verified batch and immediate continuation.
+
+## Five-hour delivery window requested on 2026-10-17
+
+The user requested merging all substantial legacy functionality within this
+session. Working window recorded at 2026-10-17 22:36:43 UTC, ending
+2026-10-18 03:36:43 UTC (04:36:43 Africa/Casablanca). Prioritize broad complete
+workflows, parallel ownership, working GitHub commits and explicit parity gaps.
+This deadline does not weaken verification or production cutover requirements,
+and is not a claim that every legacy capability can be completed in that window.
+
+## Ten queued parallel workstreams
+
+The current executor supports three simultaneous subagents plus the lead.
+Rotate workers across this queue; ten simultaneous subagents are unavailable.
+Each handoff must name owned files and shared integration points.
+
+| Queue | Workstream | Current state |
+| --- | --- | --- |
+| 1 | Mail, invitations and account onboarding | Batch 62 integration and verification |
+| 2 | Publishing templates and composer reuse | Delegated implementation |
+| 3 | Inbox assignment, private notes and saved replies | Delegated implementation |
+| 4 | Workspace operational settings and runtime rules | Delegated time zone and approval policy subset |
+| 5 | Publishing labels, custom fields, notes, versions and bulk workflows | Queued |
+| 6 | Client review/share links and public bio workflows | Queued |
+| 7 | Analytics explorer, demographics, pinned metrics and complete reports | Queued |
+| 8 | Complete Ads legacy reporting and management workflows | Queued |
+| 9 | Root plans, privileges, lifecycle, errors and backup operations | Queued |
+| 10 | Remaining legacy services: notifications, webhooks, REST/OAuth, agency, feeds, tasks and media | Queued; split into reviewable capabilities |
+
+This queue organizes delivery and does not replace the complete legacy inventory
+or omit account recovery, provider formats, data/rollback and release gates.

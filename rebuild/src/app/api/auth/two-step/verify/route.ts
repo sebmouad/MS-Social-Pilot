@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { hit } from '@/server/rate-limit';
 import { authRateLimit } from '@/server/auth-flow';
 import { pendingUserId, verifySecondStep } from '@/server/two-step';
+import { postAuthenticationPath } from '@/server/invitation-session';
 
 export async function POST(request: Request) {
   const origin = request.headers.get('origin');
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     const attempt = hit(`rebuild-two-step:${userId}`, await authRateLimit());
     if (!attempt.allowed) return NextResponse.json({ code: 'TOO_MANY_ATTEMPTS' }, { status: 429 });
     const used = await verifySecondStep(code);
-    return NextResponse.json({ ok: true, used });
+    return NextResponse.json({ ok: true, used, nextUrl: await postAuthenticationPath() });
   } catch {
     return NextResponse.json({ code: 'VERIFICATION_FAILED' }, { status: 401 });
   }

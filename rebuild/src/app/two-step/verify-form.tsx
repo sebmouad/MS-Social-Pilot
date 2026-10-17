@@ -18,7 +18,10 @@ export function VerifyForm({ hasPasskey }: { hasPasskey: boolean }) {
     const form = new FormData(event.currentTarget);
     try {
       const response = await fetch('/api/auth/two-step/verify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: form.get('code') }) });
-      if (response.ok) window.location.assign('/home');
+      if (response.ok) {
+        const result = await response.json() as { nextUrl?: string };
+        window.location.assign(result.nextUrl === '/join' ? '/join' : '/home');
+      }
       else setError(response.status === 429 ? 'Too many attempts. Try again later.' : 'The code was not accepted. Check your authenticator or use a recovery code.');
     } catch { setError('Verification is temporarily unavailable.'); }
     finally { setBusy(false); }
@@ -33,7 +36,8 @@ export function VerifyForm({ hasPasskey }: { hasPasskey: boolean }) {
       const response = await startAuthentication({ optionsJSON: data.options });
       const finish = await fetch('/api/auth/passkey/verify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ response }) });
       if (!finish.ok) throw new Error(finish.status === 429 ? 'Too many attempts. Try again later.' : 'The passkey could not be verified. Try again or use a code.');
-      window.location.assign('/home');
+      const result = await finish.json() as { nextUrl?: string };
+      window.location.assign(result.nextUrl === '/join' ? '/join' : '/home');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Passkey verification was cancelled.'); }
     finally { setBusy(false); }
   }

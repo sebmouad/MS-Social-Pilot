@@ -28,7 +28,7 @@ import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
 import { readAdsDailyRows } from '@/modules/ads/server/report-read';
 import { exportAdsReport } from '@/modules/ads/server/export';
 import { adsReportToolDefinitions, ADS_MCP_MAX_PAGE_ITEMS } from '@/modules/ads/mcp-metadata';
-import { teamToolDefinitions, teamTools, teamWriteTools, executeTeamTool } from '@/modules/settings/team-mcp';
+import { teamToolDefinitions, teamTools, teamWriteTools, executeTeamTool, invitationAvailability } from '@/modules/settings/team-mcp';
 import { parseAdsPerformanceFilters } from '@/modules/ads/performance-filters';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
@@ -124,6 +124,9 @@ const toolFeatures: Record<string, string> = {
   add_workspace_member: 'settings/team',
   update_workspace_member: 'settings/team',
   remove_workspace_member: 'settings/team',
+  list_workspace_invitations: 'settings/team',
+  invite_workspace_member: 'settings/team',
+  revoke_workspace_invitation: 'settings/team',
   export_posts: 'publishing/posts',
   list_workspace_images: 'publishing/media',
   get_workspace_image: 'publishing/media',
@@ -767,7 +770,8 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
   }
   if (method === 'tools/list') {
     if (viewer.scope === 'installation') return reply({ tools: canUseRootTool(viewer) ? rootToolDefinitions : [] });
-    return reply({ tools: tools.filter(tool => rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (!teamTools.has(tool.name) || canManageData(viewer)) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (!adsManagerTools.has(tool.name) || canManageData(viewer)) && (!dataTools.has(tool.name) || canManageData(viewer))) });
+    const invitationsReady = canManageData(viewer) && canUseFeature(viewer.entitlements, 'settings/team') ? await invitationAvailability() : false;
+    return reply({ tools: tools.filter(tool => (tool.name !== 'invite_workspace_member' || invitationsReady) && (rootTools.has(tool.name) ? canUseRootTool(viewer) : canUseFeature(viewer.entitlements, toolFeatures[tool.name]!) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, toolFeatures[tool.name]!, writeTools.has(tool.name) ? 'write' : 'read')) && (!teamTools.has(tool.name) || canManageData(viewer)) && (tool.name !== 'set_connection_selection' || viewer.role === 'owner' || viewer.role === 'admin') && (!adsManagerTools.has(tool.name) || canManageData(viewer)) && (!dataTools.has(tool.name) || canManageData(viewer)))) });
   }
   if (method === 'tools/call') {
     const name = String(params.name ?? '');
@@ -796,6 +800,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     if (viewer.scope === 'installation') return reply({ resources: canUseRootTool(viewer) ? rootResources : [] });
     return reply({ resources: [
     { uri: 'msp://workspace', name: 'Workspace', description: 'Current workspace details.', mimeType: 'application/json' },
+    { uri: 'msp://settings/invitations', name: 'Workspace invitations', description: 'Bounded workspace invitations without raw links or credentials.', mimeType: 'application/json' },
     { uri: 'msp://settings/team', name: 'Workspace team', description: 'Bounded member and assignable-channel directory. Continue pages with list_workspace_team.', mimeType: 'application/json' },
     { uri: 'msp://targets', name: 'Destinations', description: 'Enabled workspace destinations.', mimeType: 'application/json' },
     { uri: 'msp://posts', name: 'Posts', description: 'Recent workspace posts.', mimeType: 'application/json' },
@@ -807,8 +812,8 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     { uri: 'msp://data/deletion-preview', name: 'Data deletion preview', description: 'Current workspace record counts before deletion.', mimeType: 'application/json' },
     ...(canUseRootTool(viewer) ? rootResources : []),
   ].filter(resource => {
-    const feature = resource.uri === 'msp://settings/team' ? 'settings/team' : resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
-    return (resource.uri !== 'msp://settings/team' || canManageData(viewer)) && (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
+    const feature = ['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) ? 'settings/team' : resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
+    return (!['msp://settings/team', 'msp://settings/invitations'].includes(resource.uri) || canManageData(viewer)) && (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
   }) });
   }
   if (method === 'resources/read') {
@@ -828,6 +833,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     try {
       let contents: unknown;
       if (uri === 'msp://workspace') contents = viewer.workspace;
+      else if (uri === 'msp://settings/invitations') contents = await runTool(viewer, 'list_workspace_invitations', {});
       else if (uri === 'msp://settings/team') contents = await runTool(viewer, 'list_workspace_team', {});
       else if (uri === 'msp://targets') contents = await runTool(viewer, 'list_pages', {});
       else if (uri === 'msp://posts') contents = await runTool(viewer, 'list_posts', { limit: 100 });
