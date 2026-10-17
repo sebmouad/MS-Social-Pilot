@@ -5,8 +5,9 @@ import { PrismaClient } from '../generated/client';
 const databaseUrl = process.env.REBUILD_PREVIEW_DATABASE_URL;
 const integration = vi.hoisted(() => ({
   prisma: null as unknown as PrismaClient,
-  adapter: null as unknown as { publish: ReturnType<typeof vi.fn>; publishFirstComment: ReturnType<typeof vi.fn>; classifyPublishingFailure: ReturnType<typeof vi.fn>; supportsTargetKind: ReturnType<typeof vi.fn> },
+  adapter: null as unknown as { publish: ReturnType<typeof vi.fn>; publishFirstComment: ReturnType<typeof vi.fn>; classifyPublishingFailure: ReturnType<typeof vi.fn>; supportsTargetKind: ReturnType<typeof vi.fn>; canUseCredential: ReturnType<typeof vi.fn> },
   targetId: '',
+  grantAllowed: true,
 }));
 
 vi.mock('../src/server/data', () => ({ get prisma() { return integration.prisma; } }));
@@ -79,7 +80,9 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
   });
 
   function resetAdapter() {
+    integration.grantAllowed = true;
     integration.adapter = {
+      canUseCredential: vi.fn(() => integration.grantAllowed),
       publish: vi.fn(async () => ({ remoteId: `provider-post-${randomUUID()}`, url: 'https://example.test/post' })),
       publishFirstComment: vi.fn(async () => ({ remoteId: 'provider-comment' })),
       classifyPublishingFailure: vi.fn(() => 'uncertain'),
@@ -253,4 +256,17 @@ describe.skipIf(!databaseUrl)('publication journal on isolated PostgreSQL', () =
     await expect(publishPost(fixture.actor, fixture.postId)).resolves.toMatchObject({ published: 1 });
     expect(integration.adapter.publish).toHaveBeenCalledTimes(2);
   });
+  it.each(['missing-grant', 'expired', 'revoked', 'missing-token'])('does not create intent or dispatch with %s credentials', async condition => {
+    const fixture = await createFixture();
+    if (condition === 'missing-grant') integration.grantAllowed = false;
+    if (condition === 'expired') await client.socialAccount.update({ where: { id: fixture.socialAccountId }, data: { tokenExpiresAt: new Date(0) } });
+    if (condition === 'revoked') await client.socialAccount.update({ where: { id: fixture.socialAccountId }, data: { invalidatedAt: new Date() } });
+    if (condition === 'missing-token') await client.target.update({ where: { id: fixture.targetId }, data: { accessToken: null } });
+    const result = await publishPost(fixture.actor, fixture.postId);
+    expect(result).toMatchObject({ published: 0, failed: 1, needsReconciliation: 0 });
+    expect(await client.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) AS count FROM rebuild_publication_attempts WHERE "workspaceId"=${fixture.workspaceId}`).toEqual([{ count: BigInt(0) }]);
+    expect(await client.postTarget.findUnique({ where: { id: fixture.postTargetId }, select: { status: true, remotePostId: true } })).toEqual({ status: 'failed', remotePostId: null });
+    expect(integration.adapter.publish).not.toHaveBeenCalled();
+  });
+
 });

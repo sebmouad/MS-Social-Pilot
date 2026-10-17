@@ -223,7 +223,7 @@ explicit and return no matches. Shared drawer Escape handling respects an open
 native select before closing navigation. This closes the previously observed
 retained unselected post leakage in normal Publishing views and Home counts;
 it is not a complete retained-data archive UI or Publishing parity claim.
-See PUBLISHING_READS.md and PREVIEW_QA.md. PUBLICATION_RECOVERY_PLAN.md is a
+See PUBLISHING_READS.md and PREVIEW_QA.md. PUBLICATION_RECOVERY_PLAN.md is
 the original design for publication recovery; the later implemented journal/manual recovery is described below and in PUBLICATION_RECOVERY.md.
 
 
@@ -241,3 +241,17 @@ Cleanup guards preserve unresolved journal evidence independently of legacy
 status rows. See PUBLICATION_RECOVERY.md and PREVIEW_QA.md for evidence and
 limits. No automatic provider reconciliation, live provider proof or production
 cutover is established by this batch; those release requirements stay open.
+
+## Publishing readiness and photo identity — 2026-10-17
+
+Registry 45 adds consumed, nonempty Facebook publish/delete grant policies
+owned by its module. Shared Publishing resolves locally current decrypted
+credentials and adapter readiness before publication intent, first-comment
+dispatch, remote deletion or manual status sync. Facebook repeats operation
+grant checks before transport. Composer/edit/import and bounded MCP destination
+tool/resource output share current readiness, including product availability;
+recorded capability alone is insufficient. Tokens remain server-only, and
+retained selected history follows read authorization independently of grants.
+Single-photo receipts prefer an explicitly valid provider post identity rather
+than its photo identity. PUBLISHING_READINESS.md records ownership, local proof
+and limitations. No DDL, live provider verification or production change.

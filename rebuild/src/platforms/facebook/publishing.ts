@@ -241,6 +241,10 @@ export function createFacebookEngine(rawConfig: FacebookConfig, fetchImpl: Faceb
       } else if (images.length === 1) {
         payload = await request(`${encodeURIComponent(input.targetId)}/photos`, { method: 'POST', token: input.accessToken,
           body: { url: images[0].localFile ? undefined : images[0].url, caption: input.text?.trim() || undefined, alt_text_custom: images[0].altText }, file: images[0].localFile });
+        if (Object.prototype.hasOwnProperty.call(payload, 'post_id') && (typeof payload.post_id !== 'string' || !payload.post_id.trim())) {
+          throw new FacebookApiError('Facebook returned an invalid photo post id.', 200);
+        }
+        if (typeof payload.post_id === 'string' && payload.post_id.trim()) payload.id = payload.post_id;
       } else if (images.length > 1) {
         const attached: string[] = [];
         for (const image of images) {
@@ -422,19 +426,23 @@ function createFacebookFirstCommentPublisher(config: FacebookConfig, fetchImpl: 
   };
 }
 
-export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { postReadScopes: readonly string[]; firstCommentScopes?: readonly string[] }): PlatformAdapter {
+export function createFacebookAdapter(config: FacebookConfig, fetchImpl: FacebookFetch = fetch, policy?: { postReadScopes?: readonly string[]; postPublishScopes?: readonly string[]; postDeleteScopes?: readonly string[]; firstCommentScopes?: readonly string[] }): PlatformAdapter {
   const engine = createFacebookEngine(config, fetchImpl);
-  const requiredPostReadScopes = policy?.postReadScopes.map(scope => scope.trim()).filter(Boolean) ?? [];
+  const requiredPostReadScopes = policy?.postReadScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
+  const requiredPostPublishScopes = policy?.postPublishScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
+  const requiredPostDeleteScopes = policy?.postDeleteScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
   const requiredFirstCommentScopes = policy?.firstCommentScopes?.map(scope => scope.trim()).filter(Boolean) ?? [];
-  return {
-    id: 'facebook',
-    localImageUpload: { maxBytes: config.maxImageUploadBytes, mimeTypes: config.allowedImageMimeTypes },
-    capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
-    canUseCredential(credential, capability) {
+  const canUseCredential: NonNullable<PlatformAdapter['canUseCredential']> = (credential, capability) => {
       if (capability === 'remoteStatus') {
         if (!requiredPostReadScopes.length || !credential.grantedScopes) return false;
         const granted = new Set(credential.grantedScopes.map(scope => scope.trim()));
         return requiredPostReadScopes.every(scope => granted.has(scope));
+      }
+      if (capability === 'publishing' || capability === 'remoteDelete') {
+        const required = capability === 'publishing' ? requiredPostPublishScopes : requiredPostDeleteScopes;
+        if (!required.length || !credential.grantedScopes) return false;
+        const granted = new Set(credential.grantedScopes.map(scope => scope.trim()));
+        return required.every(scope => granted.has(scope));
       }
       if (capability === 'firstComment') {
         if (!requiredFirstCommentScopes.length || !credential.grantedScopes) return false;
@@ -442,7 +450,12 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
         return requiredFirstCommentScopes.every(scope => granted.has(scope));
       }
       return true;
-    },
+    };
+  return {
+    id: 'facebook',
+    localImageUpload: { maxBytes: config.maxImageUploadBytes, mimeTypes: config.allowedImageMimeTypes },
+    capabilities: { connection: 'supported', discovery: 'supported', publishing: 'supported', remoteStatus: 'supported', remoteDelete: 'supported', inbox: 'supported', analytics: 'supported', ads: 'supported' },
+    canUseCredential,
     classifyPublishingFailure(error) {
       if (!(error instanceof FacebookApiError)) return 'uncertain';
       return isFacebookDefiniteRejection(error.status, error.code, error.transient) ? 'rejected' : 'uncertain';
@@ -454,10 +467,22 @@ export function createFacebookAdapter(config: FacebookConfig, fetchImpl: Faceboo
       const [pages, accounts] = await Promise.all([engine.discoverPages(request.credential.accessToken), engine.discoverAdAccounts(request.credential.accessToken)]);
       return { targets: pages.map(p => ({ id: p.id, name: p.name, kind: 'page' })), adAccounts: accounts.map(a => ({ id: a.id, name: a.name, currency: a.currency, status: a.status === null ? null : String(a.status) })) };
     },
-    publish: createFacebookPublisher(config, fetchImpl),
-    publishFirstComment: createFacebookFirstCommentPublisher(config, fetchImpl),
-    async getRemoteStatus(request) { return createFacebookEngine(config, fetchImpl, request.signal).getStatus(request.credential.accessToken, request.remoteId); },
-    async deleteRemote(request) { await createFacebookEngine(config, fetchImpl, request.signal).deletePost(request.credential.accessToken, request.remoteId); },
+    async publish(request) {
+      if (!canUseCredential(request.credential, 'publishing')) throw new FacebookApiError('Facebook Page publishing permission is missing or unavailable.', 0);
+      return createFacebookPublisher(config, fetchImpl)(request);
+    },
+    async publishFirstComment(request) {
+      if (!canUseCredential(request.credential, 'firstComment')) throw new FacebookApiError('Facebook Page first-comment permission is missing or unavailable.', 0);
+      return createFacebookFirstCommentPublisher(config, fetchImpl)(request);
+    },
+    async getRemoteStatus(request) {
+      if (!canUseCredential(request.credential, 'remoteStatus')) throw new FacebookApiError('Facebook Page status-read permission is missing or unavailable.', 0);
+      return createFacebookEngine(config, fetchImpl, request.signal).getStatus(request.credential.accessToken, request.remoteId);
+    },
+    async deleteRemote(request) {
+      if (!canUseCredential(request.credential, 'remoteDelete')) throw new FacebookApiError('Facebook Page post deletion permission is missing or unavailable.', 0);
+      await createFacebookEngine(config, fetchImpl, request.signal).deletePost(request.credential.accessToken, request.remoteId);
+    },
     async listInbox(request) {
       const conversations = await engine.listInbox(request.credential.accessToken, request.targetId);
       return conversations.flatMap(conversation => conversation.messages.map(message => ({

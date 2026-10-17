@@ -1,7 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { Prisma } from '../../../generated/client';
 import { prisma } from '@/server/data';
-import { decryptSecret } from '@/server/secret-crypto';
 import { platformFor } from '@/server/platforms/registry';
 import { runtimeConfig } from '@/server/config/store';
 import { hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
@@ -12,6 +11,7 @@ import { isValidTimeZone, wallTimeToInstant } from '@/lib/calendar-dates';
 import { withPublishingOperation, withPublishingTransaction as publishingTransaction } from '@/modules/publishing/server/guard';
 import { OperationError } from '@/lib/operation-error';
 import { attemptFirstCommentInOperation } from '@/modules/publishing/server/first-comment';
+import { readPublishingCredential } from '@/modules/publishing/server/credentials';
 import { publishDestinationInOperation } from '@/modules/publishing/server/publication';
 
 export type PublishingActor = { userId: string; workspaceId: string; allowedTargetIds?: readonly string[] };
@@ -266,7 +266,7 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
   return withPublishingOperation(actor, { postId, allowPublicationRecovery: true }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
     await assertPostScope(actor, postId);
-    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true } } } } } } } });
+    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, message: true, firstComment: true, link: true, media: true, status: true, scheduledAt: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { id: true, type: true, providerId: true, canPublish: true, enabled: true, accessToken: true, socialAccount: { select: { provider: true, invalidatedAt: true, tokenExpiresAt: true, scopes: true } } } } } } } });
     if (expectedScheduledAt !== undefined && (!post || post.status !== 'scheduled' || !post.scheduledAt || post.scheduledAt.getTime() !== expectedScheduledAt.getTime())) return { published: 0, failed: 0, needsReconciliation: 0, firstCommentsNeedingReview: 0, firstCommentsNotSent: 0, skipped: true };
     if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
     if (!['draft', 'scheduled', 'failed', 'partially_failed'].includes(post.status)) throw new OperationError('conflict', 'This post cannot be published in its current state.');
@@ -296,11 +296,12 @@ export async function publishPost(actor: PublishingActor, postId: string, expect
       if (!['pending', 'failed'].includes(item.status)) { failed++; continue; }
       const provider = item.target.socialAccount?.provider;
       const adapter = provider ? await platformFor(provider, 'publishing') : null;
-      const eligible = Boolean(provider && hasPlatformCapability(entitlements, provider) && adapter?.publish && (!post.firstComment?.trim() || adapter.publishFirstComment) && adapter.supportsTargetKind?.(item.target.type, 'publishing') && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount?.invalidatedAt);
+      const credential = adapter ? readPublishingCredential(item.target, adapter, 'publishing') : null;
+      const eligible = Boolean(credential && provider && hasPlatformCapability(entitlements, provider) && adapter?.publish && (!post.firstComment?.trim() || adapter.publishFirstComment) && adapter.supportsTargetKind?.(item.target.type, 'publishing') && item.target.enabled && item.target.canPublish && item.target.accessToken && !item.target.socialAccount?.invalidatedAt);
       if (!eligible) { failed++; await markTarget(actor, item.id, 'failed', signal); continue; }
       const outcome = await publishDestinationInOperation({ actor, signal }, {
         postId: post.id, postTargetId: item.id, targetId: item.target.id, provider: provider!, expectedStatus: item.status as 'pending' | 'failed',
-        dispatch: operationId => adapter!.publish!({ credential: { accessToken: decryptSecret(item.target.accessToken!) }, target: { id: item.target.providerId, name: '', kind: item.target.type }, text: post.message, link: attachments.link, media: publishMedia, signal, operationId }),
+        dispatch: operationId => adapter!.publish!({ credential: credential!, target: { id: item.target.providerId, name: '', kind: item.target.type }, text: post.message, link: attachments.link, media: publishMedia, signal, operationId }),
         classifyFailure: error => adapter!.classifyPublishingFailure?.(error) ?? 'uncertain',
       });
       if (outcome === 'failed') { failed++; continue; }
@@ -330,7 +331,7 @@ export async function syncPostStatus(actor: PublishingActor, postId: string) {
   return withPublishingOperation(actor, { postId }, async ({ actor, signal, lockTargets }) => {
     const role = await membership(actor);
     await assertPostScope(actor, postId);
-    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, accessToken: true, socialAccount: { select: { provider: true, scopes: true, invalidatedAt: true } } } } } } } });
+    const post = await prisma.post.findFirst({ where: { id: postId, workspaceId: actor.workspaceId }, select: { id: true, authorId: true, status: true, targets: { select: { id: true, status: true, remotePostId: true, target: { select: { type: true, accessToken: true, socialAccount: { select: { provider: true, scopes: true, invalidatedAt: true, tokenExpiresAt: true } } } } } } } });
     if (!post || !canManage(role.role, post.authorId, actor.userId)) throw new OperationError('not_found', 'This post is unavailable in the current workspace.');
     const entitlements = await loadEntitlements(actor.userId, actor.workspaceId);
     if (!entitlements) throw new OperationError('unavailable', 'This workspace is unavailable.');
@@ -338,10 +339,9 @@ export async function syncPostStatus(actor: PublishingActor, postId: string) {
     for (const item of post.targets) {
       const provider = item.target.socialAccount?.provider;
       const adapter = provider ? await platformFor(provider, 'remoteStatus') : null;
-      const grantedScopes = (item.target.socialAccount?.scopes ?? '').split(',').map(scope => scope.trim()).filter(Boolean);
       if (!item.remotePostId || !provider || !hasPlatformCapability(entitlements, provider) || !adapter?.getRemoteStatus || !item.target.accessToken || item.target.socialAccount?.invalidatedAt) continue;
-      const credential = { accessToken: decryptSecret(item.target.accessToken), grantedScopes };
-      if (adapter.canUseCredential?.(credential, 'remoteStatus') === false) continue;
+      const credential = readPublishingCredential(item.target, adapter, 'remoteStatus');
+      if (!credential) continue;
       signal.throwIfAborted();
       const status = await adapter.getRemoteStatus({ credential, remoteId: item.remotePostId, signal });
       if (status.state === 'unknown') continue;

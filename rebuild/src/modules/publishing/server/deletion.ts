@@ -4,7 +4,7 @@ import { OperationError } from '@/lib/operation-error';
 import { connectionState } from '@/lib/connection-status';
 import { prisma } from '@/server/data';
 import { runtimeConfig } from '@/server/config/store';
-import { decryptSecret } from '@/server/secret-crypto';
+import { readPublishingCredential } from './credentials';
 import { hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
 import { platformFor } from '@/server/platforms/registry';
 import { authorizePublishing } from './access';
@@ -188,8 +188,8 @@ export async function deletePostDurably(actor: PublishingActor, postId: string, 
       }
       const adapter = await platformFor(provider, 'remoteDelete');
       if (!source || !entitlements || !hasPlatformCapability(entitlements, provider) || !adapter?.deleteRemote || !row.target.enabled || connectionState(source) !== 'connected' || !row.target.accessToken) throw new OperationError('reconnect_required', 'Reconnect each selected destination before remote deletion. The local post is preserved.');
-      const credential = { accessToken: decryptSecret(row.target.accessToken), grantedScopes: source.scopes.split(',').map(scope => scope.trim()).filter(Boolean) };
-      if (adapter.canUseCredential?.(credential, 'remoteDelete') === false) throw new OperationError('reconnect_required', 'Reconnect this destination before remote deletion.');
+      const credential = readPublishingCredential(row.target, adapter, 'remoteDelete');
+      if (!credential) throw new OperationError('reconnect_required', 'Reconnect this destination before remote deletion.');
       const aliases = await prisma.postTarget.findMany({ where: { targetId: row.targetId, remotePostId: row.remotePostId, target: { workspaceId: actor.workspaceId }, post: { workspaceId: actor.workspaceId } }, select: { id: true, postId: true }, take: max + 1 });
       if (aliases.length > max) throw new OperationError('unavailable', 'This publication has too many stored references. Ask an administrator to review it.');
       prepared.push({ row, provider, aliases, dispatch: () => adapter.deleteRemote!({ credential, remoteId: row.remotePostId!, signal }) });

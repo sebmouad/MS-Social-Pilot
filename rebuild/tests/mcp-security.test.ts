@@ -51,6 +51,8 @@ vi.mock('../src/server/ads/actions', () => ({
   canManageWorkspaceAds: vi.fn().mockResolvedValue(true),
   campaignCreationConfirmation: (_workspaceId: string, adAccountId: string, name: string, objective: string) => `CREATE PAUSED FACEBOOK CAMPAIGN ${JSON.stringify(name.trim())} IN ACCOUNT ${adAccountId} WITH OBJECTIVE ${objective}`,
 }));
+const destinationReadiness = vi.hoisted(() => vi.fn());
+vi.mock('../src/server/publishing/destinations', () => ({ publishingTargetChoices: destinationReadiness }));
 const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
 vi.mock('../src/server/publishing/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
 const firstCommentMutations = vi.hoisted(() => ({ send: vi.fn(), record: vi.fn() }));
@@ -99,6 +101,7 @@ const call = (name: string, args: Record<string, unknown> = {}) => handleMcpMess
 
 beforeEach(() => {
   vi.clearAllMocks();
+  destinationReadiness.mockResolvedValue([]);
   workspaceGuard.mockImplementation((_id: string, run: () => Promise<unknown>) => run());
   db.$executeRaw.mockResolvedValue(1);
   db.user.findUnique.mockResolvedValue({ isInstanceOwner: true, disabledAt: null });
@@ -684,6 +687,16 @@ describe('MCP workspace boundaries', () => {
     expect((await bearer.json()).result.structuredContent.deleted).toBe(true);
     expect(dataControls.remove).toHaveBeenLastCalledWith({ userId: 'user-a', workspaceId: 'workspace-a', apiKeyId: 'key-a' }, 'DELETE');
   });
+  it('reports current publishing readiness for destinations and the matching MCP resource', async () => {
+    db.target.findMany.mockResolvedValue([{ id: 'page-allowed', name: 'Allowed', canPublish: true }]);
+    destinationReadiness.mockResolvedValue([{ id: 'page-allowed', canPublish: false }]);
+    const response = await call('list_pages');
+    expect((await response.json()).result.structuredContent.items[0].canPublish).toBe(false);
+    expect(destinationReadiness).toHaveBeenCalledWith('workspace-a', viewer.entitlements, ['page-allowed']);
+    const resource = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 91, method: 'resources/read', params: { uri: 'msp://targets' } });
+    expect(JSON.parse((await resource.json()).result.contents[0].text)[0].canPublish).toBe(false);
+  });
+
   it('scopes destination queries and delegates post reads with the MCP result cap', async () => {
     db.target.findMany.mockResolvedValue([]);
     await call('list_pages');

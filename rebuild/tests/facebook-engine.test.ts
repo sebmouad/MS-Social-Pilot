@@ -86,6 +86,18 @@ describe('Facebook Graph adapter', () => {
     expect(String((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0])).toContain('/p1/feed');
   });
 
+  it('uses a photo response post_id as the durable post identity', async () => {
+    const engine = createFacebookEngine(config, mockFetch(response({ id: 'photo-1', post_id: 'p1_42' })));
+    await expect(engine.publish({ targetId: 'p1', accessToken: 'page-token', text: 'photo', media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }] }))
+      .resolves.toMatchObject({ remoteId: 'p1_42' });
+  });
+
+  it('rejects malformed explicit photo post_id instead of falling back to photo id', async () => {
+    const engine = createFacebookEngine(config, mockFetch(response({ id: 'photo-1', post_id: 42 })));
+    await expect(engine.publish({ targetId: 'p1', accessToken: 'page-token', text: 'photo', media: [{ kind: 'image', url: 'https://cdn.test/a.jpg' }] }))
+      .rejects.toThrow(/post id/i);
+  });
+
   it('uploads image URLs before creating an attached multi-photo post', async () => {
     const calls: Array<{ url: string; body: string }> = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

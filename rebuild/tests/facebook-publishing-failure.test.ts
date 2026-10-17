@@ -30,10 +30,10 @@ describe('Facebook publishing failure classification', () => {
 
   it('preserves the Graph transient hint on parsed provider errors', async () => {
     const fetcher = async () => new Response(JSON.stringify({ error: { message: 'try later', code: 100, is_transient: true } }), { status: 400 });
-    const adapter = createFacebookAdapter(config, fetcher as unknown as typeof fetch);
+    const adapter = createFacebookAdapter(config, fetcher as unknown as typeof fetch, { postPublishScopes: ['pages_manage_posts'] });
     let failure: unknown;
     try {
-      await adapter.publish!({ credential: { accessToken: 'token' }, target: { id: 'page', name: 'Page', kind: 'page' }, text: 'hello' });
+      await adapter.publish!({ credential: { accessToken: 'token', grantedScopes: ['pages_manage_posts'] }, target: { id: 'page', name: 'Page', kind: 'page' }, text: 'hello' });
     } catch (error) { failure = error; }
     expect(failure).toBeInstanceOf(FacebookApiError);
     expect(adapter.classifyPublishingFailure!(failure)).toBe('uncertain');
@@ -41,10 +41,10 @@ describe('Facebook publishing failure classification', () => {
 
   it('applies recognized Graph rejection signals to post creation failures', async () => {
     const fetcher = async () => new Response(JSON.stringify({ error: { message: 'invalid request', code: 100 } }), { status: 400 });
-    const adapter = createFacebookAdapter(config, fetcher as unknown as typeof fetch);
+    const adapter = createFacebookAdapter(config, fetcher as unknown as typeof fetch, { postPublishScopes: ['pages_manage_posts'] });
     let failure: unknown;
     try {
-      await adapter.publish!({ credential: { accessToken: 'token' }, target: { id: 'page', name: 'Page', kind: 'page' }, text: 'hello' });
+      await adapter.publish!({ credential: { accessToken: 'token', grantedScopes: ['pages_manage_posts'] }, target: { id: 'page', name: 'Page', kind: 'page' }, text: 'hello' });
     } catch (error) { failure = error; }
     expect(failure).toBeInstanceOf(FacebookApiError);
     expect(adapter.classifyPublishingFailure!(failure)).toBe('rejected');

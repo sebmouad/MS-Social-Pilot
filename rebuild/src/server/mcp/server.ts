@@ -1,3 +1,4 @@
+import { publishingTargetChoices } from '../publishing/destinations';
 import { deleteInboxCommentDurably, finishInboxDeletion, getInboxDeletion } from '@/modules/inbox/server/deletion';
 import { readInboxList, readInboxThread } from '@/modules/inbox/server/read';
 import { withAdsErrorBoundary } from '../ads/errors';
@@ -276,9 +277,13 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       const image = await uploadWorkspaceImage({ userId: viewer.userId, workspaceId: viewer.workspaceId }, new File([bytes], fileName, { type: mimeType }));
       return auditedReceipt(viewer, name, { imageId: image.id, mimeType: image.mimeType, size: bytes.length }, { ...image, size: bytes.length, reference: `media:${image.id}`, url: `/api/media/${image.id}` });
     }
-    case 'list_pages':
+    case 'list_pages': {
       const pageIds = pageIdsFor(viewer);
-      return prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: await selectedResourceConnectionWhere(viewer.workspaceId) }, ...(pageIds ? { id: { in: pageIds } } : {}) }, orderBy: [{ type: 'asc' }, { name: 'asc' }], take: cap, select: { id: true, type: true, providerId: true, name: true, pictureUrl: true, canPublish: true } });
+      const targets = await prisma.target.findMany({ where: { workspaceId: viewer.workspaceId, enabled: true, socialAccount: { is: await selectedResourceConnectionWhere(viewer.workspaceId) }, ...(pageIds ? { id: { in: pageIds } } : {}) }, orderBy: [{ type: 'asc' }, { name: 'asc' }], take: cap, select: { id: true, type: true, providerId: true, name: true, pictureUrl: true, canPublish: true } });
+      const choices = await publishingTargetChoices(viewer.workspaceId, viewer.entitlements, targets.map(target => target.id));
+      const ready = new Map(choices.map(choice => [choice.id, choice.canPublish]));
+      return targets.map(target => ({ ...target, canPublish: ready.get(target.id) === true }));
+    }
     case 'list_posts': {
       const posts = await readPublishingPostList({ userId: viewer.userId, workspaceId: viewer.workspaceId, ...(pageIdsFor(viewer) === undefined ? {} : { allowedTargetIds: pageIdsFor(viewer) }) }, args, { maxItems: cap });
       return posts.map(post => ({ ...post, targets: post.targets.map(row => {

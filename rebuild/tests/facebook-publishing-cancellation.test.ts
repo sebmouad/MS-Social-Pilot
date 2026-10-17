@@ -7,9 +7,11 @@ const config: FacebookConfig = {
   maxPages: 4, pageSize: 25, pageInsightMetrics: ['page_views_total'], adInsightFields: ['spend', 'impressions'], maxImageUploadBytes: 1024,
   allowedImageMimeTypes: ['image/jpeg', 'image/png'],
 };
+const policy = { postPublishScopes: ['pages_manage_posts'], postDeleteScopes: ['pages_manage_posts'], postReadScopes: ['pages_read_engagement'], firstCommentScopes: ['pages_manage_engagement'] };
+const credential = { accessToken: 'page-token', grantedScopes: ['pages_manage_posts', 'pages_read_engagement', 'pages_manage_engagement'] };
 const response = (payload: unknown) => new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } });
 const publishRequest = (signal?: AbortSignal) => ({
-  credential: { accessToken: 'page-token' }, target: { id: 'page-1', name: 'Page', kind: 'page' }, text: 'Hello',
+  credential, target: { id: 'page-1', name: 'Page', kind: 'page' }, text: 'Hello',
   ...(signal ? { signal } : {}),
 });
 const jpeg = (fileName: string) => ({ bytes: new Uint8Array([0xff, 0xd8, 0xff, 1]), mimeType: 'image/jpeg', fileName });
@@ -43,7 +45,7 @@ describe('Facebook publishing cancellation', () => {
   it('returns the post result without dispatching a first-comment request', async () => {
     const controller = new AbortController();
     const fetcher = vi.fn(async () => response({ id: 'post-1' })) as unknown as typeof fetch;
-    const adapter = createFacebookAdapter(config, fetcher);
+    const adapter = createFacebookAdapter(config, fetcher, policy);
 
     await expect(adapter.publish!({ ...publishRequest(controller.signal) })).resolves.toMatchObject({ remoteId: 'post-1' });
     expect(fetcher).toHaveBeenCalledTimes(1);
@@ -51,14 +53,14 @@ describe('Facebook publishing cancellation', () => {
 
   it('dispatches a first comment separately and requires a nonempty remote comment id', async () => {
     const fetcher = vi.fn(async () => response({ id: 'comment-1' })) as unknown as typeof fetch;
-    const adapter = createFacebookAdapter(config, fetcher);
+    const adapter = createFacebookAdapter(config, fetcher, policy);
 
-    await expect(adapter.publishFirstComment!({ credential: { accessToken: 'page-token' }, remotePostId: 'post-1', text: 'Follow-up' }))
+    await expect(adapter.publishFirstComment!({ credential, remotePostId: 'post-1', text: 'Follow-up' }))
       .resolves.toEqual({ remoteId: 'comment-1' });
     expect(String((fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0])).toContain('/post-1/comments');
 
-    const invalidAdapter = createFacebookAdapter(config, vi.fn(async () => response({ id: '  ' })) as unknown as typeof fetch);
-    await expect(invalidAdapter.publishFirstComment!({ credential: { accessToken: 'page-token' }, remotePostId: 'post-1', text: 'Follow-up' }))
+    const invalidAdapter = createFacebookAdapter(config, vi.fn(async () => response({ id: '  ' })) as unknown as typeof fetch, policy);
+    await expect(invalidAdapter.publishFirstComment!({ credential, remotePostId: 'post-1', text: 'Follow-up' }))
       .rejects.toBeInstanceOf(FacebookApiError);
   });
 
@@ -66,9 +68,9 @@ describe('Facebook publishing cancellation', () => {
     const controller = new AbortController();
     controller.abort();
     const fetcher = vi.fn();
-    const adapter = createFacebookAdapter(config, fetcher as unknown as typeof fetch);
+    const adapter = createFacebookAdapter(config, fetcher as unknown as typeof fetch, policy);
 
-    await expect(adapter.publishFirstComment!({ credential: { accessToken: 'page-token' }, remotePostId: 'post-1', text: 'Follow-up', signal: controller.signal }))
+    await expect(adapter.publishFirstComment!({ credential, remotePostId: 'post-1', text: 'Follow-up', signal: controller.signal }))
       .rejects.toBeInstanceOf(FacebookApiError);
     expect(fetcher).not.toHaveBeenCalled();
   });
@@ -98,10 +100,10 @@ describe('Facebook publishing cancellation', () => {
         requestSignal = init?.signal as AbortSignal | undefined;
         requestSignal?.addEventListener('abort', () => reject(requestSignal?.reason), { once: true });
       })) as unknown as typeof fetch;
-      const adapter = createFacebookAdapter(config, fetcher);
+      const adapter = createFacebookAdapter(config, fetcher, policy);
       const pending = operation === 'status'
-        ? adapter.getRemoteStatus!({ credential: { accessToken: 'page-token' }, remoteId: 'post-1', signal: controller.signal })
-        : adapter.deleteRemote!({ credential: { accessToken: 'page-token' }, remoteId: 'post-1', signal: controller.signal });
+        ? adapter.getRemoteStatus!({ credential, remoteId: 'post-1', signal: controller.signal })
+        : adapter.deleteRemote!({ credential, remoteId: 'post-1', signal: controller.signal });
 
       controller.abort();
       await expect(pending).rejects.toBeInstanceOf(FacebookApiError);
@@ -122,10 +124,10 @@ describe('Facebook publishing cancellation', () => {
   it('keeps successful remote status and deletion behavior unchanged without a signal', async () => {
     const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => init?.method === 'DELETE'
       ? response({ success: true }) : response({ is_published: true, created_time: '2026-01-01T00:00:00Z' })) as unknown as typeof fetch;
-    const adapter = createFacebookAdapter(config, fetcher);
+    const adapter = createFacebookAdapter(config, fetcher, policy);
 
-    await expect(adapter.getRemoteStatus!({ credential: { accessToken: 'page-token' }, remoteId: 'post-1' })).resolves.toMatchObject({ state: 'published' });
-    await expect(adapter.deleteRemote!({ credential: { accessToken: 'page-token' }, remoteId: 'post-1' })).resolves.toBeUndefined();
+    await expect(adapter.getRemoteStatus!({ credential, remoteId: 'post-1' })).resolves.toMatchObject({ state: 'published' });
+    await expect(adapter.deleteRemote!({ credential, remoteId: 'post-1' })).resolves.toBeUndefined();
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });

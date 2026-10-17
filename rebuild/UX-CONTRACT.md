@@ -164,6 +164,13 @@ Private Root keeps these controls under Publishing, with workspace/destination
 context and the same exact-operation confirmation model. All controls use the
 shared themed fields, buttons, validation and dialog behavior.
 
+Publishing choices also require a decryptable destination credential and the
+adapter's recorded operation grants. They share current availability with MCP
+destination tool/resource output. Missing grants never invite publishing from
+the composer; retained history keeps its independent read authorization.
+Root's Facebook API scopes category owns separate publish/delete policies.
+See docs/PUBLISHING_READINESS.md for behavior and verification boundaries.
+
 A recovery that changes list membership preserves the committed Posts URL
 filters and view, sets a result notice bound to the opaque operation, and focuses
 the shared RouteNotice after the initiating row disappears. Query notice copy

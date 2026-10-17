@@ -1,18 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const deps = vi.hoisted(() => ({ targets: vi.fn(), enabled: vi.fn(), adapter: vi.fn(), selected: vi.fn() }));
-vi.mock('../src/server/data', () => ({ getTargets: deps.targets }));
+const deps = vi.hoisted(() => ({ targets: vi.fn(), enabled: vi.fn(), product: vi.fn(), adapter: vi.fn(), selected: vi.fn(), credentials: vi.fn() }));
+vi.mock('../src/server/data', () => ({ getTargets: deps.targets, prisma: { target: { findMany: deps.credentials } } }));
 vi.mock('../src/modules/publishing/server/read-scope', () => ({ selectedPublishingTargetIds: deps.selected }));
-vi.mock('../src/server/entitlements', () => ({ hasPlatformCapability: deps.enabled }));
+vi.mock('../src/server/entitlements', () => ({ hasPlatformCapability: deps.enabled, canUseFeature: deps.product }));
 vi.mock('../src/server/platforms/registry', () => ({ platformFor: deps.adapter }));
+vi.mock('../src/server/secret-crypto', () => ({ decryptSecret: (value: string) => value }));
 import { publishingDestinationChoices } from '../src/server/publishing/destinations';
 import type { requireViewer } from '../src/server/context';
 
 const now = new Date('2026-10-16T09:00:00Z');
 const target = (id: string, overrides = {}) => ({ id, name: id, type: 'channel', canPublish: true, socialAccount: { provider: 'example-network', invalidatedAt: null, tokenExpiresAt: null }, ...overrides });
 const viewer = { workspaceId: 'workspace-a', entitlements: {}, permissions: { pageScope: { all: false, ids: ['current', 'expired', 'revoked'] } } } as unknown as Awaited<ReturnType<typeof requireViewer>>;
-beforeEach(() => { vi.clearAllMocks(); deps.selected.mockResolvedValue(['current', 'expired', 'revoked']); deps.enabled.mockReturnValue(true); deps.adapter.mockResolvedValue({ publish: vi.fn(), supportsTargetKind: () => true }); });
+beforeEach(() => { vi.clearAllMocks(); deps.selected.mockResolvedValue(['current', 'expired', 'revoked']); deps.credentials.mockResolvedValue(['current', 'expired', 'revoked'].map(id => ({ id, accessToken: 'encrypted-test-token', socialAccount: { scopes: 'configured_publish_grant', invalidatedAt: null, tokenExpiresAt: null } })));  deps.enabled.mockReturnValue(true); deps.product.mockReturnValue(true); deps.adapter.mockResolvedValue({ publish: vi.fn(), supportsTargetKind: () => true }); });
 
 describe('shared publishing destination choices', () => {
+  it('does not advertise publishing when the product feature is unavailable', async () => {
+    deps.targets.mockResolvedValue([target('current')]);
+    deps.product.mockReturnValue(false);
+    expect((await publishingDestinationChoices(viewer, now))[0]?.canPublish).toBe(false);
+    expect(deps.adapter).not.toHaveBeenCalled();
+  });
+
   it('requests scoped selected targets and marks expired and revoked sources unavailable', async () => {
     deps.targets.mockResolvedValue([
       target('current'),
@@ -35,4 +43,10 @@ describe('shared publishing destination choices', () => {
     expect((await publishingDestinationChoices(viewer, now))[0]?.canPublish).toBe(false);
     expect(deps.adapter).not.toHaveBeenCalled();
   });
+  it('keeps selected history choices visible but never marks a missing operation grant as ready', async () => {
+    deps.targets.mockResolvedValue([target('current')]);
+    deps.adapter.mockResolvedValue({ publish: vi.fn(), supportsTargetKind: () => true, canUseCredential: () => false });
+    expect((await publishingDestinationChoices(viewer, now)).map(row => [row.id, row.canPublish])).toEqual([['current', false]]);
+  });
+
 });

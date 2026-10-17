@@ -3,7 +3,7 @@ import type { Prisma } from '../../../../generated/client';
 import { OperationError } from '@/lib/operation-error';
 import { connectionState } from '@/lib/connection-status';
 import { prisma } from '@/server/data';
-import { decryptSecret } from '@/server/secret-crypto';
+import { readPublishingCredential } from './credentials';
 import { platformFor } from '@/server/platforms/registry';
 import { hasPlatformCapability, loadEntitlements } from '@/server/entitlements';
 import { runtimeConfig } from '@/server/config/store';
@@ -54,8 +54,8 @@ export async function attemptFirstCommentInOperation(context: Context, input: In
     !entitlements || !hasPlatformCapability(entitlements, provider) || !adapter?.publishFirstComment || !adapter.supportsTargetKind?.(row.target.type, 'publishing')) {
     throw new OperationError('unavailable', 'This destination cannot send its first comment right now. Check its connection, then try again.');
   }
-  const credential = { accessToken: decryptSecret(row.target.accessToken), grantedScopes: source.scopes.split(',').map(scope => scope.trim()).filter(Boolean) };
-  if (adapter.canUseCredential?.(credential, 'firstComment') === false) throw new OperationError('unavailable', 'Reconnect this destination before sending its first comment.');
+  const credential = readPublishingCredential(row.target, adapter, 'firstComment');
+  if (!credential) throw new OperationError('unavailable', 'Reconnect this destination before sending its first comment.');
   const attemptedAt = new Date();
   const claim = await withPublishingTransaction(signal, async tx => {
     const result = await tx.postTarget.updateMany({ where: { id: row.id, postId: input.postId, status: 'published', remotePostId: row.remotePostId,

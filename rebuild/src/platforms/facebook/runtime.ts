@@ -29,22 +29,26 @@ export async function configuredFacebookEngine(options?: { signal?: AbortSignal 
   return createFacebookEngine(await configuredFacebookConfig(), transport);
 }
 export async function configuredFacebookAdapter() {
-  const [config, postReadScopes, firstCommentScopes] = await Promise.all([
-    configuredFacebookConfig(), configured<string[]>('meta.postReadScopes'), configured<string[]>('meta.firstCommentScopes'),
+  const [config, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes] = await Promise.all([
+    configuredFacebookConfig(), configured<string[]>('meta.postReadScopes'), configured<string[]>('meta.postPublishScopes'),
+    configured<string[]>('meta.postDeleteScopes'), configured<string[]>('meta.firstCommentScopes'),
   ]);
-  return createFacebookAdapter(config, fetch, { postReadScopes, firstCommentScopes });
+  return createFacebookAdapter(config, fetch, { postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes });
 }
 
 export async function configuredFacebookOAuth() {
-  const [appId, appSecret, redirectUri, scopes, inboxReadScopes, inboxWriteScopes, firstCommentScopes] = await Promise.all([
+  const [appId, appSecret, redirectUri, scopes, inboxReadScopes, inboxWriteScopes, postReadScopes, postPublishScopes, postDeleteScopes, firstCommentScopes] = await Promise.all([
     configured<string>('meta.appId'),
     runtimeSecret('meta.appSecret'),
     configured<string>('meta.oauthRedirectUri'),
     configured<string[]>('meta.oauthScopes'),
     configured<string[]>('meta.inboxReadScopes'),
     configured<string[]>('meta.inboxWriteScopes'),
+    configured<string[]>('meta.postReadScopes'),
+    configured<string[]>('meta.postPublishScopes'),
+    configured<string[]>('meta.postDeleteScopes'),
     configured<string[]>('meta.firstCommentScopes'),
   ]);
   if (!appId || !appSecret || !redirectUri || !scopes.length) throw new Error('Meta connection is not configured.');
-  return { appId, appSecret, redirectUri, scopes: [...new Set([...scopes, ...inboxReadScopes, ...inboxWriteScopes, ...firstCommentScopes])] };
+  return { appId, appSecret, redirectUri, scopes: [...new Set([...scopes, ...inboxReadScopes, ...inboxWriteScopes, ...postReadScopes, ...postPublishScopes, ...postDeleteScopes, ...firstCommentScopes])] };
 }

@@ -555,3 +555,54 @@ Automatic provider reconciliation/idempotency, full Facebook formats/grants,
 complete legacy/Root/MCP parity, production-shaped data/authorization migration,
 live provider testing/cleanup and exact cutover/media/service rollback remain
 unfinished. Production remains legacy.
+
+## Publishing readiness and photo identity — 2026-10-17
+
+Final source verification passed **1,148 tests across 193 files**, including
+actual isolated PostgreSQL suites; rebuild typecheck and an isolated production
+build passed. The isolated build left the running preview's `.next` untouched.
+Earlier regression runs reproduced missing-grant/expired publication, stale
+picker readiness, unguarded adapter status/comment calls and stale MCP
+`canPublish` output. Updated older provider fixtures supply explicit operation
+policies/grants so cancellation and provider error classification still reach
+their intended transport boundary. No schema or production migration occurred.
+
+The real localhost HTTP/MCP probe `scripts/verify-publishing-readiness.ts`
+passed: current destination tool/resource readiness, missing-grant rejection
+before publication intent, retained selected post history and remote-deletion
+rejection before intent with the local post preserved. It used a disposable
+synthetic credential/channel/post/key, never a usable platform token or a
+remote post. Fixture cleanup was verified. An optional interactive run retained
+the no-grant fixture briefly for browser inspection, then cleaned it too.
+
+Chrome confirmed the composer omitted that no-grant channel while retaining
+three ready synthetic choices. This was checked on Clay desktop at 1440×1000
+and Nightfall phone at 390×844. Phone destination/timing controls remained in
+the existing 330px navigation drawer, with no horizontal page overflow; Escape
+closed it and restored focus to Menu & filters. Root's Facebook API scopes
+category displayed the separate publish/delete controls on desktop and phone;
+the phone fields were 324px wide with no horizontal page overflow. Categories
+and connection diagnostics stayed in the existing contextual sidebar/drawer.
+No Root values were saved. Appearance was restored to Clay and the preview
+returned to desktop Posts. These are representative checks, not exhaustive
+four-theme/accessibility/keyboard coverage.
+
+Independent lower-cost read-only review found no concrete issue in the
+credential/adapter/photo-identity change, then identified unsafe probe cleanup
+if an unexpected intent appeared. The script now revokes the temporary key
+first and retains post/destination/source when either journal has evidence.
+A controlled local test fabricated one uncertain intent: cleanup exited with
+failure, preserved the parent fixtures/evidence and revoked the key. After
+verifying that state, only the known fabricated journal and its fixtures were
+removed. The normal MCP probe then passed and cleaned its fixtures again.
+PUBLISHING_READINESS.md records the
+actual boundaries: local grant metadata is not current Meta approval or task
+eligibility; no real Facebook create/status/delete was tested. Durable
+intermediate media-upload receipts/cleanup and complete provider formats,
+legacy/Root/MCP coverage, data migration and cutover proof remain open.
+
+Private logs: `/private/tmp/socialpilot-credential-tests-final.log`,
+`/private/tmp/socialpilot-credential-typecheck-final.log`,
+`/private/tmp/socialpilot-credential-build-final.log`, and
+`/private/tmp/socialpilot-readiness-live.log`, and
+`/private/tmp/socialpilot-readiness-cleanup-proof.log`.

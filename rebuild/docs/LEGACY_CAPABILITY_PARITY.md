@@ -55,3 +55,14 @@ request but its receipt never commits, intent remains uncertain and requires
 external review; it is not automatically verified or resent. Automatic provider
 lookup/idempotency, delayed effects, full media/grant coverage, complete legacy
 workflows and real provider/cutover evidence remain incomplete.
+
+Publishing readiness update, 2026-10-17: locally expired/revoked credentials,
+missing/corrupt destination tokens and insufficient adapter grants cannot claim
+publication intent. First-comment/delete/manual-status operations share the
+resolver, with Facebook-owned publish/delete policies and adapter transport
+checks. Composer/edit/import and MCP destination output share current readiness.
+Single-photo publication prefers a valid returned post ID. These close specific
+local preflight/identity defects, not complete grant or format coverage. Durable
+intermediate upload receipts/cleanup, local video, Reels/Stories/native scheduling,
+real provider permission/task/response verification and full parity stay open.
+See PUBLISHING_READINESS.md.

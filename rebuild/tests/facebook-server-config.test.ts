@@ -15,9 +15,10 @@ describe('Facebook OAuth scope configuration', () => {
       ['meta.oauthScopes', ['pages_show_list']], ['meta.inboxReadScopes', ['pages_messaging']],
       ['meta.inboxWriteScopes', ['pages_manage_engagement']], ['meta.adsManageScopes', ['ads_management']],
       ['meta.firstCommentScopes', ['pages_manage_engagement']],
+      ['meta.postReadScopes', ['pages_read_engagement']], ['meta.postPublishScopes', ['pages_manage_posts']], ['meta.postDeleteScopes', ['pages_manage_posts']],
     ]);
     await expect(configuredFacebookOAuth()).resolves.toMatchObject({
-      scopes: ['pages_show_list', 'pages_messaging', 'pages_manage_engagement'],
+      scopes: ['pages_show_list', 'pages_messaging', 'pages_manage_engagement', 'pages_read_engagement', 'pages_manage_posts'],
     });
   });
 });
