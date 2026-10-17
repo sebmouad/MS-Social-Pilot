@@ -120,3 +120,16 @@ reports without partial aggregates. Root saves retain the normal schema/access/
 confirmation/audit boundary. These numeric controls limit synchronous report rows;
 they do not impose byte/time ceilings or configure provider quotas. Native Root
 input min/max metadata generation remains open. See ADS_REPORT_FILTERS.md.
+
+## Ads output controls — registry 54
+
+Root Product modules → Ads owns active `ads.detailMaxBytes` (default 1 MiB,
+range 1 KiB–10 MiB), `ads.exportMaxBytes` (10 MiB, 1 KiB–50 MiB) and
+`ads.exportFileName` (safe ASCII CSV basename, default `ads-report.csv`, at most
+100 characters). Services read and validate these values for each request; UI
+receives only safe public export props. Whole application detail JSON and
+complete UTF-8 CSV are refused above their respective bounds. Existing dataset
+row policy and independent MCP row ceilings still apply. Registry saves keep
+the current private authorization, validation, change history and value-free
+atomic audit. These controls do not configure provider quotas, authorize live
+writes or complete Root copy/parameter coverage. See ADS_REPORT_EXPORT.md.

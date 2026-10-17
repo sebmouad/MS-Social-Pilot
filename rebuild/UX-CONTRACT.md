@@ -37,6 +37,7 @@ There is no released billing or legal-copy contract for the rebuild. Do not inve
 | Dialog | `src/components/ModalDialog.tsx` | This contract | Confirmation or selection | Ads/Inbox failure recovery, native Tab wrap, Escape and opener restoration checked in Chrome; other dialog flows pending |
 | Toast | Inline `role=status`/`role=alert` | This contract | Success or error | Shared notification owner pending |
 | CRUD | Server services | Domain services | Create, edit, delete | Full failure-path E2E coverage pending |
+| CSV download | `src/components/CsvExportButton.tsx` | Publishing/Ads export services and product wrappers | Confirmed CSV receipt; Ads requires matching safe filename | Deduplicated pending, stale/unmounted cancellation, safe feedback and scoped HTTP/MCP checks; representative browser proof in PREVIEW_QA |
 
 ## Workflow ledger
 
@@ -388,3 +389,21 @@ tuple identity/latest object naming prevent arbitrary tie order for unchanged
 data. These are representative report flows; full-screen copy, status/freshness,
 comparison/export and accessibility coverage remain open. ADS_REPORT_FILTERS.md
 and PREVIEW_QA.md distinguish scope and actual proof.
+
+## Complete stored Ads export and daily measures — batch 59
+
+Ads exports applied filters across all pages and stored levels, with explicit
+row/byte ceilings. The shared CSV control checks type/version/count/exact bytes
+and filename before download. Pending clicks are deduplicated; unmount or scope
+changes cancel and invalidate the old read. Focused success/error stays inside
+the phone drawer, retains filters and supports retry. Prepared CSV describes an
+application receipt, not proof of a saved local file. No management confirmation
+is needed for an ordinary authorized read; spend-changing actions retain theirs.
+
+Daily details show primary measures as well as ratios, actions and additional
+fields. Report day and fetch time have separate labels; absent fetch provenance
+is unknown. Raw credential fields are visibly redacted with provenance in API/
+CSV. Both Ads routes explicitly admit current scoped readers while services keep
+management restrictions. ADS_REPORT_EXPORT.md owns data, permissions, limits and
+redaction policy; PREVIEW_QA.md owns actual evidence. Complete provider coverage,
+comparison/status/freshness analysis and all-screen accessibility remain open.

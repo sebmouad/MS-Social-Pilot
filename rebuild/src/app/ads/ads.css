@@ -24,6 +24,8 @@
 .ads-report-pager__nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .ads-report-pager__nav .ui-button { width: 100%; }
 .ads-report-pager__nav [aria-disabled="true"] { cursor: default; opacity: .7; }
+.ads-report-export { display: grid; gap: 8px; margin-top: 14px; }
+.ads-report-export section { display: grid; gap: 8px; }
 .ads-filter-field { display: grid; gap: 8px; }
 .ads-filter-heading { margin: 0 0 2px; color: var(--ink-faint); font-size: 10px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
 .ads-sidebar-filter .ui-button { margin-top: 8px; }

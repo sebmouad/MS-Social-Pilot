@@ -9,6 +9,8 @@ import { OperationError } from '@/lib/operation-error';
 import { AdsReportLimitError } from '@/modules/ads/read-policy';
 import type { AdsPageSlice } from '@/modules/ads/report-page';
 import { AdsReportPager } from './AdsReportPager';
+import { AdsReportExport } from './AdsReportExport';
+import type { AdsOutputPolicy } from '@/modules/ads/output-policy';
 
 type AdsAccountOption = { id: string; name: string };
 
@@ -38,8 +40,10 @@ export function AdsReportFailureView({ accounts, input, filters, error, action, 
   </div></PageFrame>;
 }
 
-export function AdsReportSidebar<T>({ accounts, filters, policy, action, kind, page }: { accounts: AdsAccountOption[]; filters: AdsFilters; policy: AdsReportPolicy; action: string; kind: 'accounts' | 'objects'; page: AdsPageSlice<T> }) {
-  return <><AdsFiltersSidebar accounts={accounts} filters={filters} action={action} policy={policy} /><AdsReportPager filters={filters} path={action} kind={kind} page={page} /></>;
+export function AdsReportSidebar<T>({ accounts, filters, policy, action, kind, page, canExport = false, maxRows, exportPolicy }: { accounts: AdsAccountOption[]; filters: AdsFilters; policy: AdsReportPolicy; action: string; kind: 'accounts' | 'objects'; page: AdsPageSlice<T>; canExport?: boolean; maxRows?: number; exportPolicy?: Pick<AdsOutputPolicy, 'exportMaxBytes' | 'exportFileName'> }) {
+  return <><AdsFiltersSidebar accounts={accounts} filters={filters} action={action} policy={policy} /><AdsReportPager filters={filters} path={action} kind={kind} page={page} />
+    {canExport && maxRows && exportPolicy ? <div className="ads-report-export"><AdsReportExport filters={filters} maxRows={maxRows} maxBytes={exportPolicy.exportMaxBytes} fileName={exportPolicy.exportFileName} /></div> : null}
+  </>;
 }
 
 export function adsQuery(filters: AdsFilters, page: string) {

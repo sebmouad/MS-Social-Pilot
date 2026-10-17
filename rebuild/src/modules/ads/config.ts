@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { entry } from '@/lib/config/entry';
 import { ADS_REPORT_DEFAULT_POLICY } from './report-policy';
 import { ADS_READ_DEFAULT_POLICY, ADS_READ_MAX_ROWS_SCHEMA, ADS_READ_PAGE_SIZE_SCHEMA } from './read-policy';
+import { ADS_DETAIL_MAX_BYTES_SCHEMA, ADS_OUTPUT_DEFAULT_POLICY, ADS_EXPORT_FILE_NAME_SCHEMA, ADS_EXPORT_MAX_BYTES_SCHEMA } from './output-policy';
 
 const preset = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/).refine(value => value !== 'custom', 'The custom range id is reserved.'),
@@ -37,4 +38,16 @@ export const ADS_CONFIG = [entry({
   key: 'ads.reportMaxRows', group: 'Ads · Reporting', label: 'Maximum report rows', kind: 'number',
   description: 'Maximum stored insight rows loaded by one Ads report request.',
   defaultValue: ADS_READ_DEFAULT_POLICY.maxRows, schema: ADS_READ_MAX_ROWS_SCHEMA, consumption: 'active',
+}), entry({
+  key: 'ads.detailMaxBytes', group: 'Ads · Reporting', label: 'Maximum detail response bytes', kind: 'number',
+  description: 'Maximum UTF-8 size of one complete Ads daily report response.',
+  defaultValue: ADS_OUTPUT_DEFAULT_POLICY.detailMaxBytes, schema: ADS_DETAIL_MAX_BYTES_SCHEMA, consumption: 'active',
+}), entry({
+  key: 'ads.exportMaxBytes', group: 'Ads · Reporting', label: 'Maximum CSV export bytes', kind: 'number',
+  description: 'Maximum UTF-8 size of one complete Ads CSV export.',
+  defaultValue: ADS_OUTPUT_DEFAULT_POLICY.exportMaxBytes, schema: ADS_EXPORT_MAX_BYTES_SCHEMA, consumption: 'active',
+}), entry({
+  key: 'ads.exportFileName', group: 'Ads · Reporting', label: 'CSV export filename', kind: 'text',
+  description: 'Safe filename used for complete Ads CSV report downloads.',
+  defaultValue: ADS_OUTPUT_DEFAULT_POLICY.exportFileName, schema: ADS_EXPORT_FILE_NAME_SCHEMA, consumption: 'active',
 })] as const;

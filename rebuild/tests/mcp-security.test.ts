@@ -31,6 +31,9 @@ vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, save
 const analytics = vi.hoisted(() => ({ snapshot: vi.fn() }));
 vi.mock('../src/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: analytics.snapshot }));
 const adsQueries = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn() }));
+const adsReports = vi.hoisted(() => ({ rows: vi.fn(), export: vi.fn() }));
+vi.mock('../src/modules/ads/server/report-read', () => ({ readAdsDailyRows: adsReports.rows }));
+vi.mock('../src/modules/ads/server/export', () => ({ exportAdsReport: adsReports.export }));
 vi.mock('../src/server/ads/queries', () => ({ getAdsAccounts: adsQueries.accounts, getAdsDataset: adsQueries.dataset, getAdsAccountWhere: async (workspaceId: string, allowedTargetIds?: string[]) => ({ workspaceId, enabled: true, socialAccount: { is: { workspaceId, invalidatedAt: null, provider: { in: ['facebook'] } } }, ...(allowedTargetIds === undefined ? {} : { socialAccountId: { in: ['social-a'] } }) }) }));
 const dataControls = vi.hoisted(() => ({ preview: vi.fn(), export: vi.fn(), remove: vi.fn() }));
 vi.mock('../src/server/data-control', () => ({ previewWorkspaceDataDeletion: dataControls.preview, exportWorkspaceData: dataControls.export, deleteWorkspaceData: dataControls.remove }));
@@ -106,6 +109,8 @@ const call = (name: string, args: Record<string, unknown> = {}) => handleMcpMess
 
 beforeEach(() => {
   vi.clearAllMocks();
+  adsReports.rows.mockResolvedValue({ format: 'ms-social-pilot-ads-daily', version: 1, rows: [{ id: 'stored-row', fetchedAt: '2026-10-14T12:00:00.000Z', fields: { video_views: 23 } }], resultCount: 1, nextOffset: null });
+  adsReports.export.mockResolvedValue({ format: 'ms-social-pilot-ads-csv', version: 1, csv: 'row_id,fields_json\r\nstored-row,{}\r\n', fileName: 'ads-report.csv', rowCount: 1 });
   rootConfig.adsPolicy = { presets: [{ id: '14d', days: 14, label: 'Last fortnight' }], defaultPreset: '14d', maxRangeDays: 14, maxFilterCharacters: 200 };
   destinationReadiness.mockResolvedValue([]);
   workspaceGuard.mockImplementation((_id: string, run: () => Promise<unknown>) => run());
@@ -501,6 +506,58 @@ describe('MCP workspace boundaries', () => {
     const denied = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 491, method: 'tools/call', params: { name: 'get_ads_performance', arguments: { accountId: 'other-workspace-account' } } });
     expect((await denied.json()).result.isError).toBe(true);
     expect(adsQueries.dataset).toHaveBeenCalledTimes(1);
+  });
+  it('exposes stored daily Ads details and complete export to scoped readers with the same service actor and result ceiling', async () => {
+    const scoped = { ...viewer, apiKeyId: 'read-key', maxResultItems: 2, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
+    const listed = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toEqual(expect.arrayContaining(['get_ads_report_rows', 'export_ads_report']));
+    const args = { period: 'custom', start: '2026-10-01', end: '2026-10-14', accountId: 'account-a', level: 'ad', objectId: 'ad-a' };
+    for (const name of ['get_ads_report_rows', 'export_ads_report']) {
+      const response = await handleMcpMessage(scoped, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name, arguments: args } });
+      expect((await response.json()).result.isError).not.toBe(true);
+      expect(name === 'get_ads_report_rows' ? adsReports.rows : adsReports.export).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a', allowedTargetIds: ['page-allowed'] }, args, { maxItems: 2 });
+    }
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+    expect(workspaceGuard).not.toHaveBeenCalled();
+  });
+  it.each([0, -1, 201, '2', 1.5, Number.MAX_SAFE_INTEGER])('refuses MCP daily limit %s before service dispatch', async limit => {
+    const result = (await (await call('get_ads_report_rows', { limit })).json()).result;
+    expect(result).toMatchObject({ isError: true, structuredContent: { code: 'invalid_request' } });
+    expect(adsReports.rows).not.toHaveBeenCalled();
+  });
+  it('scopes daily Ads resource discovery/read and both tools to current Ads entitlement and read permission', async () => {
+    const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'resources/list' });
+    expect((await listed.json()).result.resources.map((resource: { uri: string }) => resource.uri)).toContain('msp://ads/daily');
+    const read = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 2, method: 'resources/read', params: { uri: 'msp://ads/daily' } });
+    expect(JSON.parse((await read.json()).result.contents[0].text)).toMatchObject({ rows: [{ id: 'stored-row', fields: { video_views: 23 } }] });
+    expect(adsReports.rows).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a', allowedTargetIds: undefined }, {}, { maxItems: 100 });
+    adsReports.rows.mockClear();
+    for (const denied of [
+      { ...viewer, entitlements: { ...viewer.entitlements, features: { ...viewer.entitlements.features, 'ads/campaigns': false } } },
+      { ...viewer, apiKeyId: 'no-ads-key', permissions: resolvePermissions({ role: 'owner', workspaceDisabledModules: [], memberDisabledModules: ['ads'], clientAccess: [], allPages: true, pageAccess: [] }) },
+    ]) {
+      const tools = (await (await handleMcpMessage(denied, { jsonrpc: '2.0', id: 3, method: 'tools/list' })).json()).result.tools.map((tool: { name: string }) => tool.name);
+      expect(tools).not.toContain('get_ads_report_rows'); expect(tools).not.toContain('export_ads_report');
+      const resources = (await (await handleMcpMessage(denied, { jsonrpc: '2.0', id: 4, method: 'resources/list' })).json()).result.resources.map((resource: { uri: string }) => resource.uri);
+      expect(resources).not.toContain('msp://ads/daily');
+      for (const name of ['get_ads_report_rows', 'export_ads_report']) {
+        expect((await (await handleMcpMessage(denied, { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name, arguments: {} } })).json()).result.isError).toBe(true);
+      }
+      expect((await (await handleMcpMessage(denied, { jsonrpc: '2.0', id: 6, method: 'resources/read', params: { uri: 'msp://ads/daily' } })).json()).error).toBeDefined();
+    }
+    expect(adsReports.rows).not.toHaveBeenCalled(); expect(adsReports.export).not.toHaveBeenCalled();
+  });
+  it('masks unexpected daily Ads and export failures but retains intentional complete-export refusal', async () => {
+    for (const [name, service] of [['get_ads_report_rows', adsReports.rows], ['export_ads_report', adsReports.export]] as const) {
+      service.mockRejectedValueOnce(new Error('credential=never-expose database statement'));
+      const response = await call(name);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      const body = await response.json();
+      expect(body.result.isError).toBe(true);
+      expect(JSON.stringify(body)).not.toContain('never-expose');
+    }
+    adsReports.export.mockRejectedValueOnce(new OperationError('invalid_request', 'No partial file was created.'));
+    expect((await (await call('export_ads_report')).json()).result.structuredContent).toMatchObject({ code: 'invalid_request', error: 'No partial file was created.' });
   });
   it('exposes live Ads status only through the scoped read permission and shared status service', async () => {
     const scoped = { ...viewer, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };

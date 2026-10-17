@@ -1487,3 +1487,70 @@ Final logs: `/private/tmp/socialpilot-ads58-full-final.log`,
 `/private/tmp/socialpilot-ads58-mcp-red.log`. One-setting browser backup:
 `/private/tmp/socialpilot-ads58-page-size-original.json` (contains only the original
 public setting row, not credentials).
+
+## Stored Ads daily metrics and complete CSV — batch 59, 2026-10-17
+
+Final integrated verification passed **1,654 tests across 237 files**, with the
+explicit isolated-preview database opt-in and all existing rollback-only
+PostgreSQL checks enabled. Typecheck, whitespace checks and an isolated
+production build passed. The disposable build retained the running preview's
+`.next` output. An earlier build caught two TypeScript errors in the new probe;
+both were fixed before the final build. Focused service, serializer, HTTP, MCP,
+UI and stale-request tests were also run during review. Review corrections added
+consistent quoted formula-safe CSV strings, signed credential URL scrubbing,
+preserved nonsecret JSON `key` metrics and complete daily UI scalar measures.
+
+The guarded `scripts/verify-ads-report-export.ts` passed against the dedicated
+loopback `_preview` database and localhost:3200. Disposable UUID-bound insight
+rows exercised real scoped viewer HTTP/MCP reads, exact account/level/object
+filtering, scalar/action/additional-field preservation, exact fetch provenance,
+credential redaction, complete CSV receipts and `msp://ads/daily`. Removing the
+current channel grant denied the same account through both interfaces without
+rows. Missing-feature keys could neither discover nor call reporting tools.
+Anonymous HTTP and duplicate parameters were refused. Root row/detail-byte/CSV-
+byte ceilings refused whole oversized results without partial data/files.
+Temporary Root writes had value-free audits.
+
+The preview initially excluded viewers from MCP's configured role policy. A
+first draft of the probe therefore could not establish viewer MCP scope proof;
+the final probe captures that policy, temporarily permits viewers, uses keys
+created by the scoped viewer, verifies success followed by revocation denial,
+and restores the exact original policy row. It also restores all four captured
+Ads settings including absence/encryption/timestamps, and verifies removal of
+its rows, users, grants, memberships, sessions, keys and config audits. Seeded
+examples remain. No provider request, migration, production data or service
+change occurred.
+
+Actual Chrome: Clay desktop 1440×1000 exported all **12** seeded matching daily
+rows from Campaigns with focused `Prepared CSV for 12 daily rows.` feedback and
+unchanged filters. At 390×844 under Nightfall, offline export retained filters,
+reenabled the button and focused safe error feedback inside the drawer. Online
+retry prepared the same 12 rows; Escape closed the drawer and returned focus to
+Menu & filters. Shared download component regressions additionally cover
+duplicate clicks, filename/format/count/byte receipts, unmount, filter/filename
+changes and stale completion while a newer request remains pending. Completed
+feedback clears when scope changes. A desktop keyboard Enter also exported the
+12-row result successfully.
+
+Real phone daily expansion displayed report day separately from fetch time,
+currency, spend, impressions, clicks, daily non-additive reach, all ratios,
+actions and retained breakdown values without document horizontal overflow.
+All four theme token sets were inspected on the owned desktop tab, with distinct
+computed palettes and no document overflow. This is representative browser
+proof, not the full all-screen/theme/accessibility matrix. Only owned test tabs
+were changed; theme overrides were DOM-only and no user preference was saved.
+
+Frontend Design Premium strict static audit reported two existing primitive
+false positives: `Button.tsx` forwards action/type props, and `AutoTextarea.tsx`
+already applies `resize: 'none'` in its inline style. Both sources were manually
+checked; no app-wide clean static-audit claim is made. Runtime tests/build/browser
+checks above remain the actual evidence.
+
+Logs: `/private/tmp/socialpilot-ads59-full-final.log`,
+`socialpilot-ads59-build-final.log`, `socialpilot-ads59-type-final.log`,
+`socialpilot-ads59-probe.log`, and `socialpilot-ads59-premium-audit.json` in the
+same private temporary directory. ADS_REPORT_EXPORT.md records protocol and
+limits. Asynchronous exports, stable multi-request snapshots, comprehensive
+provider metric collection/management, comparison/status analysis, wider
+legacy/MCP parity and migration/cutover remain open. Facebook canary cleanup
+evidence/lock remain held and unchanged; this batch makes no remote cleanup claim.

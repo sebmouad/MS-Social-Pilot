@@ -7,14 +7,16 @@ const customPolicy = {
   presets: [{ id: '14d', days: 14, label: 'Last two weeks' }],
   defaultPreset: '14d', maxRangeDays: 14, maxFilterCharacters: 80,
 };
-const state = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn(), viewer: vi.fn(), readiness: vi.fn(), canRead: vi.fn(), policy: vi.fn() }));
+const state = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn(), viewer: vi.fn(), readiness: vi.fn(), canRead: vi.fn(), policy: vi.fn(), output: vi.fn(), feature: vi.fn(), access: vi.fn() }));
 vi.mock('../src/server/context', () => ({ requireViewer: state.viewer }));
-vi.mock('../src/server/entitlements', () => ({ entitledPlatformIds: () => ['test-platform'] }));
+vi.mock('../src/server/entitlements', () => ({ entitledPlatformIds: () => ['test-platform'], canUseFeature: state.feature }));
+vi.mock('../src/server/permissions', () => ({ canAccessFeature: state.access }));
 vi.mock('../src/server/PageFrame', () => ({ PageFrame: ({ children, sidebar }: { children: ReactNode; sidebar?: ReactNode }) => createElement('div', null, createElement('aside', null, sidebar), children) }));
 vi.mock('../src/server/ads/queries', async original => ({ ...await original<typeof import('../src/server/ads/queries')>(), getAdsAccounts: state.accounts, getAdsDataset: state.dataset }));
 vi.mock('../src/server/ads/actions', () => ({ canManageWorkspaceAds: state.readiness, canReadWorkspaceAds: state.canRead }));
 vi.mock('../src/server/platforms/registry', () => ({ platformAds: async () => null }));
 vi.mock('../src/modules/ads/server/report-policy', () => ({ loadAdsReportPolicy: state.policy }));
+vi.mock('../src/modules/ads/server/output-policy', () => ({ loadAdsOutputPolicy: state.output }));
 
 import AdsPage from '../src/app/ads/page';
 import CampaignsPage from '../src/app/ads/campaigns/page';
@@ -34,10 +36,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.viewer.mockResolvedValue({ workspaceId: 'workspace', user: { id: 'member' }, permissions: { pageScope: { all: true, ids: [] } }, entitlements: {} });
   state.accounts.mockResolvedValue(accounts);
-  state.dataset.mockResolvedValue({ accounts, insights: [], pageSize: 25 });
+  state.dataset.mockResolvedValue({ accounts, insights: [], pageSize: 25, maxRows: 2500 });
   state.readiness.mockResolvedValue(false);
   state.canRead.mockResolvedValue(false);
   state.policy.mockResolvedValue(customPolicy);
+  state.output.mockResolvedValue({ detailMaxBytes: 1024, exportMaxBytes: 4096, exportFileName: 'ads-report.csv' });
+  state.feature.mockReturnValue(true);
+  state.access.mockReturnValue(true);
 });
 
 describe('Ads report filter UX', () => {
@@ -50,7 +55,7 @@ describe('Ads report filter UX', () => {
   });
 
   it('paginates account cards while preserving global counts and the complete custom filter scope', async () => {
-    state.dataset.mockResolvedValue({ accounts, insights: [], pageSize: 1 });
+    state.dataset.mockResolvedValue({ accounts, insights: [], pageSize: 1, maxRows: 2500 });
     const node = dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({ period: 'custom', since: '2026-10-01', until: '2026-10-03', page: '2' }) })));
     expect(node.querySelectorAll('.ads-account-card')).toHaveLength(1);
     expect(node.querySelector('.ads-account-card h3')?.textContent).toBe('US account');
@@ -59,6 +64,30 @@ describe('Ads report filter UX', () => {
     const next = node.querySelector<HTMLAnchorElement>('nav[aria-label="Account report pages"] a[rel="next"]')!;
     expect(next.getAttribute('href')).toBe('/ads?period=custom&since=2026-10-01&until=2026-10-03&page=3');
     expect(node.querySelector('.ads-report-pager__current [aria-current="page"]')?.textContent).toBe('Page 2 of 3');
+  });
+
+  it('places a bounded export below paging using applied filters without the visible page', async () => {
+    const node = dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({ period: 'custom', since: '2026-10-01', until: '2026-10-03', account: 'usd', page: '2' }) })));
+    const sidebar = node.querySelector('aside')!;
+    expect(sidebar.querySelector('section[aria-label="Export Ads report"]')).not.toBeNull();
+    expect(sidebar.querySelector('.ads-report-export button')?.textContent).toBe('Export all matching daily rows');
+    expect(sidebar.textContent).toContain('Action metrics and additional fields are included');
+    expect(sidebar.querySelector('.ads-report-pager')!.compareDocumentPosition(sidebar.querySelector('.ads-report-export')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(state.output).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the report export when an overview reader lacks the campaigns feature', async () => {
+    state.feature.mockImplementation((_entitlements, feature) => feature !== 'ads/campaigns');
+    const node = dom(renderToStaticMarkup(await AdsPage({ searchParams: Promise.resolve({}) })));
+    expect(state.feature).toHaveBeenCalledWith({}, 'ads/campaigns');
+    expect(node.querySelector('[aria-label="Export Ads report"]')).toBeNull();
+    expect(node.querySelector('.ads-report-pager')).not.toBeNull();
+    expect(state.output).not.toHaveBeenCalled();
+  });
+
+  it.each([[AdsPage, 'ads/overview'], [CampaignsPage, 'ads/campaigns']] as const)('uses channel-scoped %s access for report pages', async (page, feature) => {
+    await page({ searchParams: Promise.resolve({}) });
+    expect(state.viewer).toHaveBeenCalledWith({ feature, channelScoped: true });
   });
 
   it.each([AdsPage, CampaignsPage])('refuses invalid and repeated result pages before reading report data', async page => {
@@ -72,7 +101,7 @@ describe('Ads report filter UX', () => {
   it('paginates complete campaign summaries and checks readiness only for visible object accounts', async () => {
     const date = new Date('2026-10-02T00:00:00Z');
     const row = (id: string, account: typeof accounts[number]) => ({ id, adAccountId: account.id, level: 'campaign', objectId: id, objectName: `Campaign ${id}`, date, spend: 2, impressions: 10, clicks: 1, reach: 5, cpc: 2, cpm: 200, cpp: null, ctr: 10, frequency: 1, actions: [], fields: {}, adAccount: { id: account.id, name: account.name, currency: account.currency } });
-    state.dataset.mockResolvedValue({ accounts, insights: [row('a', accounts[0]), row('b', accounts[1])], pageSize: 1 });
+    state.dataset.mockResolvedValue({ accounts, insights: [row('a', accounts[0]), row('b', accounts[1])], pageSize: 1, maxRows: 2500 });
     const node = dom(renderToStaticMarkup(await CampaignsPage({ searchParams: Promise.resolve({ page: '2' }) })));
     expect(node.querySelector('.page-heading')?.textContent).toContain('Showing 2–2 of 2 objects · Page 2 of 2');
     expect(node.querySelectorAll('.ads-results-panel')).toHaveLength(1);
@@ -90,6 +119,8 @@ describe('Ads report filter UX', () => {
     expect(node.querySelector<HTMLSelectElement>('select[name="account"]')?.value).toBe('usd');
     expect(node.querySelector('.ads-page-reset')?.getAttribute('href')).toBe('/ads?period=custom&since=2026-10-01&until=2026-10-03&account=usd');
     expect(node.querySelector('.ads-account-card')).toBeNull();
+    expect(node.querySelector('[aria-label="Export Ads report"]')).toBeNull();
+    expect(state.output).not.toHaveBeenCalled();
   });
 
 

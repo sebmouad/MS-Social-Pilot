@@ -24,4 +24,15 @@ describe('stored advertising fields', () => {
     expect(html).not.toContain('action_type');
     expect(html).not.toContain('{&quot;');
   });
+
+  it('never renders stored credential values in the customer report details', () => {
+    const html = renderToStaticMarkup(createElement(StoredFields, {
+      actions: [{ action_type: 'purchase', value: '2', accessToken: 'private-token' }],
+      fields: { nested: { authorization: 'Bearer private', safeMetric: 3 } },
+    }));
+    expect(html).toContain('[REDACTED]');
+    expect(html).not.toContain('private-token');
+    expect(html).not.toContain('Bearer private');
+    expect(html).toContain('Safe Metric');
+  });
 });

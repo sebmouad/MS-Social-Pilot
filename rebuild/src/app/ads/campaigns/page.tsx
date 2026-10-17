@@ -4,7 +4,7 @@ import { requireViewer } from '@/server/context';
 import { AdsFilterErrorView, AdsReportFailureView, AdsReportSidebar, dateRangeLabel } from '../ads-filters';
 import { getAdsAccounts, getAdsDataset, parseAdsFilters, AdsFilterError, type AdsSearchParams } from '@/server/ads/queries';
 import { groupSummariesByAccount, summarizeInsights } from '@/server/ads/summary';
-import { StoredFields } from '../stored-fields';
+import { DailyMetrics } from '../DailyMetrics';
 import { canManageWorkspaceAds, canReadWorkspaceAds } from '@/server/ads/actions';
 import { AdsObjectActions } from '../AdsObjectActions';
 import { CampaignCreateForm } from '../CampaignCreateForm';
@@ -12,13 +12,16 @@ import { AdSetCreateForm } from '../AdSetCreateForm';
 import { platformAds } from '@/server/platforms/registry';
 import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
 import { pageAdsRows, parseAdsResultPage } from '@/modules/ads/report-page';
+import { canUseFeature } from '@/server/entitlements';
+import { canAccessFeature } from '@/server/permissions';
+import { loadAdsOutputPolicy } from '@/modules/ads/server/output-policy';
 
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const money = (value: number | null, currency: string | null) => value === null ? '—' : `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
 const date = (value: Date) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(value);
 
 export default async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams & { page?: string | string[] }> }) {
-  const viewer = await requireViewer({ feature: 'ads/campaigns' });
+  const viewer = await requireViewer({ feature: 'ads/campaigns', channelScoped: true });
   const { workspaceId } = viewer;
   const policy = await loadAdsReportPolicy();
   const allowedProviders = entitledPlatformIds(viewer.entitlements);
@@ -47,7 +50,9 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   ] as const)));
   const createAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, account.id)] as const)));
   const adsUi = new Map(await Promise.all(accounts.map(async account => [account.id, account.socialAccount ? (await platformAds(account.socialAccount.provider))?.ui ?? null : null] as const)));
-  const sidebar = <AdsReportSidebar accounts={accounts} filters={filters} action="/ads/campaigns" kind="objects" policy={policy} page={objectPage} />;
+  const canExport = canUseFeature(viewer.entitlements, 'ads/campaigns') && canAccessFeature(viewer.permissions, 'ads/campaigns', 'read');
+  const exportPolicy = canExport ? await loadAdsOutputPolicy().catch(() => null) : null;
+  const sidebar = <AdsReportSidebar accounts={accounts} filters={filters} action="/ads/campaigns" kind="objects" policy={policy} page={objectPage} canExport={canExport} maxRows={dataset.maxRows} exportPolicy={exportPolicy ?? undefined} />;
   return <PageFrame module="ads" sidebar={accounts.length ? sidebar : undefined}><div className="page-stack">
     <header className="page-heading"><div><p className="eyebrow">Ads / Performance</p><h1>Campaign, ad set, and ad results</h1><p>{accounts.length ? `Showing ${objectPage.from}–${objectPage.to} of ${objectPage.resultCount} objects · Page ${objectPage.page} of ${objectPage.pageCount}. Stored daily insight records · ${dateRangeLabel(filters)}. Select an account and date range in the sidebar.` : 'Connect an advertising account to review and manage its campaigns.'}</p></div></header>
     {!accounts.length ? <section className="panel empty-state"><h2>No ad accounts connected</h2><p>Connect and select an advertising account to see campaign results and available actions here.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <>
@@ -72,13 +77,13 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                 <div><dt>CTR</dt><dd>{row.ctr === null ? '—' : `${number.format(row.ctr)}%`}</dd></div><div><dt>CPP</dt><dd>{money(row.cpp, row.currency)}</dd></div>
                 <div><dt>Frequency</dt><dd>{row.frequency === null ? '—' : number.format(row.frequency)}</dd></div>
               </dl>
-              <details className="ads-stored-details"><summary>Stored details</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily measures</h4>{row.dailyMetrics.map(day => <details className="ads-day-details" key={day.date.toISOString()}><summary>{date(day.date)}</summary><p>CPC {money(day.cpc, row.currency)} · CPM {money(day.cpm, row.currency)} · CPP {money(day.cpp, row.currency)} · CTR {day.ctr === null ? '—' : `${number.format(day.ctr)}%`} · Frequency {day.frequency === null ? '—' : number.format(day.frequency)}</p><StoredFields actions={day.actions} fields={day.fields} /></details>)}</div></details>
+              <details className="ads-stored-details"><summary>Stored details</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily measures</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details>
             </article>)}
           </div><div className="ui-table-wrap"><table className="ui-table ads-performance-table"><caption className="ui-visually-hidden">{`${level.label} results for ${account?.name ?? rows[0]?.accountName ?? "ad account"}`}</caption><thead><tr><th scope="col">{level.label.slice(0, -1)} name</th><th scope="col">Daily rows</th><th scope="col" className="is-end">Spend</th><th scope="col" className="is-end">Impressions</th><th scope="col" className="is-end">Latest reach</th><th scope="col" className="is-end">Clicks</th><th scope="col" className="is-end">CPC</th><th scope="col" className="is-end">CPM</th><th scope="col" className="is-end">CTR</th><th scope="col" className="is-end">CPP</th><th scope="col" className="is-end">Freq.</th><th scope="col">Stored details</th></tr></thead>
             <tbody>{levelRows.map(row => <tr key={row.key}>
               <td><strong>{row.name}</strong><small className="ads-object-id">{row.id}</small>{readAvailability.get(accountId) || actionAvailability.get(accountId) ? <AdsObjectActions adAccountId={accountId} objectId={row.id} objectType={row.level as 'campaign' | 'adset' | 'ad'} currency={row.currency} canRead={Boolean(readAvailability.get(accountId))} canManage={Boolean(actionAvailability.get(accountId))} /> : null}</td>
               <td>{row.rows}</td><td className="is-end">{money(row.spend, row.currency)}</td><td className="is-end">{number.format(row.impressions)}</td><td className="is-end">{number.format(row.reach)}<small>{date(row.reachDate)}</small></td><td className="is-end">{number.format(row.clicks)}</td><td className="is-end">{money(row.cpc, row.currency)}</td><td className="is-end">{money(row.cpm, row.currency)}</td><td className="is-end">{row.ctr === null ? '—' : `${number.format(row.ctr)}%`}</td><td className="is-end">{money(row.cpp, row.currency)}</td><td className="is-end">{row.frequency === null ? '—' : number.format(row.frequency)}</td>
-              <td><details className="ads-stored-details"><summary>{row.rows} daily row{row.rows === 1 ? '' : 's'}</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily measures</h4>{row.dailyMetrics.map(day => <details className="ads-day-details" key={day.date.toISOString()}><summary>{date(day.date)}</summary><p>CPC {money(day.cpc, row.currency)} · CPM {money(day.cpm, row.currency)} · CPP {money(day.cpp, row.currency)} · CTR {day.ctr === null ? '—' : `${number.format(day.ctr)}%`} · Frequency {day.frequency === null ? '—' : number.format(day.frequency)}</p><StoredFields actions={day.actions} fields={day.fields} /></details>)}</div></details></td>
+              <td><details className="ads-stored-details"><summary>{row.rows} daily row{row.rows === 1 ? '' : 's'}</summary><div className="ads-detail-content"><h4>Action metrics · summed across daily rows</h4>{row.actions.length ? <ul>{row.actions.map(action => <li key={action.name}><span>{action.name}</span><strong>{number.format(action.value)}</strong></li>)}</ul> : <p>No action breakdown stored.</p>}<h4>Daily measures</h4><DailyMetrics rows={row.dailyMetrics} currency={row.currency} /></div></details></td>
             </tr>)}</tbody></table></div></div>;
         })}
         {viewer.permissions.pageScope.all && actionAvailability.get(accountId) && adsUi.get(accountId)?.adSet && rows.some(row => row.level === 'campaign') ? <div className="ads-result-level"><h3>Create ad sets</h3><p className="small-note">Choose a campaign already verified in this account’s stored performance history.</p>

@@ -7,7 +7,7 @@ import { loadAdsReadPolicy } from '@/modules/ads/server/read-policy';
 export { parseAdsFilters, AdsFilterError, type AdsFilters, type AdsPeriod, type AdsSearchParams } from '@/modules/ads/report-filters';
 
 export type AdsInsightLevel = 'account' | 'campaign' | 'adset' | 'ad';
-export type AdsDatasetOptions = { levels?: readonly AdsInsightLevel[] };
+export type AdsDatasetOptions = { levels?: readonly AdsInsightLevel[]; objectId?: string };
 const ADS_INSIGHT_LEVELS: readonly AdsInsightLevel[] = ['account', 'campaign', 'adset', 'ad'];
 
 /** Read only the accounts and stored insight rows belonging to this workspace. */
@@ -18,6 +18,10 @@ export async function getAdsDataset(workspaceId: string, filters: AdsFilters, al
     throw new OperationError('invalid_request', 'Choose valid Ads report levels.');
   }
   const selectedLevels = levels as readonly AdsInsightLevel[] | undefined;
+  const objectId: unknown = options.objectId;
+  if (objectId !== undefined && (typeof objectId !== 'string' || !objectId || /[\u0000-\u001f\u007f]/.test(objectId) || !selectedLevels || selectedLevels.length !== 1 || !filters.accountId)) {
+    throw new OperationError('invalid_request', 'Choose one account and report level for an Ads object filter.');
+  }
   const accounts = await getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders);
   const visibleAccountIds = accounts.map(account => account.id);
   const currentAccountScope = await getAdsAccountWhere(workspaceId, allowedTargetIds, allowedProviders);
@@ -26,18 +30,19 @@ export async function getAdsDataset(workspaceId: string, filters: AdsFilters, al
       adAccount: { ...currentAccountScope, id: { in: filters.accountId ? visibleAccountIds.filter(id => id === filters.accountId) : visibleAccountIds } },
       date: { gte: filters.since, lt: filters.until },
       ...(selectedLevels !== undefined ? { level: { in: [...selectedLevels] } } : {}),
+      ...(objectId !== undefined ? { objectId } : {}),
     },
     orderBy: [{ level: "asc" }, { objectName: "asc" }, { date: "desc" }, { id: "asc" }],
     take: policy.maxRows + 1,
     select: {
-      id: true, adAccountId: true, level: true, objectId: true, objectName: true, date: true,
+      id: true, adAccountId: true, level: true, objectId: true, objectName: true, date: true, fetchedAt: true,
       spend: true, impressions: true, clicks: true, reach: true, cpc: true, cpm: true,
       cpp: true, ctr: true, frequency: true, actions: true, fields: true,
       adAccount: { select: { id: true, name: true, currency: true } },
     },
   });
   if (insights.length > policy.maxRows) throw new AdsReportLimitError();
-  return { accounts, insights, pageSize: policy.pageSize };
+  return { accounts, insights, pageSize: policy.pageSize, maxRows: policy.maxRows };
 }
 
 /** Query predicate for enabled, selected ad accounts from installed and enabled platform modules. */

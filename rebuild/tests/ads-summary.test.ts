@@ -13,7 +13,8 @@ const base: InsightRow = {
 describe('ads summaries', () => {
   it('adds delivery metrics and actions while retaining latest snapshot metrics and fields', () => {
     const older = { ...base, date: new Date('2026-10-12T00:00:00Z'), spend: 8, impressions: 1000, clicks: 10, reach: 700, cpp: 16, frequency: 1.1, actions: [{ action_type: 'link_click', value: '2' }] };
-    const [summary] = summarizeInsights([base, older]);
+    const fetchedAt = new Date('2026-10-14T12:34:00Z');
+    const [summary] = summarizeInsights([{ ...base, fetchedAt }, older]);
     expect(summary.spend).toBe(20);
     expect(summary.impressions).toBe(2000);
     expect(summary.clicks).toBe(30);
@@ -25,6 +26,8 @@ describe('ads summaries', () => {
     expect(summary.frequency).toBe(1.25);
     expect(summary.actions).toEqual([{ name: 'link_click', value: 12 }]);
     expect(summary.fields).toEqual({ provider_metric: 7 });
+    expect(summary.dailyMetrics.find(day => day.date.getTime() === base.date.getTime())).toMatchObject({ fetchedAt, spend: 12, impressions: 1000, clicks: 20, reach: 800 });
+    expect(summary.dailyMetrics.find(day => day.date.getTime() === older.date.getTime())).toMatchObject({ fetchedAt: null, spend: 8, impressions: 1000, clicks: 10, reach: 700 });
   });
 
   it('uses the newest row name and latest snapshots independently of input order', () => {

@@ -1,3 +1,5 @@
+import { sanitizeAdsReportJson } from '@/modules/ads/report-data';
+
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 });
 const abbreviations = new Set(['cpc', 'cpm', 'cpp', 'ctr', 'roas', 'roi', 'id']);
 
@@ -14,6 +16,7 @@ function display(value: unknown): string {
 
 /** Flatten JSON values from a provider without dropping an unrecognized metric. */
 export function storedFieldRows(value: unknown): Array<{ label: string; value: string }> {
+  const sanitized = sanitizeAdsReportJson(value).value;
   const rows: Array<{ label: string; value: string }> = [];
   function visit(current: unknown, path: string[]) {
     if (Array.isArray(current)) {
@@ -31,7 +34,7 @@ export function storedFieldRows(value: unknown): Array<{ label: string; value: s
       rows.push({ label: path.join(' · ') || 'Value', value: display(current) });
     }
   }
-  visit(value, []);
+  visit(sanitized, []);
   return rows;
 }
 

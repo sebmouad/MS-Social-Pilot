@@ -111,3 +111,14 @@ Page errors retain filters and support first-page recovery. Representative actua
 phone/desktop and HTTP/MCP evidence is in PREVIEW_QA.md. Byte/time/query pagination,
 large async reports, general copy, provider status/freshness, comparisons/exports,
 numeric Root input hints and the wider full-app UX/parity matrix remain open.
+
+## Stored Ads detail/export — batch 59
+
+One shared confirmed CSV control now serves Publishing and Ads. Ads exports
+applied filters from the sidebar across every matching page/level; its feedback
+is focused and stale/unmounted reads are ignored. Complete daily expansions
+reuse one metric presentation across account cards/table/mobile objects.
+ADS_REPORT_EXPORT.md documents scope and limitations. PREVIEW_QA.md records
+desktop/phone themed browser checks and synthetic API/MCP evidence. Wider copy,
+comparison/status presentation and full application accessibility/parity remain
+unfinished; this is a working batch, not production cutover.

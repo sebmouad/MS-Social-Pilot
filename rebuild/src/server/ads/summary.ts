@@ -5,6 +5,8 @@ export type InsightRow = {
   objectId: string;
   objectName: string | null;
   date: Date;
+  /** Legacy fixtures may predate fetch provenance. Never substitute the report day. */
+  fetchedAt?: Date;
   spend: number;
   impressions: number;
   clicks: number;
@@ -40,7 +42,7 @@ export type AdsSummary = {
   actions: Array<{ name: string; value: number }>;
   fields: unknown;
   fieldsDate: Date;
-  dailyMetrics: Array<{ date: Date; cpc: number | null; cpm: number | null; cpp: number | null; ctr: number | null; frequency: number | null; actions: unknown; fields: unknown }>;
+  dailyMetrics: Array<{ date: Date; fetchedAt: Date | null; spend: number; impressions: number; clicks: number; reach: number; cpc: number | null; cpm: number | null; cpp: number | null; ctr: number | null; frequency: number | null; actions: unknown; fields: unknown }>;
   rows: number;
 };
 
@@ -71,7 +73,7 @@ export function summarizeInsights(rows: readonly InsightRow[], level?: string): 
     current.impressions += row.impressions;
     current.clicks += row.clicks;
     current.rows += 1;
-    current.dailyMetrics.push({ date: row.date, cpc: row.cpc, cpm: row.cpm, cpp: row.cpp, ctr: row.ctr, frequency: row.frequency, actions: row.actions, fields: row.fields });
+    current.dailyMetrics.push({ date: row.date, fetchedAt: row.fetchedAt ?? null, spend: row.spend, impressions: row.impressions, clicks: row.clicks, reach: row.reach, cpc: row.cpc, cpm: row.cpm, cpp: row.cpp, ctr: row.ctr, frequency: row.frequency, actions: row.actions, fields: row.fields });
     if (row.date > current.nameDate) {
       current.name = row.objectName || row.objectId;
       current.nameDate = row.date;

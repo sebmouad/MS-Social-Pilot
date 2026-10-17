@@ -25,6 +25,9 @@ import { parsePublishingMedia } from '@/modules/publishing/media-support';
 import { runtimeConfig } from '../config/store';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
 import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
+import { readAdsDailyRows } from '@/modules/ads/server/report-read';
+import { exportAdsReport } from '@/modules/ads/server/export';
+import { adsReportToolDefinitions, ADS_MCP_MAX_PAGE_ITEMS } from '@/modules/ads/mcp-metadata';
 import { parseAdsPerformanceFilters } from '@/modules/ads/performance-filters';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
@@ -57,6 +60,7 @@ const postMediaInputSchema = {
 
 const tools = [
   ...rootToolDefinitions,
+  ...adsReportToolDefinitions,
   { name: 'list_workspace_images', description: 'List bounded workspace image metadata. Image bytes remain in workspace storage and are not included.', inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 200 }, cursor: { type: 'string' } }, additionalProperties: false } },
   { name: 'get_workspace_image', description: 'Read metadata for one image stored in this workspace.', inputSchema: { type: 'object', required: ['imageId'], properties: { imageId: { type: 'string' } }, additionalProperties: false } },
   { name: 'delete_workspace_image', description: 'Permanently delete an unused workspace image. Images attached to posts cannot be deleted. Confirmation must exactly match DELETE WORKSPACE IMAGE <imageId>.', inputSchema: { type: 'object', required: ['imageId', 'confirmation'], properties: { imageId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -132,6 +136,8 @@ const toolFeatures: Record<string, string> = {
   get_analytics_overview: 'analytics/overview',
   get_analytics_metric_details: 'analytics/overview',
   get_ads_performance: 'ads/campaigns',
+  get_ads_report_rows: 'ads/campaigns',
+  export_ads_report: 'ads/campaigns',
   get_live_ad_status: 'ads/campaigns',
   list_ad_accounts: 'ads/campaigns',
   get_ad_creation_options: 'ads/campaigns',
@@ -434,6 +440,14 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       ]);
       return { accounts, accountCount, nextOffset: offset + accounts.length < accountCount ? offset + accounts.length : null };
     }
+    case 'get_ads_report_rows': {
+      if (args.limit !== undefined && (!Number.isSafeInteger(args.limit) || (args.limit as number) < 1 || (args.limit as number) > ADS_MCP_MAX_PAGE_ITEMS)) {
+        throw new OperationError('invalid_request', `limit must be an integer from 1 to ${ADS_MCP_MAX_PAGE_ITEMS}.`);
+      }
+      return readAdsDailyRows({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, args, { maxItems: cap });
+    }
+    case 'export_ads_report':
+      return exportAdsReport({ userId: viewer.userId, workspaceId: viewer.workspaceId, allowedTargetIds: pageIdsFor(viewer) }, args, { maxItems: cap });
     case 'get_ads_performance': {
       const allowedTargetIds = pageIdsFor(viewer);
       const policy = await loadAdsReportPolicy();
@@ -778,10 +792,11 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
     { uri: 'msp://inbox', name: 'Inbox', description: 'Recent synced inbox activity.', mimeType: 'application/json' },
     { uri: 'msp://analytics/overview', name: 'Analytics overview', description: 'Selected-channel audience totals and available stored metrics for the default date range.', mimeType: 'application/json' },
     { uri: 'msp://ads/performance', name: 'Ads performance', description: 'Stored campaign, ad set, and ad performance for the default date range.', mimeType: 'application/json' },
+    { uri: 'msp://ads/daily', name: 'Ads daily metrics', description: 'Bounded daily stored Ads metrics, actions, additional fields and fetch provenance. Continue through get_ads_report_rows.', mimeType: 'application/json' },
     { uri: 'msp://data/deletion-preview', name: 'Data deletion preview', description: 'Current workspace record counts before deletion.', mimeType: 'application/json' },
     ...(canUseRootTool(viewer) ? rootResources : []),
   ].filter(resource => {
-    const feature = resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : resource.uri === 'msp://ads/performance' ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
+    const feature = resource.uri === 'msp://targets' ? 'settings/connections' : resource.uri === 'msp://posts' ? 'publishing/posts' : resource.uri === 'msp://media/images' ? 'publishing/media' : resource.uri === 'msp://inbox' ? 'inbox/conversations' : resource.uri === 'msp://analytics/overview' ? 'analytics/overview' : ['msp://ads/performance', 'msp://ads/daily'].includes(resource.uri) ? 'ads/campaigns' : resource.uri === 'msp://data/deletion-preview' ? 'settings/data' : null;
     return (!dataResource(resource.uri) || canManageData(viewer)) && (feature === null || (canUseFeature(viewer.entitlements, feature) && Boolean(viewer.permissions && canAccessFeature(viewer.permissions, feature, 'read'))));
   }) });
   }
@@ -808,6 +823,7 @@ export async function handleMcpMessage(viewer: McpIdentity, message: Record<stri
       else if (uri === 'msp://inbox') contents = await runTool(viewer, 'list_inbox', {});
       else if (uri === 'msp://analytics/overview') contents = await runTool(viewer, 'get_analytics_overview', {});
       else if (uri === 'msp://ads/performance') contents = await runTool(viewer, 'get_ads_performance', {});
+      else if (uri === 'msp://ads/daily') contents = await runTool(viewer, 'get_ads_report_rows', {});
       else if (uri === 'msp://data/deletion-preview') contents = await runTool(viewer, 'preview_workspace_data_deletion', {});
       else return error(-32602, `Unknown resource: ${uri}`);
       return reply({ contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(contents, null, 2) }] });

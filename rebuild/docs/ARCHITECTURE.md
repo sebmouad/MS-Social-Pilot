@@ -528,3 +528,20 @@ This is bounded synchronous aggregation, not database object pagination or a
 cross-request snapshot. Byte/time bounds, asynchronous large reports, directory
 paging, comparisons/export/freshness/status, full daily MCP details, broader
 Ads/legacy parity and cutover remain unfinished. Production remains legacy.
+
+## Stored Ads daily details and complete CSV — batch 59
+
+Registry 54 installs consumed Ads-owned detail/export byte bounds and a safe CSV
+filename. Current-authorized module services expose stored daily scalar metrics,
+actions, additional fields and fetch provenance through HTTP/MCP, plus complete-
+or-refused CSV. MCP has scoped daily tools/resource and a whole-export row cap;
+customer read access does not grant management. Both Ads pages now explicitly
+use the channel-scoped reader path. Daily expansions share a complete metric
+presentation; existing raw-field views also apply the neutral credential scrub.
+
+Publishing and Ads reuse one confirmed, stale-safe CSV download component. Root
+policy controls limits and filename without source edits; typed invalid policy
+fails closed. ADS_REPORT_EXPORT.md owns the protocol and documented redaction,
+snapshot/performance and provider-coverage limitations. PREVIEW_QA.md records
+actual evidence. These stored reads/exports do not complete Ads management,
+Facebook/legacy/MCP parity or production cutover; legacy remains running.

@@ -37,6 +37,15 @@ describe('bounded stored Ads reads', () => {
     expect(ADS_CONFIG.find(setting => setting.key === 'ads.reportPageSize')?.schema.safeParse(101).success).toBe(false);
     expect(ADS_CONFIG.find(setting => setting.key === 'ads.reportMaxRows')?.schema.safeParse(1).success).toBe(true);
     expect(ADS_CONFIG.find(setting => setting.key === 'ads.reportMaxRows')?.schema.safeParse(100001).success).toBe(false);
+    expect(ADS_CONFIG.filter(setting => ['ads.detailMaxBytes', 'ads.exportMaxBytes', 'ads.exportFileName'].includes(setting.key)))
+      .toMatchObject([
+        { key: 'ads.detailMaxBytes', kind: 'number', defaultValue: 1048576, consumption: 'active' },
+        { key: 'ads.exportMaxBytes', kind: 'number', defaultValue: 10485760, consumption: 'active' },
+        { key: 'ads.exportFileName', kind: 'text', defaultValue: 'ads-report.csv', consumption: 'active' },
+      ]);
+    expect(ADS_CONFIG.find(setting => setting.key === 'ads.detailMaxBytes')?.schema.safeParse(1024).success).toBe(true);
+    expect(ADS_CONFIG.find(setting => setting.key === 'ads.exportMaxBytes')?.schema.safeParse(52428801).success).toBe(false);
+    expect(ADS_CONFIG.find(setting => setting.key === 'ads.exportFileName')?.schema.safeParse('../ads.csv').success).toBe(false);
   });
 
   it('loads the stored page and row bounds from the active Root settings', async () => {
@@ -57,7 +66,7 @@ describe('bounded stored Ads reads', () => {
     const filters = parseAdsFilters({ period: '7d' }, ['ad-a'], new Date('2026-10-15T00:00:00Z'));
     db.insights.mockResolvedValue([{ id: 'i1' }, { id: 'i2' }]);
     const result = await getAdsDataset('workspace-a', filters, ['target-a'], ['facebook']);
-    expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ take: 3 }));
+    expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({ take: 3, select: expect.objectContaining({ fetchedAt: true }) }));
     expect(result.insights).toHaveLength(2);
     expect(result.pageSize).toBe(25);
   });
@@ -106,5 +115,21 @@ describe('bounded stored Ads reads', () => {
       where: expect.objectContaining({ level: { in: ['campaign', 'adset', 'ad'] } }),
       take: 20001,
     }));
+  });
+
+  it('applies a validated account, single level and object id before the row cap and returns active ceilings', async () => {
+    const filters = parseAdsFilters({ period: '7d', account: 'ad-a' }, ['ad-a'], new Date('2026-10-15T00:00:00Z'));
+    const result = await getAdsDataset('workspace-a', filters, ['target-a'], ['facebook'], { levels: ['campaign'], objectId: 'campaign-a' });
+    expect(db.insights).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ level: { in: ['campaign'] }, objectId: 'campaign-a' }), take: 20001,
+    }));
+    expect(result).toMatchObject({ pageSize: 25, maxRows: 20000 });
+  });
+
+  it('rejects an object filter without a specific account and one level before querying accounts', async () => {
+    const filters = parseAdsFilters({}, ['ad-a']);
+    await expect(getAdsDataset('workspace-a', filters, ['target-a'], ['facebook'], { objectId: 'campaign-a' })).rejects.toMatchObject({ code: 'invalid_request' });
+    await expect(getAdsDataset('workspace-a', filters, ['target-a'], ['facebook'], { levels: ['campaign'], objectId: 'campaign-a' })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(db.accounts).not.toHaveBeenCalled();
   });
 });

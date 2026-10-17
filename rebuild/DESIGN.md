@@ -111,3 +111,12 @@ secondary controls. Unavailable directions are noninteractive text with a clear
 disabled state. The same layout fits the phone drawer; it adds no content-side
 menu. Report headers explain the visible slice, while metric cards retain scoped
 totals. Page/size failures reuse the existing focused notice and sidebar controls.
+
+Ads and Publishing use `CsvExportButton` for confirmed downloads and focused
+feedback. Product wrappers own scope/copy; the shared control owns pending,
+receipt checks, cancellation and stale-result suppression. Ads export sits below
+report paging in the same sidebar/drawer. Daily Ads details use one semantic
+metric presentation across account cards and object table/mobile views, including
+report day, separate fetch time, units and unknown provenance. Existing tokens,
+shared buttons and natural detail scrolling govern the component; no new menu,
+theme palette or provider-specific visual rule is introduced.

@@ -185,3 +185,13 @@ stable for unchanged data. This closes bounded synchronous UI browsing gaps only
 database object/directory paging, byte/time bounds, asynchronous reports, daily
 MCP detail coverage, comparisons/exports/freshness/status and wider Ads/legacy/
 release requirements remain open. Production is unchanged.
+
+Ads stored daily metrics/export, batch 59: scoped service/API/MCP reads expose
+all stored scalar/action/additional values and fetch provenance; daily UI also
+shows primary measures. Complete CSV uses applied report filters, every matching
+level/page, explicit credential redactions, spreadsheet-safe strings and current
+Root row/byte/filename controls. Oversized exports return no partial result.
+Shared download behavior handles stale/unmounted reads and receipt validation.
+This closes the stored detail/export gaps at that scope. It does not establish
+every provider metric collection, advanced reporting/comparison/status, complete
+Ads creation/management, full MCP/legacy parity or release readiness.

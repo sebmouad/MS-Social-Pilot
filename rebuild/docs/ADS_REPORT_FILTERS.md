@@ -190,3 +190,11 @@ coverage, wider Ads/legacy/MCP parity and release gates remain open. Root numeri
 forms still rely on server schemas rather than generated native min/max hints.
 No DDL or provider/production change was made. PREVIEW_QA.md records actual tests,
 HTTP/MCP probe, browser checks and exact local setting restoration.
+
+Batch 59 extends these filters with complete stored daily HTTP/MCP reads and
+complete-or-refused CSV, byte limits and fetch provenance. See
+ADS_REPORT_EXPORT.md for canonical account/level/object inputs, output policy,
+credential redactions and current limitations; PREVIEW_QA.md records evidence.
+The earlier open export/daily-detail gaps are superseded at that stored-data
+scope only. Database execution-time limits, async/snapshot reports, directory
+paging, advanced provider metrics/management and release gates remain open.

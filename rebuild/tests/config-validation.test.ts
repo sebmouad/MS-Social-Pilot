@@ -27,7 +27,7 @@ describe('configuration registry', () => {
   });
 
   it('covers the operational configuration areas with explicit consumption status', () => {
-    expect(CONFIG_SCHEMA_VERSION).toBe(53);
+    expect(CONFIG_SCHEMA_VERSION).toBe(54);
     expect(safeConfigShape().find(setting => setting.key === 'ads.reportingFilters')).toMatchObject({ kind: 'json', consumption: 'active', owner: { kind: 'product', id: 'ads' } });
     for (const [key, value, maximum] of [['ads.reportPageSize', 25, 100], ['ads.reportMaxRows', 20000, 100000]] as const) {
       expect(CONFIG_BY_KEY.get(key)).toMatchObject({ defaultValue: value, consumption: 'active' });
@@ -35,6 +35,18 @@ describe('configuration registry', () => {
       expect(CONFIG_BY_KEY.get(key)!.schema.safeParse(maximum + 1).success).toBe(false);
       expect(safeConfigShape().find(setting => setting.key === key)?.owner).toEqual({ kind: 'product', id: 'ads' });
     }
+    for (const [key, value, maximum] of [['ads.detailMaxBytes', 1048576, 10485760], ['ads.exportMaxBytes', 10485760, 52428800]] as const) {
+      const setting = CONFIG_BY_KEY.get(key)!;
+      expect(setting).toMatchObject({ defaultValue: value, consumption: 'active' });
+      expect(safeConfigShape().find(item => item.key === key)?.owner).toEqual({ kind: 'product', id: 'ads' });
+      for (const invalid of [1023, maximum + 1, 2048.5, '2048']) expect(setting.schema.safeParse(invalid).success).toBe(false);
+      expect(setting.schema.safeParse(maximum).success).toBe(true);
+    }
+    const filename = CONFIG_BY_KEY.get('ads.exportFileName')!;
+    expect(filename).toMatchObject({ defaultValue: 'ads-report.csv', consumption: 'active' });
+    expect(safeConfigShape().find(item => item.key === filename.key)?.owner).toEqual({ kind: 'product', id: 'ads' });
+    expect(filename.schema.safeParse('Daily report-1.csv').success).toBe(true);
+    for (const invalid of ['../report.csv', '/report.csv', 'report.csv\r\nInjected: yes', 'report.xlsx', '=report.csv', 'x'.repeat(101) + '.csv']) expect(filename.schema.safeParse(invalid).success).toBe(false);
     expect(CONFIG_BY_KEY.get('meta.manualMediaAttestationEnabled')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'platform', id: 'facebook' } });
     expect(CONFIG_BY_KEY.get('meta.manualMediaCleanupEnabled')).toMatchObject({ defaultValue: false, consumption: 'active', owner: { kind: 'platform', id: 'facebook' } });
     for (const key of ['meta.mediaReadScopes', 'meta.mediaDeleteScopes']) {
