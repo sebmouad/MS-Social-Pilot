@@ -1,4 +1,4 @@
-# Ads report filter scope and correction — batch 56
+# Ads report filters and Root policy — batches 56–57
 
 ## Current behavior
 
@@ -46,9 +46,89 @@ production deployment was introduced. The existing MCP report already refuses
 unavailable account IDs; its authenticated response was checked again.
 This is not a new Ads API or complete reporting/MCP parity.
 
-The preset catalog/default and newer correction copy still require the target's
-Root-managed configuration/copy catalog. UI range ceilings need consolidation
-with the existing MCP policy, and complete report pagination, comparisons,
-freshness/status presentation, exports and broader Ads workflows remain open.
-This batch does not claim all Ads logic is physically encapsulated, all controls
-are Root-managed, or the app/core design is complete.
+The Root preset/default and UI/MCP date-policy gaps identified in batch 56 are
+addressed below. Complete report pagination, comparisons, freshness/status
+presentation, exports and broader Ads workflows remain open.
+
+## Root-managed reporting policy — batch 57
+
+Registry **52** installs `ads.reportingFilters` from the Ads-owned `config.ts`.
+The public module manifest owns its `ads.` prefix; executable validation schemas
+stay out of client manifests. Root groups the control under Product modules →
+Ads → Ads. Existing Root UI, HTTP and installation MCP writes use the registry
+schema, persistence service and value-free atomic `config.changed` audit.
+
+The setting is one strict JSON object so coupled changes validate atomically:
+
+```json
+{
+  "presets": [
+    { "id": "7d", "days": 7, "label": "Last 7 days" },
+    { "id": "30d", "days": 30, "label": "Last 30 days" },
+    { "id": "90d", "days": 90, "label": "Last 90 days" }
+  ],
+  "defaultPreset": "30d",
+  "maxRangeDays": 366,
+  "maxFilterCharacters": 200
+}
+```
+
+Root may replace preset IDs, durations, labels and the default without editing
+source. The schema requires 1–12 unique presets, a listed default, safe IDs of
+at most 32 characters, labels of at most 80 characters without control codes,
+and every duration within the configured maximum. The maximum is an integer
+1–3650 days; the filter-string ceiling is 10–2048 UTF-16 code units and must fit
+every preset ID. Ten accommodates ISO calendar dates. These outer integrity
+caps and the reserved `custom` token are code-owned format constraints, not
+separately configurable operational defaults.
+
+The authenticated server loads and validates one policy per report request.
+Only serializable public filter metadata enters the client form; no registry
+schema, secret or provider setting is passed to it. Unreadable/invalid policy
+fails closed with safe recovery text. Old preset URLs require correction when
+Root removes their preset; they never become the new default silently. Empty
+`account=` now also requires correction; a missing account filter or explicit
+UI `all` is the deliberate all-account selection.
+
+Both report pages and `get_ads_performance` use the same pure Ads parser for
+date presets, inclusive UTC custom days, character ceilings and account scope.
+The data query independently intersects workspace/resource/provider access.
+This removes the MCP report's former Analytics-policy dependency and local-time
+date interpretation. Custom endpoints are represented internally with an
+exclusive end. The sidebar explains the configured day limit and keeps invalid
+input for correction.
+
+MCP accepts a current `period` preset ID, or `period: "custom"` with both
+`start` and `end`. Mixing a preset and explicit dates is refused. Omitting
+`period` preserves partial-date requests: start-only ends today in UTC;
+end-only uses the default preset duration ending on that day. All paths enforce
+the same inclusive ceiling. A supplied MCP `accountId` is always an explicit
+authorized ID; empty/reserved/unknown values cannot widen scope. Responses expose
+safe `reportOptions` and identify `range.to` with `endExclusive: true`; the
+performance resource uses the same default tool path.
+
+Root HTTP schema validation now returns an actionable 400 with field path and
+validation guidance before persistence. Workspace owners remain separate from
+installation owners; workspace API keys cannot read or save Root policy.
+Persistence failures remain generic and do not expose database details.
+
+This closes the preset, label/default, date and filter-string policy gaps only.
+General filter/error copy still needs the requested Root copy catalog. Database
+row bounds, complete UI pagination, Ads comparisons/exports/freshness, readable
+provider-owned account status, wider module encapsulation and full legacy/MCP
+parity remain unfinished. No DDL, provider write or production cutover occurs.
+PREVIEW_QA.md records automated and actual runtime/browser evidence separately.
+
+## Guarded local runtime probe
+
+Run `scripts/verify-ads-report-policy.ts` from the rebuild with a private Node
+environment file and `--import tsx`. Set `DATABASE_URL` and
+`REBUILD_PREVIEW_DATABASE_URL` to the same explicit loopback PostgreSQL database
+whose name ends `_preview`, and `REBUILD_PREVIEW_ORIGIN` to the canonical local
+HTTP origin. Production mode, other origins and database host overrides are
+refused. The seeded `preview-qa@example.test` owner/workspace and example ad
+accounts are required. The probe creates identifiable temporary identities,
+saves the public policy through Root HTTP/MCP, reads stored example reports and
+rendered pages, and finally restores the exact prior policy row and removes its
+fixtures. Do not run concurrent policy edits during this temporary local check.
+No provider API or production application is exercised by it.

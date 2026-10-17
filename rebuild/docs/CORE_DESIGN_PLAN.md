@@ -91,3 +91,13 @@ the remaining Root catalog, report pagination, status/freshness and wider UX gap
 Inbox write receipts now refuse fabricated success after invalid/lost responses and retain reply/delete context. Local workflow controls are independent of remote credential readiness. Chrome phone checks resumed after workspace credits were refilled: long reply auto-growth, four-theme overflow, offline text retention, history paging/drawer closure and Root inline validation were checked. These representative checks do not complete all-screen accessibility/visual verification. Durable remote deletion and its MCP/UI recovery remain required; INBOX_WRITE_RECOVERY.md gives the implementation contract.
 
 Inbox recovery verification (2026-10-16): the shared destructive dialog now distinguishes new intent from existing deletion status, preserves offline/error context, checks durable state and offers provider-free local finalization. Private recovery lives with the Inbox product module in Root and reuses shared table/form/dialog controls. Actual Chrome desktop/phone, reduced-motion, temporary theme-token/layout, safe focus/Escape, Root attestation and synthetic local finalization evidence is in PREVIEW_QA.md. This is representative workflow evidence; complete cross-screen design/accessibility verification remains open.
+
+## Ads policy integration — batch 57
+
+The existing sidebar form now consumes Root-managed preset labels/defaults and
+range limits across success and correction states. MCP shares the policy and
+UTC parser. Empty accounts no longer become All accounts implicitly. Root
+validates JSON policies before persistence and keeps useful field guidance.
+ADS_REPORT_FILTERS.md and PREVIEW_QA.md own detailed scope and proof. General
+copy configuration, table selection/pagination, status/freshness, comparisons,
+exports and full app design/accessibility coverage remain unfinished.

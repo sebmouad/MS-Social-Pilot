@@ -166,3 +166,12 @@ definitively provider-rejected feed plus the existing manual checks. This closes
 the manual-reporting gap only. It does not provide arbitrary conflict resolution,
 candidate search, live create/delete proof, complete Publishing/Facebook or MCP
 parity, or cutover. See FACEBOOK_MEDIA_RECOVERY.md and UX-CONTRACT.md.
+
+Ads reporting policy, batch 57: presets, labels/defaults, calendar range ceilings
+and filter-string limits are now one Ads-owned, Root-managed object consumed by
+both UI and MCP. MCP exposes/selects current presets and uses UTC inclusive days
+with an explicitly exclusive returned end. Root HTTP validation fails before
+persistence; empty/stale filters fail without broadening scope. This addresses
+those batch-56 policy gaps only. General copy configuration, report row bounds,
+complete pagination, comparisons, exports, freshness/status presentation and
+broader Ads/legacy/MCP capability and cutover gates remain open.

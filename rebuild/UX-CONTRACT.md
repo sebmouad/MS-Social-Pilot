@@ -357,3 +357,17 @@ Inputs use shared 44px fields and buttons. Account summary counts follow the sam
 selection as their cards. Actual phone correction/submission, stale account and
 reversed-date checks are recorded in PREVIEW_QA.md; ADS_REPORT_FILTERS.md records
 remaining policy, pagination and broader design/feature gaps.
+
+## Ads report policy — batch 57
+
+Root Ads controls define report preset IDs, labels, durations, default, calendar
+ceiling and filter-string limit as one validated object. Both report pages use
+those choices, including their correction views; custom ranges explain the
+active day ceiling in the sidebar. Removed presets and an explicitly empty
+account value require correction without loading a wider report. MCP uses the
+same policy and UTC calendar parser, returns safe report options and labels its
+exclusive end. Root invalid saves return a useful 400 without changing policy;
+workspace owners/keys cannot acquire Root access. ADS_REPORT_FILTERS.md defines
+date semantics; PREVIEW_QA.md distinguishes automated, rendered HTTP and actual
+interactive browser proof. General copy configuration and complete reporting,
+visual/accessibility and legacy parity remain open.

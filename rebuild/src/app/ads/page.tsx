@@ -5,19 +5,21 @@ import { AdsFiltersSidebar, AdsFilterErrorView, adsQuery, dateRangeLabel } from 
 import { getAdsAccounts, getAdsDataset, parseAdsFilters, AdsFilterError, type AdsSearchParams } from '@/server/ads/queries';
 import { summarizeInsights } from '@/server/ads/summary';
 import { StoredFields } from './stored-fields';
+import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
 
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const money = (value: number | null, currency: string | null) => value === null ? '—' : `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
 
 export default async function AdsPage({ searchParams }: { searchParams: Promise<AdsSearchParams> }) {
   const { workspaceId, permissions, entitlements } = await requireViewer({ feature: 'ads/overview' });
+  const policy = await loadAdsReportPolicy();
   const allowedTargetIds = permissions.pageScope.all ? undefined : permissions.pageScope.ids;
   const allowedProviders = entitledPlatformIds(entitlements);
   const params = await searchParams;
   const accounts = await getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders);
   let filters;
-  try { filters = parseAdsFilters(params, accounts.map(account => account.id)); }
-  catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView accounts={accounts} input={params} error={error} action="/ads" title="Ad accounts" />; }
+  try { filters = parseAdsFilters(params, accounts.map(account => account.id), undefined, policy); }
+  catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView accounts={accounts} input={params} error={error} action="/ads" title="Ad accounts" policy={policy} />; }
   const dataset = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders);
   const accountSummaries = summarizeInsights(dataset.insights, 'account');
   const campaigns = summarizeInsights(dataset.insights, 'campaign');
@@ -27,7 +29,7 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
   const visibleAccounts = filters.accountId ? dataset.accounts.filter(account => account.id === filters.accountId) : dataset.accounts;
   const enabled = visibleAccounts.filter(account => account.enabled).length;
   const synced = visibleAccounts.filter(account => account.lastSyncedAt).length;
-  const sidebar = <AdsFiltersSidebar accounts={dataset.accounts} filters={filters} />;
+  const sidebar = <AdsFiltersSidebar accounts={dataset.accounts} filters={filters} policy={policy} />;
   return <PageFrame module="ads" sidebar={dataset.accounts.length ? sidebar : undefined}><div className="page-stack">
     <header className="page-heading"><div><p className="eyebrow">Ads</p><h1>Ad accounts</h1><p>{dataset.accounts.length ? `Stored delivery performance · ${dateRangeLabel(filters)}. Account currencies remain separate.` : 'Connect the advertising accounts you want to manage.'}</p></div></header>
     {!dataset.accounts.length ? <section className="panel empty-state"><h2>No ad accounts connected</h2><p>Connect and select an advertising account to see delivery and manage campaigns here.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <>

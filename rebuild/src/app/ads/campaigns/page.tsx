@@ -10,6 +10,7 @@ import { AdsObjectActions } from '../AdsObjectActions';
 import { CampaignCreateForm } from '../CampaignCreateForm';
 import { AdSetCreateForm } from '../AdSetCreateForm';
 import { platformAds } from '@/server/platforms/registry';
+import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
 
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const money = (value: number | null, currency: string | null) => value === null ? '—' : `${currency ? `${currency} ` : ''}${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
@@ -18,12 +19,13 @@ const date = (value: Date) => new Intl.DateTimeFormat(undefined, { dateStyle: 'm
 export default async function CampaignsPage({ searchParams }: { searchParams: Promise<AdsSearchParams> }) {
   const viewer = await requireViewer({ feature: 'ads/campaigns' });
   const { workspaceId } = viewer;
+  const policy = await loadAdsReportPolicy();
   const allowedProviders = entitledPlatformIds(viewer.entitlements);
   const allowedTargetIds = viewer.permissions.pageScope.all ? undefined : viewer.permissions.pageScope.ids;
   const [params, accounts] = await Promise.all([searchParams, getAdsAccounts(workspaceId, allowedTargetIds, allowedProviders)]);
   let filters;
-  try { filters = parseAdsFilters(params, accounts.map(account => account.id)); }
-  catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView accounts={accounts} input={params} error={error} action="/ads/campaigns" title="Campaign, ad set, and ad results" />; }
+  try { filters = parseAdsFilters(params, accounts.map(account => account.id), undefined, policy); }
+  catch (error) { if (!(error instanceof AdsFilterError)) throw error; return <AdsFilterErrorView accounts={accounts} input={params} error={error} action="/ads/campaigns" title="Campaign, ad set, and ad results" policy={policy} />; }
   const { insights } = await getAdsDataset(workspaceId, filters, allowedTargetIds, allowedProviders);
   const summaries = summarizeInsights(insights).filter(row => ['campaign', 'adset', 'ad'].includes(row.level));
   const byAccount = groupSummariesByAccount(summaries);
@@ -37,7 +39,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   ] as const)));
   const createAvailability = new Map(await Promise.all(accounts.map(async account => [account.id, await canManageWorkspaceAds({ userId: viewer.user.id, workspaceId }, account.id)] as const)));
   const adsUi = new Map(await Promise.all(accounts.map(async account => [account.id, account.socialAccount ? (await platformAds(account.socialAccount.provider))?.ui ?? null : null] as const)));
-  const sidebar = <AdsFiltersSidebar accounts={accounts} filters={filters} action="/ads/campaigns" />;
+  const sidebar = <AdsFiltersSidebar accounts={accounts} filters={filters} action="/ads/campaigns" policy={policy} />;
   return <PageFrame module="ads" sidebar={accounts.length ? sidebar : undefined}><div className="page-stack">
     <header className="page-heading"><div><p className="eyebrow">Ads / Performance</p><h1>Campaign, ad set, and ad results</h1><p>{accounts.length ? `Stored daily insight records · ${dateRangeLabel(filters)}. Select an account and date range in the sidebar.` : 'Connect an advertising account to review and manage its campaigns.'}</p></div></header>
     {!accounts.length ? <section className="panel empty-state"><h2>No ad accounts connected</h2><p>Connect and select an advertising account to see campaign results and available actions here.</p><a className="text-link" href="/settings/connections">View connections</a></section> : <>

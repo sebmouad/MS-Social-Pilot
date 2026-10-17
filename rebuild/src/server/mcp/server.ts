@@ -24,7 +24,8 @@ import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/fi
 import { parsePublishingMedia } from '@/modules/publishing/media-support';
 import { runtimeConfig } from '../config/store';
 import { readAnalyticsSnapshot } from '@/modules/analytics/server/read';
-import { analyticsRange } from '../analytics/data';
+import { loadAdsReportPolicy } from '@/modules/ads/server/report-policy';
+import { parseAdsPerformanceFilters } from '@/modules/ads/performance-filters';
 import { deleteWorkspaceData, exportWorkspaceData, previewWorkspaceDataDeletion } from '../data-control';
 import { assertWorkspaceNotPurging, withWorkspaceOperation } from '../data-control/guard';
 import { campaignCreationConfirmation, canManageWorkspaceAds, createWorkspaceAdCampaign, createWorkspaceAdSet, readWorkspaceAdObject, updateWorkspaceAd } from '../ads/actions';
@@ -75,7 +76,7 @@ const tools = [
   { name: 'get_analytics_metric_details', description: 'Read a bounded page of stored date points or channel/breakdown rows for one Analytics metric. Continue with nextOffset until null.', inputSchema: { type: 'object', required: ['metricKey', 'kind'], properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, compare: { type: 'string', enum: ['none', 'previous', 'year'] }, targetIds: { type: 'array', items: { type: 'string' }, description: 'Selected channel IDs; omit to use every accessible channel. An empty array selects no channels.' }, adAccountIds: { type: 'array', items: { type: 'string' }, description: 'Selected ad account IDs; omit to use every accessible account. An empty array selects no ad accounts.' }, search: { type: 'string' }, metricKey: { type: 'string', minLength: 1 }, kind: { type: 'string', enum: ['points', 'rows'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'list_ad_accounts', description: 'List advertising accounts in this workspace using bounded offset pagination.', inputSchema: { type: 'object', properties: { offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 } }, additionalProperties: false } },
   { name: 'get_ad_creation_options', description: 'Read safe Ads creation choices and exact confirmation formats for one enabled, connected advertising account. Only workspace owners and admins can use this tool.', inputSchema: { type: 'object', required: ['adAccountId'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' } }, additionalProperties: false } },
-  { name: 'get_ads_performance', description: 'Read stored campaign, ad set, and ad performance for accessible ad accounts. Performance rows and account summaries have independent offsets.', inputSchema: { type: 'object', properties: { start: { type: 'string', description: 'Start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'End date, YYYY-MM-DD.' }, accountId: { type: 'string', description: 'Accessible ad account ID.' }, level: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, accountOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
+  { name: 'get_ads_performance', description: 'Read stored campaign, ad set, and ad performance for accessible ad accounts. reportOptions lists current date presets and bounds. Defaults use the Ads report policy. Date inputs are inclusive UTC calendar days; range.to is exclusive. Without period, a start-only request ends today, and an end-only request uses the default preset duration. Performance rows and account summaries have independent offsets.', inputSchema: { type: 'object', properties: { period: { type: 'string', description: 'A current preset ID from reportOptions, or custom with both start and end. Do not combine presets and explicit dates.' }, start: { type: 'string', description: 'Inclusive UTC start date, YYYY-MM-DD.' }, end: { type: 'string', description: 'Inclusive UTC end date, YYYY-MM-DD.' }, accountId: { type: 'string', description: 'Accessible ad account ID.' }, level: { type: 'string', enum: ['campaign', 'adset', 'ad'] }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 200 }, accountOffset: { type: 'integer', minimum: 0 } }, additionalProperties: false } },
   { name: 'get_live_ad_status', description: 'Read live configured and effective status for a campaign, ad set, or ad verified in stored insights. Requires Ads read access and an enabled connected account visible to your page scope.', inputSchema: { type: 'object', required: ['adAccountId', 'objectId', 'objectType'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, objectId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, objectType: { type: 'string', enum: ['campaign', 'adset', 'ad'] } }, additionalProperties: false } },
   { name: 'create_ad_campaign', description: 'Create a paused campaign in the selected advertising account. Use the selected platform objective and exact confirmation format.', inputSchema: { type: 'object', required: ['adAccountId', 'name', 'objective', 'confirmation'], properties: { adAccountId: { type: 'string' }, name: { type: 'string' }, objective: { type: 'string', minLength: 1, maxLength: 100 }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'create_ad_set', description: 'Create a paused ad set under a campaign verified in the selected account. Requires all Pages in scope. Confirmation must exactly match the account platform format.', inputSchema: { type: 'object', required: ['adAccountId', 'campaignId', 'name', 'dailyBudgetMinor', 'countryCode', 'optimizationGoal', 'confirmation'], properties: { adAccountId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, campaignId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' }, name: { type: 'string', minLength: 1, maxLength: 100 }, dailyBudgetMinor: { type: 'integer', minimum: 1 }, countryCode: { type: 'string', pattern: '^[A-Z]{2}$' }, optimizationGoal: { type: 'string', minLength: 1, maxLength: 100 }, confirmation: { type: 'string', maxLength: 500 } }, additionalProperties: false } },
@@ -434,25 +435,12 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       return { accounts, accountCount, nextOffset: offset + accounts.length < accountCount ? offset + accounts.length : null };
     }
     case 'get_ads_performance': {
-      const date = (key: 'start' | 'end') => {
-        const value = args[key];
-        if (value === undefined) return undefined;
-        if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new OperationError('invalid_request', `${key} must be a valid YYYY-MM-DD date.`);
-        const parsed = new Date(`${value}T00:00:00.000Z`);
-        if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) throw new OperationError('invalid_request', `${key} must be a valid YYYY-MM-DD date.`);
-        return value;
-      };
-      const start = date('start');
-      const end = date('end');
-      if (start && end && start > end) throw new OperationError('invalid_request', 'start must not be after end.');
-      const range = analyticsRange(start, end);
-      const maxRangeDays = Number(await runtimeConfig('analytics.maxRangeDays'));
-      if ((range.to.getTime() - range.from.getTime()) / 86_400_000 > maxRangeDays) throw new OperationError('invalid_request', `Date range exceeds the configured ${maxRangeDays}-day maximum.`);
       const allowedTargetIds = pageIdsFor(viewer);
+      const policy = await loadAdsReportPolicy();
       const accounts = await getAdsAccounts(viewer.workspaceId, allowedTargetIds, entitledPlatformIds(viewer.entitlements));
-      if (args.accountId !== undefined && (typeof args.accountId !== 'string' || !accounts.some(account => account.id === args.accountId))) throw new OperationError('unavailable', 'Ad account is unavailable in this workspace.');
-      const accountId = args.accountId as string | undefined;
-      const filters = { period: 'custom' as const, since: range.from, until: range.to, accountId: accountId ?? null };
+      const filters = parseAdsPerformanceFilters(args, accounts.map(account => account.id), new Date(), policy);
+      const accountId = filters.accountId;
+      const range = { from: filters.since, to: filters.until, endExclusive: true };
       const { insights } = await getAdsDataset(viewer.workspaceId, filters, allowedTargetIds, entitledPlatformIds(viewer.entitlements));
       const level = args.level;
       if (level !== undefined && !['campaign', 'adset', 'ad'].includes(String(level))) throw new OperationError('invalid_request', 'level must be campaign, adset, or ad.');
@@ -470,7 +458,7 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       }));
       const visibleAccounts = accounts.filter(account => !accountId || account.id === accountId);
       const accountPage = visibleAccounts.slice(accountOffset, accountOffset + cap).map(({ id, name, currency }) => ({ id, name, currency }));
-      return { range, accounts: accountPage, accountCount: visibleAccounts.length, nextAccountOffset: accountOffset + accountPage.length < visibleAccounts.length ? accountOffset + accountPage.length : null, level: level ?? null, resultCount: rows.length, performance, nextOffset: offset + performance.length < rows.length ? offset + performance.length : null };
+      return { range, reportOptions: policy, accounts: accountPage, accountCount: visibleAccounts.length, nextAccountOffset: accountOffset + accountPage.length < visibleAccounts.length ? accountOffset + accountPage.length : null, level: level ?? null, resultCount: rows.length, performance, nextOffset: offset + performance.length < rows.length ? offset + performance.length : null };
     }
     case 'get_live_ad_status': {
       const adAccountId = requiredString(args, 'adAccountId');

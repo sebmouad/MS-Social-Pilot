@@ -1370,3 +1370,58 @@ Private logs: `/private/tmp/socialpilot-ads56-red.log`,
 `/private/tmp/socialpilot-ads56-full-final.log`,
 `/private/tmp/socialpilot-ads56-typecheck-final.log` and
 `/private/tmp/socialpilot-ads56-build-final.log`.
+
+## Ads Root policy and shared report validation — batch 57, 2026-10-17
+
+Scope: synthetic isolated localhost preview, registry 52; production remains
+legacy. No DDL or real provider request was part of this batch.
+
+- Test-first UI cases failed on missing policy consumption, absent custom preset
+  choices and unbounded custom days. MCP regressions reproduced its former
+  29-day/local-time date interpretation and independent Analytics maximum.
+  Added preset discovery/mixed-input and empty-account regressions failed before
+  their fixes. Root route tests reproduced missing pre-persistence schema
+  validation. Independent review found the empty account scope issue; it was
+  fixed and reviewed again.
+- Final guarded PostgreSQL suite: **1,550 tests in 227 files passed**, 45.37s.
+  Focused policy/route checks, final TypeScript and whitespace checks passed.
+  The isolated production build passed without changing preview `.next`.
+  The Vite CJS deprecation notice remains tooling output, not a failing test.
+- Actual authenticated local HTTP/installation-MCP probe
+  `scripts/verify-ads-report-policy.ts` saved a 14-day policy through both Root
+  interfaces, checked registry 52/value-free audits and invalid-policy 400/no
+  write. Ordinary workspace owners could not read/write Root; their read-only
+  Ads key could not read Root HTTP or save Root MCP configuration.
+- The same probe verified default and explicit custom preset selection,
+  exact 14-day inclusive UTC endpoints/exclusive end metadata, over-limit and
+  stale-preset refusal, end-only default-duration behavior, safe report options,
+  and both actual server-rendered Ads pages using the configured choice/limit.
+  This is HTTP-rendered evidence, not interactive browser editing of Root JSON.
+- Exact prior setting row restoration and disposable user/session/key/membership
+  cleanup were independently checked before the probe returned exit 0. Invalid
+  origin, remote/non-preview database and production-mode guard executions
+  returned exit 1 before database access, using dummy credentials/loopback port 1.
+- Actual Chrome desktop Clay check rejected a 367-day custom request with the
+  configured 366-day maximum, preserved both endpoints, associated its end-field
+  error, focused the route alert and loaded no report. Root's Ads section exposed
+  the new JSON setting with default-source/Active labels.
+- At 390×844 with reduced motion and a temporary Nightfall DOM theme, the one
+  Menu & filters drawer retained the same correction and limit guidance. Its
+  native screenshot was visually inspected; no horizontal overflow appeared.
+  Correcting the end date and choosing Preview EUR Ads through the actual form
+  loaded the selected account, closed the drawer and removed the correction
+  state. Linked/Enabled/Synced counts each became one. An empty account query
+  on Campaigns then produced correction without a report or overflow.
+- Temporary DOM theme preview was not persisted. Only the audit-owned browser
+  tab was closed; the user's pre-existing preview tab was left untouched.
+  This is representative desktop/phone evidence, not a complete four-theme
+  contrast, keyboard and every-screen accessibility matrix.
+
+General copy configuration, report database row bounds/full pagination,
+comparisons/export/freshness, readable provider-owned status, broader Ads/core/
+legacy/MCP parity and release gates remain open. Personal Chrome was still
+absent from available browser inventory after the user's access-settings reply.
+The existing Facebook photo-cleanup ledger and Page lock remain held and were
+not modified; unreadable provider objects are not treated as absent.
+
+Final full-suite log: `/private/tmp/socialpilot-ads57-full-final.log`.

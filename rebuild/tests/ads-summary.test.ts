@@ -45,6 +45,8 @@ describe('ads summaries', () => {
     { period: 'custom', until: '2026-10-03' },
     { period: 'invalid-period' },
     { account: ['all', 'known'] },
+    { account: '' },
+    { account: [''] },
   ])('rejects malformed filters without silently selecting a default report: %j', params => {
     expect(() => parseAdsFilters(params, ['known']))
       .toThrowError(expect.objectContaining({ code: 'invalid_request' }));

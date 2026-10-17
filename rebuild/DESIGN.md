@@ -98,3 +98,9 @@ correction retains invalid text. Preset date fields are visibly disabled. These
 controls inherit all four themes and use 44px input targets.
 
 Root directory forms use `.ui-field` and `.ui-input` primitives: stacked labels, a 44px input target, semantic surface/line/text colors, invalid borders and disabled state. These primitives currently cover Root directory search, creation and confirmations; other route-specific fields remain to be consolidated. Root dialog actions use the shared `Button` variants. Avoid directory-specific CSS that overrides those variants or restores native unthemed controls.
+
+Ads presets and their labels now come from the validated Ads-owned Root policy.
+The shared sidebar form shows the configured custom-range ceiling beside date
+controls; error views retain the same choices and input. This adds no new visual
+component or third menu. Root edits the coupled policy in its existing themed
+JSON setting control within the Ads product module.

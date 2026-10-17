@@ -490,3 +490,22 @@ remains enforced independently in the data query. Shared form primitives replace
 the screen-specific input/button styling. ADS_REPORT_FILTERS.md records tested
 behavior and the remaining Root catalog, report bounds/pagination and broader
 Ads/MCP/parity gaps. No registry, DDL or production/provider state changed.
+
+## Ads-owned reporting policy — batch 57
+
+Registry 52 installs the strict atomic `ads.reportingFilters` definition from
+the Ads product module. Public types/defaults, validation, runtime loading and
+pure filter interpretation stay in that module; the central registry explicitly
+installs its schema without putting executable schemas in client manifests.
+Root's existing Ads controls own presets, labels, default, maximum calendar days
+and filter-string limits. Invalid Root HTTP values now return actionable 400
+feedback before persistence; saves keep the existing value-free audit boundary.
+
+Both Ads routes and MCP consume one validated policy and shared UTC parser.
+MCP can select/discover current presets, preserves documented partial-date
+requests and marks its returned end exclusive. Empty/stale selections fail
+without broader reads; mandatory workspace/resource/provider predicates remain
+independent of filters. No adapter logic, DDL or production deployment changed.
+ADS_REPORT_FILTERS.md and PREVIEW_QA.md record scope/evidence. General copy
+configuration, report row bounds/pagination, status/freshness/comparison/export,
+broader Ads/legacy/MCP parity and release gates remain open.

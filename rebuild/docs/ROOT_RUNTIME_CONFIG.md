@@ -20,7 +20,7 @@ matching the legacy sign-in policy's fail-closed behavior.
 
 The private `/root/config` screen is guarded by the installation owner flag (`User.isInstanceOwner`) and the validated session cookie. Its API returns 404 to signed-in non-owners. Secret values are write-only: the API reports only whether a value is set, never its plaintext or ciphertext. The screen groups settings in a sidebar and supports key/description search.
 
-`src/lib/config/registry.ts` is the single definition point. Each entry declares its typed schema, default, group, UI control, and consumption status. `CONFIG_SCHEMA_VERSION` identifies the registry representation in API responses and config-change audit details; bump it when keys or stored representations change. Zod validation runs at the save boundary. Ordinary values are stored in the existing `app_settings` table. Secret values use the installation `ENCRYPTION_KEY` with AES-256-GCM in the `v1:<iv>:<tag>:<ciphertext>` envelope. Root changes append a `config.changed` record to `root_activities`; audit detail contains only the key, change type, and schema version.
+`src/lib/config/registry.ts` is the installation registry. Installed product and platform modules may own their definitions and schemas, explicitly registered there. Each entry declares its typed schema, default, group, UI control, and consumption status. `CONFIG_SCHEMA_VERSION` identifies the registry representation in API responses and config-change audit details; bump it when keys or stored representations change. Zod validation runs at the save boundary. Ordinary values are stored in the existing `app_settings` table. Secret values use the installation `ENCRYPTION_KEY` with AES-256-GCM in the `v1:<iv>:<tag>:<ciphertext>` envelope. Root changes append a `config.changed` record to `root_activities`; audit detail contains only the key, change type, and schema version.
 
 The registry covers security, API endpoints and OAuth scopes, sync schedules and retry/concurrency/lease/heartbeat/polling/record limits, API request budgets, installation entitlement defaults, retention, logging, MCP, theme defaults, and operations contact details. Retry base and maximum delays control the exponential wait between transient provider failures. The worker poll interval controls how often its process checks schedules and Root settings. Meta settings include app ID, encrypted app secret, callback URL, API base URL/version, and separate Page/Instagram, ads read, and ads management scope arrays. MCP settings include permitted role defaults, request size, request budget, result-size limits, and active key count, maximum key lifetime, and per-key request budgets. Module and feature keys are generated from `src/lib/product.ts`; theme choices come from the rebuild theme catalog. Text lists use JSON arrays, and schedules use five-field cron strings. The registry validates values but does not launch a scheduler or configure provider-side quotas.
 
@@ -95,3 +95,17 @@ evidence remains held, and no automatic retry/resend is enabled. The setting is
 consumed and audited through the existing registry service. The manual cleanup
 setting remains a separate default-off policy; human feed-absence reports do not
 satisfy its no-feed-intent/definitive-provider-rejection gate.
+
+## Ads reporting policy — registry 52
+
+`ads.reportingFilters` is owned and validated by the Ads product module and
+installed explicitly in the central registry. Root Product modules → Ads manages
+one atomic preset/label/default/range/string-limit object. The sidebar and MCP
+consume the validated policy on every new report; they do not depend on the
+Analytics date setting. Safe public MCP report options expose the current choices.
+Root HTTP registry-schema errors now return field-specific 400 feedback before
+persistence; unexpected persistence errors stay generic. Root access, confirmed
+installation MCP writes and atomic value-free configuration audits remain in
+force. ADS_REPORT_FILTERS.md defines the object, integrity bounds and incomplete
+copy/reporting scope. Bootstrap dependencies and general copy coverage remain
+separate open requirements; this is not complete configuration coverage.

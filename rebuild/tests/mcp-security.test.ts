@@ -21,13 +21,13 @@ vi.mock('../src/server/data', () => ({ prisma: db }));
 const mutations = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), remove: vi.fn(), select: vi.fn() }));
 vi.mock('../src/server/post-mutations', () => ({ createLocalDraft: mutations.create, updateLocalDraft: mutations.update, deleteLocalDraft: mutations.remove }));
 vi.mock('../src/server/connection-mutations', () => ({ setConnectionSelections: mutations.select }));
-const rootConfig = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn() }));
+const rootConfig = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn(), adsPolicy: { presets: [{ id: '14d', days: 14, label: 'Last fortnight' }], defaultPreset: '14d', maxRangeDays: 14, maxFilterCharacters: 200 } }));
 const rootWorkspaces = vi.hoisted(() => ({ list: vi.fn(), change: vi.fn() }));
 const rootActivity = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock('../src/server/root/activity', () => ({ listRootActivity: rootActivity.list }));
 vi.mock('../src/server/root/directory', () => ({ listRootWorkspaces: rootWorkspaces.list }));
 vi.mock('../src/server/root/workspace-access', () => ({ setRootWorkspaceAccess: rootWorkspaces.change }));
-vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save, runtimeConfig: vi.fn(async (key: string) => key === 'mcp.maxResultItems' ? 100 : key === 'root.directoryPageSize' ? 25 : 366) }));
+vi.mock('../src/server/config/store', () => ({ readConfig: rootConfig.read, saveConfig: rootConfig.save, runtimeConfig: vi.fn(async (key: string) => key === 'ads.reportingFilters' ? rootConfig.adsPolicy : key === 'mcp.maxResultItems' ? 100 : key === 'root.directoryPageSize' ? 25 : 366) }));
 const analytics = vi.hoisted(() => ({ snapshot: vi.fn() }));
 vi.mock('../src/modules/analytics/server/read', () => ({ readAnalyticsSnapshot: analytics.snapshot }));
 const adsQueries = vi.hoisted(() => ({ accounts: vi.fn(), dataset: vi.fn() }));
@@ -105,6 +105,7 @@ const call = (name: string, args: Record<string, unknown> = {}) => handleMcpMess
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rootConfig.adsPolicy = { presets: [{ id: '14d', days: 14, label: 'Last fortnight' }], defaultPreset: '14d', maxRangeDays: 14, maxFilterCharacters: 200 };
   destinationReadiness.mockResolvedValue([]);
   workspaceGuard.mockImplementation((_id: string, run: () => Promise<unknown>) => run());
   db.$executeRaw.mockResolvedValue(1);
@@ -420,6 +421,38 @@ describe('MCP workspace boundaries', () => {
     expect((await uploaded.json()).result.structuredContent).toMatchObject({ id: 'image-b', reference: 'media:image-b', size: 8 });
     expect(media.upload).toHaveBeenCalledWith({ userId: 'user-a', workspaceId: 'workspace-a' }, expect.objectContaining({ name: 'new.png', type: 'image/png', size: 8 }));
     expect(db.$executeRaw).toHaveBeenCalledTimes(1);
+  });
+  it('uses the Root Ads policy default with exclusive UTC endpoints', async () => {
+    const response = await call('get_ads_performance');
+    expect((await response.json()).result.isError).not.toBe(true);
+    const filters = adsQueries.dataset.mock.calls[0]![1];
+    expect(filters.until.getTime() - filters.since.getTime()).toBe(14 * 86_400_000);
+    expect(filters.period).toBe('14d');
+    expect(filters.since.getUTCHours()).toBe(0);
+    expect(filters.until.getUTCHours()).toBe(0);
+  });
+  it('rejects an Ads range over its own policy before report reads', async () => {
+    const response = await call('get_ads_performance', { start: '2026-10-01', end: '2026-10-15' });
+    const result = (await response.json()).result;
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('14');
+    expect(adsQueries.dataset).not.toHaveBeenCalled();
+  });
+  it('advertises safe report choices and consumes a Root-defined preset', async () => {
+    const response = await call('get_ads_performance', { period: '14d' });
+    const result = (await response.json()).result;
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent.reportOptions).toMatchObject({ presets: rootConfig.adsPolicy.presets, defaultPreset: '14d', maxRangeDays: 14 });
+    expect(result.structuredContent.range.endExclusive).toBe(true);
+    expect(adsQueries.dataset.mock.calls[0]![1].period).toBe('14d');
+    const invalid = await call('get_ads_performance', { period: 'stale' });
+    expect((await invalid.json()).result.isError).toBe(true);
+    expect(adsQueries.dataset).toHaveBeenCalledTimes(1);
+  });
+  it('accepts the exact inclusive Ads range ceiling', async () => {
+    const response = await call('get_ads_performance', { start: '2026-10-01', end: '2026-10-14' });
+    expect((await response.json()).result.isError).not.toBe(true);
+    expect(adsQueries.dataset).toHaveBeenCalledWith('workspace-a', expect.objectContaining({ since: new Date('2026-10-01T00:00:00.000Z'), until: new Date('2026-10-15T00:00:00.000Z') }), undefined, ['facebook']);
   });
   it('reads paginated Ads performance through workspace and channel scoped services', async () => {
     const scoped = { ...viewer, role: 'viewer', permissions: resolvePermissions({ role: 'viewer', workspaceDisabledModules: [], memberDisabledModules: [], clientAccess: [], allPages: false, pageAccess: [{ targetId: 'page-allowed' }] }) };
