@@ -10,6 +10,7 @@ import { CsvImportForm, PostRowActions } from "./PostActions";
 import { runtimeConfig } from '@/server/config/store';
 import { RouteNotice } from '@/components/RouteNotice';
 import { PostStatus } from '../../../../generated/client';
+import { canAccessFeature } from '@/server/permissions';
 
 const NOTICE_TEXT: Record<string, string> = {
   created: "Post saved.",
@@ -30,6 +31,7 @@ const NOTICE_TEXT: Record<string, string> = {
   "publish-review": "Some destinations or first comments need attention. Review their individual delivery states before another action.",
   synced: "Remote status sync completed.",
   "failed-sync": "No new delivery status was confirmed. Check the post on its platform, then try syncing again.",
+  duplicated: "A new unscheduled draft was created.",
 };
 
 export default async function PostsPage({ searchParams }: { searchParams: Promise<{ notice?: string; recovery?: string; page?: string; status?: string; channel?: string; view?: string }> }) {
@@ -49,6 +51,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   const noticeText = notice ? NOTICE_TEXT[notice] ?? (notice.startsWith('imported-') ? `${notice.slice('imported-'.length)} posts imported as drafts.` : undefined) : undefined;
   const canManageDrafts = ["owner", "admin", "editor"].includes(viewer.membership.role);
   const canAuthorDrafts = canManageDrafts || viewer.membership.role === "contributor";
+  const canWritePosts = canAccessFeature(viewer.permissions, 'publishing/posts', 'write');
   const canPublish = targetChoices.some(target => target.canPublish);
   const pageLink = (page: number) => {
     const params = new URLSearchParams({ page: String(page) });
@@ -59,9 +62,14 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   };
   const actionFor = (post: (typeof rows)[number]) => {
     const canEdit = canManageDrafts || post.authorId === viewer.user.id;
+    const canDuplicate = canWritePosts
+      && (canManageDrafts || (viewer.membership.role === 'contributor' && post.authorId === viewer.user.id))
+      && canEdit
+      && !['processing', 'publishing', 'scheduled_remote'].includes(post.status)
+      && !post.targets.some(target => target.status === 'processing' || target.status === 'scheduled_remote');
     return <details className={previewStyles.managePost}>
       <summary>Manage post</summary>
-      {canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish} imageRules={imageRules}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>}
+      {canEdit ? <PostRowActions post={post} targets={targetChoices} canEdit={canEdit} canPublish={canPublish} canDuplicate={canDuplicate} imageRules={imageRules}/> : <span className={styles.noActions}>Post actions are limited to its author and workspace managers.</span>}
     </details>;
   };
   const previewFor = (post: (typeof rows)[number], variant: 'feed' | 'card') => <PostPreview

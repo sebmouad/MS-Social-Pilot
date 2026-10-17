@@ -11,6 +11,7 @@ import { FieldError, useFormValidation } from '@/components/FormValidation';
 import { validateFields } from '@/lib/ui/form-validation';
 import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
 import { PublicationRecovery } from './PublicationRecovery';
+import { DuplicatePost } from './DuplicatePost';
 
 type TargetChoice = { id: string; name: string; type: string; provider: string | null; canPublish: boolean };
 type ImageRules = { allowedMimeTypes: string[]; maxUploadBytes: number; maxAltCharacters: number };
@@ -154,16 +155,18 @@ export function CsvImportForm({ targets }: { targets: TargetChoice[] }) {
   </form>;
 }
 
-export function PostRowActions({ post, targets, canEdit, canPublish, imageRules }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules }) {
+export function PostRowActions({ post, targets, canEdit, canPublish, imageRules, canDuplicate = false }: { post: PostRow; targets: TargetChoice[]; canEdit: boolean; canPublish: boolean; imageRules: ImageRules; canDuplicate?: boolean }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editPending, setEditPending] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
-  const rowPending = editPending || deletePending;
+  const [duplicatePending, setDuplicatePending] = useState(false);
+  const rowPending = editPending || deletePending || duplicatePending;
   const selected = new Set(post.targets.map(item => item.target.id));
   const hasRemote = post.targets.some(item => Boolean(item.remotePostId));
   const isDraft = post.status === 'draft' && !post.publishedAt;
   const isQueued = post.status === 'scheduled';
   return <div className={styles.rowActions}>
+    {canDuplicate ? <DuplicatePost postId={post.id} disabled={rowPending} onPendingChange={setDuplicatePending} /> : null}
     {canEdit && isDraft && post.media.length <= 1 ? <details className={styles.editDetails}>
       <summary onClick={event => { if (rowPending) event.preventDefault(); }}>Edit post</summary>
       <PostEditForm post={post} targets={targets} selected={selected} imageRules={imageRules} disabled={rowPending} onPendingChange={setEditPending} />

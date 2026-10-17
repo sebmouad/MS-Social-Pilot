@@ -37,7 +37,7 @@ Product modules describe what a customer can do. They are independent of social 
 
 | Module | Responsibility |
 | --- | --- |
-| Publishing | Compose, drafts, CSV import with first comments, media, approvals, queue, calendar, publishing, status refresh, and local/remote deletion |
+| Publishing | Compose, drafts, duplication, CSV import with first comments, media, approvals, queue, calendar, publishing, status refresh, and local/remote deletion |
 | Inbox | Conversations and comments, replies, moderation, resolution, and synchronization |
 | Analytics | Selected-channel audience totals, metric series and breakdowns, provenance, coverage, freshness, and export |
 | Ads | Selected ad accounts, delivery results, object status, budgets, and supported creation/management workflows |
@@ -286,3 +286,18 @@ MCP/HTTP/browser checks, restoration failure testing and remaining boundaries.
 This does not implement complete plan/billing administration, provider-owned
 background collector plan gating, webhook lifecycle or full module/legacy/MCP
 coverage. No migration, live provider request or production change occurred.
+
+## Idempotent local post duplication — 2026-10-17
+
+Publishing now owns authorized draft copying in
+`modules/publishing/server/duplicate.ts`. Shared UI/HTTP/MCP entry points use
+one service and one workspace/source/destination guard. Current whole-post
+visibility and author rules are checked before durable receipt replay; copied
+content/media/first comments use the existing authoring and workspace image
+validation. A UUID-bound draft and content-free domain audit commit atomically.
+New destination rows are pending with no remote identity or delivery history.
+Retries return the matching copy without overwriting later edits; changed
+authority, collisions and deleted copies fail closed. No provider request, DDL
+or registry change is introduced. POST_DUPLICATION.md records the exact
+request/receipt contract and limitations. Bulk actions, complete Publishing
+parity, live provider verification and production cutover remain unfinished.

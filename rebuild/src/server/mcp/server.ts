@@ -17,6 +17,7 @@ import { cancelScheduledPost, createPost, deletePost, publishPost, reviewPost, s
 import { recordFirstCommentOutcome, sendFirstComment } from '@/modules/publishing/server/first-comment';
 import { finishPostDeletion, getPostDeletion, recordPostDeletionOutcome } from '@/modules/publishing/server/deletion';
 import { adoptLegacyPublication, finishPublicationProjection, getPublicationStatus, recordPublicationOutcome } from '@/modules/publishing/server/publication';
+import { duplicatePost } from '@/modules/publishing/server/duplicate';
 import { readPublishingPostList } from '@/modules/publishing/server/read';
 import { FIRST_COMMENT_LABELS, firstCommentState } from '@/modules/publishing/first-comment-state';
 import { runtimeConfig } from '../config/store';
@@ -86,6 +87,7 @@ const tools = [
   { name: 'record_publication_outcome', description: 'Record a human external platform check for an uncertain publication. The app does not verify the platform; a delayed request may still complete. Confirmation must exactly match RECORD PUBLICATION <operationId> PUBLISHED or ABSENT.', inputSchema: { type: 'object', required: ['postId', 'operationId', 'outcome', 'verifiedExternally', 'confirmation'], properties: { postId: { type: 'string' }, operationId: { type: 'string' }, outcome: { type: 'string', enum: ['PUBLISHED', 'ABSENT'] }, remotePostId: { type: 'string' }, remoteUrl: { type: 'string' }, verifiedExternally: { type: 'boolean', const: true }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'finish_publication_projection', description: 'Finish a saved publication receipt in local records only. Never sends another provider request. Confirmation must exactly match FINISH PUBLICATION <operationId>.', inputSchema: { type: 'object', required: ['postId', 'operationId', 'confirmation'], properties: { postId: { type: 'string' }, operationId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'adopt_legacy_publication', description: 'Adopt an older processing destination into recovery after checking its current platform state. This does not contact or verify the platform. Confirmation must exactly match ADOPT PUBLICATION <postTargetId>.', inputSchema: { type: 'object', required: ['postId', 'postTargetId', 'confirmation'], properties: { postId: { type: 'string' }, postTargetId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
+  { name: 'duplicate_post', description: 'Copy an authorized post into one new unscheduled local draft with its content, first comment, media and selected destinations. Remote publications, schedules and delivery history are not copied. Use a new lowercase UUID as requestId; reuse that same UUID after an unconfirmed response to retrieve the existing draft. Confirmation must exactly match DUPLICATE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'requestId', 'confirmation'], properties: { postId: { type: 'string' }, requestId: { type: 'string', format: 'uuid' }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'create_post', description: 'Create a local post draft with selected destinations and optional first comment, link, or media URL. Confirmation must exactly match CREATE POST.', inputSchema: { type: 'object', required: ['message', 'targetIds', 'confirmation'], properties: { message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'update_post', description: 'Edit an unpublished post and its selected destinations. Confirmation must exactly match UPDATE POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'message', 'targetIds', 'confirmation'], properties: { postId: { type: 'string' }, message: { type: 'string' }, firstComment: { type: 'string' }, link: { type: 'string' }, imageUrl: { type: 'string' }, videoUrl: { type: 'string' }, targetIds: { type: 'array', items: { type: 'string' } }, confirmation: { type: 'string' } }, additionalProperties: false } },
   { name: 'submit_post_for_approval', description: 'Submit a draft for review. Confirmation must exactly match SUBMIT POST <postId>.', inputSchema: { type: 'object', required: ['postId', 'confirmation'], properties: { postId: { type: 'string' }, confirmation: { type: 'string' } }, additionalProperties: false } },
@@ -139,6 +141,7 @@ const toolFeatures: Record<string, string> = {
   record_post_deletion_outcome: 'publishing/posts',
   get_publication_status: 'publishing/posts', record_publication_outcome: 'publishing/posts', finish_publication_projection: 'publishing/posts', adopt_legacy_publication: 'publishing/posts',
   create_post: 'publishing/posts',
+  duplicate_post: 'publishing/posts',
   update_post: 'publishing/posts',
   submit_post_for_approval: 'publishing/posts',
   review_post: 'publishing/approvals',
@@ -147,8 +150,8 @@ const toolFeatures: Record<string, string> = {
   set_connection_selection: 'settings/connections',
 };
 
-const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication']);
-const writeTools = new Set(['manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'delete_workspace_data', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
+const serviceGuardedPublishingTools = new Set(['create_draft', 'update_draft', 'delete_draft', 'duplicate_post', 'create_post', 'update_post', 'delete_post', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'get_post_deletion_status', 'finish_post_deletion', 'record_post_deletion_outcome', 'get_publication_status', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication']);
+const writeTools = new Set(['manage_root_user', 'create_draft', 'update_draft', 'delete_draft', 'publish_post', 'send_first_comment', 'record_first_comment_outcome', 'sync_post_status', 'delete_post', 'finish_post_deletion', 'record_post_deletion_outcome', 'record_publication_outcome', 'finish_publication_projection', 'adopt_legacy_publication', 'delete_workspace_data', 'duplicate_post', 'create_post', 'update_post', 'submit_post_for_approval', 'review_post', 'schedule_post', 'cancel_scheduled_post', 'set_connection_selection', 'reply_to_inbox', 'set_inbox_resolved', 'delete_inbox_comment', 'finish_inbox_deletion', 'moderate_inbox_comment', 'create_ad_campaign', 'create_ad_set', 'update_ad', 'set_root_config', 'delete_workspace_image', 'upload_workspace_image', 'set_root_workspace_access']);
 
 async function auditWrite(viewer: McpViewer, tool: string, detail: Record<string, unknown>) {
   await prisma.$executeRaw`INSERT INTO root_activities (id, "actorId", action, detail, "createdAt") VALUES (${`mcp_${randomBytes(12).toString('hex')}`}, ${viewer.userId}, 'mcp.write', ${JSON.stringify({ workspaceId: viewer.workspaceId, ...(viewer.apiKeyId ? { apiKeyId: viewer.apiKeyId } : {}), tool, ...detail })}::jsonb, NOW())`;
@@ -628,6 +631,12 @@ async function executeTool(viewer: McpViewer, name: string, args: Record<string,
       requireConfirmation(args, `ADOPT PUBLICATION ${postTargetId}`);
       const result = await adoptLegacyPublication(viewer, { postId, postTargetId, confirmation: `ADOPT PUBLICATION ${postTargetId}` });
       return auditedReceipt(viewer, name, { postId, postTargetId }, result);
+    }
+    case 'duplicate_post': {
+      const postId = requiredString(args, 'postId');
+      requireConfirmation(args, `DUPLICATE POST ${postId}`);
+      const result = await duplicatePost(viewer, args);
+      return auditedReceipt(viewer, name, { sourcePostId: result.sourcePostId, postId: result.postId, replayed: result.replayed }, result);
     }
     case 'create_post': {
       requireConfirmation(args, 'CREATE POST');

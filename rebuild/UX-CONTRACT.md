@@ -194,3 +194,16 @@ that retained records were deleted or that the workspace never connected.
 Root policy changes retain data and selected-resource state. Actual local
 representative Clay desktop/Nightfall phone checks and restoration evidence
 are recorded in PREVIEW_QA.md. All-state/four-theme coverage remains open.
+
+## Post duplication — 2026-10-17
+
+Manage post offers Duplicate as draft through the same actions in Table, Feed
+and Cards for eligible current writers. It names the copied content and makes
+clear that no remote content changes. Copying disables the row's other mutation
+controls. A matching confirmed receipt opens the Drafts table with a focused
+result notice; an unknown result retains the same retry ID, focuses a safe
+error and offers Check Drafts in another tab. Confirmed success ends that
+intent so the next deliberate duplication receives a new ID. Leaving/reloading
+the component loses its local retry ID; the recovery link remains necessary.
+Business/authorization authority is docs/POST_DUPLICATION.md and its service.
+No new dialog, theme rule or third navigation surface is introduced.

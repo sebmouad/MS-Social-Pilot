@@ -55,6 +55,8 @@ const destinationReadiness = vi.hoisted(() => vi.fn());
 vi.mock('../src/server/publishing/destinations', () => ({ publishingTargetChoices: destinationReadiness }));
 const publishingMutations = vi.hoisted(() => ({ publish: vi.fn(), sync: vi.fn(), remove: vi.fn(), create: vi.fn(), update: vi.fn(), submit: vi.fn(), review: vi.fn(), schedule: vi.fn(), cancel: vi.fn() }));
 vi.mock('../src/server/publishing/lifecycle', () => ({ publishPost: publishingMutations.publish, syncPostStatus: publishingMutations.sync, deletePost: publishingMutations.remove, createPost: publishingMutations.create, updatePost: publishingMutations.update, submitPostForApproval: publishingMutations.submit, reviewPost: publishingMutations.review, schedulePost: publishingMutations.schedule, cancelScheduledPost: publishingMutations.cancel }));
+const postDuplicate = vi.hoisted(() => vi.fn());
+vi.mock('../src/modules/publishing/server/duplicate', () => ({ duplicatePost: postDuplicate }));
 const firstCommentMutations = vi.hoisted(() => ({ send: vi.fn(), record: vi.fn() }));
 vi.mock('../src/modules/publishing/server/first-comment', () => ({ sendFirstComment: firstCommentMutations.send, recordFirstCommentOutcome: firstCommentMutations.record }));
 const postDeletions = vi.hoisted(() => ({ get: vi.fn(), finish: vi.fn(), record: vi.fn() }));
@@ -126,6 +128,7 @@ beforeEach(() => {
   publishingMutations.sync.mockResolvedValue({ synced: 1 });
   publishingMutations.remove.mockResolvedValue({ ok: true, postId: 'post-a', localConfirmed: true, remoteDeletionRequested: false, state: 'completed', operations: [] });
   publishingMutations.create.mockResolvedValue({ id: 'new-post' });
+  postDuplicate.mockResolvedValue({ sourcePostId: 'post-a', postId: '5a985a8a-8234-494c-a2f7-a269ea50d111', draftCreated: true, replayed: false });
   publishingMutations.update.mockResolvedValue(undefined);
   publishingMutations.submit.mockResolvedValue(undefined);
   publishingMutations.review.mockResolvedValue(undefined);
@@ -220,6 +223,7 @@ describe('MCP workspace boundaries', () => {
   });
   it.each([
     ['create_draft', { message: 'Hello', confirmation: 'CREATE DRAFT' }, () => mutations.create, { id: 'new-post', status: 'draft' }],
+    ['duplicate_post', { postId: 'post-a', requestId: '5a985a8a-8234-494c-a2f7-a269ea50d111', confirmation: 'DUPLICATE POST post-a' }, () => postDuplicate, { sourcePostId: 'post-a', postId: '5a985a8a-8234-494c-a2f7-a269ea50d111', draftCreated: true }],
     ['reply_to_inbox', { kind: 'message', id: 'conversation-a', text: 'Hello', confirmation: 'REPLY message conversation-a' }, () => inboxMutations.reply, { ok: true, itemId: 'conversation-a' }],
     ['publish_post', { postId: 'post-a', confirmation: 'PUBLISH POST post-a' }, () => publishingMutations.publish, { postId: 'post-a', published: 1 }],
     ['delete_post', { postId: 'post-a', deleteRemote: false, confirmation: 'DELETE POST post-a LOCAL' }, () => publishingMutations.remove, { ok: true, postId: 'post-a', localConfirmed: true, remoteDeletionRequested: false, state: 'completed', operations: [] }],
@@ -976,6 +980,28 @@ describe('MCP workspace boundaries', () => {
     const post = (await response.json()).result.structuredContent.items[0];
     expect(post.targets[0]).toMatchObject({ id: 'post-target-a', firstComment: { state: 'needs_review', label: 'First comment needs review', errorPresent: true } });
     expect(JSON.stringify(post)).not.toContain('private provider error');
+  });
+
+  it('offers duplication only to writers, binds its confirmation, and preserves service idempotency without a nested lock', async () => {
+    const args = { postId: 'post-a', requestId: '5a985a8a-8234-494c-a2f7-a269ea50d111', confirmation: 'DUPLICATE POST post-a' };
+    const listed = await handleMcpMessage(viewer, { jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    expect((await listed.json()).result.tools.map((tool: { name: string }) => tool.name)).toContain('duplicate_post');
+    const readOnly = { ...viewer, permissions: { ...viewer.permissions!, features: { ...viewer.permissions!.features, 'publishing/posts': { read: true, write: false } } } };
+    const hidden = await handleMcpMessage(readOnly, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
+    expect((await hidden.json()).result.tools.map((tool: { name: string }) => tool.name)).not.toContain('duplicate_post');
+    const forbidden = await handleMcpMessage(readOnly, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'duplicate_post', arguments: args } });
+    expect((await forbidden.json()).result.structuredContent.code).toBe('forbidden');
+    expect(postDuplicate).not.toHaveBeenCalled();
+    const bad = await call('duplicate_post', { ...args, confirmation: 'DUPLICATE POST other' });
+    expect((await bad.json()).result.structuredContent.code).toBe('invalid_request');
+    expect(postDuplicate).not.toHaveBeenCalled();
+    const result = (await (await call('duplicate_post', args)).json()).result;
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({ sourcePostId: args.postId, postId: args.requestId, draftCreated: true, replayed: false });
+    expect(postDuplicate).toHaveBeenCalledWith(viewer, args);
+    postDuplicate.mockResolvedValueOnce({ sourcePostId: args.postId, postId: args.requestId, draftCreated: true, replayed: true });
+    expect((await (await call('duplicate_post', args)).json()).result.structuredContent.replayed).toBe(true);
+    expect(workspaceGuard).not.toHaveBeenCalled();
   });
 
   it('confirms configured post creation and scheduling, with workspace actor passed to lifecycle', async () => {

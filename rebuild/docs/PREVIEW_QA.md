@@ -669,3 +669,57 @@ Private logs: `/private/tmp/socialpilot-platform-access-tests-final.log`,
 `/private/tmp/socialpilot-platform-access-build-final.log`,
 `/private/tmp/socialpilot-platform-access-live.log`, and
 `/private/tmp/socialpilot-platform-restore-failure.log`.
+
+## Idempotent post duplication — 2026-10-17
+
+Final suite passed **1,206 tests across 200 files**, including the three actual
+isolated PostgreSQL duplication tests. Rebuild typecheck and an isolated
+production build passed; the build preserved the running preview's `.next`.
+Registry stays at 46. No DDL, production change or provider request occurred.
+POST_DUPLICATION.md records ownership, protocol and remaining limitations.
+
+Source and interface regressions cover strict confirmation/UUID input,
+source/current channel scope, contributor ownership, bound receipt replay,
+missing copied drafts, safe HTTP/MCP errors, cache/secondary-audit failures,
+UI receipt checks, pending state and error focus. PostgreSQL proves atomic
+audit rollback, fresh pending destination state, content/first-comment copying,
+replay and preserving an unrelated draft on UUID collision. Review found a
+scoped-editor unconnected-draft visibility mismatch; source reads now use the
+same author predicate as normal Publishing reads. Parent review also caught a
+confirmed UI request ID surviving into another deliberate duplication; only
+confirmed success now resets the ID, with a same-mounted-control regression.
+
+`scripts/verify-post-duplication.ts` ran against actual localhost HTTP/MCP and
+the isolated preview database. HTTP returned 201 for one clean two-image draft
+with first comment; MCP reused its UUID and returned the same post. HTTP replay
+preserved later edits, a different source with the same UUID conflicted, strict
+input and foreign/hidden sources were denied, a read key could not write or
+discover the Duplicate tool, and current channel-grant revocation denied even
+an existing receipt replay. Original source content/history remained unchanged.
+The original MCP role policy first denied editor authentication; the probe
+temporarily permitted it only in the local preview, then verified exact
+restoration of row presence/value/encryption/timestamp independently of fixture
+cleanup. Disposable posts, grants, identities, sessions, keys and domain/MCP
+audit rows were removed and verified. No provider transport was invoked.
+
+Actual Chrome checked Clay desktop Feed at 1440×1000, Grove desktop Table at
+1440×900, and Nightfall phone Cards at 390×844. All used the same Manage post
+action, with no page overflow. Desktop success disabled sibling actions while
+pending, navigated to Drafts and focused the shared success notice. On the
+phone, Offline produced focused, safe recovery feedback and a real Check
+Drafts link opening another tab; reconnecting and retrying succeeded. Database
+inspection confirmed the two browser-created copies contained the source's
+workspace-owned image reference, four fresh pending destinations total and no
+remote post/comment IDs, schedule or publication timestamps. Those two copies
+and their test receipts were removed; the original seeded publication stayed
+published. Browser returned to Clay desktop Posts with no overflow.
+
+These are synthetic local checks, not real Facebook evidence or all-state
+accessibility proof. Reloading/leaving the component loses its in-memory request
+ID; inspect Drafts before starting another unknown-outcome attempt. Bulk actions,
+full media editing, broad Publishing/legacy/MCP parity, Facebook formats and
+operations, live provider tests, migration/rollback and production cutover remain
+open. Private logs: `/private/tmp/socialpilot-duplicate-full-tests-final.log`,
+`/private/tmp/socialpilot-duplicate-typecheck-final.log`,
+`/private/tmp/socialpilot-duplicate-build-final.log` and
+`/private/tmp/socialpilot-duplicate-live-final.log`.

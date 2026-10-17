@@ -19,7 +19,7 @@ const WRITERS = new Set(['owner', 'admin', 'editor', 'contributor']);
 const MANAGERS = new Set(['owner', 'admin', 'editor']);
 type PublishingLimits = { maxText: number; maxImportRows: number; maxImportBytes: number; maxTargets: number; maxMedia: number; maxAlt: number };
 
-async function limits(): Promise<PublishingLimits> {
+export async function limits(): Promise<PublishingLimits> {
   const [maxText, maxImportRows, maxImportBytes, maxTargets, maxMedia, maxAlt] = await Promise.all([
     runtimeConfig('publishing.maxMessageCharacters'), runtimeConfig('publishing.maxImportRows'),
     runtimeConfig('publishing.maxImportBytes'), runtimeConfig('publishing.maxTargetsPerPost'), runtimeConfig('publishing.maxRemoteMediaPerPost'), runtimeConfig('publishing.maxImageAltCharacters'),
@@ -49,7 +49,7 @@ export function validatePostAttachments(input: PostAttachments, maxMedia: number
   return { link, media: media.map(item => ({ kind: item.kind, url: storedImageId(item) ? item.url : secureUrl(item.url), ...(item.altText?.trim() ? { altText: item.altText.trim() } : {}) })) };
 }
 
-async function resolvePublishMedia(workspaceId: string, media: PublishMedia[]): Promise<PublishMedia[]> {
+export async function resolvePublishMedia(workspaceId: string, media: PublishMedia[]): Promise<PublishMedia[]> {
   return Promise.all(media.map(async item => {
     const id = storedImageId(item);
     if (!id) return item;
@@ -75,19 +75,19 @@ async function membership(actor: PublishingActor) {
   return result;
 }
 
-function validText(value: string, maxText: number) {
+export function validText(value: string, maxText: number) {
   const text = value.trim();
   if (!text || text.length > maxText) throw new OperationError('invalid_request', `Post text must be between 1 and ${maxText.toLocaleString()} characters.`);
   return text;
 }
 
-function validFirstComment(value: string, maxText: number) {
+export function validFirstComment(value: string, maxText: number) {
   const text = value.trim();
   if (text.length > maxText) throw new OperationError('invalid_request', `First comment must be ${maxText.toLocaleString()} characters or fewer.`);
   return text || null;
 }
 
-async function validateTargets(actor: PublishingActor, ids: string[], maxTargets: number, media: PublishMedia[] = [], firstCommentRequested = false) {
+export async function validateTargets(actor: PublishingActor, ids: string[], maxTargets: number, media: PublishMedia[] = [], firstCommentRequested = false) {
   if (ids.length > maxTargets || new Set(ids).size !== ids.length) throw new OperationError('invalid_request', `Choose up to ${maxTargets} distinct destinations.`);
   if (actor.allowedTargetIds && ids.some(id => !actor.allowedTargetIds!.includes(id))) throw new OperationError('forbidden', 'One or more destinations are outside your channel access.');
   if (!ids.length) return [];
